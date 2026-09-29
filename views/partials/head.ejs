@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title><%= locals.title ? title + ' · ' : '' %><%= appName %></title>
+  <meta name="description" content="<%= appName %> – Wetten unter Freunden mit Spielgeld. Stelle eigene Wetten auf, halte dagegen oder wette mit.">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
+  <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M9 21.5 13 10h2.2l2.3 7.4L19.8 10H22l-4 11.5h-2.1L13.6 14l-2.4 7.5z" fill="#fff"/></svg>
+        <span><%= appName %></span>
+      </a>
+
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="hauptnavigation" aria-label="Menü öffnen">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav id="hauptnavigation" class="nav">
+        <a href="/" class="<%= currentPath === '/' ? 'active' : '' %>">Wetten</a>
+        <% if (currentUser) { %>
+          <a href="/wetten/neu" class="<%= currentPath === '/wetten/neu' ? 'active' : '' %>">Neue Wette</a>
+        <% } %>
+        <a href="/rangliste" class="<%= currentPath === '/rangliste' ? 'active' : '' %>">Rangliste</a>
+        <a href="/so-gehts" class="<%= currentPath === '/so-gehts' ? 'active' : '' %>">So geht's</a>
+        <div class="nav-user">
+          <% if (currentUser) { %>
+            <a class="balance-chip" href="/konto" title="Mein Konto">
+              <span class="balance-name"><%= currentUser.username %></span>
+              <strong><%= euro(currentUser.balance) %></strong>
+            </a>
+            <form method="post" action="/abmelden">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost btn-sm" type="submit">Abmelden</button>
+            </form>
+          <% } else { %>
+            <a class="btn btn-ghost btn-sm" href="/anmelden">Anmelden</a>
+            <a class="btn btn-primary btn-sm" href="/registrieren">Registrieren</a>
+          <% } %>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main id="inhalt" class="container">
+    <% if (flash) { %>
+      <div class="flash flash-<%= flash.type %>" role="status">
+        <span><%= flash.message %></span>
+        <button type="button" class="flash-close" aria-label="Hinweis schließen">×</button>
+      </div>
+    <% } %>

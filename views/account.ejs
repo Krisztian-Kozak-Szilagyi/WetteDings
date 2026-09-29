@@ -1,0 +1,75 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <h1>Mein Konto</h1>
+  <span class="muted"><%= currentUser.username %> · <%= currentUser.email %></span>
+</div>
+
+<div class="stats stats-4">
+  <div class="stat card"><span class="stat-label">Verfügbar</span><span class="stat-value"><%= euro(currentUser.balance) %></span></div>
+  <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
+  <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
+  <div class="stat card"><span class="stat-label">Bilanz seit Start</span><span class="stat-value <%= net > 0 ? 'pos' : (net < 0 ? 'neg' : '') %>"><%= net > 0 ? '+' : '' %><%= euro(net) %></span>
+    <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span></div>
+</div>
+
+<div class="card">
+  <h2>Meine Wetten</h2>
+  <% if (!positions.length) { %>
+    <p class="muted">Du hast noch nichts gesetzt. <a href="/">Zu den Wetten</a></p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Wette</th><th>Seite</th><th class="num">Einsatz</th><th>Status</th><th class="num">Ergebnis</th></tr></thead>
+        <tbody>
+          <% positions.forEach((p) => { const st = statusInfo(p.bet); %>
+            <tr>
+              <td><a href="/wetten/<%= p.bet._id %>"><%= p.bet.title %></a></td>
+              <td><span class="pill pill-<%= p.side %>"><%= sideLabel(p.side) %></span></td>
+              <td class="num"><%= euro(p.amount) %></td>
+              <td><span class="badge badge-<%= st.key %>"><%= st.label %></span></td>
+              <td class="num">
+                <% if (p.payout === null) { %><span class="muted">offen</span>
+                <% } else { const diff = p.payout - p.amount; %>
+                  <span class="<%= diff > 0 ? 'pos' : (diff < 0 ? 'neg' : '') %>"><%= diff > 0 ? '+' : '' %><%= euro(diff) %></span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>Kontoauszug</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Datum</th><th>Buchung</th><th class="num">Betrag</th></tr></thead>
+      <tbody>
+        <% ledger.forEach((l) => { %>
+          <tr>
+            <td class="nowrap"><%= date(l.createdAt) %></td>
+            <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } %></td>
+            <td class="num <%= l.amount > 0 ? 'pos' : 'neg' %>"><%= l.amount > 0 ? '+' : '' %><%= euro(l.amount) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small">Es werden die letzten 50 Buchungen angezeigt.</p>
+</div>
+
+<div class="card narrow-card" id="passwort">
+  <h2>Passwort ändern</h2>
+  <form method="post" action="/konto/passwort" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field"><span>Aktuelles Passwort</span><input type="password" name="current" autocomplete="current-password" required></label>
+    <label class="field"><span>Neues Passwort</span><input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+    <label class="field"><span>Neues Passwort wiederholen</span><input type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+    <button class="btn btn-primary" type="submit">Passwort speichern</button>
+  </form>
+</div>
+
+<%- include('partials/foot') %>

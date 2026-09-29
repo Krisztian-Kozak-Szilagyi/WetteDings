@@ -1,0 +1,26 @@
+<%- include('partials/head') %>
+
+<div class="narrow narrow-sm">
+  <div class="card">
+    <h1>Anmelden</h1>
+
+    <% if (error) { %><div class="form-errors" role="alert"><%= error %></div><% } %>
+
+    <form method="post" action="/anmelden" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="weiter" value="<%= weiter %>">
+      <label class="field">
+        <span>Benutzername oder E-Mail</span>
+        <input type="text" name="login" value="<%= values.login || '' %>" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Passwort</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Anmelden</button>
+    </form>
+    <p class="center muted">Noch kein Konto? <a href="/registrieren">Jetzt registrieren</a></p>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

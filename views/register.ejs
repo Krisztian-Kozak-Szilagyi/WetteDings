@@ -1,0 +1,41 @@
+<%- include('partials/head') %>
+
+<div class="narrow narrow-sm">
+  <div class="card">
+    <h1>Registrieren</h1>
+    <p class="muted">Du bekommst sofort <strong><%= euro(startBalance) %></strong> Spielgeld zum Wetten.</p>
+
+    <% if (errors.length) { %>
+      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+    <% } %>
+
+    <form method="post" action="/registrieren" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Benutzername</span>
+        <input type="text" name="username" value="<%= values.username || '' %>" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\-]{3,20}" required>
+        <small class="muted">3–20 Zeichen, sichtbar für alle.</small>
+      </label>
+      <label class="field">
+        <span>E-Mail</span>
+        <input type="email" name="email" value="<%= values.email || '' %>" autocomplete="email" maxlength="254" required>
+      </label>
+      <label class="field">
+        <span>Passwort</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="200" required>
+      </label>
+      <label class="field">
+        <span>Passwort wiederholen</span>
+        <input type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="200" required>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="agree" required>
+        <span>Ich habe die <a href="/so-gehts" target="_blank">Regeln</a> gelesen und weiß, dass es nur um Spielgeld geht.</span>
+      </label>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Konto erstellen</button>
+    </form>
+    <p class="center muted">Schon dabei? <a href="/anmelden">Anmelden</a></p>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

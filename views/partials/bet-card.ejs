@@ -1,0 +1,25 @@
+<%
+  const st = statusInfo(bet);
+  const pJa = percent(bet.totalJa, bet.totalNein);
+%>
+<a class="bet-card" href="/wetten/<%= bet._id %>">
+  <div class="bet-card-top">
+    <span class="badge badge-<%= st.key %>"><%= st.label %></span>
+    <span class="muted small"><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %></span>
+  </div>
+  <h3 class="bet-card-title"><%= bet.title %></h3>
+  <p class="muted small">von <%= bet.creatorName %></p>
+  <div class="split" aria-hidden="true"><div class="split-ja" style="width: <%= pJa %>%"></div></div>
+  <div class="split-legend">
+    <span class="side-ja">Ja <%= pJa %> % · <%= quote(bet.totalJa, bet.totalNein) %></span>
+    <span class="side-nein">Nein <%= 100 - pJa %> % · <%= quote(bet.totalNein, bet.totalJa) %></span>
+  </div>
+  <div class="bet-card-foot">
+    <span>Topf <strong><%= euro(bet.totalJa + bet.totalNein) %></strong></span>
+    <span class="muted small">
+      <% if (st.key === 'offen') { %>endet <%= relTime(bet.deadline) %>
+      <% } else if (st.key === 'wartend') { %>Schluss <%= relTime(bet.deadline) %>
+      <% } else { %><%= relTime(bet.resolvedAt) %><% } %>
+    </span>
+  </div>
+</a>

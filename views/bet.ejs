@@ -1,0 +1,212 @@
+<%- include('partials/head') %>
+<%
+  const st = statusInfo(bet);
+  const total = bet.totalJa + bet.totalNein;
+  const pJa = percent(bet.totalJa, bet.totalNein);
+  const settled = bet.status !== 'offen';
+  const counterSide = bet.creatorSide === 'ja' ? 'nein' : 'ja';
+%>
+
+<p class="breadcrumb"><a href="/">← Alle Wetten</a></p>
+
+<div class="bet-layout">
+  <section class="bet-main">
+    <div class="card">
+      <div class="bet-card-top">
+        <span class="badge badge-<%= st.key %>"><%= st.label %></span>
+        <span class="muted small">von <strong><%= bet.creatorName %></strong> · <%= date(bet.createdAt) %></span>
+      </div>
+      <h1 class="bet-title"><%= bet.title %></h1>
+      <% if (bet.description) { %><p class="bet-desc"><%= bet.description %></p><% } %>
+
+      <p class="muted small">
+        <%= bet.creatorName %> setzt auf <strong class="side-<%= bet.creatorSide %>"><%= sideLabel(bet.creatorSide) %></strong>.
+        Wer mitgeht, setzt auch auf <%= sideLabel(bet.creatorSide) %> – wer dagegenhält, setzt auf <%= sideLabel(counterSide) %>.
+      </p>
+
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Topf</span><span class="stat-value"><%= euro(total) %></span></div>
+        <div class="stat"><span class="stat-label">Teilnehmende</span><span class="stat-value"><%= bet.participants %></span></div>
+        <div class="stat">
+          <span class="stat-label"><%= settled ? 'Einsatzschluss war' : (st.key === 'offen' ? 'Einsatzschluss' : 'Einsatzschluss war') %></span>
+          <span class="stat-value stat-value-sm"><%= date(bet.deadline) %></span>
+          <% if (st.key === 'offen') { %><span class="muted small"><%= relTime(bet.deadline) %></span><% } %>
+        </div>
+      </div>
+
+      <div class="pool">
+        <div class="pool-side pool-ja <%= bet.outcome === 'ja' ? 'winner' : '' %>">
+          <span class="pool-label">Ja</span>
+          <span class="pool-amount"><%= euro(bet.totalJa) %></span>
+          <span class="pool-quote">Quote <%= quote(bet.totalJa, bet.totalNein) %></span>
+        </div>
+        <div class="pool-side pool-nein <%= bet.outcome === 'nein' ? 'winner' : '' %>">
+          <span class="pool-label">Nein</span>
+          <span class="pool-amount"><%= euro(bet.totalNein) %></span>
+          <span class="pool-quote">Quote <%= quote(bet.totalNein, bet.totalJa) %></span>
+        </div>
+      </div>
+      <div class="split split-lg" aria-hidden="true"><div class="split-ja" style="width: <%= pJa %>%"></div></div>
+      <div class="split-legend"><span class="side-ja"><%= pJa %> %</span><span class="side-nein"><%= 100 - pJa %> %</span></div>
+
+      <% if (bet.status === 'entschieden') { %>
+        <div class="result result-<%= bet.outcome %>">
+          <strong>Ergebnis: <%= sideLabel(bet.outcome) %></strong>
+          <span>eingetragen von <%= bet.resolvedByName %> · <%= date(bet.resolvedAt) %></span>
+          <% if (bet.refunded) { %><span>Da eine Seite leer war, wurden alle Einsätze erstattet.</span><% } %>
+        </div>
+      <% } else if (bet.status === 'annulliert') { %>
+        <div class="result result-void">
+          <strong>Annulliert – alle Einsätze wurden erstattet.</strong>
+          <span>von <%= bet.resolvedByName %> · <%= date(bet.resolvedAt) %></span>
+          <% if (bet.voidReason) { %><span>Grund: <%= bet.voidReason %></span><% } %>
+        </div>
+      <% } else if (st.key === 'wartend') { %>
+        <div class="result result-wait">
+          <strong>Einsatzschluss erreicht.</strong>
+          <span>Wartet darauf, dass <%= bet.creatorName %> das Ergebnis einträgt.</span>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Teilnehmende</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Name</th><th>Seite</th><th class="num">Einsatz</th><th class="num"><%= settled ? 'Auszahlung' : 'Anteil' %></th></tr>
+          </thead>
+          <tbody>
+            <% positions.forEach((p) => { const sideTotal = p.side === 'ja' ? bet.totalJa : bet.totalNein; %>
+              <tr class="<%= myPosition && String(p._id) === String(myPosition._id) ? 'me' : '' %>">
+                <td><%= p.username %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
+                <td><span class="pill pill-<%= p.side %>"><%= sideLabel(p.side) %></span></td>
+                <td class="num"><%= euro(p.amount) %></td>
+                <td class="num">
+                  <% if (settled) { %>
+                    <span class="<%= p.payout > p.amount ? 'pos' : (p.payout === 0 ? 'neg' : '') %>"><%= euro(p.payout) %></span>
+                  <% } else { %>
+                    <%= sideTotal ? Math.round(p.amount / sideTotal * 100) : 0 %> %
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <aside class="bet-side">
+    <% if (myPosition) { %>
+      <div class="card card-accent">
+        <h2>Dein Einsatz</h2>
+        <p class="big"><%= euro(myPosition.amount) %> auf <span class="side-<%= myPosition.side %>"><%= sideLabel(myPosition.side) %></span></p>
+        <% if (settled) { %>
+          <p>Auszahlung: <strong class="<%= myPosition.payout > myPosition.amount ? 'pos' : (myPosition.payout === 0 ? 'neg' : '') %>"><%= euro(myPosition.payout) %></strong>
+            (<%= myPosition.payout - myPosition.amount >= 0 ? '+' : '' %><%= euro(myPosition.payout - myPosition.amount) %>)</p>
+        <% } else {
+             const mine = myPosition.side === 'ja' ? bet.totalJa : bet.totalNein;
+             const other = myPosition.side === 'ja' ? bet.totalNein : bet.totalJa;
+             const est = other > 0 ? Math.floor(myPosition.amount * (mine + other) / mine) : myPosition.amount; %>
+          <p class="muted">Bei „<%= sideLabel(myPosition.side) %>“ bekämst du nach aktuellem Stand <strong><%= euro(est) %></strong>.
+            <% if (!other) { %>Noch hält niemand dagegen – ohne Gegenseite gibt es nur den Einsatz zurück.<% } %></p>
+        <% } %>
+      </div>
+    <% } %>
+
+    <% if (perms.stake) { %>
+      <div class="card">
+        <h2><%= myPosition ? 'Einsatz erhöhen' : 'Jetzt setzen' %></h2>
+        <form method="post" action="/wetten/<%= bet._id %>/setzen" class="stake-form"
+              data-ja="<%= bet.totalJa %>" data-nein="<%= bet.totalNein %>"
+              data-my-side="<%= myPosition ? myPosition.side : '' %>" data-my-amount="<%= myPosition ? myPosition.amount : 0 %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <fieldset class="side-picker">
+            <legend class="sr-only">Seite wählen</legend>
+            <% ['ja', 'nein'].forEach((side) => {
+                 const locked = myPosition && myPosition.side !== side;
+                 const checked = myPosition ? myPosition.side === side : side === counterSide; %>
+              <label class="side-option side-option-<%= side %> <%= locked ? 'locked' : '' %>">
+                <input type="radio" name="side" value="<%= side %>" <%= checked ? 'checked' : '' %> <%= locked ? 'disabled' : '' %> required>
+                <span class="side-option-title"><%= sideLabel(side) %></span>
+                <span class="side-option-sub"><%= side === bet.creatorSide ? 'Mitgehen' : 'Dagegenhalten' %></span>
+                <span class="side-option-quote"><%= quote(side === 'ja' ? bet.totalJa : bet.totalNein, side === 'ja' ? bet.totalNein : bet.totalJa) %></span>
+              </label>
+            <% }) %>
+          </fieldset>
+
+          <label class="field">
+            <span>Einsatz in €</span>
+            <input type="number" name="amount" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= Math.min(10, currentUser.balance / 100) %>" required>
+          </label>
+          <div class="quick-amounts">
+            <button type="button" class="chip" data-add="5">+5</button>
+            <button type="button" class="chip" data-add="10">+10</button>
+            <button type="button" class="chip" data-add="50">+50</button>
+            <button type="button" class="chip" data-add="100">+100</button>
+            <button type="button" class="chip" data-set="<%= currentUser.balance / 100 %>">Alles</button>
+          </div>
+          <p class="estimate" aria-live="polite"></p>
+          <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < minStake ? 'disabled' : '' %>>Einsatz platzieren</button>
+          <p class="muted small">Verfügbar: <%= euro(currentUser.balance) %>. Die Quote kann sich bis zum Einsatzschluss noch ändern.</p>
+        </form>
+      </div>
+    <% } else if (!currentUser && accepting) { %>
+      <div class="card">
+        <h2>Mitwetten?</h2>
+        <p>Melde dich an, um auf diese Wette zu setzen. Neue Mitglieder bekommen <%= euro(startBalance) %> Spielgeld.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/registrieren">Registrieren</a>
+          <a class="btn btn-ghost" href="/anmelden?weiter=<%= encodeURIComponent('/wetten/' + bet._id) %>">Anmelden</a>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (perms.resolve || perms.void || perms.close) { %>
+      <div class="card card-manage">
+        <h2>Wette verwalten</h2>
+        <% if (perms.close) { %>
+          <form method="post" action="/wetten/<%= bet._id %>/schliessen" data-confirm="Einsatzschluss jetzt setzen? Danach kann niemand mehr setzen.">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-ghost btn-block" type="submit">Einsatzschluss jetzt</button>
+          </form>
+          <% if (!currentUser.isAdmin) { %><p class="muted small">Das Ergebnis kannst du nach dem Einsatzschluss eintragen.</p><% } %>
+        <% } %>
+
+        <% if (perms.resolve) { %>
+          <p><strong>Ergebnis eintragen</strong></p>
+          <div class="resolve-buttons">
+            <form method="post" action="/wetten/<%= bet._id %>/entscheiden" data-confirm="Ergebnis „Ja“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="outcome" value="ja">
+              <button class="btn btn-ja btn-block" type="submit">Ja ist eingetreten</button>
+            </form>
+            <form method="post" action="/wetten/<%= bet._id %>/entscheiden" data-confirm="Ergebnis „Nein“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="outcome" value="nein">
+              <button class="btn btn-nein btn-block" type="submit">Nein ist eingetreten</button>
+            </form>
+          </div>
+        <% } %>
+
+        <% if (perms.void) { %>
+          <details class="void-box">
+            <summary>Wette annullieren</summary>
+            <form method="post" action="/wetten/<%= bet._id %>/annullieren" data-confirm="Wette wirklich annullieren? Alle bekommen ihren Einsatz zurück.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <label class="field">
+                <span>Grund (optional)</span>
+                <input type="text" name="reason" maxlength="300" placeholder="z. B. Spiel wurde abgesagt">
+              </label>
+              <button class="btn btn-danger btn-block" type="submit">Annullieren &amp; erstatten</button>
+            </form>
+          </details>
+        <% } %>
+        <% if (currentUser.isAdmin && !isOwner) { %><p class="muted small">Du siehst diese Optionen als Admin.</p><% } %>
+      </div>
+    <% } %>
+  </aside>
+</div>
+
+<%- include('partials/foot') %>

@@ -1,0 +1,54 @@
+<%- include('partials/head') %>
+
+<% if (!currentUser) { %>
+<section class="hero">
+  <div>
+    <h1>Wetten unter Freunden – mit Spielgeld</h1>
+    <p class="lead">Registriere dich und erhalte <strong><%= euro(startBalance) %></strong> Spielgeld. Stell eigene Wetten auf, wette mit oder halte dagegen. Der Topf wird fair unter den Gewinnern aufgeteilt.</p>
+    <div class="actions">
+      <a class="btn btn-primary btn-lg" href="/registrieren">Kostenlos mitmachen</a>
+      <a class="btn btn-ghost btn-lg" href="/so-gehts">So funktioniert's</a>
+    </div>
+    <p class="muted small">Kein echtes Geld. Keine Ein- oder Auszahlungen.</p>
+  </div>
+</section>
+<% } %>
+
+<div class="page-head">
+  <h1>Wetten</h1>
+  <% if (currentUser) { %><a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a><% } %>
+</div>
+
+<nav class="tabs" aria-label="Filter">
+  <% Object.entries(tabs).forEach(([key, label]) => { if (key === 'meine' && !currentUser) return; %>
+    <a href="/?tab=<%= key %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="tab <%= tab === key ? 'active' : '' %>"><%= label %></a>
+  <% }) %>
+</nav>
+
+<form class="search" method="get" action="/" role="search">
+  <input type="hidden" name="tab" value="<%= tab %>">
+  <input type="search" name="q" value="<%= q %>" placeholder="Wetten durchsuchen …" aria-label="Wetten durchsuchen" maxlength="100">
+  <button class="btn btn-ghost" type="submit">Suchen</button>
+</form>
+
+<% if (!bets.length) { %>
+  <div class="empty">
+    <p><strong>Hier ist noch nichts.</strong></p>
+    <p class="muted"><%= q ? 'Keine Wetten passen zu deiner Suche.' : 'In dieser Kategorie gibt es gerade keine Wetten.' %></p>
+    <% if (currentUser) { %><a class="btn btn-primary" href="/wetten/neu">Erste Wette aufstellen</a><% } %>
+  </div>
+<% } else { %>
+  <div class="bet-grid">
+    <% bets.forEach((bet) => { %><%- include('partials/bet-card', { bet }) %><% }) %>
+  </div>
+  <% if (page > 1 || hasMore) { %>
+    <nav class="pager" aria-label="Seiten">
+      <% const base = '/?tab=' + tab + (q ? '&q=' + encodeURIComponent(q) : ''); %>
+      <% if (page > 1) { %><a class="btn btn-ghost" href="<%= base %>&seite=<%= page - 1 %>">← Zurück</a><% } else { %><span></span><% } %>
+      <span class="muted">Seite <%= page %></span>
+      <% if (hasMore) { %><a class="btn btn-ghost" href="<%= base %>&seite=<%= page + 1 %>">Weiter →</a><% } else { %><span></span><% } %>
+    </nav>
+  <% } %>
+<% } %>
+
+<%- include('partials/foot') %>

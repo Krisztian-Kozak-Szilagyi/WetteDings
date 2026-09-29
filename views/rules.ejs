@@ -1,0 +1,60 @@
+<%- include('partials/head') %>
+
+<div class="narrow prose">
+  <h1>So funktioniert <%= appName %></h1>
+
+  <div class="card">
+    <h2>1. Spielgeld bekommen</h2>
+    <p>Jedes neue Mitglied erhält <strong><%= euro(startBalance) %></strong> Spielgeld. Das ist <strong>kein echtes Geld</strong> – es kann weder eingezahlt noch ausgezahlt werden. Es geht nur um den Spaß und die Rangliste.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Wette aufstellen</h2>
+    <p>Jeder kann eine Wette aufstellen: eine Aussage, die später klar mit <span class="side-ja"><strong>Ja</strong></span> oder <span class="side-nein"><strong>Nein</strong></span> entschieden werden kann – z. B. „Es schneit an Weihnachten in Berlin“. Du legst einen Einsatzschluss fest und setzt selbst als Erstes auf eine Seite.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Mitgehen oder dagegenhalten</h2>
+    <p>Alle anderen können bis zum Einsatzschluss setzen – entweder auf dieselbe Seite wie der Ersteller (<em>mitgehen</em>) oder auf die Gegenseite (<em>dagegenhalten</em>). Pro Wette setzt du immer nur auf eine Seite, kannst deinen Einsatz dort aber beliebig erhöhen. Mindesteinsatz: <%= euro(minStake) %>.</p>
+  </div>
+
+  <div class="card">
+    <h2>4. Der Topf wird geteilt (Totalisator)</h2>
+    <p>Alle Einsätze kommen in einen gemeinsamen Topf. Wenn die Wette entschieden ist, bekommt jede Person auf der Gewinnerseite</p>
+    <p class="formula">ihren Einsatz zurück <strong>+</strong> einen Anteil am Einsatz der Verliererseite – im Verhältnis zu ihrem eigenen Einsatz.</p>
+    <p>Es gibt keine Gebühren: Alles, was die Verlierer setzen, geht vollständig an die Gewinner.</p>
+
+    <h3>Beispiel</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Person</th><th>Seite</th><th class="num">Einsatz</th><th class="num">Auszahlung bei „Ja“</th></tr></thead>
+        <tbody>
+          <tr><td>Anna</td><td><span class="pill pill-ja">Ja</span></td><td class="num">100,00 €</td><td class="num pos">200,00 €</td></tr>
+          <tr><td>Ben</td><td><span class="pill pill-ja">Ja</span></td><td class="num">50,00 €</td><td class="num pos">100,00 €</td></tr>
+          <tr><td>Clara</td><td><span class="pill pill-nein">Nein</span></td><td class="num">150,00 €</td><td class="num neg">0,00 €</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Topf: 300 €. „Ja“ gewinnt. Anna hat ⅔ der Ja-Einsätze gebracht und bekommt deshalb ⅔ von Claras 150 € (= 100 €) plus ihren Einsatz zurück. Ben bekommt ⅓ (= 50 €) plus seinen Einsatz.</p>
+
+    <h3>Die Quote</h3>
+    <p>Die angezeigte Quote ist <em>Topf ÷ Einsätze auf dieser Seite</em>. Eine Quote von 2,50× bedeutet: Für 10 € Einsatz bekämst du nach aktuellem Stand 25 € ausgezahlt. Da bis zum Einsatzschluss weiter gesetzt werden kann, ändert sich die Quote noch.</p>
+  </div>
+
+  <div class="card">
+    <h2>5. Ergebnis &amp; Sonderfälle</h2>
+    <ul>
+      <li>Nach dem Einsatzschluss trägt der <strong>Ersteller</strong> das Ergebnis ein. Admins können bei Streitfällen eingreifen.</li>
+      <li>Hat niemand dagegengehalten (oder niemand auf die Gewinnerseite gesetzt), bekommen alle ihren Einsatz zurück.</li>
+      <li>Eine Wette kann <strong>annulliert</strong> werden (z. B. wenn das Ereignis ausfällt). Dann gibt es alle Einsätze zurück.</li>
+      <li>Wird das Ergebnis nicht innerhalb von <%= locals.autoVoidDays || 14 %> Tagen nach Einsatzschluss eingetragen, wird die Wette automatisch annulliert.</li>
+      <li>Rundungscents werden fair verteilt – die Summe aller Auszahlungen entspricht immer genau dem Topf.</li>
+    </ul>
+  </div>
+
+  <% if (!currentUser) { %>
+    <p class="center"><a class="btn btn-primary btn-lg" href="/registrieren">Jetzt mitmachen</a></p>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>

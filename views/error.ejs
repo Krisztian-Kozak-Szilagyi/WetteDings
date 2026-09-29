@@ -1,0 +1,12 @@
+<%- include('partials/head') %>
+
+<div class="narrow narrow-sm center">
+  <div class="card">
+    <p class="error-code"><%= status %></p>
+    <h1><%= status === 404 ? 'Nicht gefunden' : 'Hoppla!' %></h1>
+    <p><%= message %></p>
+    <a class="btn btn-primary" href="/">Zur Startseite</a>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

@@ -1,0 +1,59 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <p class="breadcrumb"><a href="/">← Alle Wetten</a></p>
+  <div class="card">
+    <h1>Neue Wette aufstellen</h1>
+    <p class="muted">Formuliere eine Aussage, die eindeutig mit <strong>Ja</strong> oder <strong>Nein</strong> entschieden werden kann. Du setzt selbst als Erstes – andere können mitgehen oder dagegenhalten.</p>
+
+    <% if (errors.length) { %>
+      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+    <% } %>
+
+    <form method="post" action="/wetten" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <label class="field">
+        <span>Aussage / Frage</span>
+        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Bayern gewinnt am Samstag gegen Dortmund">
+      </label>
+
+      <label class="field">
+        <span>Details &amp; Regeln <em class="muted">(optional)</em></span>
+        <textarea name="description" rows="4" maxlength="2000" placeholder="Wie wird entschieden? Was gilt bei Verlängerung, Absage usw.?"><%= values.description %></textarea>
+      </label>
+
+      <label class="field">
+        <span>Einsatzschluss <em class="muted">(deutsche Zeit)</em></span>
+        <input type="datetime-local" name="deadline" value="<%= values.deadline %>" min="<%= minDeadline %>" required>
+        <small class="muted">Bis dahin kann gesetzt werden. Danach trägst du das Ergebnis ein.</small>
+      </label>
+
+      <fieldset class="field">
+        <legend>Deine Seite</legend>
+        <div class="side-picker">
+          <label class="side-option side-option-ja">
+            <input type="radio" name="side" value="ja" <%= values.side !== 'nein' ? 'checked' : '' %>>
+            <span class="side-option-title">Ja</span>
+            <span class="side-option-sub">Die Aussage trifft zu</span>
+          </label>
+          <label class="side-option side-option-nein">
+            <input type="radio" name="side" value="nein" <%= values.side === 'nein' ? 'checked' : '' %>>
+            <span class="side-option-title">Nein</span>
+            <span class="side-option-sub">Die Aussage trifft nicht zu</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <label class="field">
+        <span>Dein Einsatz in €</span>
+        <input type="number" name="amount" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= values.amount %>" required>
+        <small class="muted">Verfügbar: <%= euro(currentUser.balance) %></small>
+      </label>
+
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Wette veröffentlichen</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/foot') %>
