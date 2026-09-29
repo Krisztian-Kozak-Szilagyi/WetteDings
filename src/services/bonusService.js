@@ -5,6 +5,7 @@ const Ledger = require('../models/Ledger');
 const { toZonedLocalInput } = require('../lib/time');
 const { inTransaction } = require('./betService');
 const { coinValueCents } = require('../coin/tradeService');
+const { cardValueCents } = require('../tcg/tcgService');
 
 /**
  * Aktueller "Bonustag" als "YYYY-MM-DD". Ein Bonustag beginnt um config.bonusTime (deutsche Zeit),
@@ -39,9 +40,9 @@ async function maybeGrantDailyBonus(user) {
   const day = today();
   if (user.lastBonusDay === day) return null;
 
-  // Gesamtvermögen: verfügbar + offene Einsätze + Wert der Samantha Coins
-  const [stakes, coins] = await Promise.all([openStakes(user._id), coinValueCents(user._id)]);
-  const total = user.balance + stakes + coins;
+  // Gesamtvermögen: verfügbar + offene Einsätze + Wert der Samantha Coins + Verkaufswert der TCG-Karten
+  const [stakes, coins, cards] = await Promise.all([openStakes(user._id), coinValueCents(user._id), cardValueCents(user._id)]);
+  const total = user.balance + stakes + coins + cards;
   const amount = bonusFor(total);
 
   if (!amount) {

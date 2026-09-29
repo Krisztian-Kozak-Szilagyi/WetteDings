@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0.0 0.0 400.0 400.0" width="256" height="256" role="img" aria-label="Samantha Coin (SAM)"><title>Samantha Coin (SAM)</title>
+<defs><linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff4cf"/><stop offset=".45" stop-color="#e9c766"/><stop offset="1" stop-color="#9c7a2a"/></linearGradient>
+<radialGradient id="face" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#5a2f7a"/><stop offset="1" stop-color="#1e1030"/></radialGradient>
+<linearGradient id="hrt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8fcf"/><stop offset="1" stop-color="#e0288a"/></linearGradient></defs>
+<circle cx="200" cy="200" r="194" fill="url(#rim)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="200" r="150" fill="url(#face)" stroke="#1a161c" stroke-width="12"/>
+<path d="M200,318 C132,272 78,226 78,166 C78,122 110,92 148,92 C172,92 190,106 200,124 C210,106 228,92 252,92 C290,92 322,122 322,166 C322,226 268,272 200,318 Z" fill="url(#hrt)" stroke="#1a161c" stroke-width="12" stroke-linejoin="round"/>
+<path d="M112,158 C114,134 130,120 150,118" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity=".75"/>
+<path d="M159.725 237.8V222.8H179.825V231.65L184.77499999999998 236.6H215.825L220.925 231.5V214.1L215.975 209.15H176.225L160.025 192.95V165.2L176.225 149.0H223.625L239.825 165.2V180.35000000000002H219.725V171.35000000000002L214.77499999999998 166.4H185.075L180.125 171.35000000000002V186.8L185.075 191.75H224.825L241.02499999999998 207.95V237.5L224.52499999999998 254.0H175.92499999999998Z" fill="#ffffff" stroke="#1a161c" stroke-width="12" stroke-linejoin="round" paint-order="stroke"/>
+</svg>

@@ -1,4 +1,5 @@
   </main>
+  <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld, keine Ein- oder Auszahlungen, keine Gewinne in Euro.</p>

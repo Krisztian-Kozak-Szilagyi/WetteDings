@@ -76,6 +76,8 @@ const ledgerLabels = {
   coin_verkauf: 'Samantha Coin verkauft',
   lotto_los: 'Lotterielos gekauft',
   lotto_gewinn: 'Lotteriegewinn',
+  tcg_pack: 'Booster Pack geöffnet',
+  tcg_verkauf: 'TCG-Karte verkauft',
 };
 
 /** Coin-Kurs mit passender Genauigkeit, z. B. 12,34 € oder 0,004512 € */

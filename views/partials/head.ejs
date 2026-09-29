@@ -6,7 +6,7 @@
   <title><%= locals.title ? title + ' · ' : '' %><%= appName %></title>
   <meta name="description" content="<%= appName %> – Wetten unter Freunden mit Spielgeld. Stelle eigene Wetten mit Ja/Nein oder eigenen Optionen auf und wette mit.">
   <meta name="theme-color" content="#0f766e">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
 </head>
@@ -16,7 +16,6 @@
     <div class="topbar-inner">
       <a class="brand" href="/">
         <%- include('logo') %>
-        <span><%= appName %></span>
       </a>
 
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="hauptnavigation" aria-label="Menü öffnen">
@@ -29,6 +28,7 @@
           <a href="/rangliste" class="<%= currentPath === '/rangliste' ? 'active' : '' %>">Rangliste</a>
           <a href="/coin-exchange" class="<%= currentPath === '/coin-exchange' ? 'active' : '' %>">Coin Exchange</a>
           <a href="/lotterie" class="<%= currentPath === '/lotterie' ? 'active' : '' %>">Lotterie</a>
+          <a href="/tcg" class="<%= currentPath === '/tcg' ? 'active' : '' %>">TCG</a>
         <% } %>
         <a href="/regeln" class="<%= currentPath === '/regeln' ? 'active' : '' %>">Regeln</a>
         <% if (currentUser && currentUser.isAdmin) { %>

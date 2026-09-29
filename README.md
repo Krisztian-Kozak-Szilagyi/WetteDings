@@ -16,6 +16,13 @@ Német nyelvű, reszponzív fogadási oldal. Mindenki 1000 € játékpénzt kap
   - **Árfolyammodell** (`src/coin/model.js`): sztochasztikus volatilitás (nyugodt és vad időszakok), vastag farkú (Student-t) hozamok, játékosan élénk mozgás: kis ugrások kb. 40 percenként, nagyobbak (5–15%, néha 30%+) naponta 1–2 alkalommal, pump (+40…+150%) évente kb. 6–7×, crash (−80…−99%) évente kb. 1×; nagy mozgás után megugrik a volatilitás. A várható hozam enyhén pozitív (~+0,05%/nap), így a coin se nem biztos nyerő, se nem kijátszható.
   - **Admin-vezérlés:** az Admin panelen („Samantha Coin steuern”) megadható egy százalékos változás (−99…+1000%), azonnal vagy 1–60 perc alatt fokozatosan (a normál ingadozással keveredve). Nem jelenik meg a piaci eseményekben, az API-ban vagy a naplóban; fut közben megszakítható, és újraindítás után is folytatódik.
   - **Motor** (`src/coin/engine.js`): a szerverben fut, 5 másodpercenként új ár; percenkénti (3 napig) és óránkénti (örökre) gyertyák a MongoDB-ben. Első induláskor 14 nap előtörténetet szimulál; ha a szerver állt, induláskor utólag lejátssza a kimaradt időt (max. 30 nap), így a grafikon folytonos.
+- **TCG (Trading Cards):** booster pack 80 € (`TCG_PACK_EUR`), 3 kártyával. Animált nyitás (tasak feltépése, kártyák felfordítása, a legritkább kártya jön utoljára), gyűjtemény szűrővel, a még meg nem szerzett kártyák helye „?”-lel látszik, kattintásra nagyítás 3D-s döntéssel és holo/gold/glitch effekttel, eladás egyesével vagy az összes duplikátum egyszerre.
+  - **Esélyek kártyánként** (`src/tcg/catalog.js`): Crumpled 58,12% · BFWler 28% · Gold 11% · Holo 2,5% · Bockhaber 0,3% · Glitch 0,08%. Előbb a ritkaságot sorsolja (kriptográfiai véletlen), utána azon belül egyenletes eséllyel egy kártyát.
+  - **Eladási ár:** 5 € / 20 € / 40 € / 150 € / 1 000 € / 3 000 €. Egy pack várható értéke kb. 66,17 € (a 80 €-s ár ~83%-a), tehát hosszú távon nem nyereséges; 2× Crumpled + 1× BFWler = 30 €. Ha az árakat vagy esélyeket módosítod, a teszt jelez, ha a pack nyereségessé válna.
+  - **Admin panel → „TCG: Chancen & Preise”:** a pack ára, a 6 ritkaság esélye (%-ban, 2 tizedesjegyig, összesen pontosan 100%) és eladási ára szerkeszthető. Azonnal érvényes, és a MongoDB-ben (`tcgsettings`) tárolódik, így újraindítás után is megmarad. A panel élőben mutatja az esélyek összegét és a pack várható értékét, és figyelmeztet, ha nyereséges lenne. A kódban lévő értékek (`catalog.js`, `TCG_PACK_EUR`) csak alapértelmezések, amíg nincs mentett beállítás.
+  - **Admin panel → Samantha Coin steuern:** rejtett felugró ablak; a „Registrierungscodes” szövegében az „automatisch” szóra kattintva nyílik meg. A kártyák eladási értéke beszámít a teljes vagyonba (ranglista, napi bónusz).
+- **Support-bot („Warren Buffett”):** lebegő chat gomb jobb alul (csak bejelentkezve). Csak az oldallal kapcsolatos kérdésekre válaszol, és csak azt tudja, amit egy felhasználó is lát (`src/support/knowledge.js`; az aktuális árakat/esélyeket élőben olvassa be). Groq API (`GROQ_API_KEY` a `.env`-ben; üresen a chat rejtve van), modellek sorban: `openai/gpt-oss-120b` → `openai/gpt-oss-20b` → `qwen/qwen3.8-27b` (mindegyiknek külön ingyenes percenkénti token-limitje van). Felhasználónként max. 30 üzenet/óra; az előzmények a sessionben tárolódnak (↺ = új beszélgetés).
+  - **Kártyák = képfájlok** a `public/img/tcg` mappában, `<név>[-<szám>]-<ritkaság>.png` névvel (pl. `krisz-6-glitch.png`, `bfw-energy-gold.png`). Új kártyához elég bemásolni a fájlt és újraindítani a szervert.
 - Mások határidőig tehetnek bármelyik opcióra. Egy fogadáson belül mindenki csak **egy opcióra** tehet, de a tétjét emelheti.
 - **Totalizátor (pari-mutuel) elszámolás:** az összes tét egy kasszába kerül. A jutalék levonása után a maradékon a nyerő opcióra tevők osztoznak, **a saját tétjük arányában**.
 - Kvóta = (kassza − jutalék) ÷ az adott opció tétjei (élőben kiszámolva, a tét-űrlapon a várható nyereményt is mutatja).
@@ -29,7 +36,7 @@ Német nyelvű, reszponzív fogadási oldal. Mindenki 1000 € játékpénzt kap
 - **Kommentek:** minden fogadás alatt beszélgetés; a kiíró és a résztvevők (a választott opcióval) jelölve vannak. Saját komment törölhető, admin bármelyiket eltávolíthatja; percenként max. 6 komment/felhasználó.
 - Minden pénzmozgás **MongoDB tranzakcióban** történik (nem lehet dupla költés, negatív egyenleg vagy kétszeres kifizetés), és bekerül a felhasználó számlakivonatába (Kontoauszug).
 
-**Oldalak:** Wetten (lista szűrőkkel + keresés), Wette-részletek, Neue Wette, Mein Konto (egyenleg, statisztika, kivonat, jelszócsere), Rangliste, Regeln (magatartási szabályok + működés), Impressum, Datenschutz.
+**Oldalak:** Wetten (lista szűrőkkel + keresés), Wette-részletek, Neue Wette, Mein Konto (egyenleg, statisztika, kivonat, jelszócsere), Rangliste, Coin Exchange, Lotterie, TCG, Regeln (magatartási szabályok + működés), Impressum, Datenschutz.
 
 **Biztonság:** bcrypt jelszó-hash, CSRF-token minden űrlapon, rate limit a belépésnél/regisztrációnál, Helmet biztonsági fejlécek (CSP), session a MongoDB-ben, HttpOnly/SameSite/Secure sütik.
 
@@ -148,6 +155,8 @@ src/services/betService.js  tranzakciók: regisztráció, fogadás, tét, lezár
 src/models/               User, Bet, Position (tét), Ledger (számlakivonat)
 src/routes/               oldalak
 src/jobs.js               lejárt fogadások automatikus érvénytelenítése
+src/tcg/                  TCG: kártyakatalógus + esélyek (catalog.js), packnyitás/eladás (tcgService.js)
+public/img/tcg/           kártya- és booster-pack képek
 views/                    EJS sablonok (német szöveg)
 public/                   CSS, JS, favicon
 deploy/                   Nginx konfiguráció

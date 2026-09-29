@@ -11,7 +11,8 @@
   <div class="stat card"><span class="stat-label">Wetten gesamt</span><span class="stat-value"><%= stats.totalBets %></span></div>
 </div>
 
-<div class="card admin-coin" id="coin">
+<dialog class="admin-dialog" data-admin-dialog aria-label="Samantha Coin steuern">
+  <button type="button" class="admin-dialog-close" data-admin-dialog-close aria-label="Schließen">×</button>
   <h2>Samantha Coin steuern</h2>
   <p class="muted">Nur für Admins sichtbar. Die Änderung wird nirgends angezeigt oder protokolliert – für alle anderen sieht sie wie eine normale Kursbewegung aus.</p>
   <% if (!coin) { %>
@@ -51,11 +52,52 @@
       <button class="btn btn-primary" type="submit">Kurs steuern</button>
     </form>
   <% } %>
+</dialog>
+
+<div class="card" id="tcg">
+  <h2>TCG: Chancen &amp; Preise</h2>
+  <p class="muted">Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.</p>
+  <%
+    const toInput = (c) => (c / 100).toFixed(2).replace('.', ',');
+    const pctInput = (w) => (w / 100).toFixed(2).replace('.', ',');
+  %>
+  <form method="post" action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Packpreis (3 Karten)</span>
+      <input type="text" name="pack" inputmode="decimal" value="<%= toInput(tcg.packPrice) %>" required>
+    </label>
+    <div class="table-wrap">
+      <table class="table admin-tcg-table">
+        <thead><tr><th>Seltenheit</th><th>Chance (%)</th><th>Verkaufspreis (€)</th><th class="num hide-sm">Standard</th></tr></thead>
+        <tbody>
+          <% tcg.rarities.forEach((r) => { %>
+            <tr class="r-<%= r.key %>">
+              <td><span class="tcg-dot"></span> <%= r.label %></td>
+              <td><input type="text" name="weight_<%= r.key %>" inputmode="decimal" value="<%= pctInput(r.weight) %>" required aria-label="Chance <%= r.label %> in Prozent"></td>
+              <td><input type="text" name="sell_<%= r.key %>" inputmode="decimal" value="<%= toInput(r.sell) %>" required aria-label="Verkaufspreis <%= r.label %>"></td>
+              <td class="num hide-sm muted nowrap"><%= pctInput(tcg.defaultWeights[r.key]) %> % · <%= euro(tcg.defaults[r.key]) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p class="admin-tcg-summary" data-tcg-summary>
+      Summe der Chancen: <strong data-tcg-sum><%= pctInput(tcg.rarities.reduce((s, r) => s + r.weight, 0)) %> %</strong> ·
+      Ein Pack ist im Schnitt <strong data-tcg-ev><%= euro(tcg.expectedPack) %></strong> wert
+      (<strong data-tcg-ratio class="<%= tcg.expectedPack >= tcg.packPrice ? 'neg' : 'pos' %>"><%= Math.round((tcg.expectedPack / tcg.packPrice) * 100) %> %</strong> vom Packpreis)
+      <span class="neg small" data-tcg-warn <%= tcg.expectedPack >= tcg.packPrice ? '' : 'hidden' %>><br>Packs wären im Schnitt profitabel – es kommt mehr Spielgeld in Umlauf, als ausgegeben wird.</span>
+    </p>
+    <button class="btn btn-primary" type="submit">Speichern</button>
+    <% if (tcg.lastUpdate) { %>
+      <p class="muted small">Zuletzt geändert von <%= tcg.lastUpdate.updatedByName %> · <%= date(tcg.lastUpdate.updatedAt) %></p>
+    <% } %>
+  </form>
 </div>
 
 <div class="card">
   <h2>Registrierungscodes</h2>
-  <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.</p>
+  <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er <span data-admin-dialog-open>automatisch</span> gelöscht.</p>
 
   <form method="post" action="/admin/codes" class="admin-generate">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">

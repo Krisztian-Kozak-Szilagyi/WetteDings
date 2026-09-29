@@ -293,6 +293,55 @@
     update();
   });
 
+  // Admin: Dialog öffnen/schließen
+  var adminDialog = document.querySelector('[data-admin-dialog]');
+  var adminDialogOpen = document.querySelector('[data-admin-dialog-open]');
+  if (adminDialog && adminDialogOpen) {
+    adminDialogOpen.addEventListener('click', function () {
+      if (typeof adminDialog.showModal === 'function') adminDialog.showModal();
+      else adminDialog.setAttribute('open', '');
+    });
+    var closeAdminDialog = function () {
+      if (typeof adminDialog.close === 'function') adminDialog.close();
+      else adminDialog.removeAttribute('open');
+    };
+    adminDialog.querySelector('[data-admin-dialog-close]').addEventListener('click', closeAdminDialog);
+    adminDialog.addEventListener('click', function (e) {
+      if (e.target === adminDialog) closeAdminDialog();
+    });
+  }
+
+  // Admin: TCG – Summe der Chancen und Packwert live berechnen
+  var tcgAdmin = document.querySelector('[data-tcg-admin]');
+  if (tcgAdmin) {
+    var num = function (s) {
+      var v = parseFloat(String(s || '').replace(/\s|%|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+      return isFinite(v) ? v : NaN;
+    };
+    var fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    var recalc = function () {
+      var sum = 0, ev = 0;
+      tcgAdmin.querySelectorAll('input[name^="weight_"]').forEach(function (inp) {
+        var key = inp.name.slice(7);
+        var w = num(inp.value);
+        var sell = num(tcgAdmin.querySelector('input[name="sell_' + key + '"]').value);
+        if (isFinite(w)) sum += w;
+        if (isFinite(w) && isFinite(sell)) ev += (w / 100) * sell * 3;
+      });
+      var pack = num(tcgAdmin.querySelector('input[name="pack"]').value);
+      var sumEl = tcgAdmin.querySelector('[data-tcg-sum]');
+      sumEl.textContent = sum.toFixed(2).replace('.', ',') + ' %';
+      sumEl.className = Math.abs(sum - 100) < 0.001 ? 'pos' : 'neg';
+      tcgAdmin.querySelector('[data-tcg-ev]').textContent = fmt.format(ev);
+      var ratioEl = tcgAdmin.querySelector('[data-tcg-ratio]');
+      ratioEl.textContent = pack > 0 ? Math.round((ev / pack) * 100) + ' %' : '–';
+      ratioEl.className = pack > 0 && ev >= pack ? 'neg' : 'pos';
+      tcgAdmin.querySelector('[data-tcg-warn]').hidden = !(pack > 0 && ev >= pack);
+    };
+    tcgAdmin.addEventListener('input', recalc);
+    recalc();
+  }
+
   // Admin: Coin-Steuerung – Prozent-Schnellwahl
   document.querySelectorAll('.admin-coin-form [data-percent]').forEach(function (b) {
     b.addEventListener('click', function () {

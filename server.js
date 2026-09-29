@@ -7,12 +7,14 @@ const { createApp } = require('./src/app');
 const { startJobs } = require('./src/jobs');
 const { migrate } = require('./src/migrate');
 const coinEngine = require('./src/coin/engine');
+const tcgSettings = require('./src/tcg/settings');
 
 async function main() {
   mongoose.set('strictQuery', true);
   await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: 15000 });
   console.log('MongoDB verbunden.');
   await migrate();
+  await tcgSettings.load(); // im Admin-Panel geänderte TCG-Preise
   await coinEngine.start();
 
   const app = createApp();

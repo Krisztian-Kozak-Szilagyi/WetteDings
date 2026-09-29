@@ -8,6 +8,7 @@ const { requireLogin } = require('../middleware');
 const { str } = require('../lib/util');
 const { bonusFor } = require('../services/bonusService');
 const { coinValueCents } = require('../coin/tradeService');
+const { cardValueCents } = require('../tcg/tcgService');
 
 const router = express.Router();
 
@@ -35,8 +36,8 @@ router.get('/konto', requireLogin, async (req, res) => {
 
   const inPlay = openAgg[0] ? openAgg[0].s : 0;
   const stats = statsAgg[0] || { won: 0, lost: 0 };
-  const coinValue = await coinValueCents(userId);
-  const total = req.user.balance + inPlay + coinValue;
+  const [coinValue, cardValue] = await Promise.all([coinValueCents(userId), cardValueCents(userId)]);
+  const total = req.user.balance + inPlay + coinValue + cardValue;
   const lastBonus = await Ledger.findOne({ user: userId, type: 'bonus' }).sort({ createdAt: -1 }).lean();
 
   res.render('account', {
@@ -45,6 +46,7 @@ router.get('/konto', requireLogin, async (req, res) => {
     ledger,
     inPlay,
     coinValue,
+    cardValue,
     total,
     net: total - config.startBalance,
     stats,

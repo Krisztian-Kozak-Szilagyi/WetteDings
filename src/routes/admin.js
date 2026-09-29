@@ -4,6 +4,10 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const { requireAdmin } = require('../middleware');
 const coinEngine = require('../coin/engine');
+const tcgCatalog = require('../tcg/catalog');
+const tcgSettings = require('../tcg/settings');
+const { parseEuro } = require('../lib/util');
+const { euro } = require('../lib/viewHelpers');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
@@ -25,7 +29,66 @@ router.get('/admin', requireAdmin, async (req, res) => {
     coin: coinEngine.isRunning() ? coinEngine.snapshot() : null,
     manipulation: coinEngine.manipulationStatus(),
     durations: DURATIONS,
+    tcg: {
+      packPrice: tcgSettings.getPackPrice(),
+      rarities: tcgCatalog.RARITIES,
+      defaults: tcgCatalog.DEFAULT_SELL,
+      defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
+      totalWeight: tcgCatalog.TOTAL_WEIGHT,
+      expectedPack: Math.round(tcgCatalog.expectedPackValue()),
+      lastUpdate: await tcgSettings.lastUpdate(),
+    },
   });
+});
+
+// ---------- TCG-Preise und Chancen ----------
+
+/** "12,50" -> Cent; leer/ungültig -> null */
+const centsOrNull = (value) => parseEuro(typeof value === 'string' ? value : '');
+
+/** "0,08" / "2.5" / "58" (Prozent, max. 2 Nachkommastellen) -> Gewicht in 1/10.000; ungültig -> null */
+function weightOrNull(value) {
+  const s = (typeof value === 'string' ? value : '').trim().replace(/\s|%/g, '');
+  if (!/^\d{1,3}([.,]\d{1,2})?$/.test(s)) return null;
+  const [whole, frac = ''] = s.split(/[.,]/);
+  const w = parseInt(whole, 10) * 100 + parseInt((frac + '00').slice(0, 2), 10);
+  return w <= tcgCatalog.TOTAL_WEIGHT ? w : null;
+}
+
+const percentText = (w) => `${(w / 100).toFixed(2).replace('.', ',')} %`;
+
+router.post('/admin/tcg', requireAdmin, async (req, res) => {
+  const packCents = centsOrNull(req.body.pack);
+  const sell = {};
+  const weight = {};
+  let error = null;
+  if (packCents === null || packCents < 100) error = 'Der Packpreis muss mindestens 1,00 € betragen.';
+  for (const r of tcgCatalog.RARITIES) {
+    const v = centsOrNull(req.body[`sell_${r.key}`]);
+    if (v === null) error = error || `Bitte einen gültigen Verkaufspreis für ${r.label} angeben.`;
+    sell[r.key] = v;
+    const w = weightOrNull(req.body[`weight_${r.key}`]);
+    if (w === null) error = error || `Bitte eine gültige Chance für ${r.label} angeben (z. B. 2,5 oder 0,08).`;
+    weight[r.key] = w;
+  }
+  if (!error) {
+    const sum = Object.values(weight).reduce((s, w) => s + w, 0);
+    if (sum !== tcgCatalog.TOTAL_WEIGHT) error = `Die Chancen müssen zusammen genau 100 % ergeben (aktuell ${percentText(sum)}).`;
+  }
+  if (error) {
+    req.flash('error', error);
+    return res.redirect('/admin#tcg');
+  }
+
+  await tcgSettings.save({ packCents, sell, weight, admin: req.user });
+  const ev = Math.round(tcgCatalog.expectedPackValue());
+  const ratio = Math.round((ev / packCents) * 100);
+  if (ev >= packCents) {
+    req.flash('info', `TCG-Einstellungen gespeichert. Achtung: Ein Pack ist jetzt im Schnitt ${euro(ev)} wert (${ratio} % vom Preis) – Packs öffnen lohnt sich also.`);
+  } else {
+    req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
+  }
+  res.redirect('/admin#tcg');
 });
 
 // ---------- Samantha Coin steuern (nur Admins, für Nutzer unsichtbar) ----------
@@ -48,13 +111,13 @@ router.post('/admin/coin', requireAdmin, async (req, res) => {
       ? `Kurssteuerung aktiv: ${sign}${percent} % über ${minutes} Min. (zusätzlich zur normalen Schwankung).`
       : `Kurs sofort um ${sign}${percent} % verändert.`);
   }
-  res.redirect('/admin#coin');
+  res.redirect('/admin');
 });
 
 router.post('/admin/coin/stopp', requireAdmin, async (req, res) => {
   if (coinEngine.isRunning()) await coinEngine.cancelManipulation();
   req.flash('info', 'Kurssteuerung beendet – der Kurs bewegt sich wieder nur zufällig.');
-  res.redirect('/admin#coin');
+  res.redirect('/admin');
 });
 
 router.post('/admin/codes', requireAdmin, async (req, res) => {

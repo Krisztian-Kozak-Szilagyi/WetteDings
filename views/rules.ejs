@@ -18,7 +18,7 @@
     <h3>1. Spielgeld bekommen</h3>
     <p>Jedes neue Mitglied erhält <strong><%= euro(startBalance) %></strong> Spielgeld. Das ist <strong>kein echtes Geld</strong> – es kann weder eingezahlt noch ausgezahlt werden. Es geht nur um den Spaß und die Rangliste.</p>
     <h4>Tagesbonus</h4>
-    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins):</p>
+    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins + Verkaufswert deiner TCG-Karten):</p>
     <ul>
       <% bonusTiers.forEach((t, i) => { %>
         <li><%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong></li>
@@ -98,6 +98,16 @@
       <li>Jeden Tag gibt es eine Lotterie. Ein Los kostet <strong><%= euro(lotteryTicketPrice) %></strong>; man kann mehrere Lose kaufen.</li>
       <li>Die Ziehung ist am Folgetag, immer 1 Minute vor Beginn der nächsten Lotterie (Start täglich um <%= lotteryTime %> Uhr).</li>
       <li>Jedes Los hat eine Nummer. Eine Nummer wird zufällig gezogen – der Besitzer bekommt den <strong>gesamten Topf</strong>.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>8. Trading Cards (TCG)</h3>
+    <ul>
+      <li>Ein Booster Pack kostet <strong><%= euro(tcgPackPrice) %></strong> und enthält 3 zufällige Karten.</li>
+      <li>Seltenheiten von häufig nach selten: <strong>Crumpled, BFWler, Gold, Holo, Bockhaber, Glitch</strong>. Jede Karte wird unabhängig gezogen – die genauen Drop-Raten stehen im TCG-Bereich.</li>
+      <li>Jede Karte kann jederzeit zu einem festen Preis (je nach Seltenheit) verkauft werden. Im Schnitt ist ein Pack weniger wert als sein Preis – es geht ums Sammeln.</li>
+      <li>Der Verkaufswert deiner Karten zählt zum Gesamtvermögen (Rangliste, Tagesbonus).</li>
     </ul>
   </div>
 

@@ -55,6 +55,15 @@ module.exports = {
   lotteryTicketPrice: eurosToCents(process.env.LOTTERY_TICKET_EUR, 100),
   lotteryTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.LOTTERY_TIME || '') ? process.env.LOTTERY_TIME : '20:00',
   lotteryMaxTicketsPerPurchase: 10,
+  // TCG: Preis eines Booster Packs (3 Karten)
+  tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 80),
+  // Support-Bot (Groq API). Ohne Schlüssel ist der Chat ausgeblendet.
+  groqApiKey: process.env.GROQ_API_KEY || '',
+  // Modelle der Reihe nach (bei Limit/Überlastung wird das nächste versucht), kommagetrennt
+  groqModels: (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   // Provision des Wetterstellers in % vom Topf (gilt für neu erstellte Wetten)
   creatorFeePercent: Math.min(100, Math.max(0, Number(process.env.CREATOR_FEE_PERCENT ?? 5) || 0)),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),

@@ -64,6 +64,7 @@ function createApp() {
     bonusTime: config.bonusTime,
     lotteryTicketPrice: config.lotteryTicketPrice,
     lotteryTime: config.lotteryTime,
+    supportEnabled: Boolean(config.groqApiKey),
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     currentPath: '',
@@ -83,6 +84,8 @@ function createApp() {
   app.use(require('./routes/admin'));
   app.use(require('./routes/coin'));
   app.use(require('./routes/lottery'));
+  app.use(require('./routes/tcg'));
+  app.use(require('./routes/support'));
 
   app.use((req, res) => {
     res.status(404).render('error', {
