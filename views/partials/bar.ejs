@@ -1,0 +1,5 @@
+<div class="bar <%= locals.big ? 'bar-lg' : '' %>" aria-hidden="true">
+  <% bet.options.forEach((o) => { if (!o.total) return; %>
+    <span class="bar-seg <%= optClass(bet, o.key) %>" style="flex-grow: <%= o.total %>"></span>
+  <% }) %>
+</div>

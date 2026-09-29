@@ -7,7 +7,7 @@ const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const config = require('./config');
 const viewHelpers = require('./lib/viewHelpers');
-const { flash, loadUser, csrf } = require('./middleware');
+const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
   const app = express();
@@ -59,6 +59,11 @@ function createApp() {
     minStake: config.minStake,
     startBalance: config.startBalance,
     autoVoidDays: config.autoVoidDays,
+    creatorFeePercent: config.creatorFeePercent,
+    bonusTiers: config.bonusTiers,
+    bonusTime: config.bonusTime,
+    lotteryTicketPrice: config.lotteryTicketPrice,
+    lotteryTime: config.lotteryTime,
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     currentPath: '',
@@ -68,12 +73,16 @@ function createApp() {
 
   app.use(flash);
   app.use(loadUser);
+  app.use(dailyBonus);
   app.use(csrf);
 
   app.use(require('./routes/pages'));
   app.use(require('./routes/auth'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
+  app.use(require('./routes/admin'));
+  app.use(require('./routes/coin'));
+  app.use(require('./routes/lottery'));
 
   app.use((req, res) => {
     res.status(404).render('error', {

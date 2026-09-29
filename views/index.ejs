@@ -1,22 +1,8 @@
 <%- include('partials/head') %>
 
-<% if (!currentUser) { %>
-<section class="hero">
-  <div>
-    <h1>Wetten unter Freunden – mit Spielgeld</h1>
-    <p class="lead">Registriere dich und erhalte <strong><%= euro(startBalance) %></strong> Spielgeld. Stell eigene Wetten auf, wette mit oder halte dagegen. Der Topf wird fair unter den Gewinnern aufgeteilt.</p>
-    <div class="actions">
-      <a class="btn btn-primary btn-lg" href="/registrieren">Kostenlos mitmachen</a>
-      <a class="btn btn-ghost btn-lg" href="/so-gehts">So funktioniert's</a>
-    </div>
-    <p class="muted small">Kein echtes Geld. Keine Ein- oder Auszahlungen.</p>
-  </div>
-</section>
-<% } %>
-
 <div class="page-head">
   <h1>Wetten</h1>
-  <% if (currentUser) { %><a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a><% } %>
+  <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
 </div>
 
 <nav class="tabs" aria-label="Filter">
@@ -31,6 +17,9 @@
   <button class="btn btn-ghost" type="submit">Suchen</button>
 </form>
 
+<div hidden data-live-root data-live-url="/wetten-stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= tab %>|<%= page %>|<%= q %>"></div>
+
+<div data-live="bet-list">
 <% if (!bets.length) { %>
   <div class="empty">
     <p><strong>Hier ist noch nichts.</strong></p>
@@ -50,5 +39,6 @@
     </nav>
   <% } %>
 <% } %>
+</div>
 
 <%- include('partials/foot') %>

@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
+const { maybeGrantDailyBonus } = require('../services/bonusService');
+const { euro } = require('../lib/viewHelpers');
 
 /** Einmalige Hinweise über eine Weiterleitung hinweg */
 function flash(req, res, next) {
@@ -26,6 +28,25 @@ async function loadUser(req, res, next) {
     } else {
       delete req.session.userId;
     }
+  }
+  next();
+}
+
+/** Tagesbonus beim ersten Seitenaufruf des Tages gutschreiben und direkt anzeigen */
+async function dailyBonus(req, res, next) {
+  if (!req.user || req.method !== 'GET') return next();
+  try {
+    const granted = await maybeGrantDailyBonus(req.user);
+    if (granted) {
+      req.user.balance = granted.balance;
+      const text = `Tagesbonus: ${euro(granted.amount)} wurden dir gutgeschrieben.`;
+      res.locals.flash = res.locals.flash
+        ? { ...res.locals.flash, message: `${res.locals.flash.message} ${text}` }
+        : { type: 'success', message: text };
+    }
+  } catch (err) {
+    // Ein Fehler beim Bonus darf die Seite nicht blockieren
+    console.error('Tagesbonus fehlgeschlagen:', err);
   }
   next();
 }
@@ -57,4 +78,11 @@ function csrf(req, res, next) {
   next();
 }
 
-module.exports = { flash, loadUser, requireLogin, csrf };
+/** Nur für Admins (ADMIN_USERNAMES). Andere bekommen eine 404, damit das Panel nicht auffällt. */
+function requireAdmin(req, res, next) {
+  if (!req.user) return requireLogin(req, res, next);
+  if (!req.user.isAdmin) return next('route');
+  next();
+}
+
+module.exports = { flash, loadUser, dailyBonus, requireLogin, requireAdmin, csrf };

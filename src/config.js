@@ -32,7 +32,7 @@ module.exports = {
   host: process.env.HOST || '127.0.0.1',
   mongoUri: required('MONGODB_URI'),
   sessionSecret,
-  appName: process.env.APP_NAME || 'Wettstube',
+  appName: process.env.APP_NAME || 'BfW Holdings',
   timezone: 'Europe/Berlin',
   // Alle Geldbeträge werden intern in Cent (Ganzzahlen) gespeichert.
   startBalance: eurosToCents(process.env.START_BALANCE_EUR, 1000),
@@ -42,6 +42,21 @@ module.exports = {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
   autoVoidDays: Number(process.env.AUTO_VOID_DAYS) || 14,
+  // Tagesbonus nach Gesamtvermögen (Kontostand + offene Einsätze), in Cent.
+  // Erste passende Stufe gilt; ab 1000 € gibt es keinen Bonus mehr.
+  bonusTiers: [
+    { below: 50000, amount: 15000 }, // unter 500 €: 150 € pro Tag
+    { below: 100000, amount: 10000 }, // unter 1000 €: 100 € pro Tag
+  ],
+  // Ab dieser Uhrzeit (deutsche Zeit, "HH:MM") gibt es den Tagesbonus des neuen Tages
+  bonusTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.BONUS_TIME || '') ? process.env.BONUS_TIME : '07:45',
+  // Lotterie: Lospreis und Startzeit der täglichen Lotterie (deutsche Zeit, "HH:MM").
+  // Die Ziehung ist immer 1 Minute vor dem Start der nächsten Lotterie.
+  lotteryTicketPrice: eurosToCents(process.env.LOTTERY_TICKET_EUR, 100),
+  lotteryTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.LOTTERY_TIME || '') ? process.env.LOTTERY_TIME : '20:00',
+  lotteryMaxTicketsPerPurchase: 10,
+  // Provision des Wetterstellers in % vom Topf (gilt für neu erstellte Wetten)
+  creatorFeePercent: Math.min(100, Math.max(0, Number(process.env.CREATOR_FEE_PERCENT ?? 5) || 0)),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   secureCookies: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProd,
 };

@@ -1,0 +1,30 @@
+<%- include('partials/head') %>
+
+<section class="hero">
+  <div>
+    <h1>Wetten unter Freunden – mit Spielgeld</h1>
+    <p class="lead">Melde dich an, um die aktuellen Wetten zu sehen. Neue Mitglieder erhalten <strong><%= euro(startBalance) %></strong> Spielgeld, stellen eigene Wetten auf – mit Ja/Nein oder eigenen Optionen – und wetten gegeneinander.</p>
+    <div class="actions">
+      <a class="btn btn-primary btn-lg" href="/anmelden">Anmelden</a>
+      <a class="btn btn-ghost btn-lg" href="/registrieren">Mit Code registrieren</a>
+    </div>
+    <p class="muted small">Wetten sind nur für angemeldete Mitglieder sichtbar. Registrierung nur mit Code von einem Admin. Kein echtes Geld.</p>
+  </div>
+</section>
+
+<div class="landing-grid">
+  <div class="card">
+    <h2>Spielgeld</h2>
+    <p class="muted">Start mit <%= euro(startBalance) %>, dazu ein Tagesbonus, wenn das Guthaben knapp wird.</p>
+  </div>
+  <div class="card">
+    <h2>Eigene Wetten</h2>
+    <p class="muted">Ja/Nein oder eigene Optionen – mit Einsatzschluss und festem Termin für die Auswertung.</p>
+  </div>
+  <div class="card">
+    <h2>Fair geteilt</h2>
+    <p class="muted">Der Topf geht an die Gewinner, der Wettersteller bekommt <%= creatorFeePercent %> % Provision. <a href="/regeln">Regeln</a></p>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

@@ -6,6 +6,8 @@ const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
 const { requireLogin } = require('../middleware');
 const { str } = require('../lib/util');
+const { bonusFor } = require('../services/bonusService');
+const { coinValueCents } = require('../coin/tradeService');
 
 const router = express.Router();
 
@@ -15,7 +17,7 @@ router.get('/konto', requireLogin, async (req, res) => {
     Position.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(100)
-      .populate('bet', 'title status outcome deadline totalJa totalNein refunded')
+      .populate('bet', 'title status outcome deadline options refunded')
       .lean(),
     Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).limit(50).lean(),
     Position.aggregate([{ $match: { user: userId, payout: null } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
@@ -33,16 +35,21 @@ router.get('/konto', requireLogin, async (req, res) => {
 
   const inPlay = openAgg[0] ? openAgg[0].s : 0;
   const stats = statsAgg[0] || { won: 0, lost: 0 };
-  const total = req.user.balance + inPlay;
+  const coinValue = await coinValueCents(userId);
+  const total = req.user.balance + inPlay + coinValue;
+  const lastBonus = await Ledger.findOne({ user: userId, type: 'bonus' }).sort({ createdAt: -1 }).lean();
 
   res.render('account', {
     title: 'Mein Konto',
     positions: positions.filter((p) => p.bet),
     ledger,
     inPlay,
+    coinValue,
     total,
     net: total - config.startBalance,
     stats,
+    lastBonus,
+    bonusNow: bonusFor(total),
     pwErrors: [],
   });
 });

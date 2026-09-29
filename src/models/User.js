@@ -8,6 +8,8 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true },
     // Kontostand in Cent
     balance: { type: Number, required: true, min: 0 },
+    // Tag (deutsche Zeit, "YYYY-MM-DD"), an dem zuletzt der Tagesbonus geprüft/gutgeschrieben wurde
+    lastBonusDay: { type: String, default: null },
   },
   { timestamps: true }
 );

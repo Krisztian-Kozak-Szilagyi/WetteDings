@@ -4,6 +4,10 @@
   <div class="card">
     <h1>Registrieren</h1>
     <p class="muted">Du bekommst sofort <strong><%= euro(startBalance) %></strong> Spielgeld zum Wetten.</p>
+    <div class="info-box">
+      <strong>Registrierung nur mit Code</strong>
+      <span>Du brauchst einen Registrierungscode von einem Admin. Jeder Code gilt 30 Minuten und nur für eine Person.</span>
+    </div>
 
     <% if (errors.length) { %>
       <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
@@ -11,6 +15,10 @@
 
     <form method="post" action="/registrieren" class="form">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Registrierungscode</span>
+        <input type="text" name="code" value="<%= values.code || '' %>" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="XXXX-XXXX" required>
+      </label>
       <label class="field">
         <span>Benutzername</span>
         <input type="text" name="username" value="<%= values.username || '' %>" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\-]{3,20}" required>
@@ -30,7 +38,7 @@
       </label>
       <label class="check">
         <input type="checkbox" name="agree" required>
-        <span>Ich habe die <a href="/so-gehts" target="_blank">Regeln</a> gelesen und weiß, dass es nur um Spielgeld geht.</span>
+        <span>Ich akzeptiere die <a href="/regeln" target="_blank">Regeln</a> (keine Manipulation, nur ein Konto pro Person) und weiß, dass es nur um Spielgeld geht.</span>
       </label>
       <button class="btn btn-primary btn-block btn-lg" type="submit">Konto erstellen</button>
     </form>

@@ -1,0 +1,99 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <h1>Admin-Panel</h1>
+  <span class="muted">Angemeldet als <%= currentUser.username %></span>
+</div>
+
+<div class="stats stats-3">
+  <div class="stat card"><span class="stat-label">Nutzer</span><span class="stat-value"><%= stats.userCount %></span></div>
+  <div class="stat card"><span class="stat-label">Offene Wetten</span><span class="stat-value"><%= stats.openBets %></span></div>
+  <div class="stat card"><span class="stat-label">Wetten gesamt</span><span class="stat-value"><%= stats.totalBets %></span></div>
+</div>
+
+<div class="card admin-coin" id="coin">
+  <h2>Samantha Coin steuern</h2>
+  <p class="muted">Nur für Admins sichtbar. Die Änderung wird nirgends angezeigt oder protokolliert – für alle anderen sieht sie wie eine normale Kursbewegung aus.</p>
+  <% if (!coin) { %>
+    <p class="muted">Die Kurs-Engine läuft gerade nicht.</p>
+  <% } else { %>
+    <p>Aktueller Kurs: <strong><%= coinPrice(coin.price) %></strong> <span class="<%= coin.change24h >= 0 ? 'pos' : 'neg' %>">(<%= signedPercent(coin.change24h) %> in 24 h)</span></p>
+
+    <% if (manipulation) { %>
+      <div class="admin-coin-active">
+        <span>Aktive Steuerung: noch <strong class="<%= manipulation.remainingPercent >= 0 ? 'pos' : 'neg' %>"><%= manipulation.remainingPercent > 0 ? '+' : '' %><%= manipulation.remainingPercent.toFixed(1).replace('.', ',') %> %</strong> bis <%= date(manipulation.endsAt) %></span>
+        <form method="post" action="/admin/coin/stopp">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Abbrechen</button>
+        </form>
+      </div>
+    <% } %>
+
+    <form method="post" action="/admin/coin" class="admin-coin-form" data-confirm="Kurs wirklich verändern?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Änderung in %</span>
+        <input type="number" name="percent" step="0.1" min="-99" max="1000" required placeholder="z. B. -40 oder 25">
+      </label>
+      <div class="quick-amounts">
+        <% [-80, -40, -15, 15, 40, 100].forEach((p) => { %>
+          <button type="button" class="chip <%= p < 0 ? 'chip-neg' : 'chip-pos' %>" data-percent="<%= p %>"><%= p > 0 ? '+' : '' %><%= p %> %</button>
+        <% }) %>
+      </div>
+      <label class="field">
+        <span>Über welchen Zeitraum?</span>
+        <select name="minutes">
+          <% durations.forEach((m) => { %>
+            <option value="<%= m %>" <%= m === 15 ? 'selected' : '' %>><%= m === 0 ? 'Sofort (ein Sprung)' : m + ' Minuten (fließend)' %></option>
+          <% }) %>
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Kurs steuern</button>
+    </form>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>Registrierungscodes</h2>
+  <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.</p>
+
+  <form method="post" action="/admin/codes" class="admin-generate">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-primary" type="submit">+ Neuen Code erzeugen</button>
+  </form>
+
+  <% if (!codes.length) { %>
+    <p class="muted">Aktuell gibt es keine gültigen Codes.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% codes.forEach((c) => {
+           const minutesLeft = Math.max(0, Math.ceil((new Date(c.expiresAt).getTime() - now) / 60000));
+           const used = !!c.usedAt; %>
+        <li class="code-item <%= used ? 'is-used' : '' %>">
+          <div class="code-main">
+            <code class="code-value"><%= formatCode(c.code) %></code>
+            <% if (used) { %>
+              <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
+            <% } else { %>
+              <span class="badge badge-offen">Gültig · noch <%= minutesLeft %> Min.</span>
+            <% } %>
+          </div>
+          <div class="code-meta muted small">
+            erstellt von <%= c.createdByName %> · <%= date(c.createdAt) %> · läuft ab <%= date(c.expiresAt) %>
+          </div>
+          <div class="code-actions">
+            <% if (!used) { %>
+              <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= formatCode(c.code) %>">Kopieren</button>
+            <% } %>
+            <form method="post" action="/admin/codes/<%= c._id %>/loeschen" data-confirm="Diesen Code löschen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>

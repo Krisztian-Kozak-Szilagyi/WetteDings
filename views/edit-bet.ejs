@@ -1,0 +1,42 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <p class="breadcrumb"><a href="/wetten/<%= bet._id %>">← Zurück zur Wette</a></p>
+  <div class="card">
+    <h1>Wette bearbeiten</h1>
+    <p class="muted">Alle Änderungen werden mit Datum und Name im Änderungsverlauf der Wette angezeigt. Die Optionen können nicht mehr geändert werden.</p>
+
+    <% if (errors.length) { %>
+      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+    <% } %>
+
+    <form method="post" action="/wetten/<%= bet._id %>/bearbeiten" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <% if (currentUser.isAdmin) { %>
+        <label class="field">
+          <span>Titel <em class="muted">(nur Admins)</em></span>
+          <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required>
+        </label>
+      <% } else { %>
+        <div class="field">
+          <span>Titel</span>
+          <p class="readonly-value"><%= bet.title %></p>
+          <small class="muted">Der Titel kann nur von einem Admin geändert werden. Wende dich bei Bedarf an einen Admin.</small>
+        </div>
+      <% } %>
+
+      <label class="field">
+        <span>Beschreibung</span>
+        <textarea name="description" rows="6" maxlength="2000"><%= values.description %></textarea>
+      </label>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Änderungen speichern</button>
+        <a class="btn btn-ghost" href="/wetten/<%= bet._id %>">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

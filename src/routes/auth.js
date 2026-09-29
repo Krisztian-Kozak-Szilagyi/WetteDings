@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { registerUser } = require('../services/betService');
-const { str, safeRedirect } = require('../lib/util');
+const { str, safeRedirect, UserError } = require('../lib/util');
+const { normalizeCode } = require('../services/codeService');
 
 const router = express.Router();
 
@@ -41,8 +42,10 @@ router.post('/registrieren', authLimiter, async (req, res) => {
   const email = str(req.body.email).trim().toLowerCase();
   const password = str(req.body.password);
   const password2 = str(req.body.password2);
+  const code = str(req.body.code).trim().slice(0, 20);
 
   const errors = [];
+  if (normalizeCode(code).length !== 8) errors.push('Bitte gib einen gültigen Registrierungscode ein (Format: XXXX-XXXX).');
   if (!/^[A-Za-z0-9_.-]{3,20}$/.test(username)) {
     errors.push('Der Benutzername muss 3–20 Zeichen lang sein (Buchstaben, Zahlen, _ . -).');
   }
@@ -55,12 +58,14 @@ router.post('/registrieren', authLimiter, async (req, res) => {
 
   if (!errors.length) {
     try {
-      const user = await registerUser({ username, email, password });
+      const user = await registerUser({ username, email, password, code });
       await startSession(req, user._id);
       req.flash('success', `Willkommen, ${user.username}! Dein Startguthaben ist gutgeschrieben. Viel Spaß!`);
       return res.redirect('/');
     } catch (err) {
-      if (err && err.code === 11000) {
+      if (err instanceof UserError) {
+        errors.push(err.message);
+      } else if (err && err.code === 11000) {
         errors.push(
           err.keyPattern && err.keyPattern.email
             ? 'Diese E-Mail-Adresse ist bereits registriert.'
@@ -72,7 +77,7 @@ router.post('/registrieren', authLimiter, async (req, res) => {
     }
   }
 
-  res.status(400).render('register', { title: 'Registrieren', errors, values: { username, email } });
+  res.status(400).render('register', { title: 'Registrieren', errors, values: { username, email, code } });
 });
 
 router.get('/anmelden', (req, res) => {

@@ -1,54 +1,103 @@
 <%- include('partials/head') %>
 
 <div class="narrow prose">
-  <h1>So funktioniert <%= appName %></h1>
+  <h1>Regeln</h1>
+
+  <div class="card card-rules" id="regeln">
+    <h2>Verhaltensregeln</h2>
+    <ol class="rules-list">
+      <li>Die Teilnehmer sind verpflichtet, jegliche Einflussnahme auf den Ausgang der Wette durch Manipulation zu unterlassen. Gleiches gilt für die Anstiftung Dritter zu einer solchen Handlung.</li>
+      <li>Pro Person ist nur ein Konto zulässig (Verbot von Mehrfachaccounts bzw. Alt-Accounts).</li>
+    </ol>
+    <p class="muted small">Bei Verstößen können Admins betroffene Wetten annullieren.</p>
+  </div>
+
+  <h2 class="section-title">So funktioniert <%= appName %></h2>
 
   <div class="card">
-    <h2>1. Spielgeld bekommen</h2>
+    <h3>1. Spielgeld bekommen</h3>
     <p>Jedes neue Mitglied erhält <strong><%= euro(startBalance) %></strong> Spielgeld. Das ist <strong>kein echtes Geld</strong> – es kann weder eingezahlt noch ausgezahlt werden. Es geht nur um den Spaß und die Rangliste.</p>
+    <h4>Tagesbonus</h4>
+    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins):</p>
+    <ul>
+      <% bonusTiers.forEach((t, i) => { %>
+        <li><%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong></li>
+      <% }) %>
+      <li>ab <%= euro(bonusTiers[bonusTiers.length - 1].below) %>: kein Bonus</li>
+    </ul>
+    <p class="muted small">Den Bonus gibt es täglich ab <%= bonusTime %> Uhr (deutsche Zeit) – er wird beim ersten Besuch danach gutgeschrieben.</p>
   </div>
 
   <div class="card">
-    <h2>2. Wette aufstellen</h2>
-    <p>Jeder kann eine Wette aufstellen: eine Aussage, die später klar mit <span class="side-ja"><strong>Ja</strong></span> oder <span class="side-nein"><strong>Nein</strong></span> entschieden werden kann – z. B. „Es schneit an Weihnachten in Berlin“. Du legst einen Einsatzschluss fest und setzt selbst als Erstes auf eine Seite.</p>
+    <h3>2. Wette aufstellen</h3>
+    <p>Jeder kann eine Wette aufstellen und wählt dabei die Art:</p>
+    <ul>
+      <li><strong>Ja / Nein:</strong> eine Aussage, die zutrifft oder nicht – z. B. „Es schneit an Weihnachten in Berlin“.</li>
+      <li><strong>Eigene Optionen:</strong> du legst mindestens zwei Antwortmöglichkeiten fest – z. B. „Bayern“, „Unentschieden“, „Dortmund“.</li>
+    </ul>
+    <p>Du legst zwei Termine fest: den <strong>Einsatzschluss</strong> (bis dahin kann gesetzt werden, danach nicht mehr) und die <strong>Auswertung</strong> (wann das Ergebnis bekanntgegeben wird). <strong>Nach dem Veröffentlichen können keine Optionen mehr hinzugefügt oder geändert werden.</strong></p>
+    <p><strong>Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen.</strong> Dafür erhalten sie <strong><%= creatorFeePercent %> % vom Topf</strong> als Provision, sobald sie das Ergebnis eintragen.</p>
   </div>
 
   <div class="card">
-    <h2>3. Mitgehen oder dagegenhalten</h2>
-    <p>Alle anderen können bis zum Einsatzschluss setzen – entweder auf dieselbe Seite wie der Ersteller (<em>mitgehen</em>) oder auf die Gegenseite (<em>dagegenhalten</em>). Pro Wette setzt du immer nur auf eine Seite, kannst deinen Einsatz dort aber beliebig erhöhen. Mindesteinsatz: <%= euro(minStake) %>.</p>
+    <h3>3. Setzen</h3>
+    <p>Alle anderen können bis zum Einsatzschluss auf eine der Optionen setzen. Pro Wette setzt du immer nur auf eine Option, kannst deinen Einsatz dort aber beliebig erhöhen. Mindesteinsatz: <%= euro(minStake) %>.</p>
   </div>
 
   <div class="card">
-    <h2>4. Der Topf wird geteilt (Totalisator)</h2>
-    <p>Alle Einsätze kommen in einen gemeinsamen Topf. Wenn die Wette entschieden ist, bekommt jede Person auf der Gewinnerseite</p>
-    <p class="formula">ihren Einsatz zurück <strong>+</strong> einen Anteil am Einsatz der Verliererseite – im Verhältnis zu ihrem eigenen Einsatz.</p>
-    <p>Es gibt keine Gebühren: Alles, was die Verlierer setzen, geht vollständig an die Gewinner.</p>
+    <h3>4. Der Topf wird geteilt (Totalisator)</h3>
+    <p>Alle Einsätze kommen in einen gemeinsamen Topf. Wenn die Wette entschieden ist, erhält der Wettersteller <%= creatorFeePercent %> % des Topfes. Den Rest teilen sich alle, die auf die eingetretene Option gesetzt haben:</p>
+    <p class="formula">Auszahlung = (Topf − Provision) × eigener Einsatz ÷ alle Einsätze auf die eingetretene Option</p>
 
-    <h3>Beispiel</h3>
+    <h4>Beispiel</h4>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Person</th><th>Seite</th><th class="num">Einsatz</th><th class="num">Auszahlung bei „Ja“</th></tr></thead>
+        <thead><tr><th>Person</th><th>Option</th><th class="num">Einsatz</th><th class="num">Auszahlung bei „Bayern“</th></tr></thead>
         <tbody>
-          <tr><td>Anna</td><td><span class="pill pill-ja">Ja</span></td><td class="num">100,00 €</td><td class="num pos">200,00 €</td></tr>
-          <tr><td>Ben</td><td><span class="pill pill-ja">Ja</span></td><td class="num">50,00 €</td><td class="num pos">100,00 €</td></tr>
-          <tr><td>Clara</td><td><span class="pill pill-nein">Nein</span></td><td class="num">150,00 €</td><td class="num neg">0,00 €</td></tr>
+          <tr><td>Anna</td><td><span class="pill c-0">Bayern</span></td><td class="num">100,00 €</td><td class="num pos">190,00 €</td></tr>
+          <tr><td>Ben</td><td><span class="pill c-0">Bayern</span></td><td class="num">50,00 €</td><td class="num pos">95,00 €</td></tr>
+          <tr><td>Clara</td><td><span class="pill c-1">Unentschieden</span></td><td class="num">60,00 €</td><td class="num neg">0,00 €</td></tr>
+          <tr><td>David</td><td><span class="pill c-2">Dortmund</span></td><td class="num">90,00 €</td><td class="num neg">0,00 €</td></tr>
+          <tr><td>Wettersteller</td><td>–</td><td class="num">–</td><td class="num pos">15,00 €</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Topf: 300 €. „Ja“ gewinnt. Anna hat ⅔ der Ja-Einsätze gebracht und bekommt deshalb ⅔ von Claras 150 € (= 100 €) plus ihren Einsatz zurück. Ben bekommt ⅓ (= 50 €) plus seinen Einsatz.</p>
+    <p>Topf: 300 €. „Bayern“ tritt ein. Der Wettersteller bekommt 5 % = 15 €. Die übrigen 285 € gehen an die Bayern-Tipper: Anna hat ⅔ der Bayern-Einsätze gebracht und bekommt ⅔ davon (= 190 €), Ben ⅓ (= 95 €).</p>
 
-    <h3>Die Quote</h3>
-    <p>Die angezeigte Quote ist <em>Topf ÷ Einsätze auf dieser Seite</em>. Eine Quote von 2,50× bedeutet: Für 10 € Einsatz bekämst du nach aktuellem Stand 25 € ausgezahlt. Da bis zum Einsatzschluss weiter gesetzt werden kann, ändert sich die Quote noch.</p>
+    <h4>Die Quote</h4>
+    <p>Die angezeigte Quote ist <em>(Topf − Provision) ÷ Einsätze auf diese Option</em>. Eine Quote von 2,50× bedeutet: Für 10 € Einsatz bekämst du nach aktuellem Stand 25 € ausgezahlt. Da bis zum Einsatzschluss weiter gesetzt werden kann, ändert sich die Quote noch.</p>
   </div>
 
   <div class="card">
-    <h2>5. Ergebnis &amp; Sonderfälle</h2>
+    <h3>5. Ergebnis &amp; Sonderfälle</h3>
     <ul>
-      <li>Nach dem Einsatzschluss trägt der <strong>Ersteller</strong> das Ergebnis ein. Admins können bei Streitfällen eingreifen.</li>
-      <li>Hat niemand dagegengehalten (oder niemand auf die Gewinnerseite gesetzt), bekommen alle ihren Einsatz zurück.</li>
-      <li>Eine Wette kann <strong>annulliert</strong> werden (z. B. wenn das Ereignis ausfällt). Dann gibt es alle Einsätze zurück.</li>
-      <li>Wird das Ergebnis nicht innerhalb von <%= locals.autoVoidDays || 14 %> Tagen nach Einsatzschluss eingetragen, wird die Wette automatisch annulliert.</li>
-      <li>Rundungscents werden fair verteilt – die Summe aller Auszahlungen entspricht immer genau dem Topf.</li>
+      <li>Der <strong>Wettersteller</strong> entscheidet, was eingetreten ist – jederzeit, auch schon vor dem Einsatzschluss. Die Wette wird dann sofort geschlossen und ausgezahlt. Admins können bei Streitfällen eingreifen.</li>
+      <li>Beim Abschließen muss eine <strong>Begründung</strong> angegeben werden (z. B. Endstand und Quelle). Sie bleibt dauerhaft bei der Wette sichtbar, damit das Ergebnis nachvollziehbar ist.</li>
+      <li>Hat niemand auf die eingetretene Option gesetzt – oder haben alle auf dieselbe Option gesetzt –, bekommen alle ihren Einsatz zurück. Dann gibt es keine Provision.</li>
+      <li>Eine Wette kann <strong>annulliert</strong> werden (z. B. wenn das Ereignis ausfällt). Dann gibt es alle Einsätze zurück und keine Provision.</li>
+      <li>Unter jeder Wette gibt es einen <strong>Kommentarbereich</strong> zum Austausch. Eigene Kommentare kann man löschen, Admins können Kommentare entfernen.</li>
+      <li>Die <strong>Beschreibung</strong> kann der Wettersteller nachträglich bearbeiten. Den <strong>Titel</strong> ändert nur ein Admin auf Anfrage. Alle Änderungen erscheinen im Änderungsverlauf der Wette.</li>
+      <li>Wird das Ergebnis nicht innerhalb von <%= locals.autoVoidDays || 14 %> Tagen nach dem Auswertungstermin eingetragen, wird die Wette automatisch annulliert.</li>
+      <li>Rundungscents werden fair verteilt – Auszahlungen und Provision ergeben zusammen immer genau den Topf.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>6. Coin Exchange (Samantha Coin)</h3>
+    <p>In der Coin Exchange kannst du Spielgeld in den <strong>Samantha Coin (SAM)</strong> investieren und jederzeit wieder verkaufen – zum aktuellen Kurs, ohne Gebühren.</p>
+    <ul>
+      <li>Der Kurs ist <strong>simuliert</strong> und ändert sich alle paar Sekunden – rund um die Uhr, auch wenn niemand online ist.</li>
+      <li>Wie bei echten Kryptowährungen gibt es ruhige und wilde Phasen, häufige Sprünge von 5–30 % und gelegentlich auch extreme Ereignisse: einen <strong>Pump</strong> (+40 bis +150 %) oder einen <strong>Crash</strong> (−80 bis −99 %).</li>
+      <li>Der Wert deiner Coins zählt zu deinem Gesamtvermögen (Rangliste, Tagesbonus).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>7. Lotterie</h3>
+    <ul>
+      <li>Jeden Tag gibt es eine Lotterie. Ein Los kostet <strong><%= euro(lotteryTicketPrice) %></strong>; man kann mehrere Lose kaufen.</li>
+      <li>Die Ziehung ist am Folgetag, immer 1 Minute vor Beginn der nächsten Lotterie (Start täglich um <%= lotteryTime %> Uhr).</li>
+      <li>Jedes Los hat eine Nummer. Eine Nummer wird zufällig gezogen – der Besitzer bekommt den <strong>gesamten Topf</strong>.</li>
     </ul>
   </div>
 

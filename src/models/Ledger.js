@@ -4,7 +4,7 @@ const { Schema, model } = require('mongoose');
 const ledgerSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    type: { type: String, enum: ['startguthaben', 'einsatz', 'auszahlung', 'erstattung'], required: true },
+    type: { type: String, enum: ['startguthaben', 'einsatz', 'auszahlung', 'erstattung', 'provision', 'bonus', 'coin_kauf', 'coin_verkauf', 'lotto_los', 'lotto_gewinn'], required: true },
     amount: { type: Number, required: true }, // Cent, negativ = Abbuchung
     bet: { type: Schema.Types.ObjectId, ref: 'Bet', default: null },
     betTitle: { type: String, default: null },

@@ -5,12 +5,30 @@
   <span class="muted"><%= currentUser.username %> · <%= currentUser.email %></span>
 </div>
 
-<div class="stats stats-4">
+<div class="stats stats-auto">
   <div class="stat card"><span class="stat-label">Verfügbar</span><span class="stat-value"><%= euro(currentUser.balance) %></span></div>
   <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
+  <div class="stat card"><span class="stat-label">In Samantha Coin</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/coin-exchange">Zur Coin Exchange</a></div>
   <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
   <div class="stat card"><span class="stat-label">Bilanz seit Start</span><span class="stat-value <%= net > 0 ? 'pos' : (net < 0 ? 'neg' : '') %>"><%= net > 0 ? '+' : '' %><%= euro(net) %></span>
     <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span></div>
+</div>
+
+<div class="card bonus-card">
+  <h2>Tagesbonus</h2>
+  <p>Einmal pro Tag bekommst du automatisch Spielgeld, solange dein Gesamtvermögen (verfügbar + in offenen Wetten + Samantha Coins) unter <%= euro(bonusTiers[bonusTiers.length - 1].below) %> liegt:</p>
+  <ul class="bonus-tiers">
+    <% bonusTiers.forEach((t, i) => { %>
+      <li class="<%= bonusNow === t.amount ? 'active' : '' %>">
+        <%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong>
+      </li>
+    <% }) %>
+    <li class="<%= bonusNow === 0 ? 'active' : '' %>">ab <%= euro(bonusTiers[bonusTiers.length - 1].below) %>: kein Bonus</li>
+  </ul>
+  <p class="muted small">
+    <% if (lastBonus) { %>Zuletzt erhalten: <%= date(lastBonus.createdAt) %> (+<%= euro(lastBonus.amount) %>).<% } else { %>Du hast bisher noch keinen Tagesbonus erhalten.<% } %>
+    Den Bonus gibt es täglich ab <%= bonusTime %> Uhr (deutsche Zeit) – er wird bei deinem ersten Besuch danach gutgeschrieben.
+  </p>
 </div>
 
 <div class="card">
@@ -20,12 +38,12 @@
   <% } else { %>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Wette</th><th>Seite</th><th class="num">Einsatz</th><th>Status</th><th class="num">Ergebnis</th></tr></thead>
+        <thead><tr><th>Wette</th><th>Option</th><th class="num">Einsatz</th><th>Status</th><th class="num">Ergebnis</th></tr></thead>
         <tbody>
           <% positions.forEach((p) => { const st = statusInfo(p.bet); %>
             <tr>
               <td><a href="/wetten/<%= p.bet._id %>"><%= p.bet.title %></a></td>
-              <td><span class="pill pill-<%= p.side %>"><%= sideLabel(p.side) %></span></td>
+              <td><span class="pill <%= optClass(p.bet, p.side) %>"><%= optionLabel(p.bet, p.side) %></span></td>
               <td class="num"><%= euro(p.amount) %></td>
               <td><span class="badge badge-<%= st.key %>"><%= st.label %></span></td>
               <td class="num">
