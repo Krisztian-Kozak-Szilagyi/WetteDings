@@ -1,72 +1,85 @@
-# BfW Holdings – fogadási oldal játékpénzzel
+# BfW Holdings – Wettplattform mit Spielgeld
 
-Német nyelvű, reszponzív fogadási oldal. Mindenki 1000 € játékpénzt kap regisztrációkor, bárki kiírhat fogadást, a többiek pedig **ugyanarra az oldalra tehetnek (Mitgehen)** vagy **ellenfogadást köthetnek (Dagegenhalten)**.
+Deutschsprachige, responsive Wett- und Spielplattform für eine geschlossene Gruppe. Jedes Mitglied startet mit 1.000 € Spielgeld, kann eigene Wetten aufstellen, bei den Wetten anderer **mitgehen** oder **dagegenhalten**, in einen simulierten Coin investieren, an einer täglichen Lotterie teilnehmen und Sammelkarten öffnen. Es wird **kein echtes Geld** verwendet – keine Ein- oder Auszahlungen.
 
-**Technológia:** Node.js (Express 5) · MongoDB Atlas (Mongoose) · EJS szerveroldali renderelés · saját CSS (mobil → desktop) · nincs build lépés.
+**Technik:** Node.js (Express 5) · MongoDB Atlas (Mongoose) · serverseitiges Rendering mit EJS · eigenes CSS (Mobile First) · kein Build-Schritt.
 
-## Hogyan működik a rendszer
+## Funktionen
 
-- **Két fogadástípus:** *Ja/Nein* (egy állítás igaz-e), vagy **saját opciók** (min. 2, max. 10, pl. „Bayern / Unentschieden / Dortmund“). Közzététel után az opciók nem módosíthatók, új opció nem adható hozzá.
-- A kiíró két kötelező időpontot ad meg: **Einsatzschluss** (eddig lehet tétet tenni) és **Auswertung** (ekkor lesz eredményhirdetés; nem lehet korábbi a tét-határidőnél). Mindkettő jól látható a fogadásnál.
-- **A kiíró nem tehet a saját fogadására**, cserébe a kassza **5%-át** kapja jutalékként (`CREATOR_FEE_PERCENT`), amikor rögzíti az eredményt. A jutalék a fogadás létrehozásakor rögzül; ha a beállított érték csökken, a még nyitott fogadások induláskor automatikusan az alacsonyabb értékre állnak.
-- **Csak tagoknak:** kijelentkezett látogatók semmilyen fogadást (és ranglistát) nem látnak, csak a nyitóoldalt, a szabályokat és a bejelentkezést/regisztrációt. Megosztott fogadás-link bejelentkezés után a fogadásra visz.
-- **Élő frissítés:** a fogadáslista, a fogadás oldala és a lottó 5 másodpercenként ellenőrzi, változott-e valami (kis „verzió” lekérdezés), és ha igen, a háttérben frissíti a kasszát, kvótákat, résztvevőket, kommenteket – a beírt adatok (tét, komment) megmaradnak. Ha a fogadás állapota változik (lezárult, eredmény született), az oldal magától újratölt.
-- **Lottó:** naponta egy sorsolás. Egy sorsjegy 100 € (`LOTTERY_TICKET_EUR`), több is vehető (max. 10 / vásárlás). Minden sorsjegy sorszámot kap; a húzáskor egy sorszámot sorsol a rendszer (kriptográfiai véletlen), a tulajdonos kapja a teljes kasszát. A húzás a következő napon, mindig 1 perccel a következő lottó kezdete előtt van – alapból húzás 19:59-kor, új kör 20:00-kor (`LOTTERY_TIME=20:00`).
-- **Coin Exchange – Samantha Coin (SAM):** játékpénzt lehet befektetni egy szimulált coinba, és bármikor visszaváltani (díj nélkül, az aktuális árfolyamon). Élő grafikon (1 óra / 24 óra / 7 nap / 30 nap / összes), portfólió (érték, átlagár, nyereség/veszteség), saját kötések, piaci események. A coinban lévő érték beszámít a teljes vagyonba (ranglista, napi bónusz).
-  - **Árfolyammodell** (`src/coin/model.js`): sztochasztikus volatilitás (nyugodt és vad időszakok), vastag farkú (Student-t) hozamok, játékosan élénk mozgás: kis ugrások kb. 40 percenként, nagyobbak (5–15%, néha 30%+) naponta 1–2 alkalommal, pump (+40…+150%) évente kb. 6–7×, crash (−80…−99%) évente kb. 1×; nagy mozgás után megugrik a volatilitás. A várható hozam enyhén pozitív (~+0,05%/nap), így a coin se nem biztos nyerő, se nem kijátszható.
-  - **Admin-vezérlés:** az Admin panelen („Samantha Coin steuern”) megadható egy százalékos változás (−99…+1000%), azonnal vagy 1–60 perc alatt fokozatosan (a normál ingadozással keveredve). Nem jelenik meg a piaci eseményekben, az API-ban vagy a naplóban; fut közben megszakítható, és újraindítás után is folytatódik.
-  - **Motor** (`src/coin/engine.js`): a szerverben fut, 5 másodpercenként új ár; percenkénti (3 napig) és óránkénti (örökre) gyertyák a MongoDB-ben. Első induláskor 14 nap előtörténetet szimulál; ha a szerver állt, induláskor utólag lejátssza a kimaradt időt (max. 30 nap), így a grafikon folytonos.
-- **TCG (Trading Cards):** booster pack 80 € (`TCG_PACK_EUR`), 3 kártyával. Animált nyitás (tasak feltépése, kártyák felfordítása, a legritkább kártya jön utoljára), gyűjtemény szűrővel, a még meg nem szerzett kártyák helye „?”-lel látszik, kattintásra nagyítás 3D-s döntéssel és holo/gold/glitch effekttel, eladás egyesével vagy az összes duplikátum egyszerre.
-  - **Esélyek kártyánként** (`src/tcg/catalog.js`): Crumpled 58,12% · BFWler 28% · Gold 11% · Holo 2,5% · Bockhaber 0,3% · Glitch 0,08%. Előbb a ritkaságot sorsolja (kriptográfiai véletlen), utána azon belül egyenletes eséllyel egy kártyát.
-  - **Eladási ár:** 5 € / 20 € / 40 € / 150 € / 1 000 € / 3 000 €. Egy pack várható értéke kb. 66,17 € (a 80 €-s ár ~83%-a), tehát hosszú távon nem nyereséges; 2× Crumpled + 1× BFWler = 30 €. Ha az árakat vagy esélyeket módosítod, a teszt jelez, ha a pack nyereségessé válna.
-  - **Admin panel → „TCG: Chancen & Preise”:** a pack ára, a 6 ritkaság esélye (%-ban, 2 tizedesjegyig, összesen pontosan 100%) és eladási ára szerkeszthető. Azonnal érvényes, és a MongoDB-ben (`tcgsettings`) tárolódik, így újraindítás után is megmarad. A panel élőben mutatja az esélyek összegét és a pack várható értékét, és figyelmeztet, ha nyereséges lenne. A kódban lévő értékek (`catalog.js`, `TCG_PACK_EUR`) csak alapértelmezések, amíg nincs mentett beállítás.
-  - **Admin panel → Samantha Coin steuern:** rejtett felugró ablak; a „Registrierungscodes” szövegében az „automatisch” szóra kattintva nyílik meg. A kártyák eladási értéke beszámít a teljes vagyonba (ranglista, napi bónusz).
-- **Support-bot („Warren Buffett”):** lebegő chat gomb jobb alul (csak bejelentkezve). Csak az oldallal kapcsolatos kérdésekre válaszol, és csak azt tudja, amit egy felhasználó is lát (`src/support/knowledge.js`; az aktuális árakat/esélyeket élőben olvassa be). Groq API (`GROQ_API_KEY` a `.env`-ben; üresen a chat rejtve van), modellek sorban: `openai/gpt-oss-120b` → `openai/gpt-oss-20b` → `qwen/qwen3.8-27b` (mindegyiknek külön ingyenes percenkénti token-limitje van). Felhasználónként max. 30 üzenet/óra; az előzmények a sessionben tárolódnak (↺ = új beszélgetés).
-  - **Kártyák = képfájlok** a `public/img/tcg` mappában, `<név>[-<szám>]-<ritkaság>.png` névvel (pl. `krisz-6-glitch.png`, `bfw-energy-gold.png`). Új kártyához elég bemásolni a fájlt és újraindítani a szervert.
-- Mások határidőig tehetnek bármelyik opcióra. Egy fogadáson belül mindenki csak **egy opcióra** tehet, de a tétjét emelheti.
-- **Totalizátor (pari-mutuel) elszámolás:** az összes tét egy kasszába kerül. A jutalék levonása után a maradékon a nyerő opcióra tevők osztoznak, **a saját tétjük arányában**.
-- Kvóta = (kassza − jutalék) ÷ az adott opció tétjei (élőben kiszámolva, a tét-űrlapon a várható nyereményt is mutatja).
-- **Speciális esetek** – mindenki visszakapja a tétjét, jutalék nélkül: ha nem volt ellenoldal, ha senki nem tett a nyerő opcióra, vagy ha a fogadást érvénytelenítik (annullieren).
-- A cent-kerekítést a legnagyobb maradék módszerrel osztja el, így a kifizetések és a jutalék összege **mindig pontosan** a kassza.
-- Az eredményt a **kiíró bármikor** rögzítheti (akár a határidő előtt is – ekkor a fogadás azonnal lezárul), de **kötelező indoklást** írnia (pl. végeredmény + forrás), ami utólag is látható. Érvénytelenítésnél is kötelező az indoklás. Az **adminok** (`ADMIN_USERNAMES`) bármelyik fogadást eldönthetik/érvényteleníthetik. Ha a határidő után 14 napig (`AUTO_VOID_DAYS`) nincs eredmény, a rendszer automatikusan érvényteleníti és visszatéríti.
-- **Szerkesztés:** a leírást a kiíró utólag módosíthatja (amíg a fogadás nyitott), a címet csak admin. Minden változás bekerül a fogadás nyilvános változástörténetébe.
-- **Teilen gomb:** a fogadás linkjét a vágólapra másolja.
-- **Napi bónusz:** ha a teljes vagyon (szabad egyenleg + nyitott tétek) 500 € alatt van, naponta +150 €, 500–1000 € között +100 €, 1000 €-tól nincs bónusz. A nap első látogatásakor (német idő) automatikusan jóváíródik, és megjelenik a kivonatban. A sávok a `src/config.js`-ben (`bonusTiers`) állíthatók.
-- **Regisztráció csak kóddal:** az adminok az **Admin** menüpontban (`/admin`) generálnak kódot (formátum `XXXX-XXXX`). Egy kód **30 percig** érvényes és **egyetlen** regisztrációra használható, utána megsemmisül. Vészhelyzetre (pl. nincs admin) a szerveren: `node scripts/create-code.js`.
-- **Kommentek:** minden fogadás alatt beszélgetés; a kiíró és a résztvevők (a választott opcióval) jelölve vannak. Saját komment törölhető, admin bármelyiket eltávolíthatja; percenként max. 6 komment/felhasználó.
-- Minden pénzmozgás **MongoDB tranzakcióban** történik (nem lehet dupla költés, negatív egyenleg vagy kétszeres kifizetés), és bekerül a felhasználó számlakivonatába (Kontoauszug).
+### Wetten
+- **Zwei Wettarten:** *Ja/Nein* (trifft eine Aussage zu?) oder **eigene Optionen** (2–10, z. B. „Bayern / Unentschieden / Dortmund“). Nach dem Veröffentlichen sind die Optionen fest.
+- **Zwei Pflichttermine:** **Einsatzschluss** (bis dahin kann gesetzt werden) und **Auswertung** (Termin der Ergebnisbekanntgabe, nicht vor dem Einsatzschluss). Beide sind auf der Wettseite gut sichtbar.
+- **Setzen:** Bis zum Einsatzschluss auf genau eine Option; der Einsatz kann erhöht, die Option aber nicht gewechselt werden.
+- **Wettersteller setzen nicht mit** und erhalten dafür **5 % vom Topf** als Provision (`CREATOR_FEE_PERCENT`), sobald sie das Ergebnis eintragen.
+- **Totalisator-Abrechnung:** Alle Einsätze landen in einem Topf. Nach Abzug der Provision teilen sich alle, die auf die eingetretene Option gesetzt haben, den Rest – **anteilig nach ihrem Einsatz**.
+- **Quote** = (Topf − Provision) ÷ Einsätze auf die Option – live berechnet; beim Setzen wird der voraussichtliche Gewinn angezeigt.
+- **Sonderfälle** – alle bekommen ihren Einsatz zurück, ohne Provision: keine Gegenseite, niemand auf der Gewinner-Option oder Annullierung.
+- **Rundungscents** werden nach dem Größter-Rest-Verfahren verteilt – Auszahlungen und Provision ergeben immer **exakt** den Topf.
+- **Ergebnis:** Der Wettersteller trägt es ein (jederzeit, auch vor dem Einsatzschluss – dann wird die Wette sofort geschlossen), immer mit **Pflicht-Begründung**, die dauerhaft sichtbar bleibt. Ohne Ergebnis 14 Tage nach dem Auswertungstermin (`AUTO_VOID_DAYS`) wird automatisch annulliert und erstattet.
+- **Bearbeiten:** Die Beschreibung kann der Wettersteller ändern, solange die Wette offen ist; jede Änderung erscheint im öffentlichen Änderungsverlauf.
+- **Kommentare** unter jeder Wette (Wettersteller und Teilnehmende mit gewählter Option markiert, eigene Kommentare löschbar, max. 6 pro Minute).
+- **„Teilen“-Knopf** kopiert den Link zur Wette.
+- **Live-Aktualisierung:** Übersicht, Wettseite und Lotterie prüfen alle 5 Sekunden, ob sich etwas geändert hat, und aktualisieren Topf, Quoten, Teilnehmende und Kommentare im Hintergrund – Eingaben bleiben dabei erhalten.
 
-**Oldalak:** Wetten (lista szűrőkkel + keresés), Wette-részletek, Neue Wette, Mein Konto (egyenleg, statisztika, kivonat, jelszócsere), Rangliste, Coin Exchange, Lotterie, TCG, Regeln (magatartási szabályok + működés), Impressum, Datenschutz.
+### Coin Exchange – Samantha Coin (SAM)
+- Spielgeld in einen simulierten Coin investieren und jederzeit wieder verkaufen – zum aktuellen Kurs, ohne Gebühren.
+- Live-Chart (1 Std. / 24 Std. / 7 Tage / 30 Tage / Alles), Depot (Wert, Einstand, Gewinn/Verlust), eigene Trades und Marktereignisse.
+- **Kursmodell** (`src/coin/model.js`): stochastische Volatilität (ruhige und wilde Phasen), Renditen mit fetten Rändern (Student-t), häufige kleine und gelegentlich große Sprünge, seltene Pumps (+40 … +150 %) und Crashs (−80 … −99 %).
+- **Kurs-Engine** (`src/coin/engine.js`): läuft im Server, neuer Kurs alle 5 Sekunden; Minutenkerzen (3 Tage) und Stundenkerzen (dauerhaft) in MongoDB. War der Server offline, wird die verpasste Zeit beim Start nachsimuliert, damit der Chart lückenlos bleibt.
 
-**Biztonság:** bcrypt jelszó-hash, CSRF-token minden űrlapon, rate limit a belépésnél/regisztrációnál, Helmet biztonsági fejlécek (CSP), session a MongoDB-ben, HttpOnly/SameSite/Secure sütik.
+### Lotterie
+- Täglich eine Ziehung. Ein Los kostet 100 € (`LOTTERY_TICKET_EUR`), bis zu 10 Lose pro Kauf.
+- Jedes Los hat eine Nummer; gezogen wird per kryptografischem Zufall, der Besitzer gewinnt den **gesamten Topf**.
+- Ziehung am Folgetag, immer 1 Minute vor dem Start der nächsten Lotterie – standardmäßig Ziehung 19:59 Uhr, neue Runde 20:00 Uhr (`LOTTERY_TIME`).
+
+### Trading Cards (TCG)
+- Booster Pack mit 3 Karten (Standard 80 €, `TCG_PACK_EUR`), animiertes Öffnen – die seltenste Karte kommt zuletzt.
+- **Sechs Seltenheiten** mit festen Chancen pro Karte: Crumpled 58,12 % · BFWler 28 % · Gold 11 % · Holo 2,5 % · Bockhaber 0,3 % · Glitch 0,08 %. Erst wird die Seltenheit gezogen, dann gleichverteilt eine Karte dieser Seltenheit.
+- **Verkaufswerte:** 5 € / 20 € / 40 € / 150 € / 1.000 € / 3.000 €. Im Schnitt ist ein Pack weniger wert als sein Preis – es geht ums Sammeln.
+- Sammlung mit Filter, fehlende Karten als „?“, Großansicht mit 3D-Neigung und Holo-/Gold-/Glitch-Effekten, Verkauf einzeln oder aller Duplikate.
+- **Karten = Bilddateien** in `public/img/tcg` nach dem Schema `<name>[-<nr>]-<seltenheit>.png` (z. B. `krisz-6-glitch.png`). Neue Karte: Datei ablegen und Server neu starten.
+
+### Konto, Bonus & Rangliste
+- **Registrierung nur mit Einladungscode** (Format `XXXX-XXXX`, 30 Minuten gültig, für genau eine Person).
+- **Nur für Mitglieder:** Ohne Anmeldung sind nur Startseite, Regeln, Impressum, Datenschutz sowie Anmelden/Registrieren sichtbar. Geteilte Wett-Links führen nach der Anmeldung direkt zur Wette.
+- **Tagesbonus** nach Gesamtvermögen (verfügbar + offene Einsätze + Coins + Kartenwert): unter 500 € +150 €, unter 1.000 € +100 €, ab 1.000 € kein Bonus. Gutschrift beim ersten Seitenaufruf ab 07:45 Uhr (deutsche Zeit).
+- **Mein Konto:** Guthaben, Einsätze, Coins, Karten, Gesamtvermögen, Bilanz, eigene Wetten, Kontoauszug, Passwort ändern.
+- **Rangliste** nach Gesamtvermögen.
+- **Support-Bot „Warren Buffett“:** Chat unten rechts (nur angemeldet), beantwortet ausschließlich Fragen zur Plattform auf Basis dessen, was jedes Mitglied selbst sehen kann (`src/support/knowledge.js`). Nutzt die Groq-API (`GROQ_API_KEY`; ohne Schlüssel ist der Chat ausgeblendet), max. 30 Nachrichten pro Stunde und Person.
+
+### Sicherheit
+- Alle Geldbewegungen laufen in **MongoDB-Transaktionen** (keine Doppelausgaben, kein negatives Guthaben, keine doppelten Auszahlungen) und landen im Kontoauszug.
+- bcrypt-Passwort-Hashes, CSRF-Token in jedem Formular, Rate-Limits bei Anmeldung und Registrierung, Helmet-Sicherheitsheader (CSP), Sessions in MongoDB, HttpOnly-/SameSite-/Secure-Cookies.
+
+**Seiten:** Wetten (Filter + Suche), Wettdetails, Neue Wette, Mein Konto, Rangliste, Coin Exchange, Lotterie, TCG, Regeln, Impressum, Datenschutz.
 
 ---
 
-## 1. MongoDB Atlas beállítása
+## 1. MongoDB Atlas einrichten
 
-1. [cloud.mongodb.com](https://cloud.mongodb.com) → hozz létre egy clustert (az ingyenes M0 is elég).
-2. **Database Access** → új adatbázis-felhasználó jelszóval (readWrite jog).
-3. **Network Access** → add hozzá a **VPS IP-címét** (fejlesztéshez ideiglenesen a saját IP-det is).
-4. **Connect → Drivers** → másold ki a connection stringet, és írd bele az adatbázis nevét (`/wettstube`):
+1. Auf [cloud.mongodb.com](https://cloud.mongodb.com) einen Cluster anlegen (der kostenlose M0 reicht).
+2. **Database Access** → neuen Datenbanknutzer mit Passwort anlegen (Recht: readWrite).
+3. **Network Access** → die **IP-Adresse des Servers** freigeben (zum Entwickeln vorübergehend auch die eigene).
+4. **Connect → Drivers** → Connection-String kopieren und den Datenbanknamen (`/wettstube`) einsetzen:
    ```
-   mongodb+srv://USER:JELSZO@cluster0.xxxxx.mongodb.net/wettstube?retryWrites=true&w=majority
+   mongodb+srv://USER:PASSWORT@cluster0.xxxxx.mongodb.net/wettstube?retryWrites=true&w=majority
    ```
-   Ha a jelszóban speciális karakter van (`@ : / ?` stb.), URL-kódold.
+   Sonderzeichen im Passwort (`@ : / ?` usw.) müssen URL-kodiert werden.
 
-A táblák (collections) és indexek az első indításkor automatikusan létrejönnek.
+Collections und Indizes werden beim ersten Start automatisch angelegt.
 
-## 2. Helyi futtatás (opcionális)
+## 2. Lokal starten (optional)
 
 ```bash
 npm install
-cp .env.example .env      # töltsd ki: MONGODB_URI, SESSION_SECRET; NODE_ENV=development, COOKIE_SECURE=false
+cp .env.example .env      # ausfüllen: MONGODB_URI, SESSION_SECRET; NODE_ENV=development, COOKIE_SECURE=false
 npm run dev               # http://localhost:3000
-npm test                  # elszámolási logika tesztjei
+npm test                  # Tests (Abrechnung, Coin-Modell, Lotterie, TCG …)
 ```
 
-## 3. Telepítés VPS-re (Ubuntu/Debian)
+## 3. Installation auf einem Server (Ubuntu/Debian)
 
-### 3.1 Szoftverek
+### 3.1 Software
 ```bash
 sudo apt update && sudo apt install -y nginx git
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
@@ -74,91 +87,99 @@ sudo apt install -y nodejs
 sudo npm install -g pm2
 ```
 
-### 3.2 Kód feltöltése
-Git-tel (`git clone … /var/www/wettstube`) vagy a mappát másold fel, pl.:
+### 3.2 Code auf den Server bringen
+Per Git (`git clone … /var/www/wettstube`) oder den Ordner kopieren, z. B.:
 ```bash
-scp -r wettstube user@VPS_IP:/var/www/
+scp -r wettstube user@SERVER_IP:/var/www/
 ```
-(`node_modules` és `.env` nélkül.)
+(ohne `node_modules` und `.env`)
 
-### 3.3 Konfiguráció és indítás
+### 3.3 Konfiguration und Start
 ```bash
 cd /var/www/wettstube
 npm ci --omit=dev
 cp .env.example .env
 nano .env
 ```
-Töltsd ki legalább:
-- `MONGODB_URI` – az Atlas string
-- `SESSION_SECRET` – generálj egyet: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
-- `ADMIN_USERNAMES` – a saját felhasználóneved (regisztráció után)
-- `COOKIE_SECURE=false` **amíg nincs HTTPS**, utána `true`!
+Mindestens ausfüllen:
+- `MONGODB_URI` – der Atlas-Connection-String
+- `SESSION_SECRET` – z. B. erzeugen mit `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
+- `COOKIE_SECURE=false`, **solange kein HTTPS eingerichtet ist** – danach `true`
 
 ```bash
 pm2 start ecosystem.config.js
 pm2 save
-pm2 startup        # a kiírt parancsot futtasd le, így újraindítás után is elindul
-pm2 logs wettstube # itt látod, ha valami nem jó (pl. Atlas IP nincs engedélyezve)
+pm2 startup        # den ausgegebenen Befehl ausführen, damit die App nach einem Neustart wieder läuft
+pm2 logs wettstube # zeigt Fehler, z. B. wenn die Server-IP in Atlas nicht freigegeben ist
+```
+
+Den ersten Einladungscode erzeugt man direkt auf dem Server:
+```bash
+node scripts/create-code.js
 ```
 
 ### 3.4 Nginx + HTTPS
 ```bash
 sudo cp deploy/nginx-wettstube.conf /etc/nginx/sites-available/wettstube
-sudo nano /etc/nginx/sites-available/wettstube      # example.de -> a domained
+sudo nano /etc/nginx/sites-available/wettstube      # Domain eintragen
 sudo ln -s /etc/nginx/sites-available/wettstube /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d deinedomain.de -d www.deinedomain.de
+sudo certbot --nginx -d deinedomain.de
 ```
-Ezután `.env`-ben `COOKIE_SECURE=true`, majd `pm2 restart wettstube`.
+Danach in der `.env` `COOKIE_SECURE=true` setzen und `pm2 restart wettstube` ausführen.
 
-Tűzfal (ha van): `sudo ufw allow 'Nginx Full' && sudo ufw allow OpenSSH`.
+Firewall (falls aktiv): `sudo ufw allow 'Nginx Full' && sudo ufw allow OpenSSH`.
 
-### 3.5 Frissítés
+### 3.5 Aktualisieren
 ```bash
 cd /var/www/wettstube
-git pull            # vagy új fájlok feltöltése
+git pull            # oder neue Dateien hochladen
 npm ci --omit=dev
 pm2 restart wettstube
 ```
 
-## Beállítások (.env)
+## Einstellungen (.env)
 
-| Változó | Alapérték | Jelentés |
+| Variable | Standard | Bedeutung |
 |---|---|---|
-| `MONGODB_URI` | – | Atlas connection string (kötelező) |
-| `SESSION_SECRET` | – | hosszú véletlen string (kötelező, prod-ban min. 32 karakter) |
-| `APP_NAME` | BfW Holdings | az oldal neve |
-| `START_BALANCE_EUR` | 1000 | kezdő játékpénz |
-| `MIN_STAKE_EUR` | 1 | minimális tét |
-| `ADMIN_USERNAMES` | – | vesszővel elválasztott admin felhasználónevek |
-| `CREATOR_FEE_PERCENT` | 5 | a kiíró jutaléka a kasszából (%) – csak az új fogadásokra |
-| `AUTO_VOID_DAYS` | 14 | ennyi nap után automatikus érvénytelenítés, ha nincs eredmény |
-| `COOKIE_SECURE` | prod-ban true | HTTPS nélkül `false` kell |
-| `TRUST_PROXY` | prod-ban 1 | proxyk száma az app előtt (Nginx = 1) |
-| `PORT` / `HOST` | 3000 / 127.0.0.1 | csak lokálisan figyel, kívülről az Nginx éri el |
+| `MONGODB_URI` | – | Atlas-Connection-String (Pflicht) |
+| `SESSION_SECRET` | – | langer Zufallswert (Pflicht, in Produktion mind. 32 Zeichen) |
+| `APP_NAME` | BfW Holdings | Name der Seite |
+| `START_BALANCE_EUR` | 1000 | Startguthaben |
+| `MIN_STAKE_EUR` | 1 | Mindesteinsatz |
+| `CREATOR_FEE_PERCENT` | 5 | Provision des Wetterstellers in % vom Topf (für neue Wetten) |
+| `AUTO_VOID_DAYS` | 14 | automatische Annullierung, wenn so lange nach dem Auswertungstermin kein Ergebnis vorliegt |
+| `LOTTERY_TICKET_EUR` | 100 | Preis eines Lotterieloses |
+| `LOTTERY_TIME` | 20:00 | Start der täglichen Lotterie (Ziehung 1 Minute vorher) |
+| `TCG_PACK_EUR` | 80 | Preis eines Booster Packs |
+| `GROQ_API_KEY` | – | Schlüssel für den Support-Bot (leer = Chat ausgeblendet) |
+| `COOKIE_SECURE` | in Produktion true | ohne HTTPS auf `false` setzen |
+| `TRUST_PROXY` | in Produktion 1 | Anzahl der Proxys vor der App (Nginx = 1) |
+| `PORT` / `HOST` | 3000 / 127.0.0.1 | lauscht nur lokal, von außen über Nginx erreichbar |
 
-## Élesítés előtt
+## Vor dem Livegang
 
-- **Impressum és Datenschutz**: a `views/impressum.ejs` és `views/datenschutz.ejs` fájlokban helyőrzők vannak – töltsd ki a saját adataiddal.
-- Atlas-ban érdemes bekapcsolni a biztonsági mentést (M0-n nincs automatikus backup – ott `mongodump`-pal időnként menthetsz).
+- **Impressum und Datenschutz:** In `views/impressum.ejs` und `views/datenschutz.ejs` stehen Platzhalter – mit den eigenen Angaben ausfüllen.
+- **Backups:** Der kostenlose Atlas-Cluster (M0) hat keine automatischen Backups – regelmäßig mit `mongodump` sichern.
 
-## Projektstruktúra
+## Projektstruktur
 
 ```
-server.js                 indítás, DB-kapcsolat, graceful shutdown
-src/config.js             .env beolvasása
-src/app.js                Express, biztonság, session, route-ok
-src/lib/payout.js         kifizetés-számítás (totalizátor)
-src/services/betService.js  tranzakciók: regisztráció, fogadás, tét, lezárás
-src/models/               User, Bet, Position (tét), Ledger (számlakivonat)
-src/routes/               oldalak
-src/jobs.js               lejárt fogadások automatikus érvénytelenítése
-src/tcg/                  TCG: kártyakatalógus + esélyek (catalog.js), packnyitás/eladás (tcgService.js)
-public/img/tcg/           kártya- és booster-pack képek
-views/                    EJS sablonok (német szöveg)
-public/                   CSS, JS, favicon
-deploy/                   Nginx konfiguráció
-ecosystem.config.js       PM2 konfiguráció
+server.js                   Start, Datenbankverbindung, sauberes Herunterfahren
+src/config.js               Einstellungen aus der .env
+src/app.js                  Express, Sicherheit, Sessions, Routen
+src/lib/payout.js           Abrechnung (Totalisator)
+src/services/               Wetten, Registrierung, Tagesbonus, Lotterie, Einladungscodes
+src/coin/                   Samantha Coin: Kursmodell, Kurs-Engine, Handel
+src/tcg/                    Trading Cards: Katalog und Chancen, Packs öffnen und verkaufen
+src/support/                Support-Bot
+src/models/                 MongoDB-Modelle
+src/routes/                 Seiten und Aktionen
+src/jobs.js                 Hintergrundaufgaben (automatische Annullierung, Lotterie-Ziehung)
+views/                      EJS-Vorlagen
+public/                     CSS, JavaScript, Bilder (Kartenbilder in public/img/tcg)
+deploy/                     Nginx-Konfiguration
+ecosystem.config.js         PM2-Konfiguration
 ```
