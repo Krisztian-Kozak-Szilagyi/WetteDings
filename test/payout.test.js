@@ -36,6 +36,34 @@ test('10 % Provision: Beispiel aus den Regeln', () => {
   assert.equal(sum(payouts) + fee, 30000);
 });
 
+test('Gewinner bekommen nie weniger als ihren Einsatz (Provision gedeckelt)', () => {
+  // Fast alle auf "o1": 1000 € gegen 10 €. 5 % vom Topf wären 50,50 € – mehr als die Verlierer gesetzt haben.
+  const positions = [
+    { id: 'a', side: 'o1', amount: 60000 },
+    { id: 'b', side: 'o1', amount: 40000 },
+    { id: 'x', side: 'o2', amount: 1000 },
+  ];
+  const { payouts, fee } = computePayouts(positions, 'o1', 5);
+  assert.equal(fee, 1000); // gedeckelt auf den Verlierer-Einsatz
+  assert.equal(payouts.get('a'), 60000);
+  assert.equal(payouts.get('b'), 40000);
+  assert.equal(sum(payouts) + fee, 101000);
+  // Quote fällt nie unter 1,00
+  assert.equal(quote(100000, 1000, 5), 1);
+});
+
+test('Zufallstest: kein Gewinner verliert Geld', () => {
+  for (let run = 0; run < 2000; run++) {
+    const positions = Array.from({ length: 2 + Math.floor(Math.random() * 20) }, (_, i) => ({
+      id: String(i),
+      side: Math.random() < 0.9 ? 'o1' : 'o2', // stark einseitig
+      amount: 1 + Math.floor(Math.random() * 1e6),
+    }));
+    const { payouts } = computePayouts(positions, 'o1', 5 + Math.floor(Math.random() * 20));
+    for (const p of positions) if (p.side === 'o1') assert.ok(payouts.get(p.id) >= p.amount, `Gewinner ${p.id} verliert Geld`);
+  }
+});
+
 test('Keine Provision bei Erstattung', () => {
   const positions = [
     { id: 'a', side: 'o1', amount: 500 },

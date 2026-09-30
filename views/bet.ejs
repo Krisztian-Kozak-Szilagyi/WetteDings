@@ -219,7 +219,7 @@
         <% } else { %>
           <p>Du bist Wettersteller und kannst nicht selbst mitsetzen.</p>
           <% if (feePct) { %>
-            <p class="muted">Deine Provision nach aktuellem Stand: <strong><%= euro(feeEstimate(bet)) %></strong> (<%= feePct %> % vom Topf). Sie wird ausgezahlt, wenn du das Ergebnis einträgst – nicht bei Annullierung oder wenn es keine Gegenseite gibt.</p>
+            <p class="muted">Deine Provision nach aktuellem Stand: bis zu <strong><%= euro(feeEstimate(bet)) %></strong> (<%= feePct %> % vom Topf, höchstens die Einsätze der Verlierer). Sie wird ausgezahlt, wenn du das Ergebnis einträgst – nicht bei Annullierung oder wenn es keine Gegenseite gibt.</p>
           <% } %>
         <% } %>
       </div>
@@ -235,7 +235,9 @@
         <% } else {
              const mine = totals[myPosition.side] || 0;
              const other = total - mine;
-             const est = other > 0 && mine > 0 ? Math.floor(myPosition.amount * total * (100 - feePct) / 100 / mine) : myPosition.amount; %>
+             // Provision höchstens so hoch wie die Einsätze der anderen Optionen -> nie weniger als der Einsatz
+             const estFee = Math.min(total * feePct / 100, other);
+             const est = other > 0 && mine > 0 ? Math.floor(myPosition.amount * (total - estFee) / mine) : myPosition.amount; %>
           <p class="muted">Wenn „<%= optionLabel(bet, myPosition.side) %>“ eintritt, bekämst du nach aktuellem Stand <strong><%= euro(est) %></strong>.
             <% if (!other) { %>Noch hat niemand anders gesetzt – ohne Gegenseite gibt es nur den Einsatz zurück.<% } %></p>
         <% } %>

@@ -5,9 +5,11 @@
   <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
 </div>
 
-<nav class="tabs" aria-label="Filter">
+<nav class="tabs" aria-label="Filter" data-live="tabs">
   <% Object.entries(tabs).forEach(([key, label]) => { if (key === 'meine' && !currentUser) return; %>
-    <a href="/?tab=<%= key %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="tab <%= tab === key ? 'active' : '' %>"><%= label %></a>
+    <a href="/?tab=<%= key %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="tab <%= tab === key ? 'active' : '' %>">
+      <%= label %><span class="tab-count <%= counts[key] ? '' : 'is-zero' %>" aria-label="<%= counts[key] %> Wetten"><%= counts[key] > 99 ? '99+' : counts[key] %></span>
+    </a>
   <% }) %>
 </nav>
 

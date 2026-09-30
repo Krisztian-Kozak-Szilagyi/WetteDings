@@ -234,7 +234,7 @@
       var totals = {};
       try { totals = JSON.parse(form.dataset.totals || '{}'); } catch (e) { totals = {}; }
       var pot = Object.keys(totals).reduce(function (s, k) { return s + Number(totals[k] || 0); }, 0);
-      var feeFactor = 1 - (Number(form.dataset.fee) || 0) / 100;
+      var feePct = (Number(form.dataset.fee) || 0) / 100;
       var mySide = form.dataset.mySide || '';
       var myAmount = Number(form.dataset.myAmount) || 0;
       var r = form.querySelector('input[name="side"]:checked');
@@ -250,7 +250,9 @@
         out.textContent = 'Noch hat niemand anders gesetzt – ohne Gegenseite gibt es nur den Einsatz zurück.';
         return;
       }
-      var payout = Math.floor(stake * (mine + other) * feeFactor / mine);
+      // Provision höchstens so hoch wie die Einsätze der Gegenseite -> Gewinner bekommen nie weniger als ihren Einsatz
+      var fee = Math.min((mine + other) * feePct, other);
+      var payout = Math.floor(stake * (mine + other - fee) / mine);
       out.append('Wenn ');
       var b1 = document.createElement('strong'); b1.textContent = '„' + label + '“'; out.append(b1);
       out.append(' eintritt, bekommst du nach aktuellem Stand ca. ');

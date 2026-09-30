@@ -9,6 +9,10 @@
  *  - Niemand hat auf die eingetretene Option gesetzt
  *  - Alle haben auf die eingetretene Option gesetzt (es gibt nichts zu gewinnen)
  *
+ * Gewinner-Schutz: Die Provision ist höchstens so hoch wie die Einsätze der Verlierer.
+ * Wer gewinnt, bekommt dadurch nie weniger zurück, als er eingesetzt hat – auch dann nicht,
+ * wenn fast alle auf dieselbe Option gesetzt haben.
+ *
  * Alle Beträge sind Cent-Ganzzahlen. Die Provision wird abgerundet, Rundungsreste der
  * Gewinner werden nach dem Größter-Rest-Verfahren verteilt – die Summe aus Auszahlungen
  * und Provision entspricht immer exakt dem Topf.
@@ -36,7 +40,7 @@ function computePayouts(positions, outcome, feePercent = 0) {
   if (winTotal === 0 || loseTotal === 0) return refundAll();
 
   const pot = winTotal + loseTotal;
-  const fee = Math.floor((pot * Math.min(100, Math.max(0, feePercent))) / 100);
+  const fee = feeFor(pot, loseTotal, feePercent);
   const W = BigInt(winTotal);
   const D = BigInt(pot - fee); // an die Gewinner zu verteilen
   let distributed = 0n;
@@ -62,12 +66,21 @@ function computePayouts(positions, outcome, feePercent = 0) {
   return { payouts, refunded: false, fee };
 }
 
-/** Aktuelle Quote einer Option (Auszahlung pro 1 € Einsatz, nach Provision), oder null. */
+/**
+ * Provision in Cent: feePercent % vom Topf, aber höchstens die Einsätze der Verlierer
+ * (sonst müssten die Gewinner draufzahlen).
+ */
+function feeFor(pot, loseTotal, feePercent = 0) {
+  const pct = Math.min(100, Math.max(0, feePercent));
+  return Math.min(Math.floor((pot * pct) / 100), loseTotal);
+}
+
+/** Aktuelle Quote einer Option (Auszahlung pro 1 € Einsatz, nach Provision), oder null. Nie unter 1,00. */
 function quote(sideTotal, otherTotal, feePercent = 0) {
   if (!sideTotal) return null;
   const pot = sideTotal + otherTotal;
-  const payable = otherTotal ? pot * (1 - feePercent / 100) : pot;
+  const payable = otherTotal ? pot - Math.min((pot * feePercent) / 100, otherTotal) : pot;
   return payable / sideTotal;
 }
 
-module.exports = { computePayouts, quote };
+module.exports = { computePayouts, quote, feeFor };

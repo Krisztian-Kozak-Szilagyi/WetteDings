@@ -56,38 +56,37 @@ router.get('/', async (req, res) => {
   // Versionsstand VOR dem Laden der Daten – so wird jede spätere Änderung sicher erkannt
   const liveVersion = await listVersion();
 
-  const filter = {};
-  let sort;
-  switch (tab) {
-    case 'offen':
-      Object.assign(filter, { status: 'offen', deadline: { $gt: now } });
-      sort = { deadline: 1 };
-      break;
-    case 'wartend':
-      Object.assign(filter, { status: 'offen', deadline: { $lte: now } });
-      sort = { deadline: -1 };
-      break;
-    case 'abgeschlossen':
-      filter.status = { $in: ['entschieden', 'annulliert'] };
-      sort = { resolvedAt: -1 };
-      break;
-    case 'meine':
-      // gesetzt ODER selbst erstellt (Ersteller setzen seit v3 nicht mehr mit)
-      filter.$or = [{ _id: { $in: await Position.distinct('bet', { user: req.user._id }) } }, { creator: req.user._id }];
-      sort = { createdAt: -1 };
-      break;
-  }
-  if (q) filter.title = { $regex: escapeRegex(q), $options: 'i' };
+  // Filter und Sortierung je Reiter (die Suche gilt für alle Reiter, auch für die Zähler)
+  const myBetIds = await Position.distinct('bet', { user: req.user._id });
+  const search = q ? { title: { $regex: escapeRegex(q), $options: 'i' } } : {};
+  const TAB_QUERIES = {
+    offen: { filter: { status: 'offen', deadline: { $gt: now } }, sort: { deadline: 1 } },
+    wartend: { filter: { status: 'offen', deadline: { $lte: now } }, sort: { deadline: -1 } },
+    abgeschlossen: { filter: { status: { $in: ['entschieden', 'annulliert'] } }, sort: { resolvedAt: -1 } },
+    // gesetzt ODER selbst erstellt (Ersteller setzen nicht mit)
+    meine: { filter: { $or: [{ _id: { $in: myBetIds } }, { creator: req.user._id }] }, sort: { createdAt: -1 } },
+  };
+  const { filter, sort } = TAB_QUERIES[tab];
 
-  const bets = await Bet.find(filter)
-    .sort({ ...sort, _id: -1 })
-    .skip((page - 1) * PER_PAGE)
-    .limit(PER_PAGE + 1)
-    .lean();
+  const [bets, countList] = await Promise.all([
+    Bet.find({ ...filter, ...search })
+      .sort({ ...sort, _id: -1 })
+      .skip((page - 1) * PER_PAGE)
+      .limit(PER_PAGE + 1)
+      .lean(),
+    Promise.all(Object.keys(TAB_QUERIES).map((key) => Bet.countDocuments({ ...TAB_QUERIES[key].filter, ...search }))),
+  ]);
   const hasMore = bets.length > PER_PAGE;
   if (hasMore) bets.pop();
+  const counts = Object.fromEntries(Object.keys(TAB_QUERIES).map((key, i) => [key, countList[i]]));
 
-  res.render('index', { title: 'Wetten', bets, tab, tabs: TABS, page, hasMore, q, liveVersion });
+  // Eigene Tipps auf den angezeigten Wetten: { betId: { side, amount } }
+  const myPositions = await Position.find({ user: req.user._id, bet: { $in: bets.map((b) => b._id) } })
+    .select('bet side amount')
+    .lean();
+  const myPicks = Object.fromEntries(myPositions.map((p) => [String(p.bet), { side: p.side, amount: p.amount }]));
+
+  res.render('index', { title: 'Wetten', bets, tab, tabs: TABS, counts, myPicks, page, hasMore, q, liveVersion });
 });
 
 // ---------- Live-Stand (für die automatische Aktualisierung alle 5 Sekunden) ----------

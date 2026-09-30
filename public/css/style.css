@@ -419,6 +419,27 @@ select {
 .lotto-rules { margin: 0; padding-left: 20px; }
 .lotto-rules li { margin-bottom: 6px; }
 
+/* Wetten-Übersicht: eigener Tipp + Zähler an den Reitern */
+.bet-card.has-pick { border: 2px solid var(--opt); box-shadow: 0 0 0 3px color-mix(in srgb, var(--opt) 18%, transparent), var(--shadow); }
+.bet-card.has-pick:hover { border-color: var(--opt); }
+.my-pick {
+  margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; font-size: .88rem;
+  background: color-mix(in srgb, var(--opt) 14%, var(--surface)); color: var(--text);
+}
+.my-pick strong { color: var(--opt); }
+.opt-row.is-mine .opt-label::before { content: "★ "; color: var(--opt); }
+
+nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
+.tab { position: relative; }
+.tab-count {
+  position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-size: .72rem; font-weight: 800; line-height: 1;
+  background: var(--primary); color: #fff; border: 2px solid var(--bg); font-variant-numeric: tabular-nums;
+}
+.tab-count.is-zero { background: var(--surface-2); color: var(--muted); border-color: var(--bg); }
+.tab.active .tab-count:not(.is-zero) { background: var(--primary); }
+
 /* Admin: Coin-Steuerung */
 .admin-coin-form { display: flex; flex-direction: column; gap: 12px; max-width: 460px; }
 .admin-coin-form .quick-amounts { margin: 0; }

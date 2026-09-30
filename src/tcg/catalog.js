@@ -47,6 +47,12 @@ const rarityByKey = Object.fromEntries(RARITIES.map((r) => [r.key, r]));
 // Namen, die sich nicht automatisch aus dem Dateinamen ergeben (so wie sie auf der Karte stehen)
 const NAME_OVERRIDES = {
   'casino-kaffee': 'Casino-Kaffee',
+  'good-boy': 'Good Boy',
+  'st-ivan': 'St. Ivan',
+  omer: 'Ömer',
+  'grafikkarte-amd': 'AMD-Grafikkarte',
+  'grafikkarte-nvidia': 'NVIDIA-Grafikkarte',
+  seven: '7',
 };
 
 /** "bfw-energy" -> "BFW Energy", "krisz" -> "Krisz" */

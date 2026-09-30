@@ -1,8 +1,11 @@
 <%
   const st = statusInfo(bet);
-  const shown = bet.options.slice(0, 3);
+  const pick = locals.myPicks ? myPicks[String(bet._id)] : null; // eigener Tipp auf diese Wette
+  // die eigene Option immer anzeigen, auch wenn sie nicht unter den ersten drei ist
+  let shown = bet.options.slice(0, 3);
+  if (pick && !shown.some((o) => o.key === pick.side)) shown = [...bet.options.slice(0, 2), findOption(bet, pick.side)].filter(Boolean);
 %>
-<a class="bet-card" href="/wetten/<%= bet._id %>">
+<a class="bet-card <%= pick ? 'has-pick ' + optClass(bet, pick.side) : '' %>" href="/wetten/<%= bet._id %>">
   <div class="bet-card-top">
     <span class="badge badge-<%= st.key %>"><%= st.label %></span>
     <span class="muted small"><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %><% if (bet.commentCount) { %> · <%= bet.commentCount %> <%= bet.commentCount === 1 ? 'Kommentar' : 'Kommentare' %><% } %></span>
@@ -12,7 +15,7 @@
   <%- include('bar', { bet }) %>
   <ul class="opt-list">
     <% shown.forEach((o) => { %>
-      <li class="opt-row <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'is-winner' : '' %>">
+      <li class="opt-row <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'is-winner' : '' %> <%= pick && pick.side === o.key ? 'is-mine' : '' %>">
         <span class="opt-dot"></span>
         <span class="opt-label"><%= o.label %></span>
         <span class="opt-meta"><%= share(bet, o) %> % · <%= quote(bet, o) %></span>
@@ -22,6 +25,9 @@
       <li class="muted small">+ <%= bet.options.length - shown.length %> weitere Optionen</li>
     <% } %>
   </ul>
+  <% if (pick) { %>
+    <p class="my-pick">Dein Tipp: <strong><%= optionLabel(bet, pick.side) %></strong> · <%= euro(pick.amount) %></p>
+  <% } %>
   <% if (bet.resultAt && bet.status === 'offen') { %>
     <p class="muted small card-result-date">Auswertung: <%= date(bet.resultAt) %></p>
   <% } %>
