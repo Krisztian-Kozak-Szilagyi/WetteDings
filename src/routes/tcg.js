@@ -1,6 +1,8 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
 const { TcgOpening } = require('../models/Tcg');
+const { TcgCard } = require('../models/Tcg');
+const { lockedDocs } = require('../tcg/locks');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
@@ -19,11 +21,18 @@ function cardView(card) {
 }
 
 router.get('/tcg', async (req, res) => {
-  const [owned, stats, rarePulls] = await Promise.all([
+  const [owned, stats, rarePulls, locked] = await Promise.all([
     tcg.inventory(req.user._id),
     TcgOpening.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: null, packs: { $sum: 1 }, spent: { $sum: '$cost' }, best: { $max: '$best' } } }]),
     TcgOpening.find({ best: { $gte: catalog.rarityByKey.holo.rank } }).sort({ createdAt: -1 }).limit(10).lean(),
+    lockedDocs(req.user._id),
   ]);
+  // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
+  const lockedByCard = {};
+  for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card').lean()) {
+    const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason: locked.reasons.get(String(d._id)) });
+    e.n += 1;
+  }
   const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
   const collectionValue = owned.reduce((s, o) => s + (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell * o.n : 0), 0);
   const cardCount = owned.reduce((s, o) => s + o.n, 0);
@@ -40,6 +49,7 @@ router.get('/tcg', async (req, res) => {
     counts,
     uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
     cardCount,
+    lockedByCard,
     dupCount,
     dupValue,
     collectionValue,

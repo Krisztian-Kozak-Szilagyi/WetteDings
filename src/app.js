@@ -7,6 +7,8 @@ const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const config = require('./config');
 const viewHelpers = require('./lib/viewHelpers');
+const { settings: ihkSettings } = require('./ihk/ihkService');
+const tradeService = require('./trade/tradeService');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -65,8 +67,10 @@ function createApp() {
     lotteryTicketPrice: config.lotteryTicketPrice,
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
+    ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
+    tradeIncoming: 0,
     currentPath: '',
     flash: null,
     csrfToken: '',
@@ -76,6 +80,11 @@ function createApp() {
   app.use(loadUser);
   app.use(dailyBonus);
   app.use(csrf);
+  // Anzahl neuer Handelsangebote für das Abzeichen im Menü
+  app.use(async (req, res, next) => {
+    res.locals.tradeIncoming = req.user && req.method === 'GET' ? await tradeService.incomingCount(req.user._id) : 0;
+    next();
+  });
 
   app.use(require('./routes/pages'));
   app.use(require('./routes/auth'));
@@ -86,6 +95,8 @@ function createApp() {
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));
   app.use(require('./routes/support'));
+  app.use(require('./routes/ihk'));
+  app.use(require('./routes/trade'));
 
   app.use((req, res) => {
     res.status(404).render('error', {

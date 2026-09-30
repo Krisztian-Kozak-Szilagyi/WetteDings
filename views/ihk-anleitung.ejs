@@ -1,0 +1,74 @@
+<%- include('partials/head') %>
+
+<div class="narrow prose">
+  <div class="page-head">
+    <h1>IHK – So funktioniert's</h1>
+    <a class="btn btn-ghost btn-sm" href="/ihk">← Zurück zur IHK</a>
+  </div>
+
+  <div class="card">
+    <h2>Worum geht's?</h2>
+    <p>Du nimmst Aufträge (Quests) an und schickst eine deiner Karten zur Arbeit. Schafft sie die <strong>Ziel-Punkte</strong> vor der Deadline, bekommst du den <strong>Lohn</strong>.</p>
+    <ol>
+      <li><strong>Quest wählen:</strong> Es gibt immer drei Quests. Jede zeigt Ziel-Punkte, Schwierigkeit (Crumpled bis Glitch), Dauer und Lohn.</li>
+      <li><strong>Karte wählen:</strong> Eine Charakterkarte kommt in das große Feld, optional eine Karte in den Boost-Slot.</li>
+      <li><strong>Warten:</strong> Die Quest dauert eine Weile. Die eingesetzten Karten sind so lange gesperrt.</li>
+      <li><strong>Ergebnis:</strong> Danach siehst du, wie deine Karte gearbeitet hat – und holst bei Erfolg deinen Lohn ab.</li>
+    </ol>
+    <p class="muted small">Pro Tag gibt es nur eine begrenzte Zahl an Quests und immer nur eine gleichzeitig.</p>
+  </div>
+
+  <div class="card">
+    <h2>Welche Fähigkeit wird gebraucht?</h2>
+    <p>Jede Quest braucht <strong>FIA</strong>, <strong>FIS</strong> oder <strong>BWL</strong> – verraten wird das nicht. Lies die Beschreibung und überleg, wer die Aufgabe am besten lösen kann. Die Karte sammelt nur mit dem Wert Punkte, den die Quest braucht.</p>
+  </div>
+
+  <div class="card">
+    <h2>Wie wird gerechnet?</h2>
+    <ul>
+      <li>Die Arbeitszeit ist in <strong>Runden</strong> aufgeteilt. In jeder Runde sammelt die Karte ungefähr ihren Wert in der gebrauchten Fähigkeit – mit etwas Zufall, und manchmal gibt es einen <strong>kritischen Treffer</strong> (doppelte Punkte).</li>
+      <li><strong>Speed</strong> bestimmt, wie viele Runden in die Arbeitszeit passen: langsame Karten schaffen etwa 11 Runden, die schnellsten etwa 20. Speed hilft also, die passende Fähigkeit ist aber wichtiger.</li>
+      <li><strong>Fähigkeiten</strong> der Karten werden erst zur <strong>Halbzeit</strong> aktiv – und nur, wenn die Bedingung aus dem Kartentext erfüllt ist. Ist das Ziel schon vorher erreicht, braucht es sie nicht mehr.</li>
+      <li>Im <strong>Boost-Slot</strong> zählt nur die Fähigkeit der Karte, nicht ihre Werte. Deshalb passen dort nur Karten, die als Boost etwas bewirken.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Boost-Karten</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Karte</th><th>Wirkung als Boost</th><th>Bedingung</th></tr></thead>
+        <tbody>
+          <tr><td>BFW Energy</td><td>Alle Werte +10 %. Mit Krisz: Krisz arbeitet außerdem schneller (Speed ×1,5).</td><td>–</td></tr>
+          <tr><td>Casino-Kaffee</td><td>Speed + Wert auf der Karte (+5 bis +30)</td><td>–</td></tr>
+          <tr><td>Pascal</td><td>Bloodlust: Die Deadline steht eine Runde still – eine Runde mehr Zeit</td><td>–</td></tr>
+          <tr><td>Ömer</td><td>FIS +15 %</td><td>–</td></tr>
+          <tr><td>Good Boy</td><td>Alle Werte der Hauptkarte +3 (bei Matze zusätzlich seine eigene Fähigkeit)</td><td>–</td></tr>
+          <tr><td>Lili</td><td>Alle Werte und Speed von Krisz verdoppelt</td><td>nur mit Krisz</td></tr>
+          <tr><td>NVIDIA-Grafikkarte</td><td>Speed ×2 für 3 Runden</td><td>nur mit 7</td></tr>
+          <tr><td>AMD-Grafikkarte</td><td>Speed halbiert für 3 Runden – 7 wird traurig</td><td>nur mit 7</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Fähigkeiten als Hauptkarte</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Karte</th><th>Wirkung</th><th>Bedingung</th></tr></thead>
+        <tbody>
+          <tr><td>Krisz</td><td>Speed ×1,5</td><td>nur mit BFW Energy im Boost-Slot</td></tr>
+          <tr><td>Luca</td><td>BWL +50 %</td><td>–</td></tr>
+          <tr><td>Aleks</td><td>Die nächste Runde zählt mit dem Maximalwert 99</td><td>–</td></tr>
+          <tr><td>Pascal</td><td>Bloodlust (siehe oben)</td><td>–</td></tr>
+          <tr><td>Matze</td><td>+10 FIS, +5 FIA und BWL</td><td>nur mit Good Boy (Hundekarte) im Boost-Slot</td></tr>
+          <tr><td>7</td><td>siehe NVIDIA/AMD</td><td>mit Grafikkarte im Boost-Slot</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted small">Adrian, Marcel und St. Ivan wirken auf gegnerische Karten – in der IHK haben sie keine Fähigkeit.</p>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

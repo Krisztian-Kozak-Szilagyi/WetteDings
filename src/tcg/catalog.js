@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const STATS = require('./stats');
 
 const IMAGE_DIR = path.join(__dirname, '..', '..', 'public', 'img', 'tcg');
 const IMAGE_URL = '/img/tcg';
@@ -67,9 +68,10 @@ function prettyName(slug) {
 /**
  * Karten aus den Dateinamen in public/img/tcg lesen: "<name>[-<nr>]-<seltenheit>.png",
  * z. B. "krisz-6-glitch.png" oder "bfw-energy-gold.png". Neue Karten = einfach Datei ablegen.
+ * Optional mit Werten (Speed-FIA-FIS-BWL): "anna-3-gold_36-39-21-12.png" – die Karten-ID bleibt "anna-3-gold".
  */
 function loadCards(dir = IMAGE_DIR) {
-  const pattern = new RegExp(`^(.+?)(?:-\\d+)?-(${RARITIES.map((r) => r.key).join('|')})\\.(png|jpe?g|webp)$`, 'i');
+  const pattern = new RegExp(`^(.+?)(?:-\\d+)?-(${RARITIES.map((r) => r.key).join('|')})(?:_(\\d+)-(\\d+)-(\\d+)-(\\d+))?\\.(png|jpe?g|webp)$`, 'i');
   let files = [];
   try {
     files = fs.readdirSync(dir);
@@ -81,11 +83,17 @@ function loadCards(dir = IMAGE_DIR) {
       const m = file.match(pattern);
       if (!m) return null;
       const rarity = m[2].toLowerCase();
+      const id = file.replace(/(_\d+-\d+-\d+-\d+)?\.[^.]+$/, '').toLowerCase();
+      const raw = m[3] ? [m[3], m[4], m[5], m[6]].map(Number) : STATS[id];
+      const stats = raw ? { speed: raw[0], fia: raw[1], fis: raw[2], bwl: raw[3] } : null;
       return {
-        id: file.replace(/\.[^.]+$/, '').toLowerCase(),
+        id,
         name: prettyName(m[1].toLowerCase()),
         rarity,
         image: imageUrl(file),
+        stats,
+        // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
+        isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
     })
     .filter(Boolean)

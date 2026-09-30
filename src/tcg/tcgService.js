@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard, TcgOpening } = require('../models/Tcg');
+const { lockedDocs, isLocked } = require('./locks');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const catalog = require('./catalog');
@@ -42,12 +43,16 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
   return inTransaction(async (session) => {
     const owned = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity').session(session).lean();
     if (!owned.length) throw new UserError('Du besitzt diese Karte nicht.');
+    // Exemplare auf einer IHK-Quest oder in einem Handelsangebot sind gesperrt
+    const locked = await lockedDocs(user._id, session);
+    const sellable = owned.filter((c) => !isLocked(locked, c));
 
     const n = keepOne ? owned.length - 1 : count;
     if (!Number.isInteger(n) || n < 1) throw new UserError('Du hast keine Duplikate dieser Karte.');
-    if (n > owned.length) throw new UserError(`Du besitzt nur ${owned.length} Stück dieser Karte.`);
+    if (!sellable.length) throw new UserError('Diese Karte ist gerade auf einer IHK-Quest oder im Handel und kann nicht verkauft werden.');
+    if (n > sellable.length) throw new UserError(`Du kannst nur ${sellable.length} Stück dieser Karte verkaufen.`);
 
-    const toSell = owned.slice(0, n);
+    const toSell = sellable.slice(0, n);
     const rarity = catalog.rarityByKey[toSell[0].rarity];
     if (!rarity) throw new UserError('Diese Karte kann nicht verkauft werden.');
     const res = await TcgCard.deleteMany({ _id: { $in: toSell.map((c) => c._id) }, user: user._id }, { session });
@@ -72,8 +77,13 @@ async function sellAllDuplicates({ user }) {
       if (!byCard.has(c.card)) byCard.set(c.card, []);
       byCard.get(c.card).push(c);
     }
+    // Gesperrte Exemplare (Quest/Handel) bleiben; gibt es keins, bleibt das neueste
+    const locked = await lockedDocs(user._id, session);
     const toSell = [];
-    for (const list of byCard.values()) toSell.push(...list.slice(0, -1));
+    for (const list of byCard.values()) {
+      const free = list.filter((c) => !isLocked(locked, c));
+      toSell.push(...(free.length === list.length ? free.slice(0, -1) : free));
+    }
     if (!toSell.length) throw new UserError('Du hast keine doppelten Karten.');
 
     const proceeds = toSell.reduce((s, c) => s + (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);

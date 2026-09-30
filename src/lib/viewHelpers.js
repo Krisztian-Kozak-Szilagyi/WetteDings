@@ -78,6 +78,9 @@ const ledgerLabels = {
   lotto_gewinn: 'Lotteriegewinn',
   tcg_pack: 'Booster Pack geöffnet',
   tcg_verkauf: 'TCG-Karte verkauft',
+  ihk_lohn: 'IHK-Quest geschafft',
+  handel_kauf: 'Karte gekauft (Handel)',
+  handel_verkauf: 'Karte verkauft (Handel)',
 };
 
 /** Coin-Kurs mit passender Genauigkeit, z. B. 12,34 € oder 0,004512 € */

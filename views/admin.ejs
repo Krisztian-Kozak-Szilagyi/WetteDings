@@ -95,6 +95,51 @@
   </form>
 </div>
 
+<div class="card" id="handel">
+  <h2>Handel: Steuer</h2>
+  <p class="muted">Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.</p>
+  <form method="post" action="/admin/handel" class="form admin-tcg-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Handelssteuer in % (0–50)</span>
+      <input type="text" name="tax" inputmode="decimal" value="<%= String(tradeTax).replace('.', ',') %>" required>
+    </label>
+    <button class="btn btn-primary" type="submit">Speichern</button>
+  </form>
+</div>
+
+<div class="card" id="ihk">
+  <h2>IHK: Limit &amp; Lohn</h2>
+  <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte und Lohn je Schwierigkeit (bei Erfolg). Gilt sofort für neu gestartete Quests.</p>
+  <form method="post" action="/admin/ihk" class="form admin-tcg-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="check admin-ihk-open">
+      <input type="checkbox" name="open" value="1" <%= ihk.settings.open ? 'checked' : '' %>>
+      <span><strong>Für alle Mitglieder verfügbar</strong> – sonst sehen nur Admins die IHK, alle anderen bekommen „derzeit nicht verfügbar“.</span>
+    </label>
+    <label class="field admin-tcg-pack">
+      <span>Quests pro Tag</span>
+      <input type="number" name="dailyLimit" min="0" max="100" step="1" value="<%= ihk.settings.dailyLimit %>" required>
+    </label>
+    <div class="table-wrap">
+      <table class="table admin-tcg-table">
+        <thead><tr><th>Schwierigkeit</th><th>Ziel (Punkte)</th><th>Dauer (Min., 0 = sofort)</th><th>Lohn (€)</th></tr></thead>
+        <tbody>
+          <% ihk.difficulties.forEach((d, i) => { %>
+            <tr class="r-<%= tcg.rarities[i].key %>">
+              <td><span class="tcg-dot"></span> <%= d.level %> · <%= d.label %> <span class="muted small hide-sm">(Standard <%= d.required %>)</span></td>
+              <td><input type="number" name="required_<%= d.level %>" min="1" max="100000" step="1" value="<%= ihk.settings.required[i] %>" required aria-label="Ziel-Punkte Schwierigkeit <%= d.level %>"></td>
+              <td><input type="number" name="duration_<%= d.level %>" min="0" max="1440" step="1" value="<%= ihk.settings.durations[i] %>" required aria-label="Dauer Schwierigkeit <%= d.level %>"></td>
+              <td><input type="text" name="reward_<%= d.level %>" inputmode="decimal" value="<%= (ihk.settings.rewards[i] / 100).toFixed(2).replace('.', ',') %>" required aria-label="Lohn Schwierigkeit <%= d.level %>"></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary" type="submit">Speichern</button>
+  </form>
+</div>
+
 <div class="card">
   <h2>Registrierungscodes</h2>
   <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er <span data-admin-dialog-open>automatisch</span> gelöscht.</p>

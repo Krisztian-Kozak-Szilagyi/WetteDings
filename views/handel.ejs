@@ -1,0 +1,147 @@
+<%- include('partials/head') %>
+<%
+  const bal = currentUser.balance;
+  const cardLine = (t) => { const c = cardInfo(t.card); return { c, r: rarityByKey[c.rarity] || { label: '' } }; };
+%>
+
+<div class="page-head">
+  <h1>Handel</h1>
+  <span class="muted">Handelssteuer: <strong><%= String(taxPercent).replace('.', ',') %> %</strong> – wird dem Verkäufer vom Erlös abgezogen</span>
+</div>
+
+<div class="trade-layout">
+  <section class="trade-main">
+    <div class="card" id="eingang">
+      <h2>Angebote an dich <% if (incoming.length) { %><span class="nav-badge nav-badge-inline"><%= incoming.length %></span><% } %></h2>
+      <% if (!incoming.length) { %>
+        <p class="muted">Gerade hat dir niemand etwas angeboten.</p>
+      <% } else { %>
+        <ul class="trade-list">
+          <% incoming.forEach((t) => { const { c, r } = cardLine(t); const lacks = t.price - bal; %>
+            <li class="trade-item r-<%= c.rarity %>">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+              <div class="trade-info">
+                <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span>
+                <span class="muted small">von <%= t.sellerName %> · läuft ab <%= relTime(t.expiresAt) %></span>
+              </div>
+              <div class="trade-actions">
+                <span class="trade-price"><%= euro(t.price) %></span>
+                <form method="post" action="/handel/<%= t._id %>/kaufen" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(t.price) %> kaufen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-primary btn-sm" type="submit" <%= lacks > 0 ? 'disabled' : '' %>>Annehmen</button>
+                </form>
+                <form method="post" action="/handel/<%= t._id %>/ablehnen">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-ghost btn-sm" type="submit">Ablehnen</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="card" id="markt">
+      <h2>Markt</h2>
+      <% const others = market.filter((t) => String(t.seller) !== String(currentUser._id)); %>
+      <% if (!others.length) { %>
+        <p class="muted">Auf dem Markt ist gerade nichts im Angebot.</p>
+      <% } else { %>
+        <ul class="trade-list">
+          <% others.forEach((t) => { const { c, r } = cardLine(t); const lacks = t.price - bal; %>
+            <li class="trade-item r-<%= c.rarity %>">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+              <div class="trade-info">
+                <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span>
+                <span class="muted small">von <%= t.sellerName %> · Kartenwert <%= euro(r.sell || 0) %></span>
+              </div>
+              <div class="trade-actions">
+                <span class="trade-price"><%= euro(t.price) %></span>
+                <form method="post" action="/handel/<%= t._id %>/kaufen" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(t.price) %> kaufen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-primary btn-sm" type="submit" <%= lacks > 0 ? 'disabled' : '' %>>Kaufen</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </section>
+
+  <aside class="trade-side">
+    <div class="card card-accent">
+      <h2>Karte anbieten</h2>
+      <% if (!sellable.length) { %>
+        <p class="muted">Du hast gerade keine freie Karte (Karten auf einer Quest oder im Handel sind gesperrt).</p>
+      <% } else { %>
+        <form method="post" action="/handel/angebot" class="form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field">
+            <span>Karte</span>
+            <select name="card" required>
+              <% sellable.forEach((c) => { %>
+                <option value="<%= c.id %>"><%= c.name %> (<%= rarityByKey[c.rarity].label %>)<%= c.free > 1 ? ' ×' + c.free : '' %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="field">
+            <span>Preis in €</span>
+            <input type="text" name="price" inputmode="decimal" placeholder="z. B. 50" required>
+          </label>
+          <label class="field">
+            <span>An (leer lassen = Markt)</span>
+            <input type="text" name="to" list="trade-users" autocomplete="off" placeholder="Benutzername">
+            <datalist id="trade-users">
+              <% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %>
+            </datalist>
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">Angebot erstellen</button>
+          <p class="muted small">Privat: <%= privateHours %> Std. gültig, Markt: <%= marketDays %> Tage. Die Karte ist bis dahin gesperrt. <% if (taxPercent > 0) { %>Beim Verkauf werden <%= String(taxPercent).replace('.', ',') %> % Steuer abgezogen.<% } else { %>Aktuell fällt keine Steuer an (0 %).<% } %></p>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Deine Angebote</h2>
+      <% if (!mine.length) { %>
+        <p class="muted">Du hast keine offenen Angebote.</p>
+      <% } else { %>
+        <ul class="trade-list trade-list-sm">
+          <% mine.forEach((t) => { const { c, r } = cardLine(t); %>
+            <li class="trade-item r-<%= c.rarity %>">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+              <div class="trade-info">
+                <strong><%= c.name %> <span class="muted small"><%= r.label %></span></strong>
+                <span class="small"><%= euro(t.price) %> · <%= t.kind === 'privat' ? 'an ' + t.toName : 'Markt' %></span>
+                <span class="muted small">Erlös nach Steuer <%= euro(t.price - taxFor(t.price)) %> · läuft ab <%= relTime(t.expiresAt) %></span>
+                <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-ghost btn-sm" type="submit">Zurückziehen</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Letzte Geschäfte</h2>
+      <% if (!history.length) { %>
+        <p class="muted">Noch keine Geschäfte.</p>
+      <% } else { %>
+        <ul class="trade-history">
+          <% history.forEach((t) => { const { c } = cardLine(t); const sold = String(t.seller) === String(currentUser._id); %>
+            <li>
+              <span><%= sold ? 'Verkauft an ' + t.buyerName : 'Gekauft von ' + t.sellerName %>: <strong><%= c.name %></strong></span>
+              <span class="<%= sold ? 'pos' : 'neg' %> nowrap"><%= sold ? '+' + euro(t.price - t.tax) : '−' + euro(t.price) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </aside>
+</div>
+
+<%- include('partials/foot') %>

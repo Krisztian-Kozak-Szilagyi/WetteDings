@@ -29,6 +29,8 @@
           <a href="/coin-exchange" class="<%= currentPath === '/coin-exchange' ? 'active' : '' %>">Coin Exchange</a>
           <a href="/lotterie" class="<%= currentPath === '/lotterie' ? 'active' : '' %>">Lotterie</a>
           <a href="/tcg" class="<%= currentPath === '/tcg' ? 'active' : '' %>">TCG</a>
+          <a href="/handel" class="nav-badge-link <%= currentPath === '/handel' ? 'active' : '' %>">Handel<% if (tradeIncoming) { %><span class="nav-badge" aria-label="<%= tradeIncoming %> neue Angebote"><%= tradeIncoming > 99 ? '99+' : tradeIncoming %></span><% } %></a>
+          <% if (ihkOpen() || currentUser.isAdmin) { %><a href="/ihk" class="<%= currentPath === '/ihk' ? 'active' : '' %>">IHK</a><% } %>
         <% } %>
         <a href="/regeln" class="<%= currentPath === '/regeln' ? 'active' : '' %>">Regeln</a>
         <% if (currentUser && currentUser.isAdmin) { %>

@@ -58,10 +58,18 @@
       <% } %>
       <div class="tcg-grid">
         <% cards.forEach((c) => { const n = counts[c.id] || 0; const r = rarityByKey[c.rarity]; %>
-          <% if (n) { %>
+          <% const lk = lockedByCard[c.id]; const lockLabel = lk ? (lk.reason === 'handel' ? 'Im Handel' : 'Auf Quest') : ''; %>
+          <% if (n && lk && lk.n >= n) { %>
+            <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
+              <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
+              <span class="tcg-exam-badge"><%= lockLabel %></span>
+              <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+            </div>
+          <% } else if (n) { %>
             <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
               data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>"
-              data-image="<%= c.image %>" data-count="<%= n %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"
+              data-image="<%= c.image %>" data-count="<%= n - (lk ? lk.n : 0) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"
               aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück – vergrößern">
               <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
               <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>

@@ -1,0 +1,158 @@
+<%- include('partials/head') %>
+<% const left = Math.max(0, limit - used); const canStart = phase === 'offer' && left && cards.length; %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>IHK</h1>
+    <a class="btn btn-ghost btn-sm" href="/ihk/anleitung">So funktioniert's</a>
+  </div>
+  <span class="muted">Heute: <strong><%= used %> / <%= limit %></strong> Quests</span>
+</div>
+<% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
+
+<% if (canStart) { %>
+<form method="post" action="/ihk/start" data-ihk-pick>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="card" value="">
+  <input type="hidden" name="boost" value="">
+  <input type="hidden" name="offer" value="">
+<% } %>
+
+<div class="ihk-stage">
+  <div class="ihk-col ihk-player">
+    <div class="ihk-slot ihk-slot-card" <%- canStart ? 'data-ihk-drop="card"' : '' %>
+      <% if (runCard) { %>data-zoom="<%= runCard.image %>" data-zoom-title="<%= runCard.name %>"<% } %>>
+      <% if (runCard) { %>
+        <img src="<%= runCard.image %>" alt="<%= runCard.name %>" width="720" height="1008" draggable="false">
+      <% } else { %>
+        <span class="ihk-slot-empty">Karte hierher ziehen</span>
+      <% } %>
+    </div>
+    <div class="ihk-slot ihk-slot-item" <%- canStart ? 'data-ihk-drop="boost"' : '' %>
+      <% if (runBoost) { %>data-zoom="<%= runBoost.image %>" data-zoom-title="<%= runBoost.name %>"<% } %>>
+      <% if (runBoost) { %>
+        <img src="<%= runBoost.image %>" alt="<%= runBoost.name %>" width="720" height="1008" draggable="false">
+      <% } else { %>
+        <span class="ihk-slot-empty">Boost<br><small>optional</small></span>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="ihk-col ihk-center">
+    <% if (quest) { %>
+      <div class="ihk-quest">
+        <div class="ihk-quest-head"><h2><%= quest.title %></h2><span class="ihk-quest-dur"><%= quest.duration %> Min.</span></div>
+        <p><%= quest.text %></p>
+        <div class="ihk-quest-meta">
+          <span>Ziel <strong><%= quest.required %> Punkte</strong> <span class="ihk-level r-<%= quest.level.toLowerCase() %>">(<%= quest.level %>)</span></span>
+          <span>Lohn <strong><%= euro(quest.reward) %></strong></span>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="ihk-offers">
+        <% offers.forEach((o, i) => { %>
+          <div class="ihk-quest ihk-offer" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"
+            data-zoom="<%= o.image %>" data-zoom-title="<%= o.title %>" data-zoom-text="<%= o.text %>">
+            <img class="ihk-offer-thumb" src="<%= o.image %>" alt="" width="720" height="1008" draggable="false">
+            <div>
+              <div class="ihk-quest-head"><h2><%= o.title %></h2><span class="ihk-quest-dur"><%= o.duration %> Min.</span></div>
+              <p><%= o.text %></p>
+              <div class="ihk-quest-meta">
+                <span>Ziel <strong><%= o.required %> Punkte</strong> <span class="ihk-level r-<%= o.level.toLowerCase() %>">(<%= o.level %>)</span></span>
+                <span>Lohn <strong><%= euro(o.reward) %></strong></span>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <% if (phase === 'running') { %>
+      <div class="ihk-timer">
+        <span>Quest läuft … noch <strong data-ihk-countdown="<%= new Date(run.endsAt).getTime() %>">–</strong></span>
+      </div>
+    <% } else if (phase === 'result') { %>
+      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [] }) %>'>
+        <div class="ihk-bar-label"><span>Fortschritt</span><span data-ihk-points>0 / <%= run.required %></span></div>
+        <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress" data-ihk-progress></span></div>
+        <div class="ihk-bar-label"><span>Deadline</span><span data-ihk-time></span></div>
+        <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-time" data-ihk-timebar></span></div>
+        <div class="ihk-floaters" data-ihk-floaters aria-hidden="true"></div>
+        <div class="ihk-fight-foot"><button type="button" class="btn btn-ghost btn-sm ihk-skip" data-ihk-skip>Überspringen</button></div>
+        <div class="ihk-result <%= run.success ? 'is-win' : 'is-fail' %>" data-ihk-result hidden>
+          <strong><%= run.success ? 'Geschafft!' : 'Emotional damage!' %></strong>
+          <p><%= run.success ? quest.success : quest.fail %></p>
+          <form method="post" action="/ihk/abholen">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary" type="submit"><%= run.success ? 'Lohn abholen' : 'Weiter' %></button>
+          </form>
+        </div>
+      </div>
+    <% } else if (!left) { %>
+      <p class="ihk-info">Für heute hast du alle Quests erledigt. Morgen gibt es neue Aufträge!</p>
+    <% } else if (!cards.length) { %>
+      <p class="ihk-info">Du brauchst mindestens eine Charakterkarte. Öffne ein Booster Pack im <a href="/tcg">TCG</a>!</p>
+    <% } else { %>
+      <p class="ihk-info">Tippe eine Quest und eine Karte an und wähle sie aus – oder zieh sie mit der Maus in die Felder.</p>
+    <% } %>
+  </div>
+
+  <div class="ihk-col ihk-enemy">
+    <div class="ihk-slot ihk-slot-card ihk-slot-enemy" <%- canStart ? 'data-ihk-drop="offer"' : '' %>
+      <% if (quest) { %>data-zoom="<%= quest.image %>" data-zoom-title="<%= quest.title %>" data-zoom-text="<%= quest.text %>"<% } %>>
+      <% if (quest) { %>
+        <img src="<%= quest.image %>" alt="<%= quest.title %>" width="720" height="1008" draggable="false">
+      <% } else { %>
+        <span class="ihk-slot-empty">Quest hierher ziehen</span>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<% if (canStart) { %>
+  <div class="card ihk-pick">
+    <div class="ihk-pick-head">
+      <h2>Deine Karten</h2>
+      <button class="btn btn-primary" type="submit" data-ihk-start disabled>Quest starten</button>
+    </div>
+    <div class="ihk-pick-grid">
+      <% cards.forEach((c) => { %>
+        <div class="ihk-pick-card r-<%= c.rarity %>" tabindex="0" data-drag="card" data-value="<%= c.id %>" data-image="<%= c.image %>"<%- canBoost(c) ? ' data-boostable="1"' : '' %>
+          data-zoom="<%= c.image %>" data-zoom-title="<%= c.name %> (<%= rarityByKey[c.rarity].label %>)" aria-label="<%= c.name %>, <%= rarityByKey[c.rarity].label %>">
+          <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008" draggable="false">
+          <span class="ihk-pick-stats">
+            <span title="Speed">⚡<%= c.stats.speed %></span><span>FIA <%= c.stats.fia %></span><span>FIS <%= c.stats.fis %></span><span>BWL <%= c.stats.bwl %></span>
+          </span>
+        </div>
+      <% }) %>
+    </div>
+    <% if (items.length) { %>
+      <h3 class="ihk-pick-sub">Boost-Karten</h3>
+      <div class="ihk-pick-grid">
+        <% items.forEach((c) => { %>
+          <div class="ihk-pick-card r-<%= c.rarity %>" tabindex="0" data-drag="boost" data-value="<%= c.id %>" data-image="<%= c.image %>"
+            data-zoom="<%= c.image %>" data-zoom-title="<%= c.name %> (<%= rarityByKey[c.rarity].label %>)" aria-label="<%= c.name %>, <%= rarityByKey[c.rarity].label %>">
+            <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008" draggable="false">
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</form>
+<% } %>
+
+<dialog class="tcg-modal ihk-zoom" data-ihk-zoom aria-label="Vergrößerte Ansicht">
+  <button type="button" class="tcg-close" data-ihk-zoom-close aria-label="Schließen">×</button>
+  <div class="ihk-zoom-body">
+    <img alt="" data-ihk-zoom-img>
+    <div class="ihk-zoom-info">
+      <h2 data-ihk-zoom-title></h2>
+      <p data-ihk-zoom-text></p>
+      <button type="button" class="btn btn-primary btn-block" data-ihk-zoom-pick hidden></button>
+      <button type="button" class="btn btn-ghost btn-block" data-ihk-zoom-boost hidden>Als Boost wählen</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="/js/ihk.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

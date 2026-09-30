@@ -6,6 +6,9 @@ const { requireAdmin } = require('../middleware');
 const coinEngine = require('../coin/engine');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
+const ihk = require('../ihk/ihkService');
+const tradeService = require('../trade/tradeService');
+const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
@@ -38,7 +41,44 @@ router.get('/admin', requireAdmin, async (req, res) => {
       expectedPack: Math.round(tcgCatalog.expectedPackValue()),
       lastUpdate: await tcgSettings.lastUpdate(),
     },
+    ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
+    tradeTax: tradeService.settings.taxPercent,
   });
+});
+
+// ---------- Handel: Steuer ----------
+router.post('/admin/handel', requireAdmin, async (req, res) => {
+  const tax = Number(String(typeof req.body.tax === 'string' ? req.body.tax : '').replace(',', '.'));
+  if (!Number.isFinite(tax) || tax < 0 || tax > 50) {
+    req.flash('error', 'Die Steuer muss zwischen 0 und 50 % liegen.');
+  } else {
+    const taxPercent = Math.round(tax * 10) / 10;
+    await tradeService.saveSettings({ taxPercent, admin: req.user });
+    req.flash('success', `Handelssteuer auf ${String(taxPercent).replace('.', ',')} % gesetzt.`);
+  }
+  res.redirect('/admin#handel');
+});
+
+// ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
+router.post('/admin/ihk', requireAdmin, async (req, res) => {
+  const dailyLimit = Number.parseInt(typeof req.body.dailyLimit === 'string' ? req.body.dailyLimit : '', 10);
+  const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
+  const durations = DIFFICULTIES.map((d) => num(req.body[`duration_${d.level}`]));
+  const rewards = DIFFICULTIES.map((d) => centsOrNull(req.body[`reward_${d.level}`]));
+  const required = DIFFICULTIES.map((d) => Number.parseInt(typeof req.body[`required_${d.level}`] === 'string' ? req.body[`required_${d.level}`] : '', 10));
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 100) {
+    req.flash('error', 'Das Tageslimit muss zwischen 0 und 100 liegen.');
+  } else if (durations.some((m) => !Number.isInteger(m) || m < 0 || m > 1440)) {
+    req.flash('error', 'Die Dauer muss je Schwierigkeit zwischen 0 und 1440 Minuten liegen.');
+  } else if (required.some((r) => !Number.isInteger(r) || r < 1 || r > 100000)) {
+    req.flash('error', 'Bitte für jede Schwierigkeit gültige Ziel-Punkte angeben (1–100000).');
+  } else if (rewards.some((r) => r === null)) {
+    req.flash('error', 'Bitte für jede Schwierigkeit einen gültigen Lohn angeben.');
+  } else {
+    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, admin: req.user });
+    req.flash('success', 'IHK-Einstellungen gespeichert.');
+  }
+  res.redirect('/admin#ihk');
 });
 
 // ---------- TCG-Preise und Chancen ----------
