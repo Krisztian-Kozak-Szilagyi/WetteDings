@@ -7,6 +7,7 @@ const cardSchema = new Schema(
     card: { type: String, required: true }, // Karten-ID aus dem Katalog, z. B. "krisz-6-glitch"
     rarity: { type: String, required: true },
     opening: { type: Schema.Types.ObjectId, ref: 'TcgOpening', default: null },
+    lastClaimedAt: { type: Date }, // zuletzt für Quest/Handel beansprucht – nur Schreibzugriff gegen gleichzeitige Verkäufe, nicht die Sperre selbst (siehe tcg/locks)
   },
   { timestamps: true }
 );

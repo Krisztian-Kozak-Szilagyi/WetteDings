@@ -2,6 +2,8 @@
 // Gesperrte Exemplare können nicht verkauft, gehandelt oder auf eine Quest geschickt werden.
 const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
+const { TcgCard } = require('../models/Tcg');
+const { UserError } = require('../lib/util');
 
 /** { docs: [ObjectId], reasons: Map<docId, 'quest'|'handel'> } */
 async function lockedDocs(userId, session) {
@@ -18,4 +20,16 @@ async function lockedDocs(userId, session) {
 
 const isLocked = (locked, doc) => locked.reasons.has(String(doc._id || doc));
 
-module.exports = { lockedDocs, isLocked };
+/**
+ * Sperrt Exemplare innerhalb einer Transaktion, indem auf sie geschrieben wird. Ein gleichzeitiger
+ * Verkauf, Handel oder Quest-Start derselben Karte kollidiert dadurch mit dieser Transaktion
+ * (WriteConflict → automatische Wiederholung) und sieht danach die Sperre – statt dass beide
+ * die Karte noch als frei sehen.
+ */
+async function claim(docs, userId, session) {
+  const ids = docs.filter(Boolean).map((d) => d._id || d);
+  const res = await TcgCard.updateMany({ _id: { $in: ids }, user: userId }, { $set: { lastClaimedAt: new Date() } }, { session });
+  if (res.matchedCount !== ids.length) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
+}
+
+module.exports = { lockedDocs, isLocked, claim };

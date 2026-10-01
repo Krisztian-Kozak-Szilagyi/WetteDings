@@ -10,7 +10,7 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const { QUESTS, DIFFICULTIES, questById, difficulty } = require('./quests');
 const { resolve, canBoost } = require('./abilities');
-const { lockedDocs, isLocked } = require('../tcg/locks');
+const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
 // Anzahl Arbeitstakte = 10 + Speed/10 (Speed 10 → 11, 35 → 13,5, 99 → 19,9). Speed hilft also,
@@ -145,35 +145,45 @@ async function start({ user, cardId, boostId, offerIndex }) {
   const offer = offers[offerIndex];
   if (!offer) throw new UserError('Bitte wähle eine Quest aus.');
 
-  // Nur freie Exemplare (nicht im Handel) können auf eine Quest
-  const locked = await lockedDocs(user._id);
-  const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').lean()).find((d) => !isLocked(locked, d));
-  const doc = await freeDoc(cardId);
-  if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel).');
-  const boostDoc = boost ? await freeDoc(boost.id) : null;
-  if (boost && !boostDoc) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
-
   const quest = questById[offer.quest];
   const required = requiredFor(offer.difficulty);
   const effects = resolve(card, boost);
   const result = simulate(card.stats, quest.stat, required, undefined, effects);
   try {
-    return await IhkRun.create({
-      user: user._id,
-      quest: quest.id,
-      difficulty: offer.difficulty,
-      required,
-      card: cardId,
-      cardDoc: doc._id,
-      boost: boost ? boost.id : null,
-      boostDoc: boostDoc ? boostDoc._id : null,
-      // nur Fähigkeiten, die vor Erreichen des Ziels (Halbzeit) wirklich aktiv wurden
-      abilities: result.ticks.some((x) => x.ability) ? effects.map(({ apply, ...a }) => a) : [],
-      stats: card.stats,
-      day: today(),
-      endsAt: new Date(Date.now() + durationFor(offer.difficulty) * 60000),
-      ...result,
-      reward: result.success ? settings.rewards[offer.difficulty - 1] : 0,
+    // Sperrprüfung und Quest-Anlage in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder gehandelt wird
+    return await inTransaction(async (session) => {
+      // Nur freie Exemplare (nicht im Handel) können auf eine Quest
+      const locked = await lockedDocs(user._id, session);
+      const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
+      const doc = await freeDoc(cardId);
+      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel).');
+      const boostDoc = boost ? await freeDoc(boost.id) : null;
+      if (boost && !boostDoc) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
+      await claim([doc, boostDoc], user._id, session);
+
+      const [run] = await IhkRun.create(
+        [
+          {
+            user: user._id,
+            quest: quest.id,
+            difficulty: offer.difficulty,
+            required,
+            card: cardId,
+            cardDoc: doc._id,
+            boost: boost ? boost.id : null,
+            boostDoc: boostDoc ? boostDoc._id : null,
+            // nur Fähigkeiten, die vor Erreichen des Ziels (Halbzeit) wirklich aktiv wurden
+            abilities: result.ticks.some((x) => x.ability) ? effects.map(({ apply, ...a }) => a) : [],
+            stats: card.stats,
+            day: today(),
+            endsAt: new Date(Date.now() + durationFor(offer.difficulty) * 60000),
+            ...result,
+            reward: result.success ? settings.rewards[offer.difficulty - 1] : 0,
+          },
+        ],
+        { session }
+      );
+      return run;
     });
   } catch (err) {
     if (err.code === 11000) throw new UserError('Du hast bereits eine laufende Quest.');

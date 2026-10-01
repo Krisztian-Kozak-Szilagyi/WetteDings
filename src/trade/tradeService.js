@@ -6,7 +6,7 @@ const { Trade, TradeSettings } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
-const { lockedDocs, isLocked } = require('../tcg/locks');
+const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 
 const PRIVATE_HOURS = 48; // private Angebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -52,27 +52,37 @@ async function create({ user, cardId, price, toName }) {
     throw new UserError(`Du hast schon ${MAX_OPEN} offene Angebote.`);
   }
 
-  // freies Exemplar suchen (nicht auf einer Quest, nicht schon im Handel)
-  const locked = await lockedDocs(user._id);
-  const docs = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id').lean();
-  const doc = docs.find((d) => !isLocked(locked, d));
-  if (!doc) throw new UserError(docs.length ? 'Alle Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Diese Karte besitzt du nicht.');
-
-  // abgelaufene Angebote für dieses Exemplar schließen, damit der eindeutige Index nicht blockiert
-  await Trade.updateMany({ cardDoc: doc._id, status: 'offen', expiresAt: { $lte: new Date() } }, { $set: { status: 'zurueckgezogen', closedAt: new Date() } });
-
   const hours = to ? PRIVATE_HOURS : MARKET_DAYS * 24;
   try {
-    return await Trade.create({
-      kind: to ? 'privat' : 'markt',
-      seller: user._id,
-      sellerName: user.username,
-      to: to ? to._id : null,
-      toName: to ? to.username : null,
-      card: cardId,
-      cardDoc: doc._id,
-      price,
-      expiresAt: new Date(Date.now() + hours * 3600000),
+    // Sperrprüfung und Angebot in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder auf eine Quest geschickt wird
+    return await inTransaction(async (session) => {
+      // freies Exemplar suchen (nicht auf einer Quest, nicht schon im Handel)
+      const locked = await lockedDocs(user._id, session);
+      const docs = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id').session(session).lean();
+      const doc = docs.find((d) => !isLocked(locked, d));
+      if (!doc) throw new UserError(docs.length ? 'Alle Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Diese Karte besitzt du nicht.');
+      await claim([doc], user._id, session);
+
+      // abgelaufene Angebote für dieses Exemplar schließen, damit der eindeutige Index nicht blockiert
+      await Trade.updateMany({ cardDoc: doc._id, status: 'offen', expiresAt: { $lte: new Date() } }, { $set: { status: 'zurueckgezogen', closedAt: new Date() } }, { session });
+
+      const [trade] = await Trade.create(
+        [
+          {
+            kind: to ? 'privat' : 'markt',
+            seller: user._id,
+            sellerName: user.username,
+            to: to ? to._id : null,
+            toName: to ? to.username : null,
+            card: cardId,
+            cardDoc: doc._id,
+            price,
+            expiresAt: new Date(Date.now() + hours * 3600000),
+          },
+        ],
+        { session }
+      );
+      return trade;
     });
   } catch (err) {
     if (err.code === 11000) throw new UserError('Dieses Exemplar ist schon im Handel.');
