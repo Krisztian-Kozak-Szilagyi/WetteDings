@@ -174,10 +174,13 @@ function sellValueExpr(field = '$rarity') {
   };
 }
 
-/** Verkaufswert aller Karten eines Nutzers in Cent */
+/** Wert aller Karten eines Nutzers in Cent: Verkaufswert der Karten + ungeöffnete Packs zum aktuellen Packpreis */
 async function cardValueCents(userId) {
-  const agg = await TcgCard.aggregate([{ $match: { user: userId } }, { $group: { _id: null, s: { $sum: sellValueExpr() } } }]);
-  return agg[0] ? agg[0].s : 0;
+  const [agg, packs] = await Promise.all([
+    TcgCard.aggregate([{ $match: { user: userId } }, { $group: { _id: null, s: { $sum: sellValueExpr() } } }]),
+    TcgPack.countDocuments({ user: userId }),
+  ]);
+  return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
 module.exports = { MAX_FAVORITES, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

@@ -126,3 +126,12 @@ test('Patchnotes: Auszeichnung wird zu sicherem HTML', () => {
     '<ul><li>eins</li><li>zwei &lt;script&gt;x&lt;/script&gt;</li></ul>',
   ].join('\n'));
 });
+
+test('Regeln und Anleitung nutzen dieselbe Fähigkeiten-Tabelle', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const view = (f) => fs.readFileSync(path.join(__dirname, '..', 'views', f), 'utf8');
+  for (const f of ['rules.ejs', 'ihk-anleitung.ejs']) assert.ok(view(f).includes("include('partials/ihk-faehigkeiten'"), f);
+  const partial = view('partials/ihk-faehigkeiten.ejs');
+  for (const name of ['Mauch (Spell)', 'Sigrist (Spell)', 'Hugo / Lilly', 'Hermann']) assert.ok(partial.includes(name), name);
+});

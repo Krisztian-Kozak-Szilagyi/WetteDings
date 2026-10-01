@@ -18,7 +18,7 @@
     <h3>1. Spielgeld bekommen</h3>
     <p>Jedes neue Mitglied erhält <strong><%= euro(startBalance) %></strong> Spielgeld. Das ist <strong>kein echtes Geld</strong> – es kann weder eingezahlt noch ausgezahlt werden. Es geht nur um den Spaß und die Rangliste.</p>
     <h4>Tagesbonus</h4>
-    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins + Verkaufswert deiner TCG-Karten):</p>
+    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins + Verkaufswert deiner TCG-Karten + ungeöffnete Booster Packs zum Packpreis):</p>
     <ul>
       <% bonusTiers.forEach((t, i) => { %>
         <li><%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong></li>
@@ -111,6 +111,12 @@
       <li>Der Verkaufswert deiner Karten zählt zum Gesamtvermögen (Rangliste, Tagesbonus).</li>
     </ul>
   </div>
+
+  <div class="card">
+    <h3>9. Karten in der IHK: Spells, Boosts und Fähigkeiten</h3>
+    <p>In der IHK schickst du eine Charakterkarte auf eine Quest und kannst eine Boost-Karte mitgeben (bei Hybrid-Quests zwei verschiedene). Im Boost-Slot zählt nur die Fähigkeit der Karte, nicht ihre Werte. Alle Fähigkeiten werden zur Halbzeit der Quest aktiv. Mehr dazu unter „So funktioniert's“ auf der IHK-Seite.</p>
+  </div>
+<%- include('partials/ihk-faehigkeiten', { h: 'h3' }) %>
 
   <% if (!currentUser) { %>
     <p class="center"><a class="btn btn-primary btn-lg" href="/registrieren">Jetzt mitmachen</a></p>

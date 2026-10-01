@@ -9,7 +9,7 @@
   <div class="stat card"><span class="stat-label">Verfügbar</span><span class="stat-value"><%= euro(currentUser.balance) %></span></div>
   <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
   <div class="stat card"><span class="stat-label">In Samantha Coin</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/coin-exchange">Zur Coin Exchange</a></div>
-  <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><a class="small" href="/tcg#sammlung">Zur Sammlung</a></div>
+  <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><span class="muted small">inkl. ungeöffneter Packs</span><a class="small" href="/tcg/album">Zum Album</a></div>
   <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
   <div class="stat card"><span class="stat-label">Bilanz seit Start</span><span class="stat-value <%= net > 0 ? 'pos' : (net < 0 ? 'neg' : '') %>"><%= net > 0 ? '+' : '' %><%= euro(net) %></span>
     <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span></div>
@@ -17,7 +17,7 @@
 
 <div class="card bonus-card">
   <h2>Tagesbonus</h2>
-  <p>Einmal pro Tag bekommst du automatisch Spielgeld, solange dein Gesamtvermögen (verfügbar + in offenen Wetten + Samantha Coins + TCG-Karten) unter <%= euro(bonusTiers[bonusTiers.length - 1].below) %> liegt:</p>
+  <p>Einmal pro Tag bekommst du automatisch Spielgeld, solange dein Gesamtvermögen (verfügbar + in offenen Wetten + Samantha Coins + TCG-Karten inkl. ungeöffneter Packs) unter <%= euro(bonusTiers[bonusTiers.length - 1].below) %> liegt:</p>
   <ul class="bonus-tiers">
     <% bonusTiers.forEach((t, i) => { %>
       <li class="<%= bonusNow === t.amount ? 'active' : '' %>">

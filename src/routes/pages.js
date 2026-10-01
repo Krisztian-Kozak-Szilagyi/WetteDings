@@ -13,7 +13,7 @@ const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
 // Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer
 router.get('/rangliste', requireLogin, async (req, res) => {
-  // Gesamtvermögen = Kontostand + offene Einsätze + Wert der Samantha Coins zum aktuellen Kurs + Verkaufswert der TCG-Karten
+  // Gesamtvermögen = Kontostand + offene Einsätze + Wert der Samantha Coins zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis)
   const centsPerUnit = coinEngine.isRunning() ? (coinEngine.getPrice() * 100) / 1e8 : 0;
   const leaders = await User.aggregate([
     {
@@ -46,11 +46,13 @@ router.get('/rangliste', requireLogin, async (req, res) => {
         as: 'cards',
       },
     },
+    // ungeöffnete Booster Packs zählen zum aktuellen Packpreis bei den Karten mit
+    { $lookup: { from: 'tcgpacks', localField: '_id', foreignField: 'user', as: 'packs' } },
     {
       $addFields: {
         inPlay: { $ifNull: [{ $first: '$open.s' }, 0] },
         coinValue: { $floor: { $multiply: [{ $ifNull: [{ $sum: '$coins.units' }, 0] }, centsPerUnit] } },
-        cardValue: { $ifNull: [{ $first: '$cards.s' }, 0] },
+        cardValue: { $add: [{ $ifNull: [{ $first: '$cards.s' }, 0] }, { $multiply: [{ $size: '$packs' }, tcgSettings.getPackPrice()] }] },
       },
     },
     { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue'] } } },
