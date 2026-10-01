@@ -750,8 +750,12 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 
 /* ========== Handel ========== */
 .nav-badge-link { position: relative; }
+.nav-badges { position: absolute; top: -2px; right: -4px; display: flex; gap: 3px; }
+/* zwei Abzeichen: etwas höher, damit sie das Wort nicht verdecken */
+.nav-badges:has(.nav-badge + .nav-badge) { top: -8px; }
+.nav-badge-market { background: var(--primary); }
 .nav-badge {
-  position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
   display: grid; place-items: center; font-size: .7rem; font-weight: 800; line-height: 1; color: #fff; background: #ef4444;
   box-shadow: 0 0 0 2px var(--surface);
 }
@@ -813,6 +817,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .ihk-quest-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, .2); font-size: .88rem; }
 .ihk-quest-meta strong { color: #fff; }
 .ihk-offers { display: grid; gap: 10px; width: 100%; }
+.ihk-reroll { text-align: center; }
 .ihk-offer {
   display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: start; cursor: grab; touch-action: pan-y;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform .15s, box-shadow .15s, border-color .15s;

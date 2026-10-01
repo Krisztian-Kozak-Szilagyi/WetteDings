@@ -10,6 +10,11 @@
 </div>
 <% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
+<%# Eigenes Formular außerhalb des Start-Formulars (keine verschachtelten Forms) – der Button verweist per form-Attribut darauf %>
+<form id="ihk-reroll" method="post" action="/ihk/neu-wuerfeln" hidden>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+</form>
+
 <% if (canStart) { %>
 <form method="post" action="/ihk/start" data-ihk-pick>
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -65,6 +70,15 @@
           </div>
         <% }) %>
       </div>
+      <% if (phase === 'offer' && left) { %>
+        <div class="ihk-reroll">
+          <% if (canReroll) { %>
+            <button class="btn btn-ghost btn-sm" type="submit" form="ihk-reroll">Quests neu würfeln <small>(1× pro Tag)</small></button>
+          <% } else { %>
+            <span class="muted small">Heute schon neu gewürfelt – morgen wieder möglich.</span>
+          <% } %>
+        </div>
+      <% } %>
     <% } %>
 
     <% if (phase === 'running') { %>

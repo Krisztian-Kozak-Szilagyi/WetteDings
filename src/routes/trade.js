@@ -17,6 +17,7 @@ const cardInfo = (id) => catalog.cardById[id] || { id, name: id, rarity: 'crumpl
 router.get('/handel', async (req, res) => {
   const me = req.user._id;
   const open = trade.openFilter();
+  const now = new Date();
   const [incoming, market, mine, history, docs, locked, users] = await Promise.all([
     Trade.find({ ...open, kind: 'privat', to: me }).sort({ createdAt: -1 }).lean(),
     Trade.find({ ...open, kind: 'markt' }).sort({ createdAt: -1 }).limit(200).lean(),
@@ -25,7 +26,10 @@ router.get('/handel', async (req, res) => {
     TcgCard.find({ user: me }).select('card').lean(),
     lockedDocs(me),
     User.find({ _id: { $ne: me } }).select('username').sort({ usernameLower: 1 }).lean(),
+    // Besuch merken: der Markt gilt ab jetzt als gesehen
+    User.updateOne({ _id: me }, { $set: { marketSeenAt: now } }),
   ]);
+  res.locals.tradeMarketNew = 0;
   // Karten, von denen mindestens ein Exemplar frei ist (nicht Quest/Handel)
   const free = {};
   docs.forEach((d) => { if (!isLocked(locked, d)) free[d.card] = (free[d.card] || 0) + 1; });

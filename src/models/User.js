@@ -10,6 +10,8 @@ const userSchema = new Schema(
     balance: { type: Number, required: true, min: 0 },
     // Tag (deutsche Zeit, "YYYY-MM-DD"), an dem zuletzt der Tagesbonus geprüft/gutgeschrieben wurde
     lastBonusDay: { type: String, default: null },
+    // Zeitpunkt des letzten Besuchs der Handelsseite (für das Markt-Abzeichen im Menü)
+    marketSeenAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
