@@ -91,8 +91,10 @@ function resolve(main, boost) {
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
 const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'good-boy', 'lili']);
 
-// Oliver the Sigrist "kann nicht im Spiel eingesetzt werden"
-const NO_BOOST = new Set(['oliver-the-sigrist']);
+// Oliver the Sigrist "kann nicht im Spiel eingesetzt werden".
+// Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt (er würde jede Quest
+// sicher gewinnen); seine Fähigkeit oben bleibt für später erhalten.
+const NO_BOOST = new Set(['oliver-the-sigrist', 'hermann']);
 
 /** Darf diese Karte in den Boost-Slot? Items und Spells mit Wirkung immer, Charaktere nur mit Boost-Fähigkeit. */
 const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharacter || BOOST_CHARACTERS.has(who(card)));

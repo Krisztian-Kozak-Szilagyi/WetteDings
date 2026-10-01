@@ -56,7 +56,9 @@ test('Fähigkeiten: nur unter den Bedingungen aus dem Kartentext', () => {
 test('Boost-Slot: Items immer, Charaktere nur mit Boost-Fähigkeit', () => {
   const { canBoost } = require('../src/ihk/abilities');
   const c = (id) => catalog.cardById[id];
-  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'good-boy-holo', 'lili-6-glitch', 'mauch-1-holo', 'sigrist-4-icon', 'hermann-4-icon', 'hermann-1-holo']) assert.ok(canBoost(c(id)), id);
+  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'good-boy-holo', 'lili-6-glitch', 'mauch-1-holo', 'sigrist-4-icon']) assert.ok(canBoost(c(id)), id);
+  // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt
+  for (const id of ['hermann-1-holo', 'hermann-2-bockhaber', 'hermann-3-glitch', 'hermann-4-icon']) assert.ok(!canBoost(c(id)), id);
   // Oliver the Sigrist ist in der IHK nicht einsetzbar
   assert.ok(!canBoost(c('oliver-the-sigrist-sith')));
   for (const id of ['matze-2-bfwler', 'krisz-3-gold', 'luca-3-gold', 'aleks-1-crumpled', 'adrian-3-gold', 'marcel-3-gold', 'st-ivan-3-gold', 'seven-3-gold']) assert.ok(!canBoost(c(id)), id);
