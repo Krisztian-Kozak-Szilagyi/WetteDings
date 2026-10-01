@@ -813,6 +813,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .ihk-quest-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, .2); font-size: .88rem; }
 .ihk-quest-meta strong { color: #fff; }
 .ihk-offers { display: grid; gap: 10px; width: 100%; }
+.ihk-reroll { text-align: center; }
 .ihk-offer {
   display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: start; cursor: grab; touch-action: pan-y;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform .15s, box-shadow .15s, border-color .15s;

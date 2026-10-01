@@ -36,6 +36,7 @@ runSchema.index({ user: 1, day: 1 });
 const stateSchema = new Schema({
   _id: Schema.Types.ObjectId,
   offers: { type: [new Schema({ quest: String, difficulty: Number }, { _id: false })], default: [] },
+  rerollDay: { type: String, default: null }, // "YYYY-MM-DD" des letzten Neu-Würfelns (1× pro Tag)
 });
 
 // Admin-Einstellungen (ein Dokument, _id "ihk")

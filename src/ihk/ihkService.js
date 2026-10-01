@@ -120,6 +120,29 @@ async function getOffers(userId) {
   return offers;
 }
 
+/** Darf der Nutzer heute noch neu würfeln? */
+async function canReroll(userId) {
+  const st = await IhkState.findById(userId).select('rerollDay').lean();
+  return !st || st.rerollDay !== today();
+}
+
+/** Angebote einmal pro Tag neu auswürfeln (nicht während einer laufenden Quest) */
+async function reroll({ user }) {
+  const { running, used, limit } = await getState(user._id);
+  if (running) throw new UserError('Während einer laufenden Quest kannst du nicht neu würfeln.');
+  if (used >= limit) throw new UserError('Für heute hast du alle Quests erledigt.');
+  const day = today();
+  try {
+    // Filter auf rerollDay macht das Würfeln atomar: zwei gleichzeitige Klicks zählen nur einmal
+    const res = await IhkState.updateOne({ _id: user._id, rerollDay: { $ne: day } }, { $set: { offers: generateOffers(), rerollDay: day } }, { upsert: true });
+    if (!res.modifiedCount && !res.upsertedCount) throw new UserError('Du hast heute schon neu gewürfelt.');
+  } catch (err) {
+    // Upsert kollidiert mit vorhandenem Dokument → heute schon gewürfelt
+    if (err.code === 11000) throw new UserError('Du hast heute schon neu gewürfelt.');
+    throw err;
+  }
+}
+
 // ---------- Ablauf ----------
 /** Laufende Quest (oder null) und Tagesverbrauch */
 async function getState(userId) {
@@ -210,4 +233,4 @@ async function collect({ user }) {
   return result;
 }
 
-module.exports = { WORK_TIME, settings, requiredFor, durationFor, loadSettings, saveSettings, simulate, generateOffers, getOffers, getState, start, collect };
+module.exports = { WORK_TIME, settings, requiredFor, durationFor, loadSettings, saveSettings, simulate, generateOffers, getOffers, canReroll, reroll, getState, start, collect };

@@ -34,6 +34,7 @@ router.get('/ihk', async (req, res) => {
   if (running) phase = new Date(running.endsAt).getTime() <= Date.now() ? 'result' : 'running';
 
   const offers = running ? [] : (await ihk.getOffers(req.user._id)).map((o) => questView(o.quest, o.difficulty));
+  const canReroll = !running && used < limit && (await ihk.canReroll(req.user._id));
   const owned = await TcgCard.distinct('card', { user: req.user._id });
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = owned.map((id) => catalog.cardById[id]).filter(Boolean);
@@ -46,6 +47,7 @@ router.get('/ihk', async (req, res) => {
     run: running,
     quest: running ? questView(running.quest, running.difficulty) : null,
     offers,
+    canReroll,
     runCard: running ? catalog.cardById[running.card] : null,
     runBoost: running && running.boost ? catalog.cardById[running.boost] : null,
     cards,
@@ -81,6 +83,13 @@ router.post('/ihk/start', (req, res) =>
       offerIndex: Number.parseInt(str(req.body.offer), 10),
     });
     return null;
+  })
+);
+
+router.post('/ihk/neu-wuerfeln', (req, res) =>
+  handle(req, res, async () => {
+    await ihk.reroll({ user: req.user });
+    return 'Neue Quests ausgewürfelt.';
   })
 );
 
