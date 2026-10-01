@@ -71,6 +71,7 @@ function createApp() {
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     tradeIncoming: 0,
+    tradeMarketNew: 0,
     currentPath: '',
     flash: null,
     csrfToken: '',
@@ -80,9 +81,14 @@ function createApp() {
   app.use(loadUser);
   app.use(dailyBonus);
   app.use(csrf);
-  // Anzahl neuer Handelsangebote für das Abzeichen im Menü
+  // Abzeichen im Menü: offene Angebote an mich und neue Markt-Angebote seit dem letzten Besuch
   app.use(async (req, res, next) => {
-    res.locals.tradeIncoming = req.user && req.method === 'GET' ? await tradeService.incomingCount(req.user._id) : 0;
+    if (req.user && req.method === 'GET') {
+      [res.locals.tradeIncoming, res.locals.tradeMarketNew] = await Promise.all([
+        tradeService.incomingCount(req.user._id),
+        tradeService.marketNewCount(req.user),
+      ]);
+    }
     next();
   });
 

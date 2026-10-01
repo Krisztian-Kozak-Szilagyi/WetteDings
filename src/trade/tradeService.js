@@ -35,6 +35,15 @@ const openFilter = () => ({ status: 'offen', expiresAt: { $gt: new Date() } });
 /** Anzahl neuer privater Angebote an einen Nutzer (für das Abzeichen im Menü) */
 const incomingCount = (userId) => Trade.countDocuments({ ...openFilter(), kind: 'privat', to: userId });
 
+/** Offene Markt-Angebote anderer, die seit dem letzten Besuch der Handelsseite eingestellt wurden */
+const marketNewFilter = (user) => ({
+  ...openFilter(),
+  kind: 'markt',
+  seller: { $ne: user._id },
+  createdAt: { $gt: user.marketSeenAt || user.createdAt },
+});
+const marketNewCount = (user) => Trade.countDocuments(marketNewFilter(user));
+
 // ---------- Aktionen ----------
 /** Angebot erstellen: privat (an toName) oder auf dem Markt (toName leer) */
 async function create({ user, cardId, price, toName }) {
@@ -130,4 +139,4 @@ async function close({ user, tradeId, action }) {
   if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot gibt es nicht mehr.');
 }
 
-module.exports = { PRIVATE_HOURS, MARKET_DAYS, settings, loadSettings, saveSettings, taxFor, openFilter, incomingCount, create, buy, close };
+module.exports = { PRIVATE_HOURS, MARKET_DAYS, settings, loadSettings, saveSettings, taxFor, openFilter, incomingCount, marketNewFilter, marketNewCount, create, buy, close };
