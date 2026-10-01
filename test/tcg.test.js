@@ -52,7 +52,7 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 89);
+  assert.equal(catalog.CARDS.length, 90);
   assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
   assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
   assert.equal(catalog.cardById['sigrist-3-glitch'].name, 'Sigrist');
@@ -70,8 +70,8 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   // Namen, die nicht aus dem Dateinamen folgen
   assert.equal(catalog.cardById['omer-3-gold'].name, 'Ömer');
   assert.equal(catalog.cardById['st-ivan-1-crumpled'].name, 'St. Ivan');
-  assert.equal(catalog.cardById['good-boy-holo'].name, 'Good Boy');
-  assert.equal(catalog.cardById['good-boy-holo'].rarity, 'holo');
+  assert.equal(catalog.cardById['hugo-holo'].name, 'Hugo');
+  assert.equal(catalog.cardById['lilly-holo'].rarity, 'holo');
   assert.equal(catalog.cardById['matze-6-glitch'].name, 'Matze');
   assert.equal(catalog.cardById['pascal-5-bockhaber'].name, 'Pascal');
   const c = catalog.cardById['krisz-6-glitch'];

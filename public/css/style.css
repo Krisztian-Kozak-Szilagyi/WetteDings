@@ -987,6 +987,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .tcg-shop-form { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; }
 @media (max-width: 520px) { .tcg-shop-form { grid-template-columns: 110px 1fr; gap: 14px; } .tcg-shop-info h2 { font-size: 1.05rem; } }
 .tcg-shop-info .btn { margin-bottom: 6px; }
+.tcg-packs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.tcg-pack-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; }
+.tcg-pack-item img { display: block; width: 100%; height: auto; border-radius: 5px; }
+.tcg-pack-item form { margin: 0; }
 .tcg-pack-btn { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 10px; transition: transform .2s ease, filter .2s ease; }
 .tcg-pack-btn img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 10px 28px rgba(76, 29, 149, .35); }
 .tcg-pack-btn:not(:disabled):hover { transform: translateY(-4px) rotate(-2deg); filter: brightness(1.08); }

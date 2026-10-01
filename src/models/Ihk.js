@@ -25,6 +25,7 @@ const runSchema = new Schema(
     reward: { type: Number, required: true }, // Cent (0 bei Misserfolg)
     status: { type: String, enum: ['laeuft', 'fertig'], default: 'laeuft' },
     collectedAt: { type: Date, default: null },
+    pack: { type: String, default: null }, // beim Abholen gefundenes Booster Pack (Pack-Art) oder null
   },
   { timestamps: true }
 );
@@ -41,7 +42,7 @@ const stateSchema = new Schema({
 
 // Admin-Einstellungen (ein Dokument, _id "ihk")
 const settingsSchema = new Schema(
-  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, durationMin: Number, durations: [Number], rewards: [Number], required: [Number], hybrid: { durations: [Number], rewards: [Number], required: [Number] }, updatedByName: String },
+  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, packChance: Number, durationMin: Number, durations: [Number], rewards: [Number], required: [Number], hybrid: { durations: [Number], rewards: [Number], required: [Number] }, updatedByName: String },
   { timestamps: true }
 );
 

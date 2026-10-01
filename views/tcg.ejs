@@ -21,19 +21,44 @@
 <div class="tcg-layout">
   <section class="tcg-main">
     <div class="card tcg-shop">
-      <form method="post" action="/tcg/oeffnen" class="tcg-shop-form" data-tcg-open>
+      <form method="post" action="/tcg/kaufen" class="tcg-shop-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="tcg-pack-btn" type="submit" <%= canAfford ? '' : 'disabled' %> aria-label="Booster Pack für <%= euro(packPrice) %> kaufen und öffnen">
+        <input type="hidden" name="type" value="<%= packType %>">
+        <button class="tcg-pack-btn" type="submit" <%= canAfford ? '' : 'disabled' %> aria-label="Booster Pack für <%= euro(packPrice) %> kaufen">
           <img src="<%= packImage %>" alt="" width="800" height="1280">
         </button>
         <div class="tcg-shop-info">
           <h2>BfW Holdings Booster Pack</h2>
-          <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon. Jede Karte kannst du später wieder verkaufen.</p>
-          <button class="btn btn-primary btn-block" type="submit" <%= canAfford ? '' : 'disabled' %>>Pack öffnen · <%= euro(packPrice) %></button>
+          <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon. Gekaufte Packs landen bei „Meine Packs“ und können dort geöffnet werden.</p>
+          <button class="btn btn-primary btn-block" type="submit" <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
           <p class="muted small">Verfügbar: <span data-tcg-balance><%= euro(currentUser.balance) %></span></p>
           <% if (!canAfford) { %><p class="small neg">Dein Guthaben reicht gerade für kein Pack.</p><% } %>
         </div>
       </form>
+    </div>
+
+    <div class="card" id="packs">
+      <h2>Meine Packs</h2>
+      <% if (!packs.length) { %>
+        <p class="muted">Du hast keine ungeöffneten Packs.</p>
+      <% } else { %>
+        <ul class="tcg-packs">
+          <% packs.forEach((p) => { %>
+            <li class="tcg-pack-item">
+              <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
+              <div>
+                <strong><%= p.label %></strong>
+                <span class="muted">×<span data-tcg-pack-count="<%= p.key %>"><%= p.count %></span></span>
+              </div>
+              <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= p.image %>">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="type" value="<%= p.key %>">
+                <button class="btn btn-primary btn-sm" type="submit">Öffnen</button>
+              </form>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
     </div>
 
     <div class="stats stats-4">
@@ -54,7 +79,7 @@
         </div>
       </div>
       <% if (!cardCount) { %>
-        <p class="muted">Du hast noch keine Karten. Öffne dein erstes Booster Pack!</p>
+        <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p>
       <% } %>
       <div class="tcg-grid">
         <% cards.forEach((c) => { const n = counts[c.id] || 0; const r = rarityByKey[c.rarity]; %>
@@ -179,7 +204,7 @@
     <div class="tcg-reveal-cards" data-tcg-cards></div>
     <div class="tcg-reveal-actions" data-tcg-actions hidden>
       <button type="button" class="btn btn-ghost" data-tcg-flip-all>Alle aufdecken</button>
-      <button type="button" class="btn btn-primary" data-tcg-again>Nochmal · <%= euro(packPrice) %></button>
+      <button type="button" class="btn btn-primary" data-tcg-again>Nächstes Pack öffnen</button>
       <button type="button" class="btn btn-ghost" data-tcg-done>Zur Sammlung</button>
     </div>
   </div>

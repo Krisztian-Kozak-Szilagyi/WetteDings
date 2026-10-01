@@ -11,7 +11,9 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
-const isDog = (card) => who(card) === 'good-boy';
+// Hundekarten (Spells): Hugo und Lilly
+const DOGS = new Set(['hugo', 'lilly']);
+const isDog = (card) => DOGS.has(who(card));
 
 /**
  * Liefert die aktiven Fähigkeiten für diese Kombination.
@@ -45,12 +47,14 @@ function resolve(main, boost) {
   if (both.includes('pascal')) {
     add({ key: 'bloodlust', label: 'Bloodlust', text: 'Die Aufgabe ist eine Runde lang gelähmt – die Deadline steht kurz still.', fx: 'fx-bloodlust', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.extraTicks += 1; } });
   }
-  // Matze stärkt sich selbst, wenn eine Hundekarte (Good Boy) mitgespielt wird – er ist kein Boost
+  // Matze stärkt sich selbst, wenn eine Hundekarte (Hugo, Lilly) mitgespielt wird – er ist kein Boost
   if (m === 'matze' && isDog(boost)) {
     add({ key: 'hundekarte', label: 'Hundekarte!', text: '+10 FIS und +5 auf alle anderen Stats.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fis += 10; s.stats.fia += 5; s.stats.bwl += 5; } });
   }
-  if (isDog(boost) && !isDog(main)) {
-    add({ key: 'good-boy', label: 'Good Boy', text: 'Alle Stats der ITler-Karte +3.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fia += 3; s.stats.fis += 3; s.stats.bwl += 3; } });
+  // Hundekarte: erhöht alle Werte der freundlichen Charaktere um 3. (Laut Karte höchstens zwei verschiedene
+  // Hunde gleichzeitig – in der IHK gibt es nur einen Boost-Slot, also immer genau einen.)
+  if (isDog(boost)) {
+    add({ key: 'hund', label: boost.name, text: 'Hundekarte: alle Werte +3.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fia += 3; s.stats.fis += 3; s.stats.bwl += 3; } });
   }
   if (m === 'seven' && b === 'grafikkarte-nvidia') {
     add({ key: 'nvidia', label: 'NVIDIA-Grafikkarte', text: '7 ist glücklich: doppelte Geschwindigkeit für 3 Runden.', fx: 'fx-speed', target: 'player', apply: (s) => { s.tempSpeed = { factor: 2, ticks: 3 }; } });
@@ -89,7 +93,7 @@ function resolve(main, boost) {
 }
 
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
-const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'good-boy', 'lili']);
+const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili']);
 
 // Oliver the Sigrist "kann nicht im Spiel eingesetzt werden".
 // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt (er würde jede Quest

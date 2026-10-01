@@ -76,7 +76,7 @@ const ledgerLabels = {
   coin_verkauf: 'Samantha Coin verkauft',
   lotto_los: 'Lotterielos gekauft',
   lotto_gewinn: 'Lotteriegewinn',
-  tcg_pack: 'Booster Pack geöffnet',
+  tcg_pack: 'Booster Pack gekauft',
   tcg_verkauf: 'TCG-Karte verkauft',
   ihk_lohn: 'IHK-Quest geschafft',
   handel_kauf: 'Karte gekauft (Handel)',

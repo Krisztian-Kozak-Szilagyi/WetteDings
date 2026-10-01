@@ -5,6 +5,7 @@ const Bet = require('../models/Bet');
 const { requireAdmin } = require('../middleware');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
+const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
@@ -15,11 +16,12 @@ const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } 
 const router = express.Router();
 
 router.get('/admin', requireAdmin, async (req, res) => {
-  const [codes, userCount, openBets, totalBets] = await Promise.all([
+  const [codes, userCount, openBets, totalBets, users] = await Promise.all([
     listActiveCodes(),
     User.countDocuments(),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(),
+    User.find().select('username').sort({ usernameLower: 1 }).lean(),
   ]);
   res.render('admin', {
     title: 'Admin',
@@ -28,6 +30,8 @@ router.get('/admin', requireAdmin, async (req, res) => {
     ttlMinutes: CODE_TTL_MINUTES,
     stats: { userCount, openBets, totalBets },
     now: Date.now(),
+    users,
+    packTypes: tcgCatalog.PACK_TYPES,
     tcg: {
       packPrice: tcgSettings.getPackPrice(),
       rarities: tcgCatalog.RARITIES,
@@ -65,11 +69,14 @@ router.post('/admin/ihk', requireAdmin, async (req, res) => {
     rewards: DIFFICULTIES.map((d) => centsOrNull(req.body[`${prefix}reward_${d.level}`])),
     required: DIFFICULTIES.map((d) => num(req.body[`${prefix}required_${d.level}`])),
   });
+  const packChance = Number(String(typeof req.body.packChance === 'string' ? req.body.packChance : '').replace(',', '.'));
   const { durations, rewards, required } = table('');
   const hybrid = table('hybrid_');
   const both = (key) => [...{ durations, rewards, required }[key], ...hybrid[key]];
   if (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 100) {
     req.flash('error', 'Das Tageslimit muss zwischen 0 und 100 liegen.');
+  } else if (!Number.isFinite(packChance) || packChance < 0 || packChance > 100) {
+    req.flash('error', 'Die Pack-Chance muss zwischen 0 und 100 % liegen.');
   } else if (both('durations').some((m) => !Number.isInteger(m) || m < 0 || m > 1440)) {
     req.flash('error', 'Die Dauer muss je Schwierigkeit zwischen 0 und 1440 Minuten liegen.');
   } else if (both('required').some((r) => !Number.isInteger(r) || r < 1 || r > 100000)) {
@@ -77,7 +84,7 @@ router.post('/admin/ihk', requireAdmin, async (req, res) => {
   } else if (both('rewards').some((r) => r === null)) {
     req.flash('error', 'Bitte für jede Schwierigkeit einen gültigen Lohn angeben.');
   } else {
-    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, hybrid, admin: req.user });
+    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, packChance, durations, rewards, required, hybrid, admin: req.user });
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
   res.redirect('/admin#ihk');
@@ -131,6 +138,25 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
     req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
   }
   res.redirect('/admin#tcg');
+});
+
+// ---------- TCG: Booster Packs an Mitglieder vergeben ----------
+router.post('/admin/tcg/packs', requireAdmin, async (req, res) => {
+  const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  const type = tcgCatalog.packTypeByKey[req.body.type];
+  const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
+  const user = mongoose.isValidObjectId(userId) ? await User.findById(userId).select('username').lean() : null;
+  if (!user) {
+    req.flash('error', 'Bitte ein Mitglied auswählen.');
+  } else if (!type) {
+    req.flash('error', 'Bitte ein Booster Pack auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 50) {
+    req.flash('error', 'Die Anzahl muss zwischen 1 und 50 liegen.');
+  } else {
+    await tcgService.grantPacks({ userId: user._id, type: type.key, count, source: 'admin' });
+    req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
+  }
+  res.redirect('/admin#packs');
 });
 
 router.post('/admin/codes', requireAdmin, async (req, res) => {

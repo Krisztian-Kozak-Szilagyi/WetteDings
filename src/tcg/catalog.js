@@ -19,6 +19,11 @@ function imageUrl(file) {
 const PACK_IMAGE = imageUrl('bfw-holdings-booster-pack.png');
 const CARDS_PER_PACK = 3;
 
+// Booster-Pack-Arten. Später kommen weitere dazu (eigener Schlüssel, Name und Bild).
+const PACK_TYPES = [{ key: 'bfw-holdings', label: 'BfW Holdings Booster Pack', image: PACK_IMAGE }];
+const DEFAULT_PACK = PACK_TYPES[0].key;
+const packTypeByKey = Object.fromEntries(PACK_TYPES.map((p) => [p.key, p]));
+
 /**
  * Seltenheiten von häufig nach selten. weight = Chance pro Karte in 1/10.000 (Summe 10.000),
  * sell = Verkaufspreis in Cent.
@@ -54,7 +59,6 @@ const visibleRarities = () => RARITIES.filter((r) => !r.hidden);
 // Namen, die sich nicht automatisch aus dem Dateinamen ergeben (so wie sie auf der Karte stehen)
 const NAME_OVERRIDES = {
   'casino-kaffee': 'Casino-Kaffee',
-  'good-boy': 'Good Boy',
   'st-ivan': 'St. Ivan',
   omer: 'Ömer',
   'grafikkarte-amd': 'AMD-Grafikkarte',
@@ -147,6 +151,9 @@ const chance = (key) => rarityByKey[key].weight / TOTAL_WEIGHT;
 module.exports = {
   PACK_IMAGE,
   CARDS_PER_PACK,
+  PACK_TYPES,
+  DEFAULT_PACK,
+  packTypeByKey,
   RARITIES,
   DEFAULT_SELL,
   DEFAULT_WEIGHT,

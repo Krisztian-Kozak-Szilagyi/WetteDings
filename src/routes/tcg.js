@@ -21,11 +21,12 @@ function cardView(card) {
 }
 
 router.get('/tcg', async (req, res) => {
-  const [owned, stats, rarePulls, locked] = await Promise.all([
+  const [owned, stats, rarePulls, locked, packs] = await Promise.all([
     tcg.inventory(req.user._id),
     TcgOpening.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: null, packs: { $sum: 1 }, spent: { $sum: '$cost' }, best: { $max: '$best' } } }]),
     TcgOpening.find({ best: { $gte: catalog.rarityByKey.holo.rank } }).sort({ createdAt: -1 }).limit(10).lean(),
     lockedDocs(req.user._id),
+    tcg.packInventory(req.user._id),
   ]);
   // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
   const lockedByCard = {};
@@ -57,16 +58,27 @@ router.get('/tcg', async (req, res) => {
     rarePulls,
     packPrice: settings.getPackPrice(),
     packImage: catalog.PACK_IMAGE,
+    packs,
+    packType: catalog.DEFAULT_PACK,
     cardsPerPack: catalog.CARDS_PER_PACK,
   });
 });
 
+router.post('/tcg/kaufen', async (req, res) => {
+  try {
+    const r = await tcg.buyPack({ user: req.user, type: str(req.body.type) });
+    req.flash('success', `${r.type.label} für ${euro(r.cost)} gekauft – es liegt bei deinen Packs.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/tcg#packs');
+});
+
 router.post('/tcg/oeffnen', async (req, res) => {
   try {
-    const r = await tcg.openPack({ user: req.user });
-    if (wantsJson(req)) {
-      return res.json({ cards: r.cards.map(cardView), balance: euro(r.balance), canAfford: r.balance >= settings.getPackPrice() });
-    }
+    const r = await tcg.openPack({ user: req.user, type: str(req.body.type) });
+    if (wantsJson(req)) return res.json({ cards: r.cards.map(cardView), packsLeft: r.packsLeft });
     req.flash('success', `Booster Pack geöffnet: ${r.cards.map((c) => `${c.name} (${catalog.rarityByKey[c.rarity].label})`).join(', ')}.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;

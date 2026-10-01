@@ -1,38 +1,69 @@
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { TcgCard, TcgOpening } = require('../models/Tcg');
+const { TcgCard, TcgOpening, TcgPack } = require('../models/Tcg');
 const { lockedDocs, isLocked } = require('./locks');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const catalog = require('./catalog');
 const settings = require('./settings');
 
-/** Booster Pack kaufen und sofort öffnen. Gibt die gezogenen Karten zurück. */
-async function openPack({ user }) {
+const packType = (type) => {
+  const t = catalog.packTypeByKey[type || catalog.DEFAULT_PACK];
+  if (!t) throw new UserError('Dieses Booster Pack gibt es nicht.');
+  return t;
+};
+
+/** Booster Pack kaufen: Es landet ungeöffnet im Inventar. */
+async function buyPack({ user, type }) {
+  const t = packType(type);
   const cost = settings.getPackPrice();
+  if (!catalog.CARDS.length) throw new UserError('Der TCG-Shop ist gerade geschlossen.');
+
+  return inTransaction(async (session) => {
+    const updatedUser = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { new: true, session });
+    if (!updatedUser) throw new UserError('Dein Guthaben reicht für kein Booster Pack.');
+    await TcgPack.create([{ user: user._id, type: t.key, source: 'kauf', cost }], { session });
+    await Ledger.create([{ user: user._id, type: 'tcg_pack', amount: -cost }], { session });
+    return { type: t, cost, balance: updatedUser.balance };
+  });
+}
+
+/** Booster Packs verschenken (Quest-Fund, Admin). Optional innerhalb einer laufenden Transaktion. */
+async function grantPacks({ userId, type, count = 1, source, session }) {
+  const t = packType(type);
+  await TcgPack.insertMany(Array.from({ length: count }, () => ({ user: userId, type: t.key, source, cost: 0 })), { session });
+  return t;
+}
+
+/** Ein Booster Pack aus dem Inventar öffnen (das älteste dieser Art). Gibt die gezogenen Karten zurück. */
+async function openPack({ user, type }) {
+  const t = packType(type);
   if (!catalog.CARDS.length) throw new UserError('Der TCG-Shop ist gerade geschlossen.');
   const drawn = catalog.drawPack();
 
   return inTransaction(async (session) => {
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: user._id, balance: { $gte: cost } },
-      { $inc: { balance: -cost } },
-      { new: true, session }
-    );
-    if (!updatedUser) throw new UserError('Dein Guthaben reicht für kein Booster Pack.');
+    const pack = await TcgPack.findOneAndDelete({ user: user._id, type: t.key }, { sort: { createdAt: 1 }, session });
+    if (!pack) throw new UserError('Du hast kein ungeöffnetes Booster Pack dieser Art.');
 
     const best = Math.max(...drawn.map((c) => catalog.rarityByKey[c.rarity].rank));
     const [opening] = await TcgOpening.create(
-      [{ user: user._id, username: user.username, cost, cards: drawn.map((c) => ({ card: c.id, rarity: c.rarity })), best }],
+      [{ user: user._id, username: user.username, cost: pack.cost, cards: drawn.map((c) => ({ card: c.id, rarity: c.rarity })), best }],
       { session }
     );
     await TcgCard.insertMany(
       drawn.map((c) => ({ user: user._id, card: c.id, rarity: c.rarity, opening: opening._id })),
       { session }
     );
-    await Ledger.create([{ user: user._id, type: 'tcg_pack', amount: -cost }], { session });
-    return { cards: drawn, cost, balance: updatedUser.balance, openingId: opening._id };
+    const packsLeft = await TcgPack.countDocuments({ user: user._id, type: t.key }).session(session);
+    return { cards: drawn, packsLeft, openingId: opening._id };
   });
+}
+
+/** Ungeöffnete Packs eines Nutzers: [{ ...Pack-Art, count }] (nur Arten mit mindestens einem Pack) */
+async function packInventory(userId) {
+  const agg = await TcgPack.aggregate([{ $match: { user: userId } }, { $group: { _id: '$type', n: { $sum: 1 } } }]);
+  const counts = Object.fromEntries(agg.map((a) => [a._id, a.n]));
+  return catalog.PACK_TYPES.filter((t) => counts[t.key]).map((t) => ({ ...t, count: counts[t.key] }));
 }
 
 /**
@@ -118,4 +149,4 @@ async function cardValueCents(userId) {
   return agg[0] ? agg[0].s : 0;
 }
 
-module.exports = { openPack, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

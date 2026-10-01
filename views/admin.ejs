@@ -52,6 +52,32 @@
   </form>
 </div>
 
+<div class="card" id="packs">
+  <h2>TCG: Booster Packs vergeben</h2>
+  <p class="muted">Schenkt einem Mitglied ungeöffnete Booster Packs. Sie landen in seinem Inventar auf der TCG-Seite („Meine Packs“).</p>
+  <form method="post" action="/admin/tcg/packs" class="form admin-tcg-form" data-confirm="Booster Packs wirklich vergeben?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Mitglied</span>
+      <select name="user" required>
+        <option value="">– auswählen –</option>
+        <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+      </select>
+    </label>
+    <label class="field admin-tcg-pack">
+      <span>Booster Pack</span>
+      <select name="type" required>
+        <% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %>
+      </select>
+    </label>
+    <label class="field admin-tcg-pack">
+      <span>Anzahl (1–50)</span>
+      <input type="number" name="count" min="1" max="50" step="1" value="1" required>
+    </label>
+    <button class="btn btn-primary" type="submit">Packs vergeben</button>
+  </form>
+</div>
+
 <div class="card" id="handel">
   <h2>Handel: Steuer</h2>
   <p class="muted">Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.</p>
@@ -77,6 +103,10 @@
     <label class="field admin-tcg-pack">
       <span>Quests pro Tag</span>
       <input type="number" name="dailyLimit" min="0" max="100" step="1" value="<%= ihk.settings.dailyLimit %>" required>
+    </label>
+    <label class="field admin-tcg-pack">
+      <span>Chance auf ein Booster Pack pro geschaffter Quest (%)</span>
+      <input type="text" name="packChance" inputmode="decimal" value="<%= String(ihk.settings.packChance).replace('.', ',') %>" required>
     </label>
     <% [
          { title: 'Normale Quests (FIA, FIS oder BWL)', prefix: '', values: ihk.settings },

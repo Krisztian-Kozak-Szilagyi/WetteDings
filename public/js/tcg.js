@@ -118,9 +118,11 @@
   }
 
   // ---------- Pack öffnen ----------
-  var form = $('[data-tcg-open]');
+  // Ein Formular pro Pack-Art im Inventar; form = das zuletzt benutzte (für "Nächstes Pack öffnen")
+  var forms = $all('[data-tcg-open]');
+  var form = null;
   var reveal = $('[data-tcg-reveal]');
-  if (!form || !reveal || !window.fetch) return;
+  if (!forms.length || !reveal || !window.fetch) return;
 
   var packBtn = $('[data-tcg-pack]', reveal);
   var cardsBox = $('[data-tcg-cards]', reveal);
@@ -130,13 +132,7 @@
   var againBtn = $('[data-tcg-again]', reveal);
   var doneBtn = $('[data-tcg-done]', reveal);
 
-  var state = { busy: false, cards: null, flipped: 0, canAfford: true, opened: false };
-
-  function setBalance(text) {
-    $all('[data-tcg-balance]').forEach(function (el) { el.textContent = text; });
-    var chip = $('[data-live="balance"] strong');
-    if (chip) chip.textContent = text;
-  }
+  var state = { busy: false, cards: null, flipped: 0, packsLeft: 0, opened: false };
 
   function resetStage() {
     reveal.classList.remove('all-flipped');
@@ -156,7 +152,9 @@
     resetStage();
     reveal.hidden = false;
     document.body.classList.add('tcg-noscroll');
-    hint.textContent = 'Pack wird gekauft …';
+    hint.textContent = 'Pack wird geöffnet …';
+    var packImg = packBtn.querySelector('img');
+    if (packImg && form.getAttribute('data-image')) packImg.src = form.getAttribute('data-image');
 
     fetch(form.action, {
       method: 'POST',
@@ -174,8 +172,7 @@
           showFlash('error', data.error);
           return;
         }
-        setBalance(data.balance);
-        state.canAfford = data.canAfford;
+        state.packsLeft = data.packsLeft;
         // Seltenste Karte zuletzt – für die Spannung
         state.cards = data.cards.slice().sort(function (a, b) { return a.rank - b.rank; });
         packBtn.disabled = false;
@@ -249,9 +246,8 @@
     var best = state.cards[state.cards.length - 1];
     hint.textContent = best.rank >= RARE_RANK ? 'Wow – ' + best.name + ' (' + best.rarityLabel + ')!' : 'Alle Karten sind in deiner Sammlung.';
     flipAllBtn.hidden = true;
-    againBtn.hidden = false;
-    againBtn.disabled = !state.canAfford;
-    againBtn.title = state.canAfford ? '' : 'Dein Guthaben reicht nicht für ein weiteres Pack.';
+    againBtn.hidden = !state.packsLeft;
+    againBtn.textContent = 'Nächstes Pack öffnen (' + state.packsLeft + ' übrig)';
     doneBtn.hidden = false;
     doneBtn.focus();
   }
@@ -272,9 +268,12 @@
     document.body.classList.remove('tcg-noscroll');
   }
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    openPack();
+  forms.forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      form = f;
+      openPack();
+    });
   });
   packBtn.addEventListener('click', tearPack);
   flipAllBtn.addEventListener('click', flipAll);

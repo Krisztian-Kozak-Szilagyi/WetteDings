@@ -13,6 +13,18 @@ const cardSchema = new Schema(
 );
 cardSchema.index({ user: 1, card: 1, createdAt: 1 });
 
+// Ein ungeöffnetes Booster Pack im Inventar (wird beim Öffnen gelöscht)
+const packSchema = new Schema(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    type: { type: String, required: true }, // Pack-Art aus dem Katalog (PACK_TYPES)
+    source: { type: String, enum: ['kauf', 'quest', 'admin'], required: true },
+    cost: { type: Number, default: 0 }, // bezahlter Preis in Cent (0 = geschenkt)
+  },
+  { timestamps: true }
+);
+packSchema.index({ user: 1, type: 1, createdAt: 1 });
+
 // Ein geöffnetes Booster Pack (für Statistik und den Feed seltener Ziehungen)
 const openingSchema = new Schema(
   {
@@ -44,6 +56,7 @@ const settingsSchema = new Schema(
 
 module.exports = {
   TcgCard: model('TcgCard', cardSchema),
+  TcgPack: model('TcgPack', packSchema),
   TcgOpening: model('TcgOpening', openingSchema),
   TcgSettings: model('TcgSettings', settingsSchema),
 };

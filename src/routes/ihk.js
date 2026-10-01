@@ -96,7 +96,9 @@ router.post('/ihk/neu-wuerfeln', (req, res) =>
 router.post('/ihk/abholen', (req, res) =>
   handle(req, res, async () => {
     const run = await ihk.collect({ user: req.user });
-    return run.success ? `Quest geschafft – ${euro(run.reward)} wurden dir gutgeschrieben.` : null;
+    if (!run.success) return null;
+    const pack = run.pack ? ' Außerdem hast du ein Booster Pack gefunden – es liegt bei deinen Packs im TCG!' : '';
+    return `Quest geschafft – ${euro(run.reward)} wurden dir gutgeschrieben.${pack}`;
   })
 );
 

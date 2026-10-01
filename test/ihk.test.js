@@ -42,11 +42,13 @@ test('Fähigkeiten: nur unter den Bedingungen aus dem Kartentext', () => {
   // Lili nur neben Krisz
   assert.ok(keys('krisz-1-crumpled', 'lili-6-glitch').includes('lili'));
   assert.ok(!keys('luca-1-crumpled', 'lili-6-glitch').includes('lili'));
-  // Hundekarte: nur Matze als Hauptkarte mit Good Boy; Good Boy gibt zusätzlich +3
-  assert.ok(keys('matze-3-gold', 'good-boy-holo').includes('hundekarte'));
-  assert.ok(keys('matze-3-gold', 'good-boy-holo').includes('good-boy'));
-  assert.ok(!keys('good-boy-holo', 'matze-2-bfwler').includes('hundekarte'));
-  assert.ok(keys('luca-3-gold', 'good-boy-holo').includes('good-boy'));
+  // Hundekarten (Hugo, Lilly): geben +3 auf alle Werte; Matze bekommt zusätzlich seine eigene Fähigkeit
+  for (const dog of ['hugo-holo', 'lilly-holo']) {
+    assert.deepEqual(keys('matze-3-gold', dog), ['hundekarte', 'hund']);
+    assert.deepEqual(keys('luca-3-gold', dog).filter((k) => k !== 'simulation'), ['hund']);
+    assert.ok(!c(dog).isCharacter, 'Hundekarten sind Spells');
+  }
+  assert.ok(!catalog.cardById['good-boy-holo'], 'Good Boy wurde entfernt');
   // Pascal als Haupt- oder Boost-Karte, Adrian/Marcel/St. Ivan wirken hier nicht
   assert.ok(keys('luca-3-gold', 'pascal-1-crumpled').includes('bloodlust'));
   assert.deepEqual(keys('adrian-3-gold', 'marcel-1-crumpled'), []);
@@ -56,7 +58,7 @@ test('Fähigkeiten: nur unter den Bedingungen aus dem Kartentext', () => {
 test('Boost-Slot: Items immer, Charaktere nur mit Boost-Fähigkeit', () => {
   const { canBoost } = require('../src/ihk/abilities');
   const c = (id) => catalog.cardById[id];
-  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'good-boy-holo', 'lili-6-glitch', 'mauch-1-holo', 'sigrist-4-icon']) assert.ok(canBoost(c(id)), id);
+  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'hugo-holo', 'lilly-holo', 'lili-6-glitch', 'mauch-1-holo', 'sigrist-4-icon']) assert.ok(canBoost(c(id)), id);
   // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt
   for (const id of ['hermann-1-holo', 'hermann-2-bockhaber', 'hermann-3-glitch', 'hermann-4-icon']) assert.ok(!canBoost(c(id)), id);
   // Oliver the Sigrist ist in der IHK nicht einsetzbar
@@ -195,4 +197,13 @@ test('Hybrid-Quests haben eigene Einstellungen (Ziel, Dauer, Lohn)', () => {
   } finally {
     ihk.settings.hybrid = saved;
   }
+});
+
+test('Booster Pack für eine geschaffte Quest: Chance in Prozent', () => {
+  const { rollsPack, settings } = require('../src/ihk/ihkService');
+  assert.equal(settings.packChance, 5);
+  assert.equal(rollsPack(0.049, 5), true);
+  assert.equal(rollsPack(0.05, 5), false);
+  assert.equal(rollsPack(0, 0), false);
+  assert.equal(rollsPack(0.999999, 100), true);
 });

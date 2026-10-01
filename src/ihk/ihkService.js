@@ -8,6 +8,7 @@ const { inTransaction } = require('../services/betService');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
+const tcgService = require('../tcg/tcgService');
 const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
 const { resolve, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
@@ -23,8 +24,9 @@ const OFFER_COUNT = 3;
 // open = für alle Mitglieder spielbar (sonst nur Admins)
 // required = Ziel-Punkte je Schwierigkeit (1–6)
 // durations = Wartezeit in Minuten je Schwierigkeit (1–6)
+// packChance = Chance in % auf ein Booster Pack pro geschaffter Quest
 // hybrid = eigene Werte (required, durations, rewards) für Hybrid-Quests
-const DEFAULTS = { open: false, dailyLimit: 5, durations: [10, 10, 10, 10, 10, 10], rewards: [1500, 2500, 4000, 6000, 10000, 15000], required: DIFFICULTIES.map((d) => d.required) };
+const DEFAULTS = { open: false, dailyLimit: 5, packChance: 5, durations: [10, 10, 10, 10, 10, 10], rewards: [1500, 2500, 4000, 6000, 10000, 15000], required: DIFFICULTIES.map((d) => d.required) };
 const table = (t) => ({ durations: [...t.durations], rewards: [...t.rewards], required: [...t.required] });
 const settings = { ...DEFAULTS, ...table(DEFAULTS), hybrid: table(DEFAULTS) };
 const validList = (list, min) => Array.isArray(list) && list.length === 6 && list.every((r) => Number.isInteger(r) && r >= min);
@@ -43,6 +45,7 @@ async function loadSettings() {
   if (!doc) return;
   if (typeof doc.open === 'boolean') settings.open = doc.open;
   if (Number.isInteger(doc.dailyLimit) && doc.dailyLimit >= 0) settings.dailyLimit = doc.dailyLimit;
+  if (Number.isFinite(doc.packChance) && doc.packChance >= 0 && doc.packChance <= 100) settings.packChance = doc.packChance;
   if (validList(doc.durations, 0)) settings.durations = doc.durations;
   else if (Number.isInteger(doc.durationMin) && doc.durationMin >= 0) settings.durations = Array(6).fill(doc.durationMin); // alte Einstellung
   if (validList(doc.rewards, 0)) settings.rewards = doc.rewards;
@@ -56,9 +59,9 @@ async function loadSettings() {
   };
 }
 
-async function saveSettings({ open, dailyLimit, durations, rewards, required, hybrid, admin }) {
-  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, durations, rewards, required, hybrid, updatedByName: admin.username } }, { upsert: true });
-  Object.assign(settings, { open, dailyLimit, durations, rewards, required, hybrid });
+async function saveSettings({ open, dailyLimit, packChance, durations, rewards, required, hybrid, admin }) {
+  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, packChance, durations, rewards, required, hybrid, updatedByName: admin.username } }, { upsert: true });
+  Object.assign(settings, { open, dailyLimit, packChance, durations, rewards, required, hybrid });
 }
 
 // ---------- Simulation ----------
@@ -256,6 +259,9 @@ async function start({ user, cardId, boostId, offerIndex }) {
   }
 }
 
+/** Würfelt, ob es für eine geschaffte Quest ein Booster Pack gibt (rand: Zahl in [0, 1)) */
+const rollsPack = (rand = crypto.randomInt(1000000) / 1000000, chance = settings.packChance) => rand * 100 < chance;
+
 /** Nach Ablauf: Belohnung gutschreiben, Karte freigeben, neue Quests anbieten */
 async function collect({ user }) {
   const result = await inTransaction(async (session) => {
@@ -269,10 +275,16 @@ async function collect({ user }) {
       await User.updateOne({ _id: user._id }, { $inc: { balance: run.reward } }, { session });
       await Ledger.create([{ user: user._id, type: 'ihk_lohn', amount: run.reward, betTitle: questById[run.quest] ? questById[run.quest].title : null }], { session });
     }
+    // Mit etwas Glück gibt es für eine geschaffte Quest zusätzlich ein Booster Pack (landet im TCG-Inventar)
+    if (run.success && rollsPack()) {
+      const type = await tcgService.grantPacks({ userId: user._id, source: 'quest', session });
+      run.pack = type.key;
+      await run.save({ session });
+    }
     return run;
   });
   await IhkState.updateOne({ _id: user._id }, { $set: { offers: generateOffers() } }, { upsert: true });
   return result;
 }
 
-module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, loadSettings, saveSettings, simulate, generateOffers, getOffers, canReroll, reroll, getState, start, collect };
+module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, loadSettings, saveSettings, simulate, generateOffers, rollsPack, getOffers, canReroll, reroll, getState, start, collect };

@@ -1,5 +1,8 @@
 const config = require('./config');
 const Bet = require('./models/Bet');
+const { TcgCard, TcgOpening } = require('./models/Tcg');
+const { IhkRun } = require('./models/Ihk');
+const { Trade } = require('./models/Trade');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -29,6 +32,16 @@ async function migrate() {
   if (fee.modifiedCount) {
     console.log(`Migration: Provision bei ${fee.modifiedCount} offenen Wette(n) auf ${config.creatorFeePercent} % gesenkt.`);
   }
+
+  // Good Boy wurde entfernt: Wer ihn hatte, bekommt stattdessen Lilly (auch in Quests, Angeboten und im Verlauf)
+  const from = 'good-boy-holo';
+  const to = 'lilly-holo';
+  const dogs = await TcgCard.updateMany({ card: from }, { $set: { card: to } });
+  if (dogs.modifiedCount) console.log(`Migration: ${dogs.modifiedCount}× Good Boy durch Lilly ersetzt.`);
+  await IhkRun.updateMany({ card: from }, { $set: { card: to } });
+  await IhkRun.updateMany({ boost: from }, { $set: { boost: to } });
+  await Trade.updateMany({ card: from }, { $set: { card: to } });
+  await TcgOpening.updateMany({ 'cards.card': from }, { $set: { 'cards.$[c].card': to } }, { arrayFilters: [{ 'c.card': from }] });
 }
 
 module.exports = { migrate };

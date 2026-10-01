@@ -369,7 +369,7 @@
   };
   var EFFECT_OF = {
     nachtschicht: 'bolts', 'bfw-energy': 'bolts', lili: 'hearts', simulation: 'chart', faelschung: 'scramble',
-    'good-boy': 'sparkle', hundekarte: 'sparkle', nvidia: 'speed', amd: 'rain', kaffee: 'steam',
+    hund: 'sparkle', 'good-boy': 'sparkle', hundekarte: 'sparkle', nvidia: 'speed', amd: 'rain', kaffee: 'steam',
   };
   function playEffect(slot, key) {
     var fn = EFFECTS[EFFECT_OF[key]];
