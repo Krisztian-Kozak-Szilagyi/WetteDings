@@ -28,11 +28,10 @@
           <a href="/rangliste" class="<%= currentPath === '/rangliste' ? 'active' : '' %>">Rangliste</a>
           <a href="/coin-exchange" class="<%= currentPath === '/coin-exchange' ? 'active' : '' %>">Coin Exchange</a>
           <a href="/lotterie" class="<%= currentPath === '/lotterie' ? 'active' : '' %>">Lotterie</a>
-          <a href="/tcg" class="<%= currentPath === '/tcg' ? 'active' : '' %>">TCG</a>
+          <a href="/tcg" class="nav-badge-link <%= currentPath.startsWith('/tcg') ? 'active' : '' %>">TCG<% if (newPacks) { %><span class="nav-badges"><span class="nav-badge" title="Neue Booster Packs" aria-label="<%= newPacks %> neue Booster Packs"><%= newPacks > 99 ? '99+' : newPacks %></span></span><% } %></a>
           <a href="/handel" class="nav-badge-link <%= currentPath === '/handel' ? 'active' : '' %>">Handel<% if (tradeMarketNew || tradeIncoming) { %><span class="nav-badges"><% if (tradeMarketNew) { %><span class="nav-badge nav-badge-market" title="Neu auf dem Markt" aria-label="<%= tradeMarketNew %> neue Markt-Angebote"><%= tradeMarketNew > 99 ? '99+' : tradeMarketNew %></span><% } %><% if (tradeIncoming) { %><span class="nav-badge" title="Angebote an dich" aria-label="<%= tradeIncoming %> Angebote an dich"><%= tradeIncoming > 99 ? '99+' : tradeIncoming %></span><% } %></span><% } %></a>
           <% if (ihkOpen() || currentUser.isAdmin) { %><a href="/ihk" class="<%= currentPath === '/ihk' ? 'active' : '' %>">IHK</a><% } %>
         <% } %>
-        <a href="/regeln" class="<%= currentPath === '/regeln' ? 'active' : '' %>">Regeln</a>
         <% if (currentUser && currentUser.isAdmin) { %>
           <a href="/admin" class="<%= currentPath === '/admin' ? 'active' : '' %>">Admin</a>
         <% } %>

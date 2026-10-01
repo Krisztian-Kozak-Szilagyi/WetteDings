@@ -12,6 +12,12 @@ const userSchema = new Schema(
     lastBonusDay: { type: String, default: null },
     // Zeitpunkt des letzten Besuchs der Handelsseite (für das Markt-Abzeichen im Menü)
     marketSeenAt: { type: Date, default: null },
+    // Letzter Besuch der TCG-Seite bzw. der Patchnotes (für die Abzeichen "neue Packs" / "neue Patchnotes")
+    packsSeenAt: { type: Date, default: null },
+    patchSeenAt: { type: Date, default: null },
+    // TCG: Karten-IDs, deren Duplikate nicht mitverkauft werden, und bis zu 4 Favoriten für die TCG-Seite
+    tcgProtected: { type: [String], default: [] },
+    tcgFavorites: { type: [String], default: [] },
   },
   { timestamps: true }
 );

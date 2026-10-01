@@ -115,3 +115,14 @@ test('Admin-Chancen: nur gültig, wenn zusammen genau 100 %', () => {
 test('Ein Pack hat 3 Karten', () => {
   assert.equal(catalog.drawPack().length, 3);
 });
+
+test('Patchnotes: Auszeichnung wird zu sicherem HTML', () => {
+  const { render } = require('../src/patchnotes/render');
+  const html = render('# Titel\n## Unter\nErste **fette** Zeile\nzweite __unterstrichene__\n\n- eins\n- zwei <script>x</script>');
+  assert.equal(html, [
+    '<h3 class="pn-h1">Titel</h3>',
+    '<h4 class="pn-h2">Unter</h4>',
+    '<p>Erste <strong>fette</strong> Zeile<br>zweite <u>unterstrichene</u></p>',
+    '<ul><li>eins</li><li>zwei &lt;script&gt;x&lt;/script&gt;</li></ul>',
+  ].join('\n'));
+});

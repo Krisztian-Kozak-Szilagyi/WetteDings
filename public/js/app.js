@@ -295,6 +295,29 @@
     update();
   });
 
+  // Patchnotes: Knöpfe über dem Textfeld setzen die Auszeichnung (Zeilenanfang bzw. um die Markierung)
+  document.querySelectorAll('[data-pn-toolbar]').forEach(function (bar) {
+    var ta = document.getElementById(bar.getAttribute('data-pn-toolbar'));
+    if (!ta) return;
+    bar.addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var v = ta.value, a = ta.selectionStart, b = ta.selectionEnd;
+      var line = btn.getAttribute('data-pn-line');
+      var wrap = btn.getAttribute('data-pn-wrap');
+      if (line) {
+        var start = v.lastIndexOf('\n', a - 1) + 1;
+        ta.value = v.slice(0, start) + line + v.slice(start);
+        a += line.length; b += line.length;
+      } else if (wrap) {
+        ta.value = v.slice(0, a) + wrap + (v.slice(a, b) || 'Text') + wrap + v.slice(b);
+        b = (a === b ? a + 4 : b) + wrap.length; a += wrap.length;
+      }
+      ta.focus();
+      ta.setSelectionRange(a, b);
+    });
+  });
+
   // Admin: TCG – Summe der Chancen und Packwert live berechnen
   var tcgAdmin = document.querySelector('[data-tcg-admin]');
   if (tcgAdmin) {

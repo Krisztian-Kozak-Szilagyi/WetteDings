@@ -9,6 +9,8 @@ const config = require('./config');
 const viewHelpers = require('./lib/viewHelpers');
 const { settings: ihkSettings } = require('./ihk/ihkService');
 const tradeService = require('./trade/tradeService');
+const tcgService = require('./tcg/tcgService');
+const patchnotes = require('./routes/patchnotes');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -72,6 +74,8 @@ function createApp() {
     currentUser: null,
     tradeIncoming: 0,
     tradeMarketNew: 0,
+    newPacks: 0,
+    patchNew: 0,
     currentPath: '',
     flash: null,
     csrfToken: '',
@@ -84,15 +88,18 @@ function createApp() {
   // Abzeichen im Menü: offene Angebote an mich und neue Markt-Angebote seit dem letzten Besuch
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
-      [res.locals.tradeIncoming, res.locals.tradeMarketNew] = await Promise.all([
+      [res.locals.tradeIncoming, res.locals.tradeMarketNew, res.locals.newPacks, res.locals.patchNew] = await Promise.all([
         tradeService.incomingCount(req.user._id),
         tradeService.marketNewCount(req.user),
+        tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
+        patchnotes.newCount(req.user), // Patchnotes seit dem letzten Lesen
       ]);
     }
     next();
   });
 
   app.use(require('./routes/pages'));
+  app.use(patchnotes);
   app.use(require('./routes/auth'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));

@@ -979,7 +979,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .tcg-layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
 @media (min-width: 960px) {
   .tcg-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
-  .tcg-side { position: sticky; top: 80px; }
+  /* auf niedrigen Bildschirmen scrollt die Seitenleiste für sich, statt unten abgeschnitten zu sein */
+  .tcg-side { position: sticky; top: 80px; max-height: calc(100dvh - 96px); overflow-y: auto; }
 }
 .tcg-main > .stats { margin: 0 0 20px; }
 .tcg-main > .card { margin-bottom: 20px; }
@@ -987,6 +988,33 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .tcg-shop-form { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; }
 @media (max-width: 520px) { .tcg-shop-form { grid-template-columns: 110px 1fr; gap: 14px; } .tcg-shop-info h2 { font-size: 1.05rem; } }
 .tcg-shop-info .btn { margin-bottom: 6px; }
+/* Favoriten, Album, Marken */
+.tcg-grid.tcg-favs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tcg-grid.tcg-favs a.tcg-slot { text-decoration: none; }
+.tcg-album-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px 20px; flex-wrap: wrap; }
+.tcg-album-bar p { margin: 0 0 4px; }
+.tcg-album-bar form { margin: 0; }
+.tcg-marks { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; z-index: 2; }
+.tcg-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(3, 6, 15, .78); color: #fff; }
+.tcg-mark-fav { color: #facc15; }
+.tcg-modal-info form + form { margin-top: 8px; }
+
+/* Patchnotes */
+.pn-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; }
+.pn-head h2 { margin: 0; }
+.pn-body { margin: 12px 0; overflow-wrap: anywhere; }
+.pn-body .pn-h1 { font-size: 1.25rem; margin: 18px 0 8px; }
+.pn-body .pn-h2 { font-size: 1.05rem; margin: 14px 0 6px; }
+.pn-body ul { padding-left: 20px; margin: 8px 0; }
+.pn-body p { margin: 8px 0; }
+.pn-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.pn-actions form { margin: 0; }
+.pn-arrow { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid currentColor; vertical-align: 1px; margin-right: 2px; }
+.pn-comments summary { cursor: pointer; font-weight: 700; margin-bottom: 10px; }
+.pn-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.footer nav .nav-badge-link { padding-right: 4px; }
+.footer nav .nav-badges { top: -10px; right: -14px; }
+
 .tcg-packs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .tcg-pack-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; }
 .tcg-pack-item img { display: block; width: 100%; height: auto; border-radius: 5px; }

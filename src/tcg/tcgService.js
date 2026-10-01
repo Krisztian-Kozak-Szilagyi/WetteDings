@@ -71,6 +71,7 @@ async function packInventory(userId) {
  * keepOne = true verkauft alle Duplikate und behält genau eine.
  */
 async function sellCards({ user, cardId, count = 1, keepOne = false }) {
+  if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu verkaufen.');
   return inTransaction(async (session) => {
     const owned = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity').session(session).lean();
     if (!owned.length) throw new UserError('Du besitzt diese Karte nicht.');
@@ -98,6 +99,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
 
 /**
  * Alle Duplikate auf einmal verkaufen: von jeder Karte bleibt genau eine (die neueste) übrig.
+ * Geschützte Karten (user.tcgProtected) werden komplett ausgelassen.
  * Eine Buchung im Kontoauszug über den Gesamtbetrag.
  */
 async function sellAllDuplicates({ user }) {
@@ -110,12 +112,14 @@ async function sellAllDuplicates({ user }) {
     }
     // Gesperrte Exemplare (Quest/Handel) bleiben; gibt es keins, bleibt das neueste
     const locked = await lockedDocs(user._id, session);
+    const keep = new Set(user.tcgProtected || []);
     const toSell = [];
-    for (const list of byCard.values()) {
+    for (const [cardId, list] of byCard) {
+      if (keep.has(cardId)) continue;
       const free = list.filter((c) => !isLocked(locked, c));
       toSell.push(...(free.length === list.length ? free.slice(0, -1) : free));
     }
-    if (!toSell.length) throw new UserError('Du hast keine doppelten Karten.');
+    if (!toSell.length) throw new UserError('Du hast keine doppelten Karten, die verkauft werden können.');
 
     const proceeds = toSell.reduce((s, c) => s + (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);
     const res = await TcgCard.deleteMany({ _id: { $in: toSell.map((c) => c._id) }, user: user._id }, { session });
@@ -126,6 +130,33 @@ async function sellAllDuplicates({ user }) {
     return { count: toSell.length, proceeds, balance: updated.balance };
   });
 }
+
+const MAX_FAVORITES = 4;
+
+/** Karten-ID in einer Liste am Nutzer ein- bzw. austragen. Gibt true zurück, wenn sie danach enthalten ist. */
+async function toggleCard(user, field, cardId, check) {
+  if (!catalog.cardById[cardId]) throw new UserError('Diese Karte gibt es nicht.');
+  if ((user[field] || []).includes(cardId)) {
+    await User.updateOne({ _id: user._id }, { $pull: { [field]: cardId } });
+    return false;
+  }
+  if (!(await TcgCard.exists({ user: user._id, card: cardId }))) throw new UserError('Du besitzt diese Karte nicht.');
+  if (check) check();
+  await User.updateOne({ _id: user._id }, { $addToSet: { [field]: cardId } });
+  return true;
+}
+
+/** Schutz vor dem Duplikat-Verkauf umschalten */
+const toggleProtected = ({ user, cardId }) => toggleCard(user, 'tcgProtected', cardId);
+
+/** Favorit (Anzeige auf der TCG-Seite) umschalten – höchstens MAX_FAVORITES */
+const toggleFavorite = ({ user, cardId }) =>
+  toggleCard(user, 'tcgFavorites', cardId, () => {
+    if ((user.tcgFavorites || []).length >= MAX_FAVORITES) throw new UserError(`Du kannst höchstens ${MAX_FAVORITES} Favoriten zeigen. Entferne zuerst einen.`);
+  });
+
+/** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch der TCG-Seite – für das Abzeichen im Menü */
+const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
 /** Sammlung eines Nutzers: { cardId: Anzahl } */
 async function inventory(userId) {
@@ -149,4 +180,4 @@ async function cardValueCents(userId) {
   return agg[0] ? agg[0].s : 0;
 }
 
-module.exports = { buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { MAX_FAVORITES, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

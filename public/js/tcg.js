@@ -68,6 +68,9 @@
 
     var sellOne = $('[data-tcg-sell-one]', modal);
     var sellDupes = $('[data-tcg-sell-dupes]', modal);
+    var protectForm = $('[data-tcg-protect]', modal);
+    var favoriteForm = $('[data-tcg-favorite]', modal);
+    var protectNote = $('[data-tcg-protect-note]', modal);
 
     document.addEventListener('click', function (e) {
       var slot = e.target.closest('[data-tcg-card]');
@@ -94,8 +97,16 @@
         sellOne.removeAttribute('data-confirm');
       }
 
-      sellDupes.hidden = count < 2;
-      if (count > 1) {
+      // Schutz vor dem Duplikat-Verkauf und Favorit
+      var isProtected = d.protected === '1';
+      protectForm.querySelector('input[name="card"]').value = d.tcgCard;
+      protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Vor Duplikat-Verkauf schützen';
+      protectNote.hidden = !isProtected;
+      favoriteForm.querySelector('input[name="card"]').value = d.tcgCard;
+      favoriteForm.querySelector('button').textContent = d.favorite === '1' ? 'Nicht mehr als Favorit zeigen' : 'Als Favorit zeigen';
+
+      sellDupes.hidden = count < 2 || isProtected;
+      if (count > 1 && !isProtected) {
         var total = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(((count - 1) * sell) / 100);
         sellDupes.querySelector('input[name="card"]').value = d.tcgCard;
         sellDupes.querySelector('button').textContent = 'Duplikate verkaufen (' + (count - 1) + '×) · ' + total;
@@ -260,8 +271,7 @@
 
   function closeReveal(reload) {
     if (reload) {
-      window.location.hash = 'sammlung';
-      window.location.reload();
+      window.location.href = '/tcg/album';
       return;
     }
     reveal.hidden = true;

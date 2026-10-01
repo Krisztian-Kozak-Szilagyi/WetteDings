@@ -1,0 +1,95 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <div class="page-head">
+    <h1>Patchnotes</h1>
+    <span class="muted">Was sich auf der Seite geändert hat</span>
+  </div>
+
+  <% if (currentUser.isAdmin) { %>
+    <div class="card">
+      <h2>Neue Patchnote</h2>
+      <form method="post" action="/patchnotes" class="form" data-confirm="Patchnote veröffentlichen?">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field">
+          <span>Titel</span>
+          <input type="text" name="title" maxlength="<%= titleMax %>" required>
+        </label>
+        <div class="field">
+          <label for="pn-body">Text</label>
+          <div class="pn-toolbar" data-pn-toolbar="pn-body">
+            <button type="button" class="chip" data-pn-line="# ">H1</button>
+            <button type="button" class="chip" data-pn-line="## ">H2</button>
+            <button type="button" class="chip" data-pn-line="- ">Liste</button>
+            <button type="button" class="chip" data-pn-wrap="**"><strong>Fett</strong></button>
+            <button type="button" class="chip" data-pn-wrap="__"><u>Unterstrichen</u></button>
+          </div>
+          <textarea id="pn-body" name="body" rows="10" maxlength="<%= bodyMax %>" required></textarea>
+        </div>
+        <p class="muted small"><code># Überschrift</code> · <code>## kleine Überschrift</code> · <code>- Aufzählungspunkt</code> · <code>**fett**</code> · <code>__unterstrichen__</code> · Leerzeile = neuer Absatz</p>
+        <button class="btn btn-primary" type="submit">Veröffentlichen</button>
+      </form>
+    </div>
+  <% } %>
+
+  <% if (!notes.length) { %>
+    <div class="card"><p class="muted">Noch keine Patchnotes.</p></div>
+  <% } %>
+
+  <% notes.forEach((n) => { %>
+    <article class="card pn-note" id="p-<%= n._id %>">
+      <div class="pn-head">
+        <h2><%= n.title %><% if (n.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></h2>
+        <span class="muted small"><%= n.authorName %> · <%= date(n.createdAt) %></span>
+      </div>
+      <div class="pn-body prose"><%- n.html %></div>
+
+      <div class="pn-actions">
+        <form method="post" action="/patchnotes/<%= n._id %>/upvote">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-sm <%= n.upvoted ? 'btn-primary' : 'btn-ghost' %>" type="submit" aria-pressed="<%= n.upvoted %>"><span class="pn-arrow" aria-hidden="true"></span> Upvote · <%= n.upvotes.length %></button>
+        </form>
+        <% if (currentUser.isAdmin) { %>
+          <form method="post" action="/patchnotes/<%= n._id %>/loeschen" data-confirm="Diese Patchnote samt Kommentaren löschen?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+          </form>
+        <% } %>
+      </div>
+
+      <details class="pn-comments" <%= n.comments.length ? 'open' : '' %>>
+        <summary>Kommentare (<%= n.comments.length %>)</summary>
+        <% if (n.comments.length) { %>
+          <ol class="comments">
+            <% n.comments.forEach((c) => { const mine = String(c.user) === String(currentUser._id); %>
+              <li class="comment <%= mine ? 'is-mine' : '' %>">
+                <div class="comment-head">
+                  <strong><%= c.username %></strong>
+                  <% if (mine || currentUser.isAdmin) { %>
+                    <form method="post" action="/patchnotes/<%= n._id %>/kommentar/<%= c._id %>/loeschen" class="comment-delete" data-confirm="Kommentar wirklich löschen?">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="link-btn small" type="submit">Löschen</button>
+                    </form>
+                  <% } %>
+                  <time class="muted small"><%= relTime(c.createdAt) %></time>
+                </div>
+                <p class="comment-text"><%= c.text %></p>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+        <form method="post" action="/patchnotes/<%= n._id %>/kommentar" class="comment-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="sr-only" for="pn-k-<%= n._id %>">Kommentar</label>
+          <textarea id="pn-k-<%= n._id %>" name="text" rows="2" maxlength="<%= commentMax %>" required placeholder="Schreib etwas dazu …"></textarea>
+          <div class="comment-form-foot">
+            <span class="muted small">höchstens <%= commentMax %> Zeichen</span>
+            <button class="btn btn-primary btn-sm" type="submit">Kommentar senden</button>
+          </div>
+        </form>
+      </details>
+    </article>
+  <% }) %>
+</div>
+
+<%- include('partials/foot') %>

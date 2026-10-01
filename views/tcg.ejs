@@ -68,45 +68,26 @@
       <div class="stat card"><span class="stat-label">Verkaufswert</span><span class="stat-value"><%= euro(collectionValue) %></span></div>
     </div>
 
-    <div class="card" id="sammlung">
+    <div class="card" id="favoriten">
       <div class="tcg-coll-head">
-        <h2>Meine Sammlung</h2>
-        <div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
-          <button type="button" class="chip active" data-tcg-filter="all" role="tab" aria-selected="true">Alle</button>
-          <% rarities.forEach((r) => { %>
-            <button type="button" class="chip" data-tcg-filter="<%= r.key %>" role="tab" aria-selected="false"><%= r.label %></button>
-          <% }) %>
-        </div>
+        <h2>Meine Favoriten</h2>
+        <a class="btn btn-primary btn-sm" href="/tcg/album">Zum Album</a>
       </div>
       <% if (!cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p>
+      <% } else if (!favorites.length) { %>
+        <p class="muted">Zeig hier bis zu <%= maxFavorites %> Lieblingskarten: Öffne dein Album, tippe eine Karte an und wähle „Als Favorit zeigen“.</p>
       <% } %>
-      <div class="tcg-grid">
-        <% cards.forEach((c) => { const n = counts[c.id] || 0; const r = rarityByKey[c.rarity]; %>
-          <% const lk = lockedByCard[c.id]; const lockLabel = lk ? (lk.reason === 'handel' ? 'Im Handel' : 'Auf Quest') : ''; %>
-          <% if (n && lk && lk.n >= n) { %>
-            <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
-              <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
-              <span class="tcg-exam-badge"><%= lockLabel %></span>
-              <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
-              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-            </div>
-          <% } else if (n) { %>
-            <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
-              data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>"
-              data-image="<%= c.image %>" data-count="<%= n - (lk ? lk.n : 0) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"
-              aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück – vergrößern">
-              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-              <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
-              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-            </button>
-          <% } else { %>
-            <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Noch nicht gezogen">
-              <div class="tcg-locked-inner"><span>?</span></div>
-              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden ? '???' : r.label %></span>
-            </div>
-          <% } %>
+      <div class="tcg-grid tcg-favs">
+        <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
+          <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
+            <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+          </a>
         <% }) %>
+        <% for (let i = favorites.length; i < maxFavorites && cardCount; i++) { %>
+          <a class="tcg-slot tcg-locked" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><div class="tcg-locked-inner"><span>+</span></div></a>
+        <% } %>
       </div>
     </div>
   </section>
@@ -132,6 +113,19 @@
     </div>
 
     <div class="card">
+      <h2>Duplikate verkaufen</h2>
+      <% if (!dupCount) { %>
+        <p class="muted">Du hast keine doppelten Karten.</p>
+      <% } else { %>
+        <p>Du hast <strong><%= dupCount %></strong> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> im Wert von <strong><%= euro(dupValue) %></strong>. Von jeder Karte behältst du eine; im <a href="/tcg/album">Album</a> geschützte Karten bleiben komplett.</p>
+      <% } %>
+      <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-primary btn-block" type="submit" <%= dupCount ? '' : 'disabled' %>>Alle Duplikate verkaufen<%= dupCount ? ' · ' + euro(dupValue) : '' %></button>
+      </form>
+    </div>
+
+    <div class="card">
       <h2>Seltene Ziehungen</h2>
       <% if (!rarePulls.length) { %>
         <p class="muted">Noch hat niemand eine Holo oder seltener gezogen.</p>
@@ -149,50 +143,8 @@
         </ul>
       <% } %>
     </div>
-
-    <div class="card">
-      <h2>Duplikate verkaufen</h2>
-      <% if (!dupCount) { %>
-        <p class="muted">Du hast keine doppelten Karten.</p>
-      <% } else { %>
-        <p>Du hast <strong><%= dupCount %></strong> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> im Wert von <strong><%= euro(dupValue) %></strong>. Von jeder Karte behältst du eine.</p>
-      <% } %>
-      <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig.">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="btn btn-primary btn-block" type="submit" <%= dupCount ? '' : 'disabled' %>>Alle Duplikate verkaufen<%= dupCount ? ' · ' + euro(dupValue) : '' %></button>
-      </form>
-    </div>
   </aside>
 </div>
-
-<!-- Karte vergrößern -->
-<dialog class="tcg-modal" data-tcg-modal aria-label="Karte ansehen">
-  <button type="button" class="tcg-close" data-tcg-close aria-label="Schließen">×</button>
-  <div class="tcg-modal-body">
-    <div class="tcg-zoom" data-tcg-tilt>
-      <div class="tcg-card-3d">
-        <img alt="" data-tcg-modal-img width="720" height="1008">
-        <span class="tcg-shine"></span>
-      </div>
-    </div>
-    <div class="tcg-modal-info">
-      <h2 data-tcg-modal-name></h2>
-      <p><span class="tcg-badge" data-tcg-modal-rarity></span> <span class="muted" data-tcg-modal-count></span></p>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="eins">
-        <button class="btn btn-primary btn-block" type="submit">1 verkaufen · <span data-tcg-sell-text></span></button>
-      </form>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-dupes>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="duplikate">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-    </div>
-  </div>
-</dialog>
 
 <!-- Pack-Öffnung -->
 <div class="tcg-reveal" data-tcg-reveal hidden>

@@ -7,6 +7,7 @@
         <a href="/regeln">Regeln</a>
         <a href="/impressum">Impressum</a>
         <a href="/datenschutz">Datenschutz</a>
+        <% if (currentUser) { %><a href="/patchnotes" class="nav-badge-link">Patchnotes<% if (patchNew) { %><span class="nav-badges"><span class="nav-badge" title="Neue Patchnotes" aria-label="<%= patchNew %> neue Patchnotes"><%= patchNew > 99 ? '99+' : patchNew %></span></span><% } %></a><% } %>
       </nav>
     </div>
   </footer>
