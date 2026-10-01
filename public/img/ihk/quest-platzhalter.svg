@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1008" width="720" height="1008">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f4f8f"/>
+      <stop offset="1" stop-color="#0d2a52"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#1d3d66" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="720" height="1008" rx="28" fill="url(#bg)"/>
+  <rect x="26" y="26" width="668" height="956" rx="22" fill="#0b1a30" stroke="#5fd0ff" stroke-width="4"/>
+  <rect x="48" y="48" width="624" height="76" rx="14" fill="#08142a" stroke="#2c4f7c" stroke-width="2"/>
+  <text x="76" y="98" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700" fill="#cfeaff">Auftrag</text>
+  <rect x="502" y="60" width="154" height="52" rx="26" fill="#5fd0ff"/>
+  <text x="579" y="95" text-anchor="middle" font-family="Consolas, monospace" font-size="24" font-weight="700" letter-spacing="3" fill="#08142a">! QUEST</text>
+  <rect x="48" y="144" width="624" height="770" rx="14" fill="url(#grid)" stroke="#2c4f7c" stroke-width="2"/>
+  <circle cx="360" cy="500" r="170" fill="#0e2442" stroke="#5fd0ff" stroke-width="6"/>
+  <circle cx="360" cy="500" r="130" fill="none" stroke="#2c4f7c" stroke-width="3" stroke-dasharray="12 10"/>
+  <text x="360" y="580" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="230" font-weight="800" fill="#f5a623" stroke="#08142a" stroke-width="6" paint-order="stroke">?</text>
+  <path d="M150 260l10 22 22 10-22 10-10 22-10-22-22-10 22-10z" fill="#ffffff"/>
+  <path d="M572 720l8 16 16 8-16 8-8 16-8-16-16-8 16-8z" fill="#ffffff"/>
+  <text x="360" y="820" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="30" fill="#cfeaff">Wer kann das am besten?</text>
+  <text x="652" y="958" text-anchor="end" font-family="Consolas, monospace" font-size="24" font-weight="700" letter-spacing="3" fill="#5fd0ff">QUEST</text>
+</svg>

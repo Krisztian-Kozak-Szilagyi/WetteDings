@@ -8,7 +8,7 @@ const { inTransaction } = require('../services/betService');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
-const { QUESTS, DIFFICULTIES, questById, difficulty } = require('./quests');
+const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf } = require('./quests');
 const { resolve, canBoost } = require('./abilities');
 const { lockedDocs, isLocked } = require('../tcg/locks');
 
@@ -52,11 +52,14 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, ad
 /**
  * Würfelt eine Quest aus: Innerhalb von WORK_TIME gibt es tickCount(Speed) gleichmäßig verteilte Takte,
  * pro Takt sammelt die Karte ihren Stat (×0,8–1,2, mit CRIT_CHANCE doppelt). Geschafft, wenn required erreicht ist.
+ * stat: 'fia' | 'fis' | 'bwl' oder ein Array (Hybrid-Quest) – dann zählt der Durchschnitt der Werte.
  */
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
   const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, fakeNext: false, tempSpeed: null };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
+  const keys = [].concat(stat);
+  const statValue = () => keys.reduce((sum, k) => sum + s.stats[k], 0) / keys.length;
   const ticks = [];
   let applied = effects.length === 0;
   let limit = WORK_TIME;
@@ -79,7 +82,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     if (next > limit + 1e-9) break;
     const fake = s.fakeNext;
     const crit = rand() < CRIT_CHANCE;
-    const base = fake ? 99 : s.stats[stat];
+    const base = fake ? 99 : statValue();
     const p = Math.max(1, Math.round(base * (0.8 + 0.4 * rand()) * (crit ? 2 : 1)));
     s.fakeNext = false;
     if (s.tempSpeed && --s.tempSpeed.ticks <= 0) s.tempSpeed = null;
@@ -156,7 +159,7 @@ async function start({ user, cardId, boostId, offerIndex }) {
   const quest = questById[offer.quest];
   const required = requiredFor(offer.difficulty);
   const effects = resolve(card, boost);
-  const result = simulate(card.stats, quest.stat, required, undefined, effects);
+  const result = simulate(card.stats, statsOf(quest), required, undefined, effects);
   try {
     return await IhkRun.create({
       user: user._id,
