@@ -7,16 +7,15 @@
  *  2. Diffusion mit fetten Rändern: Student-t verteilte Zufallsrenditen statt Normalverteilung.
  *  3. Sprünge: kleine (etwa alle 20 Min., 1–4 %) und große (etwa 4× täglich, 5–20 %, manchmal mehr).
  *  4. Großer Sprung ("Surge"): zweimal am Tag wird gewürfelt, mit 50 % Chance springt der Kurs kräftig –
- *     nach unten um bis zu −50 %, nach oben um bis zu +100 %. Den Zeitpunkt steuert die Engine (rollSurge).
+ *     nach unten um bis zu −70 %, nach oben um bis zu +100 %. Den Zeitpunkt steuert die Engine (rollSurge).
  *  5. Nach Sprüngen steigt die Volatilität (Panik / FOMO) und klingt langsam wieder ab.
- *  6. Drift-Kompensation für die Sprünge aus 3. Die großen Sprünge aus 4. sind im Log-Maß symmetrisch
- *     (×2 und ×0,5 heben sich auf) und verschieben den typischen Kurs deshalb nicht.
- *  7. Schwache Rückkehr zum Ankerkurs: Ohne sie würde ein so wilder Kurs auf Dauer gegen 0 laufen oder
- *     explodieren. So bleibt er langfristig in einem spielbaren Bereich (meist grob 1,50 € bis 25 €, in Extremphasen 0,40 € bis 60 €).
+ *  6. Keine Drift und kein Ankerkurs: Der Kurs ist ein reiner Zufallspfad im Log-Maß. Der typische (mediane)
+ *     Kurs bleibt gleich, er kann aber beliebig weit steigen oder fallen. Weil Einbrüche größer ausfallen
+ *     können als Anstiege, geht der große Sprung etwas öfter nach oben (upChance) – so heben sie sich im
+ *     Log-Maß genau auf.
  */
 
 const PARAMS = {
-  expectedDailyReturn: 0.0005, // erwartete Rendite pro Tag ohne große Sprünge
   baseVol: 0.15, // Grundvolatilität pro Tag (15 %)
   volMeanRev: 4, // 1/Tag: wie schnell die Volatilität zur Basis zurückkehrt
   volOfVol: 1.2, // Schwankung der Volatilität
@@ -26,10 +25,8 @@ const PARAMS = {
   small: { rate: 72, scale: 0.015, clamp: 0.12, volBoost: 0.02 }, // ~alle 20 Min., ~1–4 %
   big: { rate: 4, scale: 0.06, clamp: 0.4, volBoost: 0.2 }, // ~4x täglich, 5–20 %, manchmal mehr
   // Großer Sprung: pro Würfelfenster (die Engine würfelt 2× täglich) mit dieser Chance.
-  // Größe im Log-Maß gleichverteilt zwischen min und max: +20 % … +100 % bzw. −17 % … −50 %.
-  surge: { chance: 0.5, min: Math.log(1.2), max: Math.log(2), volBoost: 0.8 },
-  anchor: 10, // Ankerkurs in €
-  anchorPull: 0.15, // 1/Tag: Stärke der Rückkehr zum Ankerkurs (Halbwertszeit ≈ 5 Tage)
+  // Größe im Log-Maß gleichverteilt: nach oben +20 % … +100 %, nach unten −17 % … −70 %.
+  surge: { chance: 0.5, min: Math.log(1.2), upMax: Math.log(2), downMax: -Math.log(0.3), volBoost: 0.8 },
   floor: 0.0001, // Mindestkurs in €
 };
 
@@ -75,23 +72,8 @@ function jumpSize(rng, j) {
 
 const uniform = (rng, a, b) => a + (b - a) * rng();
 
-/**
- * Kompensator: erwartete relative Kursänderung pro Tag durch alle Sprungarten.
- * Wird von der Drift abgezogen, damit der Erwartungswert kontrolliert bleibt.
- */
-const JUMP_COMPENSATION = (() => {
-  const rng = mulberry32(12345);
-  const n = 200000;
-  let small = 0;
-  let big = 0;
-  for (let i = 0; i < n; i++) {
-    small += Math.expm1(jumpSize(rng, PARAMS.small));
-    big += Math.expm1(jumpSize(rng, PARAMS.big));
-  }
-  return PARAMS.small.rate * (small / n) + PARAMS.big.rate * (big / n);
-})();
-
-const LOG_DRIFT_BASE = Math.log(1 + PARAMS.expectedDailyReturn) - JUMP_COMPENSATION;
+// Anteil der großen Sprünge nach oben, bei dem sich Anstiege und Einbrüche im Log-Maß aufheben (≈ 61 %)
+const SURGE_UP_CHANCE = (PARAMS.surge.min + PARAMS.surge.downMax) / (2 * PARAMS.surge.min + PARAMS.surge.upMax + PARAMS.surge.downMax);
 
 /**
  * Ein Simulationsschritt.
@@ -104,9 +86,7 @@ function step(state, dt, rng = Math.random) {
   const sigma = Math.exp(state.lv);
   const events = [];
 
-  // Rückkehr zum Ankerkurs (wirkt nur langsam, über Tage)
-  const pull = -PARAMS.anchorPull * Math.log(state.price / PARAMS.anchor);
-  let r = (LOG_DRIFT_BASE + pull - 0.5 * sigma * sigma) * dt + sigma * Math.sqrt(dt) * studentT(rng, PARAMS.dof);
+  let r = sigma * Math.sqrt(dt) * studentT(rng, PARAMS.dof);
   let lv = state.lv + PARAMS.volMeanRev * (LN_BASE - state.lv) * dt + PARAMS.volOfVol * Math.sqrt(dt) * normal(rng);
 
   if (rng() < PARAMS.small.rate * dt) {
@@ -131,11 +111,11 @@ function step(state, dt, rng = Math.random) {
 function rollSurge(rng = Math.random) {
   const j = PARAMS.surge;
   if (rng() >= j.chance) return null;
-  const up = rng() < 0.5;
-  const log = uniform(rng, j.min, j.max) * (up ? 1 : -1);
+  const up = rng() < SURGE_UP_CHANCE;
+  const log = up ? uniform(rng, j.min, j.upMax) : -uniform(rng, j.min, j.downMax);
   return { log, change: Math.expm1(log), type: up ? 'pump' : 'crash', volBoost: j.volBoost };
 }
 
 const initialState = (price = 10) => ({ price, lv: LN_BASE });
 
-module.exports = { PARAMS, step, rollSurge, LN_MAX, initialState, mulberry32, JUMP_COMPENSATION };
+module.exports = { PARAMS, step, rollSurge, LN_MAX, SURGE_UP_CHANCE, initialState, mulberry32 };
