@@ -1,0 +1,39 @@
+<%- include('partials/head') %>
+<% const decided = stats.won + stats.lost; %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1><%= profile.username %><%= isMe ? ' (du)' : '' %></h1>
+    <a class="btn btn-ghost btn-sm" href="/rangliste">← Zur Rangliste</a>
+  </div>
+  <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
+</div>
+
+<div class="stats stats-4">
+  <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
+  <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= totalCards %></span></div>
+  <div class="stat card"><span class="stat-label">Wert der Karten</span><span class="stat-value"><%= euro(cardValue) %></span></div>
+  <div class="stat card">
+    <span class="stat-label">Wetten richtig</span>
+    <span class="stat-value"><%= decided ? Math.round((stats.won / decided) * 100) + ' %' : '–' %></span>
+    <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Favoriten</h2>
+  <% if (!favorites.length) { %>
+    <p class="muted"><%= isMe ? 'Du zeigst noch keine Favoriten. Wähle sie in deinem Album aus.' : profile.username + ' zeigt noch keine Favoriten.' %></p>
+  <% } else { %>
+    <div class="tcg-grid tcg-favs">
+      <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
+        <div class="tcg-slot r-<%= c.rarity %>">
+          <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.hidden ? '???' : r.label %>" loading="lazy" width="720" height="1008">
+          <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>

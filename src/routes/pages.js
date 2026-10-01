@@ -1,11 +1,15 @@
 const express = require('express');
 const User = require('../models/User');
+const Position = require('../models/Position');
+const catalog = require('../tcg/catalog');
+const { str } = require('../lib/util');
 const { requireLogin } = require('../middleware');
 const coinEngine = require('../coin/engine');
-const { sellValueExpr } = require('../tcg/tcgService');
+const { sellValueExpr, inventory } = require('../tcg/tcgService');
 const tcgSettings = require('../tcg/settings');
 
 const router = express.Router();
+const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
 // Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer
 router.get('/rangliste', requireLogin, async (req, res) => {
@@ -51,10 +55,42 @@ router.get('/rangliste', requireLogin, async (req, res) => {
     },
     { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue'] } } },
     { $sort: { total: -1, createdAt: 1 } },
-    { $limit: 100 },
     { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, total: 1 } },
   ]);
-  res.render('leaderboard', { title: 'Rangliste', leaders });
+  // Platz über alle Mitglieder; die Suche filtert danach, damit der Platz stimmt
+  leaders.forEach((u, i) => {
+    u.rank = i + 1;
+  });
+  const q = str(req.query.suche).trim().slice(0, 30);
+  const needle = q.toLowerCase();
+  const found = needle ? leaders.filter((u) => u.username.toLowerCase().includes(needle)) : leaders;
+  res.render('leaderboard', { title: 'Rangliste', leaders: found.slice(0, LEADERBOARD_LIMIT), q, memberCount: leaders.length });
+});
+
+// Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
+router.get('/profil/:name', requireLogin, async (req, res) => {
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase() }).select('username createdAt tcgFavorites').lean();
+  if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
+  const [owned, statsAgg] = await Promise.all([
+    inventory(profile._id),
+    Position.aggregate([
+      { $match: { user: profile._id, payout: { $ne: null } } },
+      { $group: { _id: null, won: { $sum: { $cond: [{ $gt: ['$payout', '$amount'] }, 1, 0] } }, lost: { $sum: { $cond: [{ $eq: ['$payout', 0] }, 1, 0] } } } },
+    ]),
+  ]);
+  const has = new Set(owned.map((o) => o._id));
+  res.render('profil', {
+    title: profile.username,
+    profile,
+    isMe: profile._id.equals(req.user._id),
+    cardCount: owned.reduce((s, o) => s + o.n, 0),
+    uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
+    totalCards: catalog.CARDS.length,
+    cardValue: owned.reduce((s, o) => s + (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell * o.n : 0), 0),
+    stats: statsAgg[0] || { won: 0, lost: 0 },
+    favorites: (profile.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && has.has(c.id)),
+    rarityByKey: catalog.rarityByKey,
+  });
 });
 
 router.get('/regeln', (req, res) => res.render('rules', { title: 'Regeln', tcgPackPrice: tcgSettings.getPackPrice() }));

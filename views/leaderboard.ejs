@@ -2,12 +2,17 @@
 
 <div class="page-head">
   <h1>Rangliste</h1>
-  <span class="muted">Gesamt = Kontostand + offene Einsätze + Samantha Coins (aktueller Kurs) + TCG-Karten (Verkaufswert)</span>
+  <form method="get" action="/rangliste" class="leader-search" role="search">
+    <label class="sr-only" for="rang-suche">Mitglied suchen</label>
+    <input type="search" id="rang-suche" name="suche" value="<%= q %>" maxlength="30" placeholder="Mitglied suchen …">
+    <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+    <% if (q) { %><a class="btn btn-ghost btn-sm" href="/rangliste">Alle</a><% } %>
+  </form>
 </div>
 
 <div class="card">
   <% if (!leaders.length) { %>
-    <p class="muted">Noch niemand dabei.</p>
+    <p class="muted"><%= q ? 'Kein Mitglied gefunden.' : 'Noch niemand dabei.' %></p>
   <% } else { %>
     <div class="table-wrap">
       <table class="table leaderboard">
@@ -15,8 +20,8 @@
         <tbody>
           <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
             <tr class="<%= me ? 'me' : '' %>">
-              <td class="rank rank-<%= i + 1 %>"><%= i + 1 %></td>
-              <td><%= u.username %><%= me ? ' (du)' : '' %></td>
+              <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
+              <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><%= me ? ' (du)' : '' %></td>
               <td class="num"><strong><%= euro(u.total) %></strong></td>
               <td class="num hide-sm"><%= euro(u.balance) %></td>
               <td class="num hide-sm"><%= euro(u.inPlay) %></td>

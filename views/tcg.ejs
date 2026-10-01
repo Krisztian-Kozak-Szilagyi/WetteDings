@@ -113,19 +113,6 @@
     </div>
 
     <div class="card">
-      <h2>Duplikate verkaufen</h2>
-      <% if (!dupCount) { %>
-        <p class="muted">Du hast keine doppelten Karten.</p>
-      <% } else { %>
-        <p>Du hast <strong><%= dupCount %></strong> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> im Wert von <strong><%= euro(dupValue) %></strong>. Von jeder Karte behältst du eine; im <a href="/tcg/album">Album</a> geschützte Karten bleiben komplett.</p>
-      <% } %>
-      <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="btn btn-primary btn-block" type="submit" <%= dupCount ? '' : 'disabled' %>>Alle Duplikate verkaufen<%= dupCount ? ' · ' + euro(dupValue) : '' %></button>
-      </form>
-    </div>
-
-    <div class="card">
       <h2>Seltene Ziehungen</h2>
       <% if (!rarePulls.length) { %>
         <p class="muted">Noch hat niemand eine Holo oder seltener gezogen.</p>
