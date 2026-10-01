@@ -197,10 +197,20 @@
         setText('[data-live-low]', fmtPrice(s.low24h));
         setText('[data-live-ath]', fmtPrice(s.ath));
         updateDepot(s.price);
+        updateMinBuy(s.price);
         addLivePoint(s.at, s.price);
         document.title = fmtPrice(s.price) + ' · SAM · BfW Holdings';
       })
       .catch(function () {});
+  }
+
+  // Mindestbetrag beim Kauf: 10 % des aktuellen Kurses (mindestens der allgemeine Mindestbetrag)
+  function updateMinBuy(price) {
+    var input = document.querySelector('[data-min-buy]');
+    if (!input) return;
+    var min = Math.max(Number(input.dataset.minTrade), Math.ceil(Number((price * 100 * Number(input.dataset.minShare)).toFixed(6))));
+    input.min = min / 100;
+    setText('[data-min-buy-text]', fmtEuro(min));
   }
 
   // ---------- Depot & Handel ----------

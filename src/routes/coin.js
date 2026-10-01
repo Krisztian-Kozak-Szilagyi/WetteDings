@@ -28,6 +28,8 @@ router.get('/coin-exchange', async (req, res) => {
     events,
     avgPrice: holding.units ? holding.costCents / 100 / (holding.units / trade.UNITS) : null,
     minTrade: trade.MIN_TRADE_CENTS,
+    minBuy: trade.minBuyCents(snap.price),
+    minBuyShare: trade.MIN_BUY_SHARE,
   });
 });
 

@@ -107,7 +107,7 @@
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="field">
           <span>Betrag in €</span>
-          <input type="number" name="amount" inputmode="decimal" min="<%= minTrade / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" required>
+          <input type="number" name="amount" inputmode="decimal" min="<%= minBuy / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" required data-min-buy data-min-trade="<%= minTrade %>" data-min-share="<%= minBuyShare %>">
         </label>
         <div class="quick-amounts">
           <button type="button" class="chip" data-set-amount="10">10 €</button>
@@ -115,8 +115,9 @@
           <button type="button" class="chip" data-set-amount="100">100 €</button>
           <button type="button" class="chip" data-set-amount="<%= currentUser.balance / 100 %>">Alles</button>
         </div>
+        <p class="muted small">Mindestens 10 % des aktuellen Kurses: <strong data-min-buy-text><%= euro(minBuy) %></strong></p>
         <p class="estimate" data-trade-preview></p>
-        <button class="btn btn-ja btn-block" type="submit" <%= currentUser.balance < minTrade ? 'disabled' : '' %>>Samantha Coin kaufen</button>
+        <button class="btn btn-ja btn-block" type="submit" <%= currentUser.balance < minBuy ? 'disabled' : '' %>>Samantha Coin kaufen</button>
       </form>
 
       <form method="post" action="/coin-exchange/verkaufen" class="trade-form" data-trade-form="verkaufen" data-confirm-trade="verkaufen" hidden>

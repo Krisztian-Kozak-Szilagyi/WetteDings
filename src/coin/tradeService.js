@@ -7,6 +7,11 @@ const engine = require('./engine');
 
 const UNITS = 1e8; // 1 Coin = 100.000.000 Einheiten
 const MIN_TRADE_CENTS = 100; // Mindestbetrag 1 €
+const MIN_BUY_SHARE = 0.1; // beim Kauf mindestens 10 % des aktuellen Kurses
+
+/** Mindestbetrag für einen Kauf in Cent: 10 % des Kurses, mindestens 1 € */
+const minBuyCents = (price) => Math.max(MIN_TRADE_CENTS, Math.ceil(Number((price * 100 * MIN_BUY_SHARE).toFixed(6))));
+const euroText = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
 /** Wert eines Bestands in Cent zum Kurs price */
 const valueCents = (units, price) => Math.floor((units / UNITS) * price * 100);
@@ -16,6 +21,8 @@ async function buy({ user, cents }) {
   if (!Number.isInteger(cents) || cents < MIN_TRADE_CENTS) throw new UserError('Der Mindestbetrag ist 1,00 €.');
   return inTransaction(async (session) => {
     const price = engine.getPrice();
+    const min = minBuyCents(price);
+    if (cents < min) throw new UserError(`Du musst mindestens 10 % des aktuellen Kurses investieren – derzeit ${euroText(min)} €.`);
     const units = Math.floor((cents / 100 / price) * UNITS);
     if (units <= 0) throw new UserError('Der Betrag ist zu klein.');
 
@@ -82,4 +89,4 @@ async function coinValueCents(userId) {
   return valueCents(h.units, engine.getPrice());
 }
 
-module.exports = { UNITS, MIN_TRADE_CENTS, valueCents, buy, sell, getHolding, coinValueCents };
+module.exports = { UNITS, MIN_TRADE_CENTS, MIN_BUY_SHARE, minBuyCents, valueCents, buy, sell, getHolding, coinValueCents };

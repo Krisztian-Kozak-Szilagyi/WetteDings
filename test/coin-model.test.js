@@ -1,3 +1,6 @@
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1/test';
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-secret-test-secret';
+
 const test = require('node:test');
 const assert = require('node:assert');
 const { step, rollSurge, SURGE_UP_CHANCE, initialState, mulberry32, PARAMS } = require('../src/coin/model');
@@ -84,4 +87,12 @@ test('Großer Sprung: 50 % Chance pro Fenster, höchstens −70 % bzw. +100 %', 
   assert.ok(Math.abs(ups / hits - SURGE_UP_CHANCE) < 0.03, `Anteil nach oben ${ups / hits}`);
   assert.ok(min >= -0.7 - 1e-9 && min < -0.67, `größter Einbruch ${min}`);
   assert.ok(max <= 1 + 1e-9 && max > 0.9, `größter Anstieg ${max}`);
+});
+
+test('Mindestkauf: 10 % des Kurses, mindestens 1 €', () => {
+  const { minBuyCents } = require('../src/coin/tradeService');
+  assert.equal(minBuyCents(300), 3000);
+  assert.equal(minBuyCents(5), 100);
+  assert.equal(minBuyCents(12.345), 124); // aufgerundet
+  assert.equal(minBuyCents(10000), 100000);
 });
