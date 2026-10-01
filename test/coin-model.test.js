@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { step, initialState, mulberry32, PARAMS } = require('../src/coin/model');
+const { step, rollSurge, initialState, mulberry32, PARAMS } = require('../src/coin/model');
 
 const DT_MIN = 1 / 1440; // 1 Minute in Tagen
 
@@ -37,10 +37,10 @@ test('Realistische Tagesvolatilität und fette Ränder', () => {
   const sd = Math.sqrt(variance);
   const kurtosis = returns.reduce((a, r) => a + (r - mean) ** 4, 0) / n / variance ** 2;
   const maxMove = Math.max(...returns.map(Math.abs));
-  // bewusst lebhafter Spiel-Coin: typische Tagesschwankung zwischen 8 % und 35 %
-  assert.ok(sd > 0.08 && sd < 0.35, `Tagesvolatilität ${sd}`);
-  // deutlich fettere Ränder als die Normalverteilung (Kurtosis 3)
-  assert.ok(kurtosis > 5, `Kurtosis ${kurtosis}`);
+  // bewusst wilder Spiel-Coin (ohne die großen Sprünge): typische Tagesschwankung zwischen 15 % und 60 %
+  assert.ok(sd > 0.15 && sd < 0.6, `Tagesvolatilität ${sd}`);
+  // fettere Ränder als die Normalverteilung (Kurtosis 3); die großen Sprünge kommen erst in der Engine dazu
+  assert.ok(kurtosis > 3.2, `Kurtosis ${kurtosis}`);
   // es gibt große Tagesbewegungen (> 20 %)
   assert.ok(maxMove > Math.log(1.2), `größte Tagesbewegung ${maxMove}`);
 });
@@ -60,15 +60,42 @@ test('Erwartungswert bleibt kontrolliert (kein sicherer Gewinn durch Halten)', (
   assert.ok(avg > 0.75 && avg < 1.35, `durchschnittlicher Faktor nach 30 Tagen: ${avg}`);
 });
 
-test('Extremereignisse sind möglich', () => {
-  // Mit stark erhöhter Rate prüfen, dass Pump und Crash tatsächlich eintreten können
+test('Großer Sprung: 50 % Chance pro Fenster, höchstens −50 % bzw. +100 %', () => {
   const rng = mulberry32(5);
-  const types = new Set();
-  let s = initialState(10);
-  for (let i = 0; i < 2000; i++) {
-    const next = step(s, 5, rng); // große Schritte -> Ereignisse häufig
-    next.events.forEach((e) => types.add(e.type));
-    s = next;
+  const n = 20000;
+  let hits = 0;
+  let ups = 0;
+  let min = 0;
+  let max = 0;
+  for (let i = 0; i < n; i++) {
+    const s = rollSurge(rng);
+    if (!s) continue;
+    hits++;
+    if (s.change > 0) ups++;
+    assert.equal(s.type, s.change > 0 ? 'pump' : 'crash');
+    assert.ok(Math.abs(s.change) >= 0.16, `Sprung zu klein: ${s.change}`);
+    min = Math.min(min, s.change);
+    max = Math.max(max, s.change);
   }
-  assert.ok(types.has('pump') && types.has('crash'), [...types].join(','));
+  assert.ok(Math.abs(hits / n - 0.5) < 0.02, `Trefferquote ${hits / n}`);
+  assert.ok(Math.abs(ups / hits - 0.5) < 0.03, `Anteil nach oben ${ups / hits}`);
+  assert.ok(min >= -0.5 - 1e-9 && min < -0.45, `größter Einbruch ${min}`);
+  assert.ok(max <= 1 + 1e-9 && max > 0.9, `größter Anstieg ${max}`);
+});
+
+test('Kurs bleibt langfristig in einem spielbaren Bereich (mit großen Sprüngen)', () => {
+  // 2 Jahre in 5-Minuten-Schritten, alle 12 Stunden ein Würfelfenster
+  const rng = mulberry32(11);
+  let s = initialState(10);
+  const logs = [];
+  for (let w = 0; w < 2 * 365 * 2; w++) {
+    const surge = rollSurge(rng);
+    for (let i = 0; i < 144; i++) s = step(s, 1 / 288, rng);
+    if (surge) s = { ...s, price: Math.max(PARAMS.floor, s.price * Math.exp(surge.log)) };
+    logs.push(Math.log10(s.price));
+  }
+  logs.sort((a, b) => a - b);
+  const q = (p) => 10 ** logs[Math.floor(p * (logs.length - 1))];
+  assert.ok(q(0.5) > 2 && q(0.5) < 30, `Median ${q(0.5)}`);
+  assert.ok(q(0.01) > 0.05 && q(0.99) < 2000, `1 %: ${q(0.01)}, 99 %: ${q(0.99)}`);
 });

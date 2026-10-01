@@ -295,24 +295,6 @@
     update();
   });
 
-  // Admin: Dialog öffnen/schließen
-  var adminDialog = document.querySelector('[data-admin-dialog]');
-  var adminDialogOpen = document.querySelector('[data-admin-dialog-open]');
-  if (adminDialog && adminDialogOpen) {
-    adminDialogOpen.addEventListener('click', function () {
-      if (typeof adminDialog.showModal === 'function') adminDialog.showModal();
-      else adminDialog.setAttribute('open', '');
-    });
-    var closeAdminDialog = function () {
-      if (typeof adminDialog.close === 'function') adminDialog.close();
-      else adminDialog.removeAttribute('open');
-    };
-    adminDialog.querySelector('[data-admin-dialog-close]').addEventListener('click', closeAdminDialog);
-    adminDialog.addEventListener('click', function (e) {
-      if (e.target === adminDialog) closeAdminDialog();
-    });
-  }
-
   // Admin: TCG – Summe der Chancen und Packwert live berechnen
   var tcgAdmin = document.querySelector('[data-tcg-admin]');
   if (tcgAdmin) {
@@ -343,13 +325,6 @@
     tcgAdmin.addEventListener('input', recalc);
     recalc();
   }
-
-  // Admin: Coin-Steuerung – Prozent-Schnellwahl
-  document.querySelectorAll('.admin-coin-form [data-percent]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      b.closest('form').querySelector('input[name="percent"]').value = b.getAttribute('data-percent');
-    });
-  });
 
   // Countdown (z. B. Lotterie-Ziehung): [data-countdown="<Zeitpunkt in ms>"]
   function tickCountdowns() {

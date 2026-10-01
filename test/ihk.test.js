@@ -162,5 +162,37 @@ test('Balancing: passende Karte der Seltenheit schafft die Stufe meistens, die f
   assert.ok(rate(catalog.cardById['krisz-3-gold'].stats, 'bwl', DIFFICULTIES[2].required) < 0.1);
   // falsche Fähigkeit: Krisz Crumpled (BWL 12) bei Datenschutz (BWL, Stufe 5) chancenlos
   assert.equal(rate(catalog.cardById['krisz-1-crumpled'].stats, 'bwl', DIFFICULTIES[4].required), 0);
-  assert.equal(QUESTS.length, 3);
+});
+
+test('Quests: alle Kategorien und Hybride vorhanden, Pflichtfelder gesetzt', () => {
+  const { statsOf } = require('../src/ihk/quests');
+  const cats = new Set(QUESTS.map((q) => statsOf(q).join('/')));
+  for (const c of ['fia', 'fis', 'bwl', 'fia/fis', 'fia/bwl', 'fis/bwl']) assert.ok(cats.has(c), c);
+  assert.equal(new Set(QUESTS.map((q) => q.id)).size, QUESTS.length);
+  for (const q of QUESTS) {
+    for (const f of ['title', 'text', 'success', 'fail', 'image']) assert.ok(q[f], `${q.id}: ${f} fehlt`);
+    assert.ok(statsOf(q).every((s) => ['fia', 'fis', 'bwl'].includes(s)), q.id);
+  }
+});
+
+test('Hybrid-Quest: Punkte aus dem Durchschnitt beider Werte', () => {
+  const avg = () => 0.5;
+  const r = simulate({ speed: 60, fia: 80, fis: 20, bwl: 0 }, ['fia', 'fis'], 1e9, avg);
+  assert.ok(r.ticks.every((t) => t.p === 50));
+});
+
+test('Hybrid-Quests haben eigene Einstellungen (Ziel, Dauer, Lohn)', () => {
+  const ihk = require('../src/ihk/ihkService');
+  const { questById } = require('../src/ihk/quests');
+  const saved = ihk.settings.hybrid;
+  ihk.settings.hybrid = { required: [1, 2, 3, 4, 5, 6], durations: [7, 7, 7, 7, 7, 7], rewards: [9, 9, 9, 9, 9, 9] };
+  try {
+    assert.equal(ihk.requiredFor(3, questById['webshop']), 3);
+    assert.equal(ihk.durationFor(3, questById['webshop']), 7);
+    assert.equal(ihk.rewardFor(3, questById['webshop']), 9);
+    assert.equal(ihk.requiredFor(3, questById['inventur']), ihk.settings.required[2]);
+    assert.equal(ihk.rewardFor(3, questById['inventur']), ihk.settings.rewards[2]);
+  } finally {
+    ihk.settings.hybrid = saved;
+  }
 });

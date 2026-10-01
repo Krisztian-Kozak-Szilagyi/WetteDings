@@ -25,7 +25,7 @@ router.use('/ihk', requireLogin, requireIhk);
 const questView = (questId, level) => {
   const q = questById[questId];
   const d = difficulty(level);
-  return { ...q, difficulty: level, level: d.label, required: ihk.requiredFor(level), reward: ihk.settings.rewards[level - 1], duration: ihk.durationFor(level) };
+  return { ...q, difficulty: level, level: d.label, required: ihk.requiredFor(level, q), reward: ihk.rewardFor(level, q), duration: ihk.durationFor(level, q) };
 };
 
 router.get('/ihk', async (req, res) => {

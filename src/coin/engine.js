@@ -16,6 +16,7 @@ const FLUSH_MS = 15000;
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
+const SURGE_WINDOW = 12 * HOUR; // zwei Würfelfenster pro Tag für den großen Sprung
 const BACKFILL_DAYS = 14; // beim allerersten Start: so viel Vorgeschichte simulieren
 const MAX_GAP_DAYS = 30; // längere Ausfälle werden nicht vollständig nachsimuliert
 const MINUTE_RETENTION = 3 * DAY;
@@ -56,29 +57,30 @@ function record(price, atMs) {
 }
 
 /**
- * Anteil der Admin-Kurssteuerung für den Zeitraum prevMs → atMs (log-Änderung).
- * Die Zielbewegung wird gleichmäßig über die Restzeit verteilt und mischt sich mit dem normalen Zufall.
+ * Großer Sprung: Der Tag hat zwei Würfelfenster (je 12 Stunden). Zu Beginn jedes Fensters wird einmal
+ * gewürfelt (model.rollSurge, 50 % Chance); fällt der Wurf positiv aus, passiert der Sprung zu einem
+ * zufälligen Zeitpunkt im Fenster. Gibt den fälligen Sprung zurück oder null.
  */
-function manualShare(prevMs, atMs) {
-  const m = state.manual;
-  if (!m) return 0;
-  const endsMs = m.endsAt.getTime();
-  let share;
-  if (atMs >= endsMs || endsMs <= prevMs) {
-    share = m.remainingLog;
-    state.manual = null;
-  } else {
-    share = (m.remainingLog * (atMs - prevMs)) / (endsMs - prevMs);
-    m.remainingLog -= share;
+function dueSurge(atMs) {
+  const slot = bucket(atMs, SURGE_WINDOW);
+  if (!state.surge || state.surge.slot !== slot) {
+    const roll = model.rollSurge();
+    state.surge = { slot, at: roll ? atMs + Math.random() * (slot + SURGE_WINDOW - atMs) : null, log: roll ? roll.log : 0 };
   }
-  return share;
+  const { at, log } = state.surge;
+  if (at === null || atMs < at) return null;
+  state.surge.at = null; // pro Fenster höchstens ein Sprung
+  return { log, change: Math.expm1(log), type: log >= 0 ? 'pump' : 'crash' };
 }
 
 function advance(dtDays, atMs) {
-  const prevMs = state.lastTickAt.getTime();
   const next = model.step(state, dtDays);
-  // Admin-Steuerung wirkt direkt auf den Kurs – ohne Marktereignis, also unsichtbar für Nutzer
-  next.price = Math.max(model.PARAMS.floor, next.price * Math.exp(manualShare(prevMs, atMs)));
+  const surge = dueSurge(atMs);
+  if (surge) {
+    next.price = Math.max(model.PARAMS.floor, next.price * Math.exp(surge.log));
+    next.lv = Math.min(model.LN_MAX, next.lv + model.PARAMS.surge.volBoost); // danach geht es unruhig weiter
+    next.events.push({ type: surge.type, change: surge.change });
+  }
   state.price = next.price;
   state.lv = next.lv;
   state.lastTickAt = new Date(atMs);
@@ -136,10 +138,11 @@ async function doFlush() {
           ath: state.ath,
           athAt: state.athAt,
           startedAt: state.startedAt,
-          manual: state.manual ? { remainingLog: state.manual.remainingLog, endsAt: state.manual.endsAt } : null,
+          surge: state.surge,
         },
+        $unset: { manual: '' }, // alte Admin-Kurssteuerung (entfernt)
       },
-      { upsert: true }
+      { upsert: true, strict: false } // strict aus, damit das alte Feld wirklich entfernt wird
     );
   } catch (err) {
     // Beim nächsten Mal erneut versuchen
@@ -179,7 +182,7 @@ async function start() {
       ath: init.price,
       athAt: new Date(startMs),
       startedAt: new Date(startMs),
-      manual: null,
+      surge: null,
     };
     record(state.price, startMs);
     console.log(`${NAME}: erster Start – simuliere ${BACKFILL_DAYS} Tage Vorgeschichte …`);
@@ -192,7 +195,7 @@ async function start() {
       ath: doc.ath,
       athAt: new Date(doc.athAt),
       startedAt: new Date(doc.startedAt),
-      manual: doc.manual && doc.manual.endsAt ? { remainingLog: doc.manual.remainingLog, endsAt: new Date(doc.manual.endsAt) } : null,
+      surge: doc.surge && Number.isFinite(doc.surge.slot) ? { slot: doc.surge.slot, at: doc.surge.at ?? null, log: doc.surge.log || 0 } : null,
     };
     let from = state.lastTickAt.getTime();
     if (now - from > MAX_GAP_DAYS * DAY) from = now - MAX_GAP_DAYS * DAY;
@@ -275,38 +278,6 @@ async function history(range) {
   return points;
 }
 
-// ---------- Admin-Kurssteuerung (nur im Admin-Panel sichtbar) ----------
-
-/**
- * Kurs gezielt bewegen: percent z. B. -40 (Einbruch) oder +80 (Anstieg).
- * minutes = 0: sofort; sonst gleichmäßig verteilt über diese Dauer (wirkt natürlicher).
- * Eine laufende Steuerung wird ersetzt.
- */
-async function startManipulation({ percent, minutes }) {
-  const logChange = Math.log1p(percent / 100);
-  if (!minutes) {
-    state.manual = null;
-    const now = Date.now();
-    state.price = Math.max(model.PARAMS.floor, state.price * Math.exp(logChange));
-    state.lastTickAt = new Date(Math.max(now, state.lastTickAt.getTime()));
-    record(state.price, state.lastTickAt.getTime());
-  } else {
-    state.manual = { remainingLog: logChange, endsAt: new Date(Date.now() + minutes * MIN) };
-  }
-  await flush();
-}
-
-async function cancelManipulation() {
-  state.manual = null;
-  await flush();
-}
-
-/** Status für das Admin-Panel: verbleibende Änderung in % und Ende, oder null */
-function manipulationStatus() {
-  if (!state || !state.manual) return null;
-  return { remainingPercent: Math.expm1(state.manual.remainingLog) * 100, endsAt: state.manual.endsAt.getTime() };
-}
-
 async function recentEvents(limit = 8) {
   const saved = await CoinEvent.find({ coin: SYMBOL }).sort({ at: -1 }).limit(limit).lean();
   return [...pendingEvents.slice().reverse(), ...saved].slice(0, limit);
@@ -323,7 +294,4 @@ module.exports = {
   history,
   recentEvents,
   flush,
-  startManipulation,
-  cancelManipulation,
-  manipulationStatus,
 };

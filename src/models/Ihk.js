@@ -41,7 +41,7 @@ const stateSchema = new Schema({
 
 // Admin-Einstellungen (ein Dokument, _id "ihk")
 const settingsSchema = new Schema(
-  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, durationMin: Number, durations: [Number], rewards: [Number], required: [Number], updatedByName: String },
+  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, durationMin: Number, durations: [Number], rewards: [Number], required: [Number], hybrid: { durations: [Number], rewards: [Number], required: [Number] }, updatedByName: String },
   { timestamps: true }
 );
 

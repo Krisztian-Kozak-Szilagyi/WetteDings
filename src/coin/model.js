@@ -1,29 +1,35 @@
 /**
  * Kursmodell für den Samantha Coin – Simulation eines sehr volatilen Krypto-Kurses.
- * Bewusst etwas "spielerischer" als ein echter Coin: mehr Bewegung, häufigere Sprünge.
+ * Bewusst deutlich wilder als ein echter Coin: Es ist ein Spiel-Coin mit Spielgeld.
  *
  * Bausteine (alle Zeitangaben in Tagen):
  *  1. Stochastische Volatilität: log(σ) schwankt um eine Basis (ruhige und wilde Phasen, Volatilitäts-Cluster).
  *  2. Diffusion mit fetten Rändern: Student-t verteilte Zufallsrenditen statt Normalverteilung.
- *  3. Sprünge: kleine (etwa halbstündlich, 1–3 %) und große (etwa 2× täglich, 5–15 %, manchmal 30 %+).
- *  4. Extremereignisse: Pump (+40…+150 %, etwa alle 2 Monate) und Crash (−80…−99 %, selten).
+ *  3. Sprünge: kleine (etwa alle 20 Min., 1–4 %) und große (etwa 4× täglich, 5–20 %, manchmal mehr).
+ *  4. Großer Sprung ("Surge"): zweimal am Tag wird gewürfelt, mit 50 % Chance springt der Kurs kräftig –
+ *     nach unten um bis zu −50 %, nach oben um bis zu +100 %. Den Zeitpunkt steuert die Engine (rollSurge).
  *  5. Nach Sprüngen steigt die Volatilität (Panik / FOMO) und klingt langsam wieder ab.
- *  6. Drift-Kompensation: Der erwartete Kurs steigt nur leicht (≈ +0,05 %/Tag). Der Median fällt dabei
- *     – wie bei echten, sehr volatilen Coins – eher, wenige Ausreißer nach oben gleichen das aus.
+ *  6. Drift-Kompensation für die Sprünge aus 3. Die großen Sprünge aus 4. sind im Log-Maß symmetrisch
+ *     (×2 und ×0,5 heben sich auf) und verschieben den typischen Kurs deshalb nicht.
+ *  7. Schwache Rückkehr zum Ankerkurs: Ohne sie würde ein so wilder Kurs auf Dauer gegen 0 laufen oder
+ *     explodieren. So bleibt er langfristig in einem spielbaren Bereich (meist grob 1,50 € bis 25 €, in Extremphasen 0,40 € bis 60 €).
  */
 
 const PARAMS = {
-  expectedDailyReturn: 0.0005, // erwartete Rendite pro Tag (≈ +20 % pro Jahr)
-  baseVol: 0.07, // Grundvolatilität pro Tag (7 %)
+  expectedDailyReturn: 0.0005, // erwartete Rendite pro Tag ohne große Sprünge
+  baseVol: 0.15, // Grundvolatilität pro Tag (15 %)
   volMeanRev: 4, // 1/Tag: wie schnell die Volatilität zur Basis zurückkehrt
-  volOfVol: 1.0, // Schwankung der Volatilität
-  minVol: 0.03,
-  maxVol: 1.0,
+  volOfVol: 1.2, // Schwankung der Volatilität
+  minVol: 0.06,
+  maxVol: 1.5,
   dof: 4, // Freiheitsgrade der Student-t-Verteilung (kleiner = fettere Ränder)
-  small: { rate: 36, scale: 0.01, clamp: 0.1, volBoost: 0.02 }, // ~alle 40 Min., ~1–3 %
-  big: { rate: 1.5, scale: 0.045, clamp: 0.5, volBoost: 0.2 }, // ~1–2x täglich, 5–15 %, manchmal 30 %+
-  pump: { rate: 1 / 60, min: 0.4, max: 1.5, volBoost: 0.9 }, // +40 % … +150 % (etwa alle 2 Monate)
-  crash: { rate: 1 / 500, min: 0.8, max: 0.99, volBoost: 1.0 }, // −80 % … −99 % (≈ 50 % Chance pro Jahr)
+  small: { rate: 72, scale: 0.015, clamp: 0.12, volBoost: 0.02 }, // ~alle 20 Min., ~1–4 %
+  big: { rate: 4, scale: 0.06, clamp: 0.4, volBoost: 0.2 }, // ~4x täglich, 5–20 %, manchmal mehr
+  // Großer Sprung: pro Würfelfenster (die Engine würfelt 2× täglich) mit dieser Chance.
+  // Größe im Log-Maß gleichverteilt zwischen min und max: +20 % … +100 % bzw. −17 % … −50 %.
+  surge: { chance: 0.5, min: Math.log(1.2), max: Math.log(2), volBoost: 0.8 },
+  anchor: 10, // Ankerkurs in €
+  anchorPull: 0.15, // 1/Tag: Stärke der Rückkehr zum Ankerkurs (Halbwertszeit ≈ 5 Tage)
   floor: 0.0001, // Mindestkurs in €
 };
 
@@ -82,14 +88,7 @@ const JUMP_COMPENSATION = (() => {
     small += Math.expm1(jumpSize(rng, PARAMS.small));
     big += Math.expm1(jumpSize(rng, PARAMS.big));
   }
-  const pumpMean = (PARAMS.pump.min + PARAMS.pump.max) / 2;
-  const crashMean = -(PARAMS.crash.min + PARAMS.crash.max) / 2;
-  return (
-    PARAMS.small.rate * (small / n) +
-    PARAMS.big.rate * (big / n) +
-    PARAMS.pump.rate * pumpMean +
-    PARAMS.crash.rate * crashMean
-  );
+  return PARAMS.small.rate * (small / n) + PARAMS.big.rate * (big / n);
 })();
 
 const LOG_DRIFT_BASE = Math.log(1 + PARAMS.expectedDailyReturn) - JUMP_COMPENSATION;
@@ -105,7 +104,9 @@ function step(state, dt, rng = Math.random) {
   const sigma = Math.exp(state.lv);
   const events = [];
 
-  let r = (LOG_DRIFT_BASE - 0.5 * sigma * sigma) * dt + sigma * Math.sqrt(dt) * studentT(rng, PARAMS.dof);
+  // Rückkehr zum Ankerkurs (wirkt nur langsam, über Tage)
+  const pull = -PARAMS.anchorPull * Math.log(state.price / PARAMS.anchor);
+  let r = (LOG_DRIFT_BASE + pull - 0.5 * sigma * sigma) * dt + sigma * Math.sqrt(dt) * studentT(rng, PARAMS.dof);
   let lv = state.lv + PARAMS.volMeanRev * (LN_BASE - state.lv) * dt + PARAMS.volOfVol * Math.sqrt(dt) * normal(rng);
 
   if (rng() < PARAMS.small.rate * dt) {
@@ -118,23 +119,23 @@ function step(state, dt, rng = Math.random) {
     lv += PARAMS.big.volBoost;
     events.push({ type: j >= 0 ? 'anstieg' : 'einbruch', change: Math.expm1(j) });
   }
-  if (rng() < PARAMS.pump.rate * dt) {
-    const up = uniform(rng, PARAMS.pump.min, PARAMS.pump.max);
-    r += Math.log1p(up);
-    lv += PARAMS.pump.volBoost;
-    events.push({ type: 'pump', change: up });
-  }
-  if (rng() < PARAMS.crash.rate * dt) {
-    const down = uniform(rng, PARAMS.crash.min, PARAMS.crash.max);
-    r += Math.log1p(-down);
-    lv += PARAMS.crash.volBoost;
-    events.push({ type: 'crash', change: -down });
-  }
 
   const price = Math.max(PARAMS.floor, state.price * Math.exp(r));
   return { price, lv: clamp(lv, LN_MIN, LN_MAX), events };
 }
 
+/**
+ * Würfelt einen großen Sprung aus (ein Würfelfenster): null oder { log, change, type, volBoost }.
+ * log = Änderung im Log-Maß, change = relative Änderung (z. B. -0.35 oder +0.8).
+ */
+function rollSurge(rng = Math.random) {
+  const j = PARAMS.surge;
+  if (rng() >= j.chance) return null;
+  const up = rng() < 0.5;
+  const log = uniform(rng, j.min, j.max) * (up ? 1 : -1);
+  return { log, change: Math.expm1(log), type: up ? 'pump' : 'crash', volBoost: j.volBoost };
+}
+
 const initialState = (price = 10) => ({ price, lv: LN_BASE });
 
-module.exports = { PARAMS, step, initialState, mulberry32, JUMP_COMPENSATION };
+module.exports = { PARAMS, step, rollSurge, LN_MAX, initialState, mulberry32, JUMP_COMPENSATION };

@@ -11,49 +11,6 @@
   <div class="stat card"><span class="stat-label">Wetten gesamt</span><span class="stat-value"><%= stats.totalBets %></span></div>
 </div>
 
-<dialog class="admin-dialog" data-admin-dialog aria-label="Samantha Coin steuern">
-  <button type="button" class="admin-dialog-close" data-admin-dialog-close aria-label="Schließen">×</button>
-  <h2>Samantha Coin steuern</h2>
-  <p class="muted">Nur für Admins sichtbar. Die Änderung wird nirgends angezeigt oder protokolliert – für alle anderen sieht sie wie eine normale Kursbewegung aus.</p>
-  <% if (!coin) { %>
-    <p class="muted">Die Kurs-Engine läuft gerade nicht.</p>
-  <% } else { %>
-    <p>Aktueller Kurs: <strong><%= coinPrice(coin.price) %></strong> <span class="<%= coin.change24h >= 0 ? 'pos' : 'neg' %>">(<%= signedPercent(coin.change24h) %> in 24 h)</span></p>
-
-    <% if (manipulation) { %>
-      <div class="admin-coin-active">
-        <span>Aktive Steuerung: noch <strong class="<%= manipulation.remainingPercent >= 0 ? 'pos' : 'neg' %>"><%= manipulation.remainingPercent > 0 ? '+' : '' %><%= manipulation.remainingPercent.toFixed(1).replace('.', ',') %> %</strong> bis <%= date(manipulation.endsAt) %></span>
-        <form method="post" action="/admin/coin/stopp">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button class="btn btn-ghost btn-sm" type="submit">Abbrechen</button>
-        </form>
-      </div>
-    <% } %>
-
-    <form method="post" action="/admin/coin" class="admin-coin-form" data-confirm="Kurs wirklich verändern?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label class="field">
-        <span>Änderung in %</span>
-        <input type="number" name="percent" step="0.1" min="-99" max="1000" required placeholder="z. B. -40 oder 25">
-      </label>
-      <div class="quick-amounts">
-        <% [-80, -40, -15, 15, 40, 100].forEach((p) => { %>
-          <button type="button" class="chip <%= p < 0 ? 'chip-neg' : 'chip-pos' %>" data-percent="<%= p %>"><%= p > 0 ? '+' : '' %><%= p %> %</button>
-        <% }) %>
-      </div>
-      <label class="field">
-        <span>Über welchen Zeitraum?</span>
-        <select name="minutes">
-          <% durations.forEach((m) => { %>
-            <option value="<%= m %>" <%= m === 15 ? 'selected' : '' %>><%= m === 0 ? 'Sofort (ein Sprung)' : m + ' Minuten (fließend)' %></option>
-          <% }) %>
-        </select>
-      </label>
-      <button class="btn btn-primary" type="submit">Kurs steuern</button>
-    </form>
-  <% } %>
-</dialog>
-
 <div class="card" id="tcg">
   <h2>TCG: Chancen &amp; Preise</h2>
   <p class="muted">Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.</p>
@@ -110,7 +67,7 @@
 
 <div class="card" id="ihk">
   <h2>IHK: Limit &amp; Lohn</h2>
-  <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte und Lohn je Schwierigkeit (bei Erfolg). Gilt sofort für neu gestartete Quests.</p>
+  <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte und Lohn je Schwierigkeit (bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>
   <form method="post" action="/admin/ihk" class="form admin-tcg-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label class="check admin-ihk-open">
@@ -121,28 +78,34 @@
       <span>Quests pro Tag</span>
       <input type="number" name="dailyLimit" min="0" max="100" step="1" value="<%= ihk.settings.dailyLimit %>" required>
     </label>
-    <div class="table-wrap">
-      <table class="table admin-tcg-table">
-        <thead><tr><th>Schwierigkeit</th><th>Ziel (Punkte)</th><th>Dauer (Min., 0 = sofort)</th><th>Lohn (€)</th></tr></thead>
-        <tbody>
-          <% ihk.difficulties.forEach((d, i) => { %>
-            <tr class="r-<%= tcg.rarities[i].key %>">
-              <td><span class="tcg-dot"></span> <%= d.level %> · <%= d.label %> <span class="muted small hide-sm">(Standard <%= d.required %>)</span></td>
-              <td><input type="number" name="required_<%= d.level %>" min="1" max="100000" step="1" value="<%= ihk.settings.required[i] %>" required aria-label="Ziel-Punkte Schwierigkeit <%= d.level %>"></td>
-              <td><input type="number" name="duration_<%= d.level %>" min="0" max="1440" step="1" value="<%= ihk.settings.durations[i] %>" required aria-label="Dauer Schwierigkeit <%= d.level %>"></td>
-              <td><input type="text" name="reward_<%= d.level %>" inputmode="decimal" value="<%= (ihk.settings.rewards[i] / 100).toFixed(2).replace('.', ',') %>" required aria-label="Lohn Schwierigkeit <%= d.level %>"></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
+    <% [
+         { title: 'Normale Quests (FIA, FIS oder BWL)', prefix: '', values: ihk.settings },
+         { title: 'Hybrid-Quests (zwei Fachrichtungen, es zählt der Durchschnitt)', prefix: 'hybrid_', values: ihk.settings.hybrid },
+       ].forEach((t) => { %>
+      <h3 class="admin-ihk-sub"><%= t.title %></h3>
+      <div class="table-wrap">
+        <table class="table admin-tcg-table">
+          <thead><tr><th>Schwierigkeit</th><th>Ziel (Punkte)</th><th>Dauer (Min., 0 = sofort)</th><th>Lohn (€)</th></tr></thead>
+          <tbody>
+            <% ihk.difficulties.forEach((d, i) => { %>
+              <tr class="r-<%= tcg.rarities[i].key %>">
+                <td><span class="tcg-dot"></span> <%= d.level %> · <%= d.label %> <span class="muted small hide-sm">(Standard <%= d.required %>)</span></td>
+                <td><input type="number" name="<%= t.prefix %>required_<%= d.level %>" min="1" max="100000" step="1" value="<%= t.values.required[i] %>" required aria-label="Ziel-Punkte Schwierigkeit <%= d.level %>"></td>
+                <td><input type="number" name="<%= t.prefix %>duration_<%= d.level %>" min="0" max="1440" step="1" value="<%= t.values.durations[i] %>" required aria-label="Dauer Schwierigkeit <%= d.level %>"></td>
+                <td><input type="text" name="<%= t.prefix %>reward_<%= d.level %>" inputmode="decimal" value="<%= (t.values.rewards[i] / 100).toFixed(2).replace('.', ',') %>" required aria-label="Lohn Schwierigkeit <%= d.level %>"></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% }) %>
     <button class="btn btn-primary" type="submit">Speichern</button>
   </form>
 </div>
 
 <div class="card">
   <h2>Registrierungscodes</h2>
-  <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er <span data-admin-dialog-open>automatisch</span> gelöscht.</p>
+  <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.</p>
 
   <form method="post" action="/admin/codes" class="admin-generate">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">

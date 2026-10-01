@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Bet = require('../models/Bet');
 const { requireAdmin } = require('../middleware');
-const coinEngine = require('../coin/engine');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const ihk = require('../ihk/ihkService');
@@ -29,9 +28,6 @@ router.get('/admin', requireAdmin, async (req, res) => {
     ttlMinutes: CODE_TTL_MINUTES,
     stats: { userCount, openBets, totalBets },
     now: Date.now(),
-    coin: coinEngine.isRunning() ? coinEngine.snapshot() : null,
-    manipulation: coinEngine.manipulationStatus(),
-    durations: DURATIONS,
     tcg: {
       packPrice: tcgSettings.getPackPrice(),
       rarities: tcgCatalog.RARITIES,
@@ -63,19 +59,25 @@ router.post('/admin/handel', requireAdmin, async (req, res) => {
 router.post('/admin/ihk', requireAdmin, async (req, res) => {
   const dailyLimit = Number.parseInt(typeof req.body.dailyLimit === 'string' ? req.body.dailyLimit : '', 10);
   const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
-  const durations = DIFFICULTIES.map((d) => num(req.body[`duration_${d.level}`]));
-  const rewards = DIFFICULTIES.map((d) => centsOrNull(req.body[`reward_${d.level}`]));
-  const required = DIFFICULTIES.map((d) => Number.parseInt(typeof req.body[`required_${d.level}`] === 'string' ? req.body[`required_${d.level}`] : '', 10));
+  // Wertetabelle aus dem Formular: prefix '' = normale Quests, 'hybrid_' = Hybrid-Quests
+  const table = (prefix) => ({
+    durations: DIFFICULTIES.map((d) => num(req.body[`${prefix}duration_${d.level}`])),
+    rewards: DIFFICULTIES.map((d) => centsOrNull(req.body[`${prefix}reward_${d.level}`])),
+    required: DIFFICULTIES.map((d) => num(req.body[`${prefix}required_${d.level}`])),
+  });
+  const { durations, rewards, required } = table('');
+  const hybrid = table('hybrid_');
+  const both = (key) => [...{ durations, rewards, required }[key], ...hybrid[key]];
   if (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 100) {
     req.flash('error', 'Das Tageslimit muss zwischen 0 und 100 liegen.');
-  } else if (durations.some((m) => !Number.isInteger(m) || m < 0 || m > 1440)) {
+  } else if (both('durations').some((m) => !Number.isInteger(m) || m < 0 || m > 1440)) {
     req.flash('error', 'Die Dauer muss je Schwierigkeit zwischen 0 und 1440 Minuten liegen.');
-  } else if (required.some((r) => !Number.isInteger(r) || r < 1 || r > 100000)) {
+  } else if (both('required').some((r) => !Number.isInteger(r) || r < 1 || r > 100000)) {
     req.flash('error', 'Bitte für jede Schwierigkeit gültige Ziel-Punkte angeben (1–100000).');
-  } else if (rewards.some((r) => r === null)) {
+  } else if (both('rewards').some((r) => r === null)) {
     req.flash('error', 'Bitte für jede Schwierigkeit einen gültigen Lohn angeben.');
   } else {
-    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, admin: req.user });
+    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, hybrid, admin: req.user });
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
   res.redirect('/admin#ihk');
@@ -129,35 +131,6 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
     req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
   }
   res.redirect('/admin#tcg');
-});
-
-// ---------- Samantha Coin steuern (nur Admins, für Nutzer unsichtbar) ----------
-
-const DURATIONS = [0, 1, 5, 15, 30, 60];
-
-router.post('/admin/coin', requireAdmin, async (req, res) => {
-  const percent = Number(String(req.body.percent || '').replace(',', '.').replace('−', '-'));
-  const minutes = Number(req.body.minutes);
-  if (!Number.isFinite(percent) || percent === 0 || percent < -99 || percent > 1000) {
-    req.flash('error', 'Bitte eine Änderung zwischen −99 % und +1000 % angeben (nicht 0).');
-  } else if (!DURATIONS.includes(minutes)) {
-    req.flash('error', 'Ungültige Dauer.');
-  } else if (!coinEngine.isRunning()) {
-    req.flash('error', 'Die Kurs-Engine läuft nicht.');
-  } else {
-    await coinEngine.startManipulation({ percent, minutes });
-    const sign = percent > 0 ? '+' : '';
-    req.flash('success', minutes
-      ? `Kurssteuerung aktiv: ${sign}${percent} % über ${minutes} Min. (zusätzlich zur normalen Schwankung).`
-      : `Kurs sofort um ${sign}${percent} % verändert.`);
-  }
-  res.redirect('/admin');
-});
-
-router.post('/admin/coin/stopp', requireAdmin, async (req, res) => {
-  if (coinEngine.isRunning()) await coinEngine.cancelManipulation();
-  req.flash('info', 'Kurssteuerung beendet – der Kurs bewegt sich wieder nur zufällig.');
-  res.redirect('/admin');
 });
 
 router.post('/admin/codes', requireAdmin, async (req, res) => {

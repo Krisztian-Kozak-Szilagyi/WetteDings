@@ -10,9 +10,10 @@ const coinStateSchema = new Schema(
     ath: { type: Number, required: true }, // Allzeithoch
     athAt: { type: Date, required: true },
     startedAt: { type: Date, required: true },
-    // Interne Kurssteuerung durch Admins (wird nirgends öffentlich angezeigt)
-    manual: {
-      type: new Schema({ remainingLog: Number, endsAt: Date }, { _id: false }),
+    // Großer Sprung im aktuellen 12-Stunden-Fenster: slot = Fensterbeginn (ms), at = geplanter Zeitpunkt (ms)
+    // oder null (kein Sprung bzw. schon passiert), log = Änderung im Log-Maß
+    surge: {
+      type: new Schema({ slot: Number, at: Number, log: Number }, { _id: false }),
       default: null,
     },
   },

@@ -8,7 +8,7 @@ const { inTransaction } = require('../services/betService');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
-const { QUESTS, DIFFICULTIES, questById, difficulty } = require('./quests');
+const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
 const { resolve, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 
@@ -23,14 +23,20 @@ const OFFER_COUNT = 3;
 // open = für alle Mitglieder spielbar (sonst nur Admins)
 // required = Ziel-Punkte je Schwierigkeit (1–6)
 // durations = Wartezeit in Minuten je Schwierigkeit (1–6)
+// hybrid = eigene Werte (required, durations, rewards) für Hybrid-Quests
 const DEFAULTS = { open: false, dailyLimit: 5, durations: [10, 10, 10, 10, 10, 10], rewards: [1500, 2500, 4000, 6000, 10000, 15000], required: DIFFICULTIES.map((d) => d.required) };
-const settings = { ...DEFAULTS, durations: [...DEFAULTS.durations], rewards: [...DEFAULTS.rewards], required: [...DEFAULTS.required] };
+const table = (t) => ({ durations: [...t.durations], rewards: [...t.rewards], required: [...t.required] });
+const settings = { ...DEFAULTS, ...table(DEFAULTS), hybrid: table(DEFAULTS) };
 const validList = (list, min) => Array.isArray(list) && list.length === 6 && list.every((r) => Number.isInteger(r) && r >= min);
 
+/** Wertetabelle einer Quest: Hybrid-Quests haben eigene Einstellungen */
+const tableFor = (quest) => (quest && isHybrid(quest) ? settings.hybrid : settings);
 /** Ziel-Punkte einer Schwierigkeit (aktuelle Einstellung) */
-const requiredFor = (level) => settings.required[level - 1];
+const requiredFor = (level, quest) => tableFor(quest).required[level - 1];
 /** Wartezeit (Minuten) einer Schwierigkeit */
-const durationFor = (level) => settings.durations[level - 1];
+const durationFor = (level, quest) => tableFor(quest).durations[level - 1];
+/** Lohn (Cent) einer Schwierigkeit */
+const rewardFor = (level, quest) => tableFor(quest).rewards[level - 1];
 
 async function loadSettings() {
   const doc = await IhkSettings.findById('ihk').lean();
@@ -41,22 +47,32 @@ async function loadSettings() {
   else if (Number.isInteger(doc.durationMin) && doc.durationMin >= 0) settings.durations = Array(6).fill(doc.durationMin); // alte Einstellung
   if (validList(doc.rewards, 0)) settings.rewards = doc.rewards;
   if (validList(doc.required, 1)) settings.required = doc.required;
+  // Hybrid-Quests: noch nie gespeichert → gleiche Werte wie die normalen Quests
+  const h = doc.hybrid || {};
+  settings.hybrid = {
+    durations: validList(h.durations, 0) ? h.durations : [...settings.durations],
+    rewards: validList(h.rewards, 0) ? h.rewards : [...settings.rewards],
+    required: validList(h.required, 1) ? h.required : [...settings.required],
+  };
 }
 
-async function saveSettings({ open, dailyLimit, durations, rewards, required, admin }) {
-  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, durations, rewards, required, updatedByName: admin.username } }, { upsert: true });
-  Object.assign(settings, { open, dailyLimit, durations, rewards, required });
+async function saveSettings({ open, dailyLimit, durations, rewards, required, hybrid, admin }) {
+  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, durations, rewards, required, hybrid, updatedByName: admin.username } }, { upsert: true });
+  Object.assign(settings, { open, dailyLimit, durations, rewards, required, hybrid });
 }
 
 // ---------- Simulation ----------
 /**
  * Würfelt eine Quest aus: Innerhalb von WORK_TIME gibt es tickCount(Speed) gleichmäßig verteilte Takte,
  * pro Takt sammelt die Karte ihren Stat (×0,8–1,2, mit CRIT_CHANCE doppelt). Geschafft, wenn required erreicht ist.
+ * stat: 'fia' | 'fis' | 'bwl' oder ein Array (Hybrid-Quest) – dann zählt der Durchschnitt der Werte.
  */
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
   const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
+  const keys = [].concat(stat);
+  const statValue = () => keys.reduce((sum, k) => sum + s.stats[k], 0) / keys.length;
   const ticks = [];
   let applied = effects.length === 0;
   let limit = WORK_TIME;
@@ -81,7 +97,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     if (next > limit + 1e-9) break;
     const fake = s.fakeNext;
     const crit = rand() < CRIT_CHANCE;
-    const base = fake ? 99 : s.stats[stat];
+    const base = fake ? 99 : statValue();
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
     const p = Math.max(1, Math.round((base * (0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1)));
     s.fakeNext = false;
@@ -195,9 +211,9 @@ async function start({ user, cardId, boostId, offerIndex }) {
   if (!offer) throw new UserError('Bitte wähle eine Quest aus.');
 
   const quest = questById[offer.quest];
-  const required = requiredFor(offer.difficulty);
+  const required = requiredFor(offer.difficulty, quest);
   const effects = resolve(card, boost);
-  const result = simulate(card.stats, quest.stat, required, undefined, effects);
+  const result = simulate(card.stats, statsOf(quest), required, undefined, effects);
   try {
     // Sperrprüfung und Quest-Anlage in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder gehandelt wird
     return await inTransaction(async (session) => {
@@ -225,9 +241,9 @@ async function start({ user, cardId, boostId, offerIndex }) {
             abilities: result.ticks.some((x) => x.ability) ? effects.map(({ apply, ...a }) => a) : [],
             stats: card.stats,
             day: today(),
-            endsAt: new Date(Date.now() + durationFor(offer.difficulty) * 60000),
+            endsAt: new Date(Date.now() + durationFor(offer.difficulty, quest) * 60000),
             ...result,
-            reward: result.success ? settings.rewards[offer.difficulty - 1] : 0,
+            reward: result.success ? rewardFor(offer.difficulty, quest) : 0,
           },
         ],
         { session }
@@ -259,4 +275,4 @@ async function collect({ user }) {
   return result;
 }
 
-module.exports = { WORK_TIME, settings, requiredFor, durationFor, loadSettings, saveSettings, simulate, generateOffers, getOffers, canReroll, reroll, getState, start, collect };
+module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, loadSettings, saveSettings, simulate, generateOffers, getOffers, canReroll, reroll, getState, start, collect };
