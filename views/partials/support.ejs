@@ -1,4 +1,4 @@
-<div class="support" data-support data-csrf="<%= csrfToken %>" data-name="<%= currentUser.username %>">
+<div class="support" data-support data-csrf="<%= csrfToken %>" data-name="<%= currentUser.username %>" data-consent="<%= currentUser.supportConsentAt ? 1 : 0 %>">
   <button type="button" class="support-fab" data-support-toggle aria-expanded="false" aria-controls="support-panel" aria-label="Support-Chat öffnen">
     <span class="support-fab-avatar" aria-hidden="true">WB<span class="support-fab-dot"></span></span>
     <span class="support-fab-text" aria-hidden="true"><strong>Support</strong><small>Warren hilft dir</small></span>
@@ -14,11 +14,16 @@
       <button type="button" class="support-icon-btn" data-support-close aria-label="Chat schließen">×</button>
     </header>
     <div class="support-log" data-support-log aria-live="polite"></div>
+    <div class="support-consent" data-support-consent hidden>
+      <p><strong>Bevor es losgeht:</strong> Der Support-Chat wird von einer KI beantwortet. Dafür werden deine Nachrichten und der Gesprächsverlauf an den Dienst <strong>Groq (USA)</strong> übermittelt – ohne deinen Namen, deine E-Mail-Adresse oder deinen Spielstand. In den USA gilt nicht derselbe Datenschutz wie in der EU.</p>
+      <p>Bitte gib keine persönlichen Daten ein. Die Einwilligung kannst du jederzeit unter „Mein Konto“ widerrufen. <a href="/datenschutz#support" target="_blank">Datenschutzerklärung</a></p>
+      <button type="button" class="btn btn-primary btn-sm" data-support-agree>Einverstanden</button>
+    </div>
     <form class="support-form" data-support-form>
       <textarea name="message" rows="1" maxlength="500" placeholder="Frag mich etwas zur Seite …" aria-label="Deine Frage" required></textarea>
       <button type="submit" class="btn btn-primary btn-sm" aria-label="Senden">Senden</button>
     </form>
-    <p class="support-note">KI-Antworten können Fehler enthalten. Deine Nachrichten werden zur Beantwortung an den KI-Dienst Groq (USA) übermittelt – mit dem Absenden bist du damit einverstanden. Bitte keine persönlichen Daten eingeben. <a href="/datenschutz#support" target="_blank">Mehr dazu</a></p>
+    <p class="support-note">KI-Antworten können Fehler enthalten. Bitte keine persönlichen Daten eingeben. <a href="/datenschutz#support" target="_blank">Datenschutz</a></p>
   </section>
 </div>
 <script src="/js/support.js?v=<%= assetVersion %>" defer></script>

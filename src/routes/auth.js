@@ -32,6 +32,12 @@ function startSession(req, userId) {
   });
 }
 
+// Hinweis nach dem Löschen des Kontos (die Sitzung gibt es dann nicht mehr, deshalb per Parameter)
+router.use('/anmelden', (req, res, next) => {
+  if (req.method === 'GET' && req.query.geloescht === '1' && !res.locals.flash) res.locals.flash = { type: 'success', message: 'Dein Konto wurde gelöscht.' };
+  next();
+});
+
 router.get('/registrieren', (req, res) => {
   if (req.user) return res.redirect('/');
   res.render('register', { title: 'Registrieren', errors: [], values: {} });

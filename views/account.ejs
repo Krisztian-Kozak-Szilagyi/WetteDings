@@ -2,7 +2,7 @@
 
 <div class="page-head">
   <h1>Mein Konto</h1>
-  <span class="muted"><%= currentUser.username %> · <%= currentUser.email %></span>
+  <span class="muted"><%= currentUser.username %> · <%= currentUser.email %> · registriert am <%= date(currentUser.createdAt) %></span>
 </div>
 
 <div class="stats stats-auto">
@@ -80,6 +80,22 @@
   <p class="muted small">Es werden die letzten 50 Buchungen angezeigt.</p>
 </div>
 
+<div class="card narrow-card" id="name">
+  <h2>Benutzernamen ändern</h2>
+  <% if (currentUser.isAdmin) { %>
+    <p class="muted">Admin-Konten können ihren Namen nicht ändern – die Admin-Rechte hängen am Benutzernamen.</p>
+  <% } else if (nextRenameAt) { %>
+    <p class="muted">Du hast deinen Namen vor Kurzem geändert. Die nächste Änderung ist ab <%= date(nextRenameAt) %> möglich.</p>
+  <% } else { %>
+    <form method="post" action="/konto/name" class="form" data-confirm="Benutzernamen wirklich ändern? Der neue Name erscheint überall – auch bei deinen bisherigen Wetten und Kommentaren.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Neuer Benutzername</span><input type="text" name="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\-]{3,20}" autocomplete="off" required placeholder="<%= currentUser.username %>"></label>
+      <p class="muted small">3–20 Zeichen (Buchstaben, Zahlen, _ . -). Danach kannst du den Namen <%= renameDays %> Tage lang nicht erneut ändern. Mit dem neuen Namen meldest du dich auch an.</p>
+      <button class="btn btn-primary" type="submit">Namen ändern</button>
+    </form>
+  <% } %>
+</div>
+
 <div class="card narrow-card" id="passwort">
   <h2>Passwort ändern</h2>
   <form method="post" action="/konto/passwort" class="form">
@@ -89,6 +105,35 @@
     <label class="field"><span>Neues Passwort wiederholen</span><input type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="200" required></label>
     <button class="btn btn-primary" type="submit">Passwort speichern</button>
   </form>
+</div>
+
+<div class="card narrow-card" id="datenschutz">
+  <h2>Datenschutz</h2>
+  <p class="muted">Was über dich gespeichert wird und was andere sehen, steht in der <a href="/datenschutz">Datenschutzerklärung</a>.</p>
+
+  <h3>Support-Chat</h3>
+  <% if (currentUser.supportConsentAt) { %>
+    <p>Du hast am <%= date(currentUser.supportConsentAt) %> eingewilligt, dass deine Chat-Nachrichten an den KI-Dienst Groq (USA) übermittelt werden.</p>
+    <form method="post" action="/konto/support-einwilligung/widerrufen">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-ghost btn-sm" type="submit">Einwilligung widerrufen</button>
+    </form>
+  <% } else { %>
+    <p class="muted">Du hast der Übermittlung von Chat-Nachrichten an den KI-Dienst nicht zugestimmt. Der Support-Chat fragt dich danach, bevor du ihn nutzen kannst.</p>
+  <% } %>
+
+  <h3>Konto löschen</h3>
+  <% if (currentUser.isAdmin) { %>
+    <p class="muted">Admin-Konten können nicht gelöscht werden.</p>
+  <% } else { %>
+    <p>Dein Konto wird sofort und endgültig gelöscht: Benutzername, E-Mail-Adresse, Spielgeld, Coins, Karten, Packs, Quests, Kontoauszug und der Text deiner Kommentare. Deine Einsätze in gemeinsamen Wetten bleiben ohne deinen Namen bestehen, damit die Wetten für die anderen abgerechnet werden können.</p>
+    <form method="post" action="/konto/loeschen" class="form" data-confirm="Konto wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Passwort zur Bestätigung</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <label class="check"><input type="checkbox" name="confirm" required><span>Ich möchte mein Konto endgültig löschen.</span></label>
+      <button class="btn btn-danger" type="submit">Konto endgültig löschen</button>
+    </form>
+  <% } %>
 </div>
 
 <%- include('partials/foot') %>

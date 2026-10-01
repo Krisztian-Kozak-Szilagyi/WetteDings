@@ -12,6 +12,9 @@
   var sendBtn = form.querySelector('button[type="submit"]');
   var csrf = root.getAttribute('data-csrf');
   var name = root.getAttribute('data-name');
+  var consentBox = root.querySelector('[data-support-consent]');
+  var note = root.querySelector('.support-note');
+  var consent = root.getAttribute('data-consent') === '1';
   var loaded = false;
   var busy = false;
   var STORE_KEY = 'supportOpen';
@@ -56,6 +59,21 @@
     });
   }
 
+  // Ohne Einwilligung gibt es statt des Eingabefelds den Hinweis mit dem Knopf "Einverstanden"
+  function showConsent() {
+    consentBox.hidden = consent;
+    form.hidden = !consent;
+    if (note) note.hidden = !consent;
+  }
+  root.querySelector('[data-support-agree]').addEventListener('click', function () {
+    post('/support/einwilligung').then(function (data) {
+      if (!data.ok) return;
+      consent = true;
+      showConsent();
+      input.focus();
+    });
+  });
+
   function loadHistory() {
     if (loaded) return;
     loaded = true;
@@ -75,6 +93,7 @@
     root.classList.toggle('is-open', open);
     try { sessionStorage.setItem(STORE_KEY, open ? '1' : '0'); } catch (e) {}
     if (open) {
+      showConsent();
       loadHistory();
       setTimeout(function () { input.focus(); }, 50);
     }

@@ -21,7 +21,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
     User.countDocuments(),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(),
-    User.find().select('username').sort({ usernameLower: 1 }).lean(),
+    User.find({ deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
   ]);
   res.render('admin', {
     title: 'Admin',

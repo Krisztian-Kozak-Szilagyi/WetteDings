@@ -1,5 +1,6 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
+const User = require('../models/User');
 const chat = require('../support/chatService');
 const { str } = require('../lib/util');
 
@@ -30,11 +31,18 @@ const history = (req) => (Array.isArray(req.session.supportChat) ? req.session.s
 
 router.get('/support/verlauf', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ enabled: chat.isEnabled(), messages: history(req) });
+  res.json({ enabled: chat.isEnabled(), consent: !!req.user.supportConsentAt, messages: history(req) });
+});
+
+// Einmalige Einwilligung: Chat-Nachrichten gehen an einen KI-Dienst in den USA (Art. 6 Abs. 1 lit. a, Art. 49 Abs. 1 lit. a DSGVO)
+router.post('/support/einwilligung', async (req, res) => {
+  await User.updateOne({ _id: req.user._id }, { $set: { supportConsentAt: new Date() } });
+  res.json({ ok: true });
 });
 
 router.post('/support/chat', async (req, res) => {
   res.set('Cache-Control', 'no-store');
+  if (!req.user.supportConsentAt) return res.status(403).json({ error: 'Bitte stimme zuerst der Übermittlung an den KI-Dienst zu.' });
   const message = str(req.body.message).trim().slice(0, MAX_MESSAGE);
   if (!message) return res.status(400).json({ error: 'Bitte schreib eine Frage.' });
   const limited = rateLimited(req.user._id);

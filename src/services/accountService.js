@@ -1,0 +1,135 @@
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
+const config = require('../config');
+const User = require('../models/User');
+const Bet = require('../models/Bet');
+const Comment = require('../models/Comment');
+const Position = require('../models/Position');
+const Ledger = require('../models/Ledger');
+const PatchNote = require('../models/PatchNote');
+const RegistrationCode = require('../models/RegistrationCode');
+const { LotteryRound, LotteryEntry } = require('../models/Lottery');
+const { TcgCard, TcgPack, TcgOpening } = require('../models/Tcg');
+const { CoinHolding, CoinTrade } = require('../models/Coin');
+const { IhkRun, IhkState } = require('../models/Ihk');
+const { Trade } = require('../models/Trade');
+const { inTransaction } = require('./betService');
+const { UserError } = require('../lib/util');
+
+const NAME_PATTERN = /^[A-Za-z0-9_.-]{3,20}$/;
+const NAME_HINT = 'Der Benutzername muss 3–20 Zeichen lang sein (Buchstaben, Zahlen, _ . -).';
+const RENAME_COOLDOWN_DAYS = 7; // so lange muss man nach einer Namensänderung bis zur nächsten warten
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Der Benutzername steht an vielen Stellen als Kopie (damit Listen ohne Nachschlagen auskommen).
+ * Hier werden alle Kopien auf den neuen Namen gesetzt. Wo keine Nutzer-ID daneben gespeichert ist,
+ * wird über den alten Namen gesucht – Namen sind eindeutig.
+ */
+async function propagateName(userId, oldName, name, session) {
+  const opt = { session };
+  await Promise.all([
+    Bet.updateMany({ creator: userId }, { $set: { creatorName: name } }, opt),
+    Bet.updateMany({ resolvedBy: userId }, { $set: { resolvedByName: name } }, opt),
+    Bet.updateMany({ 'edits.byName': oldName }, { $set: { 'edits.$[e].byName': name } }, { ...opt, arrayFilters: [{ 'e.byName': oldName }] }),
+    Comment.updateMany({ user: userId }, { $set: { username: name } }, opt),
+    Comment.updateMany({ deletedByName: oldName }, { $set: { deletedByName: name } }, opt),
+    Position.updateMany({ user: userId }, { $set: { username: name } }, opt),
+    LotteryEntry.updateMany({ user: userId }, { $set: { username: name } }, opt),
+    LotteryRound.updateMany({ winner: userId }, { $set: { winnerName: name } }, opt),
+    PatchNote.updateMany({ authorName: oldName }, { $set: { authorName: name } }, opt),
+    PatchNote.updateMany({ 'comments.user': userId }, { $set: { 'comments.$[c].username': name } }, { ...opt, arrayFilters: [{ 'c.user': userId }] }),
+    RegistrationCode.updateMany({ createdBy: userId }, { $set: { createdByName: name } }, opt),
+    RegistrationCode.updateMany({ usedBy: userId }, { $set: { usedByName: name } }, opt),
+    TcgOpening.updateMany({ user: userId }, { $set: { username: name } }, opt),
+    Trade.updateMany({ seller: userId }, { $set: { sellerName: name } }, opt),
+    Trade.updateMany({ buyer: userId }, { $set: { buyerName: name } }, opt),
+    Trade.updateMany({ to: userId }, { $set: { toName: name } }, opt),
+  ]);
+}
+
+/** Wann darf der Name frühestens wieder geändert werden? (null = sofort) */
+function nextRenameAt(user) {
+  if (!user.usernameChangedAt) return null;
+  const at = new Date(new Date(user.usernameChangedAt).getTime() + RENAME_COOLDOWN_DAYS * DAY);
+  return at > new Date() ? at : null;
+}
+
+/** Benutzernamen ändern – überall, wo er angezeigt wird */
+async function rename({ user, username }) {
+  const name = String(username || '').trim();
+  // Admin-Rechte hängen am Benutzernamen (ADMIN_USERNAMES) – deshalb bleibt der Name von Admins fest
+  if (user.isAdmin) throw new UserError('Admin-Konten können ihren Namen nicht ändern – die Admin-Rechte hängen am Benutzernamen.');
+  if (!NAME_PATTERN.test(name)) throw new UserError(NAME_HINT);
+  if (name === user.username) throw new UserError('Das ist bereits dein Benutzername.');
+  const lower = name.toLowerCase();
+  if (config.adminUsernames.includes(lower) || /^geloescht-/.test(lower)) throw new UserError('Dieser Benutzername ist nicht verfügbar.');
+  if (nextRenameAt(user)) throw new UserError(`Du kannst deinen Namen nur alle ${RENAME_COOLDOWN_DAYS} Tage ändern.`);
+
+  try {
+    await inTransaction(async (session) => {
+      await User.updateOne({ _id: user._id }, { $set: { username: name, usernameLower: lower, usernameChangedAt: new Date() } }, { session });
+      await propagateName(user._id, user.username, name, session);
+    });
+  } catch (err) {
+    if (err && err.code === 11000) throw new UserError('Dieser Benutzername ist bereits vergeben.');
+    throw err;
+  }
+  return name;
+}
+
+/**
+ * Konto löschen (Art. 17 DSGVO). Alle persönlichen Angaben und der eigene Spielstand werden entfernt.
+ * Das Nutzer-Dokument bleibt als leere Hülle mit neutralem Namen bestehen, damit gemeinsame Wetten
+ * (Einsätze, Töpfe, Auszahlungen) für die anderen Mitglieder nachvollziehbar und abrechenbar bleiben.
+ */
+async function deleteAccount({ user, password }) {
+  if (user.isAdmin) throw new UserError('Admin-Konten können nicht gelöscht werden. Entferne zuerst die Admin-Rechte.');
+  const doc = await User.findById(user._id).select('passwordHash');
+  if (!doc || !(await bcrypt.compare(String(password || ''), doc.passwordHash))) throw new UserError('Das Passwort ist falsch.');
+
+  const id = user._id;
+  const anon = `geloescht-${String(id).slice(-8)}`;
+  await inTransaction(async (session) => {
+    const opt = { session };
+    await User.updateOne(
+      { _id: id },
+      {
+        $set: {
+          username: anon,
+          usernameLower: anon,
+          email: `${anon}@geloescht.invalid`,
+          passwordHash: crypto.randomBytes(32).toString('hex'), // kein gültiger Hash → Anmeldung unmöglich
+          balance: 0,
+          deletedAt: new Date(),
+          tcgProtected: [],
+          tcgFavorites: [],
+        },
+        $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
+      },
+      opt
+    );
+    await propagateName(id, user.username, anon, session);
+    await Promise.all([
+      TcgCard.deleteMany({ user: id }, opt),
+      TcgPack.deleteMany({ user: id }, opt),
+      TcgOpening.deleteMany({ user: id }, opt),
+      CoinHolding.deleteMany({ user: id }, opt),
+      CoinTrade.deleteMany({ user: id }, opt),
+      Ledger.deleteMany({ user: id }, opt),
+      IhkRun.deleteMany({ user: id }, opt),
+      IhkState.deleteOne({ _id: id }, opt),
+      // offene Handelsangebote verschwinden; abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
+      Trade.deleteMany({ seller: id, status: 'offen' }, opt),
+      Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),
+      // Kommentare: Text entfernen
+      Comment.updateMany({ user: id }, { $set: { deleted: true, text: '' } }, opt),
+      PatchNote.updateMany({}, { $pull: { comments: { user: id }, upvotes: id } }, opt),
+    ]);
+  });
+  // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
+  await mongoose.connection.collection('sessions').deleteMany({ session: { $regex: `"userId":"${String(id)}"` } });
+}
+
+module.exports = { NAME_PATTERN, NAME_HINT, RENAME_COOLDOWN_DAYS, nextRenameAt, rename, deleteAccount, propagateName };

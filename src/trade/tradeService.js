@@ -53,7 +53,7 @@ async function create({ user, cardId, price, toName }) {
 
   let to = null;
   if (toName) {
-    to = await User.findOne({ usernameLower: toName.trim().toLowerCase() }).select('_id username').lean();
+    to = await User.findOne({ usernameLower: toName.trim().toLowerCase(), deletedAt: null }).select('_id username').lean();
     if (!to) throw new UserError('Diesen Benutzer gibt es nicht.');
     if (to._id.equals(user._id)) throw new UserError('Du kannst dir nicht selbst ein Angebot machen.');
   }

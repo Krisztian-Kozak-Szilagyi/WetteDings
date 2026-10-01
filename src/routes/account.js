@@ -9,6 +9,8 @@ const { str } = require('../lib/util');
 const { bonusFor } = require('../services/bonusService');
 const { coinValueCents } = require('../coin/tradeService');
 const { cardValueCents } = require('../tcg/tcgService');
+const account = require('../services/accountService');
+const { UserError } = require('../lib/util');
 
 const router = express.Router();
 
@@ -53,7 +55,40 @@ router.get('/konto', requireLogin, async (req, res) => {
     lastBonus,
     bonusNow: bonusFor(total),
     pwErrors: [],
+    renameDays: account.RENAME_COOLDOWN_DAYS,
+    nextRenameAt: account.nextRenameAt(req.user),
   });
+});
+
+router.post('/konto/name', requireLogin, async (req, res) => {
+  try {
+    const name = await account.rename({ user: req.user, username: str(req.body.username) });
+    req.flash('success', `Dein Benutzername ist jetzt „${name}“.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/konto#name');
+});
+
+// Einwilligung für den Support-Chat widerrufen (Art. 7 Abs. 3 DSGVO); der Chat fragt danach erneut
+router.post('/konto/support-einwilligung/widerrufen', requireLogin, async (req, res) => {
+  await User.updateOne({ _id: req.user._id }, { $set: { supportConsentAt: null } });
+  req.session.supportChat = [];
+  req.flash('success', 'Deine Einwilligung für den Support-Chat wurde widerrufen und der Gesprächsverlauf gelöscht.');
+  res.redirect('/konto#datenschutz');
+});
+
+router.post('/konto/loeschen', requireLogin, async (req, res) => {
+  try {
+    if (req.body.confirm !== 'on') throw new UserError('Bitte bestätige, dass du dein Konto endgültig löschen möchtest.');
+    await account.deleteAccount({ user: req.user, password: str(req.body.password) });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+    return res.redirect('/konto#datenschutz');
+  }
+  req.session.destroy(() => res.redirect('/anmelden?geloescht=1'));
 });
 
 router.post('/konto/passwort', requireLogin, async (req, res) => {

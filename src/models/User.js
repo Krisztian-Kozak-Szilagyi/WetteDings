@@ -18,6 +18,12 @@ const userSchema = new Schema(
     // TCG: Karten-IDs, deren Duplikate nicht mitverkauft werden, und bis zu 4 Favoriten für die TCG-Seite
     tcgProtected: { type: [String], default: [] },
     tcgFavorites: { type: [String], default: [] },
+    // Letzte Namensänderung (Wartezeit bis zur nächsten)
+    usernameChangedAt: { type: Date, default: null },
+    // Einwilligung in die Übermittlung der Chat-Nachrichten an den KI-Dienst (Support-Chat)
+    supportConsentAt: { type: Date, default: null },
+    // Gelöschtes Konto: nur noch eine leere Hülle mit neutralem Namen (siehe services/accountService)
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

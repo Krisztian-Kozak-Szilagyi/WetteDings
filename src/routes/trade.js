@@ -25,7 +25,7 @@ router.get('/handel', async (req, res) => {
     Trade.find({ status: 'verkauft', $or: [{ seller: me }, { buyer: me }] }).sort({ closedAt: -1 }).limit(10).lean(),
     TcgCard.find({ user: me }).select('card').lean(),
     lockedDocs(me),
-    User.find({ _id: { $ne: me } }).select('username').sort({ usernameLower: 1 }).lean(),
+    User.find({ _id: { $ne: me }, deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
     // Besuch merken: der Markt gilt ab jetzt als gesehen
     User.updateOne({ _id: me }, { $set: { marketSeenAt: now } }),
   ]);

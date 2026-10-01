@@ -21,7 +21,7 @@ async function loadUser(req, res, next) {
   res.locals.currentPath = req.path;
   if (req.session.userId) {
     const user = await User.findById(req.session.userId).select('-passwordHash').lean();
-    if (user) {
+    if (user && !user.deletedAt) {
       user.isAdmin = config.adminUsernames.includes(user.usernameLower);
       req.user = user;
       res.locals.currentUser = user;

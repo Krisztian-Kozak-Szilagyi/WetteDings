@@ -1304,3 +1304,50 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 
 /* IHK: Boost 2 ist nur bei Hybrid-Quests aktiv */
 .ihk-slot-item.is-disabled { opacity: .35; filter: grayscale(1); cursor: var(--cur-no); }
+
+/* Rangliste: der Name auf Platz 1 brennt – fließender Glut-Verlauf, weiches Flackern dahinter, aufsteigende Funken */
+.leader-flame { position: relative; display: inline-block; isolation: isolate; padding: 0 2px; }
+.leader-flame a {
+  font-weight: 800; color: transparent; text-decoration: none;
+  background: linear-gradient(100deg, #fde68a 0%, #fbbf24 18%, #fb923c 38%, #ef4444 55%, #fb923c 72%, #fbbf24 86%, #fde68a 100%);
+  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text;
+  animation: flame-flow 3.6s linear infinite; filter: drop-shadow(0 0 5px rgba(249, 115, 22, .55));
+}
+.leader-flame::before {
+  content: ''; position: absolute; z-index: -1; inset: -7px -12px -3px; pointer-events: none;
+  background:
+    radial-gradient(55% 95% at 18% 100%, rgba(251, 146, 60, .55), transparent 70%),
+    radial-gradient(50% 110% at 52% 100%, rgba(239, 68, 68, .5), transparent 70%),
+    radial-gradient(42% 85% at 86% 100%, rgba(253, 224, 71, .45), transparent 70%);
+  filter: blur(7px); transform-origin: 50% 100%; animation: flame-flicker 1.7s ease-in-out infinite alternate;
+}
+.leader-flame i {
+  position: absolute; bottom: 55%; width: 3px; height: 3px; border-radius: 50%; pointer-events: none;
+  background: #fde68a; box-shadow: 0 0 6px 1px rgba(251, 146, 60, .9); opacity: 0; animation: flame-ember 2.4s ease-out infinite;
+}
+.leader-flame i:nth-of-type(1) { left: 14%; animation-delay: 0s; }
+.leader-flame i:nth-of-type(2) { left: 52%; animation-delay: .8s; animation-duration: 2.9s; }
+.leader-flame i:nth-of-type(3) { left: 84%; animation-delay: 1.5s; animation-duration: 2.1s; }
+@keyframes flame-flow { to { background-position: -220% 0; } }
+@keyframes flame-flicker {
+  0% { transform: scaleY(.85); opacity: .65; }
+  45% { transform: scaleY(1.18) skewX(-5deg); opacity: 1; }
+  100% { transform: scaleY(.95) skewX(4deg); opacity: .8; }
+}
+@keyframes flame-ember {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(6px, -22px) scale(.3); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leader-flame a, .leader-flame::before { animation: none; }
+  .leader-flame i { display: none; }
+}
+
+/* Support-Chat: Einwilligung */
+.support-consent { padding: 12px; border-top: 1px solid var(--border); font-size: .85rem; }
+.support-consent p { margin: 0 0 8px; }
+.support-form[hidden] { display: none; }
+
+/* Mein Konto: Datenschutz-Karte */
+#datenschutz h3 { margin: 18px 0 6px; font-size: 1rem; }

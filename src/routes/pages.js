@@ -16,6 +16,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
   // Gesamtvermögen = Kontostand + offene Einsätze + Wert der Samantha Coins zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis)
   const centsPerUnit = coinEngine.isRunning() ? (coinEngine.getPrice() * 100) / 1e8 : 0;
   const leaders = await User.aggregate([
+    { $match: { deletedAt: null } }, // gelöschte Konten erscheinen nicht
     {
       $lookup: {
         from: 'positions',
@@ -71,7 +72,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase() }).select('username createdAt tcgFavorites').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username createdAt tcgFavorites').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const [owned, statsAgg] = await Promise.all([
     inventory(profile._id),
