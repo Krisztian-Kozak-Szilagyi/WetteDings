@@ -1305,44 +1305,81 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 /* IHK: Boost 2 ist nur bei Hybrid-Quests aktiv */
 .ihk-slot-item.is-disabled { opacity: .35; filter: grayscale(1); cursor: var(--cur-no); }
 
-/* Rangliste: der Name auf Platz 1 brennt – fließender Glut-Verlauf, weiches Flackern dahinter, aufsteigende Funken */
-.leader-flame { position: relative; display: inline-block; isolation: isolate; padding: 0 2px; }
-.leader-flame a {
-  font-weight: 800; color: transparent; text-decoration: none;
-  background: linear-gradient(100deg, #fde68a 0%, #fbbf24 18%, #fb923c 38%, #ef4444 55%, #fb923c 72%, #fbbf24 86%, #fde68a 100%);
-  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text;
-  animation: flame-flow 3.6s linear infinite; filter: drop-shadow(0 0 5px rgba(249, 115, 22, .55));
+/* Rangliste: lodernder Name für Platz 1 (Flammenzungen über einen SVG-Filter, siehe app.js).
+   data-text muss dem Namen entsprechen – daraus entstehen die Flammen hinter den Buchstaben. */
+
+.flame-name {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  font-weight: 800;
+  color: #fff4cf;
+  text-shadow: 0 1px 1px rgba(70, 12, 0, .95), 0 0 1px rgba(70, 12, 0, .8), 0 0 8px rgba(255, 120, 0, .55);
+  animation: flame-glow 1.4s ease-in-out infinite alternate;
 }
-.leader-flame::before {
-  content: ''; position: absolute; z-index: -1; inset: -7px -12px -3px; pointer-events: none;
-  background:
-    radial-gradient(55% 95% at 18% 100%, rgba(251, 146, 60, .55), transparent 70%),
-    radial-gradient(50% 110% at 52% 100%, rgba(239, 68, 68, .5), transparent 70%),
-    radial-gradient(42% 85% at 86% 100%, rgba(253, 224, 71, .45), transparent 70%);
-  filter: blur(7px); transform-origin: 50% 100%; animation: flame-flicker 1.7s ease-in-out infinite alternate;
+
+/* lángnyelvek a betűk mögött (az SVG-szűrő torzítja őket lobogóvá) */
+.flame-name::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-text-fill-color: #ff6a00;
+  color: #ff6a00;
+  text-shadow:
+    0 0 3px #ffb300,
+    0 -3px 3px #ffb300,
+    0 -6px 5px #ff9100,
+    0 -10px 7px #ff6d00,
+    0 -15px 9px #f4511e,
+    0 -20px 11px rgba(216, 40, 0, .85),
+    0 -26px 14px rgba(150, 20, 0, .55);
+  filter: url(#bfw-flame);
+  transform: translateY(-3px);
+  opacity: .95;
+  pointer-events: none;
 }
-.leader-flame i {
-  position: absolute; bottom: 55%; width: 3px; height: 3px; border-radius: 50%; pointer-events: none;
-  background: #fde68a; box-shadow: 0 0 6px 1px rgba(251, 146, 60, .9); opacity: 0; animation: flame-ember 2.4s ease-out infinite;
+
+/* parázs-szikrák */
+.flame-name::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 45%;
+  height: 28px;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, #ffe082 0 1px, transparent 1.7px),
+    radial-gradient(circle, #ffab40 0 1.2px, transparent 1.9px),
+    radial-gradient(circle, #fff3c4 0 .9px, transparent 1.5px),
+    radial-gradient(circle, #ff6d00 0 1px, transparent 1.7px);
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  animation: flame-embers 1.7s linear infinite;
 }
-.leader-flame i:nth-of-type(1) { left: 14%; animation-delay: 0s; }
-.leader-flame i:nth-of-type(2) { left: 52%; animation-delay: .8s; animation-duration: 2.9s; }
-.leader-flame i:nth-of-type(3) { left: 84%; animation-delay: 1.5s; animation-duration: 2.1s; }
-@keyframes flame-flow { to { background-position: -220% 0; } }
-@keyframes flame-flicker {
-  0% { transform: scaleY(.85); opacity: .65; }
-  45% { transform: scaleY(1.18) skewX(-5deg); opacity: 1; }
-  100% { transform: scaleY(.95) skewX(4deg); opacity: .8; }
+
+@keyframes flame-glow {
+  from { color: #fff4cf; }
+  to   { color: #ffe9a8; }
 }
-@keyframes flame-ember {
-  0% { transform: translate(0, 0) scale(1); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translate(6px, -22px) scale(.3); opacity: 0; }
+
+@keyframes flame-embers {
+  0%   { background-position: 15% 100%, 45% 100%, 72% 100%, 90% 100%; opacity: 0; }
+  20%  { opacity: 1; }
+  100% { background-position: 22% 0%, 38% -20%, 80% 10%, 84% -15%; opacity: 0; }
 }
+
+.is-top1 {
+  background: linear-gradient(90deg, rgba(255, 109, 0, .20) 0%, rgba(255, 109, 0, .05) 60%, transparent 100%);
+  box-shadow: inset 3px 0 0 #ff8f00, inset 8px 0 14px -8px rgba(255, 143, 0, .9);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .leader-flame a, .leader-flame::before { animation: none; }
-  .leader-flame i { display: none; }
+  .flame-name, .flame-name::after { animation: none; }
 }
+
+/* in der Rangliste ist der Name ein Link – Farbe und Unterstreichung kommen vom Effekt */
+.leaderboard td a.flame-name { color: #fff4cf; text-decoration: none; }
 
 /* Support-Chat: Einwilligung */
 .support-consent { padding: 12px; border-top: 1px solid var(--border); font-size: .85rem; }

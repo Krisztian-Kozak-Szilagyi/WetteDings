@@ -364,3 +364,19 @@
     setInterval(tickCountdowns, 1000);
   }
 })();
+
+// Rangliste: SVG-Filter für den lodernden Namen auf Platz 1
+(function () {
+  if (!document.querySelector('.flame-name') || document.getElementById('bfw-flame-defs')) return;
+  var svg = '<svg id="bfw-flame-defs" width="0" height="0" style="position:absolute" aria-hidden="true">' +
+    '<filter id="bfw-flame" x="-30%" y="-150%" width="160%" height="260%" color-interpolation-filters="sRGB">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.035 0.11" numOctaves="2" seed="7" result="noise">' +
+        '<animate attributeName="baseFrequency" dur="1.6s" repeatCount="indefinite" ' +
+          'values="0.035 0.11;0.04 0.15;0.03 0.09;0.035 0.11"/>' +
+      '</feTurbulence>' +
+      '<feDisplacementMap in="SourceGraphic" in2="noise" scale="11" xChannelSelector="R" yChannelSelector="G"/>' +
+      '<feGaussianBlur stdDeviation="0.5"/>' +
+    '</filter></svg>';
+  var add = function () { document.body.insertAdjacentHTML('afterbegin', svg); };
+  if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+})();
