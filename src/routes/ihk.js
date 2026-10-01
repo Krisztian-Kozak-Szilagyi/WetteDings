@@ -3,7 +3,7 @@ const { requireLogin } = require('../middleware');
 const { TcgCard } = require('../models/Tcg');
 const catalog = require('../tcg/catalog');
 const ihk = require('../ihk/ihkService');
-const { questById, difficulty } = require('../ihk/quests');
+const { questById, difficulty, isHybrid } = require('../ihk/quests');
 const { canBoost } = require('../ihk/abilities');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -25,7 +25,7 @@ router.use('/ihk', requireLogin, requireIhk);
 const questView = (questId, level) => {
   const q = questById[questId];
   const d = difficulty(level);
-  return { ...q, difficulty: level, level: d.label, required: ihk.requiredFor(level, q), reward: ihk.rewardFor(level, q), duration: ihk.durationFor(level, q) };
+  return { ...q, hybrid: isHybrid(q), difficulty: level, level: d.label, required: ihk.requiredFor(level, q), reward: ihk.rewardFor(level, q), duration: ihk.durationFor(level, q) };
 };
 
 router.get('/ihk', async (req, res) => {
@@ -50,6 +50,7 @@ router.get('/ihk', async (req, res) => {
     canReroll,
     runCard: running ? catalog.cardById[running.card] : null,
     runBoost: running && running.boost ? catalog.cardById[running.boost] : null,
+    runBoost2: running && running.boost2 ? catalog.cardById[running.boost2] : null,
     cards,
     items,
     rarityByKey: catalog.rarityByKey,
@@ -80,6 +81,7 @@ router.post('/ihk/start', (req, res) =>
       user: req.user,
       cardId: str(req.body.card),
       boostId: str(req.body.boost) || null,
+      boost2Id: str(req.body.boost2) || null,
       offerIndex: Number.parseInt(str(req.body.offer), 10),
     });
     return null;

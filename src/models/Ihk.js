@@ -11,6 +11,8 @@ const runSchema = new Schema(
     cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // gesperrtes Exemplar
     boost: { type: String, default: null }, // Karte im Boost-Slot
     boostDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+    boost2: { type: String, default: null }, // zweiter Boost-Slot (nur Hybrid-Quests)
+    boost2Doc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
     abilities: {
       type: [new Schema({ key: String, label: String, text: String, fx: String, target: String, enemyFx: String }, { _id: false })],
       default: [],
@@ -19,8 +21,9 @@ const runSchema = new Schema(
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean }, { _id: false })], default: [] },
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean }, { _id: false })], default: [] },
     total: { type: Number, required: true },
+    total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },
     reward: { type: Number, required: true }, // Cent (0 bei Misserfolg)
     status: { type: String, enum: ['laeuft', 'fertig'], default: 'laeuft' },
@@ -42,7 +45,7 @@ const stateSchema = new Schema({
 
 // Admin-Einstellungen (ein Dokument, _id "ihk")
 const settingsSchema = new Schema(
-  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, packChance: Number, durationMin: Number, durations: [Number], rewards: [Number], required: [Number], hybrid: { durations: [Number], rewards: [Number], required: [Number] }, updatedByName: String },
+  { _id: { type: String, default: 'ihk' }, open: Boolean, dailyLimit: Number, packChance: Number, packChances: [Number], durationMin: Number, durations: [Number], rewards: [Number], required: [Number], hybrid: { durations: [Number], rewards: [Number], required: [Number], packChances: [Number] }, updatedByName: String },
   { timestamps: true }
 );
 

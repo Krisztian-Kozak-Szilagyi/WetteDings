@@ -51,12 +51,13 @@
   var pick = document.querySelector('[data-ihk-pick]');
   if (pick) {
     var startBtn = pick.querySelector('[data-ihk-start]');
-    var slots = { card: pick.querySelector('[data-ihk-drop="card"]'), boost: pick.querySelector('[data-ihk-drop="boost"]'), offer: pick.querySelector('[data-ihk-drop="offer"]') };
-    var accepts = { card: ['card'], boost: ['card', 'boost'], offer: ['offer'] };
-    // Charakterkarten nur in den Boost-Slot, wenn ihre Fähigkeit dort wirkt
+    var slots = { card: pick.querySelector('[data-ihk-drop="card"]'), boost: pick.querySelector('[data-ihk-drop="boost"]'), boost2: pick.querySelector('[data-ihk-drop="boost2"]'), offer: pick.querySelector('[data-ihk-drop="offer"]') };
+    var accepts = { card: ['card'], boost: ['card', 'boost'], boost2: ['card', 'boost'], offer: ['offer'] };
+    var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2'; };
+    // Charakterkarten nur in einen Boost-Slot, wenn ihre Fähigkeit dort wirkt
     var fits = function (slot, el) {
-      if (accepts[slot].indexOf(el.dataset.drag) === -1) return false;
-      return !(slot === 'boost' && el.dataset.drag === 'card' && !el.dataset.boostable);
+      if (slots[slot].hidden || accepts[slot].indexOf(el.dataset.drag) === -1) return false;
+      return !(isBoostSlot(slot) && el.dataset.drag === 'card' && !el.dataset.boostable);
     };
     var input = function (name) { return pick.querySelector('input[name="' + name + '"]'); };
 
@@ -66,7 +67,8 @@
       if (!el) {
         var empty = document.createElement('span');
         empty.className = 'ihk-slot-empty';
-        empty.innerHTML = 'Boost<br><small>optional</small>';
+        if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>optional</small>';
+        else empty.textContent = 'Karte hierher ziehen';
         slot.appendChild(empty);
         delete slot.dataset.zoom;
         return;
@@ -83,20 +85,41 @@
       void slot.offsetWidth;
       slot.classList.add('is-picked');
     };
+    var clear = function (target) { input(target).value = ''; fillSlot(target, null); };
 
-    var marker = { card: 'is-selected', boost: 'is-boost', offer: 'is-selected' };
+    // Markierungen in der Kartenliste und der zweite Boost-Slot (nur bei Hybrid-Quests) folgen den Eingabefeldern
+    var refresh = function () {
+      var card = input('card').value, b1 = input('boost').value, b2 = input('boost2').value, offer = input('offer').value;
+      var hybrid = false;
+      pick.querySelectorAll('[data-drag="offer"]').forEach(function (x) {
+        var on = offer !== '' && x.dataset.value === offer;
+        x.classList.toggle('is-selected', on);
+        if (on && x.dataset.hybrid) hybrid = true;
+      });
+      if (!hybrid && b2) { clear('boost2'); b2 = ''; }
+      slots.boost2.hidden = !hybrid;
+      pick.querySelectorAll('[data-drag="card"], [data-drag="boost"]').forEach(function (x) {
+        x.classList.toggle('is-selected', x.dataset.drag === 'card' && x.dataset.value === card);
+        x.classList.toggle('is-boost', x.dataset.value === b1 || x.dataset.value === b2);
+      });
+      startBtn.disabled = !(card && offer !== '');
+    };
+
     var assign = function (el, target) {
       target = target || (el.dataset.drag === 'boost' ? 'boost' : el.dataset.drag);
       var value = el.dataset.value;
-      // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte
-      if (target === 'card' && input('boost').value === value) { input('boost').value = ''; fillSlot('boost', null); }
-      if (target === 'boost' && (input('card').value === value || (el.dataset.drag === 'card' && !el.dataset.boostable))) return;
+      if (isBoostSlot(target)) {
+        // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte; Charaktere nur mit Boost-Fähigkeit
+        if (input('card').value === value || (el.dataset.drag === 'card' && !el.dataset.boostable)) return;
+        // "Als Boost wählen": ist der erste Slot belegt, kommt die Karte bei Hybrid-Quests in den zweiten
+        if (target === 'boost' && !slots.boost2.hidden && input('boost').value && input('boost').value !== value && !input('boost2').value) target = 'boost2';
+        var other = target === 'boost' ? 'boost2' : 'boost';
+        if (input(other).value === value) clear(other);
+      }
+      if (target === 'card') ['boost', 'boost2'].forEach(function (k) { if (input(k).value === value) clear(k); });
       input(target).value = value;
-      var group = target === 'offer' ? '[data-drag="offer"]' : '[data-drag="card"], [data-drag="boost"]';
-      pick.querySelectorAll(group).forEach(function (x) { x.classList.toggle(marker[target], x === el); });
-      if (target === 'card') pick.querySelectorAll('.is-boost').forEach(function (x) { if (x.dataset.value !== input('boost').value) x.classList.remove('is-boost'); });
       fillSlot(target, el);
-      startBtn.disabled = !(input('card').value && input('offer').value);
+      refresh();
     };
     pickFn = assign;
 
@@ -193,12 +216,16 @@
   var progress = fight.querySelector('[data-ihk-progress]');
   var timebar = fight.querySelector('[data-ihk-timebar]');
   var points = fight.querySelector('[data-ihk-points]');
+  // Hybrid-Quest: zweiter Balken für die zweite Fachrichtung
+  var progress2 = fight.querySelector('[data-ihk-progress2]');
+  var points2 = fight.querySelector('[data-ihk-points2]');
+  var total2 = 0;
   var timeLabel = fight.querySelector('[data-ihk-time]');
   var floaters = fight.querySelector('[data-ihk-floaters]');
   var result = fight.querySelector('[data-ihk-result]');
   var skip = fight.querySelector('[data-ihk-skip]');
   var player = document.querySelector('.ihk-player .ihk-slot-card');
-  var boostSlot = document.querySelector('.ihk-player .ihk-slot-item');
+  var boostSlots = document.querySelectorAll('.ihk-player .ihk-slot-item');
   var enemy = document.querySelector('.ihk-slot-enemy');
 
   var ticks = data.ticks.filter(function (t) { return !t.ability; });
@@ -219,6 +246,10 @@
   function render(t) {
     progress.style.width = (Math.min(1, total / data.required) * 100).toFixed(1) + '%';
     points.textContent = total + ' / ' + data.required;
+    if (progress2) {
+      progress2.style.width = (Math.min(1, total2 / data.required) * 100).toFixed(1) + '%';
+      points2.textContent = total2 + ' / ' + data.required;
+    }
     var left = Math.max(0, data.workTime - elapsed(t));
     timebar.style.width = ((left / data.workTime) * 100).toFixed(1) + '%';
     timeLabel.textContent = Math.ceil(left) + ' s';
@@ -232,7 +263,7 @@
   function floater(tk) {
     var el = document.createElement('span');
     el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
-    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p;
+    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
     if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
     el.style.left = (15 + Math.random() * 60) + '%';
     floaters.appendChild(el);
@@ -383,12 +414,12 @@
       if (a.enemyFx) enemy && enemy.classList.add(a.enemyFx);
       playEffect(player, a.key);
     });
-    if (boostSlot && boostSlot.querySelector('img')) bump(boostSlot, 'fx-flash');
+    boostSlots.forEach(function (b) { if (b.querySelector('img')) bump(b, 'fx-flash'); });
   }
   function finish() {
     if (done) return;
     done = true;
-    while (i < ticks.length) total += ticks[i++].p;
+    while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
     if (hasAbility && (data.success ? last >= half : true)) activate();
     render(endT);
     skip.hidden = true;
@@ -401,6 +432,7 @@
     if (hasAbility && t >= half) activate();
     while (i < ticks.length && ticks[i].t <= t) {
       total += ticks[i].p;
+      total2 += ticks[i].p2 || 0;
       floater(ticks[i]);
       i++;
     }

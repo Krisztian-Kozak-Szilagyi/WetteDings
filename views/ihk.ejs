@@ -20,6 +20,7 @@
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
   <input type="hidden" name="card" value="">
   <input type="hidden" name="boost" value="">
+  <input type="hidden" name="boost2" value="">
   <input type="hidden" name="offer" value="">
 <% } %>
 
@@ -33,13 +34,20 @@
         <span class="ihk-slot-empty">Karte hierher ziehen</span>
       <% } %>
     </div>
-    <div class="ihk-slot ihk-slot-item" <%- canStart ? 'data-ihk-drop="boost"' : '' %>
-      <% if (runBoost) { %>data-zoom="<%= runBoost.image %>" data-zoom-title="<%= runBoost.name %>"<% } %>>
-      <% if (runBoost) { %>
-        <img src="<%= runBoost.image %>" alt="<%= runBoost.name %>" width="720" height="1008" draggable="false">
-      <% } else { %>
-        <span class="ihk-slot-empty">Boost<br><small>optional</small></span>
-      <% } %>
+    <div class="ihk-boosts">
+      <% [{ key: 'boost', card: runBoost, label: 'Boost' }, { key: 'boost2', card: runBoost2, label: 'Boost 2' }].forEach((b) => { %>
+        <% if (b.key === 'boost' || b.card || canStart) { %>
+          <div class="ihk-slot ihk-slot-item" <%- canStart ? 'data-ihk-drop="' + b.key + '"' : '' %> data-empty-label="<%= b.label %>"
+            <%= b.key === 'boost2' && canStart ? 'hidden' : '' %>
+            <% if (b.card) { %>data-zoom="<%= b.card.image %>" data-zoom-title="<%= b.card.name %>"<% } %>>
+            <% if (b.card) { %>
+              <img src="<%= b.card.image %>" alt="<%= b.card.name %>" width="720" height="1008" draggable="false">
+            <% } else { %>
+              <span class="ihk-slot-empty"><%= b.label %><br><small>optional</small></span>
+            <% } %>
+          </div>
+        <% } %>
+      <% }) %>
     </div>
   </div>
 
@@ -50,13 +58,14 @@
         <p><%= quest.text %></p>
         <div class="ihk-quest-meta">
           <span>Ziel <strong><%= quest.required %> Punkte</strong> <span class="ihk-level r-<%= quest.level.toLowerCase() %>">(<%= quest.level %>)</span></span>
+          <% if (quest.hybrid) { %><span class="ihk-hybrid">Hybrid</span><% } %>
           <span>Lohn <strong><%= euro(quest.reward) %></strong></span>
         </div>
       </div>
     <% } else { %>
       <div class="ihk-offers">
         <% offers.forEach((o, i) => { %>
-          <div class="ihk-quest ihk-offer" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"
+          <div class="ihk-quest ihk-offer" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"<%- o.hybrid ? ' data-hybrid="1"' : '' %>
             data-zoom="<%= o.image %>" data-zoom-title="<%= o.title %>" data-zoom-text="<%= o.text %>">
             <img class="ihk-offer-thumb" src="<%= o.image %>" alt="" width="720" height="1008" draggable="false">
             <div>
@@ -64,6 +73,7 @@
               <p><%= o.text %></p>
               <div class="ihk-quest-meta">
                 <span>Ziel <strong><%= o.required %> Punkte</strong> <span class="ihk-level r-<%= o.level.toLowerCase() %>">(<%= o.level %>)</span></span>
+                <% if (o.hybrid) { %><span class="ihk-hybrid" title="Zwei Fachrichtungen, zwei Fortschrittsbalken, zwei Boost-Slots">Hybrid</span><% } %>
                 <span>Lohn <strong><%= euro(o.reward) %></strong></span>
               </div>
             </div>
@@ -86,9 +96,14 @@
         <span>Quest läuft … noch <strong data-ihk-countdown="<%= new Date(run.endsAt).getTime() %>">–</strong></span>
       </div>
     <% } else if (phase === 'result') { %>
-      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [] }) %>'>
-        <div class="ihk-bar-label"><span>Fortschritt</span><span data-ihk-points>0 / <%= run.required %></span></div>
+      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [] }) %>'>
+        <% const twoBars = quest.hybrid && run.total2 != null; %>
+        <div class="ihk-bar-label"><span>Fortschritt<%= twoBars ? ' 1' : '' %></span><span data-ihk-points>0 / <%= run.required %></span></div>
         <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress" data-ihk-progress></span></div>
+        <% if (twoBars) { %>
+          <div class="ihk-bar-label"><span>Fortschritt 2</span><span data-ihk-points2>0 / <%= run.required %></span></div>
+          <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress ihk-bar-progress2" data-ihk-progress2></span></div>
+        <% } %>
         <div class="ihk-bar-label"><span>Deadline</span><span data-ihk-time></span></div>
         <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-time" data-ihk-timebar></span></div>
         <div class="ihk-floaters" data-ihk-floaters aria-hidden="true"></div>

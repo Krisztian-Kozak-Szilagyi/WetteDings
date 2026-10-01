@@ -10,7 +10,7 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const tcgService = require('../tcg/tcgService');
 const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
-const { resolve, canBoost, needsCoffee, isCoffee } = require('./abilities');
+const { resolveAll, who, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
@@ -24,12 +24,13 @@ const OFFER_COUNT = 3;
 // open = für alle Mitglieder spielbar (sonst nur Admins)
 // required = Ziel-Punkte je Schwierigkeit (1–6)
 // durations = Wartezeit in Minuten je Schwierigkeit (1–6)
-// packChance = Chance in % auf ein Booster Pack pro geschaffter Quest
-// hybrid = eigene Werte (required, durations, rewards) für Hybrid-Quests
-const DEFAULTS = { open: false, dailyLimit: 5, packChance: 5, durations: [10, 10, 10, 10, 10, 10], rewards: [1500, 2500, 4000, 6000, 10000, 15000], required: DIFFICULTIES.map((d) => d.required) };
-const table = (t) => ({ durations: [...t.durations], rewards: [...t.rewards], required: [...t.required] });
-const settings = { ...DEFAULTS, ...table(DEFAULTS), hybrid: table(DEFAULTS) };
+// packChances = Chance in % auf ein Booster Pack pro geschaffter Quest, je Schwierigkeit (1–6)
+// hybrid = eigene Werte (required, durations, rewards, packChances) für Hybrid-Quests
+const DEFAULTS = { open: false, dailyLimit: 5, durations: [10, 10, 10, 10, 10, 10], rewards: [1500, 2500, 4000, 6000, 10000, 15000], required: DIFFICULTIES.map((d) => d.required), packChances: [5, 5, 5, 5, 5, 5] };
+const table = (t) => ({ durations: [...t.durations], rewards: [...t.rewards], required: [...t.required], packChances: [...t.packChances] });
+const settings = { open: DEFAULTS.open, dailyLimit: DEFAULTS.dailyLimit, ...table(DEFAULTS), hybrid: table(DEFAULTS) };
 const validList = (list, min) => Array.isArray(list) && list.length === 6 && list.every((r) => Number.isInteger(r) && r >= min);
+const validChances = (list) => Array.isArray(list) && list.length === 6 && list.every((c) => Number.isFinite(c) && c >= 0 && c <= 100);
 
 /** Wertetabelle einer Quest: Hybrid-Quests haben eigene Einstellungen */
 const tableFor = (quest) => (quest && isHybrid(quest) ? settings.hybrid : settings);
@@ -39,50 +40,57 @@ const requiredFor = (level, quest) => tableFor(quest).required[level - 1];
 const durationFor = (level, quest) => tableFor(quest).durations[level - 1];
 /** Lohn (Cent) einer Schwierigkeit */
 const rewardFor = (level, quest) => tableFor(quest).rewards[level - 1];
+/** Chance (%) auf ein Booster Pack bei geschaffter Quest */
+const packChanceFor = (level, quest) => tableFor(quest).packChances[level - 1];
 
 async function loadSettings() {
   const doc = await IhkSettings.findById('ihk').lean();
   if (!doc) return;
   if (typeof doc.open === 'boolean') settings.open = doc.open;
   if (Number.isInteger(doc.dailyLimit) && doc.dailyLimit >= 0) settings.dailyLimit = doc.dailyLimit;
-  if (Number.isFinite(doc.packChance) && doc.packChance >= 0 && doc.packChance <= 100) settings.packChance = doc.packChance;
   if (validList(doc.durations, 0)) settings.durations = doc.durations;
   else if (Number.isInteger(doc.durationMin) && doc.durationMin >= 0) settings.durations = Array(6).fill(doc.durationMin); // alte Einstellung
   if (validList(doc.rewards, 0)) settings.rewards = doc.rewards;
   if (validList(doc.required, 1)) settings.required = doc.required;
+  if (validChances(doc.packChances)) settings.packChances = doc.packChances;
+  else if (validChances(Array(6).fill(doc.packChance))) settings.packChances = Array(6).fill(doc.packChance); // alte Einstellung: eine Chance für alle
   // Hybrid-Quests: noch nie gespeichert → gleiche Werte wie die normalen Quests
   const h = doc.hybrid || {};
   settings.hybrid = {
     durations: validList(h.durations, 0) ? h.durations : [...settings.durations],
     rewards: validList(h.rewards, 0) ? h.rewards : [...settings.rewards],
     required: validList(h.required, 1) ? h.required : [...settings.required],
+    packChances: validChances(h.packChances) ? h.packChances : [...settings.packChances],
   };
 }
 
-async function saveSettings({ open, dailyLimit, packChance, durations, rewards, required, hybrid, admin }) {
-  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, packChance, durations, rewards, required, hybrid, updatedByName: admin.username } }, { upsert: true });
-  Object.assign(settings, { open, dailyLimit, packChance, durations, rewards, required, hybrid });
+async function saveSettings({ open, dailyLimit, durations, rewards, required, packChances, hybrid, admin }) {
+  await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, durations, rewards, required, packChances, hybrid, updatedByName: admin.username } }, { upsert: true });
+  Object.assign(settings, { open, dailyLimit, durations, rewards, required, packChances, hybrid });
 }
 
 // ---------- Simulation ----------
 /**
  * Würfelt eine Quest aus: Innerhalb von WORK_TIME gibt es tickCount(Speed) gleichmäßig verteilte Takte,
  * pro Takt sammelt die Karte ihren Stat (×0,8–1,2, mit CRIT_CHANCE doppelt). Geschafft, wenn required erreicht ist.
- * stat: 'fia' | 'fis' | 'bwl' oder ein Array (Hybrid-Quest) – dann zählt der Durchschnitt der Werte.
+ * stat: 'fia' | 'fis' | 'bwl' oder ein Array mit zwei davon (Hybrid-Quest). Eine Hybrid-Quest hat zwei
+ * Fortschrittsbalken – je Fähigkeit einen, jeder braucht required Punkte – und ist erst geschafft, wenn beide voll sind.
+ * Ergebnis: ticks mit p (erster Balken) und p2 (zweiter Balken, nur bei Hybrid), total und total2.
  */
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
   const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
-  const statValue = () => keys.reduce((sum, k) => sum + s.stats[k], 0) / keys.length;
+  const hybrid = keys.length > 1;
+  const totals = keys.map(() => 0);
+  const open = () => totals.some((x) => x < required);
   const ticks = [];
   let applied = effects.length === 0;
   let limit = WORK_TIME;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
-  let total = 0;
   let t = 0;
-  while (total < required) {
+  while (open()) {
     let next = t + interval();
     if (!applied && next > half) {
       // Halbzeit: Fähigkeiten aktivieren
@@ -100,28 +108,34 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     if (next > limit + 1e-9) break;
     const fake = s.fakeNext;
     const crit = rand() < CRIT_CHANCE;
-    const base = fake ? 99 : statValue();
+    // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
-    const p = Math.max(1, Math.round((base * (0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1)));
+    const factor = ((0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1);
+    const ps = keys.map((k) => Math.max(1, Math.round((fake ? 99 : s.stats[k]) * factor)));
     s.fakeNext = false;
     if (s.tempSpeed && --s.tempSpeed.ticks <= 0) {
       const { then } = s.tempSpeed;
       s.tempSpeed = null;
       if (then) then(s); // z. B. Mauch: nach dem Gruschteln sind alle Werte höher
     }
-    total += p;
-    ticks.push({ t: Math.round(next * 10) / 10, p, crit, ...(fake ? { fake: true } : {}) });
+    ps.forEach((p, i) => {
+      totals[i] += p;
+    });
+    ticks.push({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) });
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
       s.doom = null;
-      if (total < required) {
-        ticks.push({ t: Math.round(t * 10) / 10, p: required - total, destroy: true });
-        total = required;
+      if (open()) {
+        const rest = totals.map((x) => Math.max(0, required - x));
+        ticks.push({ t: Math.round(t * 10) / 10, p: rest[0], ...(hybrid ? { p2: rest[1] } : {}), destroy: true });
+        rest.forEach((r, i) => {
+          totals[i] += r;
+        });
       }
     }
   }
-  return { ticks, total, success: total >= required, freeze: Math.round(freeze * 10) / 10 };
+  return { ticks, total: totals[0], ...(hybrid ? { total2: totals[1] } : {}), success: !open(), freeze: Math.round(freeze * 10) / 10 };
 }
 
 // ---------- Angebote ----------
@@ -194,17 +208,23 @@ async function getState(userId) {
   return { running, used, limit: settings.dailyLimit };
 }
 
-async function start({ user, cardId, boostId, offerIndex }) {
-  const card = catalog.cardById[cardId];
-  if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
-  const boost = boostId ? catalog.cardById[boostId] : null;
-  if (boostId && !boost) throw new UserError('Unbekannte Boost-Karte.');
-  if (boost && boost.id === card.id) throw new UserError('Die Boost-Karte muss eine andere Karte sein.');
-  if (boost && !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
-  if (boost && needsCoffee(boost)) {
+/** Boost-Karte prüfen (Slot 1 oder 2). Gibt die Katalog-Karte zurück oder null, wenn der Slot leer ist. */
+async function checkBoost(user, card, boostId) {
+  if (!boostId) return null;
+  const boost = catalog.cardById[boostId];
+  if (!boost) throw new UserError('Unbekannte Boost-Karte.');
+  if (boost.id === card.id) throw new UserError('Die Boost-Karte muss eine andere Karte sein.');
+  if (!canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
+  if (needsCoffee(boost)) {
     const owned = await TcgCard.distinct('card', { user: user._id });
     if (!owned.some((id) => isCoffee(catalog.cardById[id]))) throw new UserError(`${boost.name} kann nur ausgespielt werden, wenn du eine Kaffee-Karte besitzt.`);
   }
+  return boost;
+}
+
+async function start({ user, cardId, boostId, boost2Id, offerIndex }) {
+  const card = catalog.cardById[cardId];
+  if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   const { running, used, limit } = await getState(user._id);
   if (running) throw new UserError('Du hast bereits eine laufende Quest.');
   if (used >= limit) throw new UserError(`Du hast heute schon alle ${limit} Quests erledigt. Morgen geht es weiter!`);
@@ -212,10 +232,15 @@ async function start({ user, cardId, boostId, offerIndex }) {
   const offers = await getOffers(user._id);
   const offer = offers[offerIndex];
   if (!offer) throw new UserError('Bitte wähle eine Quest aus.');
-
   const quest = questById[offer.quest];
+
+  // Hybrid-Quests haben einen zweiten Boost-Slot; beide Boosts müssen verschiedene Karten sein
+  if (boost2Id && !isHybrid(quest)) throw new UserError('Nur Hybrid-Quests haben einen zweiten Boost-Slot.');
+  const boosts = [await checkBoost(user, card, boostId), await checkBoost(user, card, boost2Id)].filter(Boolean);
+  if (boosts.length === 2 && who(boosts[0]) === who(boosts[1])) throw new UserError('Die beiden Boost-Karten müssen verschieden sein.');
+
   const required = requiredFor(offer.difficulty, quest);
-  const effects = resolve(card, boost);
+  const effects = resolveAll(card, boosts);
   const result = simulate(card.stats, statsOf(quest), required, undefined, effects);
   try {
     // Sperrprüfung und Quest-Anlage in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder gehandelt wird
@@ -225,9 +250,13 @@ async function start({ user, cardId, boostId, offerIndex }) {
       const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
       const doc = await freeDoc(cardId);
       if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel).');
-      const boostDoc = boost ? await freeDoc(boost.id) : null;
-      if (boost && !boostDoc) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
-      await claim([doc, boostDoc], user._id, session);
+      const boostDocs = [];
+      for (const b of boosts) {
+        const d = await freeDoc(b.id);
+        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
+        boostDocs.push(d);
+      }
+      await claim([doc, ...boostDocs], user._id, session);
 
       const [run] = await IhkRun.create(
         [
@@ -238,8 +267,10 @@ async function start({ user, cardId, boostId, offerIndex }) {
             required,
             card: cardId,
             cardDoc: doc._id,
-            boost: boost ? boost.id : null,
-            boostDoc: boostDoc ? boostDoc._id : null,
+            boost: boosts[0] ? boosts[0].id : null,
+            boostDoc: boostDocs[0] ? boostDocs[0]._id : null,
+            boost2: boosts[1] ? boosts[1].id : null,
+            boost2Doc: boostDocs[1] ? boostDocs[1]._id : null,
             // nur Fähigkeiten, die vor Erreichen des Ziels (Halbzeit) wirklich aktiv wurden
             abilities: result.ticks.some((x) => x.ability) ? effects.map(({ apply, ...a }) => a) : [],
             stats: card.stats,
@@ -259,8 +290,8 @@ async function start({ user, cardId, boostId, offerIndex }) {
   }
 }
 
-/** Würfelt, ob es für eine geschaffte Quest ein Booster Pack gibt (rand: Zahl in [0, 1)) */
-const rollsPack = (rand = crypto.randomInt(1000000) / 1000000, chance = settings.packChance) => rand * 100 < chance;
+/** Würfelt mit chance % (rand: Zahl in [0, 1)) */
+const rollsPack = (chance, rand = crypto.randomInt(1000000) / 1000000) => rand * 100 < chance;
 
 /** Nach Ablauf: Belohnung gutschreiben, Karte freigeben, neue Quests anbieten */
 async function collect({ user }) {
@@ -276,7 +307,8 @@ async function collect({ user }) {
       await Ledger.create([{ user: user._id, type: 'ihk_lohn', amount: run.reward, betTitle: questById[run.quest] ? questById[run.quest].title : null }], { session });
     }
     // Mit etwas Glück gibt es für eine geschaffte Quest zusätzlich ein Booster Pack (landet im TCG-Inventar)
-    if (run.success && rollsPack()) {
+    // Nur geschaffte Quests; die Chance hängt von der Schwierigkeit ab (Admin-Panel)
+    if (run.success && rollsPack(packChanceFor(run.difficulty, questById[run.quest]))) {
       const type = await tcgService.grantPacks({ userId: user._id, source: 'quest', session });
       run.pack = type.key;
       await run.save({ session });
@@ -287,4 +319,4 @@ async function collect({ user }) {
   return result;
 }
 
-module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, loadSettings, saveSettings, simulate, generateOffers, rollsPack, getOffers, canReroll, reroll, getState, start, collect };
+module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, packChanceFor, loadSettings, saveSettings, simulate, generateOffers, rollsPack, getOffers, canReroll, reroll, getState, start, collect };

@@ -93,7 +93,7 @@
 
 <div class="card" id="ihk">
   <h2>IHK: Limit &amp; Lohn</h2>
-  <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte und Lohn je Schwierigkeit (bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>
+  <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>
   <form method="post" action="/admin/ihk" class="form admin-tcg-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label class="check admin-ihk-open">
@@ -104,10 +104,6 @@
       <span>Quests pro Tag</span>
       <input type="number" name="dailyLimit" min="0" max="100" step="1" value="<%= ihk.settings.dailyLimit %>" required>
     </label>
-    <label class="field admin-tcg-pack">
-      <span>Chance auf ein Booster Pack pro geschaffter Quest (%)</span>
-      <input type="text" name="packChance" inputmode="decimal" value="<%= String(ihk.settings.packChance).replace('.', ',') %>" required>
-    </label>
     <% [
          { title: 'Normale Quests (FIA, FIS oder BWL)', prefix: '', values: ihk.settings },
          { title: 'Hybrid-Quests (zwei Fachrichtungen, es zählt der Durchschnitt)', prefix: 'hybrid_', values: ihk.settings.hybrid },
@@ -115,7 +111,7 @@
       <h3 class="admin-ihk-sub"><%= t.title %></h3>
       <div class="table-wrap">
         <table class="table admin-tcg-table">
-          <thead><tr><th>Schwierigkeit</th><th>Ziel (Punkte)</th><th>Dauer (Min., 0 = sofort)</th><th>Lohn (€)</th></tr></thead>
+          <thead><tr><th>Schwierigkeit</th><th>Ziel (Punkte)</th><th>Dauer (Min., 0 = sofort)</th><th>Lohn (€)</th><th>Pack-Chance (%)</th></tr></thead>
           <tbody>
             <% ihk.difficulties.forEach((d, i) => { %>
               <tr class="r-<%= tcg.rarities[i].key %>">
@@ -123,6 +119,7 @@
                 <td><input type="number" name="<%= t.prefix %>required_<%= d.level %>" min="1" max="100000" step="1" value="<%= t.values.required[i] %>" required aria-label="Ziel-Punkte Schwierigkeit <%= d.level %>"></td>
                 <td><input type="number" name="<%= t.prefix %>duration_<%= d.level %>" min="0" max="1440" step="1" value="<%= t.values.durations[i] %>" required aria-label="Dauer Schwierigkeit <%= d.level %>"></td>
                 <td><input type="text" name="<%= t.prefix %>reward_<%= d.level %>" inputmode="decimal" value="<%= (t.values.rewards[i] / 100).toFixed(2).replace('.', ',') %>" required aria-label="Lohn Schwierigkeit <%= d.level %>"></td>
+                <td><input type="text" name="<%= t.prefix %>pack_<%= d.level %>" inputmode="decimal" value="<%= String(t.values.packChances[i]).replace('.', ',') %>" required aria-label="Chance auf ein Booster Pack, Schwierigkeit <%= d.level %>"></td>
               </tr>
             <% }) %>
           </tbody>

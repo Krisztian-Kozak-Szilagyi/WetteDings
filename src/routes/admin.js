@@ -68,15 +68,15 @@ router.post('/admin/ihk', requireAdmin, async (req, res) => {
     durations: DIFFICULTIES.map((d) => num(req.body[`${prefix}duration_${d.level}`])),
     rewards: DIFFICULTIES.map((d) => centsOrNull(req.body[`${prefix}reward_${d.level}`])),
     required: DIFFICULTIES.map((d) => num(req.body[`${prefix}required_${d.level}`])),
+    packChances: DIFFICULTIES.map((d) => Number(String(typeof req.body[`${prefix}pack_${d.level}`] === 'string' ? req.body[`${prefix}pack_${d.level}`] : 'x').replace(',', '.') || 'x')),
   });
-  const packChance = Number(String(typeof req.body.packChance === 'string' ? req.body.packChance : '').replace(',', '.'));
-  const { durations, rewards, required } = table('');
+  const { durations, rewards, required, packChances } = table('');
   const hybrid = table('hybrid_');
-  const both = (key) => [...{ durations, rewards, required }[key], ...hybrid[key]];
+  const both = (key) => [...{ durations, rewards, required, packChances }[key], ...hybrid[key]];
   if (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 100) {
     req.flash('error', 'Das Tageslimit muss zwischen 0 und 100 liegen.');
-  } else if (!Number.isFinite(packChance) || packChance < 0 || packChance > 100) {
-    req.flash('error', 'Die Pack-Chance muss zwischen 0 und 100 % liegen.');
+  } else if (both('packChances').some((c) => !Number.isFinite(c) || c < 0 || c > 100)) {
+    req.flash('error', 'Die Pack-Chance muss je Schwierigkeit zwischen 0 und 100 % liegen.');
   } else if (both('durations').some((m) => !Number.isInteger(m) || m < 0 || m > 1440)) {
     req.flash('error', 'Die Dauer muss je Schwierigkeit zwischen 0 und 1440 Minuten liegen.');
   } else if (both('required').some((r) => !Number.isInteger(r) || r < 1 || r > 100000)) {
@@ -84,7 +84,7 @@ router.post('/admin/ihk', requireAdmin, async (req, res) => {
   } else if (both('rewards').some((r) => r === null)) {
     req.flash('error', 'Bitte für jede Schwierigkeit einen gültigen Lohn angeben.');
   } else {
-    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, packChance, durations, rewards, required, hybrid, admin: req.user });
+    await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, packChances, hybrid, admin: req.user });
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
   res.redirect('/admin#ihk');

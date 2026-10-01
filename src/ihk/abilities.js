@@ -92,6 +92,19 @@ function resolve(main, boost) {
   return out;
 }
 
+/**
+ * Fähigkeiten für eine Hauptkarte mit mehreren Boost-Karten (Hybrid-Quests haben zwei Boost-Slots).
+ * Jede Fähigkeit zählt nur einmal – z. B. die eigene der Hauptkarte. Zwei verschiedene Hunde zählen beide.
+ */
+function resolveAll(main, boosts) {
+  const list = boosts.filter(Boolean);
+  const out = [];
+  for (const a of (list.length ? list : [null]).flatMap((b) => resolve(main, b))) {
+    if (!out.some((x) => x.key === a.key && x.label === a.label)) out.push(a);
+  }
+  return out;
+}
+
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
 const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili']);
 
@@ -106,4 +119,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { resolve, who, canBoost, needsCoffee, isCoffee };
+module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };

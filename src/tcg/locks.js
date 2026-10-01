@@ -8,12 +8,12 @@ const { UserError } = require('../lib/util');
 /** { docs: [ObjectId], reasons: Map<docId, 'quest'|'handel'> } */
 async function lockedDocs(userId, session) {
   const [run, trades] = await Promise.all([
-    IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc').session(session || null).lean(),
+    IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
     Trade.find({ seller: userId, status: 'offen', expiresAt: { $gt: new Date() } }).select('cardDoc').session(session || null).lean(),
   ]);
   const reasons = new Map();
-  if (run) [run.cardDoc, run.boostDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
+  if (run) [run.cardDoc, run.boostDoc, run.boost2Doc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
   trades.forEach((t) => reasons.set(String(t.cardDoc), 'handel'));
   return { docs: [...reasons.keys()], reasons };
 }

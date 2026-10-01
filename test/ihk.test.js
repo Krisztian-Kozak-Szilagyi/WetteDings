@@ -177,10 +177,31 @@ test('Quests: alle Kategorien und Hybride vorhanden, Pflichtfelder gesetzt', () 
   }
 });
 
-test('Hybrid-Quest: Punkte aus dem Durchschnitt beider Werte', () => {
+test('Hybrid-Quest: zwei Balken, je Fähigkeit einer – geschafft erst, wenn beide voll sind', () => {
   const avg = () => 0.5;
   const r = simulate({ speed: 60, fia: 80, fis: 20, bwl: 0 }, ['fia', 'fis'], 1e9, avg);
-  assert.ok(r.ticks.every((t) => t.p === 50));
+  assert.ok(r.ticks.every((t) => t.p === 80 && t.p2 === 20));
+  assert.equal(r.success, false);
+  // 16 Runden: FIA schafft 400 locker, FIS mit 20 pro Runde (320) nicht → gescheitert
+  const lop = simulate({ speed: 60, fia: 80, fis: 20, bwl: 0 }, ['fia', 'fis'], 400, avg);
+  assert.ok(lop.total >= 400 && lop.total2 < 400 && !lop.success);
+  // Allrounder schafft beide Balken
+  const all = simulate({ speed: 60, fia: 50, fis: 50, bwl: 0 }, ['fia', 'fis'], 300, avg);
+  assert.ok(all.success && all.total >= 300 && all.total2 >= 300);
+  // normale Quest: ein Balken, kein p2
+  const one = simulate({ speed: 60, fia: 50, fis: 50, bwl: 0 }, 'fia', 300, avg);
+  assert.ok(one.success && one.total2 === undefined && one.ticks.every((t) => t.p2 === undefined));
+});
+
+test('Zwei Boosts (Hybrid): Fähigkeiten zählen einmal, verschiedene Hunde beide', () => {
+  const { resolveAll } = require('../src/ihk/abilities');
+  const c = (id) => catalog.cardById[id];
+  const keys = (m, bs) => resolveAll(c(m), bs.map(c)).map((a) => a.key + ':' + a.label);
+  assert.deepEqual(keys('matze-3-gold', ['hugo-holo', 'lilly-holo']), ['hundekarte:Hundekarte!', 'hund:Hugo', 'hund:Lilly']);
+  assert.equal(keys('luca-3-gold', ['omer-1-crumpled', 'bfw-energy-gold']).filter((k) => k.startsWith('simulation')).length, 1);
+  // Ömer als Hauptkarte mit Ömer als Boost: die Macht wirkt genau einmal
+  assert.equal(keys('omer-3-gold', ['omer-1-crumpled']).filter((k) => k.startsWith('osmanen')).length, 1);
+  assert.deepEqual(keys('krisz-3-gold', []), []);
 });
 
 test('Hybrid-Quests haben eigene Einstellungen (Ziel, Dauer, Lohn)', () => {
@@ -199,11 +220,21 @@ test('Hybrid-Quests haben eigene Einstellungen (Ziel, Dauer, Lohn)', () => {
   }
 });
 
-test('Booster Pack für eine geschaffte Quest: Chance in Prozent', () => {
-  const { rollsPack, settings } = require('../src/ihk/ihkService');
-  assert.equal(settings.packChance, 5);
-  assert.equal(rollsPack(0.049, 5), true);
-  assert.equal(rollsPack(0.05, 5), false);
-  assert.equal(rollsPack(0, 0), false);
-  assert.equal(rollsPack(0.999999, 100), true);
+test('Booster Pack für eine geschaffte Quest: Chance je Schwierigkeit, Hybrid getrennt', () => {
+  const ihk = require('../src/ihk/ihkService');
+  const { questById } = require('../src/ihk/quests');
+  assert.deepEqual(ihk.settings.packChances, [5, 5, 5, 5, 5, 5]);
+  assert.equal(ihk.rollsPack(5, 0.049), true);
+  assert.equal(ihk.rollsPack(5, 0.05), false);
+  assert.equal(ihk.rollsPack(0, 0), false);
+  assert.equal(ihk.rollsPack(100, 0.999999), true);
+  const saved = [ihk.settings.packChances, ihk.settings.hybrid.packChances];
+  ihk.settings.packChances = [1, 2, 3, 4, 5, 6];
+  ihk.settings.hybrid.packChances = [10, 20, 30, 40, 50, 60];
+  try {
+    assert.equal(ihk.packChanceFor(4, questById['inventur']), 4);
+    assert.equal(ihk.packChanceFor(4, questById['webshop']), 40);
+  } finally {
+    [ihk.settings.packChances, ihk.settings.hybrid.packChances] = saved;
+  }
 });
