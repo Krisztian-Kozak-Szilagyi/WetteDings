@@ -43,7 +43,7 @@ router.post('/support/chat', async (req, res) => {
   try {
     const past = history(req);
     const context = past.slice(-CONTEXT_MESSAGES).map((m) => ({ role: m.role, content: m.content.slice(0, CONTEXT_CHARS) }));
-    const { text } = await chat.reply({ username: req.user.username, history: context, message });
+    const { text } = await chat.reply({ history: context, message });
     req.session.supportChat = [...past, { role: 'user', content: message }, { role: 'assistant', content: text }].slice(-MAX_HISTORY);
     res.json({ reply: text });
   } catch (err) {

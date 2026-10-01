@@ -44,9 +44,9 @@ async function callModel(model, messages) {
  * Antwort des Support-Bots. history: [{ role: 'user'|'assistant', content }] (ohne die neue Nachricht).
  * Die Modelle werden der Reihe nach versucht (jedes hat ein eigenes Gratis-Limit pro Minute).
  */
-async function reply({ username, history, message }) {
+async function reply({ history, message }) {
   if (!isEnabled()) throw new SupportUnavailable('Der Support-Chat ist gerade nicht verfügbar.');
-  const messages = [{ role: 'system', content: systemPrompt({ username }) }, ...history, { role: 'user', content: message }];
+  const messages = [{ role: 'system', content: systemPrompt() }, ...history, { role: 'user', content: message }];
   let limited = false;
   for (const model of config.groqModels) {
     try {
