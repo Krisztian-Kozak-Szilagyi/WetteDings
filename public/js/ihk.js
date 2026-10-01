@@ -56,7 +56,7 @@
     var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2'; };
     // Charakterkarten nur in einen Boost-Slot, wenn ihre Fähigkeit dort wirkt
     var fits = function (slot, el) {
-      if (slots[slot].hidden || accepts[slot].indexOf(el.dataset.drag) === -1) return false;
+      if (slots[slot].classList.contains('is-disabled') || accepts[slot].indexOf(el.dataset.drag) === -1) return false;
       return !(isBoostSlot(slot) && el.dataset.drag === 'card' && !el.dataset.boostable);
     };
     var input = function (name) { return pick.querySelector('input[name="' + name + '"]'); };
@@ -67,7 +67,8 @@
       if (!el) {
         var empty = document.createElement('span');
         empty.className = 'ihk-slot-empty';
-        if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>optional</small>';
+        // Boost 2 ist nur bei Hybrid-Quests aktiv – sonst ausgegraut
+        if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>' + (slot.classList.contains('is-disabled') ? 'nur bei Hybrid-Quests' : 'optional') + '</small>';
         else empty.textContent = 'Karte hierher ziehen';
         slot.appendChild(empty);
         delete slot.dataset.zoom;
@@ -96,8 +97,12 @@
         x.classList.toggle('is-selected', on);
         if (on && x.dataset.hybrid) hybrid = true;
       });
-      if (!hybrid && b2) { clear('boost2'); b2 = ''; }
-      slots.boost2.hidden = !hybrid;
+      // Wechsel auf eine normale Quest: Boost 2 wird wieder grau und gibt seine Karte zurück
+      if (slots.boost2.classList.contains('is-disabled') === hybrid) {
+        slots.boost2.classList.toggle('is-disabled', !hybrid);
+        clear('boost2');
+        b2 = '';
+      }
       pick.querySelectorAll('[data-drag="card"], [data-drag="boost"]').forEach(function (x) {
         x.classList.toggle('is-selected', x.dataset.drag === 'card' && x.dataset.value === card);
         x.classList.toggle('is-boost', x.dataset.value === b1 || x.dataset.value === b2);
@@ -112,7 +117,7 @@
         // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte; Charaktere nur mit Boost-Fähigkeit
         if (input('card').value === value || (el.dataset.drag === 'card' && !el.dataset.boostable)) return;
         // "Als Boost wählen": ist der erste Slot belegt, kommt die Karte bei Hybrid-Quests in den zweiten
-        if (target === 'boost' && !slots.boost2.hidden && input('boost').value && input('boost').value !== value && !input('boost2').value) target = 'boost2';
+        if (target === 'boost' && !slots.boost2.classList.contains('is-disabled') && input('boost').value && input('boost').value !== value && !input('boost2').value) target = 'boost2';
         var other = target === 'boost' ? 'boost2' : 'boost';
         if (input(other).value === value) clear(other);
       }
@@ -147,6 +152,7 @@
       drag.ghost.className = 'ihk-ghost';
       document.body.appendChild(drag.ghost);
       drag.el.classList.add('is-dragging');
+      document.body.classList.add('ihk-dragging'); // Cursor: zugreifende Hand
       Object.keys(slots).forEach(function (k) { if (fits(k, drag.el)) slots[k].classList.add('is-drop-hint'); });
     };
     var endDrag = function (drop) {
@@ -155,6 +161,7 @@
         if (slot) assign(drag.el, slot.dataset.ihkDrop);
         drag.ghost.remove();
         drag.el.classList.remove('is-dragging');
+        document.body.classList.remove('ihk-dragging');
         Object.keys(slots).forEach(function (k) { slots[k].classList.remove('is-target', 'is-drop-hint'); });
         setTimeout(function () { drag.active = false; }, 0);
       } else if (drop && drag.el) {

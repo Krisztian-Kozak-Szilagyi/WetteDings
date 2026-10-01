@@ -37,13 +37,12 @@
     <div class="ihk-boosts">
       <% [{ key: 'boost', card: runBoost, label: 'Boost' }, { key: 'boost2', card: runBoost2, label: 'Boost 2' }].forEach((b) => { %>
         <% if (b.key === 'boost' || b.card || canStart) { %>
-          <div class="ihk-slot ihk-slot-item" <%- canStart ? 'data-ihk-drop="' + b.key + '"' : '' %> data-empty-label="<%= b.label %>"
-            <%= b.key === 'boost2' && canStart ? 'hidden' : '' %>
+          <div class="ihk-slot ihk-slot-item<%= b.key === 'boost2' && canStart ? ' is-disabled' : '' %>" <%- canStart ? 'data-ihk-drop="' + b.key + '"' : '' %> data-empty-label="<%= b.label %>"
             <% if (b.card) { %>data-zoom="<%= b.card.image %>" data-zoom-title="<%= b.card.name %>"<% } %>>
             <% if (b.card) { %>
               <img src="<%= b.card.image %>" alt="<%= b.card.name %>" width="720" height="1008" draggable="false">
             <% } else { %>
-              <span class="ihk-slot-empty"><%= b.label %><br><small>optional</small></span>
+              <span class="ihk-slot-empty"><%= b.label %><br><small><%= b.key === 'boost2' ? 'nur bei Hybrid-Quests' : 'optional' %></small></span>
             <% } %>
           </div>
         <% } %>

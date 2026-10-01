@@ -798,7 +798,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .ihk-offers { display: grid; gap: 10px; width: 100%; }
 .ihk-reroll { text-align: center; }
 .ihk-offer {
-  display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: start; cursor: grab; touch-action: pan-y;
+  display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: start; cursor: var(--cur-grab); touch-action: pan-y;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform .15s, box-shadow .15s, border-color .15s;
 }
 .ihk-offer:hover { transform: translateY(-2px); border-color: rgba(56, 189, 248, .85); }
@@ -816,7 +816,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 }
 .ihk-slot.is-drop-hint { border-color: #22c55e; border-style: dashed; }
 .ihk-slot.is-target { box-shadow: 0 0 0 4px #22c55e, 0 0 30px rgba(34, 197, 94, .5); }
-.ihk-slot[data-zoom] { cursor: zoom-in; }
+.ihk-slot[data-zoom] { cursor: var(--cur-zoom-in); }
 .ihk-zoom-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: center; }
 .ihk-zoom-body img { width: min(100%, 420px, calc((100dvh - 80px) * 720 / 1008)); justify-self: center; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, .55); }
 .ihk-zoom-info h2 { color: #fff; }
@@ -945,7 +945,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .ihk-pick-head h2 { margin: 0; }
 .ihk-pick-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); margin-bottom: 10px; }
 .ihk-pick-card {
-  position: relative; cursor: grab; border-radius: 9px; touch-action: pan-y;
+  position: relative; cursor: var(--cur-grab); border-radius: 9px; touch-action: pan-y;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .ihk-pick-card img { display: block; width: 100%; height: auto; border-radius: 9px; transition: transform .15s, box-shadow .15s; pointer-events: none; }
@@ -1247,6 +1247,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
    Alle vier Cursor sind 32×32 px; auf hochauflösenden Bildschirmen wird die 64-px-Variante in gleicher Größe gezeigt. */
 :root {
   --cur-default: url("/img/cursors/bfw-cursor-default.png") 3 3, auto;
+  --cur-grab: url("/img/cursors/bfw-cursor-grab.png") 15 15, grab;
+  --cur-grabbing: url("/img/cursors/bfw-cursor-grabbing.png") 15 15, grabbing;
+  --cur-zoom-in: url("/img/cursors/bfw-cursor-zoom-in.png") 13 13, zoom-in;
+  --cur-zoom-out: url("/img/cursors/bfw-cursor-zoom-out.png") 13 13, zoom-out;
   --cur-pointer: url("/img/cursors/bfw-cursor-pointer.png") 10 3, pointer;
   --cur-wait: url("/img/cursors/bfw-cursor-wait.png") 16 16, wait;
   --cur-no: url("/img/cursors/bfw-cursor-not-allowed.png") 16 16, not-allowed;
@@ -1254,6 +1258,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 @supports (cursor: -webkit-image-set(url("x.png") 1x) 0 0, auto) {
   :root {
     --cur-default: -webkit-image-set(url("/img/cursors/bfw-cursor-default.png") 1x, url("/img/cursors/bfw-cursor-default@2x.png") 2x) 3 3, auto;
+    --cur-grab: -webkit-image-set(url("/img/cursors/bfw-cursor-grab.png") 1x, url("/img/cursors/bfw-cursor-grab@2x.png") 2x) 15 15, grab;
+    --cur-grabbing: -webkit-image-set(url("/img/cursors/bfw-cursor-grabbing.png") 1x, url("/img/cursors/bfw-cursor-grabbing@2x.png") 2x) 15 15, grabbing;
+    --cur-zoom-in: -webkit-image-set(url("/img/cursors/bfw-cursor-zoom-in.png") 1x, url("/img/cursors/bfw-cursor-zoom-in@2x.png") 2x) 13 13, zoom-in;
+    --cur-zoom-out: -webkit-image-set(url("/img/cursors/bfw-cursor-zoom-out.png") 1x, url("/img/cursors/bfw-cursor-zoom-out@2x.png") 2x) 13 13, zoom-out;
     --cur-pointer: -webkit-image-set(url("/img/cursors/bfw-cursor-pointer.png") 1x, url("/img/cursors/bfw-cursor-pointer@2x.png") 2x) 10 3, pointer;
     --cur-wait: -webkit-image-set(url("/img/cursors/bfw-cursor-wait.png") 1x, url("/img/cursors/bfw-cursor-wait@2x.png") 2x) 16 16, wait;
     --cur-no: -webkit-image-set(url("/img/cursors/bfw-cursor-not-allowed.png") 1x, url("/img/cursors/bfw-cursor-not-allowed@2x.png") 2x) 16 16, not-allowed;
@@ -1262,6 +1270,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 @supports (cursor: image-set(url("x.png") 1x) 0 0, auto) {
   :root {
     --cur-default: image-set(url("/img/cursors/bfw-cursor-default.png") 1x, url("/img/cursors/bfw-cursor-default@2x.png") 2x) 3 3, auto;
+    --cur-grab: image-set(url("/img/cursors/bfw-cursor-grab.png") 1x, url("/img/cursors/bfw-cursor-grab@2x.png") 2x) 15 15, grab;
+    --cur-grabbing: image-set(url("/img/cursors/bfw-cursor-grabbing.png") 1x, url("/img/cursors/bfw-cursor-grabbing@2x.png") 2x) 15 15, grabbing;
+    --cur-zoom-in: image-set(url("/img/cursors/bfw-cursor-zoom-in.png") 1x, url("/img/cursors/bfw-cursor-zoom-in@2x.png") 2x) 13 13, zoom-in;
+    --cur-zoom-out: image-set(url("/img/cursors/bfw-cursor-zoom-out.png") 1x, url("/img/cursors/bfw-cursor-zoom-out@2x.png") 2x) 13 13, zoom-out;
     --cur-pointer: image-set(url("/img/cursors/bfw-cursor-pointer.png") 1x, url("/img/cursors/bfw-cursor-pointer@2x.png") 2x) 10 3, pointer;
     --cur-wait: image-set(url("/img/cursors/bfw-cursor-wait.png") 1x, url("/img/cursors/bfw-cursor-wait@2x.png") 2x) 16 16, wait;
     --cur-no: image-set(url("/img/cursors/bfw-cursor-not-allowed.png") 1x, url("/img/cursors/bfw-cursor-not-allowed@2x.png") 2x) 16 16, not-allowed;
@@ -1282,3 +1294,13 @@ a.tcg-locked { cursor: var(--cur-pointer); } /* freier Favoriten-Platz führt in
 
 /* Rangliste: Suchfeld so hoch wie der Knopf daneben */
 .leader-search input[type="search"] { height: 36px; min-height: 0; padding: 4px 12px; }
+
+/* Greifen, Ziehen, Vergrößern, Verkleinern */
+[data-drag]:active { cursor: var(--cur-grabbing); }
+body.ihk-dragging, body.ihk-dragging * { cursor: var(--cur-grabbing) !important; }
+[data-tcg-card] { cursor: var(--cur-zoom-in); }
+dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schließt die große Ansicht */
+.tcg-modal-body, .ihk-zoom-body { cursor: var(--cur-default); }
+
+/* IHK: Boost 2 ist nur bei Hybrid-Quests aktiv */
+.ihk-slot-item.is-disabled { opacity: .35; filter: grayscale(1); cursor: var(--cur-no); }

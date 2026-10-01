@@ -21,7 +21,7 @@
           <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
             <tr class="<%= me ? 'me' : '' %>">
               <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
-              <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><%= me ? ' (du)' : '' %></td>
+              <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a></td>
               <td class="num"><strong><%= euro(u.total) %></strong></td>
               <td class="num hide-sm"><%= euro(u.balance) %></td>
               <td class="num hide-sm"><%= euro(u.inPlay) %></td>
