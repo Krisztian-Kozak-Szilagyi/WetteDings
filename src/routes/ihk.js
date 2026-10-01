@@ -38,7 +38,7 @@ router.get('/ihk', async (req, res) => {
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = owned.map((id) => catalog.cardById[id]).filter(Boolean);
   const cards = all.filter((c) => c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
-  const items = all.filter((c) => !c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
+  const items = all.filter((c) => !c.isCharacter && canBoost(c)).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
 
   res.render('ihk', {
     title: 'IHK',

@@ -42,7 +42,7 @@ router.get('/tcg', async (req, res) => {
   res.render('tcg', {
     title: 'TCG',
     cards: catalog.CARDS,
-    rarities: catalog.RARITIES,
+    rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
     totalWeight: catalog.TOTAL_WEIGHT,
     cardById: catalog.cardById,

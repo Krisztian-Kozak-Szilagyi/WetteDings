@@ -985,6 +985,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .r-holo { --rar: #e9a8ff; }
 .r-bockhaber { --rar: #b794f6; }
 .r-glitch { --rar: #3cf29a; }
+.r-icon { --rar: #ffffff; }
+.r-sith { --rar: #ff2d3d; }
+/* Icon ist weiß – goldener Rand, damit es auch auf hellem Grund zu sehen ist */
+.r-icon .tcg-dot, .tcg-badge.r-icon { background: #fff; box-shadow: 0 0 0 1.5px #d9b45a; }
 .tcg-dot { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); background: var(--rar, var(--muted)); border-radius: 2px; flex: none; }
 .r-holo .tcg-dot, .tcg-badge.r-holo { background: linear-gradient(135deg, #ffd1f0, #a8e6ff 50%, #d9b8ff); }
 
@@ -1035,6 +1039,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
   background: repeating-linear-gradient(135deg, var(--surface-2) 0 10px, transparent 10px 20px);
   color: color-mix(in srgb, var(--rar) 70%, var(--muted)); font-size: 2.2rem; font-weight: 900; opacity: .75;
 }
+.r-icon .tcg-locked-inner { border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #d9b45a; opacity: .9; }
+.r-sith .tcg-locked-inner { border-color: #ff2d3d; color: #ff2d3d; opacity: 1; }
+.r-icon.tcg-slot:not(.tcg-locked) img { box-shadow: 0 0 0 1px #d9b45a, 0 0 16px rgba(255, 255, 255, .55); }
+.r-sith.tcg-slot:not(.tcg-locked) img { box-shadow: 0 0 18px rgba(255, 45, 61, .6); }
 .r-glitch.tcg-slot:not(.tcg-locked) img { animation: tcg-glitch-soft 4s infinite; }
 
 .admin-tcg-pack { max-width: 240px; }
@@ -1092,7 +1100,7 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
   background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .7), transparent 55%);
 }
 .tcg-zoom.tilting .tcg-shine { opacity: 1; }
-.tcg-zoom.r-holo .tcg-shine, .tcg-zoom.r-bockhaber .tcg-shine, .tcg-zoom.r-gold .tcg-shine { opacity: .5; }
+.tcg-zoom.r-holo .tcg-shine, .tcg-zoom.r-bockhaber .tcg-shine, .tcg-zoom.r-gold .tcg-shine, .tcg-zoom.r-icon .tcg-shine, .tcg-zoom.r-sith .tcg-shine { opacity: .5; }
 .tcg-zoom.r-holo .tcg-shine {
   mix-blend-mode: color-dodge;
   background:
@@ -1121,6 +1129,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .tcg-reveal.flash-holo::before { --rar: #e9a8ff; opacity: .45; }
 .tcg-reveal.flash-bockhaber::before { --rar: #b794f6; opacity: .55; }
 .tcg-reveal.flash-glitch::before { --rar: #3cf29a; opacity: .7; }
+.tcg-reveal.flash-icon::before { --rar: #ffffff; opacity: .8; }
+.tcg-reveal.flash-sith::before { --rar: #ff2d3d; opacity: .8; }
 .tcg-reveal-stage { position: relative; width: 100%; max-width: 980px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
 .tcg-reveal-hint { min-height: 1.6em; margin: 0; font-weight: 700; font-size: 1.1rem; text-align: center; letter-spacing: .02em; }
 .tcg-reveal-pack { padding: 0; border: 0; background: none; cursor: pointer; width: min(62vw, 280px, calc((100dvh - 180px) * 800 / 1280)); }

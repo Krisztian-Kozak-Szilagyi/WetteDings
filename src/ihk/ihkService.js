@@ -9,7 +9,7 @@ const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const { QUESTS, DIFFICULTIES, questById, difficulty } = require('./quests');
-const { resolve, canBoost } = require('./abilities');
+const { resolve, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, isLocked } = require('../tcg/locks');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
@@ -54,7 +54,7 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, ad
  * pro Takt sammelt die Karte ihren Stat (×0,8–1,2, mit CRIT_CHANCE doppelt). Geschafft, wenn required erreicht ist.
  */
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, fakeNext: false, tempSpeed: null };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const ticks = [];
@@ -67,11 +67,13 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     let next = t + interval();
     if (!applied && next > half) {
       // Halbzeit: Fähigkeiten aktivieren
+      s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
       effects.forEach((e) => e.apply(s));
       applied = true;
       ticks.push({ t: half, p: 0, ability: true });
-      if (s.extraTicks) {
-        freeze = s.extraTicks * interval();
+      if (s.extraTicks || s.extraTime) {
+        // Bloodlust: ganze Runden; Reality Check: Sekunden
+        freeze = s.extraTicks * interval() + s.extraTime;
         limit += freeze;
       }
       next = Math.max(half, t + interval());
@@ -80,12 +82,25 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     const fake = s.fakeNext;
     const crit = rand() < CRIT_CHANCE;
     const base = fake ? 99 : s.stats[stat];
-    const p = Math.max(1, Math.round(base * (0.8 + 0.4 * rand()) * (crit ? 2 : 1)));
+    // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
+    const p = Math.max(1, Math.round((base * (0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1)));
     s.fakeNext = false;
-    if (s.tempSpeed && --s.tempSpeed.ticks <= 0) s.tempSpeed = null;
+    if (s.tempSpeed && --s.tempSpeed.ticks <= 0) {
+      const { then } = s.tempSpeed;
+      s.tempSpeed = null;
+      if (then) then(s); // z. B. Mauch: nach dem Gruschteln sind alle Werte höher
+    }
     total += p;
     ticks.push({ t: Math.round(next * 10) / 10, p, crit, ...(fake ? { fake: true } : {}) });
     t = next;
+    if (s.doom && --s.doom.ticks <= 0) {
+      // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
+      s.doom = null;
+      if (total < required) {
+        ticks.push({ t: Math.round(t * 10) / 10, p: required - total, destroy: true });
+        total = required;
+      }
+    }
   }
   return { ticks, total, success: total >= required, freeze: Math.round(freeze * 10) / 10 };
 }
@@ -137,6 +152,10 @@ async function start({ user, cardId, boostId, offerIndex }) {
   if (boostId && !boost) throw new UserError('Unbekannte Boost-Karte.');
   if (boost && boost.id === card.id) throw new UserError('Die Boost-Karte muss eine andere Karte sein.');
   if (boost && !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
+  if (boost && needsCoffee(boost)) {
+    const owned = await TcgCard.distinct('card', { user: user._id });
+    if (!owned.some((id) => isCoffee(catalog.cardById[id]))) throw new UserError(`${boost.name} kann nur ausgespielt werden, wenn du eine Kaffee-Karte besitzt.`);
+  }
   const { running, used, limit } = await getState(user._id);
   if (running) throw new UserError('Du hast bereits eine laufende Quest.');
   if (used >= limit) throw new UserError(`Du hast heute schon alle ${limit} Quests erledigt. Morgen geht es weiter!`);

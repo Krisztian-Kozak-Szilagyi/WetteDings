@@ -231,8 +231,9 @@
   }
   function floater(tk) {
     var el = document.createElement('span');
-    el.className = 'ihk-floater' + (tk.crit ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
-    el.textContent = (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p;
+    el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
+    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p;
+    if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
     el.style.left = (15 + Math.random() * 60) + '%';
     floaters.appendChild(el);
     setTimeout(function () { el.remove(); }, 1200);

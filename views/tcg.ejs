@@ -28,7 +28,7 @@
         </button>
         <div class="tcg-shop-info">
           <h2>BfW Holdings Booster Pack</h2>
-          <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Glitch. Jede Karte kannst du später wieder verkaufen.</p>
+          <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon. Jede Karte kannst du später wieder verkaufen.</p>
           <button class="btn btn-primary btn-block" type="submit" <%= canAfford ? '' : 'disabled' %>>Pack öffnen · <%= euro(packPrice) %></button>
           <p class="muted small">Verfügbar: <span data-tcg-balance><%= euro(currentUser.balance) %></span></p>
           <% if (!canAfford) { %><p class="small neg">Dein Guthaben reicht gerade für kein Pack.</p><% } %>
@@ -78,7 +78,7 @@
           <% } else { %>
             <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Noch nicht gezogen">
               <div class="tcg-locked-inner"><span>?</span></div>
-              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden ? '???' : r.label %></span>
             </div>
           <% } %>
         <% }) %>

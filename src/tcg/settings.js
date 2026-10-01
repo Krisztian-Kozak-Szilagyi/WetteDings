@@ -20,14 +20,31 @@ function validWeights(weight) {
   return sum === catalog.TOTAL_WEIGHT;
 }
 
+/**
+ * Ältere gespeicherte Chancen kennen später hinzugekommene Seltenheiten noch nicht: Diese bekommen
+ * ihren Standardwert, der bei der häufigsten Seltenheit abgezogen wird – die Summe bleibt 100 %.
+ */
+function withNewRarities(weight) {
+  if (!weight) return weight;
+  const missing = catalog.RARITIES.filter((r) => weight[r.key] === undefined);
+  if (!missing.length) return weight;
+  const filled = { ...weight };
+  for (const r of missing) {
+    filled[r.key] = catalog.DEFAULT_WEIGHT[r.key];
+    filled[catalog.RARITIES[0].key] -= catalog.DEFAULT_WEIGHT[r.key];
+  }
+  return filled;
+}
+
 function apply(doc) {
   if (!doc) return;
   if (Number.isInteger(doc.packPrice) && doc.packPrice > 0) packPrice = doc.packPrice;
-  const weightsOk = validWeights(doc.weight);
+  const weight = withNewRarities(doc.weight);
+  const weightsOk = validWeights(weight);
   for (const r of catalog.RARITIES) {
     const v = doc.sell ? doc.sell[r.key] : undefined;
     if (Number.isInteger(v) && v >= 0) r.sell = v;
-    if (weightsOk) r.weight = doc.weight[r.key];
+    if (weightsOk) r.weight = weight[r.key];
   }
 }
 
@@ -51,4 +68,4 @@ async function lastUpdate() {
   return TcgSettings.findById(SETTINGS_ID).select('updatedAt updatedByName').lean();
 }
 
-module.exports = { getPackPrice, validWeights, load, save, lastUpdate };
+module.exports = { getPackPrice, validWeights, withNewRarities, load, save, lastUpdate };

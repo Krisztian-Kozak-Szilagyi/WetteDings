@@ -56,7 +56,9 @@ test('Fähigkeiten: nur unter den Bedingungen aus dem Kartentext', () => {
 test('Boost-Slot: Items immer, Charaktere nur mit Boost-Fähigkeit', () => {
   const { canBoost } = require('../src/ihk/abilities');
   const c = (id) => catalog.cardById[id];
-  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'good-boy-holo', 'lili-6-glitch']) assert.ok(canBoost(c(id)), id);
+  for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-nvidia-gold', 'pascal-1-crumpled', 'omer-3-gold', 'good-boy-holo', 'lili-6-glitch', 'mauch-1-holo', 'sigrist-4-icon', 'hermann-4-icon', 'hermann-1-holo']) assert.ok(canBoost(c(id)), id);
+  // Oliver the Sigrist ist in der IHK nicht einsetzbar
+  assert.ok(!canBoost(c('oliver-the-sigrist-sith')));
   for (const id of ['matze-2-bfwler', 'krisz-3-gold', 'luca-3-gold', 'aleks-1-crumpled', 'adrian-3-gold', 'marcel-3-gold', 'st-ivan-3-gold', 'seven-3-gold']) assert.ok(!canBoost(c(id)), id);
 });
 
@@ -74,6 +76,47 @@ test('Fähigkeiten wirken erst ab der Halbzeit', () => {
   const pascal = simulate(luca.stats, 'bwl', 1e9, avg, resolve(luca, catalog.cardById['pascal-1-crumpled']));
   assert.ok(pascal.freeze > 0);
   assert.equal(pascal.ticks.filter((t) => !t.ability).length, plain.ticks.length + 1);
+});
+
+test('Spell-Karten: Mauch und Sigrist wirken aus dem Boost-Slot, Stärke je Seltenheit', () => {
+  const { resolve } = require('../src/ihk/abilities');
+  const avg = () => 0.5;
+  const luca = catalog.cardById['luca-3-gold'];
+  const run = (boostId) => simulate(luca.stats, 'bwl', 1e9, avg, resolve(luca, catalog.cardById[boostId]));
+  const points = (r) => r.ticks.filter((t) => !t.ability && t.t > WORK_TIME / 2).map((t) => t.p);
+  assert.ok(!resolve(luca, catalog.cardById['oliver-the-sigrist-sith']).some((a) => a.key !== 'simulation'));
+
+  // Hermann: zwei schwächere Runden (Aufgabe +30 % bzw. +45 %), dann ist die Aufgabe zerstört
+  const { needsCoffee, isCoffee } = require('../src/ihk/abilities');
+  assert.ok(needsCoffee(catalog.cardById['hermann-2-bockhaber']) && !needsCoffee(catalog.cardById['mauch-4-icon']));
+  assert.ok(isCoffee(catalog.cardById['casino-kaffee-1-crumpled']) && !isCoffee(catalog.cardById['bfw-energy-gold']));
+  const hermann = run('hermann-4-icon');
+  assert.equal(hermann.success, true);
+  assert.equal(hermann.total, 1e9);
+  assert.deepEqual(points(hermann).slice(0, 2), [Math.round(75 / 1.3), Math.round(75 / 1.3)]);
+  assert.equal(points(hermann).length, 3);
+  assert.ok(hermann.ticks[hermann.ticks.length - 1].destroy);
+  assert.equal(hermann.ticks.reduce((s, t) => s + t.p, 0), 1e9); // der Client summiert die Takte
+  assert.equal(points(run('hermann-1-holo'))[0], Math.round(75 / 1.45));
+  // Ziel schon vor der Halbzeit erreicht: Hermann wird nicht mehr gebraucht
+  assert.ok(!simulate(luca.stats, 'bwl', 100, avg, resolve(luca, catalog.cardById['hermann-4-icon'])).ticks.some((t) => t.destroy));
+
+  // Mauch Icon: zwei Runden normale Punkte (nur langsamer), danach +25 % – zusätzlich zu Lucas eigenen +50 %
+  const mauch = points(run('mauch-4-icon'));
+  assert.equal(mauch[0], 75);
+  assert.equal(mauch[1], 75);
+  assert.equal(mauch[2], Math.round(75 * 1.25));
+  assert.equal(points(run('mauch-1-holo'))[2], Math.round(75 * 1.1));
+  assert.match(resolve(luca, catalog.cardById['mauch-2-bockhaber']).find((a) => a.key === 'gruschteln').text, /25 % langsamer.*\+15 %/);
+
+  // Sigrist: Deadline wird um 5–20 % der abgelaufenen Zeit zurückgeworfen
+  assert.equal(run('sigrist-1-holo').freeze, 4.5);
+  assert.equal(run('sigrist-2-bockhaber').freeze, 9);
+  assert.equal(run('sigrist-3-glitch').freeze, 13.5);
+  const icon = run('sigrist-4-icon');
+  assert.equal(icon.freeze, 18);
+  assert.ok(icon.ticks.length > run('sigrist-1-holo').ticks.length);
+  assert.ok(icon.ticks.every((t) => t.t <= WORK_TIME + 18));
 });
 
 test('Werte im Dateinamen', () => {

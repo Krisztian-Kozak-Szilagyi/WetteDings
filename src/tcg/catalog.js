@@ -23,16 +23,20 @@ const CARDS_PER_PACK = 3;
  * Seltenheiten von häufig nach selten. weight = Chance pro Karte in 1/10.000 (Summe 10.000),
  * sell = Verkaufspreis in Cent.
  *
- * Erwartungswert pro Karte: 22,06 € -> pro Pack 66,17 € bei 80 € Packpreis (~83 % Rückfluss).
+ * Erwartungswert pro Karte: 23,85 € -> pro Pack 71,56 € bei 80 € Packpreis (~89 % Rückfluss).
  * Ein schwaches Pack (2× Crumpled + 1× BFWler = 30 €) bleibt klar im Minus.
+ *
+ * hidden = geheime Seltenheit: taucht für Mitglieder weder in den Drop-Raten noch im Filter auf.
  */
 const RARITIES = [
-  { key: 'crumpled', label: 'Crumpled', weight: 5812, sell: 500 },
+  { key: 'crumpled', label: 'Crumpled', weight: 5809, sell: 500 },
   { key: 'bfwler', label: 'BFWler', weight: 2800, sell: 2000 },
   { key: 'gold', label: 'Gold', weight: 1100, sell: 4000 },
   { key: 'holo', label: 'Holo', weight: 250, sell: 15000 },
   { key: 'bockhaber', label: 'Bockhaber', weight: 30, sell: 100000 },
   { key: 'glitch', label: 'Glitch', weight: 8, sell: 300000 },
+  { key: 'icon', label: 'Icon', weight: 2, sell: 400000 },
+  { key: 'sith', label: 'Sith', weight: 1, sell: 1000000, hidden: true },
 ];
 const TOTAL_WEIGHT = RARITIES.reduce((s, r) => s + r.weight, 0);
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
@@ -44,6 +48,8 @@ RARITIES.forEach((r, i) => {
 });
 // Gleiche Objekte wie in RARITIES, damit Preisänderungen überall sofort gelten
 const rarityByKey = Object.fromEntries(RARITIES.map((r) => [r.key, r]));
+/** Seltenheiten, die Mitglieder sehen dürfen (ohne die geheimen) */
+const visibleRarities = () => RARITIES.filter((r) => !r.hidden);
 
 // Namen, die sich nicht automatisch aus dem Dateinamen ergeben (so wie sie auf der Karte stehen)
 const NAME_OVERRIDES = {
@@ -54,6 +60,7 @@ const NAME_OVERRIDES = {
   'grafikkarte-amd': 'AMD-Grafikkarte',
   'grafikkarte-nvidia': 'NVIDIA-Grafikkarte',
   seven: '7',
+  'oliver-the-sigrist': 'Oliver the Sigrist',
 };
 
 /** "bfw-energy" -> "BFW Energy", "krisz" -> "Krisz" */
@@ -146,6 +153,7 @@ module.exports = {
   TOTAL_WEIGHT,
   CARDS,
   rarityByKey,
+  visibleRarities,
   cardById,
   cardsByRarity,
   prettyName,

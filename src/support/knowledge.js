@@ -16,8 +16,8 @@ const pct = (w) => `${(w / 100).toLocaleString('de-DE', { maximumFractionDigits:
 function systemPrompt({ username }) {
   const t = config.bonusTiers;
   const bonus = t.map((x, i) => `${i ? `${euro(t[i - 1].below)}–` : '<'}${euro(x.below)}: +${euro(x.amount)}`).join(', ') + `, ab ${euro(t[t.length - 1].below)}: nichts`;
-  const rarities = catalog.RARITIES.map((r) => `${r.label} ${pct(r.weight)} (Wert ${euro(r.sell)})`).join(', ');
-  const names = [...new Set(catalog.CARDS.map((c) => c.name))].join(', ');
+  const rarities = catalog.visibleRarities().map((r) => `${r.label} ${pct(r.weight)} (Wert ${euro(r.sell)})`).join(', ');
+  const names = [...new Set(catalog.CARDS.filter((c) => !catalog.rarityByKey[c.rarity].hidden).map((c) => c.name))].join(', ');
   const fee = config.creatorFeePercent;
 
   return `Du bist „${BOT_NAME}“, Support-Bot der Website „${config.appName}“. Gesprächspartner: Mitglied „${username}“.

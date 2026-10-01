@@ -15,12 +15,18 @@ test('Gewichte ergeben 100 % und werden seltener', () => {
     assert.ok(catalog.RARITIES[i].sell > catalog.RARITIES[i - 1].sell, `${catalog.RARITIES[i].key} muss mehr wert sein`);
   }
   assert.equal(catalog.chance('glitch'), 0.0008);
+  assert.equal(catalog.chance('icon'), 0.0002);
+  assert.equal(catalog.chance('sith'), 0.0001);
+  assert.equal(sell('icon'), 400000);
+  assert.equal(sell('sith'), 1000000);
+  // Die geheime Seltenheit erscheint nicht in den Drop-Raten
+  assert.deepEqual(catalog.visibleRarities().map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon']);
   assert.equal(catalog.chance('bockhaber'), 0.003);
 });
 
 test('Ein Pack ist im Schnitt weniger wert als sein Preis', () => {
   const ev = catalog.expectedPackValue();
-  assert.equal(Math.round(ev), 6617);
+  assert.equal(Math.round(ev), 7156);
   assert.ok(ev < config.tcgPackPrice, `Erwartungswert ${ev} muss unter ${config.tcgPackPrice} liegen`);
 });
 
@@ -30,11 +36,14 @@ test('2× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {
 
 test('Seltenheit je Wurf (Grenzen)', () => {
   assert.equal(catalog.rarityForRoll(0), 'crumpled');
-  assert.equal(catalog.rarityForRoll(5811), 'crumpled');
-  assert.equal(catalog.rarityForRoll(5812), 'bfwler');
-  assert.equal(catalog.rarityForRoll(9991), 'bockhaber');
-  assert.equal(catalog.rarityForRoll(9992), 'glitch');
-  assert.equal(catalog.rarityForRoll(9999), 'glitch');
+  assert.equal(catalog.rarityForRoll(5808), 'crumpled');
+  assert.equal(catalog.rarityForRoll(5809), 'bfwler');
+  assert.equal(catalog.rarityForRoll(9988), 'bockhaber');
+  assert.equal(catalog.rarityForRoll(9989), 'glitch');
+  assert.equal(catalog.rarityForRoll(9996), 'glitch');
+  assert.equal(catalog.rarityForRoll(9997), 'icon');
+  assert.equal(catalog.rarityForRoll(9998), 'icon');
+  assert.equal(catalog.rarityForRoll(9999), 'sith');
 });
 
 test('Karten werden aus den Dateinamen gelesen', () => {
@@ -43,7 +52,14 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 76);
+  assert.equal(catalog.CARDS.length, 89);
+  assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
+  assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
+  assert.equal(catalog.cardById['sigrist-3-glitch'].name, 'Sigrist');
+  assert.equal(catalog.cardById['oliver-the-sigrist-sith'].name, 'Oliver the Sigrist');
+  assert.equal(catalog.cardById['oliver-the-sigrist-sith'].rarity, 'sith');
+  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Sammlung
+  assert.deepEqual(catalog.cardsByRarity.sith.map((c) => c.id), ['oliver-the-sigrist-sith']);
   assert.equal(catalog.cardById['aleks-5-bockhaber'].name, 'Aleks');
   assert.equal(catalog.cardById['seven-3-gold'].name, '7');
   assert.equal(catalog.cardById['grafikkarte-amd-gold'].name, 'AMD-Grafikkarte');
@@ -89,6 +105,11 @@ test('Admin-Chancen: nur gültig, wenn zusammen genau 100 %', () => {
   const { glitch, ...missing } = ok;
   assert.ok(!settings.validWeights(missing), 'fehlende Seltenheit');
   assert.ok(settings.validWeights({ ...ok, glitch: 0, crumpled: ok.crumpled + ok.glitch }), '0 % ist erlaubt');
+  // Alte gespeicherte Chancen (ohne Icon/Sith) bleiben gültig: Die neuen kommen von Crumpled dazu
+  const old = { crumpled: 5000, bfwler: 3612, gold: 1100, holo: 250, bockhaber: 30, glitch: 8 };
+  const filled = settings.withNewRarities(old);
+  assert.deepEqual(filled, { ...old, crumpled: 4997, icon: 2, sith: 1 });
+  assert.ok(settings.validWeights(filled));
 });
 
 test('Ein Pack hat 3 Karten', () => {

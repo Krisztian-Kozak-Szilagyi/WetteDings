@@ -2,13 +2,21 @@
 // aus dem Kartentext. main = Hauptkarte (arbeitet), boost = Karte im Boost-Slot (nur ihre Fähigkeit zählt).
 // fx = CSS-Effekt beim Aktivieren, target = welcher Slot den Effekt bekommt.
 
-const who = (card) => (card ? card.id.replace(/(-\d+)?-(crumpled|bfwler|gold|holo|bockhaber|glitch)$/, '') : null);
+const who = (card) => (card ? card.id.replace(/(-\d+)?-(crumpled|bfwler|gold|holo|bockhaber|glitch|icon|sith)$/, '') : null);
+
+// Spell-Karten: Stärke je Seltenheit, wie auf den Karten gedruckt (Prozent).
+// Mauch: [Verlangsamung für 2 Runden, danach Bonus auf alle Werte]; Sigrist: verlorener Fortschritt des Gegners.
+const MAUCH = { holo: [30, 10], bockhaber: [25, 15], glitch: [20, 20], icon: [15, 25] };
+const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
+// Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
+const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
+const isCoffee = (card) => who(card) === 'casino-kaffee';
 const isDog = (card) => who(card) === 'good-boy';
 
 /**
  * Liefert die aktiven Fähigkeiten für diese Kombination.
  * Jede Fähigkeit: { key, label, text, fx, target, apply(state) }.
- * state: { speed, stats: { fia, fis, bwl }, extraTicks, fakeNext, tempSpeed: { factor, ticks } }
+ * state: { speed, stats: { fia, fis, bwl }, extraTicks, extraTime, elapsed, fakeNext, tempSpeed: { factor, ticks, then }, doom: { factor, ticks } }
  */
 function resolve(main, boost) {
   const m = who(main);
@@ -57,13 +65,39 @@ function resolve(main, boost) {
     const plus = boost.stats.speed;
     add({ key: 'kaffee', label: 'Casino-Kaffee', text: `Speed +${plus}.`, fx: 'fx-coffee', target: 'player', apply: (s) => { s.speed += plus; } });
   }
+  // Spell: Mauch schickt die eigene Gruppe zum Gruschteln – erst langsamer, danach alle Werte höher
+  if (b === 'mauch' && MAUCH[boost.rarity]) {
+    const [slow, plus] = MAUCH[boost.rarity];
+    const f = 1 + plus / 100;
+    add({ key: 'gruschteln', label: 'Gruschteln', text: `Kein Witz, purer Ernst: 2 Runden lang ${slow} % langsamer, danach alle Werte +${plus} %.`, fx: 'fx-buff', target: 'player', apply: (s) => {
+      s.tempSpeed = { factor: 1 - slow / 100, ticks: 2, then: (st) => { st.speed *= f; st.stats.fia *= f; st.stats.fis *= f; st.stats.bwl *= f; } };
+    } });
+  }
+  // Spell: Sigrist – der Gegner ist in der IHK die Aufgabe, ihr "Projektfortschritt" die abgelaufene Deadline
+  if (b === 'sigrist' && SIGRIST[boost.rarity]) {
+    const pct = SIGRIST[boost.rarity];
+    add({ key: 'reality-check', label: 'Absolute Reality Check', text: `Die Aufgabe verliert ${pct} % ihres Fortschritts – die Deadline wird entsprechend zurückgeworfen.`, fx: 'fx-aura', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.extraTime += (pct / 100) * s.elapsed; } });
+  }
+  // Spell: Hermann – der gegnerische "Charakter" ist in der IHK die Aufgabe: zwei Runden lang ist sie stärker
+  // (es gibt entsprechend weniger Punkte), danach wird sie vollständig zerstört = Quest geschafft.
+  // Die Bedingung "Kaffee-Karte auf der Hand" prüft ihkService.start (Besitz einer Casino-Kaffee-Karte).
+  if (b === 'hermann' && HERMANN[boost.rarity]) {
+    const pct = HERMANN[boost.rarity];
+    add({ key: 'hermann', label: 'Hermann', text: `Die Aufgabe ist zwei Runden lang ${pct} % stärker – danach wird sie vollständig zerstört.`, fx: 'fx-aura', target: 'player', enemyFx: 'fx-bloodlust', apply: (s) => { s.doom = { factor: 1 + pct / 100, ticks: 2 }; } });
+  }
   return out;
 }
 
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
 const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'good-boy', 'lili']);
 
-/** Darf diese Karte in den Boost-Slot? Items immer, Charaktere nur mit Boost-Fähigkeit. */
-const canBoost = (card) => !!card && (!card.isCharacter || BOOST_CHARACTERS.has(who(card)));
+// Oliver the Sigrist "kann nicht im Spiel eingesetzt werden"
+const NO_BOOST = new Set(['oliver-the-sigrist']);
 
-module.exports = { resolve, who, canBoost };
+/** Darf diese Karte in den Boost-Slot? Items und Spells mit Wirkung immer, Charaktere nur mit Boost-Fähigkeit. */
+const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharacter || BOOST_CHARACTERS.has(who(card)));
+
+/** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
+const needsCoffee = (card) => who(card) === 'hermann';
+
+module.exports = { resolve, who, canBoost, needsCoffee, isCoffee };

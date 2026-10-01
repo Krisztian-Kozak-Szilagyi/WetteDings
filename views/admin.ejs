@@ -73,7 +73,7 @@
         <tbody>
           <% tcg.rarities.forEach((r) => { %>
             <tr class="r-<%= r.key %>">
-              <td><span class="tcg-dot"></span> <%= r.label %></td>
+              <td><span class="tcg-dot"></span> <%= r.label %><%= r.hidden ? ' (geheim)' : '' %></td>
               <td><input type="text" name="weight_<%= r.key %>" inputmode="decimal" value="<%= pctInput(r.weight) %>" required aria-label="Chance <%= r.label %> in Prozent"></td>
               <td><input type="text" name="sell_<%= r.key %>" inputmode="decimal" value="<%= toInput(r.sell) %>" required aria-label="Verkaufspreis <%= r.label %>"></td>
               <td class="num hide-sm muted nowrap"><%= pctInput(tcg.defaultWeights[r.key]) %> % · <%= euro(tcg.defaults[r.key]) %></td>
