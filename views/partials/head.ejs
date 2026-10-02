@@ -62,6 +62,26 @@
                 </form>
               </div>
             </details>
+            <%# Im aufgeklappten Hamburger-Menü (schmale Bildschirme) stehen die Konto-Punkte direkt in der Liste –
+                ohne zweites Aufklappmenü: erst die Links, dann Name/Kontostand/Bild, ganz unten "Abmelden" %>
+            <div class="nav-account">
+              <a href="/konto" class="<%= currentPath === '/konto' ? 'active' : '' %>">Statistiken</a>
+              <a href="/konto/wetten" class="<%= currentPath === '/konto/wetten' ? 'active' : '' %>">Meine Wetten</a>
+              <a href="/konto/auszug" class="<%= currentPath === '/konto/auszug' ? 'active' : '' %>">Kontoauszug</a>
+              <a href="/konto/gruppen" class="<%= currentPath === '/konto/gruppen' ? 'active' : '' %>">Wett-Gruppen</a>
+              <a href="/konto/einstellungen" class="<%= currentPath === '/konto/einstellungen' ? 'active' : '' %>">Konto-Einstellungen</a>
+              <div class="nav-account-who" data-live="balance-mobile">
+                <img class="avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="34" height="34">
+                <span class="balance-text">
+                  <span class="balance-name"><%= currentUser.username %></span>
+                  <strong><%= euro(currentUser.balance) %></strong>
+                </span>
+              </div>
+              <form method="post" action="/abmelden">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-ghost btn-block" type="submit">Abmelden</button>
+              </form>
+            </div>
           <% } else { %>
             <a class="btn btn-ghost btn-sm" href="/anmelden">Anmelden</a>
             <a class="btn btn-primary btn-sm" href="/registrieren">Registrieren</a>
