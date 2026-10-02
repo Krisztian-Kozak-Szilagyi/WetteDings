@@ -4,8 +4,10 @@ const config = require('../config');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const Comment = require('../models/Comment');
+const User = require('../models/User');
 const rateLimit = require('express-rate-limit');
 const { requireLogin } = require('../middleware');
+const { verdictRole } = require('../lib/verdict');
 const { str, escapeRegex, parseEuro, UserError } = require('../lib/util');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const { euro } = require('../lib/viewHelpers');
@@ -63,8 +65,11 @@ router.get('/', async (req, res) => {
     offen: { filter: { status: 'offen', deadline: { $gt: now } }, sort: { deadline: 1 } },
     wartend: { filter: { status: 'offen', deadline: { $lte: now } }, sort: { deadline: -1 } },
     abgeschlossen: { filter: { status: { $in: ['entschieden', 'annulliert'] } }, sort: { resolvedAt: -1 } },
-    // gesetzt ODER selbst erstellt (Ersteller setzen nicht mit)
-    meine: { filter: { $or: [{ _id: { $in: myBetIds } }, { creator: req.user._id }] }, sort: { createdAt: -1 } },
+    // gesetzt ODER selbst erstellt ODER Schiedsrichter (Ersteller und Schiedsrichter setzen nicht mit)
+    meine: {
+      filter: { $or: [{ _id: { $in: myBetIds } }, { creator: req.user._id }, { referee: req.user._id }] },
+      sort: { createdAt: -1 },
+    },
   };
   const { filter, sort } = TAB_QUERIES[tab];
 
@@ -126,12 +131,21 @@ router.get('/wetten/:id/stand', validId, requireLogin, async (req, res, next) =>
 
 // ---------- Neue Wette ----------
 
-function newBetForm(res, { errors = [], values = {} } = {}, status = 200) {
+/** Mitglieder, die als Schiedsrichter in Frage kommen: alle außer dem Ersteller selbst */
+function refereeCandidates(userId) {
+  return User.find({ deletedAt: null, _id: { $ne: userId } })
+    .select('username')
+    .sort({ usernameLower: 1 })
+    .lean();
+}
+
+async function newBetForm(req, res, { errors = [], values = {} } = {}, status = 200) {
   const defaults = {
     title: '',
     description: '',
     type: 'janein',
     options: ['', '', ''],
+    referee: '',
     deadline: '', // bewusst leer – muss vom Wettersteller angegeben werden
     resultAt: '',
   };
@@ -141,6 +155,7 @@ function newBetForm(res, { errors = [], values = {} } = {}, status = 200) {
     title: 'Neue Wette',
     errors,
     values: merged,
+    candidates: await refereeCandidates(req.user._id),
     minOptions: Bet.MIN_OPTIONS,
     maxOptions: Bet.MAX_OPTIONS,
     feePercent: config.creatorFeePercent,
@@ -148,7 +163,7 @@ function newBetForm(res, { errors = [], values = {} } = {}, status = 200) {
   });
 }
 
-router.get('/wetten/neu', requireLogin, (req, res) => newBetForm(res));
+router.get('/wetten/neu', requireLogin, (req, res) => newBetForm(req, res));
 
 router.post('/wetten', requireLogin, async (req, res) => {
   const rawOptions = [].concat(req.body.options || []).slice(0, 20).map((o) => str(o).trim().replace(/\s+/g, ' '));
@@ -157,6 +172,7 @@ router.post('/wetten', requireLogin, async (req, res) => {
     description: str(req.body.description).trim().replace(/\r\n/g, '\n'),
     type: str(req.body.type) === 'optionen' ? 'optionen' : 'janein',
     options: rawOptions,
+    referee: str(req.body.referee),
     deadline: str(req.body.deadline),
     resultAt: str(req.body.resultAt),
   };
@@ -177,6 +193,17 @@ router.post('/wetten', requireLogin, async (req, res) => {
   else if (deadline && resultAt < deadline) errors.push('Die Auswertung kann nicht vor dem Einsatzschluss liegen.');
   else if (deadline && resultAt.getTime() > deadline.getTime() + YEAR) errors.push('Die Auswertung darf höchstens ein Jahr nach dem Einsatzschluss liegen.');
 
+  // Schiedsrichter: Pflicht, muss ein anderes, existierendes Mitglied sein
+  let referee = null;
+  if (!values.referee) {
+    errors.push('Bitte wähle einen Schiedsrichter aus, der das Ergebnis mit dir bestätigt.');
+  } else if (!mongoose.isValidObjectId(values.referee) || values.referee === String(req.user._id)) {
+    errors.push('Bitte wähle ein anderes Mitglied als Schiedsrichter aus.');
+  } else {
+    referee = await User.findOne({ _id: values.referee, deletedAt: null }).select('username').lean();
+    if (!referee) errors.push('Dieses Mitglied gibt es nicht mehr. Bitte wähle einen anderen Schiedsrichter.');
+  }
+
   let options;
   if (values.type === 'janein') {
     options = JA_NEIN;
@@ -190,7 +217,7 @@ router.post('/wetten', requireLogin, async (req, res) => {
     options = filled.map((label, i) => ({ key: `o${i + 1}`, label }));
   }
 
-  if (errors.length) return newBetForm(res, { errors, values }, 400);
+  if (errors.length) return newBetForm(req, res, { errors, values }, 400);
 
   const bet = await svc.createBet({
     user: req.user,
@@ -198,10 +225,11 @@ router.post('/wetten', requireLogin, async (req, res) => {
     description: values.description,
     type: values.type,
     options,
+    referee,
     deadline,
     resultAt,
   });
-  req.flash('success', 'Deine Wette ist online! Teile den Link, damit andere mitwetten können.');
+  req.flash('success', `Deine Wette ist online! ${referee.username} bestätigt am Ende das Ergebnis mit dir. Teile den Link, damit andere mitwetten können.`);
   res.redirect(`/wetten/${bet._id}`);
 });
 
@@ -272,10 +300,16 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
   const me = req.user;
   const myPosition = me ? positions.find((p) => String(p.user) === String(me._id)) || null : null;
   const isOwner = !!me && String(bet.creator) === String(me._id);
+  const isReferee = !!me && !!bet.referee && String(bet.referee) === String(me._id);
   const isAdmin = !!me && me.isAdmin;
   const isStaff = !!me && me.isStaff; // Admin oder Dev: entscheiden, annullieren, schließen
   const isOpen = bet.status === 'offen';
   const accepting = isOpen && bet.deadline > now;
+  // Rolle bei der Ergebnisfindung – die eigene Beteiligung wiegt schwerer als die Dev-Rolle
+  const role = me ? verdictRole(bet, me) : null;
+  // Ohne Schiedsrichter (alte Wetten) entscheidet der Ersteller allein; ein unbeteiligter Dev immer
+  const decidesAlone = role === 'dev' || (role === 'creator' && !bet.referee);
+  const myVote = (bet.votes || []).find((v) => v.role === role) || null;
 
   res.render('bet', {
     title: bet.title,
@@ -287,16 +321,20 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
     commentMax: COMMENT_MAX,
     myPosition,
     isOwner,
+    isReferee,
+    role,
+    decidesAlone,
+    myVote,
     accepting,
     noteMin: svc.NOTE_MIN,
     noteMax: svc.NOTE_MAX,
     perms: {
-      // Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen
-      stake: !!me && accepting && !isOwner,
-      // Ersteller und Admins dürfen jederzeit das Ergebnis eintragen
-      resolve: isOpen && (isOwner || isStaff),
-      void: isOpen && (isOwner || isStaff),
-      close: accepting && (isOwner || isStaff),
+      // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen
+      stake: !!me && accepting && !isOwner && !isReferee,
+      // Ersteller, Schiedsrichter und Devs dürfen jederzeit eine Stimme abgeben
+      resolve: isOpen && !!role,
+      void: isOpen && !!role,
+      close: accepting && (isOwner || isReferee || isStaff),
       edit: (isOwner && isOpen) || isAdmin,
     },
   });
@@ -323,21 +361,39 @@ router.post('/wetten/:id/schliessen', validId, requireLogin, (req, res) =>
   })
 );
 
+/** Provisionsteil der Rückmeldung: Wettersteller und Schiedsrichter teilen sich die Provision. */
+function feeText(r) {
+  if (!r.fee) return '';
+  if (!r.refereeFee) return ` Provision für den Wettersteller: ${euro(r.creatorFee)}.`;
+  return ` Provision: ${euro(r.creatorFee)} für den Wettersteller und ${euro(r.refereeFee)} für den Schiedsrichter.`;
+}
+
+/** Rückmeldung nach einer Stimme: ausgezahlt, auf die Gegenseite wartend oder strittig. */
+function voteMessage(r, what) {
+  if (r.kind === 'offen') {
+    return `Deine Stimme für ${what} ist gespeichert. Jetzt muss ${r.other} dasselbe eintragen – erst dann wird ausgezahlt. Weitere Einsätze sind ab sofort nicht mehr möglich.`;
+  }
+  if (r.kind === 'streitig') {
+    return `Deine Stimme für ${what} weicht von der Stimme von ${r.other} ab. Die Wette ist damit strittig – ein Dev entscheidet. Du kannst deine Stimme bis dahin noch ändern.`;
+  }
+  if (r.outcome === 'annulliert') return 'Die Wette wurde annulliert. Alle Einsätze wurden erstattet.';
+  if (r.refunded) return `Ergebnis „${r.label}“ gespeichert. Da es keine Gegenseite gab, wurden alle Einsätze erstattet.`;
+  return `Ergebnis „${r.label}“ gespeichert. ${euro(r.paidTotal)} wurden an ${r.winnerCount} Gewinner ausgezahlt.${feeText(r)}`;
+}
+
 router.post('/wetten/:id/entscheiden', validId, requireLogin, (req, res) =>
   action(req, res, async () => {
     const outcome = str(req.body.outcome);
     if (!outcome || outcome === 'annulliert') throw new UserError('Bitte wähle aus, welche Option eingetreten ist.');
     const r = await svc.resolveBet({ actor: req.user, betId: req.params.id, outcome, note: str(req.body.note) });
-    if (r.refunded) return `Ergebnis „${r.label}“ gespeichert. Da es keine Gegenseite gab, wurden alle Einsätze erstattet.`;
-    const feeText = r.fee ? ` Provision für den Wettersteller: ${euro(r.fee)}.` : '';
-    return `Ergebnis „${r.label}“ gespeichert. ${euro(r.paidTotal)} wurden an ${r.winnerCount} Gewinner ausgezahlt.${feeText}`;
+    return voteMessage(r, `„${r.label}“`);
   })
 );
 
 router.post('/wetten/:id/annullieren', validId, requireLogin, (req, res) =>
   action(req, res, async () => {
-    await svc.resolveBet({ actor: req.user, betId: req.params.id, outcome: 'annulliert', note: str(req.body.note) });
-    return 'Die Wette wurde annulliert. Alle Einsätze wurden erstattet.';
+    const r = await svc.resolveBet({ actor: req.user, betId: req.params.id, outcome: 'annulliert', note: str(req.body.note) });
+    return voteMessage(r, 'eine Annullierung');
   })
 );
 

@@ -13,6 +13,7 @@ const tcgService = require('./tcg/tcgService');
 const forumRoutes = require('./routes/forum');
 const forumService = require('./forum/forumService');
 const roles = require('./services/roles');
+const betService = require('./services/betService');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -81,6 +82,8 @@ function createApp() {
     packLogNew: 0,
     forumMine: 0,
     forumOther: 0,
+    betVotePending: 0, // Wetten, in denen meine Stimme zum Ergebnis fehlt
+    betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     roleBadge: roles.roleBadge,
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
     currentPath: '',
@@ -95,17 +98,21 @@ function createApp() {
   // Abzeichen im Menü: offene Angebote an mich und neue Markt-Angebote seit dem letzten Besuch
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
-      [res.locals.tradeIncoming, res.locals.tradeMarketNew, res.locals.newPacks, res.locals.patchNew] = await Promise.all([
-        // rot: Angebote an mich + abgeschlossene Geschäfte, von denen ich noch nichts weiß
-        Promise.all([tradeService.incomingCount(req.user._id), tradeService.newDealsCount(req.user)]).then(([a, b]) => a + b),
-        tradeService.marketNewCount(req.user),
-        tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
-        forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen
-      ]);
+      [res.locals.tradeIncoming, res.locals.tradeMarketNew, res.locals.newPacks, res.locals.patchNew, res.locals.betVotePending] =
+        await Promise.all([
+          // rot: Angebote an mich + abgeschlossene Geschäfte, von denen ich noch nichts weiß
+          Promise.all([tradeService.incomingCount(req.user._id), tradeService.newDealsCount(req.user)]).then(([a, b]) => a + b),
+          tradeService.marketNewCount(req.user),
+          tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
+          forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen
+          betService.pendingVoteCount(req.user._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
+        ]);
       // Forum: Neues in eigenen Themen (rot) und Neues im übrigen Forum
       const forumNew = await forumService.navCounts(req.user);
       res.locals.forumMine = forumNew.mine;
       res.locals.forumOther = forumNew.other;
+      // nur für Devs/Admins: strittige Wetten, die eine entscheidende Stimme brauchen
+      if (req.user.isStaff) res.locals.betDisputes = await betService.disputedCount();
       // nur für den Admin: Pack-Vergaben der Devs seit dem letzten Blick ins Log
       if (req.user.isAdmin) res.locals.packLogNew = await require('./routes/admin').packLogNewCount(req.user);
     }

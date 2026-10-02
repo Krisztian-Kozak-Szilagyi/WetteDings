@@ -64,8 +64,9 @@ module.exports = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  // Provision des Wetterstellers in % vom Topf (gilt für neu erstellte Wetten)
-  creatorFeePercent: Math.min(100, Math.max(0, Number(process.env.CREATOR_FEE_PERCENT ?? 5) || 0)),
+  // Gesamtprovision in % vom Topf (gilt für neu erstellte Wetten). Wettersteller und
+  // Schiedsrichter teilen sie sich zur Hälfte (siehe lib/payout → splitFee).
+  creatorFeePercent: Math.min(100, Math.max(0, Number(process.env.CREATOR_FEE_PERCENT ?? 8) || 0)),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   secureCookies: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProd,
 };

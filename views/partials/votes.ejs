@@ -1,0 +1,20 @@
+<%
+  // Stimmen von Wettersteller und Schiedsrichter (Dev-Stimmen stehen beim Ergebnis)
+  const voteList = (bet.votes || []).filter((v) => v.role === 'creator' || v.role === 'referee');
+  const roleLabel = { creator: 'Wettersteller', referee: 'Schiedsrichter' };
+%>
+<% if (voteList.length) { %>
+  <ul class="vote-list">
+    <% voteList.forEach((v) => { %>
+      <li class="vote-item">
+        <div class="vote-head">
+          <span class="tag"><%= roleLabel[v.role] %></span>
+          <strong><%- userLink(v.byName) %></strong>
+          <span class="pill <%= v.outcome === 'annulliert' ? 'c-nein' : optClass(bet, v.outcome) %>"><%= voteLabel(bet, v.outcome) %></span>
+          <time class="muted small" datetime="<%= new Date(v.at).toISOString() %>"><%= date(v.at) %></time>
+        </div>
+        <% if (v.note) { %><p class="vote-note"><%= v.note %></p><% } %>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>

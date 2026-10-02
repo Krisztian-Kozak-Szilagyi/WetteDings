@@ -24,7 +24,7 @@
 
       <nav id="hauptnavigation" class="nav">
         <% if (currentUser) { %>
-          <a href="/" class="<%= currentPath === '/' ? 'active' : '' %>">Wetten</a>
+          <a href="/" class="nav-badge-link <%= currentPath === '/' ? 'active' : '' %>">Wetten<% if (betVotePending) { %><span class="nav-badges"><span class="nav-badge" title="Wetten, in denen deine Stimme zum Ergebnis fehlt" aria-label="<%= betVotePending %> Wetten warten auf deine Stimme"><%= betVotePending > 99 ? '99+' : betVotePending %></span></span><% } %></a>
           <a href="/rangliste" class="<%= currentPath === '/rangliste' ? 'active' : '' %>">Rangliste</a>
           <a href="/coin-exchange" class="<%= currentPath === '/coin-exchange' ? 'active' : '' %>">Coin Exchange</a>
           <a href="/lotterie" class="<%= currentPath === '/lotterie' ? 'active' : '' %>">Lotterie</a>
@@ -34,7 +34,7 @@
           <a href="/forum" class="nav-badge-link <%= currentPath.startsWith('/forum') ? 'active' : '' %>">Forum<% if (forumMine || forumOther) { %><span class="nav-badges"><% if (forumOther) { %><span class="nav-badge nav-badge-market" title="Neues im Forum" aria-label="<%= forumOther %> Themen mit neuen Beiträgen"><%= forumOther > 99 ? '99+' : forumOther %></span><% } %><% if (forumMine) { %><span class="nav-badge" title="Neues in deinen Themen" aria-label="<%= forumMine %> deiner Themen mit neuen Beiträgen"><%= forumMine > 99 ? '99+' : forumMine %></span><% } %></span><% } %></a>
         <% } %>
         <% if (currentUser && currentUser.isStaff) { %>
-          <a href="/admin" class="nav-badge-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>"><%= currentUser.isAdmin ? 'Admin' : 'Dev' %><% if (packLogNew) { %><span class="nav-badges"><span class="nav-badge" title="Neue Pack-Vergaben" aria-label="<%= packLogNew %> neue Pack-Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span></span><% } %></a>
+          <a href="/admin" class="nav-badge-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>"><%= currentUser.isAdmin ? 'Admin' : 'Dev' %><% if (packLogNew || betDisputes) { %><span class="nav-badges"><% if (betDisputes) { %><span class="nav-badge nav-badge-dispute" title="Strittige Wetten, die ein Dev entscheiden muss" aria-label="<%= betDisputes %> strittige Wetten"><%= betDisputes > 99 ? '99+' : betDisputes %></span><% } %><% if (packLogNew) { %><span class="nav-badge" title="Neue Pack-Vergaben" aria-label="<%= packLogNew %> neue Pack-Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span><% } %></span><% } %></a>
         <% } %>
         <div class="nav-user">
           <% if (currentUser) { %>

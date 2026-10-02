@@ -31,7 +31,9 @@ async function propagateName(userId, oldName, name, session) {
   const opt = { session };
   await Promise.all([
     Bet.updateMany({ creator: userId }, { $set: { creatorName: name } }, opt),
+    Bet.updateMany({ referee: userId }, { $set: { refereeName: name } }, opt),
     Bet.updateMany({ resolvedBy: userId }, { $set: { resolvedByName: name } }, opt),
+    Bet.updateMany({ 'votes.by': userId }, { $set: { 'votes.$[v].byName': name } }, { ...opt, arrayFilters: [{ 'v.by': userId }] }),
     Bet.updateMany({ 'edits.byName': oldName }, { $set: { 'edits.$[e].byName': name } }, { ...opt, arrayFilters: [{ 'e.byName': oldName }] }),
     Comment.updateMany({ user: userId }, { $set: { username: name } }, opt),
     Comment.updateMany({ deletedByName: oldName }, { $set: { deletedByName: name } }, opt),

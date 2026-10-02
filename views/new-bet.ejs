@@ -4,11 +4,16 @@
   <p class="breadcrumb"><a href="/">← Alle Wetten</a></p>
   <div class="card">
     <h1>Neue Wette aufstellen</h1>
-    <p class="muted">Formuliere eine Frage oder Aussage, die später eindeutig entschieden werden kann. Die anderen setzen auf die Optionen – du bist Wettersteller und entscheidest am Ende, was eingetreten ist.</p>
+    <p class="muted">Formuliere eine Frage oder Aussage, die später eindeutig entschieden werden kann. Die anderen setzen auf die Optionen – du und ein Schiedsrichter deiner Wahl bestätigen am Ende gemeinsam, was eingetreten ist.</p>
 
     <div class="info-box">
-      <strong>Als Wettersteller setzt du nicht selbst mit.</strong>
-      <span>Dafür bekommst du <strong><%= feePercent %> % vom Topf</strong> als Provision, sobald du das Ergebnis einträgst (nicht bei Annullierung oder wenn alle ihren Einsatz zurückbekommen).</span>
+      <strong>Das Ergebnis entscheidet ihr zu zweit.</strong>
+      <span>Du wählst ein weiteres Mitglied als <strong>Schiedsrichter</strong>. Am Ende tragt ihr beide ein, was eingetreten ist – ausgezahlt wird nur, wenn ihr <strong>einstimmig</strong> seid. Seid ihr euch nicht einig, entscheidet ein Dev.</span>
+    </div>
+
+    <div class="info-box">
+      <strong>Ihr beide setzt nicht mit – dafür gibt es Provision.</strong>
+      <span>Sobald das Ergebnis feststeht, gehen <strong><%= feePercent %> % vom Topf</strong> an euch: je die Hälfte für dich und deinen Schiedsrichter (nicht bei Annullierung oder wenn alle ihren Einsatz zurückbekommen).</span>
     </div>
 
     <% if (errors.length) { %>
@@ -60,6 +65,20 @@
         <button type="button" class="btn btn-ghost btn-sm add-option" data-add-option>+ Option hinzufügen</button>
         <small class="muted">Mindestens <%= minOptions %>, höchstens <%= maxOptions %> Optionen. <strong>Nach dem Veröffentlichen können keine Optionen mehr hinzugefügt oder geändert werden.</strong></small>
       </div>
+
+      <label class="field">
+        <span>Schiedsrichter</span>
+        <select name="referee" required <%= candidates.length ? '' : 'disabled' %>>
+          <option value="">– Mitglied auswählen –</option>
+          <% candidates.forEach((u) => { %>
+            <option value="<%= u._id %>" <%= values.referee === String(u._id) ? 'selected' : '' %>><%= u.username %></option>
+          <% }) %>
+        </select>
+        <small class="muted">Dieses Mitglied bestätigt am Ende gemeinsam mit dir das Ergebnis. Es kann bei dieser Wette <strong>nicht mitsetzen</strong> und lässt sich später nicht mehr wechseln – wähle also jemanden, der das Ereignis zuverlässig beurteilen kann.</small>
+        <% if (!candidates.length) { %>
+          <small class="neg">Es gibt bisher kein weiteres Mitglied, das als Schiedsrichter einspringen könnte.</small>
+        <% } %>
+      </label>
 
       <label class="field">
         <span>Einsatzschluss</span>

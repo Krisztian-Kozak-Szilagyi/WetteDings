@@ -10,10 +10,23 @@
   const descEdited = edits.some((e) => e.field === 'description');
   const totals = {};
   bet.options.forEach((o) => { totals[o.key] = o.total; });
+  // Schiedsrichter-Verfahren: Stimmen von Ersteller und Schiedsrichter müssen übereinstimmen
+  const creatorVote = voteOf(bet, 'creator');
+  const refereeVote = voteOf(bet, 'referee');
+  const votes = (bet.votes || []).filter((v) => v.role === 'creator' || v.role === 'referee');
+  const devVote = voteOf(bet, 'dev');
+  const myRoleLabel = role === 'creator' ? 'Wettersteller' : role === 'referee' ? 'Schiedsrichter' : currentUser && currentUser.isAdmin ? 'Admin' : 'Dev';
+  // Genau eine der beiden Stimmen liegt vor – dann wird auf die andere Seite gewartet
+  const pendingVote = bet.referee && !!creatorVote !== !!refereeVote ? creatorVote || refereeVote : null;
+  const waitingFor = pendingVote ? (pendingVote.role === "creator" ? bet.refereeName : bet.creatorName) : null;
+  // Die bereits abgegebene Stimme der anderen Seite – der Indikator für meine eigene Entscheidung
+  const otherVote = role === 'creator' ? refereeVote : role === 'referee' ? creatorVote : null;
+  const otherName = role === 'creator' ? bet.refereeName : bet.creatorName;
+  const fees = feeSplit(bet);
 %>
 
 <div hidden data-live-root data-live-url="/wetten/<%= bet._id %>/stand" data-live-version="<%= liveVersion %>"
-     data-live-signature="<%= bet.status %>|<%= accepting ? 1 : 0 %>|<%= myPosition ? myPosition.side : '-' %>|<%= edits.length %>|<%= perms.resolve ? 1 : 0 %>|<%= perms.edit ? 1 : 0 %>"></div>
+     data-live-signature="<%= bet.status %>|<%= accepting ? 1 : 0 %>|<%= myPosition ? myPosition.side : '-' %>|<%= edits.length %>|<%= perms.resolve ? 1 : 0 %>|<%= perms.edit ? 1 : 0 %>|<%= votes.length %>|<%= bet.disputed ? 1 : 0 %>"></div>
 
 <div class="bet-toolbar">
   <a class="breadcrumb" href="/">← Alle Wetten</a>
@@ -46,10 +59,21 @@
         <% if (isJaNein) { %>Ja/Nein-Wette.<% } else { %>Wette mit <%= bet.options.length %> Optionen.<% } %>
         <% if (legacyCreatorBet) { %>
           <%= bet.creatorName %> setzt auf <strong class="opt-text <%= optClass(bet, bet.creatorSide) %>"><%= optionLabel(bet, bet.creatorSide) %></strong>.
+        <% } else if (bet.referee) { %>
+          Wettersteller <%= bet.creatorName %> und Schiedsrichter <%= bet.refereeName %> setzen nicht mit<% if (feePct) { %> und teilen sich <%= feePct %> % vom Topf als Provision<% } %>.
         <% } else { %>
           Wettersteller <%= bet.creatorName %> setzt nicht mit<% if (feePct) { %> und erhält <%= feePct %> % vom Topf als Provision<% } %>.
         <% } %>
       </p>
+
+      <% if (bet.referee) { %>
+        <p class="muted small referee-line">
+          Schiedsrichter: <strong><%- userLink(bet.refereeName) %></strong> – bestätigt das Ergebnis gemeinsam mit <%= bet.creatorName %>.
+          Nur wenn beide dasselbe eintragen, wird ausgezahlt; sonst entscheidet ein Dev.
+        </p>
+      <% } else { %>
+        <p class="muted small referee-line">Wette ohne Schiedsrichter (vor Einführung des Verfahrens aufgestellt) – hier entscheidet der Wettersteller allein.</p>
+      <% } %>
 
       <div class="dates">
         <div class="date-box <%= st.key === 'offen' ? 'is-next' : 'is-past' %>">
@@ -88,24 +112,56 @@
       <%- include('partials/bar', { bet, big: true }) %>
       <% if (!total && !settled) { %><p class="muted small">Noch keine Einsätze – sei die erste Person, die setzt!</p><% } %>
 
+      <%
+        // Wie das Ergebnis zustande kam (alte Wetten ohne resolvedVia: Ersteller bzw. Admin)
+        const viaText = {
+          einstimmig: 'einstimmig bestätigt von Wettersteller und Schiedsrichter',
+          dev: 'entschieden von einem Dev, weil Wettersteller und Schiedsrichter sich nicht einig waren',
+          system: 'automatisch eingetragen, weil kein Ergebnis gemeldet wurde',
+          ersteller: 'eingetragen vom Wettersteller',
+        }[bet.resolvedVia] || 'eingetragen';
+      %>
       <% if (bet.status === 'entschieden') { %>
         <div class="result result-win">
           <strong>Ergebnis: <%= optionLabel(bet, bet.outcome) %></strong>
-          <span>eingetragen von <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
+          <span><%= viaText %> · <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
           <% if (bet.resolutionNote) { %><span class="result-note"><b>Begründung:</b> <%= bet.resolutionNote %></span><% } %>
           <% if (bet.refunded) { %><span>Da es keine Gegenseite gab, wurden alle Einsätze erstattet.</span><% } %>
-          <% if (bet.creatorFee) { %><span>Provision an <%= bet.creatorName %>: <%= euro(bet.creatorFee) %> (<%= feePct %> % vom Topf)</span><% } %>
+          <% if (bet.creatorFee || bet.refereeFee) { %>
+            <span>Provision (<%= feePct %> % vom Topf): <%= euro(bet.creatorFee) %> an <%= bet.creatorName %><% if (bet.refereeFee) { %>, <%= euro(bet.refereeFee) %> an <%= bet.refereeName %><% } %></span>
+          <% } %>
         </div>
       <% } else if (bet.status === 'annulliert') { %>
         <div class="result result-void">
           <strong>Annulliert – alle Einsätze wurden erstattet.</strong>
-          <span>von <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
+          <span><%= viaText %> · <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
           <% const why = bet.resolutionNote || bet.voidReason; if (why) { %><span class="result-note"><b>Begründung:</b> <%= why %></span><% } %>
+        </div>
+      <% } else if (bet.disputed) { %>
+        <div class="result result-dispute">
+          <strong>Strittig: Wettersteller und Schiedsrichter sind sich nicht einig.</strong>
+          <span><%= bet.creatorName %> hat für „<%= voteLabel(bet, creatorVote.outcome) %>“ gestimmt, <%= bet.refereeName %> für „<%= voteLabel(bet, refereeVote.outcome) %>“.</span>
+          <span>Solange das so bleibt, wird nicht ausgezahlt. Ein Dev entscheidet mit seiner Stimme – oder eine der beiden Seiten ändert ihre Stimme.</span>
+        </div>
+      <% } else if (pendingVote) { %>
+        <div class="result result-wait">
+          <strong><%= pendingVote.byName %> hat für „<%= voteLabel(bet, pendingVote.outcome) %>“ gestimmt.</strong>
+          <span>Es fehlt die Bestätigung von <%= waitingFor %>. Erst wenn beide dasselbe eintragen, wird ausgezahlt. Einsätze sind nicht mehr möglich.</span>
         </div>
       <% } else if (st.key === 'wartend') { %>
         <div class="result result-wait">
           <strong>Einsatzschluss erreicht.</strong>
-          <span>Wartet darauf, dass <%= bet.creatorName %> das Ergebnis einträgt<% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
+          <span>Wartet darauf, dass <%= bet.referee ? bet.creatorName + ' und ' + bet.refereeName + ' das Ergebnis eintragen' : bet.creatorName + ' das Ergebnis einträgt' %><% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
+        </div>
+      <% } %>
+
+      <% if (votes.length) { %>
+        <div class="votes-box">
+          <h3 class="votes-title">Stimmen zum Ergebnis</h3>
+          <%- include('partials/votes', { bet }) %>
+          <% if (devVote) { %>
+            <p class="muted small">Entschieden hat am Ende <strong><%- userLink(devVote.byName) %></strong> als Dev.</p>
+          <% } %>
         </div>
       <% } %>
       </div>
@@ -218,9 +274,24 @@
           <p>Deine Provision: <strong class="<%= bet.creatorFee ? 'pos' : '' %>"><%= euro(bet.creatorFee || 0) %></strong></p>
         <% } else { %>
           <p>Du bist Wettersteller und kannst nicht selbst mitsetzen.</p>
-          <% if (feePct) { %>
-            <p class="muted">Deine Provision nach aktuellem Stand: bis zu <strong><%= euro(feeEstimate(bet)) %></strong> (<%= feePct %> % vom Topf, höchstens die Einsätze der Verlierer). Sie wird ausgezahlt, wenn du das Ergebnis einträgst – nicht bei Annullierung oder wenn es keine Gegenseite gibt.</p>
+          <% if (bet.referee) { %>
+            <p class="muted">Das Ergebnis trägst du gemeinsam mit <strong><%- userLink(bet.refereeName) %></strong> ein – ausgezahlt wird nur, wenn ihr dasselbe eintragt.</p>
           <% } %>
+          <% if (feePct) { %>
+            <p class="muted">Dein Provisionsanteil nach aktuellem Stand: bis zu <strong><%= euro(fees.creator) %></strong><% if (bet.referee) { %> (die Hälfte von <%= feePct %> % des Topfes, die andere Hälfte geht an <%= bet.refereeName %>)<% } else { %> (<%= feePct %> % vom Topf)<% } %>, höchstens die Einsätze der Verlierer. Ausgezahlt wird sie, wenn das Ergebnis feststeht – nicht bei Annullierung oder wenn es keine Gegenseite gibt.</p>
+          <% } %>
+        <% } %>
+      </div>
+    <% } %>
+
+    <% if (isReferee) { %>
+      <div class="card card-accent" data-live="referee-card">
+        <h2>Du bist Schiedsrichter</h2>
+        <% if (settled) { %>
+          <p>Deine Provision: <strong class="<%= bet.refereeFee ? 'pos' : '' %>"><%= euro(bet.refereeFee || 0) %></strong></p>
+        <% } else { %>
+          <p>Du bestätigst gemeinsam mit <strong><%- userLink(bet.creatorName) %></strong>, was eingetreten ist.</p>
+          <p class="muted">Du kannst hier nicht mitsetzen<% if (feePct) { %>, bekommst aber nach aktuellem Stand bis zu <strong><%= euro(fees.referee) %></strong> Provision (die Hälfte von <%= feePct %> % des Topfes)<% } %>. Ausgezahlt wird nur, wenn ihr beide dasselbe Ergebnis eintragt – sonst entscheidet ein Dev.</p>
         <% } %>
       </div>
     <% } %>
@@ -280,7 +351,7 @@
           </div>
           <p class="estimate" aria-live="polite"></p>
           <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < minStake ? 'disabled' : '' %>>Einsatz platzieren</button>
-          <p class="muted small">Verfügbar: <span data-live="stake-balance"><%= euro(currentUser.balance) %></span>. Die Quote kann sich bis zum Einsatzschluss noch ändern.<% if (feePct) { %> <%= feePct %> % des Topfes gehen als Provision an den Wettersteller.<% } %></p>
+          <p class="muted small">Verfügbar: <span data-live="stake-balance"><%= euro(currentUser.balance) %></span>. Die Quote kann sich bis zum Einsatzschluss noch ändern.<% if (feePct) { %> <%= feePct %> % des Topfes gehen als Provision an <%= bet.referee ? 'Wettersteller und Schiedsrichter' : 'den Wettersteller' %>.<% } %></p>
         </form>
       </div>
     <% } else if (!currentUser && accepting) { %>
@@ -299,16 +370,52 @@
         <h2>Wette verwalten</h2>
 
         <% if (perms.resolve) { %>
-          <form method="post" action="/wetten/<%= bet._id %>/entscheiden" class="resolve-form" data-confirm-resolve>
+          <form method="post" action="/wetten/<%= bet._id %>/entscheiden" class="resolve-form"
+                data-confirm-resolve="<%= decidesAlone ? 'Ergebnis „%s“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.' : 'Stimme für „%s“ abgeben? Ausgezahlt wird, sobald die andere Seite dasselbe einträgt.' %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <p><strong>Ergebnis eintragen</strong></p>
-            <p class="muted small">Als <%= isOwner ? 'Ersteller' : 'Admin' %> kannst du jederzeit festlegen, was eingetreten ist. Die Wette wird dann sofort geschlossen und ausgezahlt.</p>
+            <p><strong><%= decidesAlone ? 'Ergebnis eintragen' : 'Deine Stimme zum Ergebnis' %></strong></p>
+            <% if (decidesAlone && role === 'dev') { %>
+              <p class="muted small">Als <%= myRoleLabel %> gibst du die entscheidende Stimme ab – auch dann, wenn Wettersteller und Schiedsrichter sich nicht einig sind. Die Wette wird sofort geschlossen und ausgezahlt.</p>
+            <% } else if (decidesAlone) { %>
+              <p class="muted small">Diese Wette hat keinen Schiedsrichter. Du kannst jederzeit festlegen, was eingetreten ist – die Wette wird dann sofort geschlossen und ausgezahlt.</p>
+            <% } else { %>
+              <p class="muted small">
+                Als <%= myRoleLabel %> gibst du eine von zwei Stimmen ab. Ausgezahlt wird erst, wenn
+                <strong><%= role === 'creator' ? bet.refereeName : bet.creatorName %></strong> dasselbe Ergebnis einträgt.
+                Bei Uneinigkeit entscheidet ein Dev.
+                <% if (accepting) { %><br><strong>Achtung:</strong> Deine Stimme beendet sofort die Einsatzphase.<% } %>
+              </p>
+            <% } %>
+            <% if (otherVote) { %>
+              <div class="vote-indicator">
+                <div class="vote-indicator-head">
+                  <span class="vote-indicator-label"><%= otherName %> hat gestimmt für</span>
+                  <span class="pill <%= otherVote.outcome === 'annulliert' ? 'c-nein' : optClass(bet, otherVote.outcome) %>"><%= voteLabel(bet, otherVote.outcome) %></span>
+                </div>
+                <% if (otherVote.note) { %><p class="vote-note"><%= otherVote.note %></p><% } %>
+                <p class="muted small">Trägst du dasselbe ein, wird sofort ausgezahlt. Bei einer anderen Stimme wird die Wette strittig und ein Dev entscheidet.</p>
+              </div>
+            <% } else if (role === 'dev' && votes.length) { %>
+              <div class="vote-indicator">
+                <span class="vote-indicator-label">Bereits abgegebene Stimmen</span>
+                <%- include('partials/votes', { bet }) %>
+              </div>
+            <% } %>
+            <% if (myVote) { %>
+              <p class="muted small">Deine aktuelle Stimme: <span class="pill <%= myVote.outcome === 'annulliert' ? 'c-nein' : optClass(bet, myVote.outcome) %>"><%= voteLabel(bet, myVote.outcome) %></span> – du kannst sie bis zum Abschluss noch ändern.</p>
+            <% } %>
             <fieldset class="side-picker <%= bet.options.length > 2 ? 'side-picker-many' : '' %>">
               <legend class="sr-only">Eingetretene Option</legend>
-              <% bet.options.forEach((o) => { %>
-                <label class="side-option side-option-sm <%= optClass(bet, o.key) %>">
-                  <input type="radio" name="outcome" value="<%= o.key %>" data-label="<%= o.label %>" required>
+              <% bet.options.forEach((o) => {
+                   // Wer bisher für diese Option gestimmt hat – der Indikator direkt an der Auswahl
+                   const by = [];
+                   if (myVote && myVote.outcome === o.key) by.push('Deine Stimme');
+                   if (creatorVote && creatorVote.outcome === o.key && role !== 'creator') by.push('Stimme von ' + bet.creatorName);
+                   if (refereeVote && refereeVote.outcome === o.key && role !== 'referee') by.push('Stimme von ' + bet.refereeName); %>
+                <label class="side-option side-option-sm <%= optClass(bet, o.key) %> <%= by.length ? 'is-voted' : '' %>">
+                  <input type="radio" name="outcome" value="<%= o.key %>" data-label="<%= o.label %>" <%= myVote && myVote.outcome === o.key ? 'checked' : '' %> required>
                   <span class="side-option-title"><%= o.label %></span>
+                  <% if (by.length) { %><span class="side-option-sub"><%= by.join(' · ') %></span><% } %>
                 </label>
               <% }) %>
             </fieldset>
@@ -316,7 +423,9 @@
               <span>Begründung <em class="muted">(Pflicht, für alle sichtbar)</em></span>
               <textarea name="note" rows="3" minlength="<%= noteMin %>" maxlength="<%= noteMax %>" required></textarea>
             </label>
-            <button class="btn btn-primary btn-block" type="submit">Ergebnis festlegen &amp; auszahlen</button>
+            <button class="btn btn-primary btn-block" type="submit">
+              <%= decidesAlone ? 'Ergebnis festlegen & auszahlen' : (myVote ? 'Stimme ändern' : 'Stimme abgeben') %>
+            </button>
           </form>
         <% } %>
 
@@ -330,17 +439,23 @@
         <% if (perms.void) { %>
           <details class="void-box">
             <summary>Wette annullieren</summary>
-            <form method="post" action="/wetten/<%= bet._id %>/annullieren" data-confirm="Wette wirklich annullieren? Alle bekommen ihren Einsatz zurück.">
+            <form method="post" action="/wetten/<%= bet._id %>/annullieren"
+                  data-confirm="<%= decidesAlone ? 'Wette wirklich annullieren? Alle bekommen ihren Einsatz zurück.' : 'Für eine Annullierung stimmen? Erstattet wird erst, wenn die andere Seite zustimmt.' %>">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <% if (otherVote && otherVote.outcome === 'annulliert') { %>
+                <p class="small"><strong><%= otherName %> hat bereits für eine Annullierung gestimmt.</strong> Mit deiner Zustimmung werden alle Einsätze sofort erstattet.</p>
+              <% } else if (!decidesAlone) { %>
+                <p class="muted small">Auch die Annullierung braucht beide Stimmen – <%= otherName %> muss zustimmen<% if (otherVote) { %>, hat aber für „<%= voteLabel(bet, otherVote.outcome) %>“ gestimmt<% } %>.</p>
+              <% } %>
               <label class="field">
                 <span>Begründung <em class="muted">(Pflicht)</em></span>
                 <textarea name="note" rows="2" minlength="<%= noteMin %>" maxlength="300" required></textarea>
               </label>
-              <button class="btn btn-danger btn-block" type="submit">Annullieren &amp; erstatten</button>
+              <button class="btn btn-danger btn-block" type="submit"><%= decidesAlone ? 'Annullieren & erstatten' : 'Für Annullierung stimmen' %></button>
             </form>
           </details>
         <% } %>
-        <% if (currentUser.isStaff && !isOwner) { %><p class="muted small">Du siehst diese Optionen als <%= currentUser.isAdmin ? 'Admin' : 'Dev' %>.</p><% } %>
+        <% if (role === 'dev') { %><p class="muted small">Du siehst diese Optionen als <%= myRoleLabel %> – deine Stimme entscheidet auch Streitfälle.</p><% } %>
       </div>
     <% } %>
   </aside>

@@ -13,6 +13,16 @@
 </div>
 <% } %>
 
+<div class="card" id="streitfaelle">
+  <h2>Streitfälle <%= betDisputes ? '(' + betDisputes + ')' : '' %></h2>
+  <p class="muted">Wetten, bei denen Wettersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben. Dort wird nichts ausgezahlt, bis ein Dev mit seiner Stimme entscheidet.</p>
+  <% if (betDisputes) { %>
+    <p><a class="btn btn-primary" href="/admin/streitfaelle"><%= betDisputes %> <%= betDisputes === 1 ? 'Streitfall' : 'Streitfälle' %> entscheiden</a></p>
+  <% } else { %>
+    <p><a class="btn btn-ghost" href="/admin/streitfaelle">Streitfälle ansehen</a> <span class="muted small">Aktuell gibt es keine.</span></p>
+  <% } %>
+</div>
+
 <% if (currentUser.isAdmin) { %>
 <div class="card" id="tcg">
   <h2>TCG: Chancen &amp; Preise</h2>

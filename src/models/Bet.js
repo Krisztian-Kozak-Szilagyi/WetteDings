@@ -14,6 +14,22 @@ const optionSchema = new Schema(
   { _id: false }
 );
 
+// Stimme zum Ausgang einer Wette. Wettersteller und Schiedsrichter müssen übereinstimmen,
+// sonst entscheidet ein Dev (siehe lib/verdict).
+const VOTE_ROLES = ['creator', 'referee', 'dev', 'system'];
+
+const voteSchema = new Schema(
+  {
+    role: { type: String, enum: VOTE_ROLES, required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // null beim System
+    byName: { type: String, required: true },
+    outcome: { type: String, required: true }, // key der Option oder 'annulliert'
+    note: { type: String, default: '', maxlength: 500 },
+    at: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const betSchema = new Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 140 },
@@ -27,9 +43,21 @@ const betSchema = new Schema(
     creatorName: { type: String, required: true },
     // Nur bei alten Wetten gesetzt: damals durfte der Ersteller noch mitwetten
     creatorSide: { type: String, default: null },
-    // Provision des Erstellers in % vom Topf – beim Erstellen festgeschrieben (alte Wetten: 0)
+    // Schiedsrichter: bestätigt das Ergebnis gemeinsam mit dem Ersteller (Pflicht bei neuen Wetten,
+    // alte Wetten: null – dort entscheidet der Ersteller weiterhin allein)
+    referee: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    refereeName: { type: String, default: null },
+    // Abgegebene Stimmen zum Ausgang (je Rolle höchstens eine)
+    votes: { type: [voteSchema], default: [] },
+    // true, solange Ersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben
+    disputed: { type: Boolean, default: false },
+    // Wie das Ergebnis zustande kam
+    resolvedVia: { type: String, enum: ['ersteller', 'einstimmig', 'dev', 'system', null], default: null },
+    // Gesamtprovision in % vom Topf – beim Erstellen festgeschrieben (alte Wetten: 0).
+    // Ersteller und Schiedsrichter teilen sie sich (siehe lib/payout → splitFee).
     creatorFeePercent: { type: Number, default: 0, min: 0, max: 100 },
-    creatorFee: { type: Number, default: 0 }, // tatsächlich ausgezahlte Provision in Cent
+    creatorFee: { type: Number, default: 0 }, // tatsächlich ausgezahlte Provision des Erstellers in Cent
+    refereeFee: { type: Number, default: 0 }, // tatsächlich ausgezahlte Provision des Schiedsrichters in Cent
     // Einsatzschluss: danach sind keine Einsätze mehr möglich
     deadline: { type: Date, required: true },
     // Geplanter Termin der Auswertung (Ergebnisbekanntgabe) – nicht vor dem Einsatzschluss. Alte Wetten: null
@@ -67,6 +95,8 @@ const betSchema = new Schema(
 );
 
 betSchema.index({ status: 1, deadline: 1 });
+betSchema.index({ status: 1, disputed: 1 }); // Streitfälle im Dev-Panel
+betSchema.index({ referee: 1, status: 1 });
 betSchema.index({ status: 1, resolvedAt: -1 });
 betSchema.index({ createdAt: -1 });
 betSchema.index({ updatedAt: -1 }); // für die Live-Aktualisierung der Übersicht
@@ -75,3 +105,4 @@ module.exports = model('Bet', betSchema);
 module.exports.TYPES = TYPES;
 module.exports.MIN_OPTIONS = MIN_OPTIONS;
 module.exports.MAX_OPTIONS = MAX_OPTIONS;
+module.exports.VOTE_ROLES = VOTE_ROLES;
