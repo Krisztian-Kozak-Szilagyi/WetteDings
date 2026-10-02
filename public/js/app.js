@@ -402,8 +402,11 @@
     e.preventDefault();
     e.stopPropagation();
     // nur Profil-Seiten dieser Plattform
-    var href = el.getAttribute('data-user-link') || '';
-    if (/^\/profil\/[^/\\]+$/.test(href)) window.location.assign(href);
+    var m = /^\/profil\/([^/\\]+)$/.exec(el.getAttribute('data-user-link') || '');
+    if (!m) return;
+    var name = m[1];
+    try { name = decodeURIComponent(name); } catch (err) { /* Name bleibt, wie er ist */ }
+    window.location.assign('/profil/' + encodeURIComponent(name));
   }
   document.addEventListener('click', go, true);
   document.addEventListener('keydown', go, true);

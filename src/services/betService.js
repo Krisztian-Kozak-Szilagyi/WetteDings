@@ -370,8 +370,10 @@ async function deleteBet({ actor, betId }) {
     await Bet.deleteOne({ _id: betId }, { session });
   });
   // Titel ohne Zeilenumbrüche ins Protokoll (er stammt von Nutzern)
-  const logTitle = String(bet.title).replace(/[\r\n]+/g, ' ');
-  console.log(`Wette "${logTitle}" (${betId}) gelöscht von ${actor.username}${wasOpen ? ' – Einsätze erstattet' : ''}.`);
+  const logTitle = String(bet.title).replace(/\n|\r/g, ' ');
+  const logActor = String(actor.username).replace(/\n|\r/g, ' ');
+  const logId = String(betId).replace(/\n|\r/g, '');
+  console.log(`Wette "${logTitle}" (${logId}) gelöscht von ${logActor}${wasOpen ? ' – Einsätze erstattet' : ''}.`);
   return { title: bet.title, refunded: wasOpen };
 }
 

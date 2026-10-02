@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { registerUser } = require('../services/betService');
-const { str, isLocalUrl, safeRedirect, UserError } = require('../lib/util');
+const { str, safeRedirect, UserError } = require('../lib/util');
 const { normalizeCode } = require('../services/codeService');
 const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../services/usernameRules');
 const config = require('../config');
@@ -96,7 +96,9 @@ router.post('/registrieren', authLimiter, async (req, res) => {
 
 router.get('/anmelden', (req, res) => {
   if (req.user) return res.redirect('/');
-  res.render('login', { title: 'Anmelden', error: null, values: {}, weiter: safeRedirect(req.query.weiter, '') });
+  // Das Ziel nach der Anmeldung merkt sich der Server in der Sitzung – es wird nicht aus dem Formular übernommen
+  req.session.loginTarget = safeRedirect(req.query.weiter, '');
+  res.render('login', { title: 'Anmelden', error: null, values: {}, weiter: req.session.loginTarget });
 });
 
 router.post('/anmelden', authLimiter, async (req, res) => {
@@ -122,12 +124,10 @@ router.post('/anmelden', authLimiter, async (req, res) => {
     return res.status(403).render('login', { title: 'Anmelden', error: deviceService.banMessage(ban, date), values: { login: str(req.body.login) }, weiter });
   }
 
+  const target = safeRedirect(req.session.loginTarget, '/'); // vor dem Sitzungswechsel lesen
   await startSession(req, user._id);
   req.flash('success', `Schön, dass du da bist, ${user.username}!`);
-  // nur auf Seiten dieser Plattform weiterleiten
-  const target = str(req.body.weiter);
-  if (isLocalUrl(target)) return res.redirect(target);
-  res.redirect('/');
+  res.redirect(target);
 });
 
 // Der Browser meldet einmal pro Sitzung seinen Fingerabdruck (public/js/device.js). "alt" ist die Geräte-Kennung
