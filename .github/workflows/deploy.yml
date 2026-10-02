@@ -41,8 +41,8 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -56,17 +56,17 @@ jobs:
     outputs:
       name: ${{ steps.meta.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Image-Adresse (klein geschrieben)
         id: meta
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           load: true # erst lokal laden und prüfen, hochgeladen wird danach
@@ -127,7 +127,7 @@ jobs:
             echo "::notice::Deployment übersprungen – die DEPLOY_*-Secrets sind noch nicht eingerichtet."
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.ready.outputs.ok == 'true'
 
       - name: SSH einrichten
