@@ -1,0 +1,30 @@
+# Dependabot: schlägt per Pull Request Aktualisierungen vor – für die npm-Pakete, die in den Workflows
+# verwendeten Actions und das Basis-Image des Containers. Sicherheitsupdates kommen sofort (dafür müssen
+# in den Repository-Einstellungen "Dependabot alerts" und "Dependabot security updates" eingeschaltet sein),
+# gewöhnliche Updates gesammelt einmal pro Woche.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      kleine-updates: # Minor- und Patch-Versionen in einem gemeinsamen PR
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

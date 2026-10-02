@@ -1,0 +1,23 @@
+# Tests für Pull Requests: Vor dem Zusammenführen ist sichtbar, ob die Tests grün sind.
+# (Auf main laufen die Tests im Deployment, siehe deploy.yml.)
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

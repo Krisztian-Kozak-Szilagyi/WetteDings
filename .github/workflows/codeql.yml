@@ -1,0 +1,35 @@
+# CodeQL: durchsucht den Code nach Schwachstellen (z. B. Injection, XSS, unsichere Weiterleitungen).
+# Läuft bei jedem Push auf main, bei jedem Pull Request und einmal pro Woche (neue Regeln finden auch
+# in altem Code etwas). Ergebnisse: GitHub → Security → Code scanning.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '27 3 * * 1' # montags früh
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyse (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions] # App-Code und die Workflows selbst
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

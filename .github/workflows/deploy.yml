@@ -18,6 +18,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Änderungen, die die laufende App nicht betreffen, lösen kein Deployment (und keinen Neustart) aus
+    paths-ignore:
+      - '**.md'
+      - '.github/dependabot.yml'
+      - '.github/workflows/codeql.yml'
+      - '.github/workflows/ci.yml'
+      - 'test/**'
   workflow_dispatch: # von Hand starten: Actions → Deploy → Run workflow
 
 # nie zwei Deployments gleichzeitig; ein laufendes wird zu Ende geführt
