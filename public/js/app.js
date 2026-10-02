@@ -12,6 +12,18 @@
     });
   }
 
+  // Zugeklappte Karte aufklappen, wenn die Adresse auf sie zeigt (z. B. /admin#tcg nach dem Speichern)
+  var openTarget = function () {
+    var el = null;
+    try { el = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null; } catch (err) { /* ungültige Adresse */ }
+    if (el && el.tagName === 'DETAILS' && !el.open) {
+      el.open = true;
+      el.scrollIntoView();
+    }
+  };
+  openTarget();
+  window.addEventListener('hashchange', openTarget);
+
   // Hinweise schließen (delegiert – funktioniert auch für nachgeladene Hinweise)
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('.flash-close');

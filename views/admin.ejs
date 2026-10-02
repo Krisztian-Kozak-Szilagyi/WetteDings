@@ -24,8 +24,8 @@
 </div>
 
 <% if (currentUser.isAdmin) { %>
-<div class="card" id="tcg">
-  <h2>TCG: Chancen &amp; Preise</h2>
+<details class="card fold" id="tcg">
+  <summary><h2>TCG: Chancen &amp; Preise</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.</p>
   <%
     const toInput = (c) => (c / 100).toFixed(2).replace('.', ',');
@@ -63,12 +63,12 @@
       <p class="muted small">Zuletzt geändert von <%= tcg.lastUpdate.updatedByName %> · <%= date(tcg.lastUpdate.updatedAt) %></p>
     <% } %>
   </form>
-</div>
+</details>
 
 <% } %>
 
-<div class="card" id="packs">
-  <h2>TCG: Booster Packs vergeben</h2>
+<details class="card fold" id="packs">
+  <summary><h2>TCG: Booster Packs vergeben<% if (packLogNew) { %> <span class="muted small">(<%= packLogNew > 99 ? '99+' : packLogNew %> neu im Pack-Log)</span><% } %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Schenkt einem Mitglied ungeöffnete Booster Packs. Sie landen in seinem Inventar auf der TCG-Seite („Meine Packs“). Jede Vergabe wird im Pack-Log festgehalten (wer, wem, wann).</p>
   <form method="post" action="/admin/tcg/packs" class="form admin-tcg-form" data-confirm="Booster Packs wirklich vergeben?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -92,11 +92,11 @@
     <button class="btn btn-primary" type="submit">Packs vergeben</button>
     <a class="btn btn-ghost nav-badge-link" href="/admin/pack-log">Pack-Log ansehen<% if (packLogNew) { %><span class="nav-badges"><span class="nav-badge" title="Neue Vergaben" aria-label="<%= packLogNew %> neue Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span></span><% } %></a>
   </form>
-</div>
+</details>
 
 <% if (currentUser.isAdmin) { %>
-<div class="card" id="devs">
-  <h2>Devs</h2>
+<details class="card fold" id="devs">
+  <summary><h2>Devs</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), können alle Wetten entscheiden oder annullieren, Booster Packs vergeben und überall moderieren. Sie sehen statt des Admin-Panels ein Dev-Panel und tragen ein grünes DEV-Abzeichen.</p>
   <% { const list = users.filter((u) => u.role === 'dev'); %>
   <% if (!list.length) { %>
@@ -104,7 +104,7 @@
   <% } else { %>
     <ul class="code-list">
       <% list.forEach((u) => { %>
-        <li class="code-item">
+        <li class="code-item code-item-single">
           <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
           <div class="code-actions">
             <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Dev-Rolle entziehen?">
@@ -132,10 +132,10 @@
     </label>
     <button class="btn btn-primary" type="submit">Zum Dev machen</button>
   </form>
-</div>
+</details>
 
-<div class="card" id="mods">
-  <h2>Mods</h2>
+<details class="card fold" id="mods">
+  <summary><h2>Mods</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.</p>
   <% { const list = users.filter((u) => u.role === 'mod'); %>
   <% if (!list.length) { %>
@@ -143,7 +143,7 @@
   <% } else { %>
     <ul class="code-list">
       <% list.forEach((u) => { %>
-        <li class="code-item">
+        <li class="code-item code-item-single">
           <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
           <div class="code-actions">
             <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Mod-Rolle entziehen?">
@@ -171,7 +171,7 @@
     </label>
     <button class="btn btn-primary" type="submit">Zum Mod machen</button>
   </form>
-</div>
+</details>
 <% } %>
 
 <% if (currentUser.isAdmin) { %>
@@ -188,8 +188,8 @@
   </form>
 </div>
 
-<div class="card" id="ihk">
-  <h2>IHK: Limit &amp; Lohn</h2>
+<details class="card fold" id="ihk">
+  <summary><h2>IHK: Limit &amp; Lohn</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>
   <form method="post" action="/admin/ihk" class="form admin-tcg-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -225,9 +225,9 @@
     <% }) %>
     <button class="btn btn-primary" type="submit">Speichern</button>
   </form>
-</div>
+</details>
 
-<div class="card">
+<div class="card" id="codes">
   <h2>Registrierungscodes</h2>
   <p class="muted">Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong><%= ttlMinutes %> Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.</p>
 

@@ -268,13 +268,13 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
 router.post('/admin/codes', requireAdmin, async (req, res) => {
   const code = await createCode(req.user);
   req.flash('success', `Neuer Registrierungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
-  res.redirect('/admin');
+  res.redirect('/admin#codes');
 });
 
 router.post('/admin/codes/:id/loeschen', requireAdmin, async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await revokeCode(req.params.id);
   req.flash('info', 'Code gelöscht.');
-  res.redirect('/admin');
+  res.redirect('/admin#codes');
 });
 
 module.exports = router;

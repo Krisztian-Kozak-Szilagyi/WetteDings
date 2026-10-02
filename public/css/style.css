@@ -456,6 +456,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .code-meta { grid-column: 1; }
 .code-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; align-items: center; }
 .code-actions form { margin: 0; }
+/* Einzeilige Einträge (Devs, Mods): Name und Knopf auf einer Höhe, flacher Kasten, Abstand zum Formular darunter */
+.code-item-single { padding: 8px 14px; }
+.code-item-single .code-actions { grid-row: 1; }
+.code-list + .form { margin-top: 18px; }
 .code-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 560px) {
   .code-item { grid-template-columns: 1fr; }
