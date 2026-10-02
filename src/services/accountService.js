@@ -127,6 +127,9 @@ async function deleteAccount({ user, password }) {
       Comment.updateMany({ user: id }, { $set: { deleted: true, text: '' } }, opt),
       PatchNote.updateMany({}, { $pull: { comments: { user: id }, upvotes: id } }, opt),
     ]);
+    // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
+    await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
+    await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
   });
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
   await mongoose.connection.collection('sessions').deleteMany({ session: { $regex: `"userId":"${String(id)}"` } });

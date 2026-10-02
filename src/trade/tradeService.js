@@ -5,6 +5,7 @@ const { TcgCard } = require('../models/Tcg');
 const { Trade, TradeSettings, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
+const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
@@ -68,9 +69,51 @@ function settlement(trade, { buyer, taxPercent = settings.taxPercent } = {}) {
   return { payer, payee, amount: trade.price, tax: taxFor(trade.price, taxPercent) };
 }
 
+// ---------- Verhandlung beim Tausch (reine Regeln) ----------
+const MESSAGE_MAX = 500; // Zeichen pro Nachricht
+const MAX_MESSAGES = 200; // ältere Nachrichten fallen weg
+const MESSAGES_PER_MINUTE = 8;
+
+/** Rolle eines Nutzers in einem Angebot: 'seller' (Anbieter), 'to' (Empfänger) oder null */
+const roleOf = (trade, userId) => (String(trade.seller) === String(userId) ? 'seller' : trade.to && String(trade.to) === String(userId) ? 'to' : null);
+const otherRole = (role) => (role === 'seller' ? 'to' : 'seller');
+
+/** Darf diese Rolle annehmen? Beim Tausch nur, wer die aktuellen Bedingungen nicht selbst gesetzt hat. */
+const canAccept = (trade, role) => (trade.kind === 'tausch' ? role !== null && role !== (trade.lastChangeBy || 'seller') : role === 'to');
+
+/** Ungelesene Aktivität (Nachricht oder Gegenvorschlag) für diese Rolle? */
+const isUnread = (trade, role) => {
+  const seen = role === 'seller' ? trade.sellerSeenAt : trade.toSeenAt;
+  return !!trade.activityAt && (!seen || new Date(trade.activityAt) > new Date(seen));
+};
+
+/** Nachricht bereinigen und prüfen: nicht leer, höchstens MESSAGE_MAX Zeichen, keine Leerzeilen-Wüsten */
+function cleanMessage(input) {
+  const text = String(input || '').trim().replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  if (!text) throw new UserError('Die Nachricht ist leer.');
+  if (text.length > MESSAGE_MAX) throw new UserError(`Eine Nachricht darf höchstens ${MESSAGE_MAX} Zeichen lang sein.`);
+  return text;
+}
+
+/** Bedingungen als Satz, z. B. "anna legt 5,00 € drauf" oder "ohne Aufpreis" */
+function termsText(trade, { price = trade.price, extraFrom = trade.extraFrom } = {}) {
+  if (!price) return 'ohne Aufpreis';
+  return `${extraFrom === 'seller' ? trade.sellerName : trade.toName} legt ${euro(price)} drauf`;
+}
+
 // ---------- Abfragen ----------
-/** Offene Angebote an einen Nutzer – privat und Tausch (für das Abzeichen im Menü) */
-const incomingFilter = (userId) => ({ ...openFilter(), to: userId });
+/**
+ * Angebote, um die ich mich kümmern sollte (für das Abzeichen im Menü):
+ * private Angebote an mich und Tauschangebote, bei denen ich am Zug bin oder etwas Neues steht.
+ */
+const incomingFilter = (userId) => ({
+  ...openFilter(),
+  $or: [
+    { to: userId, kind: 'privat' },
+    { to: userId, kind: 'tausch', $or: [{ lastChangeBy: { $ne: 'to' } }, { $expr: { $gt: ['$activityAt', '$toSeenAt'] } }] },
+    { seller: userId, kind: 'tausch', $or: [{ lastChangeBy: 'to' }, { $expr: { $gt: ['$activityAt', '$sellerSeenAt'] } }] },
+  ],
+});
 const incomingCount = (userId) => Trade.countDocuments(incomingFilter(userId));
 
 /** Offene Markt-Angebote anderer, die seit dem letzten Besuch der Handelsseite eingestellt wurden */
@@ -87,9 +130,9 @@ async function overview(user) {
   const me = user._id;
   const open = openFilter();
   const [incoming, market, mine, history, coll, users] = await Promise.all([
-    Trade.find({ ...open, to: me }).sort({ createdAt: -1 }).lean(),
+    Trade.find({ ...open, to: me }).select('-messages').sort({ createdAt: -1 }).lean(),
     Trade.find({ ...open, kind: 'markt', seller: { $ne: me } }).sort({ createdAt: -1 }).limit(200).lean(),
-    Trade.find({ ...open, seller: me }).sort({ createdAt: -1 }).lean(),
+    Trade.find({ ...open, seller: me }).select('-messages').sort({ createdAt: -1 }).lean(),
     Trade.find({ status: 'verkauft', $or: [{ seller: me }, { buyer: me }] }).sort({ closedAt: -1 }).limit(10).lean(),
     collection(user),
     User.find({ _id: { $ne: me }, deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
@@ -109,8 +152,10 @@ async function freeCopy(userId, cardId, session) {
  * Angebot erstellen.
  * markt: für alle, privat: an toName gegen Geld, tausch: an toName gegen dessen Karte wantCardId (+ optional Aufpreis)
  */
-async function create({ user, kind, cardId, price, toName, wantCardId = null, extraFrom = null }) {
+async function create({ user, kind, cardId, price, toName, wantCardId = null, extraFrom = null, message = '' }) {
   const valid = validateOffer({ kind, price, cardId, wantCardId, extraFrom });
+  // Beim Tausch kann gleich eine erste Nachricht mitgeschickt werden
+  const firstMessage = kind === 'tausch' && String(message || '').trim() ? cleanMessage(message) : null;
 
   let to = null;
   if (kind !== 'markt') {
@@ -151,6 +196,12 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
             extraFrom: valid.extraFrom,
             price,
             expiresAt: new Date(Date.now() + hours * 3600000),
+            ...(kind === 'tausch' && {
+              lastChangeBy: 'seller',
+              activityAt: new Date(),
+              sellerSeenAt: new Date(),
+              messages: firstMessage ? [{ from: 'seller', text: firstMessage }] : [],
+            }),
           },
         ],
         { session }
@@ -199,49 +250,133 @@ async function buy({ user, tradeId }) {
   });
 }
 
-/** Tausch annehmen: beide Karten wechseln den Besitzer, ein Aufpreis wird wie ein Verkauf (mit Steuer) gebucht */
-async function acceptSwap({ user, tradeId }) {
+/**
+ * Tausch annehmen: beide Karten wechseln den Besitzer, ein Aufpreis wird wie ein Verkauf (mit Steuer) gebucht.
+ * Annehmen darf, wer die aktuellen Bedingungen nicht selbst gesetzt hat – also auch der Anbieter nach einem
+ * Gegenvorschlag. version = Stand der Bedingungen, den der Annehmende gesehen hat.
+ */
+async function acceptSwap({ user, tradeId, version }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
   return inTransaction(async (session) => {
-    const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', to: user._id, ...openFilter() }).session(session);
-    if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+    const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', ...openFilter() }).session(session);
+    const role = trade && roleOf(trade, user._id);
+    if (!role) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+    if (!canAccept(trade, role)) throw new UserError('Das ist dein eigener Vorschlag – jetzt ist die andere Seite am Zug.');
+    if (Number.isInteger(version) && version !== trade.termsVersion) {
+      throw new UserError('Die Bedingungen wurden gerade geändert. Bitte schau sie dir noch einmal an.');
+    }
 
     // Die Wunschkarte wird erst jetzt gesperrt: freies Exemplar beim Empfänger suchen
-    const { doc } = await freeCopy(user._id, trade.wantCard, session);
-    if (!doc) throw new UserError(`Du hast gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest oder Handel).`);
-    await claim([doc], user._id, session);
+    const { doc } = await freeCopy(trade.to, trade.wantCard, session);
+    if (!doc) {
+      throw new UserError(role === 'to'
+        ? `Du hast gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest oder Handel).`
+        : `${trade.toName} hat gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest oder Handel).`);
+    }
+    await claim([doc], trade.to, session);
 
     const money = settlement(trade);
     if (money) {
       const iPay = money.payer.equals(user._id);
+      const other = role === 'to' ? trade.sellerName : trade.toName;
       await transfer(
         money,
         {
           title: `${cardName(trade.card)} gegen ${cardName(trade.wantCard)}`,
           payerType: 'handel_tausch_zahlung',
           payeeType: 'handel_tausch_erhalt',
-          payerMsg: iPay ? 'Dein Guthaben reicht für den Aufpreis nicht aus.' : `${trade.sellerName} hat nicht mehr genug Guthaben für den Aufpreis.`,
+          payerMsg: iPay ? 'Dein Guthaben reicht für den Aufpreis nicht aus.' : `${other} hat nicht mehr genug Guthaben für den Aufpreis.`,
         },
         session
       );
     }
 
-    const given = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
-    const taken = await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { user: trade.seller } }, { session });
+    const given = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: trade.to } }, { session });
+    const taken = await TcgCard.updateOne({ _id: doc._id, user: trade.to }, { $set: { user: trade.seller } }, { session });
     if (given.modifiedCount !== 1 || taken.modifiedCount !== 1) throw new UserError('Eine der Karten ist nicht mehr verfügbar.');
 
     Object.assign(trade, {
       status: 'verkauft',
-      buyer: user._id,
-      buyerName: user.username,
+      buyer: trade.to, // beim Tausch immer der Empfänger, egal wer zuletzt angenommen hat
+      buyerName: trade.toName,
       wantCardDoc: doc._id,
       taxPercent: settings.taxPercent,
       tax: money ? money.tax : 0,
       closedAt: new Date(),
     });
     await trade.save({ session });
-    return { trade, money };
+    return { trade, money, role };
   });
+}
+
+// ---------- Verhandlung beim Tausch ----------
+const seenField = (role) => (role === 'seller' ? 'sellerSeenAt' : 'toSeenAt');
+
+/** Verhandlung öffnen (nur die beiden Beteiligten); markiert sie als gelesen */
+async function negotiation({ user, tradeId }) {
+  if (!mongoose.isValidObjectId(tradeId)) return null;
+  const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch' }).lean();
+  const role = trade && roleOf(trade, user._id);
+  if (!role) return null;
+  await Trade.updateOne({ _id: trade._id }, { $set: { [seenField(role)]: new Date() } });
+  return { trade, role };
+}
+
+/** Offenes Tauschangebot laden, an dem der Nutzer beteiligt ist */
+async function openSwapFor(user, tradeId) {
+  if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
+  const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', ...openFilter() }).select('-messages.text').lean();
+  const role = trade && roleOf(trade, user._id);
+  if (!role) throw new UserError('Dieses Angebot ist nicht mehr offen.');
+  return { trade, role };
+}
+
+/** Nachricht in der Verhandlung schreiben */
+async function sendMessage({ user, tradeId, text }) {
+  const clean = cleanMessage(text);
+  const { trade, role } = await openSwapFor(user, tradeId);
+  const since = Date.now() - 60000;
+  if ((trade.messages || []).filter((m) => m.from === role && new Date(m.createdAt) > since).length >= MESSAGES_PER_MINUTE) {
+    throw new UserError('Du schreibst gerade sehr schnell – bitte warte einen Moment.');
+  }
+  const now = new Date();
+  const res = await Trade.updateOne(
+    { _id: trade._id, ...openFilter() },
+    { $push: { messages: { $each: [{ from: role, text: clean }], $slice: -MAX_MESSAGES } }, $set: { activityAt: now, [seenField(role)]: now } }
+  );
+  if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot ist nicht mehr offen.');
+}
+
+/**
+ * Gegenvorschlag: Aufpreis und wer ihn zahlt ändern. Danach ist die andere Seite am Zug, das Angebot
+ * läuft wieder volle PRIVATE_HOURS. version = Stand, den der Ändernde gesehen hat (sonst Konflikt).
+ */
+async function changeTerms({ user, tradeId, price, extraFrom, version }) {
+  const { trade, role } = await openSwapFor(user, tradeId);
+  const valid = validateOffer({ kind: 'tausch', price, cardId: trade.card, wantCardId: trade.wantCard, extraFrom });
+  if (price === trade.price && valid.extraFrom === (trade.price ? trade.extraFrom : null)) {
+    throw new UserError('Das sind schon die aktuellen Bedingungen.');
+  }
+  const now = new Date();
+  const actor = role === 'seller' ? trade.sellerName : trade.toName;
+  const seen = Number.isInteger(version) ? version : trade.termsVersion || 0;
+  const res = await Trade.updateOne(
+    // Ältere Angebote haben noch kein termsVersion-Feld – das zählt als Stand 0
+    { _id: trade._id, ...openFilter(), termsVersion: { $in: seen === 0 ? [0, null] : [seen] } },
+    {
+      $set: {
+        price,
+        extraFrom: valid.extraFrom,
+        lastChangeBy: role,
+        activityAt: now,
+        [seenField(role)]: now,
+        expiresAt: new Date(now.getTime() + PRIVATE_HOURS * 3600000),
+      },
+      $inc: { termsVersion: 1 },
+      $push: { messages: { $each: [{ from: 'system', text: `${actor} schlägt vor: ${termsText(trade, { price, extraFrom: valid.extraFrom })}.` }], $slice: -MAX_MESSAGES } },
+    }
+  );
+  if (res.modifiedCount !== 1) throw new UserError('Die Bedingungen wurden gerade geändert. Bitte schau sie dir noch einmal an.');
 }
 
 /** Verkäufer zieht zurück bzw. Empfänger lehnt ab – die Karte wird wieder frei */
@@ -264,6 +399,13 @@ module.exports = {
   validateOffer,
   settlement,
   openFilter,
+  MESSAGE_MAX,
+  roleOf,
+  otherRole,
+  canAccept,
+  isUnread,
+  cleanMessage,
+  termsText,
   incomingFilter,
   incomingCount,
   marketNewFilter,
@@ -272,5 +414,8 @@ module.exports = {
   create,
   buy,
   acceptSwap,
+  negotiation,
+  sendMessage,
+  changeTerms,
   close,
 };

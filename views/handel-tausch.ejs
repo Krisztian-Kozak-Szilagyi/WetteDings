@@ -53,7 +53,11 @@
         <label><input type="radio" name="extra" value="to" <%= pickFrom === 'to' ? 'checked' : '' %>> <%= partner.username %> legt drauf</label>
       </fieldset>
     </div>
-    <p class="muted small">Ohne Aufpreis tauscht ihr nur die Karten. Das Angebot gilt <%= privateHours %> Std., deine Karte ist bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf den Aufpreis fallen <%= String(taxPercent).replace('.', ',') %> % Steuer an, die der Empfänger des Geldes trägt.<% } %></p>
+    <label class="field trade-swap-message">
+      <span>Nachricht an <%= partner.username %> (optional)</span>
+      <textarea name="message" rows="2" maxlength="500" placeholder="z. B. warum der Tausch für beide passt"></textarea>
+    </label>
+    <p class="muted small">Nach dem Senden könnt ihr auf der Verhandlungsseite schreiben und den Aufpreis per Gegenvorschlag anpassen, bis eine Seite annimmt. Ohne Aufpreis tauscht ihr nur die Karten. Das Angebot gilt <%= privateHours %> Std., deine Karte ist bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf den Aufpreis fallen <%= String(taxPercent).replace('.', ',') %> % Steuer an, die der Empfänger des Geldes trägt.<% } %></p>
     <button class="btn btn-primary" type="submit" <%= canOffer ? '' : 'disabled' %>>Tauschangebot senden</button>
   </div>
 </form>

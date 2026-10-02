@@ -12,6 +12,8 @@
   };
   // Hinweis, ob ich die Karte schon besitze
   const ownTag = (id) => { const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
+  // Stand einer Tausch-Verhandlung aus meiner Sicht: am Zug / wartet, dazu "Neu" bei ungelesener Aktivität
+  const swapState = (t, role) => { const turn = canAccept(t, role); %><span class="own-tag<%= turn ? ' own-new' : '' %>"><%= turn ? 'Du bist am Zug' : 'Wartet auf ' + (role === 'seller' ? t.toName : t.sellerName) %></span><% if (isUnread(t, role)) { %> <span class="nav-badge nav-badge-inline" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } };
 %>
 
 <div class="page-head">
@@ -28,21 +30,25 @@
       <% } else { %>
         <ul class="trade-list">
           <% incoming.forEach((t) => { const { c, r } = line(t.card); %>
-            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); %>
+            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
               <li class="trade-item trade-swap">
                 <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
                 <div class="trade-info">
-                  <strong>Tausch von <%= t.sellerName %></strong>
+                  <span class="trade-title"><strong>Tausch von <%= t.sellerName %></strong> <% swapState(t, 'to') %></span>
                   <span class="small trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
                   <span class="small">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
                   <span class="muted small"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %></span>
                   <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest oder Handel).</span><% } %>
                 </div>
                 <div class="trade-actions">
-                  <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= w.c.name %> gegen <%= c.name %> tauschen<%= t.price ? ' (' + x.text + ')' : '' %>?">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="btn btn-primary btn-sm" type="submit" <%= blocked ? 'disabled' : '' %>>Annehmen</button>
-                  </form>
+                  <a class="btn btn-ghost btn-sm" href="/handel/verhandlung/<%= t._id %>">Verhandeln</a>
+                  <% if (myTurn) { %>
+                    <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= w.c.name %> gegen <%= c.name %> tauschen<%= t.price ? ' (' + x.text + ')' : '' %>?">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="version" value="<%= t.termsVersion || 0 %>">
+                      <button class="btn btn-primary btn-sm" type="submit" <%= blocked ? 'disabled' : '' %>>Annehmen</button>
+                    </form>
+                  <% } %>
                   <form method="post" action="/handel/<%= t._id %>/ablehnen">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button class="btn btn-ghost btn-sm" type="submit">Ablehnen</button>
@@ -140,6 +146,7 @@
                   <span class="trade-offer-kind"><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %></span>
                   <% if (w) { %>
                     <strong><%= c.name %> gegen <%= w.c.name %></strong>
+                    <span class="trade-title"><% swapState(t, 'seller') %></span>
                   <% } else { %>
                     <strong><%= c.name %></strong>
                     <span><span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span></span>
@@ -157,10 +164,13 @@
                 <% } %>
                 <div><dt>Läuft ab</dt><dd><%= relTime(t.expiresAt) %></dd></div>
               </dl>
-              <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button class="btn btn-ghost btn-sm btn-block" type="submit">Zurückziehen</button>
-              </form>
+              <div class="trade-offer-actions">
+                <% if (w) { %><a class="btn btn-<%= canAccept(t, 'seller') ? 'primary' : 'ghost' %> btn-sm" href="/handel/verhandlung/<%= t._id %>"><%= canAccept(t, 'seller') ? 'Gegenvorschlag ansehen' : 'Verhandeln' %></a><% } %>
+                <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-ghost btn-sm btn-block" type="submit">Zurückziehen</button>
+                </form>
+              </div>
             </li>
           <% }) %>
         </ul>
@@ -195,22 +205,7 @@
 </div>
 
 <!-- Karte aus einem Angebot groß ansehen -->
-<dialog class="tcg-modal" data-zoom-modal aria-label="Karte ansehen">
-  <button type="button" class="tcg-close" data-zoom-close aria-label="Schließen">×</button>
-  <div class="tcg-modal-body">
-    <div class="tcg-zoom" data-zoom-tilt>
-      <div class="tcg-card-3d">
-        <img alt="" data-zoom-img width="720" height="1008">
-        <span class="tcg-shine"></span>
-      </div>
-    </div>
-    <div class="tcg-modal-info">
-      <h2 data-zoom-name></h2>
-      <p><span class="tcg-badge" data-zoom-rarity></span></p>
-      <p class="muted" data-zoom-meta></p>
-    </div>
-  </div>
-</dialog>
+<%- include('partials/card-zoom') %>
 
 <datalist id="trade-users">
   <% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %>

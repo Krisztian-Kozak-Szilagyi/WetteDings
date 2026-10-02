@@ -31,12 +31,54 @@ test('Markt-Abzeichen: nur fremde, offene Markt-Angebote seit dem letzten Besuch
   assert.equal(trade.marketNewFilter({ ...user, marketSeenAt: seen }).createdAt.$gt, seen);
 });
 
-test('Abzeichen "Angebote an dich": privat und Tausch, nur offene', () => {
+test('Abzeichen: private Angebote an mich und Tausch-Verhandlungen, bei denen ich dran bin oder Neues steht', () => {
   const f = trade.incomingFilter('u1');
-  assert.equal(f.to, 'u1');
   assert.equal(f.status, 'offen');
   assert.ok(f.expiresAt.$gt instanceof Date);
-  assert.equal(f.kind, undefined); // keine Einschränkung auf "privat"
+  const [privat, alsEmpfaenger, alsAnbieter] = f.$or;
+  assert.deepEqual(privat, { to: 'u1', kind: 'privat' });
+  assert.equal(alsEmpfaenger.to, 'u1');
+  assert.equal(alsEmpfaenger.kind, 'tausch');
+  assert.deepEqual(alsEmpfaenger.$or[0], { lastChangeBy: { $ne: 'to' } }); // auch alte Angebote ohne Feld
+  assert.equal(alsAnbieter.seller, 'u1');
+  assert.deepEqual(alsAnbieter.$or[0], { lastChangeBy: 'to' }); // Gegenvorschlag des Empfängers
+});
+
+test('Verhandlung: Rollen und wer annehmen darf', () => {
+  const t = { kind: 'tausch', seller: 's', to: 't', lastChangeBy: 'seller' };
+  assert.equal(trade.roleOf(t, 's'), 'seller');
+  assert.equal(trade.roleOf(t, 't'), 'to');
+  assert.equal(trade.roleOf(t, 'x'), null);
+  // Wer den Vorschlag gemacht hat, wartet; die andere Seite nimmt an
+  assert.equal(trade.canAccept(t, 'to'), true);
+  assert.equal(trade.canAccept(t, 'seller'), false);
+  assert.equal(trade.canAccept({ ...t, lastChangeBy: 'to' }, 'seller'), true);
+  assert.equal(trade.canAccept({ ...t, lastChangeBy: 'to' }, 'to'), false);
+  assert.equal(trade.canAccept({ ...t, lastChangeBy: undefined }, 'to'), true); // alte Angebote
+  assert.equal(trade.canAccept(t, null), false);
+  // Verkauf: nur der Empfänger
+  assert.equal(trade.canAccept({ kind: 'privat', seller: 's', to: 't' }, 'to'), true);
+  assert.equal(trade.canAccept({ kind: 'privat', seller: 's', to: 't' }, 'seller'), false);
+});
+
+test('Verhandlung: ungelesen, Nachrichten prüfen, Bedingungen als Text', () => {
+  const now = new Date('2026-10-02T10:00:00Z');
+  const before = new Date('2026-10-02T09:00:00Z');
+  assert.equal(trade.isUnread({ activityAt: now, toSeenAt: null }, 'to'), true);
+  assert.equal(trade.isUnread({ activityAt: now, toSeenAt: before }, 'to'), true);
+  assert.equal(trade.isUnread({ activityAt: before, sellerSeenAt: now }, 'seller'), false);
+  assert.equal(trade.isUnread({ activityAt: null }, 'to'), false);
+
+  assert.equal(trade.cleanMessage('  hallo\r\n\r\n\r\n\r\nwelt  '), 'hallo\n\nwelt');
+  rejects(() => trade.cleanMessage('   '), /leer/);
+  rejects(() => trade.cleanMessage('x'.repeat(trade.MESSAGE_MAX + 1)), /höchstens/);
+  assert.equal(trade.cleanMessage('x'.repeat(trade.MESSAGE_MAX)).length, trade.MESSAGE_MAX);
+
+  const t = { sellerName: 'anna', toName: 'ben', price: 0, extraFrom: null };
+  assert.equal(trade.termsText(t), 'ohne Aufpreis');
+  const { euro } = require('../src/lib/viewHelpers'); // setzt ein geschütztes Leerzeichen vor das €
+  assert.equal(trade.termsText({ ...t, price: 500, extraFrom: 'seller' }), `anna legt ${euro(500)} drauf`);
+  assert.equal(trade.termsText(t, { price: 1250, extraFrom: 'to' }), `ben legt ${euro(1250)} drauf`);
 });
 
 test('Angebot prüfen: Verkauf', () => {

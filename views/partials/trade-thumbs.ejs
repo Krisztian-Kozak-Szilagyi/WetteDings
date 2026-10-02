@@ -3,7 +3,8 @@
   Jedes Bild ist ein Knopf, der die Karte groß zeigt (Zoom-Dialog auf /handel, public/js/handel.js).
 %>
 <%
-  const owned = (c) => (locals.coll && coll.counts[c.id]) || 0;
+  const ownCounts = locals.coll ? coll.counts : locals.ownedCounts || {};
+  const owned = (c) => ownCounts[c.id] || 0;
   const thumb = (c) => { const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
     <button type="button" class="trade-thumb r-<%= c.rarity %>" data-zoom-card
       data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"

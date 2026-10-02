@@ -37,6 +37,83 @@
     });
   }
 
+  // ---------- Verhandlung: Nachrichten live nachladen ----------
+  var chat = $('[data-chat]');
+  if (chat) {
+    var since = chat.getAttribute('data-since');
+    var version = chat.getAttribute('data-version');
+    var meRole = chat.getAttribute('data-me');
+    var names = { seller: chat.getAttribute('data-seller-name'), to: chat.getAttribute('data-to-name') };
+    var changed = $('[data-chat-changed]');
+    var empty = $('[data-chat-empty]');
+    var textarea = $('.nego-send textarea');
+
+    var scrollDown = function () { chat.scrollTop = chat.scrollHeight; };
+    var append = function (m) {
+      var li = document.createElement('li');
+      var time = document.createElement('time');
+      time.className = 'muted small';
+      time.textContent = 'gerade eben';
+      if (m.from === 'system') {
+        li.className = 'nego-msg nego-msg-system';
+        var s = document.createElement('span');
+        s.textContent = m.text;
+        li.appendChild(s);
+        li.appendChild(document.createTextNode(' '));
+        li.appendChild(time);
+      } else {
+        li.className = 'nego-msg' + (m.from === meRole ? ' nego-msg-me' : '');
+        var head = document.createElement('span');
+        head.className = 'nego-msg-head';
+        var who = document.createElement('strong');
+        who.textContent = names[m.from] || '';
+        head.appendChild(who);
+        head.appendChild(document.createTextNode(' '));
+        head.appendChild(time);
+        var text = document.createElement('span');
+        text.className = 'nego-msg-text';
+        text.textContent = m.text;
+        li.appendChild(head);
+        li.appendChild(text);
+      }
+      chat.appendChild(li);
+      if (empty) empty.hidden = true;
+    };
+    scrollDown();
+
+    var poll = function () {
+      if (document.hidden) return;
+      fetch(chat.getAttribute('data-url') + '?seit=' + encodeURIComponent(since || ''), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          if (data.messages.length) {
+            data.messages.forEach(append);
+            since = data.messages[data.messages.length - 1].at;
+            scrollDown();
+          }
+          // Neue Bedingungen oder Abschluss: Hinweis statt Neuladen, damit eine angefangene Nachricht nicht verloren geht
+          if (String(data.version) !== String(version) || data.status !== 'offen') {
+            if (textarea && !textarea.value.trim()) window.location.reload();
+            else if (changed) changed.hidden = false;
+          }
+        })
+        .catch(function () { /* nächster Versuch beim nächsten Intervall */ });
+    };
+    if (chat.getAttribute('data-open') === '1') setInterval(poll, 5000);
+
+    // Enter sendet, Umschalt+Enter macht eine neue Zeile
+    if (textarea) {
+      textarea.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey && textarea.value.trim()) {
+          e.preventDefault();
+          textarea.form.requestSubmit ? textarea.form.requestSubmit() : textarea.form.submit();
+        }
+      });
+      if (window.location.hash === '#chat') textarea.focus();
+    }
+  }
+
   // ---------- Karte aus der Sammlung anbieten ----------
   var modal = $('[data-trade-modal]');
   if (!modal) return;
