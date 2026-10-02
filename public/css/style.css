@@ -744,27 +744,44 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .trade-main > .card, .trade-side > .card { margin-bottom: 20px; }
 .trade-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .trade-item { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
-.trade-item img { width: 56px; height: auto; border-radius: 6px; box-shadow: 0 0 0 2px var(--rar, transparent); }
 .trade-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .trade-info .tcg-badge { align-self: flex-start; }
 .trade-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
 .trade-actions form { margin: 0; }
 .trade-price { font-weight: 900; font-size: 1.05rem; font-variant-numeric: tabular-nums; margin-right: 4px; }
-.trade-list-sm .trade-item { grid-template-columns: 56px 1fr; align-items: start; }
-.trade-list-sm .trade-info form { margin: 6px 0 0; }
-.trade-list-sm .trade-item img { margin-top: 6px; }
 .trade-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
 .trade-history li { display: flex; justify-content: space-between; gap: 10px; }
-@media (max-width: 560px) { .trade-item { grid-template-columns: 48px 1fr; } .trade-item img { width: 48px; } .trade-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 560px) { .trade-item { grid-template-columns: 48px 1fr; } .trade-item .trade-thumb img { width: 48px; } .trade-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* Miniatur eines Angebots: Knopf, der die Karte groß zeigt */
+.trade-thumb { display: block; padding: 0; border: 0; background: none; border-radius: 6px; cursor: var(--cur-zoom-in); }
+.trade-thumb img { display: block; width: 56px; height: auto; border-radius: 6px; box-shadow: 0 0 0 2px var(--rar, transparent); transition: transform .15s ease; }
+.trade-thumb:hover img, .trade-thumb:focus-visible img { transform: scale(1.06); }
+.trade-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.own-tag { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.own-tag.own-new { border-color: var(--primary); color: var(--primary); }
 
 /* Tausch: zwei Karten mit Pfeil */
 .trade-item.trade-swap { grid-template-columns: 104px 1fr auto; }
-.trade-list-sm .trade-item.trade-swap { grid-template-columns: 104px 1fr; }
 .trade-thumbs { display: flex; align-items: center; gap: 4px; }
-.trade-item .trade-thumbs img { width: 44px; margin: 0; }
-.trade-thumbs img { box-shadow: 0 0 0 2px var(--rar, transparent); }
+.trade-thumbs .trade-thumb img { width: 44px; }
 .trade-swap-icon { flex: none; color: var(--muted); }
-@media (max-width: 560px) { .trade-item.trade-swap, .trade-list-sm .trade-item.trade-swap { grid-template-columns: 96px 1fr; } .trade-item .trade-thumbs img { width: 40px; } }
+@media (max-width: 560px) { .trade-item.trade-swap { grid-template-columns: 96px 1fr; } .trade-thumbs .trade-thumb img { width: 40px; } }
+
+/* Deine Angebote: Kopf mit Bild und Titel, darunter Eckdaten und Zurückziehen */
+.trade-offers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.trade-offer { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.trade-offer-head { display: flex; align-items: center; gap: 12px; }
+.trade-offer-head > .trade-thumb img { width: 52px; }
+.trade-offer-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trade-offer-title strong { line-height: 1.25; overflow-wrap: anywhere; }
+.trade-offer-kind { font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.trade-offer-facts { margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: .88rem; }
+.trade-offer-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+.trade-offer-facts div:last-child { border-bottom: 0; padding-bottom: 0; }
+.trade-offer-facts dt { color: var(--muted); white-space: nowrap; }
+.trade-offer-facts dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.trade-offer form { margin: 0; }
 .trade-help { margin: 0 0 14px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Handelsdialog */

@@ -1,10 +1,43 @@
 (function () {
   'use strict';
 
-  // Handelsseite: Karte in der Sammlung antippen -> Dialog mit Markt / Privat / Tauschen
+  // Handelsseite: Miniaturen in Angeboten vergrößern; Karte in der Sammlung antippen -> Dialog mit Markt / Privat / Tauschen
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
+  // ---------- Miniaturen in den Angeboten vergrößern ----------
+  var zoom = $('[data-zoom-modal]');
+  if (zoom) {
+    var zoomTilt = $('[data-zoom-tilt]', zoom);
+    if (window.tcgBindTilt) window.tcgBindTilt(zoomTilt);
+    var closeZoom = function () {
+      if (typeof zoom.close === 'function') zoom.close();
+      else zoom.removeAttribute('open');
+    };
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-zoom-card]');
+      if (!btn) return;
+      var d = btn.dataset;
+      var owned = parseInt(d.owned, 10) || 0;
+      zoomTilt.className = 'tcg-zoom r-' + d.rarity; // Seltenheits-Effekte wie im Album
+      var img = $('[data-zoom-img]', zoom);
+      img.src = d.image;
+      img.alt = d.name + ' (' + d.rarityLabel + ')';
+      $('[data-zoom-name]', zoom).textContent = d.name;
+      var badge = $('[data-zoom-rarity]', zoom);
+      badge.textContent = d.rarityLabel;
+      badge.className = 'tcg-badge r-' + d.rarity;
+      $('[data-zoom-meta]', zoom).textContent = 'Kartenwert ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
+      if (typeof zoom.showModal === 'function') zoom.showModal();
+      else zoom.setAttribute('open', '');
+    });
+    $('[data-zoom-close]', zoom).addEventListener('click', closeZoom);
+    zoom.addEventListener('click', function (e) {
+      if (e.target === zoom) closeZoom();
+    });
+  }
+
+  // ---------- Karte aus der Sammlung anbieten ----------
   var modal = $('[data-trade-modal]');
   if (!modal) return;
 

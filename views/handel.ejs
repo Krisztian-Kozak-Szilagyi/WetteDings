@@ -10,6 +10,8 @@
     const iPay = (String(t.seller) === me) === (t.extraFrom === 'seller');
     return { iPay, text: iPay ? 'du zahlst ' + euro(t.price) + ' drauf' : 'du bekommst ' + euro(t.price - taxFor(t.price)) + ' drauf' + (taxFor(t.price) ? ' (nach Steuer)' : '') };
   };
+  // Hinweis, ob ich die Karte schon besitze
+  const ownTag = (id) => { const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
 %>
 
 <div class="page-head">
@@ -31,7 +33,7 @@
                 <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
                 <div class="trade-info">
                   <strong>Tausch von <%= t.sellerName %></strong>
-                  <span class="small">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span></span>
+                  <span class="small trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
                   <span class="small">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
                   <span class="muted small"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %></span>
                   <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest oder Handel).</span><% } %>
@@ -51,7 +53,7 @@
               <li class="trade-item r-<%= c.rarity %>">
                 <%- include('partials/trade-thumbs', { a: c }) %>
                 <div class="trade-info">
-                  <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span>
+                  <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
                   <span class="muted small">von <%= t.sellerName %> · läuft ab <%= relTime(t.expiresAt) %></span>
                 </div>
                 <div class="trade-actions">
@@ -82,7 +84,7 @@
             <li class="trade-item r-<%= c.rarity %>">
               <%- include('partials/trade-thumbs', { a: c }) %>
               <div class="trade-info">
-                <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span>
+                <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
                 <span class="muted small">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a> · Kartenwert <%= euro(r.sell || 0) %></span>
               </div>
               <div class="trade-actions">
@@ -129,25 +131,36 @@
       <% if (!mine.length) { %>
         <p class="muted">Du hast keine offenen Angebote.</p>
       <% } else { %>
-        <ul class="trade-list trade-list-sm">
+        <ul class="trade-offers">
           <% mine.forEach((t) => { const { c, r } = line(t.card); const w = t.kind === 'tausch' ? line(t.wantCard) : null; %>
-            <li class="trade-item r-<%= c.rarity %><%= w ? ' trade-swap' : '' %>">
-              <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
-              <div class="trade-info">
-                <% if (w) { %>
-                  <strong>Tausch mit <%= t.toName %></strong>
-                  <span class="small"><%= c.name %> gegen <%= w.c.name %> · <%= extra(t).text %></span>
-                <% } else { %>
-                  <strong><%= c.name %> <span class="muted small"><%= r.label %></span></strong>
-                  <span class="small"><%= euro(t.price) %> · <%= t.kind === 'privat' ? 'an ' + t.toName : 'Markt' %></span>
-                  <span class="muted small">Erlös nach Steuer <%= euro(t.price - taxFor(t.price)) %></span>
-                <% } %>
-                <span class="muted small">läuft ab <%= relTime(t.expiresAt) %></span>
-                <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button class="btn btn-ghost btn-sm" type="submit">Zurückziehen</button>
-                </form>
+            <li class="trade-offer">
+              <div class="trade-offer-head">
+                <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
+                <div class="trade-offer-title">
+                  <span class="trade-offer-kind"><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %></span>
+                  <% if (w) { %>
+                    <strong><%= c.name %> gegen <%= w.c.name %></strong>
+                  <% } else { %>
+                    <strong><%= c.name %></strong>
+                    <span><span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span></span>
+                  <% } %>
+                </div>
               </div>
+              <dl class="trade-offer-facts">
+                <% if (w) { %>
+                  <div><dt>Du gibst</dt><dd><%= c.name %> <span class="muted">(<%= r.label %>)</span></dd></div>
+                  <div><dt>Du bekommst</dt><dd><%= w.c.name %> <span class="muted">(<%= w.r.label %>)</span></dd></div>
+                  <div><dt>Aufpreis</dt><dd><%= extra(t).text %></dd></div>
+                <% } else { %>
+                  <div><dt>Preis</dt><dd><%= euro(t.price) %></dd></div>
+                  <% if (taxFor(t.price)) { %><div><dt>Erlös nach Steuer</dt><dd><%= euro(t.price - taxFor(t.price)) %></dd></div><% } %>
+                <% } %>
+                <div><dt>Läuft ab</dt><dd><%= relTime(t.expiresAt) %></dd></div>
+              </dl>
+              <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-ghost btn-sm btn-block" type="submit">Zurückziehen</button>
+              </form>
             </li>
           <% }) %>
         </ul>
@@ -180,6 +193,24 @@
     </div>
   </aside>
 </div>
+
+<!-- Karte aus einem Angebot groß ansehen -->
+<dialog class="tcg-modal" data-zoom-modal aria-label="Karte ansehen">
+  <button type="button" class="tcg-close" data-zoom-close aria-label="Schließen">×</button>
+  <div class="tcg-modal-body">
+    <div class="tcg-zoom" data-zoom-tilt>
+      <div class="tcg-card-3d">
+        <img alt="" data-zoom-img width="720" height="1008">
+        <span class="tcg-shine"></span>
+      </div>
+    </div>
+    <div class="tcg-modal-info">
+      <h2 data-zoom-name></h2>
+      <p><span class="tcg-badge" data-zoom-rarity></span></p>
+      <p class="muted" data-zoom-meta></p>
+    </div>
+  </div>
+</dialog>
 
 <datalist id="trade-users">
   <% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %>

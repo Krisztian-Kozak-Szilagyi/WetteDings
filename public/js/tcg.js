@@ -61,6 +61,7 @@
       el.classList.remove('tilting');
     });
   }
+  window.tcgBindTilt = bindTilt; // auch für den Zoom auf der Handelsseite (public/js/handel.js)
 
   // ---------- Karte vergrößern + verkaufen ----------
   var modal = $('[data-tcg-modal]');
