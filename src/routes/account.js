@@ -6,7 +6,6 @@ const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
 const { requireLogin } = require('../middleware');
 const { str } = require('../lib/util');
-const { bonusFor } = require('../services/bonusService');
 const { coinValueCents } = require('../coin/tradeService');
 const { cardValueCents } = require('../tcg/tcgService');
 const account = require('../services/accountService');
@@ -15,15 +14,28 @@ const roles = require('../services/roles');
 
 const router = express.Router();
 
+const BETS_PER_PAGE = 15; // Meine Wetten
+const LEDGER_PER_PAGE = 20; // Kontoauszug
+
+/** Seitenzahl aus der Adresse (?name=3), begrenzt auf 1 … pages */
+const pageOf = (req, name, total, perPage) => {
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  return { pages, page: Math.min(pages, Math.max(1, Number.parseInt(req.query[name], 10) || 1)) };
+};
+
 router.get('/konto', requireLogin, async (req, res) => {
   const userId = req.user._id;
+  const [betTotal, ledgerTotal] = await Promise.all([Position.countDocuments({ user: userId }), Ledger.countDocuments({ user: userId })]);
+  const bets = pageOf(req, 'wetten', betTotal, BETS_PER_PAGE);
+  const led = pageOf(req, 'auszug', ledgerTotal, LEDGER_PER_PAGE);
   const [positions, ledger, openAgg, statsAgg] = await Promise.all([
     Position.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .limit(100)
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((bets.page - 1) * BETS_PER_PAGE)
+      .limit(BETS_PER_PAGE)
       .populate('bet', 'title status outcome deadline options refunded')
       .lean(),
-    Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).limit(50).lean(),
+    Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean(),
     Position.aggregate([{ $match: { user: userId, payout: null } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     Position.aggregate([
       { $match: { user: userId, payout: { $ne: null } } },
@@ -41,20 +53,20 @@ router.get('/konto', requireLogin, async (req, res) => {
   const stats = statsAgg[0] || { won: 0, lost: 0 };
   const [coinValue, cardValue] = await Promise.all([coinValueCents(userId), cardValueCents(userId)]);
   const total = req.user.balance + inPlay + coinValue + cardValue;
-  const lastBonus = await Ledger.findOne({ user: userId, type: 'bonus' }).sort({ createdAt: -1 }).lean();
 
   res.render('account', {
     title: 'Mein Konto',
     positions: positions.filter((p) => p.bet),
     ledger,
+    // Blättern; ein Abschnitt ist aufgeklappt, wenn gerade in ihm geblättert wird
+    bets: { ...bets, total: betTotal, open: 'wetten' in req.query },
+    led: { ...led, total: ledgerTotal, open: 'auszug' in req.query },
     inPlay,
     coinValue,
     cardValue,
     total,
     net: total - config.startBalance,
     stats,
-    lastBonus,
-    bonusNow: bonusFor(total),
     pwErrors: [],
     renameDays: account.RENAME_COOLDOWN_DAYS,
     nextRenameAt: account.nextRenameAt(req.user),

@@ -15,25 +15,8 @@
     <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span></div>
 </div>
 
-<div class="card bonus-card">
-  <h2>Tagesbonus</h2>
-  <p>Einmal pro Tag bekommst du automatisch Spielgeld, solange dein Gesamtvermögen (verfügbar + in offenen Wetten + Samantha Coins + TCG-Karten inkl. ungeöffneter Packs) unter <%= euro(bonusTiers[bonusTiers.length - 1].below) %> liegt:</p>
-  <ul class="bonus-tiers">
-    <% bonusTiers.forEach((t, i) => { %>
-      <li class="<%= bonusNow === t.amount ? 'active' : '' %>">
-        <%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong>
-      </li>
-    <% }) %>
-    <li class="<%= bonusNow === 0 ? 'active' : '' %>">ab <%= euro(bonusTiers[bonusTiers.length - 1].below) %>: kein Bonus</li>
-  </ul>
-  <p class="muted small">
-    <% if (lastBonus) { %>Zuletzt erhalten: <%= date(lastBonus.createdAt) %> (+<%= euro(lastBonus.amount) %>).<% } else { %>Du hast bisher noch keinen Tagesbonus erhalten.<% } %>
-    Den Bonus gibt es täglich ab <%= bonusTime %> Uhr (deutsche Zeit) – er wird bei deinem ersten Besuch danach gutgeschrieben.
-  </p>
-</div>
-
-<div class="card">
-  <h2>Meine Wetten</h2>
+<details class="card fold" id="wetten" <%= bets.open ? 'open' : '' %>>
+  <summary><h2>Meine Wetten <span class="muted small">(<%= bets.total %>)</span></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <% if (!positions.length) { %>
     <p class="muted">Du hast noch nichts gesetzt. <a href="/">Zu den Wetten</a></p>
   <% } else { %>
@@ -59,10 +42,17 @@
       </table>
     </div>
   <% } %>
-</div>
+  <% if (bets.pages > 1) { const link = (p) => '/konto?' + new URLSearchParams({ wetten: p, ...(led.open ? { auszug: led.page } : {}) }) + '#wetten'; %>
+    <div class="log-pager">
+      <% if (bets.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(bets.page - 1) %>">← Neuere</a><% } %>
+      <span class="muted small">Seite <%= bets.page %> / <%= bets.pages %></span>
+      <% if (bets.page < bets.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(bets.page + 1) %>">Ältere →</a><% } %>
+    </div>
+  <% } %>
+</details>
 
-<div class="card">
-  <h2>Kontoauszug</h2>
+<details class="card fold" id="auszug" <%= led.open ? 'open' : '' %>>
+  <summary><h2>Kontoauszug <span class="muted small">(<%= led.total %>)</span></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <div class="table-wrap">
     <table class="table">
       <thead><tr><th>Datum</th><th>Buchung</th><th class="num">Betrag</th></tr></thead>
@@ -77,10 +67,17 @@
       </tbody>
     </table>
   </div>
-  <p class="muted small">Es werden die letzten 50 Buchungen angezeigt.</p>
-</div>
+  <% if (led.pages > 1) { const link = (p) => '/konto?' + new URLSearchParams({ auszug: p, ...(bets.open ? { wetten: bets.page } : {}) }) + '#auszug'; %>
+    <div class="log-pager">
+      <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page - 1) %>">← Neuere</a><% } %>
+      <span class="muted small">Seite <%= led.page %> / <%= led.pages %></span>
+      <% if (led.page < led.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page + 1) %>">Ältere →</a><% } %>
+    </div>
+  <% } %>
+</details>
 
-<div class="card narrow-card" id="name">
+<div class="account-grid">
+<div class="card" id="name">
   <h2>Benutzernamen ändern</h2>
   <% if (currentUser.isAdmin) { %>
     <p class="muted">Admin-Konten können ihren Namen nicht ändern – die Admin-Rechte hängen am Benutzernamen.</p>
@@ -96,7 +93,7 @@
   <% } %>
 </div>
 
-<div class="card narrow-card" id="echter-name">
+<div class="card" id="echter-name">
   <h2>Echter Name <span class="muted small">(freiwillig)</span></h2>
   <p class="muted">Wenn du möchtest, erscheint dein echter Name überall in Klammern neben deinem Benutzernamen – für alle angemeldeten Mitglieder sichtbar. Leer lassen und speichern entfernt ihn wieder.</p>
   <form method="post" action="/konto/echter-name" class="form">
@@ -107,7 +104,7 @@
   </form>
 </div>
 
-<div class="card narrow-card" id="passwort">
+<div class="card" id="passwort">
   <h2>Passwort ändern</h2>
   <form method="post" action="/konto/passwort" class="form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -118,7 +115,7 @@
   </form>
 </div>
 
-<div class="card narrow-card" id="datenschutz">
+<div class="card" id="datenschutz">
   <h2>Datenschutz</h2>
   <p class="muted">Was über dich gespeichert wird und was andere sehen, steht in der <a href="/datenschutz">Datenschutzerklärung</a>.</p>
 
@@ -145,6 +142,7 @@
       <button class="btn btn-danger" type="submit">Konto endgültig löschen</button>
     </form>
   <% } %>
+</div>
 </div>
 
 <%- include('partials/foot') %>

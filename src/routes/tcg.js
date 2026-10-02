@@ -79,7 +79,7 @@ router.post('/tcg/kaufen', async (req, res) => {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/tcg#packs');
+  res.redirect('/tcg'); // oben bleiben – so lassen sich bequem weitere Packs kaufen
 });
 
 router.post('/tcg/oeffnen', async (req, res) => {
