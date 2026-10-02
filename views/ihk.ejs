@@ -65,7 +65,7 @@
       <div class="ihk-offers">
         <% offers.forEach((o, i) => { %>
           <div class="ihk-quest ihk-offer" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"<%- o.hybrid ? ' data-hybrid="1"' : '' %>
-            data-zoom="<%= o.image %>" data-zoom-title="<%= o.title %>" data-zoom-text="<%= o.text %>">
+            data-zoom="<%= o.image %>" data-zoom-title="<%= o.title %>" data-zoom-text="<%= o.text %>" data-zoom-level="<%= o.level %>" data-zoom-level-key="<%= o.level.toLowerCase() %>"<%- o.hybrid ? ' data-zoom-hybrid="1"' : '' %>>
             <img class="ihk-offer-thumb" src="<%= o.image %>" alt="" width="720" height="1008" draggable="false">
             <div>
               <div class="ihk-quest-head"><h2><%= o.title %></h2><span class="ihk-quest-dur"><%= o.duration %> Min.</span></div>
@@ -127,7 +127,7 @@
 
   <div class="ihk-col ihk-enemy">
     <div class="ihk-slot ihk-slot-card ihk-slot-enemy" <%- canStart ? 'data-ihk-drop="offer"' : '' %>
-      <% if (quest) { %>data-zoom="<%= quest.image %>" data-zoom-title="<%= quest.title %>" data-zoom-text="<%= quest.text %>"<% } %>>
+      <% if (quest) { %>data-zoom="<%= quest.image %>" data-zoom-title="<%= quest.title %>" data-zoom-text="<%= quest.text %>" data-zoom-level="<%= quest.level %>" data-zoom-level-key="<%= quest.level.toLowerCase() %>"<%- quest.hybrid ? ' data-zoom-hybrid="1"' : '' %><% } %>>
       <% if (quest) { %>
         <img src="<%= quest.image %>" alt="<%= quest.title %>" width="720" height="1008" draggable="false">
       <% } else { %>
@@ -176,8 +176,10 @@
     <div class="ihk-zoom-info">
       <h2 data-ihk-zoom-title></h2>
       <p data-ihk-zoom-text></p>
+      <p class="ihk-zoom-meta" data-ihk-zoom-meta hidden></p>
       <button type="button" class="btn btn-primary btn-block" data-ihk-zoom-pick hidden></button>
       <button type="button" class="btn btn-ghost btn-block" data-ihk-zoom-boost hidden>Als Boost wählen</button>
+      <button type="button" class="btn btn-ghost btn-block" data-ihk-zoom-remove hidden>Aus dem Feld nehmen</button>
     </div>
   </div>
 </dialog>

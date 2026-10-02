@@ -485,6 +485,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .mod-menu-panel .form { gap: 12px; }
 .mod-menu-panel .admin-tcg-pack { max-width: none; }
 .device-done { margin-top: 14px; }
+/* IHK: Schwierigkeit/Hybrid in der vergrößerten Quest-Ansicht (über den Knöpfen) */
+.ihk-zoom-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 /* Admin: Handel-Log */
 #handellog .leader-search { margin: 0 0 10px; flex-wrap: wrap; }
 .trade-log td { vertical-align: top; }

@@ -7,9 +7,36 @@
   var zoomEl = null;
   var zoomPick = zoom && zoom.querySelector('[data-ihk-zoom-pick]');
   var zoomBoost = zoom && zoom.querySelector('[data-ihk-zoom-boost]');
+  var zoomRemove = zoom && zoom.querySelector('[data-ihk-zoom-remove]');
+  var zoomMeta = zoom && zoom.querySelector('[data-ihk-zoom-meta]');
+  var removeFn = null; // removeFn(slotKey) – leert ein Feld (nur bei der Auswahl)
+  var zoomSlot = null; // Feld, dessen Karte gerade vergrößert ist
 
-  function openZoom(el) {
+  // Schwierigkeit und – nur bei Hybrid-Quests – der Hinweis "Hybrid" unter dem Quest-Text
+  function showMeta(el) {
+    zoomMeta.textContent = '';
+    zoomMeta.hidden = !el.dataset.zoomLevel;
+    if (zoomMeta.hidden) return;
+    zoomMeta.appendChild(document.createTextNode('Schwierigkeit: '));
+    var level = document.createElement('strong');
+    level.className = 'ihk-level r-' + (el.dataset.zoomLevelKey || '');
+    level.textContent = el.dataset.zoomLevel;
+    zoomMeta.appendChild(level);
+    if (el.dataset.zoomHybrid) {
+      var hybrid = document.createElement('span');
+      hybrid.className = 'ihk-hybrid';
+      hybrid.textContent = 'Hybrid';
+      zoomMeta.appendChild(document.createTextNode(' '));
+      zoomMeta.appendChild(hybrid);
+    }
+  }
+
+  function openZoom(el, slotKey) {
     if (!zoom || !el || !el.dataset.zoom) return;
+    showMeta(el);
+    // Belegtes Feld bei der Auswahl: Karte bzw. Quest wieder herausnehmen
+    zoomSlot = slotKey && removeFn ? slotKey : null;
+    zoomRemove.hidden = !zoomSlot;
     zoom.querySelector('[data-ihk-zoom-img]').src = el.dataset.zoom;
     zoom.querySelector('[data-ihk-zoom-title]').textContent = el.dataset.zoomTitle || '';
     zoom.querySelector('[data-ihk-zoom-text]').textContent = el.dataset.zoomText || '';
@@ -39,6 +66,7 @@
   if (zoom) {
     zoomPick.addEventListener('click', function () { if (zoomEl) pickFn(zoomEl, zoomPick.dataset.target); closeZoom(); });
     zoomBoost.addEventListener('click', function () { if (zoomEl) pickFn(zoomEl, 'boost'); closeZoom(); });
+    zoomRemove.addEventListener('click', function () { if (zoomSlot) removeFn(zoomSlot); closeZoom(); });
     zoom.querySelector('[data-ihk-zoom-close]').addEventListener('click', closeZoom);
     zoom.addEventListener('click', function (e) { if (e.target === zoom) closeZoom(); });
   }
@@ -71,7 +99,7 @@
         if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>' + (slot.classList.contains('is-disabled') ? 'nur bei Hybrid-Quests' : 'optional') + '</small>';
         else empty.textContent = 'Karte hierher ziehen';
         slot.appendChild(empty);
-        delete slot.dataset.zoom;
+        ['zoom', 'zoomTitle', 'zoomText', 'zoomLevel', 'zoomLevelKey', 'zoomHybrid'].forEach(function (k) { delete slot.dataset[k]; });
         return;
       }
       var img = document.createElement('img');
@@ -82,6 +110,7 @@
       slot.dataset.zoom = el.dataset.zoom;
       slot.dataset.zoomTitle = el.dataset.zoomTitle || '';
       slot.dataset.zoomText = el.dataset.zoomText || '';
+      ['zoomLevel', 'zoomLevelKey', 'zoomHybrid'].forEach(function (k) { if (el.dataset[k]) slot.dataset[k] = el.dataset[k]; else delete slot.dataset[k]; });
       slot.classList.remove('is-picked');
       void slot.offsetWidth;
       slot.classList.add('is-picked');
@@ -115,7 +144,9 @@
       var value = el.dataset.value;
       if (isBoostSlot(target)) {
         // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte; Charaktere nur mit Boost-Fähigkeit
-        if (input('card').value === value || (el.dataset.drag === 'card' && !el.dataset.boostable)) return;
+        if (el.dataset.drag === 'card' && !el.dataset.boostable) return;
+        // bisher Hauptkarte: wandert in den Boost-Slot, das Hauptfeld wird frei
+        if (input('card').value === value) clear('card');
         // "Als Boost wählen": ist der erste Slot belegt, kommt die Karte bei Hybrid-Quests in den zweiten
         if (target === 'boost' && !slots.boost2.classList.contains('is-disabled') && input('boost').value && input('boost').value !== value && !input('boost2').value) target = 'boost2';
         var other = target === 'boost' ? 'boost2' : 'boost';
@@ -127,9 +158,10 @@
       refresh();
     };
     pickFn = assign;
+    removeFn = function (k) { clear(k); refresh(); };
 
     Object.keys(slots).forEach(function (k) {
-      slots[k].addEventListener('click', function () { if (!drag.active) openZoom(slots[k]); });
+      slots[k].addEventListener('click', function () { if (!drag.active) openZoom(slots[k], input(k).value !== '' ? k : null); });
     });
 
     // Ziehen (nur Maus); auf Touch-Geräten: antippen = vergrößern + Knopf
