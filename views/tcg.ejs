@@ -30,7 +30,15 @@
         <div class="tcg-shop-info">
           <h2>BfW Holdings Booster Pack</h2>
           <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon. Gekaufte Packs landen bei „Meine Packs“ und können dort geöffnet werden.</p>
-          <button class="btn btn-primary btn-block" type="submit" <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
+          <% const maxBuy = Math.min(maxPacksPerPurchase, Math.floor(currentUser.balance / packPrice)); %>
+          <div class="tcg-qty" data-tcg-qty data-price="<%= packPrice %>" data-max="<%= Math.max(1, maxBuy) %>">
+            <span class="tcg-qty-label">Anzahl</span>
+            <button type="button" class="btn btn-ghost btn-sm" data-qty-step="-1" aria-label="Ein Pack weniger" <%= canAfford ? '' : 'disabled' %>>−</button>
+            <input type="number" name="count" value="1" min="1" max="<%= Math.max(1, maxBuy) %>" step="1" inputmode="numeric" aria-label="Anzahl Packs" required <%= canAfford ? '' : 'disabled' %>>
+            <button type="button" class="btn btn-ghost btn-sm" data-qty-step="1" aria-label="Ein Pack mehr" <%= canAfford ? '' : 'disabled' %>>+</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-qty-max <%= canAfford ? '' : 'disabled' %>>Max</button>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit" data-qty-submit <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
           <p class="muted small">Verfügbar: <span data-tcg-balance><%= euro(currentUser.balance) %></span></p>
           <% if (!canAfford) { %><p class="small neg">Dein Guthaben reicht gerade für kein Pack.</p><% } %>
         </div>
@@ -123,7 +131,7 @@
                const info = cardById[bestCard.card]; const r = rarityByKey[bestCard.rarity]; %>
             <li class="r-<%= bestCard.rarity %>">
               <span class="tcg-dot"></span>
-              <span><strong><%= o.username %></strong> zog <strong><%= info ? info.name : bestCard.card %></strong> (<%= r ? r.label : bestCard.rarity %>)</span>
+              <span><strong><%= o.username %></strong><%- roleBadge(o.username) %> zog <strong><%= info ? info.name : bestCard.card %></strong> (<%= r ? r.label : bestCard.rarity %>)</span>
               <span class="muted small nowrap"><%= relTime(o.createdAt) %></span>
             </li>
           <% }) %>

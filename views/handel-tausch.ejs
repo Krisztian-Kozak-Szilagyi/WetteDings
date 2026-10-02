@@ -1,0 +1,66 @@
+<%- include('partials/head') %>
+<% const canOffer = mine.cardCount > 0 && theirs.cardCount > 0; %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>Tausch mit <%= partner.username %></h1>
+    <a class="btn btn-ghost btn-sm" href="/handel">← Zurück zum Handel</a>
+  </div>
+  <span class="muted">Wähle deine Karte und die Karte, die du von <%= partner.username %> haben möchtest.</span>
+</div>
+
+<form method="post" action="/handel/tausch" class="trade-swap-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="to" value="<%= partner.username %>">
+
+  <div class="trade-swap-grids">
+    <div class="card">
+      <div class="tcg-coll-head">
+        <h2>1. Deine Karte</h2>
+        <%- include('partials/tcg-filter') %>
+      </div>
+      <% if (!mine.cardCount) { %>
+        <p class="muted">Du hast noch keine Karten zum Tauschen.</p>
+      <% } else { %>
+        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'card', picked: pickCard, showMissing: false, counts: mine.counts, lockedByCard: mine.lockedByCard }) %>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="tcg-coll-head">
+        <h2>2. Karte von <%= partner.username %></h2>
+        <%- include('partials/tcg-filter') %>
+      </div>
+      <% if (!theirs.cardCount) { %>
+        <p class="muted"><%= partner.username %> hat noch keine Karten.</p>
+      <% } else { %>
+        <p class="muted small">Gesperrte Karten kannst du trotzdem wählen. <%= partner.username %> kann erst annehmen, wenn die Karte wieder frei ist.</p>
+        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'want', picked: pickWant, showMissing: false, counts: theirs.counts, lockedByCard: {} }) %>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card card-accent trade-swap-submit">
+    <h2>3. Aufpreis (optional)</h2>
+    <div class="trade-swap-extra">
+      <label class="field">
+        <span>Aufpreis in €</span>
+        <input type="text" name="price" inputmode="decimal" placeholder="0" value="<%= pickPrice %>">
+      </label>
+      <fieldset class="field trade-extra-from">
+        <legend>Wer zahlt den Aufpreis?</legend>
+        <label><input type="radio" name="extra" value="seller" <%= pickFrom !== 'to' ? 'checked' : '' %>> Ich lege drauf</label>
+        <label><input type="radio" name="extra" value="to" <%= pickFrom === 'to' ? 'checked' : '' %>> <%= partner.username %> legt drauf</label>
+      </fieldset>
+    </div>
+    <label class="field trade-swap-message">
+      <span>Nachricht an <%= partner.username %> (optional)</span>
+      <textarea name="message" rows="2" maxlength="500" placeholder="z. B. warum der Tausch für beide passt"></textarea>
+    </label>
+    <p class="muted small">Nach dem Senden könnt ihr auf der Verhandlungsseite schreiben und den Aufpreis per Gegenvorschlag anpassen, bis eine Seite annimmt. Ohne Aufpreis tauscht ihr nur die Karten. Das Angebot gilt <%= privateHours %> Std., deine Karte ist bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf den Aufpreis fallen <%= String(taxPercent).replace('.', ',') %> % Steuer an, die der Empfänger des Geldes trägt.<% } %></p>
+    <button class="btn btn-primary" type="submit" <%= canOffer ? '' : 'disabled' %>>Tauschangebot senden</button>
+  </div>
+</form>
+
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

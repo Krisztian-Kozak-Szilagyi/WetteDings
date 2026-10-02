@@ -1,0 +1,47 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>Pack-Log</h1>
+    <a class="btn btn-ghost btn-sm" href="/admin#packs">← Zurück zum <%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</a>
+  </div>
+  <form method="get" action="/admin/pack-log" class="leader-search" role="search">
+    <label class="sr-only" for="log-suche">Im Log suchen</label>
+    <input type="search" id="log-suche" name="suche" value="<%= q %>" maxlength="40" placeholder="Name oder Pack suchen …">
+    <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+    <% if (q) { %><a class="btn btn-ghost btn-sm" href="/admin/pack-log">Alle</a><% } %>
+  </form>
+</div>
+
+<div class="card">
+  <p class="muted small"><%= total %> <%= total === 1 ? 'Eintrag' : 'Einträge' %><%= q ? ' für „' + q + '“' : '' %> · Seite <%= page %> von <%= pages %></p>
+  <% if (!entries.length) { %>
+    <p class="muted"><%= q ? 'Nichts gefunden.' : 'Es wurden noch keine Packs vergeben.' %></p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Pack</th><th class="num">Anzahl</th></tr></thead>
+        <tbody>
+          <% entries.forEach((e) => { %>
+            <tr class="<%= e.isNew ? 'me' : '' %>">
+              <td class="nowrap"><%= dateSec(e.createdAt) %><% if (e.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
+              <td><%= e.byName %><%- roleBadge(e.byName) %></td>
+              <td><%= e.toName %><%- roleBadge(e.toName) %></td>
+              <td><%= e.typeLabel %></td>
+              <td class="num"><%= e.count %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <% if (pages > 1) { const link = (p) => '/admin/pack-log?' + new URLSearchParams({ ...(q ? { suche: q } : {}), seite: p }); %>
+    <div class="pager">
+      <% if (page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(page - 1) %>">← Neuere</a><% } %>
+      <span class="muted small">Seite <%= page %> / <%= pages %></span>
+      <% if (page < pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(page + 1) %>">Ältere →</a><% } %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>

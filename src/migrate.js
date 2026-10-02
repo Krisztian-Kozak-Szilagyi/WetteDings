@@ -41,6 +41,7 @@ async function migrate() {
   await IhkRun.updateMany({ card: from }, { $set: { card: to } });
   await IhkRun.updateMany({ boost: from }, { $set: { boost: to } });
   await Trade.updateMany({ card: from }, { $set: { card: to } });
+  await Trade.updateMany({ wantCard: from }, { $set: { wantCard: to } });
   await TcgOpening.updateMany({ 'cards.card': from }, { $set: { 'cards.$[c].card': to } }, { arrayFilters: [{ 'c.card': from }] });
 }
 

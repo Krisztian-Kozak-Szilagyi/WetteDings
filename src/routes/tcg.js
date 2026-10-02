@@ -2,8 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const User = require('../models/User');
 const { TcgOpening } = require('../models/Tcg');
-const { TcgCard } = require('../models/Tcg');
-const { lockedDocs } = require('../tcg/locks');
+const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
@@ -19,32 +18,6 @@ const wantsJson = (req) => (req.get('Accept') || '').includes('application/json'
 function cardView(card) {
   const r = catalog.rarityByKey[card.rarity];
   return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, sell: euro(r.sell) };
-}
-
-/** Sammlung eines Nutzers mit allen Kennzahlen (für TCG-Seite und Album) */
-async function collection(user) {
-  const [owned, locked] = await Promise.all([tcg.inventory(user._id), lockedDocs(user._id)]);
-  // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
-  const lockedByCard = {};
-  for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card').lean()) {
-    const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason: locked.reasons.get(String(d._id)) });
-    e.n += 1;
-  }
-  const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
-  const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
-  // Geschützte Karten zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft
-  const protectedIds = new Set(user.tcgProtected || []);
-  const dups = owned.filter((o) => !protectedIds.has(o._id));
-  return {
-    counts,
-    lockedByCard,
-    protectedIds,
-    uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
-    cardCount: owned.reduce((s, o) => s + o.n, 0),
-    collectionValue: owned.reduce((s, o) => s + sell(o) * o.n, 0),
-    dupCount: dups.reduce((s, o) => s + o.n - 1, 0),
-    dupValue: dups.reduce((s, o) => s + sell(o) * (o.n - 1), 0),
-  };
 }
 
 router.get('/tcg', async (req, res) => {
@@ -72,6 +45,7 @@ router.get('/tcg', async (req, res) => {
     stats: stats[0] || { packs: 0, spent: 0, best: null },
     rarePulls,
     packPrice: settings.getPackPrice(),
+    maxPacksPerPurchase: tcg.MAX_PACKS_PER_PURCHASE,
     packImage: catalog.PACK_IMAGE,
     packs,
     packType: catalog.DEFAULT_PACK,
@@ -94,8 +68,13 @@ router.get('/tcg/album', async (req, res) => {
 
 router.post('/tcg/kaufen', async (req, res) => {
   try {
-    const r = await tcg.buyPack({ user: req.user, type: str(req.body.type) });
-    req.flash('success', `${r.type.label} für ${euro(r.cost)} gekauft – es liegt bei deinen Packs.`);
+    // Ohne Mengenangabe (altes Formular) ein Pack; ungültige Eingaben lehnt buyPack ab
+    const raw = str(req.body.count).trim();
+    const count = raw === '' ? 1 : /^\d+$/.test(raw) ? Number(raw) : NaN;
+    const r = await tcg.buyPack({ user: req.user, type: str(req.body.type), count });
+    req.flash('success', r.count === 1
+      ? `${r.type.label} für ${euro(r.cost)} gekauft – es liegt bei deinen Packs.`
+      : `${r.count}× ${r.type.label} für ${euro(r.cost)} gekauft – sie liegen bei deinen Packs.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

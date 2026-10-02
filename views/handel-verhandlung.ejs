@@ -1,0 +1,128 @@
+<%- include('partials/head') %>
+<%
+  const other = role === 'seller' ? t.toName : t.sellerName;
+  const myName = role === 'seller' ? t.sellerName : t.toName;
+  const nameOf = (from) => (from === 'seller' ? t.sellerName : t.toName);
+  // Aus meiner Sicht: was gebe ich, was bekomme ich
+  const give = cardInfo(role === 'seller' ? t.card : t.wantCard);
+  const get = cardInfo(role === 'seller' ? t.wantCard : t.card);
+  const rar = (c) => rarityByKey[c.rarity] || { label: '' };
+  const payerRole = t.extraFrom === 'seller' ? 'seller' : 'to';
+  const iPay = t.price > 0 && payerRole === role;
+  const lastBy = t.lastChangeBy || 'seller';
+  const version = t.termsVersion || 0;
+  const statusText = { verkauft: 'Getauscht', abgelehnt: 'Abgelehnt', zurueckgezogen: 'Zurückgezogen' }[t.status] || 'Abgelaufen';
+  const lastAt = (t.messages || []).length ? t.messages[t.messages.length - 1].createdAt : null;
+%>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>Tausch mit <a href="/profil/<%= encodeURIComponent(other) %>"><%= other %></a></h1>
+    <a class="btn btn-ghost btn-sm" href="/handel">← Zurück zum Handel</a>
+  </div>
+  <% if (isOpen) { %>
+    <span class="nego-turn <%= canAccept ? 'nego-turn-me' : '' %>"><%= canAccept ? 'Du bist am Zug' : 'Warte auf ' + other %> · läuft ab <%= relTime(t.expiresAt) %></span>
+  <% } else { %>
+    <span class="nego-turn"><%= statusText %></span>
+  <% } %>
+</div>
+
+<div class="nego-layout">
+  <section>
+    <div class="card">
+      <h2>Der Tausch</h2>
+      <div class="nego-cards">
+        <figure class="nego-card">
+          <figcaption>Du gibst</figcaption>
+          <%- include('partials/trade-thumbs', { a: give }) %>
+          <span><strong><%= give.name %></strong> <span class="tcg-badge r-<%= give.rarity %>"><%= rar(give).label %></span></span>
+        </figure>
+        <svg class="nego-swap" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
+        <figure class="nego-card">
+          <figcaption>Du bekommst</figcaption>
+          <%- include('partials/trade-thumbs', { a: get }) %>
+          <span><strong><%= get.name %></strong> <span class="tcg-badge r-<%= get.rarity %>"><%= rar(get).label %></span></span>
+        </figure>
+      </div>
+
+      <div class="nego-terms" data-version="<%= version %>">
+        <span class="nego-terms-label"><%= isOpen ? 'Aktueller Vorschlag von ' + nameOf(lastBy) : 'Bedingungen' %></span>
+        <strong class="nego-terms-value"><%= termsText(t) %></strong>
+        <% if (t.price) { %>
+          <span class="muted small"><%= iPay ? 'Du zahlst ' + euro(t.price) + '.' : 'Du bekommst ' + euro(t.price - taxFor(t.price)) + (taxFor(t.price) ? ' (nach ' + String(taxPercent).replace('.', ',') + ' % Steuer).' : '.') %></span>
+        <% } %>
+      </div>
+
+      <% if (isOpen) { %>
+        <% if (role === 'to' && !wantFree) { %><p class="neg small">Du hast <%= give.name %> gerade nicht frei (Quest oder Handel). Annehmen geht erst, wenn die Karte wieder frei ist.</p><% } %>
+        <div class="nego-actions">
+          <% if (canAccept) { %>
+            <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= give.name %> gegen <%= get.name %> tauschen (<%= termsText(t) %>)?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="version" value="<%= version %>">
+              <input type="hidden" name="zurueck" value="verhandlung">
+              <button class="btn btn-primary" type="submit" <%= role === 'to' && !wantFree ? 'disabled' : '' %>>Annehmen</button>
+            </form>
+          <% } %>
+          <form method="post" action="/handel/<%= t._id %>/<%= role === 'to' ? 'ablehnen' : 'zurueckziehen' %>" data-confirm="<%= role === 'to' ? 'Tauschangebot ablehnen?' : 'Tauschangebot zurückziehen?' %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-ghost" type="submit"><%= role === 'to' ? 'Ablehnen' : 'Zurückziehen' %></button>
+          </form>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (isOpen) { %>
+      <div class="card">
+        <h2>Gegenvorschlag</h2>
+        <p class="muted small">Ändere den Aufpreis oder wer ihn zahlt. Danach ist <%= other %> am Zug und kann annehmen oder wieder einen Vorschlag machen. Das Angebot läuft dann wieder 48 Std.</p>
+        <form method="post" action="/handel/verhandlung/<%= t._id %>/bedingungen" class="trade-swap-extra">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="version" value="<%= version %>">
+          <label class="field">
+            <span>Aufpreis in €</span>
+            <input type="text" name="price" inputmode="decimal" placeholder="0" value="<%= t.price ? (t.price / 100).toFixed(2).replace('.', ',') : '' %>">
+          </label>
+          <fieldset class="field trade-extra-from">
+            <legend>Wer zahlt?</legend>
+            <label><input type="radio" name="extra" value="<%= role %>" <%= !t.price || payerRole === role ? 'checked' : '' %>> Ich</label>
+            <label><input type="radio" name="extra" value="<%= role === 'seller' ? 'to' : 'seller' %>" <%= t.price && payerRole !== role ? 'checked' : '' %>> <%= other %></label>
+          </fieldset>
+          <button class="btn btn-ghost" type="submit">Vorschlag senden</button>
+        </form>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="card nego-chat" id="chat">
+    <h2>Nachrichten</h2>
+    <ol class="nego-messages" data-chat data-url="/handel/verhandlung/<%= t._id %>/stand" data-since="<%= lastAt ? new Date(lastAt).toISOString() : '' %>"
+      data-version="<%= version %>" data-open="<%= isOpen ? 1 : 0 %>" data-me="<%= role %>" data-seller-name="<%= t.sellerName %>" data-to-name="<%= t.toName %>">
+      <% (t.messages || []).forEach((m) => { %>
+        <% if (m.from === 'system') { %>
+          <li class="nego-msg nego-msg-system"><span><%= m.text %></span> <time class="muted small"><%= relTime(m.createdAt) %></time></li>
+        <% } else { %>
+          <li class="nego-msg <%= m.from === role ? 'nego-msg-me' : '' %>">
+            <span class="nego-msg-head"><strong><%= nameOf(m.from) %></strong> <time class="muted small"><%= relTime(m.createdAt) %></time></span>
+            <span class="nego-msg-text"><%= m.text %></span>
+          </li>
+        <% } %>
+      <% }) %>
+    </ol>
+    <p class="muted small nego-empty" data-chat-empty <%= (t.messages || []).length ? 'hidden' : '' %>>Noch keine Nachrichten. Schreib <%= other %>, was du dir vorstellst.</p>
+    <p class="nego-changed small" data-chat-changed hidden>Die Bedingungen wurden geändert. <a href="">Neu laden</a></p>
+    <% if (isOpen) { %>
+      <form method="post" action="/handel/verhandlung/<%= t._id %>/nachricht" class="nego-send">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="sr-only" for="nego-text">Nachricht an <%= other %></label>
+        <textarea id="nego-text" name="text" rows="2" maxlength="<%= messageMax %>" placeholder="Nachricht an <%= other %>" required></textarea>
+        <button class="btn btn-primary" type="submit">Senden</button>
+      </form>
+    <% } %>
+  </section>
+</div>
+
+<%- include('partials/card-zoom') %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

@@ -21,7 +21,7 @@
           <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
             <tr class="<%= me ? 'me' : '' %><%= u.rank === 1 ? ' is-top1' : '' %>">
               <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
-              <td><% if (u.rank === 1) { %><a class="flame-name" data-text="<%= u.username %>" href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><% } else { %><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><% } %></td>
+              <td><% if (u.rank === 1) { %><a class="flame-name" data-text="<%= u.username %>" href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><% } else { %><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><% } %><%- roleBadge(u.username) %></td>
               <td class="num"><strong><%= euro(u.total) %></strong></td>
               <td class="num hide-sm"><%= euro(u.balance) %></td>
               <td class="num hide-sm"><%= euro(u.inPlay) %></td>

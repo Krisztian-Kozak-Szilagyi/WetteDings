@@ -135,7 +135,7 @@ async function placeStake({ user, betId, side, amount }) {
 async function closeBet({ actor, betId }) {
   const bet = await Bet.findById(betId);
   if (!bet) throw new UserError('Wette nicht gefunden.');
-  if (!isOwnerOf(bet, actor) && !actor.isAdmin) throw new UserError('Nur der Ersteller oder ein Admin darf das.');
+  if (!isOwnerOf(bet, actor) && !actor.isAdmin && !actor.isDev) throw new UserError('Nur der Ersteller oder ein Admin darf das.');
   const res = await Bet.updateOne(
     { _id: betId, status: 'offen', deadline: { $gt: new Date() } },
     { $set: { deadline: new Date() } }
@@ -191,7 +191,7 @@ async function resolveBet({ actor, betId, outcome, note }) {
     if (!bet) throw new UserError('Wette nicht gefunden.');
     if (bet.status !== 'offen') throw new UserError('Diese Wette ist bereits abgeschlossen.');
 
-    const isAdmin = actor.system || actor.isAdmin;
+    const isAdmin = actor.system || actor.isAdmin || actor.isDev; // Devs dürfen alle Wetten entscheiden und annullieren
     if (!isOwnerOf(bet, actor) && !isAdmin) throw new UserError('Nur der Ersteller oder ein Admin kann diese Wette abschließen.');
     const winner = bet.options.find((o) => o.key === outcome);
     if (outcome !== 'annulliert' && !winner) throw new UserError('Ungültiges Ergebnis.');

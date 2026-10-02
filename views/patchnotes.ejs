@@ -6,7 +6,7 @@
     <span class="muted">Was sich auf der Seite geändert hat</span>
   </div>
 
-  <% if (currentUser.isAdmin) { %>
+  <% if (currentUser.isStaff) { %>
     <div class="card">
       <h2>Neue Patchnote</h2>
       <form method="post" action="/patchnotes" class="form" data-confirm="Patchnote veröffentlichen?">
@@ -40,7 +40,7 @@
     <article class="card pn-note" id="p-<%= n._id %>">
       <div class="pn-head">
         <h2><%= n.title %><% if (n.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></h2>
-        <span class="muted small"><%= n.authorName %> · <%= date(n.createdAt) %></span>
+        <span class="muted small"><%= n.authorName %><%- roleBadge(n.authorName) %> · <%= date(n.createdAt) %></span>
       </div>
       <div class="pn-body prose"><%- n.html %></div>
 
@@ -49,7 +49,7 @@
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button class="btn btn-sm <%= n.upvoted ? 'btn-primary' : 'btn-ghost' %>" type="submit" aria-pressed="<%= n.upvoted %>"><span class="pn-arrow" aria-hidden="true"></span> Upvote · <%= n.upvotes.length %></button>
         </form>
-        <% if (currentUser.isAdmin) { %>
+        <% if (n.canDelete) { %>
           <form method="post" action="/patchnotes/<%= n._id %>/loeschen" data-confirm="Diese Patchnote samt Kommentaren löschen?">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
@@ -64,7 +64,7 @@
             <% n.comments.forEach((c) => { const mine = String(c.user) === String(currentUser._id); %>
               <li class="comment <%= mine ? 'is-mine' : '' %>">
                 <div class="comment-head">
-                  <strong><%= c.username %></strong>
+                  <strong><%= c.username %></strong><%- roleBadge(c.username) %>
                   <% if (mine || currentUser.isAdmin) { %>
                     <form method="post" action="/patchnotes/<%= n._id %>/kommentar/<%= c._id %>/loeschen" class="comment-delete" data-confirm="Kommentar wirklich löschen?">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">

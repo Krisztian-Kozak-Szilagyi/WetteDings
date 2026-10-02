@@ -1,16 +1,19 @@
 <%- include('partials/head') %>
 
 <div class="page-head">
-  <h1>Admin-Panel</h1>
+  <h1><%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</h1>
   <span class="muted">Angemeldet als <%= currentUser.username %></span>
 </div>
 
+<% if (currentUser.isAdmin) { %>
 <div class="stats stats-3">
   <div class="stat card"><span class="stat-label">Nutzer</span><span class="stat-value"><%= stats.userCount %></span></div>
   <div class="stat card"><span class="stat-label">Offene Wetten</span><span class="stat-value"><%= stats.openBets %></span></div>
   <div class="stat card"><span class="stat-label">Wetten gesamt</span><span class="stat-value"><%= stats.totalBets %></span></div>
 </div>
+<% } %>
 
+<% if (currentUser.isAdmin) { %>
 <div class="card" id="tcg">
   <h2>TCG: Chancen &amp; Preise</h2>
   <p class="muted">Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.</p>
@@ -52,9 +55,11 @@
   </form>
 </div>
 
+<% } %>
+
 <div class="card" id="packs">
   <h2>TCG: Booster Packs vergeben</h2>
-  <p class="muted">Schenkt einem Mitglied ungeöffnete Booster Packs. Sie landen in seinem Inventar auf der TCG-Seite („Meine Packs“).</p>
+  <p class="muted">Schenkt einem Mitglied ungeöffnete Booster Packs. Sie landen in seinem Inventar auf der TCG-Seite („Meine Packs“). Jede Vergabe wird im Pack-Log festgehalten (wer, wem, wann).</p>
   <form method="post" action="/admin/tcg/packs" class="form admin-tcg-form" data-confirm="Booster Packs wirklich vergeben?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label class="field admin-tcg-pack">
@@ -75,9 +80,49 @@
       <input type="number" name="count" min="1" max="50" step="1" value="1" required>
     </label>
     <button class="btn btn-primary" type="submit">Packs vergeben</button>
+    <a class="btn btn-ghost nav-badge-link" href="/admin/pack-log">Pack-Log ansehen<% if (packLogNew) { %><span class="nav-badges"><span class="nav-badge" title="Neue Vergaben" aria-label="<%= packLogNew %> neue Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span></span><% } %></a>
   </form>
 </div>
 
+<% if (currentUser.isAdmin) { %>
+<div class="card" id="devs">
+  <h2>Devs</h2>
+  <p class="muted">Devs können Patchnotes schreiben, alle Wetten entscheiden oder annullieren und Booster Packs vergeben. Sie sehen statt des Admin-Panels ein Dev-Panel und tragen ein grünes DEV-Abzeichen.</p>
+  <% const devList = users.filter((u) => u.role === 'dev'); %>
+  <% if (!devList.length) { %>
+    <p class="muted">Aktuell gibt es keine Devs.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% devList.forEach((u) => { %>
+        <li class="code-item">
+          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
+          <div class="code-actions">
+            <form method="post" action="/admin/devs" data-confirm="<%= u.username %> die Dev-Rolle entziehen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="user" value="<%= u._id %>">
+              <input type="hidden" name="action" value="entfernen">
+              <button class="btn btn-danger btn-sm" type="submit">Entfernen</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <form method="post" action="/admin/devs" class="form admin-tcg-form" data-confirm="Dieses Mitglied zum Dev machen?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Mitglied zum Dev machen</span>
+      <select name="user" required>
+        <option value="">– auswählen –</option>
+        <% users.filter((u) => u.role !== 'dev').forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Zum Dev machen</button>
+  </form>
+</div>
+<% } %>
+
+<% if (currentUser.isAdmin) { %>
 <div class="card" id="handel">
   <h2>Handel: Steuer</h2>
   <p class="muted">Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.</p>
@@ -172,5 +217,7 @@
     </ul>
   <% } %>
 </div>
+
+<% } %>
 
 <%- include('partials/foot') %>

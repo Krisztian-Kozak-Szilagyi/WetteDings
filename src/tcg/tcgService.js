@@ -13,18 +13,24 @@ const packType = (type) => {
   return t;
 };
 
-/** Booster Pack kaufen: Es landet ungeöffnet im Inventar. */
-async function buyPack({ user, type }) {
+const MAX_PACKS_PER_PURCHASE = 100; // Obergrenze pro Kauf (Schutz vor Vertippern)
+
+/** Booster Packs kaufen (1 bis MAX_PACKS_PER_PURCHASE): Sie landen ungeöffnet im Inventar. */
+async function buyPack({ user, type, count = 1 }) {
   const t = packType(type);
-  const cost = settings.getPackPrice();
+  if (!Number.isInteger(count) || count < 1 || count > MAX_PACKS_PER_PURCHASE) {
+    throw new UserError(`Du kannst 1 bis ${MAX_PACKS_PER_PURCHASE} Packs auf einmal kaufen.`);
+  }
+  const price = settings.getPackPrice();
+  const cost = price * count;
   if (!catalog.CARDS.length) throw new UserError('Der TCG-Shop ist gerade geschlossen.');
 
   return inTransaction(async (session) => {
     const updatedUser = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { new: true, session });
-    if (!updatedUser) throw new UserError('Dein Guthaben reicht für kein Booster Pack.');
-    await TcgPack.create([{ user: user._id, type: t.key, source: 'kauf', cost }], { session });
-    await Ledger.create([{ user: user._id, type: 'tcg_pack', amount: -cost }], { session });
-    return { type: t, cost, balance: updatedUser.balance };
+    if (!updatedUser) throw new UserError(count === 1 ? 'Dein Guthaben reicht für kein Booster Pack.' : `Dein Guthaben reicht nicht für ${count} Booster Packs.`);
+    await TcgPack.insertMany(Array.from({ length: count }, () => ({ user: user._id, type: t.key, source: 'kauf', cost: price })), { session });
+    await Ledger.create([{ user: user._id, type: 'tcg_pack', amount: -cost, betTitle: `${count}× ${t.label}` }], { session });
+    return { type: t, count, cost, balance: updatedUser.balance };
   });
 }
 
@@ -183,4 +189,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { MAX_FAVORITES, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { MAX_FAVORITES, MAX_PACKS_PER_PURCHASE,toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

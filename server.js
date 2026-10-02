@@ -17,6 +17,7 @@ async function main() {
   await tcgSettings.load(); // im Admin-Panel geänderte TCG-Preise
   await require('./src/ihk/ihkService').loadSettings(); // IHK: Tageslimit und Belohnungen
   await require('./src/trade/tradeService').loadSettings(); // Handel: Steuer
+  await require('./src/services/roles').load(); // Devs für die Abzeichen neben Namen
   await coinEngine.start();
 
   const app = createApp();

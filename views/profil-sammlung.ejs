@@ -1,0 +1,29 @@
+<%- include('partials/head') %>
+<% const tradeLink = (id) => '/handel/tausch?' + new URLSearchParams({ an: profile.username, will: id }); %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>Sammlung von <%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
+    <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>">← Zum Profil</a>
+  </div>
+  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Verkaufswert <%= euro(collectionValue) %></span>
+</div>
+
+<div class="card" id="sammlung">
+  <div class="tcg-coll-head">
+    <h2>Sammlung</h2>
+    <%- include('partials/tcg-filter') %>
+  </div>
+  <% if (isMe) { %>
+    <p class="muted small">So sehen andere deine Sammlung. Verkaufen und Schützen geht im <a href="/tcg/album">Album</a>.</p>
+  <% } else { %>
+    <p class="muted small">Tippe eine Karte an, um <%= profile.username %> einen Tausch vorzuschlagen.</p>
+  <% } %>
+  <% if (!cardCount) { %>
+    <p class="muted"><%= isMe ? 'Du hast' : profile.username + ' hat' %> noch keine Karten.</p>
+  <% } %>
+  <%- include('partials/tcg-grid', { mode: 'view', lockedByCard: {}, linkFor: isMe ? null : tradeLink }) %>
+</div>
+
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

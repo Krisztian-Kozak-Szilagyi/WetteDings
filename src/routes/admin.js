@@ -2,7 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Bet = require('../models/Bet');
-const { requireAdmin } = require('../middleware');
+const { requireAdmin, requireStaff } = require('../middleware');
+const { PackGrant } = require('../models/Tcg');
+const roles = require('../services/roles');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
@@ -15,16 +17,17 @@ const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } 
 
 const router = express.Router();
 
-router.get('/admin', requireAdmin, async (req, res) => {
+router.get('/admin', requireStaff, async (req, res) => {
   const [codes, userCount, openBets, totalBets, users] = await Promise.all([
     listActiveCodes(),
     User.countDocuments(),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(),
-    User.find({ deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
+    User.find({ deletedAt: null }).select('username role').sort({ usernameLower: 1 }).lean(),
   ]);
   res.render('admin', {
-    title: 'Admin',
+    title: req.user.isAdmin ? 'Admin' : 'Dev',
+    packLogNew: res.locals.packLogNew || 0,
     codes,
     formatCode,
     ttlMinutes: CODE_TTL_MINUTES,
@@ -141,7 +144,7 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
 });
 
 // ---------- TCG: Booster Packs an Mitglieder vergeben ----------
-router.post('/admin/tcg/packs', requireAdmin, async (req, res) => {
+router.post('/admin/tcg/packs', requireStaff, async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
@@ -154,9 +157,56 @@ router.post('/admin/tcg/packs', requireAdmin, async (req, res) => {
     req.flash('error', 'Die Anzahl muss zwischen 1 und 50 liegen.');
   } else {
     await tcgService.grantPacks({ userId: user._id, type: type.key, count, source: 'admin' });
+    // Protokoll: wer, wem, was, wann
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count });
     req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
   }
   res.redirect('/admin#packs');
+});
+
+// ---------- Pack-Log: eigene Seite, 50 Einträge pro Seite, mit Suche ----------
+const LOG_PAGE = 50;
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Neue Vergaben anderer seit dem letzten Blick ins Log (Abzeichen für den Admin) */
+const packLogNewCount = (user) => PackGrant.countDocuments({ by: { $ne: user._id }, createdAt: { $gt: user.packLogSeenAt || new Date(0) } });
+
+router.get('/admin/pack-log', requireStaff, async (req, res) => {
+  const q = (typeof req.query.suche === 'string' ? req.query.suche : '').trim().slice(0, 40);
+  const rx = q ? new RegExp(escapeRegex(q), 'i') : null;
+  const filter = rx ? { $or: [{ byName: rx }, { toName: rx }, { typeLabel: rx }] } : {};
+  const total = await PackGrant.countDocuments(filter);
+  const pages = Math.max(1, Math.ceil(total / LOG_PAGE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt(req.query.seite, 10) || 1));
+  const entries = await PackGrant.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * LOG_PAGE).limit(LOG_PAGE).lean();
+  const seen = req.user.packLogSeenAt || new Date(0);
+  if (req.user.isAdmin) {
+    // Besuch merken: das Abzeichen am Menüpunkt verschwindet
+    await User.updateOne({ _id: req.user._id }, { $set: { packLogSeenAt: new Date() } });
+    res.locals.packLogNew = 0;
+  }
+  res.render('pack-log', {
+    title: 'Pack-Log',
+    q,
+    total,
+    page,
+    pages,
+    entries: entries.map((e) => ({ ...e, isNew: req.user.isAdmin && e.createdAt > seen && !e.by.equals(req.user._id) })),
+  });
+});
+
+// ---------- Devs ernennen / abberufen (nur Admin) ----------
+router.post('/admin/devs', requireAdmin, async (req, res) => {
+  const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  const on = req.body.action !== 'entfernen';
+  const user = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower').lean() : null;
+  if (!user) req.flash('error', 'Bitte ein Mitglied auswählen.');
+  else if (roles.roleOf(user.username) === 'admin') req.flash('error', 'Der Admin braucht keine Dev-Rolle.');
+  else {
+    await roles.setDev(user._id, on);
+    req.flash('success', on ? `${user.username} ist jetzt Dev.` : `${user.username} ist kein Dev mehr.`);
+  }
+  res.redirect('/admin#devs');
 });
 
 router.post('/admin/codes', requireAdmin, async (req, res) => {
@@ -172,3 +222,4 @@ router.post('/admin/codes/:id/loeschen', requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.packLogNewCount = packLogNewCount;

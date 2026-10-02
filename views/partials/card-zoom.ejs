@@ -1,0 +1,17 @@
+<%# Karte groß ansehen – öffnet sich bei Klick auf [data-zoom-card] (public/js/handel.js) %>
+<dialog class="tcg-modal" data-zoom-modal aria-label="Karte ansehen">
+  <button type="button" class="tcg-close" data-zoom-close aria-label="Schließen">×</button>
+  <div class="tcg-modal-body">
+    <div class="tcg-zoom" data-zoom-tilt>
+      <div class="tcg-card-3d">
+        <img alt="" data-zoom-img width="720" height="1008">
+        <span class="tcg-shine"></span>
+      </div>
+    </div>
+    <div class="tcg-modal-info">
+      <h2 data-zoom-name></h2>
+      <p><span class="tcg-badge" data-zoom-rarity></span></p>
+      <p class="muted" data-zoom-meta></p>
+    </div>
+  </div>
+</dialog>

@@ -3,7 +3,7 @@
 
 <div class="page-head">
   <div class="ihk-title">
-    <h1><%= profile.username %><%= isMe ? ' (du)' : '' %></h1>
+    <h1><%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
     <a class="btn btn-ghost btn-sm" href="/rangliste">← Zur Rangliste</a>
   </div>
   <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
@@ -21,7 +21,13 @@
 </div>
 
 <div class="card">
-  <h2>Favoriten</h2>
+  <div class="tcg-coll-head">
+    <h2>Favoriten</h2>
+    <div class="profil-actions">
+      <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>/sammlung">Sammlung ansehen</a>
+      <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/handel/tausch?an=<%= encodeURIComponent(profile.username) %>">Tausch vorschlagen</a><% } %>
+    </div>
+  </div>
   <% if (!favorites.length) { %>
     <p class="muted"><%= isMe ? 'Du zeigst noch keine Favoriten. Wähle sie in deinem Album aus.' : profile.username + ' zeigt noch keine Favoriten.' %></p>
   <% } else { %>

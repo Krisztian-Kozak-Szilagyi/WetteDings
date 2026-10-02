@@ -11,6 +11,7 @@ const { settings: ihkSettings } = require('./ihk/ihkService');
 const tradeService = require('./trade/tradeService');
 const tcgService = require('./tcg/tcgService');
 const patchnotes = require('./routes/patchnotes');
+const roles = require('./services/roles');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -76,6 +77,8 @@ function createApp() {
     tradeMarketNew: 0,
     newPacks: 0,
     patchNew: 0,
+    packLogNew: 0,
+    roleBadge: roles.roleBadge, // Abzeichen neben Namen (Admin rot, Dev grün)
     currentPath: '',
     flash: null,
     csrfToken: '',
@@ -94,6 +97,8 @@ function createApp() {
         tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
         patchnotes.newCount(req.user), // Patchnotes seit dem letzten Lesen
       ]);
+      // nur für den Admin: Pack-Vergaben der Devs seit dem letzten Blick ins Log
+      if (req.user.isAdmin) res.locals.packLogNew = await require('./routes/admin').packLogNewCount(req.user);
     }
     next();
   });

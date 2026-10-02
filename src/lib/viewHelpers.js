@@ -12,6 +12,9 @@ const rtf = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
 const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
+// sekundengenau, z. B. für Protokolle
+const dateSecFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'medium', timeZone: config.timezone });
+const dateSec = (d) => (d ? `${dateSecFmt.format(new Date(d))} Uhr` : '–');
 
 function relTime(d) {
   const diff = (new Date(d).getTime() - Date.now()) / 1000;
@@ -81,6 +84,8 @@ const ledgerLabels = {
   ihk_lohn: 'IHK-Quest geschafft',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
+  handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
+  handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
 };
 
 /** Coin-Kurs mit passender Genauigkeit, z. B. 12,34 € oder 0,004512 € */
@@ -105,6 +110,7 @@ const editFieldLabels = { title: 'Titel', description: 'Beschreibung' };
 module.exports = {
   euro,
   date,
+  dateSec,
   relTime,
   pool,
   quote,

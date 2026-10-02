@@ -273,6 +273,7 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
   const myPosition = me ? positions.find((p) => String(p.user) === String(me._id)) || null : null;
   const isOwner = !!me && String(bet.creator) === String(me._id);
   const isAdmin = !!me && me.isAdmin;
+  const isStaff = !!me && me.isStaff; // Admin oder Dev: entscheiden, annullieren, schließen
   const isOpen = bet.status === 'offen';
   const accepting = isOpen && bet.deadline > now;
 
@@ -293,9 +294,9 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
       // Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen
       stake: !!me && accepting && !isOwner,
       // Ersteller und Admins dürfen jederzeit das Ergebnis eintragen
-      resolve: isOpen && (isOwner || isAdmin),
-      void: isOpen && (isOwner || isAdmin),
-      close: accepting && (isOwner || isAdmin),
+      resolve: isOpen && (isOwner || isStaff),
+      void: isOpen && (isOwner || isStaff),
+      close: accepting && (isOwner || isStaff),
       edit: (isOwner && isOpen) || isAdmin,
     },
   });

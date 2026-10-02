@@ -25,6 +25,21 @@ const packSchema = new Schema(
 );
 packSchema.index({ user: 1, type: 1, createdAt: 1 });
 
+// Protokoll: wer hat wem wann Booster Packs geschenkt (Admin/Dev)
+const packGrantSchema = new Schema(
+  {
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    byName: { type: String, required: true },
+    to: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    toName: { type: String, required: true },
+    type: { type: String, required: true }, // Pack-Art
+    typeLabel: { type: String, required: true },
+    count: { type: Number, required: true },
+  },
+  { timestamps: true }
+);
+packGrantSchema.index({ createdAt: -1 });
+
 // Ein geöffnetes Booster Pack (für Statistik und den Feed seltener Ziehungen)
 const openingSchema = new Schema(
   {
@@ -57,6 +72,7 @@ const settingsSchema = new Schema(
 module.exports = {
   TcgCard: model('TcgCard', cardSchema),
   TcgPack: model('TcgPack', packSchema),
+  PackGrant: model('PackGrant', packGrantSchema),
   TcgOpening: model('TcgOpening', openingSchema),
   TcgSettings: model('TcgSettings', settingsSchema),
 };

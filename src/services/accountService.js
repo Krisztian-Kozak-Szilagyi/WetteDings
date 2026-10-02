@@ -10,7 +10,8 @@ const Ledger = require('../models/Ledger');
 const PatchNote = require('../models/PatchNote');
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
-const { TcgCard, TcgPack, TcgOpening } = require('../models/Tcg');
+const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
+const roles = require('./roles');
 const { CoinHolding, CoinTrade } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
@@ -46,6 +47,9 @@ async function propagateName(userId, oldName, name, session) {
     Trade.updateMany({ seller: userId }, { $set: { sellerName: name } }, opt),
     Trade.updateMany({ buyer: userId }, { $set: { buyerName: name } }, opt),
     Trade.updateMany({ to: userId }, { $set: { toName: name } }, opt),
+    PackGrant.updateMany({ by: userId }, { $set: { byName: name } }, opt),
+    PackGrant.updateMany({ to: userId }, { $set: { toName: name } }, opt),
+    PatchNote.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
   ]);
 }
 
@@ -76,6 +80,7 @@ async function rename({ user, username }) {
     if (err && err.code === 11000) throw new UserError('Dieser Benutzername ist bereits vergeben.');
     throw err;
   }
+  await roles.load(); // Dev-Abzeichen folgt dem neuen Namen
   return name;
 }
 
@@ -103,6 +108,7 @@ async function deleteAccount({ user, password }) {
           passwordHash: crypto.randomBytes(32).toString('hex'), // kein gültiger Hash → Anmeldung unmöglich
           balance: 0,
           deletedAt: new Date(),
+          role: null,
           tcgProtected: [],
           tcgFavorites: [],
         },
@@ -127,7 +133,11 @@ async function deleteAccount({ user, password }) {
       Comment.updateMany({ user: id }, { $set: { deleted: true, text: '' } }, opt),
       PatchNote.updateMany({}, { $pull: { comments: { user: id }, upvotes: id } }, opt),
     ]);
+    // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
+    await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
+    await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
   });
+  await roles.load();
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
   await mongoose.connection.collection('sessions').deleteMany({ session: { $regex: `"userId":"${String(id)}"` } });
 }

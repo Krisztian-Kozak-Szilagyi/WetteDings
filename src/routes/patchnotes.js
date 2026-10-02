@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const PatchNote = require('../models/PatchNote');
-const { requireLogin, requireAdmin } = require('../middleware');
+const { requireLogin, requireStaff } = require('../middleware');
 const { render } = require('../patchnotes/render');
 const { str } = require('../lib/util');
 
@@ -32,6 +32,7 @@ router.get('/patchnotes', async (req, res) => {
       html: render(n.body),
       isNew: n.createdAt > seen,
       upvoted: n.upvotes.some((id) => id.equals(req.user._id)),
+      canDelete: req.user.isAdmin || (req.user.isDev && !!n.author && n.author.equals(req.user._id)),
     })),
     titleMax: TITLE_MAX,
     bodyMax: BODY_MAX,
@@ -39,13 +40,13 @@ router.get('/patchnotes', async (req, res) => {
   });
 });
 
-router.post('/patchnotes', requireAdmin, async (req, res) => {
+router.post('/patchnotes', requireStaff, async (req, res) => {
   const title = str(req.body.title).trim();
   const body = (typeof req.body.body === 'string' ? req.body.body : '').trim();
   if (!title || title.length > TITLE_MAX) req.flash('error', `Bitte einen Titel angeben (höchstens ${TITLE_MAX} Zeichen).`);
   else if (!body || body.length > BODY_MAX) req.flash('error', `Bitte einen Text angeben (höchstens ${BODY_MAX} Zeichen).`);
   else {
-    await PatchNote.create({ title, body, authorName: req.user.username });
+    await PatchNote.create({ title, body, author: req.user._id, authorName: req.user.username });
     req.flash('success', 'Patchnote veröffentlicht.');
   }
   res.redirect('/patchnotes');
@@ -58,9 +59,11 @@ router.param('id', (req, res, next, id) => {
   res.redirect('/patchnotes');
 });
 
-router.post('/patchnotes/:id/loeschen', requireAdmin, async (req, res) => {
-  await PatchNote.deleteOne({ _id: req.params.id });
-  req.flash('info', 'Patchnote gelöscht.');
+router.post('/patchnotes/:id/loeschen', requireStaff, async (req, res) => {
+  // Admin: jede Patchnote; Dev: nur die eigenen
+  const own = req.user.isAdmin ? {} : { author: req.user._id };
+  const r = await PatchNote.deleteOne({ _id: req.params.id, ...own });
+  req.flash(r.deletedCount ? 'info' : 'error', r.deletedCount ? 'Patchnote gelöscht.' : 'Du kannst nur deine eigenen Patchnotes löschen.');
   res.redirect('/patchnotes');
 });
 

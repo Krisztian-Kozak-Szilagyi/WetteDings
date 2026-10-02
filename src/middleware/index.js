@@ -23,6 +23,8 @@ async function loadUser(req, res, next) {
     const user = await User.findById(req.session.userId).select('-passwordHash').lean();
     if (user && !user.deletedAt) {
       user.isAdmin = config.adminUsernames.includes(user.usernameLower);
+      user.isDev = user.role === 'dev';
+      user.isStaff = user.isAdmin || user.isDev; // Admin oder Dev
       req.user = user;
       res.locals.currentUser = user;
     } else {
@@ -85,4 +87,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { flash, loadUser, dailyBonus, requireLogin, requireAdmin, csrf };
+/** Für Admin und Devs (Dev-Panel, Packs vergeben, Patchnotes). Andere bekommen eine 404. */
+function requireStaff(req, res, next) {
+  if (!req.user) return requireLogin(req, res, next);
+  if (!req.user.isStaff) return next('route');
+  next();
+}
+
+module.exports = { flash, loadUser, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };

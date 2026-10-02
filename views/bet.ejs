@@ -34,7 +34,7 @@
       <div data-live="bet-head">
       <div class="bet-card-top">
         <span class="badge badge-<%= st.key %>"><%= st.label %></span>
-        <span class="muted small">von <strong><%= bet.creatorName %></strong> · <%= date(bet.createdAt) %></span>
+        <span class="muted small">von <strong><%= bet.creatorName %></strong><%- roleBadge(bet.creatorName) %> · <%= date(bet.createdAt) %></span>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
       <% if (bet.description) { %>
@@ -141,7 +141,7 @@
           <tbody>
             <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; %>
               <tr class="<%= myPosition && String(p._id) === String(myPosition._id) ? 'me' : '' %>">
-                <td><%= p.username %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
+                <td><%= p.username %><%- roleBadge(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
                 <td><span class="pill <%= optClass(bet, p.side) %>"><%= optionLabel(bet, p.side) %></span></td>
                 <td class="num"><%= euro(p.amount) %></td>
                 <td class="num">
@@ -172,7 +172,7 @@
                const canDelete = !c.deleted && currentUser && (mine || currentUser.isAdmin); %>
             <li class="comment <%= c.deleted ? 'is-deleted' : '' %> <%= mine ? 'is-mine' : '' %>" id="k-<%= c._id %>">
               <div class="comment-head">
-                <strong><%= c.username %></strong>
+                <strong><%= c.username %></strong><%- roleBadge(c.username) %>
                 <% if (String(c.user) === String(bet.creator)) { %><span class="tag">Wettersteller</span><% } %>
                 <% if (side) { %><span class="pill <%= optClass(bet, side) %>"><%= optionLabel(bet, side) %></span><% } %>
                 <time class="muted small" datetime="<%= new Date(c.createdAt).toISOString() %>" title="<%= date(c.createdAt) %>"><%= relTime(c.createdAt) %></time>
@@ -340,7 +340,7 @@
             </form>
           </details>
         <% } %>
-        <% if (currentUser.isAdmin && !isOwner) { %><p class="muted small">Du siehst diese Optionen als Admin.</p><% } %>
+        <% if (currentUser.isStaff && !isOwner) { %><p class="muted small">Du siehst diese Optionen als <%= currentUser.isAdmin ? 'Admin' : 'Dev' %>.</p><% } %>
       </div>
     <% } %>
   </aside>

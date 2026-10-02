@@ -5,6 +5,7 @@ const patchNoteSchema = new Schema(
   {
     title: { type: String, required: true },
     body: { type: String, required: true }, // einfacher Text mit Auszeichnung, siehe patchnotes/render.js
+    author: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // fehlt bei alten Einträgen
     authorName: { type: String, required: true },
     upvotes: { type: [Schema.Types.ObjectId], default: [] }, // Nutzer-IDs
     comments: {
