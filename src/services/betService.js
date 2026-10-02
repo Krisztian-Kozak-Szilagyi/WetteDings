@@ -8,6 +8,7 @@ const Ledger = require('../models/Ledger');
 const { computePayouts } = require('../lib/payout');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
+const { assertUsernameAllowed } = require('./usernameRules');
 
 const SYSTEM_ACTOR = { system: true, username: 'System' };
 const NOTE_MIN = 5;
@@ -44,15 +45,18 @@ const isOwnerOf = (bet, actor) => !actor.system && String(bet.creator) === Strin
 /**
  * Registrierung – nur mit gültigem Registrierungscode. Code-Einlösung und Konto-Erstellung
  * passieren in einer Transaktion: scheitert eins davon, bleibt der Code gültig.
+ * Der Benutzername wird hier verbindlich geprüft (reservierte Namen tragen Rechte, siehe
+ * services/usernameRules) – unabhängig davon, was die aufrufende Route schon geprüft hat.
  */
 async function registerUser({ username, email, password, code }) {
+  const name = assertUsernameAllowed(username);
   const passwordHash = await bcrypt.hash(password, 12);
   return inTransaction(async (session) => {
     const [user] = await User.create(
       [
         {
-          username,
-          usernameLower: username.toLowerCase(),
+          username: name,
+          usernameLower: name.toLowerCase(),
           email,
           passwordHash,
           balance: config.startBalance,
