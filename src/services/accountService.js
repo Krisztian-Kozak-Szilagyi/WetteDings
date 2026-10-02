@@ -10,6 +10,7 @@ const { ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Fo
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
+const Group = require('../models/Group');
 const roles = require('./roles');
 const { CoinHolding, CoinTrade } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
@@ -32,6 +33,7 @@ async function propagateName(userId, oldName, name, session) {
   await Promise.all([
     Bet.updateMany({ creator: userId }, { $set: { creatorName: name } }, opt),
     Bet.updateMany({ referee: userId }, { $set: { refereeName: name } }, opt),
+    Group.updateMany({ owner: userId }, { $set: { ownerName: name } }, opt),
     Bet.updateMany({ resolvedBy: userId }, { $set: { resolvedByName: name } }, opt),
     Bet.updateMany({ 'votes.by': userId }, { $set: { 'votes.$[v].byName': name } }, { ...opt, arrayFilters: [{ 'v.by': userId }] }),
     Bet.updateMany({ 'edits.byName': oldName }, { $set: { 'edits.$[e].byName': name } }, { ...opt, arrayFilters: [{ 'e.byName': oldName }] }),
@@ -137,6 +139,9 @@ async function deleteAccount({ user, password }) {
       ForumThread.updateMany({ upvotes: id }, { $pull: { upvotes: id } }, opt),
       ForumRead.deleteMany({ user: id }, opt),
       ForumReport.deleteMany({ by: id }, opt),
+      // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus
+      Group.updateMany({ owner: id }, { $set: { deleted: true } }, opt),
+      Group.updateMany({ members: id, owner: { $ne: id } }, { $pull: { members: id } }, opt),
     ]);
     // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);

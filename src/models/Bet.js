@@ -47,6 +47,9 @@ const betSchema = new Schema(
     // alte Wetten: null – dort entscheidet der Ersteller weiterhin allein)
     referee: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     refereeName: { type: String, default: null },
+    // Gruppen-Wette: nur Mitglieder dieser Gruppe sehen sie (null = öffentlich für alle Mitglieder)
+    group: { type: Schema.Types.ObjectId, ref: 'Group', default: null },
+    groupName: { type: String, default: null },
     // Abgegebene Stimmen zum Ausgang (je Rolle höchstens eine)
     votes: { type: [voteSchema], default: [] },
     // true, solange Ersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben
@@ -97,6 +100,7 @@ const betSchema = new Schema(
 betSchema.index({ status: 1, deadline: 1 });
 betSchema.index({ status: 1, disputed: 1 }); // Streitfälle im Dev-Panel
 betSchema.index({ referee: 1, status: 1 });
+betSchema.index({ group: 1, status: 1 });
 betSchema.index({ status: 1, resolvedAt: -1 });
 betSchema.index({ createdAt: -1 });
 betSchema.index({ updatedAt: -1 }); // für die Live-Aktualisierung der Übersicht

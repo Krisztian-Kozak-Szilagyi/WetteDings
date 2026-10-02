@@ -22,16 +22,21 @@
 <div hidden data-live-root data-live-url="/wetten-stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= tab %>|<%= page %>|<%= q %>"></div>
 
 <div data-live="bet-list">
-<% if (!bets.length) { %>
+<% if (!bets.length && !groupBets.length) { %>
   <div class="empty">
     <p><strong>Hier ist noch nichts.</strong></p>
     <p class="muted"><%= q ? 'Keine Wetten passen zu deiner Suche.' : 'In dieser Kategorie gibt es gerade keine Wetten.' %></p>
     <% if (currentUser) { %><a class="btn btn-primary" href="/wetten/neu">Erste Wette aufstellen</a><% } %>
   </div>
 <% } else { %>
-  <div class="bet-grid">
-    <% bets.forEach((bet) => { %><%- include('partials/bet-card', { bet }) %><% }) %>
-  </div>
+  <% if (groupBets.length) { %><h2 class="bet-section">Für alle</h2><% } %>
+  <% if (bets.length) { %>
+    <div class="bet-grid">
+      <% bets.forEach((bet) => { %><%- include('partials/bet-card', { bet }) %><% }) %>
+    </div>
+  <% } else { %>
+    <p class="muted bet-section-empty">In dieser Kategorie gibt es gerade keine öffentlichen Wetten.</p>
+  <% } %>
   <% if (page > 1 || hasMore) { %>
     <nav class="pager" aria-label="Seiten">
       <% const base = '/?tab=' + tab + (q ? '&q=' + encodeURIComponent(q) : ''); %>
@@ -39,6 +44,15 @@
       <span class="muted">Seite <%= page %></span>
       <% if (hasMore) { %><a class="btn btn-ghost" href="<%= base %>&seite=<%= page + 1 %>">Weiter →</a><% } else { %><span></span><% } %>
     </nav>
+  <% } %>
+
+  <% if (groupBets.length) { %>
+    <section class="bet-groups">
+      <h2 class="bet-section bet-section-group">In deinen Gruppen <span class="muted small">– nur für Mitglieder sichtbar</span></h2>
+      <div class="bet-grid">
+        <% groupBets.forEach((bet) => { %><%- include('partials/bet-card', { bet }) %><% }) %>
+      </div>
+    </section>
   <% } %>
 <% } %>
 </div>

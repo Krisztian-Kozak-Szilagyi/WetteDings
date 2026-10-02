@@ -77,6 +77,60 @@
 </details>
 
 <div class="account-grid">
+<div class="card" id="gruppen">
+  <h2>Wett-Gruppen</h2>
+  <p class="muted">Wetten lassen sich nur für eine Gruppe aufstellen – dann sehen und setzen ausschließlich ihre Mitglieder. Mitglieder einladen und entfernen kann nur, wer die Gruppe angelegt hat; austreten kann jeder selbst.</p>
+  <% if (!groups.length) { %>
+    <p class="muted">Du bist in keiner Gruppe.</p>
+  <% } %>
+  <% groups.forEach((g) => { %>
+    <div class="group-box">
+      <div class="group-head">
+        <strong><%= g.name %></strong>
+        <span class="muted small"><%= g.mine ? 'von dir angelegt' : 'von ' + g.ownerName %> · <%= g.memberList.length %> <%= g.memberList.length === 1 ? 'Mitglied' : 'Mitglieder' %></span>
+      </div>
+      <ul class="group-members">
+        <% g.memberList.forEach((m) => { const isOwner = String(m._id) === String(g.owner); %>
+          <li>
+            <span><%- userLink(m.username) %><% if (isOwner) { %> <span class="tag">Ersteller</span><% } %></span>
+            <% if (g.mine && !isOwner) { %>
+              <form method="post" action="/gruppen/<%= g._id %>/mitglied/<%= m._id %>/entfernen" data-confirm="<%= m.username %> aus der Gruppe entfernen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="link-btn" type="submit">Entfernen</button>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+      <% if (g.mine) { %>
+        <form method="post" action="/gruppen/<%= g._id %>/mitglied" class="group-add">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="sr-only" for="gm-<%= g._id %>">Mitglied einladen</label>
+          <select id="gm-<%= g._id %>" name="username" required>
+            <option value="">– Mitglied einladen –</option>
+            <% memberChoices.filter((u) => !g.memberList.some((m) => String(m._id) === String(u._id))).forEach((u) => { %><option value="<%= u.username %>"><%= u.username %></option><% }) %>
+          </select>
+          <button class="btn btn-primary btn-sm" type="submit">Einladen</button>
+        </form>
+        <form method="post" action="/gruppen/<%= g._id %>/aufloesen" data-confirm="Gruppe „<%= g.name %>“ auflösen? Neue Wetten sind dann nicht mehr möglich; alte bleiben für die bisherigen Mitglieder sichtbar.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="link-btn" type="submit">Gruppe auflösen</button>
+        </form>
+      <% } else { %>
+        <form method="post" action="/gruppen/<%= g._id %>/verlassen" data-confirm="Gruppe „<%= g.name %>“ verlassen? Du siehst ihre Wetten dann nicht mehr.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Gruppe verlassen</button>
+        </form>
+      <% } %>
+    </div>
+  <% }) %>
+  <form method="post" action="/gruppen" class="form group-new">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field"><span>Neue Gruppe anlegen</span><input type="text" name="name" minlength="2" maxlength="<%= groupNameMax %>" placeholder="Name der Gruppe" required></label>
+    <button class="btn btn-primary" type="submit">Gruppe anlegen</button>
+  </form>
+</div>
+
 <div class="card" id="name">
   <h2>Benutzernamen ändern</h2>
   <% if (currentUser.isAdmin) { %>

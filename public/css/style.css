@@ -1586,9 +1586,9 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .fold > summary:hover .fold-arrow { border-color: var(--text); }
 
 /* Mein Konto: Einstellungs-Karten zu zweit nebeneinander */
-.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
-.account-grid > .card { margin: 0; }
-@media (max-width: 760px) { .account-grid { grid-template-columns: 1fr; } }
+.account-grid { columns: 2; column-gap: 20px; }
+.account-grid > .card { margin: 0 0 20px; break-inside: avoid; }
+@media (max-width: 760px) { .account-grid { columns: 1; } }
 
 /* Namen als Profil-Links: unauffällig, erst beim Überfahren unterstrichen */
 .user-link { color: inherit; text-decoration: none; cursor: var(--cur-pointer); }
@@ -1690,3 +1690,27 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .trade-news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .trade-news li { display: flex; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; }
 .trade-history li.is-new { box-shadow: inset 3px 0 0 var(--primary); padding-left: 10px; }
+
+/* Wett-Gruppen */
+.tag-group { background: color-mix(in srgb, #a78bfa 18%, transparent); color: #c4b5fd; border: 1px solid color-mix(in srgb, #a78bfa 55%, transparent); }
+.nav-badge-group { background: #8b5cf6; }
+.bet-section { margin: 4px 0 12px; font-size: 1.05rem; }
+.bet-section-empty { margin: 0 0 8px; }
+.bet-groups { margin-top: 28px; padding-top: 22px; border-top: 2px solid color-mix(in srgb, #a78bfa 45%, var(--border)); }
+.bet-section-group { color: #c4b5fd; }
+.bet-group-note { margin: 6px 0 0; }
+.group-box { padding: 12px 14px; margin: 0 0 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
+.group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.group-members { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.group-members li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.group-members form, .group-box > form { margin: 0; }
+.group-add { display: flex; gap: 8px; align-items: center; margin-bottom: 8px !important; }
+.group-add select { flex: 1; min-width: 0; height: 36px; min-height: 0; padding: 4px 10px; }
+.group-new { margin-top: 14px; }
+
+/* Platzhalter für das Profilbild oben rechts */
+.avatar {
+  flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6); color: #fff; font-weight: 800; font-size: .95rem;
+  text-decoration: none; border: 2px solid var(--border);
+}

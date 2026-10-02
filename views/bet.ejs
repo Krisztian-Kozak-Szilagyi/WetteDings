@@ -50,6 +50,7 @@
         <span class="muted small">von <strong><%- userLink(bet.creatorName) %></strong> · <%= date(bet.createdAt) %></span>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
+      <% if (bet.groupName) { %><p class="bet-group-note"><span class="tag tag-group">Gruppe: <%= bet.groupName %></span> <span class="muted small">Diese Wette sehen nur die Mitglieder der Gruppe.</span></p><% } %>
       <% if (bet.description) { %>
         <p class="bet-desc"><%= bet.description %></p>
         <% if (descEdited) { %><p class="muted small edited-hint">Beschreibung nachträglich bearbeitet – siehe Änderungsverlauf.</p><% } %>

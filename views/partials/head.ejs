@@ -24,7 +24,9 @@
 
       <nav id="hauptnavigation" class="nav">
         <% if (currentUser) { %>
-          <a href="/" class="nav-badge-link <%= currentPath === '/' ? 'active' : '' %>">Wetten<% if (betVotePending) { %><span class="nav-badges"><span class="nav-badge" title="Wetten, in denen deine Stimme zum Ergebnis fehlt" aria-label="<%= betVotePending %> Wetten warten auf deine Stimme"><%= betVotePending > 99 ? '99+' : betVotePending %></span></span><% } %></a>
+          <%# Abzeichen: neue Gruppen-Wetten (eigene Farbe) haben Vorrang vor neuen öffentlichen (rot); fehlende eigene Stimmen zählen immer rot %>
+          <% const betRed = betVotePending + (betNewGroup ? 0 : betNewPublic); %>
+          <a href="/" class="nav-badge-link <%= currentPath === '/' ? 'active' : '' %>">Wetten<% if (betNewGroup || betRed) { %><span class="nav-badges"><% if (betNewGroup) { %><span class="nav-badge nav-badge-group" title="Neue Wetten in deinen Gruppen" aria-label="<%= betNewGroup %> neue Wetten in deinen Gruppen"><%= betNewGroup > 99 ? '99+' : betNewGroup %></span><% } %><% if (betRed) { %><span class="nav-badge" title="<%= betVotePending ? 'Wetten, in denen deine Stimme zum Ergebnis fehlt' + (betNewGroup || !betNewPublic ? '' : ', und neue Wetten') : 'Neue Wetten' %>" aria-label="<%= betRed %> Wetten: neu oder deine Stimme fehlt"><%= betRed > 99 ? '99+' : betRed %></span><% } %></span><% } %></a>
           <a href="/rangliste" class="<%= currentPath === '/rangliste' ? 'active' : '' %>">Rangliste</a>
           <a href="/coin-exchange" class="<%= currentPath === '/coin-exchange' ? 'active' : '' %>">Coin Exchange</a>
           <a href="/lotterie" class="<%= currentPath === '/lotterie' ? 'active' : '' %>">Lotterie</a>
@@ -42,6 +44,8 @@
               <span class="balance-name"><%= currentUser.username %></span>
               <strong><%= euro(currentUser.balance) %></strong>
             </a>
+            <%# Platzhalter für das Profilbild (noch nicht änderbar): Anfangsbuchstabe des Namens %>
+            <a class="avatar" href="/konto" title="Mein Konto" aria-hidden="true" tabindex="-1"><%= currentUser.username.slice(0, 1).toUpperCase() %></a>
             <form method="post" action="/abmelden">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button class="btn btn-ghost btn-sm" type="submit">Abmelden</button>

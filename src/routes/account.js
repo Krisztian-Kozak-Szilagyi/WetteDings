@@ -11,6 +11,7 @@ const { cardValueCents } = require('../tcg/tcgService');
 const account = require('../services/accountService');
 const { UserError } = require('../lib/util');
 const roles = require('../services/roles');
+const groups = require('../services/groupService');
 
 const router = express.Router();
 
@@ -71,6 +72,9 @@ router.get('/konto', requireLogin, async (req, res) => {
     renameDays: account.RENAME_COOLDOWN_DAYS,
     nextRenameAt: account.nextRenameAt(req.user),
     realNameMax: roles.REAL_NAME_MAX,
+    groups: await groups.overview(req.user._id),
+    groupNameMax: groups.NAME_MAX,
+    memberChoices: await User.find({ deletedAt: null, _id: { $ne: req.user._id } }).select('username').sort({ usernameLower: 1 }).lean(),
   });
 });
 
@@ -133,5 +137,51 @@ router.post('/konto/passwort', requireLogin, async (req, res) => {
   }
   res.redirect('/konto#passwort');
 });
+
+// ---------- Wett-Gruppen (Verwaltung unter "Mein Konto") ----------
+async function groupAction(req, res, fn) {
+  try {
+    req.flash('success', await fn());
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/konto#gruppen');
+}
+
+router.post('/gruppen', requireLogin, (req, res) =>
+  groupAction(req, res, async () => {
+    const g = await groups.create({ user: req.user, name: str(req.body.name) });
+    return `Gruppe „${g.name}“ angelegt. Lade jetzt Mitglieder ein.`;
+  })
+);
+
+router.post('/gruppen/:id/mitglied', requireLogin, (req, res) =>
+  groupAction(req, res, async () => {
+    const { group, member } = await groups.addMember({ user: req.user, groupId: req.params.id, username: str(req.body.username) });
+    return `${member.username} ist jetzt in der Gruppe „${group.name}“.`;
+  })
+);
+
+router.post('/gruppen/:id/mitglied/:uid/entfernen', requireLogin, (req, res) =>
+  groupAction(req, res, async () => {
+    const group = await groups.removeMember({ user: req.user, groupId: req.params.id, memberId: req.params.uid });
+    return `Mitglied aus der Gruppe „${group.name}“ entfernt.`;
+  })
+);
+
+router.post('/gruppen/:id/verlassen', requireLogin, (req, res) =>
+  groupAction(req, res, async () => {
+    const group = await groups.leave({ user: req.user, groupId: req.params.id });
+    return `Du hast die Gruppe „${group.name}“ verlassen.`;
+  })
+);
+
+router.post('/gruppen/:id/aufloesen', requireLogin, (req, res) =>
+  groupAction(req, res, async () => {
+    const group = await groups.dissolve({ user: req.user, groupId: req.params.id });
+    return `Gruppe „${group.name}“ aufgelöst.`;
+  })
+);
 
 module.exports = router;

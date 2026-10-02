@@ -81,7 +81,7 @@ async function registerUser({ username, email, password, code }) {
  * Die Optionen sind danach fest – es gibt bewusst keine Funktion zum Hinzufügen.
  * referee: Mitglied ({ _id, username }), das das Ergebnis gemeinsam mit dem Ersteller bestätigt.
  */
-async function createBet({ user, title, description, type, options, deadline, resultAt, referee }) {
+async function createBet({ user, title, description, type, options, deadline, resultAt, referee, group = null }) {
   if (!referee) throw new UserError('Bitte wähle einen Schiedsrichter für diese Wette aus.');
   if (String(referee._id) === String(user._id)) throw new UserError('Du kannst nicht selbst Schiedsrichter deiner Wette sein.');
   return Bet.create({
@@ -93,6 +93,8 @@ async function createBet({ user, title, description, type, options, deadline, re
     creatorName: user.username,
     referee: referee._id,
     refereeName: referee.username,
+    group: group ? group._id : null, // Gruppen-Wette: nur für Mitglieder sichtbar
+    groupName: group ? group.name : null,
     creatorFeePercent: config.creatorFeePercent,
     deadline,
     resultAt,

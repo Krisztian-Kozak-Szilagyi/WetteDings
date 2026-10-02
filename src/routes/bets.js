@@ -12,9 +12,11 @@ const { str, escapeRegex, parseEuro, UserError } = require('../lib/util');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const { euro } = require('../lib/viewHelpers');
 const svc = require('../services/betService');
+const groups = require('../services/groupService');
 
 const router = express.Router();
 const PER_PAGE = 24;
+const GROUP_BETS_MAX = 48; // so viele Gruppen-Wetten zeigt der eigene Abschnitt höchstens
 const COMMENT_MAX = 1000;
 const TABS = {
   offen: 'Offen',
@@ -45,6 +47,15 @@ function validId(req, res, next) {
   next();
 }
 
+// Gruppen-Wetten sind nur für Mitglieder der Gruppe erreichbar (und für Admin/Devs, die Streitfälle
+// entscheiden). Gilt für alle Routen unter /wetten/:id – ansehen, setzen, kommentieren, Live-Stand.
+router.use('/wetten/:id', async (req, res, next) => {
+  if (!req.user || !mongoose.isValidObjectId(req.params.id)) return next();
+  const bet = await Bet.findById(req.params.id).select('group').lean();
+  if (bet && bet.group && !groups.canSee(bet, req.user, await groups.groupIdsOf(req.user._id))) return next('router'); // wie "nicht gefunden"
+  next();
+});
+
 // ---------- Übersicht ----------
 
 router.get('/', async (req, res) => {
@@ -73,25 +84,39 @@ router.get('/', async (req, res) => {
   };
   const { filter, sort } = TAB_QUERIES[tab];
 
+  // Sichtbar: öffentliche Wetten und die der eigenen Gruppen
+  const groupIds = await groups.groupIdsOf(req.user._id);
+  const vis = groups.visibleFilter(groupIds);
+
   const [bets, countList] = await Promise.all([
-    Bet.find({ ...filter, ...search })
+    Bet.find({ $and: [filter, search, { group: null }] })
       .sort({ ...sort, _id: -1 })
       .skip((page - 1) * PER_PAGE)
       .limit(PER_PAGE + 1)
       .lean(),
-    Promise.all(Object.keys(TAB_QUERIES).map((key) => Bet.countDocuments({ ...TAB_QUERIES[key].filter, ...search }))),
+    Promise.all(Object.keys(TAB_QUERIES).map((key) => Bet.countDocuments({ $and: [TAB_QUERIES[key].filter, search, vis] }))),
   ]);
   const hasMore = bets.length > PER_PAGE;
   if (hasMore) bets.pop();
+  // Wetten aus den eigenen Gruppen: eigener Abschnitt unter den öffentlichen (auf der ersten Seite)
+  const groupBets =
+    page === 1 && groupIds.length
+      ? await Bet.find({ $and: [filter, search, { group: { $in: groupIds } }] }).sort({ ...sort, _id: -1 }).limit(GROUP_BETS_MAX).lean()
+      : [];
   const counts = Object.fromEntries(Object.keys(TAB_QUERIES).map((key, i) => [key, countList[i]]));
 
   // Eigene Tipps auf den angezeigten Wetten: { betId: { side, amount } }
-  const myPositions = await Position.find({ user: req.user._id, bet: { $in: bets.map((b) => b._id) } })
+  const myPositions = await Position.find({ user: req.user._id, bet: { $in: [...bets, ...groupBets].map((b) => b._id) } })
     .select('bet side amount')
     .lean();
   const myPicks = Object.fromEntries(myPositions.map((p) => [String(p.bet), { side: p.side, amount: p.amount }]));
 
-  res.render('index', { title: 'Wetten', bets, tab, tabs: TABS, counts, myPicks, page, hasMore, q, liveVersion });
+  // Besuch merken: die Abzeichen für neue Wetten am Menüpunkt verschwinden
+  await User.updateOne({ _id: req.user._id }, { $set: { betsSeenAt: new Date() } });
+  res.locals.betNewPublic = 0;
+  res.locals.betNewGroup = 0;
+
+  res.render('index', { title: 'Wetten', bets, groupBets, tab, tabs: TABS, counts, myPicks, page, hasMore, q, liveVersion });
 });
 
 // ---------- Live-Stand (für die automatische Aktualisierung alle 5 Sekunden) ----------
@@ -146,6 +171,7 @@ async function newBetForm(req, res, { errors = [], values = {} } = {}, status = 
     type: 'janein',
     options: ['', '', ''],
     referee: '',
+    group: '', // leer = öffentlich
     deadline: '', // bewusst leer – muss vom Wettersteller angegeben werden
     resultAt: '',
   };
@@ -156,6 +182,7 @@ async function newBetForm(req, res, { errors = [], values = {} } = {}, status = 
     errors,
     values: merged,
     candidates: await refereeCandidates(req.user._id),
+    groups: await groups.groupsOf(req.user._id),
     minOptions: Bet.MIN_OPTIONS,
     maxOptions: Bet.MAX_OPTIONS,
     feePercent: config.creatorFeePercent,
@@ -173,6 +200,7 @@ router.post('/wetten', requireLogin, async (req, res) => {
     type: str(req.body.type) === 'optionen' ? 'optionen' : 'janein',
     options: rawOptions,
     referee: str(req.body.referee),
+    group: str(req.body.group),
     deadline: str(req.body.deadline),
     resultAt: str(req.body.resultAt),
   };
@@ -204,6 +232,14 @@ router.post('/wetten', requireLogin, async (req, res) => {
     if (!referee) errors.push('Dieses Mitglied gibt es nicht mehr. Bitte wähle einen anderen Schiedsrichter.');
   }
 
+  // Gruppe (optional): nur eine eigene, aktive Gruppe; der Schiedsrichter muss die Wette sehen können
+  let group = null;
+  if (values.group) {
+    group = (await groups.groupsOf(req.user._id)).find((g) => String(g._id) === values.group) || null;
+    if (!group) errors.push('Diese Gruppe gibt es nicht (mehr) oder du bist kein Mitglied.');
+    else if (referee && !group.members.some((id) => id.equals(referee._id))) errors.push(`Der Schiedsrichter muss Mitglied der Gruppe „${group.name}“ sein.`);
+  }
+
   let options;
   if (values.type === 'janein') {
     options = JA_NEIN;
@@ -226,10 +262,16 @@ router.post('/wetten', requireLogin, async (req, res) => {
     type: values.type,
     options,
     referee,
+    group,
     deadline,
     resultAt,
   });
-  req.flash('success', `Deine Wette ist online! ${referee.username} bestätigt am Ende das Ergebnis mit dir. Teile den Link, damit andere mitwetten können.`);
+  req.flash(
+    'success',
+    group
+      ? `Deine Wette ist online – nur die Mitglieder der Gruppe „${group.name}“ sehen sie. ${referee.username} bestätigt am Ende das Ergebnis mit dir.`
+      : `Deine Wette ist online! ${referee.username} bestätigt am Ende das Ergebnis mit dir. Teile den Link, damit andere mitwetten können.`
+  );
   res.redirect(`/wetten/${bet._id}`);
 });
 

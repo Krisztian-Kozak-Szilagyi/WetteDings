@@ -12,6 +12,7 @@ const tradeService = require('./trade/tradeService');
 const tcgService = require('./tcg/tcgService');
 const forumRoutes = require('./routes/forum');
 const forumService = require('./forum/forumService');
+const groupService = require('./services/groupService');
 const roles = require('./services/roles');
 const betService = require('./services/betService');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
@@ -77,6 +78,8 @@ function createApp() {
     currentUser: null,
     tradeIncoming: 0,
     tradeMarketNew: 0,
+    betNewPublic: 0,
+    betNewGroup: 0,
     newPacks: 0,
     patchNew: 0,
     packLogNew: 0,
@@ -107,6 +110,10 @@ function createApp() {
           forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen
           betService.pendingVoteCount(req.user._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
         ]);
+      // Wetten: neue öffentliche Wetten und neue Wetten in den eigenen Gruppen seit dem letzten Besuch der Übersicht
+      const betNew = await groupService.newBetCounts(req.user, await groupService.groupIdsOf(req.user._id));
+      res.locals.betNewPublic = betNew.pub;
+      res.locals.betNewGroup = betNew.group;
       // Forum: Neues in eigenen Themen (rot) und Neues im übrigen Forum
       const forumNew = await forumService.navCounts(req.user);
       res.locals.forumMine = forumNew.mine;
