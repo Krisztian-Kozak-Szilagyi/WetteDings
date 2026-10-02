@@ -351,6 +351,28 @@ async function resolveBet({ actor, betId, outcome, note }) {
   });
 }
 
+/**
+ * Wette vollständig löschen (nur Admin/Dev): Sie verschwindet überall, auch aus dem Archiv.
+ * Ist sie noch offen, gehen vorher alle Einsätze zurück (wie bei einer Annullierung). Bei einer bereits
+ * abgeschlossenen Wette bleiben die Auszahlungen bestehen; es wird nur der Eintrag entfernt.
+ * Buchungen im Kontoauszug bleiben erhalten (ohne Link auf die Wette).
+ */
+async function deleteBet({ actor, betId }) {
+  if (!actor.isAdmin && !actor.isDev) throw new UserError('Nur Admin und Devs können Wetten löschen.');
+  const bet = await Bet.findById(betId).select('title status').lean();
+  if (!bet) throw new UserError('Wette nicht gefunden.');
+  const wasOpen = bet.status === 'offen';
+  if (wasOpen) await resolveBet({ actor: SYSTEM_ACTOR, betId, outcome: 'annulliert', note: `Gelöscht von ${actor.username} – alle Einsätze wurden erstattet.` });
+  await inTransaction(async (session) => {
+    await Position.deleteMany({ bet: betId }, { session });
+    await require('../models/Comment').deleteMany({ bet: betId }, { session });
+    await Ledger.updateMany({ bet: betId }, { $set: { bet: null } }, { session });
+    await Bet.deleteOne({ _id: betId }, { session });
+  });
+  console.log(`Wette "${bet.title}" (${betId}) gelöscht von ${actor.username}${wasOpen ? ' – Einsätze erstattet' : ''}.`);
+  return { title: bet.title, refunded: wasOpen };
+}
+
 /** Offene Streitfälle (Ersteller und Schiedsrichter uneinig) – Abzeichen und Liste im Dev-Panel */
 const disputedFilter = () => ({ status: 'offen', disputed: true });
 const disputedCount = () => Bet.countDocuments(disputedFilter());
@@ -383,6 +405,7 @@ module.exports = {
   closeBet,
   editBet,
   resolveBet,
+  deleteBet,
   disputedFilter,
   disputedCount,
   pendingVoteFilter,

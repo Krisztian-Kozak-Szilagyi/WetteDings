@@ -74,7 +74,7 @@
             <option value="<%= g._id %>" <%= values.group === String(g._id) ? 'selected' : '' %>>Nur Gruppe „<%= g.name %>“ (<%= g.members.length %> Mitglieder)</option>
           <% }) %>
         </select>
-        <small class="muted"><% if (groups.length) { %>Bei einer Gruppen-Wette sehen und setzen nur die Mitglieder der Gruppe; auch der Schiedsrichter muss dazugehören. Das lässt sich später nicht mehr ändern.<% } else { %>Du bist in keiner Gruppe. Unter „Mein Konto“ kannst du eine Gruppe anlegen und Mitglieder einladen – dann lassen sich Wetten nur für diese Gruppe aufstellen.<% } %></small>
+        <small class="muted"><% if (groups.length) { %>Bei einer Gruppen-Wette sehen und setzen nur die Mitglieder der Gruppe; auch der Schiedsrichter muss dazugehören. Das lässt sich später nicht mehr ändern.<% } else { %>Du bist in keiner Gruppe. Im Profil-Menü oben rechts unter <a href="/konto/gruppen">Wett-Gruppen</a> kannst du eine Gruppe anlegen und Mitglieder einladen – dann lassen sich Wetten nur für diese Gruppe aufstellen.<% } %></small>
       </label>
 
       <label class="field">

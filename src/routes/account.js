@@ -1,13 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const config = require('../config');
 const User = require('../models/User');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
 const { requireLogin } = require('../middleware');
 const { str } = require('../lib/util');
 const { coinValueCents } = require('../coin/tradeService');
-const { cardValueCents } = require('../tcg/tcgService');
+const { cardValueCents, inventory } = require('../tcg/tcgService');
+const catalog = require('../tcg/catalog');
 const account = require('../services/accountService');
 const { UserError } = require('../lib/util');
 const roles = require('../services/roles');
@@ -18,64 +18,79 @@ const router = express.Router();
 const BETS_PER_PAGE = 15; // Meine Wetten
 const LEDGER_PER_PAGE = 20; // Kontoauszug
 
-/** Seitenzahl aus der Adresse (?name=3), begrenzt auf 1 … pages */
-const pageOf = (req, name, total, perPage) => {
-  const pages = Math.max(1, Math.ceil(total / perPage));
-  return { pages, page: Math.min(pages, Math.max(1, Number.parseInt(req.query[name], 10) || 1)) };
+// Die Bereiche des Kontos – erreichbar über das Menü am Profil oben rechts
+const SECTIONS = {
+  statistiken: { path: '/konto', label: 'Statistiken' },
+  wetten: { path: '/konto/wetten', label: 'Meine Wetten' },
+  auszug: { path: '/konto/auszug', label: 'Kontoauszug' },
+  gruppen: { path: '/konto/gruppen', label: 'Wett-Gruppen' },
+  einstellungen: { path: '/konto/einstellungen', label: 'Konto-Einstellungen' },
 };
 
+/** Seitenzahl aus der Adresse (?seite=3), begrenzt auf 1 … pages */
+const pageOf = (req, total, perPage) => {
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  return { pages, total, page: Math.min(pages, Math.max(1, Number.parseInt(req.query.seite, 10) || 1)) };
+};
+
+const show = (res, section, data = {}) => res.render('account', { title: SECTIONS[section].label, section, sections: SECTIONS, ...data });
+
+// Statistiken: Spielgeld, Wetten und Karten auf einen Blick
 router.get('/konto', requireLogin, async (req, res) => {
   const userId = req.user._id;
-  const [betTotal, ledgerTotal] = await Promise.all([Position.countDocuments({ user: userId }), Ledger.countDocuments({ user: userId })]);
-  const bets = pageOf(req, 'wetten', betTotal, BETS_PER_PAGE);
-  const led = pageOf(req, 'auszug', ledgerTotal, LEDGER_PER_PAGE);
-  const [positions, ledger, openAgg, statsAgg] = await Promise.all([
-    Position.find({ user: userId })
-      .sort({ createdAt: -1, _id: -1 })
-      .skip((bets.page - 1) * BETS_PER_PAGE)
-      .limit(BETS_PER_PAGE)
-      .populate('bet', 'title status outcome deadline options refunded')
-      .lean(),
-    Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean(),
+  const [openAgg, statsAgg, coinValue, cardValue, owned] = await Promise.all([
     Position.aggregate([{ $match: { user: userId, payout: null } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     Position.aggregate([
       { $match: { user: userId, payout: { $ne: null } } },
-      {
-        $group: {
-          _id: null,
-          won: { $sum: { $cond: [{ $gt: ['$payout', '$amount'] }, 1, 0] } },
-          lost: { $sum: { $cond: [{ $eq: ['$payout', 0] }, 1, 0] } },
-        },
-      },
+      { $group: { _id: null, won: { $sum: { $cond: [{ $gt: ['$payout', '$amount'] }, 1, 0] } }, lost: { $sum: { $cond: [{ $eq: ['$payout', 0] }, 1, 0] } } } },
     ]),
+    coinValueCents(userId),
+    cardValueCents(userId),
+    inventory(userId),
   ]);
-
   const inPlay = openAgg[0] ? openAgg[0].s : 0;
-  const stats = statsAgg[0] || { won: 0, lost: 0 };
-  const [coinValue, cardValue] = await Promise.all([coinValueCents(userId), cardValueCents(userId)]);
-  const total = req.user.balance + inPlay + coinValue + cardValue;
-
-  res.render('account', {
-    title: 'Mein Konto',
-    positions: positions.filter((p) => p.bet),
-    ledger,
-    // Blättern; ein Abschnitt ist aufgeklappt, wenn gerade in ihm geblättert wird
-    bets: { ...bets, total: betTotal, open: 'wetten' in req.query },
-    led: { ...led, total: ledgerTotal, open: 'auszug' in req.query },
+  const has = new Set(owned.map((o) => o._id));
+  show(res, 'statistiken', {
     inPlay,
     coinValue,
     cardValue,
-    total,
-    net: total - config.startBalance,
-    stats,
-    pwErrors: [],
-    renameDays: account.RENAME_COOLDOWN_DAYS,
-    nextRenameAt: account.nextRenameAt(req.user),
-    realNameMax: roles.REAL_NAME_MAX,
+    total: req.user.balance + inPlay + coinValue + cardValue,
+    stats: statsAgg[0] || { won: 0, lost: 0 },
+    cardCount: owned.reduce((n, o) => n + o.n, 0),
+    uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
+    totalCards: catalog.CARDS.length,
+  });
+});
+
+router.get('/konto/wetten', requireLogin, async (req, res) => {
+  const userId = req.user._id;
+  const bets = pageOf(req, await Position.countDocuments({ user: userId }), BETS_PER_PAGE);
+  const positions = await Position.find({ user: userId })
+    .sort({ createdAt: -1, _id: -1 })
+    .skip((bets.page - 1) * BETS_PER_PAGE)
+    .limit(BETS_PER_PAGE)
+    .populate('bet', 'title status outcome deadline options refunded')
+    .lean();
+  show(res, 'wetten', { positions: positions.filter((p) => p.bet), bets });
+});
+
+router.get('/konto/auszug', requireLogin, async (req, res) => {
+  const userId = req.user._id;
+  const led = pageOf(req, await Ledger.countDocuments({ user: userId }), LEDGER_PER_PAGE);
+  const ledger = await Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean();
+  show(res, 'auszug', { ledger, led });
+});
+
+router.get('/konto/gruppen', requireLogin, async (req, res) => {
+  show(res, 'gruppen', {
     groups: await groups.overview(req.user._id),
     groupNameMax: groups.NAME_MAX,
     memberChoices: await User.find({ deletedAt: null, _id: { $ne: req.user._id } }).select('username').sort({ usernameLower: 1 }).lean(),
   });
+});
+
+router.get('/konto/einstellungen', requireLogin, (req, res) => {
+  show(res, 'einstellungen', { renameDays: account.RENAME_COOLDOWN_DAYS, nextRenameAt: account.nextRenameAt(req.user), realNameMax: roles.REAL_NAME_MAX });
 });
 
 // Echter Name (freiwillig): erscheint überall in Klammern neben dem Benutzernamen; leer = entfernen
@@ -83,7 +98,7 @@ router.post('/konto/echter-name', requireLogin, async (req, res) => {
   const saved = await roles.setRealName(req.user._id, str(req.body.realName));
   if (saved === false) req.flash('error', `Der Name darf 2–${roles.REAL_NAME_MAX} Zeichen lang sein und nur Buchstaben, Leerzeichen, Bindestrich, Apostroph und Punkt enthalten.`);
   else req.flash('success', saved ? `Dein echter Name „${saved}“ wird jetzt neben deinem Benutzernamen angezeigt.` : 'Dein echter Name wird nicht mehr angezeigt.');
-  res.redirect('/konto#name');
+  res.redirect('/konto/einstellungen#name');
 });
 
 router.post('/konto/name', requireLogin, async (req, res) => {
@@ -94,7 +109,7 @@ router.post('/konto/name', requireLogin, async (req, res) => {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/konto#name');
+  res.redirect('/konto/einstellungen#name');
 });
 
 // Einwilligung für den Support-Chat widerrufen (Art. 7 Abs. 3 DSGVO); der Chat fragt danach erneut
@@ -102,7 +117,7 @@ router.post('/konto/support-einwilligung/widerrufen', requireLogin, async (req, 
   await User.updateOne({ _id: req.user._id }, { $set: { supportConsentAt: null } });
   req.session.supportChat = [];
   req.flash('success', 'Deine Einwilligung für den Support-Chat wurde widerrufen und der Gesprächsverlauf gelöscht.');
-  res.redirect('/konto#datenschutz');
+  res.redirect('/konto/einstellungen#datenschutz');
 });
 
 router.post('/konto/loeschen', requireLogin, async (req, res) => {
@@ -112,7 +127,7 @@ router.post('/konto/loeschen', requireLogin, async (req, res) => {
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
-    return res.redirect('/konto#datenschutz');
+    return res.redirect('/konto/einstellungen#datenschutz');
   }
   req.session.destroy(() => res.redirect('/anmelden?geloescht=1'));
 });
@@ -135,7 +150,7 @@ router.post('/konto/passwort', requireLogin, async (req, res) => {
     await user.save();
     req.flash('success', 'Dein Passwort wurde geändert.');
   }
-  res.redirect('/konto#passwort');
+  res.redirect('/konto/einstellungen#passwort');
 });
 
 // ---------- Wett-Gruppen (Verwaltung unter "Mein Konto") ----------
@@ -146,7 +161,7 @@ async function groupAction(req, res, fn) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/konto#gruppen');
+  res.redirect('/konto/gruppen');
 }
 
 router.post('/gruppen', requireLogin, (req, res) =>
@@ -165,8 +180,8 @@ router.post('/gruppen/:id/mitglied', requireLogin, (req, res) =>
 
 router.post('/gruppen/:id/mitglied/:uid/entfernen', requireLogin, (req, res) =>
   groupAction(req, res, async () => {
-    const group = await groups.removeMember({ user: req.user, groupId: req.params.id, memberId: req.params.uid });
-    return `Mitglied aus der Gruppe „${group.name}“ entfernt.`;
+    const { group, voided } = await groups.removeMember({ user: req.user, groupId: req.params.id, memberId: req.params.uid });
+    return `Mitglied aus der Gruppe „${group.name}“ entfernt.${voided ? ` ${voided} offene Wette(n), an denen es als Wettersteller oder Schiedsrichter beteiligt war, wurden annulliert – die Einsätze sind zurück.` : ''}`;
   })
 );
 
@@ -179,8 +194,8 @@ router.post('/gruppen/:id/verlassen', requireLogin, (req, res) =>
 
 router.post('/gruppen/:id/aufloesen', requireLogin, (req, res) =>
   groupAction(req, res, async () => {
-    const group = await groups.dissolve({ user: req.user, groupId: req.params.id });
-    return `Gruppe „${group.name}“ aufgelöst.`;
+    const { group, voided } = await groups.dissolve({ user: req.user, groupId: req.params.id });
+    return `Gruppe „${group.name}“ aufgelöst.${voided ? ` ${voided} offene Wette(n) wurden annulliert – die Einsätze sind zurück.` : ''}`;
   })
 );
 

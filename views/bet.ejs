@@ -34,6 +34,12 @@
     <% if (perms.edit) { %>
       <a class="btn btn-ghost btn-sm" href="/wetten/<%= bet._id %>/bearbeiten">Bearbeiten</a>
     <% } %>
+    <% if (perms.remove) { %>
+      <form method="post" action="/wetten/<%= bet._id %>/loeschen" class="bet-delete" data-confirm="Diese Wette vollständig löschen? Sie verschwindet überall, auch aus dem Archiv, samt Kommentaren.<%= bet.status === 'offen' ? ' Alle Einsätze werden erstattet.' : ' Bereits erfolgte Auszahlungen bleiben bestehen.' %> Das kann nicht rückgängig gemacht werden.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+      </form>
+    <% } %>
     <button type="button" class="btn btn-ghost btn-sm share-btn" data-share>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
       <span data-share-label>Teilen</span>

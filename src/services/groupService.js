@@ -68,12 +68,25 @@ async function assertNotInvolved(groupId, userId, who) {
   if (involved || staked) throw new UserError(`${who} noch an offenen Wetten dieser Gruppe beteiligt. Das geht erst, wenn sie abgeschlossen sind.`);
 }
 
+/** Offene Wetten annullieren (Einsätze gehen zurück) – z. B. wenn ihre Gruppe aufgelöst wird */
+async function voidBets(bets, note) {
+  const { resolveBet, SYSTEM_ACTOR } = require('./betService'); // erst hier laden (gegenseitige Abhängigkeit)
+  for (const b of bets) await resolveBet({ actor: SYSTEM_ACTOR, betId: b._id, outcome: 'annulliert', note });
+  return bets.length;
+}
+
+/**
+ * Mitglied entfernen – geht immer. Offene Gruppen-Wetten, die dieses Mitglied aufgestellt hat oder bei
+ * denen es Schiedsrichter ist, werden annulliert (die Einsätze gehen zurück), weil sie sonst niemand mehr
+ * abschließen könnte. Eigene Einsätze des Mitglieds in anderen Wetten der Gruppe laufen normal weiter.
+ */
 async function removeMember({ user, groupId, memberId }) {
   const group = await ownGroup(user, groupId);
   if (!mongoose.isValidObjectId(memberId) || String(memberId) === String(user._id)) throw new UserError('Dieses Mitglied kann nicht entfernt werden.');
-  await assertNotInvolved(group._id, memberId, 'Dieses Mitglied ist');
+  const stuck = await Bet.find({ group: group._id, status: 'offen', $or: [{ creator: memberId }, { referee: memberId }] }).select('_id').lean();
+  const voided = await voidBets(stuck, `Annulliert: Ein Beteiligter (Wettersteller oder Schiedsrichter) gehört nicht mehr zur Gruppe „${group.name}“.`);
   await Group.updateOne({ _id: group._id }, { $pull: { members: memberId } });
-  return group;
+  return { group, voided };
 }
 
 /** Selbst austreten (nicht als Ersteller – der löst die Gruppe auf) */
@@ -86,12 +99,16 @@ async function leave({ user, groupId }) {
   return group;
 }
 
-/** Gruppe auflösen: keine neuen Wetten mehr; alte bleiben für die bisherigen Mitglieder sichtbar */
+/**
+ * Gruppe auflösen – geht immer. Noch offene Wetten der Gruppe werden annulliert (die Einsätze gehen zurück);
+ * abgeschlossene bleiben für die bisherigen Mitglieder sichtbar.
+ */
 async function dissolve({ user, groupId }) {
   const group = await ownGroup(user, groupId);
-  if (await Bet.exists({ group: group._id, status: 'offen' })) throw new UserError('In dieser Gruppe gibt es noch offene Wetten. Auflösen geht erst, wenn sie abgeschlossen sind.');
+  const open = await Bet.find({ group: group._id, status: 'offen' }).select('_id').lean();
+  const voided = await voidBets(open, `Annulliert: Die Gruppe „${group.name}“ wurde aufgelöst.`);
   await Group.updateOne({ _id: group._id }, { $set: { deleted: true } });
-  return group;
+  return { group, voided };
 }
 
 /** Für "Mein Konto": eigene und fremde Gruppen samt Mitgliedernamen */

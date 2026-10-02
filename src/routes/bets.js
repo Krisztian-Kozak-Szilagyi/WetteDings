@@ -378,6 +378,7 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
       void: isOpen && !!role,
       close: accepting && (isOwner || isReferee || isStaff),
       edit: (isOwner && isOpen) || isAdmin,
+      remove: isStaff, // vollständig löschen: Admin und Devs
     },
   });
 });
@@ -451,6 +452,19 @@ const commentLimiter = rateLimit({
     req.flash('error', 'Du schreibst gerade sehr schnell – bitte warte einen Moment.');
     res.redirect(`/wetten/${req.params.id}#kommentare`);
   },
+});
+
+// Wette vollständig löschen (Admin/Dev): offene Einsätze gehen zurück, nichts bleibt im Archiv
+router.post('/wetten/:id/loeschen', validId, requireLogin, async (req, res) => {
+  try {
+    const r = await svc.deleteBet({ actor: req.user, betId: req.params.id });
+    req.flash('success', `Wette „${r.title}“ gelöscht.${r.refunded ? ' Alle Einsätze wurden erstattet.' : ''}`);
+    return res.redirect('/');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+    return res.redirect(`/wetten/${req.params.id}`);
+  }
 });
 
 router.post('/wetten/:id/kommentare', validId, requireLogin, commentLimiter, (req, res) =>

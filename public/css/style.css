@@ -1713,3 +1713,30 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .balance-text { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
 .avatar { flex: none; display: block; width: 34px; height: 34px; border-radius: 9px; }
 @media (max-width: 760px) { .balance-chip { justify-content: space-between; } .balance-text { align-items: flex-start; } }
+
+/* Profil-Menü oben rechts (ohne farbigen Hintergrund) */
+.user-menu { position: relative; }
+.user-menu > summary { list-style: none; cursor: var(--cur-pointer); background: transparent; border: 1px solid transparent; }
+.user-menu > summary::-webkit-details-marker { display: none; }
+.user-menu > summary:hover, .user-menu[open] > summary { background: var(--surface-2); border-color: var(--border); filter: none; }
+.user-menu-list {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; min-width: 220px; padding: 6px;
+  display: flex; flex-direction: column; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); box-shadow: var(--shadow);
+}
+.user-menu-list a, .user-menu-list button {
+  display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: none; text-align: left;
+  font: inherit; font-weight: 600; color: var(--text); text-decoration: none; cursor: var(--cur-pointer);
+}
+.user-menu-list a:hover, .user-menu-list button:hover, .user-menu-list a:focus-visible, .user-menu-list button:focus-visible { background: var(--surface-2); text-decoration: none; }
+.user-menu-list form { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--border); }
+.user-menu-list form button { color: var(--nein); }
+@media (max-width: 760px) {
+  .user-menu { flex: 1; }
+  .user-menu-list { position: static; margin-top: 8px; box-shadow: none; }
+}
+
+/* Konto: Reiter und Abschnittstitel */
+.account-tabs { flex-wrap: wrap; margin-bottom: 18px; }
+.section-title { margin: 22px 0 10px; font-size: 1.05rem; }
+.bet-delete { margin: 0; display: inline-flex; }

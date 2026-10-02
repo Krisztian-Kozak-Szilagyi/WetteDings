@@ -1,22 +1,43 @@
 <%- include('partials/head') %>
 
 <div class="page-head">
-  <h1>Mein Konto</h1>
+  <h1><%= sections[section].label %></h1>
   <span class="muted"><%= currentUser.username %> · <%= currentUser.email %> · registriert am <%= date(currentUser.createdAt) %></span>
 </div>
 
+<nav class="tabs account-tabs" aria-label="Konto">
+  <% Object.entries(sections).forEach(([key, sec]) => { %>
+    <a href="<%= sec.path %>" class="tab <%= section === key ? 'active' : '' %>"><%= sec.label %></a>
+  <% }) %>
+</nav>
+
+<% if (section === 'statistiken') { const decided = stats.won + stats.lost; %>
+<h2 class="section-title">Spielgeld</h2>
 <div class="stats stats-auto">
   <div class="stat card"><span class="stat-label">Verfügbar</span><span class="stat-value"><%= euro(currentUser.balance) %></span></div>
   <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
   <div class="stat card"><span class="stat-label">In Samantha Coin</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/coin-exchange">Zur Coin Exchange</a></div>
-  <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><span class="muted small">inkl. ungeöffneter Packs</span><a class="small" href="/tcg/album">Zum Album</a></div>
+  <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><span class="muted small">inkl. ungeöffneter Packs</span></div>
   <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
-  <div class="stat card"><span class="stat-label">Bilanz seit Start</span><span class="stat-value <%= net > 0 ? 'pos' : (net < 0 ? 'neg' : '') %>"><%= net > 0 ? '+' : '' %><%= euro(net) %></span>
-    <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span></div>
 </div>
 
-<details class="card fold" id="wetten" <%= bets.open ? 'open' : '' %>>
-  <summary><h2>Meine Wetten <span class="muted small">(<%= bets.total %>)</span></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+<h2 class="section-title">Wetten</h2>
+<div class="stats stats-auto">
+  <div class="stat card"><span class="stat-label">Gewonnen</span><span class="stat-value pos"><%= stats.won %></span></div>
+  <div class="stat card"><span class="stat-label">Verloren</span><span class="stat-value neg"><%= stats.lost %></span></div>
+  <div class="stat card"><span class="stat-label">Richtig getippt</span><span class="stat-value"><%= decided ? Math.round((stats.won / decided) * 100) + ' %' : '–' %></span><a class="small" href="/konto/wetten">Meine Wetten</a></div>
+</div>
+
+<h2 class="section-title">Karten</h2>
+<div class="stats stats-auto">
+  <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
+  <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= totalCards %></span><a class="small" href="/tcg/album">Zum Album</a></div>
+</div>
+<% } %>
+
+<% if (section === 'wetten') { %>
+<div class="card" id="wetten">
+  <h2>Meine Wetten <span class="muted small">(<%= bets.total %>)</span></h2>
   <% if (!positions.length) { %>
     <p class="muted">Du hast noch nichts gesetzt. <a href="/">Zu den Wetten</a></p>
   <% } else { %>
@@ -42,17 +63,19 @@
       </table>
     </div>
   <% } %>
-  <% if (bets.pages > 1) { const link = (p) => '/konto?' + new URLSearchParams({ wetten: p, ...(led.open ? { auszug: led.page } : {}) }) + '#wetten'; %>
+  <% if (bets.pages > 1) { const link = (p) => '/konto/wetten?seite=' + p; %>
     <div class="log-pager">
       <% if (bets.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(bets.page - 1) %>">← Neuere</a><% } %>
       <span class="muted small">Seite <%= bets.page %> / <%= bets.pages %></span>
       <% if (bets.page < bets.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(bets.page + 1) %>">Ältere →</a><% } %>
     </div>
   <% } %>
-</details>
+</div>
+<% } %>
 
-<details class="card fold" id="auszug" <%= led.open ? 'open' : '' %>>
-  <summary><h2>Kontoauszug <span class="muted small">(<%= led.total %>)</span></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+<% if (section === 'auszug') { %>
+<div class="card" id="auszug">
+  <h2>Kontoauszug <span class="muted small">(<%= led.total %>)</span></h2>
   <div class="table-wrap">
     <table class="table">
       <thead><tr><th>Datum</th><th>Buchung</th><th class="num">Betrag</th></tr></thead>
@@ -67,16 +90,17 @@
       </tbody>
     </table>
   </div>
-  <% if (led.pages > 1) { const link = (p) => '/konto?' + new URLSearchParams({ auszug: p, ...(bets.open ? { wetten: bets.page } : {}) }) + '#auszug'; %>
+  <% if (led.pages > 1) { const link = (p) => '/konto/auszug?seite=' + p; %>
     <div class="log-pager">
       <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page - 1) %>">← Neuere</a><% } %>
       <span class="muted small">Seite <%= led.page %> / <%= led.pages %></span>
       <% if (led.page < led.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page + 1) %>">Ältere →</a><% } %>
     </div>
   <% } %>
-</details>
+</div>
+<% } %>
 
-<div class="account-grid">
+<% if (section === 'gruppen') { %>
 <div class="card" id="gruppen">
   <h2>Wett-Gruppen</h2>
   <p class="muted">Wetten lassen sich nur für eine Gruppe aufstellen – dann sehen und setzen ausschließlich ihre Mitglieder. Mitglieder einladen und entfernen kann nur, wer die Gruppe angelegt hat; austreten kann jeder selbst.</p>
@@ -94,7 +118,7 @@
           <li>
             <span><%- userLink(m.username) %><% if (isOwner) { %> <span class="tag">Ersteller</span><% } %></span>
             <% if (g.mine && !isOwner) { %>
-              <form method="post" action="/gruppen/<%= g._id %>/mitglied/<%= m._id %>/entfernen" data-confirm="<%= m.username %> aus der Gruppe entfernen?">
+              <form method="post" action="/gruppen/<%= g._id %>/mitglied/<%= m._id %>/entfernen" data-confirm="<%= m.username %> aus der Gruppe entfernen? Offene Wetten der Gruppe, die <%= m.username %> aufgestellt hat oder bei denen <%= m.username %> Schiedsrichter ist, werden annulliert (Einsätze gehen zurück).">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button class="link-btn" type="submit">Entfernen</button>
               </form>
@@ -112,7 +136,7 @@
           </select>
           <button class="btn btn-primary btn-sm" type="submit">Einladen</button>
         </form>
-        <form method="post" action="/gruppen/<%= g._id %>/aufloesen" data-confirm="Gruppe „<%= g.name %>“ auflösen? Neue Wetten sind dann nicht mehr möglich; alte bleiben für die bisherigen Mitglieder sichtbar.">
+        <form method="post" action="/gruppen/<%= g._id %>/aufloesen" data-confirm="Gruppe „<%= g.name %>“ auflösen? Noch offene Wetten der Gruppe werden annulliert (Einsätze gehen zurück). Neue Wetten sind dann nicht mehr möglich; abgeschlossene bleiben für die bisherigen Mitglieder sichtbar.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button class="link-btn" type="submit">Gruppe auflösen</button>
         </form>
@@ -130,7 +154,10 @@
     <button class="btn btn-primary" type="submit">Gruppe anlegen</button>
   </form>
 </div>
+<% } %>
 
+<% if (section === 'einstellungen') { %>
+<div class="account-grid">
 <div class="card" id="name">
   <h2>Benutzernamen ändern</h2>
   <% if (currentUser.isAdmin) { %>
@@ -198,5 +225,6 @@
   <% } %>
 </div>
 </div>
+<% } %>
 
 <%- include('partials/foot') %>
