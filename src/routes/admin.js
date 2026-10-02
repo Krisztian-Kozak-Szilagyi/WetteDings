@@ -5,6 +5,7 @@ const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const { requireAdmin, requireStaff } = require('../middleware');
 const { PackGrant } = require('../models/Tcg');
+const { Trade } = require('../models/Trade');
 const roles = require('../services/roles');
 const betService = require('../services/betService');
 const { verdictRole } = require('../lib/verdict');
@@ -24,9 +25,54 @@ const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } 
 
 const router = express.Router();
 
+// ---------- Handel-Log (nur Admin): wer wem welche Karte gegeben hat und wann ----------
+const TRADE_LOG_PAGE = 50;
+const KIND_LABEL = { markt: 'Markt', privat: 'Privatverkauf', tausch: 'Tausch' };
+
+/** Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte */
+async function tradeLog(query) {
+  const q = (typeof query.handelsuche === 'string' ? query.handelsuche : '').trim().slice(0, 40);
+  const filter = { status: 'verkauft' };
+  if (q) {
+    const rx = new RegExp(escapeRegex(q), 'i');
+    // Karten über ihren angezeigten Namen finden (z. B. "St. Ivan") – gespeichert ist nur die Karten-ID
+    const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
+    filter.$or = [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }];
+  }
+  const total = await Trade.countDocuments(filter);
+  const pages = Math.max(1, Math.ceil(total / TRADE_LOG_PAGE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt(query.handelseite, 10) || 1));
+  const rows = await Trade.find(filter)
+    .select('kind sellerName buyerName toName card wantCard price extraFrom tax closedAt')
+    .sort({ closedAt: -1, _id: -1 })
+    .skip((page - 1) * TRADE_LOG_PAGE)
+    .limit(TRADE_LOG_PAGE)
+    .lean();
+  const card = (id) => {
+    const c = tcgCatalog.cardById[id];
+    return c ? `${c.name} (${tcgCatalog.rarityByKey[c.rarity].label})` : id;
+  };
+  return {
+    q,
+    total,
+    page,
+    pages,
+    rows: rows.map((t) => {
+      // "An" ist beim Verkauf der Käufer, beim Tausch der Empfänger des Angebots
+      const to = t.kind === 'tausch' ? t.toName : t.buyerName;
+      let back = euro(t.price); // Gegenleistung
+      if (t.kind === 'tausch') {
+        back = card(t.wantCard);
+        if (t.price > 0) back += ` + ${euro(t.price)} von ${t.extraFrom === 'to' ? to : t.sellerName}`;
+      }
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: card(t.card), back, tax: t.tax };
+    }),
+  };
+}
+
 router.get('/admin', requireStaff, async (req, res) => {
   const isAdmin = req.user.isAdmin;
-  const [codes, userCount, openBets, totalBets, users, deviceMatches, bans] = await Promise.all([
+  const [codes, userCount, openBets, totalBets, users, deviceMatches, bans, trades] = await Promise.all([
     listActiveCodes(),
     User.countDocuments(),
     Bet.countDocuments({ status: 'offen' }),
@@ -34,6 +80,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean(),
     isAdmin ? deviceService.listAlerts() : [], // Konten mit gemeinsamem Gerät
     isAdmin ? deviceService.listBans() : [],
+    isAdmin ? tradeLog(req.query) : null, // Handel-Log: abgeschlossene Verkäufe und Tausche
   ]);
   res.render('admin', {
     title: req.user.isAdmin ? 'Admin' : 'Dev',
@@ -59,6 +106,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     bans,
     maxBanHours: MAX_BAN_HOURS,
+    trades,
     // Mitglieder, die gesperrt werden können (der Admin selbst nicht)
     bannable: users.filter((u) => !config.adminUsernames.includes(u.usernameLower)),
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',

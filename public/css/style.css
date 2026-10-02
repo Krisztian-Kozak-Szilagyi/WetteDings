@@ -485,6 +485,9 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .mod-menu-panel .form { gap: 12px; }
 .mod-menu-panel .admin-tcg-pack { max-width: none; }
 .device-done { margin-top: 14px; }
+/* Admin: Handel-Log */
+#handellog .leader-search { margin: 0 0 10px; flex-wrap: wrap; }
+.trade-log td { vertical-align: top; }
 .device-done > .code-list { margin-top: 12px; }
 .nav-badge.nav-badge-device { background: #f59e0b; }
 .code-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }

@@ -277,6 +277,46 @@
 <% } %>
 
 <% if (currentUser.isAdmin) { %>
+<details class="card fold" id="handellog" <%= trades.q || trades.page > 1 ? 'open' : '' %>>
+  <summary><h2>Handel-Log</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen.</p>
+  <form method="get" action="/admin#handellog" class="leader-search" role="search">
+    <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
+    <input type="search" id="handel-suche" name="handelsuche" value="<%= trades.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
+    <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+    <% if (trades.q) { %><a class="btn btn-ghost btn-sm" href="/admin#handellog">Alle</a><% } %>
+  </form>
+  <p class="muted small"><%= trades.total %> <%= trades.total === 1 ? 'Geschäft' : 'Geschäfte' %><%= trades.q ? ' für „' + trades.q + '“' : '' %> · Seite <%= trades.page %> von <%= trades.pages %></p>
+  <% if (!trades.rows.length) { %>
+    <p class="muted"><%= trades.q ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table trade-log">
+        <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Karte</th><th>Gegenleistung</th><th>Art</th></tr></thead>
+        <tbody>
+          <% trades.rows.forEach((t) => { %>
+            <tr>
+              <td class="nowrap"><%= dateSec(t.at) %></td>
+              <td><%- userLink(t.from) %></td>
+              <td><%- userLink(t.to) %></td>
+              <td><%= t.card %></td>
+              <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
+              <td class="nowrap"><%= t.kind %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <% if (trades.pages > 1) { const link = (p) => '/admin?' + new URLSearchParams({ ...(trades.q ? { handelsuche: trades.q } : {}), handelseite: p }) + '#handellog'; %>
+    <div class="log-pager">
+      <% if (trades.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(trades.page - 1) %>">← Neuere</a><% } %>
+      <span class="muted small">Seite <%= trades.page %> / <%= trades.pages %></span>
+      <% if (trades.page < trades.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(trades.page + 1) %>">Ältere →</a><% } %>
+    </div>
+  <% } %>
+</details>
+
 <div class="card" id="handel">
   <h2>Handel: Steuer</h2>
   <p class="muted">Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.</p>
