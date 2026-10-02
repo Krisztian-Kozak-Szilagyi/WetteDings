@@ -273,7 +273,7 @@ select {
 
 .info-box {
   display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; margin: 0 0 18px;
-  border-radius: 12px; background: var(--primary-soft); border-left: 4px solid var(--primary); font-size: .95rem;
+  border-radius: 12px; background: var(--primary-soft); border: 2px solid var(--primary); font-size: .95rem;
 }
 .readonly-value { margin: 0; padding: 11px 12px; border-radius: 10px; background: var(--surface-2); border: 1px dashed var(--border); overflow-wrap: anywhere; }
 .edited-hint { margin-top: -6px; font-style: italic; }
