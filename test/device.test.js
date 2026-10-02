@@ -44,12 +44,14 @@ test('Treffer-Stufen: Cookie sicher, Fingerabdruck+IP wahrscheinlich, nur Finger
   assert.equal(d.pairKey('b', 'a'), d.pairKey('a', 'b'));
 });
 
-test('Sperrdauer und Sperrstatus', () => {
+test('Ban-Dauer in Stunden (0 = dauerhaft) und Ban-Status', () => {
   const now = Date.UTC(2026, 9, 2, 12);
-  assert.equal(d.banUntil('7', now).getTime(), now + 7 * 24 * 60 * 60 * 1000);
-  assert.equal(d.isForever(d.banUntil('immer', now)), true);
-  assert.equal(d.isForever(d.banUntil('30', now)), false);
-  for (const bad of ['', '2', 'x', undefined]) assert.equal(d.banUntil(bad, now), null);
+  assert.equal(d.banUntil('24', now).getTime(), now + 24 * 60 * 60 * 1000);
+  assert.equal(d.banUntil(' 1 ', now).getTime(), now + 60 * 60 * 1000);
+  assert.equal(d.isForever(d.banUntil('0', now)), true);
+  assert.equal(d.isForever(d.banUntil('720', now)), false);
+  assert.ok(d.banUntil(String(d.MAX_BAN_HOURS), now));
+  for (const bad of ['', '-1', '1.5', '1,5', 'x', 'immer', undefined, null, ['1'], String(d.MAX_BAN_HOURS + 1), '999999']) assert.equal(d.banUntil(bad, now), null);
   assert.equal(d.isBanned({ bannedUntil: new Date(now + 1000) }, now), true);
   assert.equal(d.isBanned({ bannedUntil: new Date(now - 1000) }, now), false);
   assert.equal(d.isBanned({ bannedUntil: null }, now), false);

@@ -19,7 +19,7 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
-const { BAN_DURATIONS, isForever } = require('../device/deviceLogic');
+const { MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
@@ -58,10 +58,10 @@ router.get('/admin', requireStaff, async (req, res) => {
     tradeTax: tradeService.settings.taxPercent,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     bans,
-    banDurations: BAN_DURATIONS,
+    maxBanHours: MAX_BAN_HOURS,
     // Mitglieder, die gesperrt werden können (der Admin selbst nicht)
     bannable: users.filter((u) => !config.adminUsernames.includes(u.usernameLower)),
-    banPreselect: typeof req.query.sperren === 'string' ? req.query.sperren : '',
+    banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
   });
 });
 
@@ -124,20 +124,20 @@ router.post('/admin/sperren', requireAdmin, async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   try {
     if (!mongoose.isValidObjectId(userId)) throw new UserError('Bitte ein Mitglied auswählen.');
-    const r = await deviceService.ban({ userId, duration: str(req.body.duration), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
-    req.flash('success', `${r.username} ist gesperrt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
+    const r = await deviceService.ban({ userId, hours: str(req.body.hours), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
+    req.flash('success', `${r.username} ist gebannt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  // vom Profil aus gesperrt: dorthin zurück
-  res.redirect(safeRedirect(req.body.zurueck, '/admin#sperren'));
+  // vom Profil aus gebannt: dorthin zurück
+  res.redirect(safeRedirect(req.body.zurueck, '/admin#ban'));
 });
 
 router.post('/admin/sperren/:id/aufheben', requireAdmin, async (req, res) => {
   const user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id) : null;
-  req.flash(user ? 'success' : 'error', user ? `Die Sperre von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
-  res.redirect(safeRedirect(req.body.zurueck, '/admin#sperren'));
+  req.flash(user ? 'success' : 'error', user ? `Der Ban von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
+  res.redirect(safeRedirect(req.body.zurueck, '/admin#banliste'));
 });
 
 // ---------- Handel: Steuer ----------

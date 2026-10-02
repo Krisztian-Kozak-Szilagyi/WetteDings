@@ -4,16 +4,9 @@ const crypto = require('crypto');
 const COOKIE = 'bfw.geraet';
 const LEVEL = { sicher: 3, wahrscheinlich: 2, moeglich: 1 };
 const LEVEL_LABEL = { 3: 'Sicher', 2: 'Wahrscheinlich', 1: 'Möglich' };
-const DAY = 24 * 60 * 60 * 1000;
 // "dauerhaft" = ein Datum weit in der Zukunft, damit überall derselbe Vergleich (bannedUntil > jetzt) reicht
 const FOREVER = new Date('9999-12-31T00:00:00Z');
-const BAN_DURATIONS = [
-  { key: '1', label: '1 Tag', days: 1 },
-  { key: '3', label: '3 Tage', days: 3 },
-  { key: '7', label: '7 Tage', days: 7 },
-  { key: '30', label: '30 Tage', days: 30 },
-  { key: 'immer', label: 'Dauerhaft', days: null },
-];
+const MAX_BAN_HOURS = 87600; // 10 Jahre
 
 const hmac = (secret, text) => crypto.createHmac('sha256', secret).update(text).digest('hex');
 
@@ -75,14 +68,16 @@ function matchLevel(a, b) {
   return 0;
 }
 
-/** Ende einer Sperre aus der gewählten Dauer; null bei ungültiger Auswahl */
-function banUntil(key, now = Date.now()) {
-  const d = BAN_DURATIONS.find((x) => x.key === key);
-  if (!d) return null;
-  return d.days === null ? FOREVER : new Date(now + d.days * DAY);
+/** Ende eines Bans aus der Dauer in Stunden ("0" = dauerhaft); null bei ungültiger Eingabe */
+function banUntil(hours, now = Date.now()) {
+  const text = typeof hours === 'number' ? String(hours) : typeof hours === 'string' ? hours.trim() : '';
+  if (!/^\d{1,5}$/.test(text)) return null;
+  const h = Number(text);
+  if (h > MAX_BAN_HOURS) return null;
+  return h === 0 ? FOREVER : new Date(now + h * 60 * 60 * 1000);
 }
 
 const isForever = (date) => !!date && new Date(date).getTime() >= FOREVER.getTime();
 const isBanned = (user, now = Date.now()) => !!(user && user.bannedUntil && new Date(user.bannedUntil).getTime() > now);
 
-module.exports = { COOKIE, LEVEL, LEVEL_LABEL, BAN_DURATIONS, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };
+module.exports = { COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };

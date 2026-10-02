@@ -163,12 +163,12 @@ function banMessage(ban, date) {
   return `Der Zugang ist gesperrt (${until}).${ban.reason ? ` Grund: ${ban.reason}` : ''}`;
 }
 
-async function ban({ userId, duration, reason, admin, adminUsernames = [] }) {
-  const until = logic.banUntil(duration);
-  if (!until) throw new UserError('Bitte eine Dauer auswählen.');
+async function ban({ userId, hours, reason, admin, adminUsernames = [] }) {
+  const until = logic.banUntil(hours);
+  if (!until) throw new UserError(`Bitte die Dauer in ganzen Stunden angeben (0 = dauerhaft, höchstens ${logic.MAX_BAN_HOURS}).`);
   const user = await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower');
   if (!user) throw new UserError('Bitte ein Mitglied auswählen.');
-  if (adminUsernames.includes(user.usernameLower)) throw new UserError('Der Admin kann nicht gesperrt werden.');
+  if (adminUsernames.includes(user.usernameLower)) throw new UserError('Der Admin kann nicht gebannt werden.');
   await User.updateOne({ _id: user._id }, { $set: { bannedUntil: until, banReason: String(reason || '').trim().slice(0, 200), bannedAt: new Date(), bannedByName: admin.username } });
   await reload();
   return { username: user.username, until };

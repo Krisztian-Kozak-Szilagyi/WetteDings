@@ -5,40 +5,39 @@
   <div class="ihk-title">
     <h1><%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
     <a class="btn btn-ghost btn-sm" href="/rangliste">← Zur Rangliste</a>
+    <% if (canBan) { const back = '/profil/' + encodeURIComponent(profile.username); %>
+      <details class="mod-menu" data-dropdown>
+        <summary class="btn btn-ghost btn-sm">Moderation</summary>
+        <div class="mod-menu-panel">
+          <form method="post" action="/admin/sperren" class="form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich bannen?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="user" value="<%= profile._id %>">
+            <input type="hidden" name="zurueck" value="<%= back %>">
+            <label class="field admin-tcg-pack">
+              <span>Dauer in Stunden <em>(0 = dauerhaft)</em></span>
+              <input type="number" name="hours" min="0" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
+            </label>
+            <label class="field">
+              <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
+              <input type="text" name="reason" maxlength="200">
+            </label>
+            <button class="btn btn-danger" type="submit">Ban</button>
+          </form>
+          <% if (ban) { %>
+            <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= ban.active ? profile.username + ' wirklich entbannen?' : 'Vermerk entfernen?' %> Der Vermerk im Profil verschwindet dann.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="zurueck" value="<%= back %>">
+              <button class="btn btn-ghost btn-block" type="submit"><%= ban.active ? 'Unban' : 'Vermerk entfernen' %></button>
+            </form>
+          <% } %>
+        </div>
+      </details>
+    <% } %>
   </div>
   <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
 </div>
 <% if (ban) { %>
-  <p class="ban-note"><%= ban.active ? (ban.forever ? 'Dauerhaft gesperrt' : 'Gesperrt bis ' + date(ban.until)) : 'War gesperrt bis ' + date(ban.until) %> · von <%= ban.by || '–' %> am <%= date(ban.at) %><%= ban.reason ? ' · Grund: ' + ban.reason : '' %></p>
-<% } %>
-<% if (canBan) { const back = '/profil/' + encodeURIComponent(profile.username); %>
-  <details class="card fold" id="sperren">
-    <summary><h2><%= ban && ban.active ? 'Sperre ändern' : 'Mitglied sperren' %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
-    <p class="muted">Das Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden – auch nicht von seinen Geräten aus mit einem anderen Konto. Guthaben, Karten, Wetten und Angebote bleiben unverändert.</p>
-    <form method="post" action="/admin/sperren" class="form admin-tcg-form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich sperren?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <input type="hidden" name="user" value="<%= profile._id %>">
-      <input type="hidden" name="zurueck" value="<%= back %>">
-      <label class="field admin-tcg-pack">
-        <span>Dauer</span>
-        <select name="duration" required>
-          <% banDurations.forEach((d) => { %><option value="<%= d.key %>" <%= d.key === '7' ? 'selected' : '' %>><%= d.label %></option><% }) %>
-        </select>
-      </label>
-      <label class="field">
-        <span>Grund <em>(freiwillig – steht danach im Profil und beim Anmeldeversuch)</em></span>
-        <input type="text" name="reason" maxlength="200">
-      </label>
-      <button class="btn btn-danger" type="submit">Sperren</button>
-    </form>
-    <% if (ban) { %>
-      <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" class="ban-lift" data-confirm="Sperre von <%= profile.username %> aufheben? Der Vermerk im Profil verschwindet dann auch.">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="zurueck" value="<%= back %>">
-        <button class="btn btn-ghost" type="submit"><%= ban.active ? 'Sperre aufheben' : 'Vermerk entfernen' %></button>
-      </form>
-    <% } %>
-  </details>
+  <p class="ban-note"><%= ban.active ? (ban.forever ? 'Dauerhaft gebannt' : 'Gebannt bis ' + date(ban.until)) : 'War gebannt bis ' + date(ban.until) %> · von <%= ban.by || '–' %> am <%= date(ban.at) %><%= ban.reason ? ' · Grund: ' + ban.reason : '' %></p>
 <% } %>
 
 <div class="stats stats-4">

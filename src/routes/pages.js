@@ -93,7 +93,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     // Sperr-Vermerk unter dem Namen (bleibt auch nach Ablauf stehen) und Sperr-Formular für den Admin
     ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), forever: deviceLogic.isForever(profile.bannedUntil), until: profile.bannedUntil, at: profile.bannedAt, by: profile.bannedByName, reason: profile.banReason } : null,
     canBan: req.user.isAdmin && !config.adminUsernames.includes(profile.usernameLower),
-    banDurations: deviceLogic.BAN_DURATIONS,
+    maxBanHours: deviceLogic.MAX_BAN_HOURS,
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,

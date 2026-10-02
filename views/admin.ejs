@@ -41,7 +41,7 @@
         <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
           <div class="code-main">
             <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
-            <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gesperrt</span><% } %><% }) %>
+            <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
           </div>
           <div class="code-meta small">
             <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
@@ -57,7 +57,7 @@
           </div>
           <div class="code-actions">
             <% a.users.filter((u) => !u.banned).forEach((u) => { %>
-              <a class="btn btn-danger btn-sm" href="/admin?sperren=<%= u._id %>#sperren"><%= u.username %> sperren</a>
+              <a class="btn btn-danger btn-sm" href="/admin?ban=<%= u._id %>#ban"><%= u.username %> bannen</a>
             <% }) %>
             <form method="post" action="/admin/geraete/<%= a._id %>">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -78,30 +78,10 @@
   <% } %>
 </div>
 
-<details class="card fold" id="sperren">
-  <summary><h2>Sperren <%= bans.length ? '(' + bans.length + ')' : '' %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
-  <p class="muted">Ein gesperrtes Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden. Die Sperre gilt auch für <strong>alle Geräte</strong>, mit denen das Konto benutzt wurde: von dort aus ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.</p>
-  <% if (!bans.length) { %>
-    <p class="muted">Aktuell ist niemand gesperrt.</p>
-  <% } else { %>
-    <ul class="code-list">
-      <% bans.forEach((b) => { %>
-        <li class="code-item">
-          <div class="code-main"><strong><%- userLink(b.username) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
-          <div class="code-meta muted small">
-            <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gesperrt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgesperrt
-          </div>
-          <div class="code-actions">
-            <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="Sperre von <%= b.username %> aufheben?">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="btn btn-ghost btn-sm" type="submit">Aufheben</button>
-            </form>
-          </div>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
-  <form method="post" action="/admin/sperren" class="form admin-tcg-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich sperren?">
+<details class="card fold" id="ban">
+  <summary><h2>Ban</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Ein gebanntes Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden. Der Ban gilt auch für <strong>alle Geräte</strong>, mit denen das Konto benutzt wurde: von dort aus ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.</p>
+  <form method="post" action="/admin/sperren" class="form admin-tcg-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich bannen?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label class="field admin-tcg-pack">
       <span>Mitglied</span>
@@ -111,18 +91,40 @@
       </select>
     </label>
     <label class="field admin-tcg-pack">
-      <span>Dauer</span>
-      <select name="duration" required>
-        <% banDurations.forEach((d) => { %><option value="<%= d.key %>" <%= d.key === '7' ? 'selected' : '' %>><%= d.label %></option><% }) %>
-      </select>
+      <span>Dauer in Stunden <em>(0 = dauerhaft)</em></span>
+      <input type="number" name="hours" min="0" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
     </label>
     <label class="field">
-      <span>Grund <em>(freiwillig – das Mitglied sieht ihn beim Anmelden)</em></span>
+      <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
       <input type="text" name="reason" maxlength="200">
     </label>
-    <button class="btn btn-danger" type="submit">Sperren</button>
+    <button class="btn btn-danger" type="submit">Ban</button>
   </form>
 </details>
+
+<div class="card" id="banliste">
+  <h2>Ban-Liste <%= bans.length ? '(' + bans.length + ')' : '' %></h2>
+  <% if (!bans.length) { %>
+    <p class="muted">Aktuell ist niemand gebannt.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% bans.forEach((b) => { %>
+        <li class="code-item">
+          <div class="code-main"><strong><%- userLink(b.username) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
+          <div class="code-meta muted small">
+            <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gebannt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgebannt
+          </div>
+          <div class="code-actions">
+            <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen? Der Vermerk im Profil verschwindet dann auch.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>
 
 <details class="card fold" id="tcg">
   <summary><h2>TCG: Chancen &amp; Preise</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
