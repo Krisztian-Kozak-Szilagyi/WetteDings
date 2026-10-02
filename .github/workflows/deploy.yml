@@ -1,0 +1,101 @@
+# Automatisches Deployment: Alles, was auf main landet, wird getestet und – wenn die Tests grün sind –
+# auf den Server übertragen; danach wird die App neu gestartet und geprüft, ob sie antwortet.
+#
+# Benötigte Secrets (GitHub → Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST         Adresse des Servers
+#   DEPLOY_USER         SSH-Benutzer
+#   DEPLOY_SSH_KEY      privater SSH-Schlüssel nur für dieses Deployment
+#   DEPLOY_KNOWN_HOSTS  Ausgabe von: ssh-keyscan <Adresse des Servers>
+# Solange die Secrets fehlen, laufen nur die Tests – es wird nichts übertragen.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# nie zwei Deployments gleichzeitig; ein laufendes wird zu Ende geführt
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    name: Auf den Server übertragen
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      APP_DIR: /var/www/wettstube
+      PM2_NAME: wettstube
+    steps:
+      - name: Secrets vorhanden?
+        id: ready
+        run: |
+          if [ -n "$DEPLOY_HOST" ] && [ -n "$DEPLOY_USER" ] && [ -n "$DEPLOY_SSH_KEY" ] && [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Deployment übersprungen – die DEPLOY_*-Secrets sind noch nicht eingerichtet."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ok == 'true'
+
+      - name: SSH einrichten
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Sicherung auf dem Server
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$APP_DIR' && tar czf /root/wettstube-backup-deploy.tgz server.js package.json package-lock.json src views public/css public/js"
+
+      # --delete: entfernte Dateien verschwinden auch auf dem Server (z. B. gelöschte Karten oder Seiten).
+      # .env und node_modules liegen daneben und werden nicht angefasst.
+      - name: Dateien übertragen
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
+            server.js package.json package-lock.json src views public \
+            "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
+
+      - name: Abhängigkeiten, Neustart, Kontrolle
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "
+            set -e
+            cd '$APP_DIR'
+            npm ci --omit=dev --no-audit --no-fund
+            pm2 restart '$PM2_NAME' --update-env
+            # warten, bis die App wieder antwortet (Start inkl. Datenbank und Kurs-Engine)
+            for i in \$(seq 1 30); do
+              if curl -fsS -o /dev/null http://127.0.0.1:3100/regeln; then echo 'App antwortet.'; exit 0; fi
+              sleep 2
+            done
+            echo 'Die App antwortet nach dem Neustart nicht.' >&2
+            pm2 logs '$PM2_NAME' --lines 30 --nostream >&2 || true
+            exit 1
+          "
