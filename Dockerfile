@@ -1,6 +1,6 @@
 # BfW Holdings als Container. Die Datenbank (MongoDB Atlas) liegt außerhalb; alle Einstellungen kommen
 # zur Laufzeit aus der .env des Servers (siehe deploy/docker-compose.yml) – im Image stehen keine Geheimnisse.
-FROM node:22-slim
+FROM node:26-slim
 
 ENV NODE_ENV=production
 WORKDIR /app
