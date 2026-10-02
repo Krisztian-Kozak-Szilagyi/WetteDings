@@ -1645,3 +1645,8 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .forum-section-head { padding-top: 8px; }
 .forum-list:first-child > .forum-row:first-child { border-top: 0; } /* keine Linie über der ersten Zeile */
 .forum-empty { margin: 0; padding: 12px 4px; }
+
+/* Forum: rechte Spalte ("letzter Beitrag") – der Titel bleibt einzeilig und wird mit … gekürzt */
+.forum-row-last { min-width: 0; }
+.forum-row-last a { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.forum-row-last br { display: none; }
