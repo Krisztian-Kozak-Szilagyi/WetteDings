@@ -5,6 +5,7 @@ const User = require('../models/User');
 const { registerUser } = require('../services/betService');
 const { str, safeRedirect, UserError } = require('../lib/util');
 const { normalizeCode } = require('../services/codeService');
+const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../services/usernameRules');
 
 const router = express.Router();
 
@@ -52,9 +53,9 @@ router.post('/registrieren', authLimiter, async (req, res) => {
 
   const errors = [];
   if (normalizeCode(code).length !== 8) errors.push('Bitte gib einen gültigen Registrierungscode ein (Format: XXXX-XXXX).');
-  if (!/^[A-Za-z0-9_.-]{3,20}$/.test(username)) {
-    errors.push('Der Benutzername muss 3–20 Zeichen lang sein (Buchstaben, Zahlen, _ . -).');
-  }
+  if (!NAME_PATTERN.test(username)) errors.push(NAME_HINT);
+  // Reservierte Namen (Admin-Namen tragen Rechte, "geloescht-…" täuscht ein gelöschtes Konto vor)
+  else if (isReserved(username)) errors.push(RESERVED_HINT);
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errors.push('Bitte gib eine gültige E-Mail-Adresse ein.');
   }

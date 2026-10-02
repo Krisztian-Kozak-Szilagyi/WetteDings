@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
-const config = require('../config');
 const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Comment = require('../models/Comment');
@@ -18,8 +17,8 @@ const { Trade } = require('../models/Trade');
 const { inTransaction } = require('./betService');
 const { UserError } = require('../lib/util');
 
-const NAME_PATTERN = /^[A-Za-z0-9_.-]{3,20}$/;
-const NAME_HINT = 'Der Benutzername muss 3–20 Zeichen lang sein (Buchstaben, Zahlen, _ . -).';
+const { NAME_PATTERN, NAME_HINT, assertUsernameAllowed } = require('./usernameRules');
+
 const RENAME_COOLDOWN_DAYS = 7; // so lange muss man nach einer Namensänderung bis zur nächsten warten
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -62,13 +61,11 @@ function nextRenameAt(user) {
 
 /** Benutzernamen ändern – überall, wo er angezeigt wird */
 async function rename({ user, username }) {
-  const name = String(username || '').trim();
   // Admin-Rechte hängen am Benutzernamen (ADMIN_USERNAMES) – deshalb bleibt der Name von Admins fest
   if (user.isAdmin) throw new UserError('Admin-Konten können ihren Namen nicht ändern – die Admin-Rechte hängen am Benutzernamen.');
-  if (!NAME_PATTERN.test(name)) throw new UserError(NAME_HINT);
+  const name = assertUsernameAllowed(username); // Muster und reservierte Namen
   if (name === user.username) throw new UserError('Das ist bereits dein Benutzername.');
   const lower = name.toLowerCase();
-  if (config.adminUsernames.includes(lower) || /^geloescht-/.test(lower)) throw new UserError('Dieser Benutzername ist nicht verfügbar.');
   if (nextRenameAt(user)) throw new UserError(`Du kannst deinen Namen nur alle ${RENAME_COOLDOWN_DAYS} Tage ändern.`);
 
   try {
