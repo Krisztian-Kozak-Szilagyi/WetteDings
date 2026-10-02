@@ -3,3 +3,6 @@ node_modules/
 *.log
 .DS_Store
 .claude/
+
+# persönliche Notizen für Claude (nur lokal)
+CLAUDE.local.md
