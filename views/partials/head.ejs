@@ -52,6 +52,7 @@
                 <img class="avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="34" height="34">
               </summary>
               <div class="user-menu-list" role="menu">
+                <a role="menuitem" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Profil ansehen</a>
                 <a role="menuitem" href="/konto">Statistiken</a>
                 <a role="menuitem" href="/konto/wetten">Meine Wetten</a>
                 <a role="menuitem" href="/konto/auszug">Kontoauszug</a>
@@ -66,6 +67,7 @@
             <%# Im aufgeklappten Hamburger-Menü (schmale Bildschirme) stehen die Konto-Punkte direkt in der Liste –
                 ohne zweites Aufklappmenü: erst die Links, dann Name/Kontostand/Bild, ganz unten "Abmelden" %>
             <div class="nav-account">
+              <a href="/profil/<%= encodeURIComponent(currentUser.username) %>" class="<%= currentPath.toLowerCase() === '/profil/' + encodeURIComponent(currentUser.username).toLowerCase() ? 'active' : '' %>">Profil ansehen</a>
               <a href="/konto" class="<%= currentPath === '/konto' ? 'active' : '' %>">Statistiken</a>
               <a href="/konto/wetten" class="<%= currentPath === '/konto/wetten' ? 'active' : '' %>">Meine Wetten</a>
               <a href="/konto/auszug" class="<%= currentPath === '/konto/auszug' ? 'active' : '' %>">Kontoauszug</a>
