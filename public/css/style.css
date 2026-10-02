@@ -469,6 +469,9 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .device-level-3 { background: var(--nein-soft); color: var(--nein); }
 .device-level-2 { background: rgba(245, 158, 11, .16); color: #f59e0b; }
 .device-level-1 { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+/* Profil: Sperr-Vermerk unter dem Namen – schlichter Text ohne Kasten */
+.ban-note { margin: -8px 0 16px; color: var(--nein); font-size: .92rem; font-weight: 600; overflow-wrap: anywhere; }
+.ban-lift { margin-top: 12px; }
 .device-done { margin-top: 14px; }
 .device-done > .code-list { margin-top: 12px; }
 .nav-badge.nav-badge-device { background: #f59e0b; }

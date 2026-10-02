@@ -8,7 +8,7 @@ const { PackGrant } = require('../models/Tcg');
 const roles = require('../services/roles');
 const betService = require('../services/betService');
 const { verdictRole } = require('../lib/verdict');
-const { UserError, str } = require('../lib/util');
+const { UserError, str, safeRedirect } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
@@ -130,13 +130,14 @@ router.post('/admin/sperren', requireAdmin, async (req, res) => {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/admin#sperren');
+  // vom Profil aus gesperrt: dorthin zurück
+  res.redirect(safeRedirect(req.body.zurueck, '/admin#sperren'));
 });
 
 router.post('/admin/sperren/:id/aufheben', requireAdmin, async (req, res) => {
   const user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id) : null;
   req.flash(user ? 'success' : 'error', user ? `Die Sperre von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
-  res.redirect('/admin#sperren');
+  res.redirect(safeRedirect(req.body.zurueck, '/admin#sperren'));
 });
 
 // ---------- Handel: Steuer ----------

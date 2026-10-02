@@ -4,6 +4,8 @@ const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
 const { str } = require('../lib/util');
 const { requireLogin } = require('../middleware');
+const config = require('../config');
+const deviceLogic = require('../device/deviceLogic');
 const coinEngine = require('../coin/engine');
 const { sellValueExpr, inventory } = require('../tcg/tcgService');
 const { collection } = require('../tcg/collection');
@@ -73,7 +75,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username createdAt tcgFavorites').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower createdAt tcgFavorites bannedUntil banReason bannedAt bannedByName').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const [owned, mine, statsAgg] = await Promise.all([
     inventory(profile._id),
@@ -88,6 +90,10 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     title: profile.username,
     profile,
     isMe: profile._id.equals(req.user._id),
+    // Sperr-Vermerk unter dem Namen (bleibt auch nach Ablauf stehen) und Sperr-Formular für den Admin
+    ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), forever: deviceLogic.isForever(profile.bannedUntil), until: profile.bannedUntil, at: profile.bannedAt, by: profile.bannedByName, reason: profile.banReason } : null,
+    canBan: req.user.isAdmin && !config.adminUsernames.includes(profile.usernameLower),
+    banDurations: deviceLogic.BAN_DURATIONS,
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,

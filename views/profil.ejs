@@ -8,6 +8,38 @@
   </div>
   <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
 </div>
+<% if (ban) { %>
+  <p class="ban-note"><%= ban.active ? (ban.forever ? 'Dauerhaft gesperrt' : 'Gesperrt bis ' + date(ban.until)) : 'War gesperrt bis ' + date(ban.until) %> · von <%= ban.by || '–' %> am <%= date(ban.at) %><%= ban.reason ? ' · Grund: ' + ban.reason : '' %></p>
+<% } %>
+<% if (canBan) { const back = '/profil/' + encodeURIComponent(profile.username); %>
+  <details class="card fold" id="sperren">
+    <summary><h2><%= ban && ban.active ? 'Sperre ändern' : 'Mitglied sperren' %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+    <p class="muted">Das Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden – auch nicht von seinen Geräten aus mit einem anderen Konto. Guthaben, Karten, Wetten und Angebote bleiben unverändert.</p>
+    <form method="post" action="/admin/sperren" class="form admin-tcg-form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich sperren?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="user" value="<%= profile._id %>">
+      <input type="hidden" name="zurueck" value="<%= back %>">
+      <label class="field admin-tcg-pack">
+        <span>Dauer</span>
+        <select name="duration" required>
+          <% banDurations.forEach((d) => { %><option value="<%= d.key %>" <%= d.key === '7' ? 'selected' : '' %>><%= d.label %></option><% }) %>
+        </select>
+      </label>
+      <label class="field">
+        <span>Grund <em>(freiwillig – steht danach im Profil und beim Anmeldeversuch)</em></span>
+        <input type="text" name="reason" maxlength="200">
+      </label>
+      <button class="btn btn-danger" type="submit">Sperren</button>
+    </form>
+    <% if (ban) { %>
+      <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" class="ban-lift" data-confirm="Sperre von <%= profile.username %> aufheben? Der Vermerk im Profil verschwindet dann auch.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="zurueck" value="<%= back %>">
+        <button class="btn btn-ghost" type="submit"><%= ban.active ? 'Sperre aufheben' : 'Vermerk entfernen' %></button>
+      </form>
+    <% } %>
+  </details>
+<% } %>
 
 <div class="stats stats-4">
   <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
