@@ -98,30 +98,37 @@ function createApp() {
   app.use(loadUser);
   app.use(dailyBonus);
   app.use(csrf);
-  // Abzeichen im Menü: offene Angebote an mich und neue Markt-Angebote seit dem letzten Besuch
+  // Abzeichen im Menü. Alle Zähler laufen gleichzeitig – so kostet das pro Seitenaufruf nur die Dauer der
+  // langsamsten Abfrage statt der Summe aller (die Datenbank liegt nicht auf diesem Server).
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
-      [res.locals.tradeIncoming, res.locals.tradeMarketNew, res.locals.newPacks, res.locals.patchNew, res.locals.betVotePending] =
-        await Promise.all([
-          // rot: Angebote an mich + abgeschlossene Geschäfte, von denen ich noch nichts weiß
-          Promise.all([tradeService.incomingCount(req.user._id), tradeService.newDealsCount(req.user)]).then(([a, b]) => a + b),
-          tradeService.marketNewCount(req.user),
-          tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
-          forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen
-          betService.pendingVoteCount(req.user._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
-        ]);
-      // Wetten: neue öffentliche Wetten und neue Wetten in den eigenen Gruppen seit dem letzten Besuch der Übersicht
-      const betNew = await groupService.newBetCounts(req.user, await groupService.groupIdsOf(req.user._id));
-      res.locals.betNewPublic = betNew.pub;
-      res.locals.betNewGroup = betNew.group;
-      // Forum: Neues in eigenen Themen (rot) und Neues im übrigen Forum
-      const forumNew = await forumService.navCounts(req.user);
-      res.locals.forumMine = forumNew.mine;
-      res.locals.forumOther = forumNew.other;
-      // nur für Devs/Admins: strittige Wetten, die eine entscheidende Stimme brauchen
-      if (req.user.isStaff) res.locals.betDisputes = await betService.disputedCount();
-      // nur für den Admin: Pack-Vergaben der Devs seit dem letzten Blick ins Log
-      if (req.user.isAdmin) res.locals.packLogNew = await require('./routes/admin').packLogNewCount(req.user);
+      const u = req.user;
+      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew] = await Promise.all([
+        tradeService.incomingCount(u._id), // Angebote an mich
+        tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
+        tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
+        tcgService.newPackCount(u), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
+        forumService.patchNewCount(u), // Patchnotes seit dem letzten Lesen
+        betService.pendingVoteCount(u._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
+        // neue öffentliche Wetten und neue Wetten in den eigenen Gruppen seit dem letzten Besuch der Übersicht
+        groupService.groupIdsOf(u._id).then((ids) => groupService.newBetCounts(u, ids)),
+        forumService.navCounts(u), // Neues in eigenen Themen (rot) und im übrigen Forum
+        u.isStaff ? betService.disputedCount() : 0, // nur Devs/Admins: strittige Wetten
+        u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
+      ]);
+      Object.assign(res.locals, {
+        tradeIncoming: incoming + deals,
+        tradeMarketNew: marketNew,
+        newPacks,
+        patchNew,
+        betVotePending: votePending,
+        betNewPublic: betNew.pub,
+        betNewGroup: betNew.group,
+        forumMine: forumNew.mine,
+        forumOther: forumNew.other,
+        betDisputes: disputes,
+        packLogNew,
+      });
     }
     next();
   });

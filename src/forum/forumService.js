@@ -31,7 +31,16 @@ async function seed() {
   await make('Feedback & Bugs', 'Wünsche, Fehler und Verbesserungen.', { parent: general._id, order: 4 });
 }
 
-const patchnotesCategory = () => ForumCategory.findOne({ key: PATCHNOTES_KEY }).lean();
+// Der Bereich "Patchnotes" ändert sich praktisch nie – kurz im Speicher halten statt bei jedem Seitenaufruf nachzuschlagen
+let patchCat = null;
+let patchCatAt = 0;
+async function patchnotesCategory() {
+  if (!patchCat || Date.now() - patchCatAt > 5 * 60 * 1000) {
+    patchCat = await ForumCategory.findOne({ key: PATCHNOTES_KEY }).lean();
+    patchCatAt = Date.now();
+  }
+  return patchCat;
+}
 
 /** Alte Patchnotes (eigene Seite) einmalig als Themen in den Bereich "Patchnotes" übernehmen. */
 async function migratePatchnotes() {
