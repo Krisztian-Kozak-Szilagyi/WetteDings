@@ -54,13 +54,16 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 // Abzeichen: Admin rot und Dev grün (beide "DEV"), Mod orange ("MOD")
 const BADGE = { admin: { text: 'DEV', title: 'Admin & Dev' }, dev: { text: 'DEV', title: 'Dev' }, mod: { text: 'MOD', title: 'Moderator' } };
 
-/** Zusatz hinter einem Benutzernamen (fertiges HTML): echter Name in Klammern (falls angegeben) und das Rollen-Abzeichen. */
-function roleBadge(username) {
+/**
+ * Zusatz hinter einem Benutzernamen (fertiges HTML): echter Name in Klammern (falls angegeben) und das Rollen-Abzeichen.
+ * realName = false: ohne echten Namen (Admin-Panel und Logs).
+ */
+function roleBadge(username, { realName = true } = {}) {
   const lower = String(username || '').toLowerCase();
   const real = realNames.get(lower);
   const role = roleOf(username);
   let out = '';
-  if (real) out += ` <span class="real-name">(${esc(real)})</span>`;
+  if (real && realName) out += ` <span class="real-name">(${esc(real)})</span>`;
   if (role) {
     const b = BADGE[role];
     out += ` <span class="role-badge role-${role}" data-text="${b.text}" title="${b.title}" aria-label="${b.title}">${b.text}</span>`;
@@ -72,11 +75,12 @@ function roleBadge(username) {
  * Benutzername als Link zum Profil samt Zusätzen (echter Name, Abzeichen) – fertiges HTML.
  * nested = true: innerhalb eines anderen Links (z. B. Wett-Karte) – dort ist ein <a> nicht erlaubt,
  * deshalb ein <span>, den app.js anklickbar macht. Gelöschte Konten haben kein Profil.
+ * realName = false: ohne echten Namen (Admin-Panel und Logs).
  */
-function userLink(username, { nested = false } = {}) {
+function userLink(username, { nested = false, realName = true } = {}) {
   const name = String(username || '');
   if (!name) return '';
-  const extra = roleBadge(name);
+  const extra = roleBadge(name, { realName });
   if (/^geloescht-/i.test(name)) return esc(name);
   const href = `/profil/${encodeURIComponent(name)}`;
   return nested

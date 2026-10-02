@@ -41,7 +41,7 @@
         <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
           <div class="code-main">
             <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
-            <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
+            <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
           </div>
           <div class="code-meta small">
             <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
@@ -110,7 +110,7 @@
     <ul class="code-list">
       <% bans.forEach((b) => { %>
         <li class="code-item">
-          <div class="code-main"><strong><%- userLink(b.username) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
+          <div class="code-main"><strong><%- userLink(b.username, { realName: false }) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
           <div class="code-meta muted small">
             <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gebannt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgebannt
           </div>
@@ -207,7 +207,7 @@
     <ul class="code-list">
       <% list.forEach((u) => { %>
         <li class="code-item code-item-single">
-          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
+          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username, { realName: false }) %></div>
           <div class="code-actions">
             <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Dev-Rolle entziehen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -246,7 +246,7 @@
     <ul class="code-list">
       <% list.forEach((u) => { %>
         <li class="code-item code-item-single">
-          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
+          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username, { realName: false }) %></div>
           <div class="code-actions">
             <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Mod-Rolle entziehen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -276,7 +276,6 @@
 </details>
 <% } %>
 
-<% if (currentUser.isAdmin) { %>
 <details class="card fold" id="handellog" <%= trades.q || trades.page > 1 ? 'open' : '' %>>
   <summary><h2>Handel-Log</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen.</p>
@@ -297,8 +296,8 @@
           <% trades.rows.forEach((t) => { %>
             <tr>
               <td class="nowrap"><%= dateSec(t.at) %></td>
-              <td><%- userLink(t.from) %></td>
-              <td><%- userLink(t.to) %></td>
+              <td><%- userLink(t.from, { realName: false }) %></td>
+              <td><%- userLink(t.to, { realName: false }) %></td>
               <td><%= t.card %></td>
               <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
               <td class="nowrap"><%= t.kind %></td>
@@ -317,6 +316,7 @@
   <% } %>
 </details>
 
+<% if (currentUser.isAdmin) { %>
 <div class="card" id="handel">
   <h2>Handel: Steuer</h2>
   <p class="muted">Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.</p>

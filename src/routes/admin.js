@@ -25,7 +25,7 @@ const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } 
 
 const router = express.Router();
 
-// ---------- Handel-Log (nur Admin): wer wem welche Karte gegeben hat und wann ----------
+// ---------- Handel-Log (Admin und Devs): wer wem welche Karte gegeben hat und wann ----------
 const TRADE_LOG_PAGE = 50;
 const KIND_LABEL = { markt: 'Markt', privat: 'Privatverkauf', tausch: 'Tausch' };
 
@@ -80,7 +80,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean(),
     isAdmin ? deviceService.listAlerts() : [], // Konten mit gemeinsamem Gerät
     isAdmin ? deviceService.listBans() : [],
-    isAdmin ? tradeLog(req.query) : null, // Handel-Log: abgeschlossene Verkäufe und Tausche
+    tradeLog(req.query), // Handel-Log (Admin und Devs): abgeschlossene Verkäufe und Tausche
   ]);
   res.render('admin', {
     title: req.user.isAdmin ? 'Admin' : 'Dev',
