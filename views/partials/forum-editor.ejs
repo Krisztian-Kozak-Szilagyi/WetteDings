@@ -1,0 +1,13 @@
+<%# Textfeld mit Knöpfen für die Auszeichnung. locals: id, name, value, rows, max, myTags (eigene Rollen-Tags), placeholder %>
+<div class="pn-toolbar" data-pn-toolbar="<%= id %>">
+  <button type="button" class="chip" data-pn-line="# ">H1</button>
+  <button type="button" class="chip" data-pn-line="## ">H2</button>
+  <button type="button" class="chip" data-pn-line="- ">Liste</button>
+  <button type="button" class="chip" data-pn-wrap="**"><strong>Fett</strong></button>
+  <button type="button" class="chip" data-pn-wrap="__"><u>Unterstrichen</u></button>
+  <% (locals.myTags || []).forEach((t) => { %>
+    <button type="button" class="chip chip-role chip-role-<%= t %>" data-pn-wrap="<<%= t %>>" data-pn-wrap-end="</<%= t %>>" title="Text als <%= t.toUpperCase() %> kennzeichnen">&lt;<%= t %>&gt;</button>
+  <% }) %>
+</div>
+<textarea id="<%= id %>" name="<%= locals.name || 'body' %>" rows="<%= locals.rows || 6 %>" maxlength="<%= max %>" required placeholder="<%= locals.placeholder || '' %>"><%= locals.value || '' %></textarea>
+<p class="muted small"><code># Überschrift</code> · <code>- Liste</code> · <code>**fett**</code> · <code>__unterstrichen__</code> · Leerzeile = neuer Absatz<% if ((locals.myTags || []).length) { %> · <% myTags.forEach((t, i) => { %><%= i ? ', ' : '' %><code>&lt;<%= t %>&gt;Text&lt;/<%= t %>&gt;</code><% }) %> hebt deinen Text als Team-Beitrag hervor<% } %></p>

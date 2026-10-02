@@ -6,7 +6,7 @@ const Bet = require('../models/Bet');
 const Comment = require('../models/Comment');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const PatchNote = require('../models/PatchNote');
+const { ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Forum');
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
@@ -38,8 +38,10 @@ async function propagateName(userId, oldName, name, session) {
     Position.updateMany({ user: userId }, { $set: { username: name } }, opt),
     LotteryEntry.updateMany({ user: userId }, { $set: { username: name } }, opt),
     LotteryRound.updateMany({ winner: userId }, { $set: { winnerName: name } }, opt),
-    PatchNote.updateMany({ authorName: oldName }, { $set: { authorName: name } }, opt),
-    PatchNote.updateMany({ 'comments.user': userId }, { $set: { 'comments.$[c].username': name } }, { ...opt, arrayFilters: [{ 'c.user': userId }] }),
+    ForumThread.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
+    ForumThread.updateMany({ lastPostBy: userId }, { $set: { lastPostByName: name } }, opt),
+    ForumPost.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
+    ForumReport.updateMany({ by: userId }, { $set: { byName: name } }, opt),
     RegistrationCode.updateMany({ createdBy: userId }, { $set: { createdByName: name } }, opt),
     RegistrationCode.updateMany({ usedBy: userId }, { $set: { usedByName: name } }, opt),
     TcgOpening.updateMany({ user: userId }, { $set: { username: name } }, opt),
@@ -48,7 +50,6 @@ async function propagateName(userId, oldName, name, session) {
     Trade.updateMany({ to: userId }, { $set: { toName: name } }, opt),
     PackGrant.updateMany({ by: userId }, { $set: { byName: name } }, opt),
     PackGrant.updateMany({ to: userId }, { $set: { toName: name } }, opt),
-    PatchNote.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
   ]);
 }
 
@@ -129,7 +130,11 @@ async function deleteAccount({ user, password }) {
       Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),
       // Kommentare: Text entfernen
       Comment.updateMany({ user: id }, { $set: { deleted: true, text: '' } }, opt),
-      PatchNote.updateMany({}, { $pull: { comments: { user: id }, upvotes: id } }, opt),
+      // Forum: Texte der eigenen Beiträge entfernen (auch das aufbewahrte Original), Upvotes und Lesestände löschen
+      ForumPost.updateMany({ author: id }, { $set: { deleted: true, deletedByRole: 'autor', body: '', original: null } }, opt),
+      ForumThread.updateMany({ upvotes: id }, { $pull: { upvotes: id } }, opt),
+      ForumRead.deleteMany({ user: id }, opt),
+      ForumReport.deleteMany({ by: id }, opt),
     ]);
     // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);

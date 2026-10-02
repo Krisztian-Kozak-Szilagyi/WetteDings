@@ -1,0 +1,98 @@
+<%- include('partials/head') %>
+<% const link = (p) => '/forum/t/' + thread._id + '?seite=' + p; %>
+
+<nav class="forum-crumbs muted small" aria-label="Pfad">
+  <a href="/forum">Forum</a> ›
+  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a> › <% } %>
+  <% if (cat) { %><a href="/forum/k/<%= cat._id %>"><%= cat.title %></a><% } %>
+</nav>
+
+<div class="page-head">
+  <h1><% if (thread.pinned) { %><span class="tag">Angepinnt</span> <% } %><% if (thread.locked) { %><span class="tag">Geschlossen</span> <% } %><%= thread.title %></h1>
+  <form method="post" action="/forum/t/<%= thread._id %>/upvote">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-sm <%= upvoted ? 'btn-primary' : 'btn-ghost' %>" type="submit" aria-pressed="<%= upvoted %>"><span class="pn-arrow" aria-hidden="true"></span> Upvote · <%= thread.upvotes.length %></button>
+  </form>
+</div>
+
+<% if (currentUser.canModerate) { %>
+  <form method="post" action="/forum/t/<%= thread._id %>/moderation" class="forum-mod">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <span class="muted small">Moderation:</span>
+    <button class="btn btn-ghost btn-sm" type="submit" name="action" value="<%= thread.pinned ? 'loesen' : 'anpinnen' %>"><%= thread.pinned ? 'Nicht mehr anpinnen' : 'Anpinnen' %></button>
+    <button class="btn btn-ghost btn-sm" type="submit" name="action" value="<%= thread.locked ? 'oeffnen' : 'schliessen' %>"><%= thread.locked ? 'Wieder öffnen' : 'Schließen' %></button>
+  </form>
+  <form method="post" action="/forum/t/<%= thread._id %>/moderation" class="forum-mod" data-confirm="Dieses Thema samt allen Beiträgen entfernen?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="action" value="entfernen">
+    <button class="btn btn-danger btn-sm" type="submit">Thema entfernen</button>
+  </form>
+<% } %>
+
+<ol class="forum-posts">
+  <% posts.forEach((p) => { %>
+    <li class="forum-post <%= p.isNew ? 'is-new' : '' %> <%= p.mine ? 'is-mine' : '' %> <%= p.deleted ? 'is-deleted' : '' %>" id="b-<%= p._id %>">
+      <div class="forum-post-head">
+        <strong><%- userLink(p.authorName) %></strong>
+        <% if (p.isFirst) { %><span class="tag">Thema</span><% } %>
+        <% if (p.isNew) { %><span class="badge badge-offen">Neu</span><% } %>
+        <time class="muted small" datetime="<%= new Date(p.createdAt).toISOString() %>" title="<%= date(p.createdAt) %>"><%= relTime(p.createdAt) %></time>
+      </div>
+      <% if (p.deleted) { %>
+        <p class="forum-post-gone muted"><em>Nachricht gelöscht<%= p.deletedByRole && p.deletedByRole !== 'autor' ? ' (von der Moderation)' : '' %>.</em></p>
+        <% if (p.originalHtml) { %>
+          <details class="forum-original">
+            <summary class="muted small">Original ansehen (nur Admin/Dev)</summary>
+            <div class="pn-body prose"><%- p.originalHtml %></div>
+          </details>
+        <% } %>
+      <% } else { %>
+        <div class="pn-body prose"><%- p.html %></div>
+        <div class="forum-post-foot muted small">
+          <% if (p.modEdited) { %><span class="forum-edited role-mod-text">von einem Mod bearbeitet</span><% } else if (p.editedAt) { %><span class="forum-edited">bearbeitet <%= relTime(p.editedAt) %></span><% } %>
+          <span class="forum-post-actions">
+            <% if (p.canEdit) { %><a href="/forum/b/<%= p._id %>/bearbeiten">Bearbeiten</a><% } %>
+            <% if (p.canDelete) { %>
+              <form method="post" action="/forum/b/<%= p._id %>/loeschen" data-confirm="Diesen Beitrag löschen? Er wird durch „Nachricht gelöscht“ ersetzt.">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="link-btn" type="submit">Löschen</button>
+              </form>
+            <% } %>
+            <% if (!p.mine) { %>
+              <form method="post" action="/forum/b/<%= p._id %>/melden" data-confirm="Diesen Beitrag der Moderation melden?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="link-btn link-btn-muted" type="submit">Melden</button>
+              </form>
+            <% } %>
+          </span>
+        </div>
+      <% } %>
+    </li>
+  <% }) %>
+</ol>
+
+<% if (pages > 1) { %>
+  <div class="log-pager">
+    <% if (page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(page - 1) %>">← Zurück</a><% } %>
+    <span class="muted small">Seite <%= page %> / <%= pages %></span>
+    <% if (page < pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(page + 1) %>">Weiter →</a><% } %>
+  </div>
+<% } %>
+
+<section class="card" id="antwort">
+  <% if (canReply) { %>
+    <h2>Antworten</h2>
+    <form method="post" action="/forum/t/<%= thread._id %>/antwort" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="field">
+        <label class="sr-only" for="antwort-text">Deine Antwort</label>
+        <%- include('partials/forum-editor', { id: 'antwort-text', rows: 5, max: bodyMax, myTags, placeholder: 'Schreib etwas dazu …' }) %>
+      </div>
+      <button class="btn btn-primary" type="submit">Antwort senden</button>
+    </form>
+  <% } else { %>
+    <p class="muted">Dieses Thema ist geschlossen – es kann nicht mehr geantwortet werden.</p>
+  <% } %>
+</section>
+
+<%- include('partials/foot') %>

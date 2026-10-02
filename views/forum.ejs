@@ -1,0 +1,56 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <h1>Forum</h1>
+  <% if (currentUser.canModerate) { %>
+    <a class="btn btn-ghost btn-sm nav-badge-link" href="/forum/meldungen">Meldungen<% if (reports) { %><span class="nav-badges"><span class="nav-badge" aria-label="<%= reports %> offene Meldungen"><%= reports > 99 ? '99+' : reports %></span></span><% } %></a>
+  <% } else { %>
+    <span class="muted">Weiß = Neues für dich, grau = schon gelesen</span>
+  <% } %>
+</div>
+
+<% roots.forEach((root) => { %>
+  <section class="card forum-section <%= root.staffOnly ? 'forum-staff' : '' %>">
+    <div class="forum-section-head">
+      <h2 class="<%= root.unread ? '' : 'is-read' %>"><a href="/forum/k/<%= root._id %>"><%= root.title %></a><% if (root.staffOnly) { %> <span class="tag">Team</span><% } %></h2>
+      <% if (root.description) { %><p class="muted small"><%= root.description %></p><% } %>
+    </div>
+    <ul class="forum-list">
+      <% [root, ...root.subs].forEach((c, i) => { const s = c.stats; if (i === 0 && !s.threads && root.subs.length) return; %>
+        <li class="forum-row <%= s.unread ? 'is-unread' : 'is-read' %>">
+          <div class="forum-row-main">
+            <a class="forum-row-title" href="/forum/k/<%= c._id %>"><%= i === 0 ? 'Themen direkt in „' + c.title + '“' : c.title %></a>
+            <% if (i > 0 && c.description) { %><span class="muted small"><%= c.description %></span><% } %>
+          </div>
+          <div class="forum-row-count muted small"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></div>
+          <div class="forum-row-last muted small">
+            <% if (s.last) { %><a href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a><br><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %><% } else { %>noch keine Themen<% } %>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+<% }) %>
+
+<% if (canManage) { %>
+  <details class="card fold" id="bereiche">
+    <summary><h2>Neuen Bereich anlegen</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+    <form method="post" action="/forum/bereiche" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
+      <label class="field"><span>Beschreibung (optional)</span><input type="text" name="description" maxlength="200"></label>
+      <label class="field">
+        <span>Gehört zu</span>
+        <select name="parent">
+          <option value="">– eigener Hauptbereich –</option>
+          <% allCats.filter((c) => !c.parent).forEach((c) => { %><option value="<%= c._id %>">Unterbereich von „<%= c.title %>“</option><% }) %>
+        </select>
+      </label>
+      <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="10"></label>
+      <label class="check"><input type="checkbox" name="staffOnly" value="1"><span>Team-Bereich: Nur Admin und Devs eröffnen hier Themen (antworten dürfen alle).</span></label>
+      <button class="btn btn-primary" type="submit">Bereich anlegen</button>
+    </form>
+  </details>
+<% } %>
+
+<%- include('partials/foot') %>

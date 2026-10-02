@@ -310,7 +310,8 @@
         ta.value = v.slice(0, start) + line + v.slice(start);
         a += line.length; b += line.length;
       } else if (wrap) {
-        ta.value = v.slice(0, a) + wrap + (v.slice(a, b) || 'Text') + wrap + v.slice(b);
+        var end = btn.getAttribute('data-pn-wrap-end') || wrap; // z. B. <dev> … </dev>
+        ta.value = v.slice(0, a) + wrap + (v.slice(a, b) || 'Text') + end + v.slice(b);
         b = (a === b ? a + 4 : b) + wrap.length; a += wrap.length;
       }
       ta.focus();

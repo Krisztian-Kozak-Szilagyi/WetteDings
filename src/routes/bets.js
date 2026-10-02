@@ -381,7 +381,7 @@ router.post('/wetten/:id/kommentare/:cid/loeschen', validId, requireLogin, (req,
       const comment = await Comment.findOne({ _id: req.params.cid, bet: req.params.id });
       if (!comment || comment.deleted) throw new UserError('Kommentar nicht gefunden.');
       const isAuthor = String(comment.user) === String(req.user._id);
-      if (!isAuthor && !req.user.isAdmin) throw new UserError('Du kannst nur deine eigenen Kommentare löschen.');
+      if (!isAuthor && !req.user.canModerate) throw new UserError('Du kannst nur deine eigenen Kommentare löschen.');
       const res1 = await Comment.updateOne(
         { _id: comment._id, deleted: false },
         { $set: { deleted: true, text: '', deletedByName: isAuthor ? null : req.user.username } }

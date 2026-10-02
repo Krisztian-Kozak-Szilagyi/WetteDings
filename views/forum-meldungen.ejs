@@ -1,0 +1,39 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <div class="ihk-title">
+    <h1>Meldungen</h1>
+    <a class="btn btn-ghost btn-sm" href="/forum">← Zurück zum Forum</a>
+  </div>
+  <span class="muted">Gemeldete Beiträge, die noch niemand geprüft hat</span>
+</div>
+
+<div class="card">
+  <% if (!reports.length) { %>
+    <p class="muted">Keine offenen Meldungen.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% reports.forEach((r) => { %>
+        <li class="code-item">
+          <div class="code-main">
+            <span>Gemeldet von <%- userLink(r.byName) %> · <%= dateSec(r.createdAt) %></span>
+          </div>
+          <div class="code-meta muted small">
+            <% if (r.postDoc) { %>
+              Beitrag von <%= r.postDoc.authorName %>: <%= r.postDoc.deleted ? '(inzwischen gelöscht)' : r.postDoc.body.slice(0, 220) + (r.postDoc.body.length > 220 ? ' …' : '') %>
+            <% } else { %>Beitrag nicht mehr vorhanden<% } %>
+          </div>
+          <div class="code-actions">
+            <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
+            <form method="post" action="/forum/meldungen/<%= r._id %>/erledigt">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>

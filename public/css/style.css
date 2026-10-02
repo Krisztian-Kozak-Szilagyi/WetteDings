@@ -1562,3 +1562,77 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .user-link { color: inherit; text-decoration: none; cursor: var(--cur-pointer); }
 .user-link:hover, .user-link:focus-visible { text-decoration: underline; color: var(--primary); }
 [data-zoom-card] { cursor: var(--cur-zoom-in); }
+
+/* ========== Forum ========== */
+.role-mod { --role: #ff9f1c; }
+.role-mod-text { color: #ff9f1c; }
+.forum-crumbs { margin-bottom: 8px; }
+.forum-crumbs a { color: inherit; }
+.forum-section { padding-bottom: 6px; }
+.forum-section-head { margin-bottom: 8px; }
+.forum-section-head h2 { margin: 0; }
+.forum-section-head h2 a { color: inherit; text-decoration: none; }
+.forum-section-head p { margin: 2px 0 0; }
+.forum-staff { border-color: color-mix(in srgb, #22e07a 35%, var(--border)); }
+.forum-list { list-style: none; margin: 0; padding: 0; }
+.forum-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 210px; gap: 6px 16px; align-items: center; padding: 12px 4px; border-top: 1px solid var(--border); }
+.forum-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.forum-row-title { font-weight: 700; text-decoration: none; overflow-wrap: anywhere; transition: color .2s; }
+.forum-row-last a { color: inherit; }
+/* Ungelesen: volle Helligkeit. Gelesen: Titel wird grauer – unaufdringlich, ohne Punkte oder Zähler. */
+.forum-row.is-unread .forum-row-title { color: var(--text); }
+.forum-row.is-read .forum-row-title { color: var(--muted); font-weight: 600; }
+.forum-section-head h2.is-read { color: var(--muted); }
+.forum-row-title:hover { color: var(--primary); }
+@media (max-width: 760px) {
+  .forum-row { grid-template-columns: 1fr; }
+  .forum-row-count, .forum-row-last br { display: none; }
+}
+.forum-mod { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 8px 14px 0; }
+.forum-posts { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.forum-post { padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+.forum-post.is-mine { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+.forum-post.is-new { box-shadow: inset 3px 0 0 var(--primary); }
+.forum-post.is-deleted { opacity: .75; }
+.forum-post-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.forum-post-head time { margin-left: auto; }
+.forum-post-gone { margin: 8px 0 0; }
+.forum-original { margin-top: 8px; }
+.forum-original summary { cursor: var(--cur-pointer); }
+.forum-post-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.forum-post-actions { display: inline-flex; align-items: center; gap: 14px; margin-left: auto; }
+.forum-post-actions form { margin: 0; }
+.forum-post-actions a { font-size: .85rem; }
+.link-btn-muted { color: var(--muted); }
+
+/* Team-Beitrag (<admin>, <dev>, <mod>): abgerundeter Kasten in der Rollenfarbe mit Glitch-Effekt */
+.role-say {
+  --role: #22e07a;
+  position: relative; margin: 12px 0; padding: 14px 14px 10px; border-radius: 12px;
+  border: 1px solid var(--role); background: color-mix(in srgb, var(--role) 9%, transparent);
+  box-shadow: 0 0 14px -6px var(--role); animation: role-say-glitch 4.2s steps(1) infinite;
+}
+.role-say-admin { --role: #ff3b4e; }
+.role-say-mod { --role: #ff9f1c; }
+.role-say > :last-child { margin-bottom: 0; }
+.role-say-label {
+  position: absolute; top: -9px; left: 12px; padding: 0 6px; border-radius: 4px;
+  font: 800 .62rem/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .1em;
+  color: var(--role); background: var(--surface); border: 1px solid var(--role); text-shadow: 0 0 6px color-mix(in srgb, var(--role) 70%, transparent);
+}
+.role-say-label::before, .role-say-label::after { content: attr(data-text); position: absolute; left: 0; right: 0; top: 0; padding: 0 6px; opacity: 0; pointer-events: none; }
+.role-say-label::before { color: #6ff; animation: role-glitch-a 4.2s steps(1) infinite; }
+.role-say-label::after { color: #f6f; animation: role-glitch-b 4.2s steps(1) infinite; }
+@keyframes role-say-glitch {
+  0%, 86%, 96%, 100% { transform: none; box-shadow: 0 0 14px -6px var(--role); }
+  88% { transform: translateX(1px); box-shadow: -2px 0 0 rgba(102, 255, 255, .5), 2px 0 0 rgba(255, 102, 255, .5); }
+  91% { transform: translateX(-1px); box-shadow: 2px 0 0 rgba(102, 255, 255, .5), -2px 0 0 rgba(255, 102, 255, .5); }
+  94% { transform: none; box-shadow: 0 0 20px -4px var(--role); }
+}
+.chip-role { font-family: ui-monospace, Consolas, monospace; }
+.chip-role-dev { color: #22e07a; }
+.chip-role-admin { color: #ff3b4e; }
+.chip-role-mod { color: #ff9f1c; }
+@media (prefers-reduced-motion: reduce) {
+  .role-say, .role-say-label::before, .role-say-label::after { animation: none; }
+}

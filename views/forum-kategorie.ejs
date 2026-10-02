@@ -1,0 +1,101 @@
+<%- include('partials/head') %>
+<% const link = (p) => '/forum/k/' + cat._id + '?seite=' + p; %>
+
+<nav class="forum-crumbs muted small" aria-label="Pfad">
+  <a href="/forum">Forum</a> ›
+  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a> › <% } %>
+  <span><%= cat.title %></span>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="tag">Team</span><% } %></h1>
+    <% if (cat.description) { %><span class="muted"><%= cat.description %></span><% } %>
+  </div>
+  <% if (canCreate) { %><a class="btn btn-primary btn-sm" href="#neu">+ Neues Thema</a><% } %>
+</div>
+
+<% if (subs.length) { %>
+  <section class="card forum-section">
+    <ul class="forum-list">
+      <% subs.forEach((c) => { const s = c.stats; %>
+        <li class="forum-row <%= s.unread ? 'is-unread' : 'is-read' %>">
+          <div class="forum-row-main">
+            <a class="forum-row-title" href="/forum/k/<%= c._id %>"><%= c.title %></a>
+            <% if (c.description) { %><span class="muted small"><%= c.description %></span><% } %>
+          </div>
+          <div class="forum-row-count muted small"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></div>
+          <div class="forum-row-last muted small">
+            <% if (s.last) { %><a href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a><br><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %><% } else { %>noch keine Themen<% } %>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+<% } %>
+
+<section class="card forum-section">
+  <% if (!threads.length) { %>
+    <p class="muted"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Hier gibt es noch keine Themen.' %><%= canCreate ? ' Eröffne das erste!' : '' %></p>
+  <% } else { %>
+    <ul class="forum-list">
+      <% threads.forEach((t) => { %>
+        <li class="forum-row <%= t.unread ? 'is-unread' : 'is-read' %>">
+          <div class="forum-row-main">
+            <a class="forum-row-title" href="/forum/t/<%= t._id %>"><% if (t.pinned) { %><span class="tag">Angepinnt</span> <% } %><% if (t.locked) { %><span class="tag">Geschlossen</span> <% } %><%= t.title %></a>
+            <span class="muted small">von <%- userLink(t.authorName) %> · <%= date(t.createdAt) %></span>
+          </div>
+          <div class="forum-row-count muted small"><%= t.replyCount %> <%= t.replyCount === 1 ? 'Antwort' : 'Antworten' %><% if (t.upvotes.length) { %> · <%= t.upvotes.length %> Upvotes<% } %></div>
+          <div class="forum-row-last muted small"><a href="/forum/t/<%= t._id %>?seite=letzte">Letzter Beitrag</a><br><%= t.lastPostByName %> · <%= relTime(t.lastPostAt) %></div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <% if (pages > 1) { %>
+    <div class="log-pager">
+      <% if (page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(page - 1) %>">← Zurück</a><% } %>
+      <span class="muted small">Seite <%= page %> / <%= pages %></span>
+      <% if (page < pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(page + 1) %>">Weiter →</a><% } %>
+    </div>
+  <% } %>
+</section>
+
+<% if (canCreate) { %>
+  <section class="card" id="neu">
+    <h2>Neues Thema</h2>
+    <form method="post" action="/forum/k/<%= cat._id %>/thema" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Titel</span><input type="text" name="title" minlength="3" maxlength="<%= titleMax %>" required></label>
+      <div class="field">
+        <label for="thema-text">Text</label>
+        <%- include('partials/forum-editor', { id: 'thema-text', rows: 8, max: bodyMax, myTags }) %>
+      </div>
+      <button class="btn btn-primary" type="submit">Thema eröffnen</button>
+    </form>
+  </section>
+<% } else if (cat.staffOnly) { %>
+  <p class="muted small">In diesem Bereich eröffnen nur Admin und Devs Themen – antworten kannst du trotzdem.</p>
+<% } %>
+
+<% if (canManage) { %>
+  <details class="card fold">
+    <summary><h2>Bereich bearbeiten</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+    <form method="post" action="/forum/bereiche/<%= cat._id %>" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" value="<%= cat.title %>" required></label>
+      <label class="field"><span>Beschreibung</span><input type="text" name="description" maxlength="200" value="<%= cat.description %>"></label>
+      <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="<%= cat.order %>"></label>
+      <label class="check"><input type="checkbox" name="staffOnly" value="1" <%= cat.staffOnly ? 'checked' : '' %>><span>Team-Bereich: Nur Admin und Devs eröffnen hier Themen.</span></label>
+      <button class="btn btn-primary" type="submit">Speichern</button>
+    </form>
+    <% if (!cat.key) { %>
+      <form method="post" action="/forum/bereiche/<%= cat._id %>" data-confirm="Diesen Bereich löschen? Das geht nur, wenn er leer ist.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="loeschen">
+        <button class="btn btn-danger btn-sm" type="submit">Bereich löschen</button>
+      </form>
+    <% } %>
+  </details>
+<% } %>
+
+<%- include('partials/foot') %>

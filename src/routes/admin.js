@@ -195,18 +195,22 @@ router.get('/admin/pack-log', requireStaff, async (req, res) => {
   });
 });
 
-// ---------- Devs ernennen / abberufen (nur Admin) ----------
-router.post('/admin/devs', requireAdmin, async (req, res) => {
+// ---------- Rollen vergeben / entziehen: Devs und Mods (nur Admin) ----------
+const ROLE_LABEL = { dev: 'Dev', mod: 'Mod' };
+
+router.post('/admin/rollen', requireAdmin, async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  const role = roles.ASSIGNABLE.includes(req.body.role) ? req.body.role : null;
   const on = req.body.action !== 'entfernen';
-  const user = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower').lean() : null;
-  if (!user) req.flash('error', 'Bitte ein Mitglied auswählen.');
-  else if (roles.roleOf(user.username) === 'admin') req.flash('error', 'Der Admin braucht keine Dev-Rolle.');
+  const user = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username role').lean() : null;
+  if (!user || !role) req.flash('error', 'Bitte ein Mitglied auswählen.');
+  else if (roles.roleOf(user.username) === 'admin') req.flash('error', 'Der Admin braucht keine weitere Rolle.');
+  else if (!on && user.role !== role) req.flash('error', `${user.username} ist kein ${ROLE_LABEL[role]}.`);
   else {
-    await roles.setDev(user._id, on);
-    req.flash('success', on ? `${user.username} ist jetzt Dev.` : `${user.username} ist kein Dev mehr.`);
+    await roles.setRole(user._id, on ? role : null);
+    req.flash('success', on ? `${user.username} ist jetzt ${ROLE_LABEL[role]}.` : `${user.username} ist kein ${ROLE_LABEL[role]} mehr.`);
   }
-  res.redirect('/admin#devs');
+  res.redirect(`/admin#${role === 'mod' ? 'mods' : 'devs'}`);
 });
 
 router.post('/admin/codes', requireAdmin, async (req, res) => {

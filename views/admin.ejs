@@ -87,19 +87,20 @@
 <% if (currentUser.isAdmin) { %>
 <div class="card" id="devs">
   <h2>Devs</h2>
-  <p class="muted">Devs können Patchnotes schreiben, alle Wetten entscheiden oder annullieren und Booster Packs vergeben. Sie sehen statt des Admin-Panels ein Dev-Panel und tragen ein grünes DEV-Abzeichen.</p>
-  <% const devList = users.filter((u) => u.role === 'dev'); %>
-  <% if (!devList.length) { %>
+  <p class="muted">Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), können alle Wetten entscheiden oder annullieren, Booster Packs vergeben und überall moderieren. Sie sehen statt des Admin-Panels ein Dev-Panel und tragen ein grünes DEV-Abzeichen.</p>
+  <% { const list = users.filter((u) => u.role === 'dev'); %>
+  <% if (!list.length) { %>
     <p class="muted">Aktuell gibt es keine Devs.</p>
   <% } else { %>
     <ul class="code-list">
-      <% devList.forEach((u) => { %>
+      <% list.forEach((u) => { %>
         <li class="code-item">
           <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
           <div class="code-actions">
-            <form method="post" action="/admin/devs" data-confirm="<%= u.username %> die Dev-Rolle entziehen?">
+            <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Dev-Rolle entziehen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="user" value="<%= u._id %>">
+              <input type="hidden" name="role" value="dev">
               <input type="hidden" name="action" value="entfernen">
               <button class="btn btn-danger btn-sm" type="submit">Entfernen</button>
             </form>
@@ -108,16 +109,57 @@
       <% }) %>
     </ul>
   <% } %>
-  <form method="post" action="/admin/devs" class="form admin-tcg-form" data-confirm="Dieses Mitglied zum Dev machen?">
+  <% } %>
+  <form method="post" action="/admin/rollen" class="form admin-tcg-form" data-confirm="Dieses Mitglied zum Dev machen?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="role" value="dev">
     <label class="field admin-tcg-pack">
       <span>Mitglied zum Dev machen</span>
       <select name="user" required>
         <option value="">– auswählen –</option>
-        <% users.filter((u) => u.role !== 'dev').forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+        <% users.filter((u) => u.role !== 'dev').forEach((u) => { %><option value="<%= u._id %>"><%= u.username %><%= u.role ? ' (bisher ' + u.role + ')' : '' %></option><% }) %>
       </select>
     </label>
     <button class="btn btn-primary" type="submit">Zum Dev machen</button>
+  </form>
+</div>
+
+<div class="card" id="mods">
+  <h2>Mods</h2>
+  <p class="muted">Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.</p>
+  <% { const list = users.filter((u) => u.role === 'mod'); %>
+  <% if (!list.length) { %>
+    <p class="muted">Aktuell gibt es keine Mods.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% list.forEach((u) => { %>
+        <li class="code-item">
+          <div class="code-main"><strong><%= u.username %></strong><%- roleBadge(u.username) %></div>
+          <div class="code-actions">
+            <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die Mod-Rolle entziehen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="user" value="<%= u._id %>">
+              <input type="hidden" name="role" value="mod">
+              <input type="hidden" name="action" value="entfernen">
+              <button class="btn btn-danger btn-sm" type="submit">Entfernen</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <% } %>
+  <form method="post" action="/admin/rollen" class="form admin-tcg-form" data-confirm="Dieses Mitglied zum Mod machen?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="role" value="mod">
+    <label class="field admin-tcg-pack">
+      <span>Mitglied zum Mod machen</span>
+      <select name="user" required>
+        <option value="">– auswählen –</option>
+        <% users.filter((u) => u.role !== 'mod').forEach((u) => { %><option value="<%= u._id %>"><%= u.username %><%= u.role ? ' (bisher ' + u.role + ')' : '' %></option><% }) %>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Zum Mod machen</button>
   </form>
 </div>
 <% } %>

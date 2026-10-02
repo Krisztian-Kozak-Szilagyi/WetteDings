@@ -1,6 +1,7 @@
 const { Schema, model } = require('mongoose');
 
-// Patchnotes: Admins schreiben, alle Mitglieder lesen, kommentieren und geben Upvotes
+// Alte Patchnotes. Sie leben jetzt als Themen im Forum (Bereich "Patchnotes"); dieses Modell wird nur noch
+// für die einmalige Übernahme gebraucht.
 const patchNoteSchema = new Schema(
   {
     title: { type: String, required: true },
@@ -8,6 +9,7 @@ const patchNoteSchema = new Schema(
     author: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // fehlt bei alten Einträgen
     authorName: { type: String, required: true },
     upvotes: { type: [Schema.Types.ObjectId], default: [] }, // Nutzer-IDs
+    migrated: { type: Boolean, default: false }, // ins Forum übernommen (siehe forum/forumService)
     comments: {
       type: [
         new Schema({

@@ -10,7 +10,8 @@ const viewHelpers = require('./lib/viewHelpers');
 const { settings: ihkSettings } = require('./ihk/ihkService');
 const tradeService = require('./trade/tradeService');
 const tcgService = require('./tcg/tcgService');
-const patchnotes = require('./routes/patchnotes');
+const forumRoutes = require('./routes/forum');
+const forumService = require('./forum/forumService');
 const roles = require('./services/roles');
 const { flash, loadUser, dailyBonus, csrf } = require('./middleware');
 
@@ -78,6 +79,8 @@ function createApp() {
     newPacks: 0,
     patchNew: 0,
     packLogNew: 0,
+    forumMine: 0,
+    forumOther: 0,
     roleBadge: roles.roleBadge,
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
     currentPath: '',
@@ -96,8 +99,12 @@ function createApp() {
         tradeService.incomingCount(req.user._id),
         tradeService.marketNewCount(req.user),
         tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
-        patchnotes.newCount(req.user), // Patchnotes seit dem letzten Lesen
+        forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen
       ]);
+      // Forum: Neues in eigenen Themen (rot) und Neues im übrigen Forum
+      const forumNew = await forumService.navCounts(req.user);
+      res.locals.forumMine = forumNew.mine;
+      res.locals.forumOther = forumNew.other;
       // nur für den Admin: Pack-Vergaben der Devs seit dem letzten Blick ins Log
       if (req.user.isAdmin) res.locals.packLogNew = await require('./routes/admin').packLogNewCount(req.user);
     }
@@ -105,7 +112,7 @@ function createApp() {
   });
 
   app.use(require('./routes/pages'));
-  app.use(patchnotes);
+  app.use(forumRoutes);
   app.use(require('./routes/auth'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));

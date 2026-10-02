@@ -169,7 +169,7 @@
           <% comments.forEach((c) => {
                const side = sideByUser[String(c.user)];
                const mine = currentUser && String(c.user) === String(currentUser._id);
-               const canDelete = !c.deleted && currentUser && (mine || currentUser.isAdmin); %>
+               const canDelete = !c.deleted && currentUser && (mine || currentUser.canModerate); %>
             <li class="comment <%= c.deleted ? 'is-deleted' : '' %> <%= mine ? 'is-mine' : '' %>" id="k-<%= c._id %>">
               <div class="comment-head">
                 <strong><%- userLink(c.username) %></strong>

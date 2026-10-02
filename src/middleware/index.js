@@ -24,7 +24,9 @@ async function loadUser(req, res, next) {
     if (user && !user.deletedAt) {
       user.isAdmin = config.adminUsernames.includes(user.usernameLower);
       user.isDev = user.role === 'dev';
+      user.isMod = user.role === 'mod';
       user.isStaff = user.isAdmin || user.isDev; // Admin oder Dev
+      user.canModerate = user.isStaff || user.isMod; // Forum und Kommentare moderieren
       req.user = user;
       res.locals.currentUser = user;
     } else {

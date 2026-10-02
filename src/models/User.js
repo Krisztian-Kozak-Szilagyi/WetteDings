@@ -24,8 +24,10 @@ const userSchema = new Schema(
     supportConsentAt: { type: Date, default: null },
     // Echter Name (freiwillig) – erscheint in Klammern neben dem Benutzernamen
     realName: { type: String, default: null },
-    // Rolle: 'dev' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
-    role: { type: String, enum: ['dev', null], default: null },
+    // Rolle: 'dev' oder 'mod' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
+    role: { type: String, enum: ['dev', 'mod', null], default: null },
+    // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
+    forumSeenAt: { type: Date, default: null },
     // Admin: wann das Pack-Log zuletzt angesehen wurde (für das Abzeichen am Menüpunkt)
     packLogSeenAt: { type: Date, default: null },
     // Gelöschtes Konto: nur noch eine leere Hülle mit neutralem Namen (siehe services/accountService)

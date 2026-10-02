@@ -1,0 +1,27 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <div class="page-head">
+    <h1>Beitrag bearbeiten</h1>
+    <a class="btn btn-ghost btn-sm" href="/forum/t/<%= thread._id %>#b-<%= post._id %>">← Zurück zum Thema</a>
+  </div>
+
+  <div class="card">
+    <% if (!own) { %>
+      <p class="muted">Du bearbeitest den Beitrag von <strong><%= post.authorName %></strong>. Danach kann <%= post.authorName %> ihn nicht mehr selbst ändern. Dein Name erscheint nicht am Beitrag – kennzeichne deine Änderung mit <% myTags.forEach((t, i) => { %><%= i ? ' oder ' : '' %><code>&lt;<%= t %>&gt;…&lt;/<%= t %>&gt;</code><% }) %>.</p>
+    <% } %>
+    <form method="post" action="/forum/b/<%= post._id %>/bearbeiten" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <% if (post.isFirst) { %>
+        <label class="field"><span>Titel des Themas</span><input type="text" name="title" minlength="3" maxlength="<%= titleMax %>" value="<%= thread.title %>" required></label>
+      <% } %>
+      <div class="field">
+        <label for="edit-text">Text</label>
+        <%- include('partials/forum-editor', { id: 'edit-text', rows: 12, max: bodyMax, myTags, value: post.body }) %>
+      </div>
+      <button class="btn btn-primary" type="submit">Speichern</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/foot') %>
