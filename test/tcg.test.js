@@ -116,6 +116,15 @@ test('Ein Pack hat 3 Karten', () => {
   assert.equal(catalog.drawPack().length, 3);
 });
 
+test('Packs kaufen: Anzahl 1 bis Obergrenze, nur ganze Zahlen', async () => {
+  const tcg = require('../src/tcg/tcgService');
+  const { UserError } = require('../src/lib/util');
+  const user = { _id: 'u1' };
+  for (const count of [0, -1, 1.5, NaN, tcg.MAX_PACKS_PER_PURCHASE + 1]) {
+    await assert.rejects(tcg.buyPack({ user, count }), (err) => err instanceof UserError && /Packs auf einmal/.test(err.message), String(count));
+  }
+});
+
 test('Patchnotes: Auszeichnung wird zu sicherem HTML', () => {
   const { render } = require('../src/patchnotes/render');
   const html = render('# Titel\n## Unter\nErste **fette** Zeile\nzweite __unterstrichene__\n\n- eins\n- zwei <script>x</script>');

@@ -1053,6 +1053,12 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .tcg-shop-form { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; }
 @media (max-width: 520px) { .tcg-shop-form { grid-template-columns: 110px 1fr; gap: 14px; } .tcg-shop-info h2 { font-size: 1.05rem; } }
 .tcg-shop-info .btn { margin-bottom: 6px; }
+.tcg-qty { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.tcg-qty .btn { margin: 0; min-width: 36px; }
+.tcg-qty input { width: 72px; text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+/* Browser-Pfeile ausblenden – dafür gibt es die Knöpfe − und + daneben */
+.tcg-qty input::-webkit-outer-spin-button, .tcg-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tcg-qty-label { font-weight: 600; margin-right: 4px; }
 /* Favoriten, Album, Marken */
 .tcg-grid.tcg-favs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .tcg-grid.tcg-favs a.tcg-slot { text-decoration: none; }

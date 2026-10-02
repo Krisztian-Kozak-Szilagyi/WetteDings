@@ -70,7 +70,7 @@
         <% ledger.forEach((l) => { %>
           <tr>
             <td class="nowrap"><%= date(l.createdAt) %></td>
-            <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } %></td>
+            <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } else if (l.betTitle) { %> · <span class="muted"><%= l.betTitle %></span><% } %></td>
             <td class="num <%= l.amount > 0 ? 'pos' : 'neg' %>"><%= l.amount > 0 ? '+' : '' %><%= euro(l.amount) %></td>
           </tr>
         <% }) %>

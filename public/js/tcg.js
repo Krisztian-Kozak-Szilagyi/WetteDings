@@ -42,6 +42,30 @@
     });
   });
 
+  // ---------- Anzahl Packs im Shop ----------
+  var qty = $('[data-tcg-qty]');
+  if (qty) {
+    var qtyInput = $('input[name="count"]', qty);
+    var qtySubmit = $('[data-qty-submit]');
+    var price = parseInt(qty.getAttribute('data-price'), 10) || 0;
+    var maxQty = parseInt(qty.getAttribute('data-max'), 10) || 1;
+    var money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    var setQty = function (n) {
+      n = Math.max(1, Math.min(maxQty, parseInt(n, 10) || 1));
+      qtyInput.value = n;
+      qtySubmit.textContent = (n === 1 ? 'Pack kaufen' : n + ' Packs kaufen') + ' · ' + money.format((n * price) / 100);
+    };
+    $all('[data-qty-step]', qty).forEach(function (b) {
+      b.addEventListener('click', function () { setQty((parseInt(qtyInput.value, 10) || 1) + parseInt(b.getAttribute('data-qty-step'), 10)); });
+    });
+    $('[data-qty-max]', qty).addEventListener('click', function () { setQty(maxQty); });
+    qtyInput.addEventListener('input', function () {
+      var n = parseInt(qtyInput.value, 10);
+      if (n >= 1) setQty(n); // leeres Feld beim Tippen stehen lassen
+    });
+    qtyInput.addEventListener('blur', function () { setQty(qtyInput.value); });
+  }
+
   // ---------- 3D-Neigung (Zoom-Ansicht) ----------
   function bindTilt(el) {
     if (!el) return;

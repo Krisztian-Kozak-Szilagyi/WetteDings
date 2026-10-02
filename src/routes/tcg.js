@@ -45,6 +45,7 @@ router.get('/tcg', async (req, res) => {
     stats: stats[0] || { packs: 0, spent: 0, best: null },
     rarePulls,
     packPrice: settings.getPackPrice(),
+    maxPacksPerPurchase: tcg.MAX_PACKS_PER_PURCHASE,
     packImage: catalog.PACK_IMAGE,
     packs,
     packType: catalog.DEFAULT_PACK,
@@ -67,8 +68,13 @@ router.get('/tcg/album', async (req, res) => {
 
 router.post('/tcg/kaufen', async (req, res) => {
   try {
-    const r = await tcg.buyPack({ user: req.user, type: str(req.body.type) });
-    req.flash('success', `${r.type.label} für ${euro(r.cost)} gekauft – es liegt bei deinen Packs.`);
+    // Ohne Mengenangabe (altes Formular) ein Pack; ungültige Eingaben lehnt buyPack ab
+    const raw = str(req.body.count).trim();
+    const count = raw === '' ? 1 : /^\d+$/.test(raw) ? Number(raw) : NaN;
+    const r = await tcg.buyPack({ user: req.user, type: str(req.body.type), count });
+    req.flash('success', r.count === 1
+      ? `${r.type.label} für ${euro(r.cost)} gekauft – es liegt bei deinen Packs.`
+      : `${r.count}× ${r.type.label} für ${euro(r.cost)} gekauft – sie liegen bei deinen Packs.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
