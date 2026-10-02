@@ -117,14 +117,23 @@ router.get('/forum/k/:id', async (req, res) => {
     canCreate: forum.can.createThread(req.user, cat),
     canManage: forum.can.manageCategory(req.user, cat, parent),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
-    myTags: tagsFor(forum.roleOfUser(req.user)),
-    titleMax: forum.TITLE_MAX,
-    bodyMax: forum.BODY_MAX,
   });
 });
 
+// Neues Thema: eigene Seite (erreichbar über den Knopf oben rechts im Bereich)
+router.get('/forum/k/:id/neu', async (req, res) => {
+  const cat = valid(req.params.id) ? await ForumCategory.findById(req.params.id).lean() : null;
+  if (!cat) return notFound(res, 'Diesen Bereich gibt es nicht.');
+  if (!forum.can.createThread(req.user, cat)) {
+    req.flash('error', 'In diesem Bereich eröffnen nur Admin und Devs Themen.');
+    return res.redirect(`/forum/k/${cat._id}`);
+  }
+  const parent = cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
+  res.render('forum-neu', { title: 'Neues Thema', cat, parent, myTags: tagsFor(forum.roleOfUser(req.user)), titleMax: forum.TITLE_MAX, bodyMax: forum.BODY_MAX });
+});
+
 router.post('/forum/k/:id/thema', (req, res) =>
-  act(req, res, `/forum/k/${req.params.id}#neu`, async () => {
+  act(req, res, `/forum/k/${req.params.id}/neu`, async () => {
     const thread = await forum.createThread({ user: req.user, categoryId: req.params.id, title: str(req.body.title), body: req.body.body });
     return `/forum/t/${thread._id}`;
   })

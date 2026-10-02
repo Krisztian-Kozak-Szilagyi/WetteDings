@@ -1639,3 +1639,9 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 
 /* Bereich bearbeiten: Abstand zwischen "Speichern" und "Bereich löschen" */
 .forum-cat-delete { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* Forum: gleichmäßige Abstände in den Listen-Karten */
+.forum-section { padding-top: 10px; padding-bottom: 10px; }
+.forum-section-head { padding-top: 8px; }
+.forum-list:first-child > .forum-row:first-child { border-top: 0; } /* keine Linie über der ersten Zeile */
+.forum-empty { margin: 0; padding: 12px 4px; }

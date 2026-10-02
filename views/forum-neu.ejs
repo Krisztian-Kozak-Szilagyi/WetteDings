@@ -1,0 +1,26 @@
+<%- include('partials/head') %>
+
+<nav class="forum-crumbs muted small" aria-label="Pfad">
+  <a href="/forum">Forum</a> ›
+  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a> › <% } %>
+  <a href="/forum/k/<%= cat._id %>"><%= cat.title %></a>
+</nav>
+
+<div class="page-head">
+  <h1>Neues Thema</h1>
+  <a class="btn btn-ghost btn-sm" href="/forum/k/<%= cat._id %>">← Zurück zu „<%= cat.title %>“</a>
+</div>
+
+<section class="card">
+  <form method="post" action="/forum/k/<%= cat._id %>/thema" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field"><span>Titel</span><input type="text" name="title" minlength="3" maxlength="<%= titleMax %>" required autofocus></label>
+    <div class="field">
+      <label for="thema-text">Text</label>
+      <%- include('partials/forum-editor', { id: 'thema-text', rows: 10, max: bodyMax, myTags }) %>
+    </div>
+    <button class="btn btn-primary" type="submit">Thema eröffnen</button>
+  </form>
+</section>
+
+<%- include('partials/foot') %>

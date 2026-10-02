@@ -12,7 +12,7 @@
     <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="tag">Team</span><% } %></h1>
     <% if (cat.description) { %><span class="muted"><%= cat.description %></span><% } %>
   </div>
-  <% if (canCreate) { %><a class="btn btn-primary btn-sm" href="#neu">+ Neues Thema</a><% } %>
+  <% if (canCreate) { %><a class="btn btn-primary btn-sm" href="/forum/k/<%= cat._id %>/neu">+ Neues Thema</a><% } %>
 </div>
 
 <% if (subs.length) { %>
@@ -36,7 +36,7 @@
 
 <section class="card forum-section">
   <% if (!threads.length) { %>
-    <p class="muted"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Hier gibt es noch keine Themen.' %><%= canCreate ? ' Eröffne das erste!' : '' %></p>
+    <p class="muted forum-empty"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Hier gibt es noch keine Themen.' %><%= canCreate ? ' Eröffne das erste über „+ Neues Thema“.' : '' %></p>
   <% } else { %>
     <ul class="forum-list">
       <% threads.forEach((t) => { %>
@@ -60,20 +60,7 @@
   <% } %>
 </section>
 
-<% if (canCreate) { %>
-  <section class="card" id="neu">
-    <h2>Neues Thema</h2>
-    <form method="post" action="/forum/k/<%= cat._id %>/thema" class="form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label class="field"><span>Titel</span><input type="text" name="title" minlength="3" maxlength="<%= titleMax %>" required></label>
-      <div class="field">
-        <label for="thema-text">Text</label>
-        <%- include('partials/forum-editor', { id: 'thema-text', rows: 8, max: bodyMax, myTags }) %>
-      </div>
-      <button class="btn btn-primary" type="submit">Thema eröffnen</button>
-    </form>
-  </section>
-<% } else if (cat.staffOnly) { %>
+<% if (!canCreate && cat.staffOnly) { %>
   <p class="muted small">In diesem Bereich eröffnen nur Admin und Devs Themen – antworten kannst du trotzdem.</p>
 <% } %>
 
