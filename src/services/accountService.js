@@ -17,6 +17,7 @@ const { IhkRun, IhkState } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const { inTransaction } = require('./betService');
 const { UserError } = require('../lib/util');
+const deviceService = require('../device/deviceService');
 
 const { NAME_PATTERN, NAME_HINT, assertUsernameAllowed } = require('./usernameRules');
 
@@ -149,6 +150,7 @@ async function deleteAccount({ user, password }) {
   });
   await roles.load();
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
+  await deviceService.forgetUser(id); // Geräte und Mehrfach-Konten-Hinweise
   await mongoose.connection.collection('sessions').deleteMany({ session: { $regex: `"userId":"${String(id)}"` } });
 }
 

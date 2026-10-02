@@ -2,7 +2,11 @@ const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
 const { maybeGrantDailyBonus } = require('../services/bonusService');
-const { euro } = require('../lib/viewHelpers');
+const { euro, date } = require('../lib/viewHelpers');
+const deviceLogic = require('../device/deviceLogic');
+const deviceService = require('../device/deviceService');
+
+const DEVICE_COOKIE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
 /** Einmalige Hinweise über eine Weiterleitung hinweg */
 function flash(req, res, next) {
@@ -32,6 +36,47 @@ async function loadUser(req, res, next) {
     } else {
       delete req.session.userId;
     }
+  }
+  next();
+}
+
+/**
+ * Geräte-Erkennung und Sperren: liest bzw. setzt das Geräte-Cookie, wirft gesperrte Konten und Geräte hinaus
+ * und hält pro Sitzung einmal fest, mit welchem Gerät das Konto benutzt wird.
+ */
+async function device(req, res, next) {
+  const wanted = !!req.user || req.path === '/anmelden' || req.path === '/registrieren';
+  req.deviceId = deviceLogic.readToken(config.sessionSecret, deviceLogic.cookieValue(req.headers.cookie, deviceLogic.COOKIE));
+  req.setDeviceCookie = (token) => {
+    res.cookie(deviceLogic.COOKIE, token, { maxAge: DEVICE_COOKIE_MS, sameSite: 'lax', secure: config.secureCookies, path: '/' });
+    req.deviceId = deviceLogic.readToken(config.sessionSecret, token);
+  };
+  if (!req.deviceId && wanted) req.setDeviceCookie(deviceLogic.newToken(config.sessionSecret));
+  req.ipHash = deviceLogic.ipHash(config.sessionSecret, req.ip);
+  // Der Browser meldet seinen Fingerabdruck einmal pro Sitzung (public/js/device.js)
+  res.locals.deviceProbe = wanted && !req.session.fp;
+  try {
+    await deviceService.ensureFresh();
+    /** Sperre für dieses Gerät – für Anmeldung und Registrierung */
+    req.deviceBan = () => deviceService.blockedDevice({ deviceId: req.deviceId, fp: req.session.fp, ip: req.ipHash });
+    if (req.user && !req.user.isAdmin) {
+      const ban = deviceService.userBan(req.user) || req.deviceBan();
+      if (ban) {
+        delete req.session.userId;
+        req.user = null;
+        res.locals.currentUser = null;
+        req.flash('error', deviceService.banMessage(ban, date));
+        return res.redirect('/anmelden');
+      }
+    }
+    if (req.user && req.deviceId && req.session.deviceSeen !== req.deviceId) {
+      req.session.deviceSeen = req.deviceId;
+      await deviceService.record({ userId: req.user._id, deviceId: req.deviceId, fp: req.session.fp, ip: req.ipHash, ua: req.headers['user-agent'] });
+    }
+  } catch (err) {
+    // Die Geräte-Erkennung darf die Seite nicht blockieren
+    console.error('Geräte-Erkennung fehlgeschlagen:', err);
+    if (!req.deviceBan) req.deviceBan = () => null;
   }
   next();
 }
@@ -96,4 +141,4 @@ function requireStaff(req, res, next) {
   next();
 }
 
-module.exports = { flash, loadUser, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };
+module.exports = { flash, loadUser, device, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };

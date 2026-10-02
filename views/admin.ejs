@@ -24,6 +24,106 @@
 </div>
 
 <% if (currentUser.isAdmin) { %>
+<%
+  const openAlerts = deviceMatches.filter((a) => !a.doneAt);
+  const doneAlerts = deviceMatches.filter((a) => a.doneAt);
+  const urgent = openAlerts.filter((a) => a.level >= 2).length;
+%>
+<div class="card" id="geraete">
+  <h2>Mehrfach-Konten <%= urgent ? '(' + urgent + ')' : '' %></h2>
+  <p class="muted">Konten, die vom selben Gerät aus benutzt wurden. <strong>Sicher</strong> = derselbe Browser (Geräte-Kennung). <strong>Wahrscheinlich</strong> = gleiche Geräte-Merkmale und gleiche IP-Adresse (z. B. anderer Browser oder privates Fenster). <strong>Möglich</strong> = nur gleiche Geräte-Merkmale – das kommt auch bei baugleichen Geräten vor (Schulrechner, gleiches Handymodell) und zählt nicht fürs Abzeichen.</p>
+  <% if (!openAlerts.length) { %>
+    <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
+  <% } %>
+  <% const alertList = (list) => { %>
+    <ul class="code-list">
+      <% list.forEach((a) => { %>
+        <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
+          <div class="code-main">
+            <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
+            <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gesperrt</span><% } %><% }) %>
+          </div>
+          <div class="code-meta small">
+            <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
+            <% a.shared.forEach((s) => { %>
+              <div class="device-shared">
+                <div class="muted"><%= s.label %> · <%= s.ua || 'Gerät' %></div>
+                <% a.users.forEach((u, i) => { %>
+                  <div><strong><%= u.username %>:</strong> <%= s.logins[i].times.length ? 'Anmeldungen ' + s.logins[i].times.map((t) => date(t)).join(' · ') : 'zuletzt gesehen ' + date(s.logins[i].lastAt) %></div>
+                <% }) %>
+              </div>
+            <% }) %>
+            <div class="muted">Konten erstellt: <%= a.users.map((u) => u.username + ' ' + date(u.createdAt)).join(' · ') %></div>
+          </div>
+          <div class="code-actions">
+            <% a.users.filter((u) => !u.banned).forEach((u) => { %>
+              <a class="btn btn-danger btn-sm" href="/admin?sperren=<%= u._id %>#sperren"><%= u.username %> sperren</a>
+            <% }) %>
+            <form method="post" action="/admin/geraete/<%= a._id %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
+              <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <% if (openAlerts.length) alertList(openAlerts); %>
+  <% if (doneAlerts.length) { %>
+    <details class="history device-done">
+      <summary>Erledigte Hinweise (<%= doneAlerts.length %>)</summary>
+      <% alertList(doneAlerts); %>
+    </details>
+  <% } %>
+</div>
+
+<details class="card fold" id="sperren">
+  <summary><h2>Sperren <%= bans.length ? '(' + bans.length + ')' : '' %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Ein gesperrtes Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden. Die Sperre gilt auch für <strong>alle Geräte</strong>, mit denen das Konto benutzt wurde: von dort aus ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.</p>
+  <% if (!bans.length) { %>
+    <p class="muted">Aktuell ist niemand gesperrt.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% bans.forEach((b) => { %>
+        <li class="code-item">
+          <div class="code-main"><strong><%- userLink(b.username) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
+          <div class="code-meta muted small">
+            <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gesperrt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgesperrt
+          </div>
+          <div class="code-actions">
+            <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="Sperre von <%= b.username %> aufheben?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost btn-sm" type="submit">Aufheben</button>
+            </form>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <form method="post" action="/admin/sperren" class="form admin-tcg-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich sperren?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Mitglied</span>
+      <select name="user" required>
+        <option value="">– auswählen –</option>
+        <% bannable.forEach((u) => { %><option value="<%= u._id %>" <%= String(u._id) === banPreselect ? 'selected' : '' %>><%= u.username %></option><% }) %>
+      </select>
+    </label>
+    <label class="field admin-tcg-pack">
+      <span>Dauer</span>
+      <select name="duration" required>
+        <% banDurations.forEach((d) => { %><option value="<%= d.key %>" <%= d.key === '7' ? 'selected' : '' %>><%= d.label %></option><% }) %>
+      </select>
+    </label>
+    <label class="field">
+      <span>Grund <em>(freiwillig – das Mitglied sieht ihn beim Anmelden)</em></span>
+      <input type="text" name="reason" maxlength="200">
+    </label>
+    <button class="btn btn-danger" type="submit">Sperren</button>
+  </form>
+</details>
+
 <details class="card fold" id="tcg">
   <summary><h2>TCG: Chancen &amp; Preise</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.</p>

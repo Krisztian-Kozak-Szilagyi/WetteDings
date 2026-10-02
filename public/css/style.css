@@ -460,6 +460,18 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .code-item-single { padding: 8px 14px; }
 .code-item-single .code-actions { grid-row: 1; }
 .code-list + .form { margin-top: 18px; }
+
+/* Admin: Mehrfach-Konten (gleiches Gerät) */
+.device-alert { align-items: start; }
+.device-alert .code-meta { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.device-alert .code-actions { flex-wrap: wrap; justify-content: flex-end; }
+.device-shared { padding-left: 10px; border-left: 2px solid var(--border); }
+.device-level-3 { background: var(--nein-soft); color: var(--nein); }
+.device-level-2 { background: rgba(245, 158, 11, .16); color: #f59e0b; }
+.device-level-1 { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+.device-done { margin-top: 14px; }
+.device-done > .code-list { margin-top: 12px; }
+.nav-badge.nav-badge-device { background: #f59e0b; }
 .code-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 560px) {
   .code-item { grid-template-columns: 1fr; }

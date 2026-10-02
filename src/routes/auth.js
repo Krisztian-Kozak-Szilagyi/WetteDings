@@ -6,6 +6,10 @@ const { registerUser } = require('../services/betService');
 const { str, safeRedirect, UserError } = require('../lib/util');
 const { normalizeCode } = require('../services/codeService');
 const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../services/usernameRules');
+const config = require('../config');
+const deviceLogic = require('../device/deviceLogic');
+const deviceService = require('../device/deviceService');
+const { date } = require('../lib/viewHelpers');
 
 const router = express.Router();
 
@@ -62,6 +66,9 @@ router.post('/registrieren', authLimiter, async (req, res) => {
   if (password.length < 8 || password.length > 200) errors.push('Das Passwort muss mindestens 8 Zeichen lang sein.');
   if (password !== password2) errors.push('Die Passwörter stimmen nicht überein.');
   if (req.body.agree !== 'on') errors.push('Bitte bestätige, dass du die Regeln gelesen hast.');
+  // Von einem gesperrten Gerät aus lässt sich kein neues Konto anlegen
+  const deviceBan = req.deviceBan();
+  if (deviceBan) errors.push(deviceService.banMessage(deviceBan, date));
 
   if (!errors.length) {
     try {
@@ -109,9 +116,35 @@ router.post('/anmelden', authLimiter, async (req, res) => {
     });
   }
 
+  // Gesperrtes Konto oder gesperrtes Gerät (der Admin kommt immer hinein)
+  const ban = config.adminUsernames.includes(user.usernameLower) ? null : deviceService.userBan(user) || req.deviceBan();
+  if (ban) {
+    return res.status(403).render('login', { title: 'Anmelden', error: deviceService.banMessage(ban, date), values: { login: str(req.body.login) }, weiter });
+  }
+
   await startSession(req, user._id);
   req.flash('success', `Schön, dass du da bist, ${user.username}!`);
   res.redirect(weiter);
+});
+
+// Der Browser meldet einmal pro Sitzung seinen Fingerabdruck (public/js/device.js). "alt" ist die Geräte-Kennung
+// aus dem lokalen Speicher: fehlt das Cookie (gelöscht), bekommt das Gerät damit seine alte Kennung zurück.
+router.post('/geraet', async (req, res) => {
+  const fp = deviceLogic.cleanFp(req.body.fp);
+  if (fp) req.session.fp = fp;
+  const alt = str(req.body.alt);
+  const altId = deviceLogic.readToken(config.sessionSecret, alt);
+  const restored = !!altId && altId !== req.deviceId;
+  if (restored) req.setDeviceCookie(alt);
+  if (req.user && req.deviceId) {
+    req.session.deviceSeen = req.deviceId;
+    try {
+      await deviceService.record({ userId: req.user._id, deviceId: req.deviceId, fp: req.session.fp, ip: req.ipHash, ua: req.headers['user-agent'], login: restored });
+    } catch (err) {
+      console.error('Geräte-Erkennung fehlgeschlagen:', err);
+    }
+  }
+  res.status(204).end();
 });
 
 router.post('/abmelden', (req, res, next) => {

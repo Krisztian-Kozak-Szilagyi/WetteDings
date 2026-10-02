@@ -34,6 +34,12 @@ const userSchema = new Schema(
     forumSeenAt: { type: Date, default: null },
     // Admin: wann das Pack-Log zuletzt angesehen wurde (für das Abzeichen am Menüpunkt)
     packLogSeenAt: { type: Date, default: null },
+    // Sperre durch den Admin: gesperrt, solange bannedUntil in der Zukunft liegt (dauerhaft = Jahr 9999).
+    // Gilt auch für alle Geräte des Kontos (siehe src/device/deviceService.js).
+    bannedUntil: { type: Date, default: null },
+    banReason: { type: String, default: '' },
+    bannedAt: { type: Date, default: null },
+    bannedByName: { type: String, default: null },
     // Gelöschtes Konto: nur noch eine leere Hülle mit neutralem Namen (siehe services/accountService)
     deletedAt: { type: Date, default: null },
   },

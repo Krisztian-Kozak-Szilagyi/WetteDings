@@ -9,6 +9,7 @@
   <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
+  <% if (deviceProbe) { %><script src="/js/device.js?v=<%= assetVersion %>" defer data-csrf="<%= csrfToken %>"></script><% } %>
 </head>
 <body>
   <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
@@ -36,7 +37,7 @@
           <a href="/forum" class="nav-badge-link <%= currentPath.startsWith('/forum') ? 'active' : '' %>">Forum<% if (forumMine || forumOther) { %><span class="nav-badges"><% if (forumOther) { %><span class="nav-badge nav-badge-market" title="Neues im Forum" aria-label="<%= forumOther %> Themen mit neuen Beiträgen"><%= forumOther > 99 ? '99+' : forumOther %></span><% } %><% if (forumMine) { %><span class="nav-badge" title="Neues in deinen Themen" aria-label="<%= forumMine %> deiner Themen mit neuen Beiträgen"><%= forumMine > 99 ? '99+' : forumMine %></span><% } %></span><% } %></a>
         <% } %>
         <% if (currentUser && currentUser.isStaff) { %>
-          <a href="/admin" class="nav-badge-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>"><%= currentUser.isAdmin ? 'Admin' : 'Dev' %><% if (packLogNew || betDisputes) { %><span class="nav-badges"><% if (betDisputes) { %><span class="nav-badge nav-badge-dispute" title="Strittige Wetten, die ein Dev entscheiden muss" aria-label="<%= betDisputes %> strittige Wetten"><%= betDisputes > 99 ? '99+' : betDisputes %></span><% } %><% if (packLogNew) { %><span class="nav-badge" title="Neue Pack-Vergaben" aria-label="<%= packLogNew %> neue Pack-Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span><% } %></span><% } %></a>
+          <a href="/admin" class="nav-badge-link <%= currentPath.startsWith('/admin') ? 'active' : '' %>"><%= currentUser.isAdmin ? 'Admin' : 'Dev' %><% if (packLogNew || betDisputes || deviceAlerts) { %><span class="nav-badges"><% if (betDisputes) { %><span class="nav-badge nav-badge-dispute" title="Strittige Wetten, die ein Dev entscheiden muss" aria-label="<%= betDisputes %> strittige Wetten"><%= betDisputes > 99 ? '99+' : betDisputes %></span><% } %><% if (deviceAlerts) { %><span class="nav-badge nav-badge-device" title="Konten, die dasselbe Gerät benutzen" aria-label="<%= deviceAlerts %> Hinweise auf Mehrfach-Konten"><%= deviceAlerts > 99 ? '99+' : deviceAlerts %></span><% } %><% if (packLogNew) { %><span class="nav-badge" title="Neue Pack-Vergaben" aria-label="<%= packLogNew %> neue Pack-Vergaben"><%= packLogNew > 99 ? '99+' : packLogNew %></span><% } %></span><% } %></a>
         <% } %>
         <div class="nav-user">
           <% if (currentUser) { %>

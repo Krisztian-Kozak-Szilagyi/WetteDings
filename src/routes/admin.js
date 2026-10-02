@@ -16,18 +16,24 @@ const ihk = require('../ihk/ihkService');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
-const { euro } = require('../lib/viewHelpers');
+const { euro, date } = require('../lib/viewHelpers');
+const config = require('../config');
+const deviceService = require('../device/deviceService');
+const { BAN_DURATIONS, isForever } = require('../device/deviceLogic');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
 
 router.get('/admin', requireStaff, async (req, res) => {
-  const [codes, userCount, openBets, totalBets, users] = await Promise.all([
+  const isAdmin = req.user.isAdmin;
+  const [codes, userCount, openBets, totalBets, users, deviceMatches, bans] = await Promise.all([
     listActiveCodes(),
     User.countDocuments(),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(),
-    User.find({ deletedAt: null }).select('username role').sort({ usernameLower: 1 }).lean(),
+    User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean(),
+    isAdmin ? deviceService.listAlerts() : [], // Konten mit gemeinsamem Gerät
+    isAdmin ? deviceService.listBans() : [],
   ]);
   res.render('admin', {
     title: req.user.isAdmin ? 'Admin' : 'Dev',
@@ -50,6 +56,12 @@ router.get('/admin', requireStaff, async (req, res) => {
     },
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
     tradeTax: tradeService.settings.taxPercent,
+    deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
+    bans,
+    banDurations: BAN_DURATIONS,
+    // Mitglieder, die gesperrt werden können (der Admin selbst nicht)
+    bannable: users.filter((u) => !config.adminUsernames.includes(u.usernameLower)),
+    banPreselect: typeof req.query.sperren === 'string' ? req.query.sperren : '',
   });
 });
 
@@ -99,6 +111,32 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res
     req.flash('error', err.message);
   }
   res.redirect('/admin/streitfaelle');
+});
+
+// ---------- Mehrfach-Konten: Hinweise abhaken ----------
+router.post('/admin/geraete/:id', requireAdmin, async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
+  res.redirect('/admin#geraete');
+});
+
+// ---------- Sperren: Konto samt allen bekannten Geräten ----------
+router.post('/admin/sperren', requireAdmin, async (req, res) => {
+  const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  try {
+    if (!mongoose.isValidObjectId(userId)) throw new UserError('Bitte ein Mitglied auswählen.');
+    const r = await deviceService.ban({ userId, duration: str(req.body.duration), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
+    req.flash('success', `${r.username} ist gesperrt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/admin#sperren');
+});
+
+router.post('/admin/sperren/:id/aufheben', requireAdmin, async (req, res) => {
+  const user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id) : null;
+  req.flash(user ? 'success' : 'error', user ? `Die Sperre von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
+  res.redirect('/admin#sperren');
 });
 
 // ---------- Handel: Steuer ----------
