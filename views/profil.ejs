@@ -23,11 +23,11 @@
             </label>
             <button class="btn btn-danger" type="submit">Ban</button>
           </form>
-          <% if (ban) { %>
-            <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= ban.active ? profile.username + ' wirklich entbannen?' : 'Vermerk entfernen?' %> Der Vermerk im Profil verschwindet dann.">
+          <% if (ban && ban.active) { %>
+            <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= profile.username %> wirklich entbannen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="zurueck" value="<%= back %>">
-              <button class="btn btn-ghost btn-block" type="submit"><%= ban.active ? 'Unban' : 'Vermerk entfernen' %></button>
+              <button class="btn btn-ghost btn-block" type="submit">Unban</button>
             </form>
           <% } %>
         </div>
@@ -37,7 +37,7 @@
   <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
 </div>
 <% if (ban) { %>
-  <p class="ban-note"><%= ban.active ? (ban.forever ? 'Dauerhaft gebannt' : 'Gebannt bis ' + date(ban.until)) : 'War gebannt bis ' + date(ban.until) %> · von <%= ban.by || '–' %> am <%= date(ban.at) %><%= ban.reason ? ' · Grund: ' + ban.reason : '' %></p>
+  <p class="ban-note">Dieser Spieler war bereits gebannt, gebannt von: <%= ban.by || '–' %>, Grund: <%= ban.reason || '–' %></p>
 <% } %>
 
 <div class="stats stats-4">

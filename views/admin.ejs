@@ -115,7 +115,7 @@
             <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gebannt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgebannt
           </div>
           <div class="code-actions">
-            <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen? Der Vermerk im Profil verschwindet dann auch.">
+            <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button class="btn btn-ghost btn-sm" type="submit">Unban</button>
             </form>

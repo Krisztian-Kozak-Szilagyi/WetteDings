@@ -174,8 +174,9 @@ async function ban({ userId, hours, reason, admin, adminUsernames = [] }) {
   return { username: user.username, until };
 }
 
+/** Ban aufheben. Wer wann und warum gebannt hat, bleibt stehen – das Profil zeigt den Vermerk weiterhin. */
 async function unban(userId) {
-  const user = await User.findOneAndUpdate({ _id: userId }, { $set: { bannedUntil: null, banReason: '', bannedAt: null, bannedByName: null } }).select('username').lean();
+  const user = await User.findOneAndUpdate({ _id: userId }, { $set: { bannedUntil: null } }).select('username').lean();
   await reload();
   return user;
 }

@@ -35,7 +35,8 @@ const userSchema = new Schema(
     // Admin: wann das Pack-Log zuletzt angesehen wurde (für das Abzeichen am Menüpunkt)
     packLogSeenAt: { type: Date, default: null },
     // Sperre durch den Admin: gesperrt, solange bannedUntil in der Zukunft liegt (dauerhaft = Jahr 9999).
-    // Gilt auch für alle Geräte des Kontos (siehe src/device/deviceService.js).
+    // Gilt auch für alle Geräte des Kontos (siehe src/device/deviceService.js). Grund, Zeitpunkt und Name des Admins
+    // bleiben nach Ablauf oder Aufhebung stehen (Vermerk im Profil).
     bannedUntil: { type: Date, default: null },
     banReason: { type: String, default: '' },
     bannedAt: { type: Date, default: null },
