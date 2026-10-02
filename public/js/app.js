@@ -28,7 +28,9 @@
     if (form.hasAttribute('data-confirm-resolve')) {
       var r = form.querySelector('input[name="outcome"]:checked');
       var label = r ? r.dataset.label : '?';
-      if (!window.confirm('Ergebnis „' + label + '“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.')) e.preventDefault();
+      // Der Text steht am Formular, weil er je nach Rolle anders lautet (Stimme abgeben vs. entscheiden)
+      var tpl = form.getAttribute('data-confirm-resolve') || 'Ergebnis „%s“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.';
+      if (!window.confirm(tpl.replace('%s', label))) e.preventDefault();
     }
   });
 

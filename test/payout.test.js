@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { computePayouts, quote } = require('../src/lib/payout');
+const { computePayouts, quote, splitFee } = require('../src/lib/payout');
 const { parseEuro } = require('../src/lib/util');
 
 const sum = (m) => [...m.values()].reduce((a, b) => a + b, 0);
@@ -103,6 +103,37 @@ test('Zufallstest: Auszahlungen + Provision = Topf', () => {
     assert.equal(sum(payouts) + fee, pot);
     for (const v of payouts.values()) assert.ok(Number.isInteger(v) && v >= 0);
   }
+});
+
+test('Provision teilen: Wettersteller und Schiedsrichter je die Hälfte', () => {
+  assert.deepEqual(splitFee(2400, true), { creator: 1200, referee: 1200 });
+  // ungerader Cent an den Wettersteller
+  assert.deepEqual(splitFee(1201, true), { creator: 601, referee: 600 });
+  assert.deepEqual(splitFee(1, true), { creator: 1, referee: 0 });
+  // Wetten ohne Schiedsrichter (Altbestand): alles an den Wettersteller
+  assert.deepEqual(splitFee(2400, false), { creator: 2400, referee: 0 });
+  // keine Provision
+  assert.deepEqual(splitFee(0, true), { creator: 0, referee: 0 });
+  // die Summe bleibt immer die Gesamtprovision
+  for (const fee of [0, 1, 2, 3, 99, 100, 777, 123457]) {
+    const s = splitFee(fee, true);
+    assert.equal(s.creator + s.referee, fee, `Summe bei ${fee}`);
+  }
+});
+
+test('Beispiel aus den Regeln mit 8 % Provision', () => {
+  const positions = [
+    { id: 'anna', side: 'o1', amount: 10000 },
+    { id: 'ben', side: 'o1', amount: 5000 },
+    { id: 'clara', side: 'o2', amount: 6000 },
+    { id: 'david', side: 'o3', amount: 9000 },
+  ];
+  const { payouts, fee } = computePayouts(positions, 'o1', 8);
+  assert.equal(fee, 2400); // 8 % von 300 €
+  assert.deepEqual(splitFee(fee, true), { creator: 1200, referee: 1200 });
+  assert.equal(payouts.get('anna'), 18400);
+  assert.equal(payouts.get('ben'), 9200);
+  assert.equal(sum(payouts) + fee, 30000);
 });
 
 test('Quote', () => {

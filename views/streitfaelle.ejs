@@ -1,0 +1,87 @@
+<%- include('partials/head') %>
+
+<div class="page-head">
+  <h1>Streitfälle</h1>
+  <a class="btn btn-ghost" href="/admin">← <%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</a>
+</div>
+
+<p class="muted">
+  Hier stehen alle Wetten, bei denen <strong>Wettersteller und Schiedsrichter unterschiedliche Ergebnisse</strong> eingetragen haben.
+  Solange das so ist, wird nichts ausgezahlt. Deine Stimme als Dev entscheidet – die Wette wird damit sofort geschlossen und abgerechnet.
+  Ohne Entscheidung werden die Einsätze <%= autoVoidDays %> Tage nach dem Auswertungstermin automatisch erstattet.
+</p>
+
+<% if (!bets.length) { %>
+  <div class="empty">
+    <p><strong>Keine Streitfälle.</strong></p>
+    <p class="muted">Aktuell sind sich bei allen offenen Wetten beide Seiten einig – oder es wurde noch nicht abgestimmt.</p>
+  </div>
+<% } else { %>
+  <% bets.forEach((bet) => { %>
+    <div class="card dispute-card">
+      <div class="bet-card-top">
+        <span class="badge badge-streitig">Strittig</span>
+        <span class="muted small">Topf <strong><%= euro(pool(bet)) %></strong> · <%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %></span>
+      </div>
+      <h2 class="dispute-title"><a href="/wetten/<%= bet._id %>"><%= bet.title %></a></h2>
+      <p class="muted small">
+        Wettersteller <strong><%- userLink(bet.creatorName) %></strong> · Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong>
+        · Auswertung <%= date(bet.resultAt) %>
+      </p>
+      <% if (bet.description) { %><p class="bet-desc"><%= bet.description %></p><% } %>
+
+      <%- include('partials/votes', { bet }) %>
+
+      <%- include('partials/bar', { bet, big: true }) %>
+      <div class="pool">
+        <% bet.options.forEach((o) => { %>
+          <div class="pool-side <%= optClass(bet, o.key) %>">
+            <span class="pool-label"><%= o.label %></span>
+            <span class="pool-amount"><%= euro(o.total) %></span>
+            <span class="pool-quote"><%= share(bet, o) %> % · Quote <%= quote(bet, o) %></span>
+          </div>
+        <% }) %>
+      </div>
+
+      <% if (bet.mine) { %>
+        <p class="result result-wait">
+          <strong>Du bist hier selbst beteiligt.</strong>
+          <span>Als Wettersteller oder Schiedsrichter dieser Wette kannst du den Streitfall nicht entscheiden – das muss ein anderer Dev übernehmen.</span>
+        </p>
+      <% } else { %>
+        <% if (bet.myStake) { %>
+          <p class="result result-dispute">
+            <strong>Du hast hier selbst auf „<%= optionLabel(bet, bet.myStake) %>“ gesetzt.</strong>
+            <span>Du darfst entscheiden, hast aber ein eigenes Interesse am Ausgang – überlasse den Fall besser einem Dev ohne Einsatz.</span>
+          </p>
+        <% } %>
+        <form method="post" action="/admin/streitfaelle/<%= bet._id %>/entscheiden" class="form dispute-form"
+              data-confirm-resolve="Als Dev „%s“ festlegen und abrechnen? Das kann nicht rückgängig gemacht werden.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <fieldset class="side-picker side-picker-many">
+            <legend class="sr-only">Entscheidung</legend>
+            <% bet.options.forEach((o) => { %>
+              <label class="side-option side-option-sm <%= optClass(bet, o.key) %>">
+                <input type="radio" name="outcome" value="<%= o.key %>" data-label="<%= o.label %>" required>
+                <span class="side-option-title"><%= o.label %></span>
+              </label>
+            <% }) %>
+            <label class="side-option side-option-sm c-nein">
+              <input type="radio" name="outcome" value="annulliert" data-label="Annullieren" required>
+              <span class="side-option-title">Annullieren</span>
+              <span class="side-option-sub">Alle Einsätze zurück</span>
+            </label>
+          </fieldset>
+          <label class="field">
+            <span>Begründung <em class="muted">(Pflicht, für alle sichtbar)</em></span>
+            <textarea name="note" rows="2" minlength="<%= noteMin %>" maxlength="<%= noteMax %>" required
+                      placeholder="Worauf stützt sich deine Entscheidung?"></textarea>
+          </label>
+          <button class="btn btn-primary" type="submit">Mit meiner Stimme entscheiden</button>
+        </form>
+      <% } %>
+    </div>
+  <% }) %>
+<% } %>
+
+<%- include('partials/foot') %>

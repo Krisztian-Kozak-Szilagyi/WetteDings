@@ -1,5 +1,5 @@
 const config = require('../config');
-const { quote: rawQuote } = require('./payout');
+const { quote: rawQuote, splitFee } = require('./payout');
 
 const euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 const dateFmt = new Intl.DateTimeFormat('de-DE', {
@@ -48,8 +48,11 @@ function share(bet, opt) {
   return total ? Math.round((opt.total / total) * 100) : 0;
 }
 
-/** Voraussichtliche Provision des Wetterstellers nach aktuellem Topf */
+/** Voraussichtliche Gesamtprovision nach aktuellem Topf */
 const feeEstimate = (bet) => Math.floor((pool(bet) * (bet.creatorFeePercent || 0)) / 100);
+
+/** Voraussichtliche Provision je Seite: { creator, referee } */
+const feeSplit = (bet) => splitFee(feeEstimate(bet), !!bet.referee);
 
 const findOption = (bet, key) => bet.options.find((o) => o.key === key) || null;
 const optionLabel = (bet, key) => (findOption(bet, key) || { label: '–' }).label;
@@ -61,9 +64,17 @@ function optClass(bet, key) {
   return `c-${Math.max(0, index) % 10}`;
 }
 
+/** Beschriftung einer Stimme: Option oder „Annullieren“ */
+const voteLabel = (bet, outcome) => (outcome === 'annulliert' ? 'Annullieren' : optionLabel(bet, outcome));
+
+/** Stimmen von Wettersteller und Schiedsrichter (eine je Rolle) */
+const voteOf = (bet, role) => (bet.votes || []).find((v) => v.role === role) || null;
+
 function statusInfo(bet) {
   if (bet.status === 'annulliert') return { key: 'annulliert', label: 'Annulliert' };
   if (bet.status === 'entschieden') return { key: 'entschieden', label: `Ergebnis: ${optionLabel(bet, bet.outcome)}` };
+  if (bet.disputed) return { key: 'streitig', label: 'Strittig – Dev entscheidet' };
+  if (voteOf(bet, 'creator') || voteOf(bet, 'referee')) return { key: 'bestaetigung', label: 'Warte auf Bestätigung' };
   if (new Date(bet.deadline) > new Date()) return { key: 'offen', label: 'Offen' };
   return { key: 'wartend', label: 'Wartet auf Ergebnis' };
 }
@@ -74,6 +85,7 @@ const ledgerLabels = {
   auszahlung: 'Gewinnauszahlung',
   erstattung: 'Erstattung',
   provision: 'Provision (Wettersteller)',
+  provision_schiri: 'Provision (Schiedsrichter)',
   bonus: 'Tagesbonus',
   coin_kauf: 'Samantha Coin gekauft',
   coin_verkauf: 'Samantha Coin verkauft',
@@ -116,10 +128,13 @@ module.exports = {
   quote,
   share,
   feeEstimate,
+  feeSplit,
   editFieldLabels,
   findOption,
   optionLabel,
   optClass,
+  voteLabel,
+  voteOf,
   statusInfo,
   ledgerLabels,
   coinPrice,

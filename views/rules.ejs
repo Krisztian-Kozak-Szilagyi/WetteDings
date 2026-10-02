@@ -36,7 +36,8 @@
       <li><strong>Eigene Optionen:</strong> du legst mindestens zwei Antwortmöglichkeiten fest – z. B. „Bayern“, „Unentschieden“, „Dortmund“.</li>
     </ul>
     <p>Du legst zwei Termine fest: den <strong>Einsatzschluss</strong> (bis dahin kann gesetzt werden, danach nicht mehr) und die <strong>Auswertung</strong> (wann das Ergebnis bekanntgegeben wird). <strong>Nach dem Veröffentlichen können keine Optionen mehr hinzugefügt oder geändert werden.</strong></p>
-    <p><strong>Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen.</strong> Dafür erhalten sie <strong><%= creatorFeePercent %> % vom Topf</strong> als Provision, sobald sie das Ergebnis eintragen.</p>
+    <p>Außerdem benennst du ein weiteres Mitglied als <strong>Schiedsrichter</strong>. Es bestätigt am Ende gemeinsam mit dir das Ergebnis (siehe Punkt 5) und kann danach nicht mehr gewechselt werden.</p>
+    <p><strong>Wettersteller und Schiedsrichter dürfen an der Wette nicht teilnehmen.</strong> Dafür teilen sie sich <strong><%= creatorFeePercent %> % vom Topf</strong> als Provision – je die Hälfte, sobald das Ergebnis feststeht.</p>
   </div>
 
   <div class="card">
@@ -46,7 +47,7 @@
 
   <div class="card">
     <h3>4. Der Topf wird geteilt (Totalisator)</h3>
-    <p>Alle Einsätze kommen in einen gemeinsamen Topf. Wenn die Wette entschieden ist, erhält der Wettersteller <%= creatorFeePercent %> % des Topfes. Den Rest teilen sich alle, die auf die eingetretene Option gesetzt haben:</p>
+    <p>Alle Einsätze kommen in einen gemeinsamen Topf. Wenn die Wette entschieden ist, gehen <%= creatorFeePercent %> % des Topfes als Provision an Wettersteller und Schiedsrichter (je die Hälfte). Den Rest teilen sich alle, die auf die eingetretene Option gesetzt haben:</p>
     <p class="formula">Auszahlung = (Topf − Provision) × eigener Einsatz ÷ alle Einsätze auf die eingetretene Option</p>
     <p><strong>Wer gewinnt, verliert nie Geld:</strong> Die Provision ist höchstens so hoch wie die Einsätze der Verlierer. Haben fast alle auf dieselbe Option gesetzt, bekommen die Gewinner also mindestens ihren Einsatz zurück.</p>
 
@@ -55,30 +56,36 @@
       <table class="table">
         <thead><tr><th>Person</th><th>Option</th><th class="num">Einsatz</th><th class="num">Auszahlung bei „Bayern“</th></tr></thead>
         <tbody>
-          <tr><td>Anna</td><td><span class="pill c-0">Bayern</span></td><td class="num">100,00 €</td><td class="num pos">190,00 €</td></tr>
-          <tr><td>Ben</td><td><span class="pill c-0">Bayern</span></td><td class="num">50,00 €</td><td class="num pos">95,00 €</td></tr>
+          <tr><td>Anna</td><td><span class="pill c-0">Bayern</span></td><td class="num">100,00 €</td><td class="num pos">184,00 €</td></tr>
+          <tr><td>Ben</td><td><span class="pill c-0">Bayern</span></td><td class="num">50,00 €</td><td class="num pos">92,00 €</td></tr>
           <tr><td>Clara</td><td><span class="pill c-1">Unentschieden</span></td><td class="num">60,00 €</td><td class="num neg">0,00 €</td></tr>
           <tr><td>David</td><td><span class="pill c-2">Dortmund</span></td><td class="num">90,00 €</td><td class="num neg">0,00 €</td></tr>
-          <tr><td>Wettersteller</td><td>–</td><td class="num">–</td><td class="num pos">15,00 €</td></tr>
+          <tr><td>Wettersteller</td><td>–</td><td class="num">–</td><td class="num pos">12,00 €</td></tr>
+          <tr><td>Schiedsrichter</td><td>–</td><td class="num">–</td><td class="num pos">12,00 €</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Topf: 300 €. „Bayern“ tritt ein. Der Wettersteller bekommt 5 % = 15 €. Die übrigen 285 € gehen an die Bayern-Tipper: Anna hat ⅔ der Bayern-Einsätze gebracht und bekommt ⅔ davon (= 190 €), Ben ⅓ (= 95 €).</p>
+    <p>Topf: 300 €. „Bayern“ tritt ein. Die Provision beträgt 8 % = 24 € und wird geteilt: 12 € für den Wettersteller, 12 € für den Schiedsrichter. Die übrigen 276 € gehen an die Bayern-Tipper: Anna hat ⅔ der Bayern-Einsätze gebracht und bekommt ⅔ davon (= 184 €), Ben ⅓ (= 92 €).</p>
 
     <h4>Die Quote</h4>
     <p>Die angezeigte Quote ist <em>(Topf − Provision) ÷ Einsätze auf diese Option</em>. Eine Quote von 2,50× bedeutet: Für 10 € Einsatz bekämst du nach aktuellem Stand 25 € ausgezahlt. Da bis zum Einsatzschluss weiter gesetzt werden kann, ändert sich die Quote noch.</p>
   </div>
 
   <div class="card">
-    <h3>5. Ergebnis &amp; Sonderfälle</h3>
+    <h3>5. Ergebnis: Vier-Augen-Prinzip</h3>
+    <p>Über den Ausgang entscheiden <strong>Wettersteller und Schiedsrichter gemeinsam</strong> – damit niemand allein über den Topf bestimmt.</p>
     <ul>
-      <li>Der <strong>Wettersteller</strong> entscheidet, was eingetreten ist – jederzeit, auch schon vor dem Einsatzschluss. Die Wette wird dann sofort geschlossen und ausgezahlt. Admins können bei Streitfällen eingreifen.</li>
-      <li>Beim Abschließen muss eine <strong>Begründung</strong> angegeben werden (z. B. Endstand und Quelle). Sie bleibt dauerhaft bei der Wette sichtbar, damit das Ergebnis nachvollziehbar ist.</li>
+      <li>Beide tragen ein, was eingetreten ist. <strong>Ausgezahlt wird nur, wenn sie dasselbe eintragen</strong> (Einstimmigkeit). Die zweite, übereinstimmende Stimme schließt die Wette ab und zahlt aus.</li>
+      <li>Die <strong>erste Stimme beendet sofort die Einsatzphase</strong>, auch vor dem Einsatzschluss – sonst könnte man mit dem Wissen um eine bereits abgegebene Stimme noch setzen.</li>
+      <li>Sind sich beide <strong>nicht einig</strong>, gilt die Wette als <strong>strittig</strong>: Es wird nichts ausgezahlt, bis ein <strong>Dev</strong> die entscheidende Stimme abgibt. Bis dahin kann jede Seite ihre Stimme ändern – stimmen sie dann überein, ist der Streit erledigt.</li>
+      <li>Auch eine <strong>Annullierung</strong> braucht beide Stimmen.</li>
+      <li>Beim Abstimmen muss eine <strong>Begründung</strong> angegeben werden (z. B. Endstand und Quelle). Beide Begründungen bleiben dauerhaft bei der Wette sichtbar, damit das Ergebnis nachvollziehbar ist.</li>
       <li>Hat niemand auf die eingetretene Option gesetzt – oder haben alle auf dieselbe Option gesetzt –, bekommen alle ihren Einsatz zurück. Dann gibt es keine Provision.</li>
       <li>Eine Wette kann <strong>annulliert</strong> werden (z. B. wenn das Ereignis ausfällt). Dann gibt es alle Einsätze zurück und keine Provision.</li>
       <li>Unter jeder Wette gibt es einen <strong>Kommentarbereich</strong> zum Austausch. Eigene Kommentare kann man löschen, Admins können Kommentare entfernen.</li>
       <li>Die <strong>Beschreibung</strong> kann der Wettersteller nachträglich bearbeiten. Den <strong>Titel</strong> ändert nur ein Admin auf Anfrage. Alle Änderungen erscheinen im Änderungsverlauf der Wette.</li>
-      <li>Wird das Ergebnis nicht innerhalb von <%= locals.autoVoidDays || 14 %> Tagen nach dem Auswertungstermin eingetragen, wird die Wette automatisch annulliert.</li>
+      <li>Wird das Ergebnis nicht innerhalb von <%= locals.autoVoidDays || 14 %> Tagen nach dem Auswertungstermin eingetragen, wird die Wette automatisch annulliert – das gilt auch für Streitfälle, die kein Dev entschieden hat.</li>
+      <li>Wetten, die vor Einführung des Schiedsrichter-Verfahrens aufgestellt wurden, haben keinen Schiedsrichter. Dort entscheidet weiterhin der Wettersteller allein.</li>
       <li>Rundungscents werden fair verteilt – Auszahlungen und Provision ergeben zusammen immer genau den Topf.</li>
     </ul>
   </div>

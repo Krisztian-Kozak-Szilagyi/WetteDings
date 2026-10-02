@@ -546,6 +546,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .badge-wartend { background: var(--warn-soft); color: var(--warn); }
 .badge-entschieden { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
 .badge-annulliert { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.badge-bestaetigung { background: var(--warn-soft); color: var(--warn); }
+.badge-streitig { background: var(--nein-soft); color: var(--nein); }
 .pill {
   display: inline-block; font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px;
   color: var(--opt, var(--muted)); background: color-mix(in srgb, var(--opt, var(--muted)) 15%, var(--surface));
@@ -603,6 +605,36 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .result-win strong { color: var(--primary); }
 .result-void, .result-wait { background: var(--warn-soft); }
 .result-void strong, .result-wait strong { color: var(--warn); }
+.result-dispute { background: var(--nein-soft); }
+.result-dispute strong { color: var(--nein); }
+
+/* Schiedsrichter: Stimmen zum Ergebnis */
+.referee-line { margin-top: -4px; }
+.votes-box { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.votes-title { font-size: .95rem; margin: 0 0 10px; }
+.vote-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vote-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.vote-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vote-note { margin: 6px 0 0; font-size: .92rem; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Indikator im Abstimmungsformular: wie hat die andere Seite entschieden? */
+.vote-indicator {
+  background: var(--warn-soft); border-radius: 10px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.vote-indicator-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vote-indicator-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--warn); }
+.vote-indicator .vote-item { background: var(--surface); }
+.vote-indicator .vote-note { font-style: italic; }
+/* Option, für die schon eine Stimme vorliegt */
+.side-option.is-voted { border-style: dashed; border-color: var(--opt); }
+.side-option.is-voted:has(input:checked) { border-style: solid; }
+
+/* Dev-Panel: Streitfälle */
+.dispute-card { margin-bottom: 20px; }
+.dispute-title { margin: 6px 0 2px; font-size: 1.25rem; }
+.dispute-form { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
+.nav-badge-dispute { background: var(--nein); }
 
 .resolve-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .resolve-buttons-many { grid-template-columns: 1fr; }

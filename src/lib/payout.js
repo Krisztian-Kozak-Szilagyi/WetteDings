@@ -1,8 +1,8 @@
 /**
- * Totalisator-Prinzip (Pari-Mutuel) mit Provision für den Wettersteller:
- * Alle Einsätze einer Wette landen in einem Topf. Vom Topf erhält der Wettersteller
- * feePercent % als Provision. Den Rest teilen sich alle, die auf die eingetretene Option
- * gesetzt haben – anteilig nach Höhe ihres Einsatzes.
+ * Totalisator-Prinzip (Pari-Mutuel) mit Provision für Wettersteller und Schiedsrichter:
+ * Alle Einsätze einer Wette landen in einem Topf. Vom Topf gehen feePercent % als Provision
+ * an die beiden, die die Wette tragen (Aufteilung siehe splitFee). Den Rest teilen sich alle,
+ * die auf die eingetretene Option gesetzt haben – anteilig nach Höhe ihres Einsatzes.
  *
  * Sonderfälle (alle Einsätze werden vollständig erstattet, keine Provision):
  *  - Wette annulliert
@@ -19,7 +19,7 @@
  *
  * @param {{id: string, side: string, amount: number}[]} positions  in Einsatz-Reihenfolge
  * @param {string} outcome  key der eingetretenen Option oder 'annulliert'
- * @param {number} feePercent  Provision des Wetterstellers in Prozent (0–100)
+ * @param {number} feePercent  Gesamtprovision in Prozent (0–100), für Wettersteller und Schiedsrichter
  * @returns {{ payouts: Map<string, number>, refunded: boolean, fee: number }}
  */
 function computePayouts(positions, outcome, feePercent = 0) {
@@ -67,12 +67,23 @@ function computePayouts(positions, outcome, feePercent = 0) {
 }
 
 /**
- * Provision in Cent: feePercent % vom Topf, aber höchstens die Einsätze der Verlierer
+ * Gesamtprovision in Cent: feePercent % vom Topf, aber höchstens die Einsätze der Verlierer
  * (sonst müssten die Gewinner draufzahlen).
  */
 function feeFor(pot, loseTotal, feePercent = 0) {
   const pct = Math.min(100, Math.max(0, feePercent));
   return Math.min(Math.floor((pot * pct) / 100), loseTotal);
+}
+
+/**
+ * Provision auf Wettersteller und Schiedsrichter verteilen – sie tragen die Wette gemeinsam
+ * und bekommen je die Hälfte; ein ungerader Cent geht an den Wettersteller.
+ * Wetten ohne Schiedsrichter (Altbestand): alles an den Wettersteller.
+ */
+function splitFee(fee, hasReferee) {
+  const total = Math.max(0, Math.floor(fee || 0));
+  const referee = hasReferee ? Math.floor(total / 2) : 0;
+  return { creator: total - referee, referee };
 }
 
 /** Aktuelle Quote einer Option (Auszahlung pro 1 € Einsatz, nach Provision), oder null. Nie unter 1,00. */
@@ -83,4 +94,4 @@ function quote(sideTotal, otherTotal, feePercent = 0) {
   return payable / sideTotal;
 }
 
-module.exports = { computePayouts, quote, feeFor };
+module.exports = { computePayouts, quote, feeFor, splitFee };

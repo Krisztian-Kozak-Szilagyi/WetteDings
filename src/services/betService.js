@@ -5,7 +5,8 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const { computePayouts } = require('../lib/payout');
+const { computePayouts, splitFee } = require('../lib/payout');
+const { verdictRole, evaluateVotes } = require('../lib/verdict');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
 const { assertUsernameAllowed } = require('./usernameRules');
@@ -41,6 +42,7 @@ async function debit(userId, amount, session) {
 }
 
 const isOwnerOf = (bet, actor) => !actor.system && String(bet.creator) === String(actor._id);
+const isRefereeOf = (bet, actor) => !actor.system && !!bet.referee && String(bet.referee) === String(actor._id);
 
 /**
  * Registrierung – nur mit gültigem Registrierungscode. Code-Einlösung und Konto-Erstellung
@@ -75,10 +77,13 @@ async function registerUser({ username, email, password, code }) {
 
 /**
  * Neue Wette. options: [{ key, label }] (bei Ja/Nein: ja + nein).
- * Der Ersteller setzt nicht mit, sondern erhält bei Entscheidung eine Provision vom Topf.
+ * Ersteller und Schiedsrichter setzen nicht mit, sondern teilen sich bei Entscheidung die Provision.
  * Die Optionen sind danach fest – es gibt bewusst keine Funktion zum Hinzufügen.
+ * referee: Mitglied ({ _id, username }), das das Ergebnis gemeinsam mit dem Ersteller bestätigt.
  */
-async function createBet({ user, title, description, type, options, deadline, resultAt }) {
+async function createBet({ user, title, description, type, options, deadline, resultAt, referee }) {
+  if (!referee) throw new UserError('Bitte wähle einen Schiedsrichter für diese Wette aus.');
+  if (String(referee._id) === String(user._id)) throw new UserError('Du kannst nicht selbst Schiedsrichter deiner Wette sein.');
   return Bet.create({
     title,
     description,
@@ -86,6 +91,8 @@ async function createBet({ user, title, description, type, options, deadline, re
     options: options.map((o) => ({ key: o.key, label: o.label, total: 0 })),
     creator: user._id,
     creatorName: user.username,
+    referee: referee._id,
+    refereeName: referee.username,
     creatorFeePercent: config.creatorFeePercent,
     deadline,
     resultAt,
@@ -100,6 +107,10 @@ async function placeStake({ user, betId, side, amount }) {
     // Neue Regel: Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen
     if (isOwnerOf(current, user)) {
       throw new UserError('Als Wettersteller kannst du nicht auf deine eigene Wette setzen – du erhältst dafür eine Provision vom Topf.');
+    }
+    // Der Schiedsrichter entscheidet mit über den Ausgang und darf deshalb kein eigenes Interesse haben
+    if (isRefereeOf(current, user)) {
+      throw new UserError('Als Schiedsrichter dieser Wette kannst du nicht mitsetzen – du bestätigst am Ende das Ergebnis.');
     }
     if (!current.options.some((o) => o.key === side)) throw new UserError('Bitte wähle eine gültige Option.');
 
@@ -139,7 +150,9 @@ async function placeStake({ user, betId, side, amount }) {
 async function closeBet({ actor, betId }) {
   const bet = await Bet.findById(betId);
   if (!bet) throw new UserError('Wette nicht gefunden.');
-  if (!isOwnerOf(bet, actor) && !actor.isAdmin && !actor.isDev) throw new UserError('Nur der Ersteller oder ein Admin darf das.');
+  if (!isOwnerOf(bet, actor) && !isRefereeOf(bet, actor) && !actor.isAdmin && !actor.isDev) {
+    throw new UserError('Nur der Ersteller, der Schiedsrichter oder ein Admin darf das.');
+  }
   const res = await Bet.updateOne(
     { _id: betId, status: 'offen', deadline: { $gt: new Date() } },
     { $set: { deadline: new Date() } }
@@ -177,10 +190,110 @@ async function editBet({ actor, betId, title, description }) {
 }
 
 /**
- * Wette abschließen und auszahlen.
+ * Schließt die Wette ab und zahlt aus. Rechte und Stimmen sind an dieser Stelle bereits geprüft;
+ * der Aufruf passiert immer innerhalb der Transaktion von resolveBet.
+ * via: wie das Ergebnis zustande kam ('einstimmig' | 'dev' | 'ersteller' | 'system').
+ */
+async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
+  const winner = bet.options.find((o) => o.key === outcome) || null;
+  const positions = await Position.find({ bet: bet._id }).sort({ createdAt: 1, _id: 1 }).session(session).lean();
+  const { payouts, refunded, fee } = computePayouts(
+    positions.map((p) => ({ id: String(p._id), side: p.side, amount: p.amount })),
+    outcome,
+    bet.creatorFeePercent || 0
+  );
+
+  // Provision tragen Wettersteller und Schiedsrichter gemeinsam – je die Hälfte
+  const feeShare = splitFee(fee, !!bet.referee);
+
+  const updated = await Bet.updateOne(
+    { _id: bet._id, status: 'offen' },
+    {
+      $set: {
+        status: outcome === 'annulliert' ? 'annulliert' : 'entschieden',
+        outcome: outcome === 'annulliert' ? null : outcome,
+        resolvedAt: now,
+        // Falls vor dem Einsatzschluss entschieden wurde, gilt die Wette ab jetzt als geschlossen
+        deadline: bet.deadline > now ? now : bet.deadline,
+        resolvedBy: actor.system ? null : actor._id,
+        resolvedByName: actor.username,
+        resolvedVia: via,
+        resolutionNote: note,
+        voidReason: outcome === 'annulliert' ? note.slice(0, 300) : null,
+        refunded,
+        creatorFee: feeShare.creator,
+        refereeFee: feeShare.referee,
+        votes,
+        disputed: false,
+      },
+    },
+    { session }
+  );
+  if (updated.modifiedCount !== 1) throw new UserError('Diese Wette ist bereits abgeschlossen.');
+
+  const userOps = [];
+  const positionOps = [];
+  const ledgerDocs = [];
+  let paidTotal = 0;
+  let winnerCount = 0;
+
+  for (const p of positions) {
+    const payout = payouts.get(String(p._id)) || 0;
+    positionOps.push({
+      updateOne: { filter: { _id: p._id }, update: { $set: { payout, settledAt: now } } },
+    });
+    if (payout > 0) {
+      userOps.push({ updateOne: { filter: { _id: p.user }, update: { $inc: { balance: payout } } } });
+      ledgerDocs.push({
+        user: p.user,
+        type: refunded ? 'erstattung' : 'auszahlung',
+        amount: payout,
+        bet: bet._id,
+        betTitle: bet.title,
+      });
+      paidTotal += payout;
+      winnerCount++;
+    }
+  }
+
+  if (feeShare.creator > 0) {
+    userOps.push({ updateOne: { filter: { _id: bet.creator }, update: { $inc: { balance: feeShare.creator } } } });
+    ledgerDocs.push({ user: bet.creator, type: 'provision', amount: feeShare.creator, bet: bet._id, betTitle: bet.title });
+  }
+  if (feeShare.referee > 0) {
+    userOps.push({ updateOne: { filter: { _id: bet.referee }, update: { $inc: { balance: feeShare.referee } } } });
+    ledgerDocs.push({ user: bet.referee, type: 'provision_schiri', amount: feeShare.referee, bet: bet._id, betTitle: bet.title });
+  }
+
+  if (positionOps.length) await Position.bulkWrite(positionOps, { session });
+  if (userOps.length) await User.bulkWrite(userOps, { session });
+  if (ledgerDocs.length) await Ledger.insertMany(ledgerDocs, { session });
+
+  return {
+    kind: 'entschieden',
+    via,
+    refunded,
+    paidTotal,
+    winnerCount,
+    fee,
+    creatorFee: feeShare.creator,
+    refereeFee: feeShare.referee,
+    outcome,
+    label: winner ? winner.label : null,
+  };
+}
+
+/**
+ * Stimme zum Ausgang abgeben – und abschließen, sobald das Ergebnis feststeht.
  * outcome: key der eingetretenen Option oder 'annulliert'.
- * note: Pflicht-Begründung (bei Entscheidung und Annullierung), damit das Ergebnis nachvollziehbar bleibt.
- * Der Ersteller (und Admins) dürfen jederzeit entscheiden – die Wette wird dabei sofort geschlossen.
+ * note: Pflicht-Begründung, damit jede Stimme nachvollziehbar bleibt.
+ *
+ * Wettersteller und Schiedsrichter müssen sich einig sein; die zweite, übereinstimmende Stimme
+ * zahlt aus. Weichen die Stimmen ab, ist die Wette strittig und ein Dev gibt die entscheidende
+ * Stimme ab (Dev-Panel → Streitfälle). Eine abgegebene Stimme kann bis zum Abschluss geändert
+ * werden – stimmt sie dann mit der anderen überein, löst sich der Streitfall von selbst.
+ *
+ * Rückgabe: { kind: 'entschieden' | 'offen' | 'streitig', … }
  */
 async function resolveBet({ actor, betId, outcome, note }) {
   const text = String(note || '').trim().replace(/\r\n/g, '\n');
@@ -195,75 +308,81 @@ async function resolveBet({ actor, betId, outcome, note }) {
     if (!bet) throw new UserError('Wette nicht gefunden.');
     if (bet.status !== 'offen') throw new UserError('Diese Wette ist bereits abgeschlossen.');
 
-    const isAdmin = actor.system || actor.isAdmin || actor.isDev; // Devs dürfen alle Wetten entscheiden und annullieren
-    if (!isOwnerOf(bet, actor) && !isAdmin) throw new UserError('Nur der Ersteller oder ein Admin kann diese Wette abschließen.');
-    const winner = bet.options.find((o) => o.key === outcome);
+    const role = verdictRole(bet, actor);
+    if (!role) throw new UserError('Nur der Wettersteller, der Schiedsrichter oder ein Dev kann diese Wette abschließen.');
+    const winner = bet.options.find((o) => o.key === outcome) || null;
     if (outcome !== 'annulliert' && !winner) throw new UserError('Ungültiges Ergebnis.');
 
-    const positions = await Position.find({ bet: bet._id }).sort({ createdAt: 1, _id: 1 }).session(session).lean();
-    const { payouts, refunded, fee } = computePayouts(
-      positions.map((p) => ({ id: String(p._id), side: p.side, amount: p.amount })),
-      outcome,
-      bet.creatorFeePercent || 0
-    );
+    const vote = { role, by: actor.system ? null : actor._id, byName: actor.username, outcome, note: text, at: now };
+    // Je Rolle zählt nur die letzte Stimme
+    const votes = [...(bet.toObject().votes || []).filter((v) => v.role !== role), vote];
+    const hasReferee = !!bet.referee;
 
+    // Das System (automatische Annullierung) und Devs entscheiden sofort – Devs lösen damit Streitfälle.
+    if (role === 'system' || role === 'dev') {
+      return payOut({ session, bet, outcome, note: text, actor, votes, via: role, now });
+    }
+
+    const verdict = evaluateVotes(votes, { hasReferee });
+    if (verdict.decided) {
+      const via = hasReferee ? 'einstimmig' : 'ersteller';
+      return payOut({ session, bet, outcome: verdict.outcome, note: text, actor, votes, via, now });
+    }
+
+    // Noch keine Einigung: Stimme festhalten. Die erste Stimme beendet sofort die Einsatzphase, damit
+    // niemand mit dem Wissen um eine bereits abgegebene Stimme noch setzen kann.
     const updated = await Bet.updateOne(
       { _id: bet._id, status: 'offen' },
-      {
-        $set: {
-          status: outcome === 'annulliert' ? 'annulliert' : 'entschieden',
-          outcome: outcome === 'annulliert' ? null : outcome,
-          resolvedAt: now,
-          // Falls vor dem Einsatzschluss entschieden wurde, gilt die Wette ab jetzt als geschlossen
-          deadline: bet.deadline > now ? now : bet.deadline,
-          resolvedBy: actor.system ? null : actor._id,
-          resolvedByName: actor.username,
-          resolutionNote: text,
-          voidReason: outcome === 'annulliert' ? text.slice(0, 300) : null,
-          refunded,
-          creatorFee: fee,
-        },
-      },
+      { $set: { votes, disputed: verdict.disputed, deadline: bet.deadline > now ? now : bet.deadline } },
       { session }
     );
     if (updated.modifiedCount !== 1) throw new UserError('Diese Wette ist bereits abgeschlossen.');
 
-    const userOps = [];
-    const positionOps = [];
-    const ledgerDocs = [];
-    let paidTotal = 0;
-    let winnerCount = 0;
-
-    for (const p of positions) {
-      const payout = payouts.get(String(p._id)) || 0;
-      positionOps.push({
-        updateOne: { filter: { _id: p._id }, update: { $set: { payout, settledAt: now } } },
-      });
-      if (payout > 0) {
-        userOps.push({ updateOne: { filter: { _id: p.user }, update: { $inc: { balance: payout } } } });
-        ledgerDocs.push({
-          user: p.user,
-          type: refunded ? 'erstattung' : 'auszahlung',
-          amount: payout,
-          bet: bet._id,
-          betTitle: bet.title,
-        });
-        paidTotal += payout;
-        winnerCount++;
-      }
-    }
-
-    if (fee > 0) {
-      userOps.push({ updateOne: { filter: { _id: bet.creator }, update: { $inc: { balance: fee } } } });
-      ledgerDocs.push({ user: bet.creator, type: 'provision', amount: fee, bet: bet._id, betTitle: bet.title });
-    }
-
-    if (positionOps.length) await Position.bulkWrite(positionOps, { session });
-    if (userOps.length) await User.bulkWrite(userOps, { session });
-    if (ledgerDocs.length) await Ledger.insertMany(ledgerDocs, { session });
-
-    return { refunded, paidTotal, winnerCount, fee, outcome, label: winner ? winner.label : null };
+    return {
+      kind: verdict.disputed ? 'streitig' : 'offen',
+      role,
+      outcome,
+      label: winner ? winner.label : null,
+      // Wer jetzt am Zug ist bzw. anders gestimmt hat
+      other: role === 'creator' ? bet.refereeName : bet.creatorName,
+    };
   });
 }
 
-module.exports = { SYSTEM_ACTOR, NOTE_MIN, NOTE_MAX, inTransaction, registerUser, createBet, placeStake, closeBet, editBet, resolveBet };
+/** Offene Streitfälle (Ersteller und Schiedsrichter uneinig) – Abzeichen und Liste im Dev-Panel */
+const disputedFilter = () => ({ status: 'offen', disputed: true });
+const disputedCount = () => Bet.countDocuments(disputedFilter());
+
+/**
+ * Wetten, in denen die andere Seite schon abgestimmt hat und ich noch nicht –
+ * ich bin also am Zug (Abzeichen am Menüpunkt „Wetten“).
+ */
+function pendingVoteFilter(userId) {
+  return {
+    status: 'offen',
+    disputed: false,
+    'votes.0': { $exists: true }, // mindestens eine Stimme liegt vor
+    $or: [
+      { creator: userId, votes: { $not: { $elemMatch: { role: 'creator' } } } },
+      { referee: userId, votes: { $not: { $elemMatch: { role: 'referee' } } } },
+    ],
+  };
+}
+const pendingVoteCount = (userId) => Bet.countDocuments(pendingVoteFilter(userId));
+
+module.exports = {
+  SYSTEM_ACTOR,
+  NOTE_MIN,
+  NOTE_MAX,
+  inTransaction,
+  registerUser,
+  createBet,
+  placeStake,
+  closeBet,
+  editBet,
+  resolveBet,
+  disputedFilter,
+  disputedCount,
+  pendingVoteFilter,
+  pendingVoteCount,
+};

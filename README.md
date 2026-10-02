@@ -10,12 +10,15 @@ Deutschsprachige, responsive Wett- und Spielplattform für eine geschlossene Gru
 - **Zwei Wettarten:** *Ja/Nein* (trifft eine Aussage zu?) oder **eigene Optionen** (2–10, z. B. „Bayern / Unentschieden / Dortmund“). Nach dem Veröffentlichen sind die Optionen fest.
 - **Zwei Pflichttermine:** **Einsatzschluss** (bis dahin kann gesetzt werden) und **Auswertung** (Termin der Ergebnisbekanntgabe, nicht vor dem Einsatzschluss). Beide sind auf der Wettseite gut sichtbar.
 - **Setzen:** Bis zum Einsatzschluss auf genau eine Option; der Einsatz kann erhöht, die Option aber nicht gewechselt werden.
-- **Wettersteller setzen nicht mit** und erhalten dafür **5 % vom Topf** als Provision (`CREATOR_FEE_PERCENT`), sobald sie das Ergebnis eintragen.
+- **Schiedsrichter (Pflicht):** Beim Aufstellen benennt der Wettersteller ein weiteres Mitglied, das das Ergebnis mit ihm bestätigt (siehe *Ergebnis*). Es ist danach fest.
+- **Wettersteller und Schiedsrichter setzen nicht mit.** Dafür teilen sie sich **8 % vom Topf** als Provision (`CREATOR_FEE_PERCENT`, gesamt) – je die Hälfte, ein ungerader Cent geht an den Wettersteller. Ausgezahlt wird sie, sobald das Ergebnis feststeht.
 - **Totalisator-Abrechnung:** Alle Einsätze landen in einem Topf. Nach Abzug der Provision teilen sich alle, die auf die eingetretene Option gesetzt haben, den Rest – **anteilig nach ihrem Einsatz**.
 - **Quote** = (Topf − Provision) ÷ Einsätze auf die Option – live berechnet; beim Setzen wird der voraussichtliche Gewinn angezeigt.
 - **Sonderfälle** – alle bekommen ihren Einsatz zurück, ohne Provision: keine Gegenseite, niemand auf der Gewinner-Option oder Annullierung.
 - **Rundungscents** werden nach dem Größter-Rest-Verfahren verteilt – Auszahlungen und Provision ergeben immer **exakt** den Topf.
-- **Ergebnis:** Der Wettersteller trägt es ein (jederzeit, auch vor dem Einsatzschluss – dann wird die Wette sofort geschlossen), immer mit **Pflicht-Begründung**, die dauerhaft sichtbar bleibt. Ohne Ergebnis 14 Tage nach dem Auswertungstermin (`AUTO_VOID_DAYS`) wird automatisch annulliert und erstattet.
+- **Ergebnis im Vier-Augen-Prinzip:** Wettersteller **und** Schiedsrichter tragen beide ein, was eingetreten ist – jeweils mit **Pflicht-Begründung**, die dauerhaft sichtbar bleibt. Ausgezahlt wird nur bei **Einstimmigkeit**; die zweite, übereinstimmende Stimme schließt die Wette ab. Die **erste Stimme beendet sofort die Einsatzphase** (auch vor dem Einsatzschluss), damit niemand mit dem Wissen um eine abgegebene Stimme noch setzt. Auch eine Annullierung braucht beide Stimmen.
+- **Streitfall:** Weichen die Stimmen ab, ist die Wette *strittig* – es wird nichts ausgezahlt, bis ein **Dev** die entscheidende Stimme abgibt (Dev-Panel → **Streitfälle**, mit Abzeichen im Menü). Bis dahin kann jede Seite ihre Stimme ändern; stimmen beide überein, löst sich der Streit von selbst. An einer Wette, in der ein Dev selbst Ersteller oder Schiedsrichter ist, muss ein anderer Dev entscheiden. Ohne Ergebnis 14 Tage nach dem Auswertungstermin (`AUTO_VOID_DAYS`) wird automatisch annulliert und erstattet – auch bei offenen Streitfällen.
+- **Alte Wetten** von vor der Einführung des Verfahrens haben keinen Schiedsrichter; dort entscheidet der Wettersteller weiterhin allein.
 - **Bearbeiten:** Die Beschreibung kann der Wettersteller ändern, solange die Wette offen ist; jede Änderung erscheint im öffentlichen Änderungsverlauf.
 - **Kommentare** unter jeder Wette (Wettersteller und Teilnehmende mit gewählter Option markiert, eigene Kommentare löschbar, max. 6 pro Minute).
 - **„Teilen“-Knopf** kopiert den Link zur Wette.
@@ -150,7 +153,7 @@ pm2 restart wettstube
 | `APP_NAME` | BfW Holdings | Name der Seite |
 | `START_BALANCE_EUR` | 1000 | Startguthaben |
 | `MIN_STAKE_EUR` | 1 | Mindesteinsatz |
-| `CREATOR_FEE_PERCENT` | 5 | Provision des Wetterstellers in % vom Topf (für neue Wetten) |
+| `CREATOR_FEE_PERCENT` | 8 | Gesamtprovision in % vom Topf für Wettersteller und Schiedsrichter (je die Hälfte, für neue Wetten) |
 | `AUTO_VOID_DAYS` | 14 | automatische Annullierung, wenn so lange nach dem Auswertungstermin kein Ergebnis vorliegt |
 | `LOTTERY_TICKET_EUR` | 100 | Preis eines Lotterieloses |
 | `LOTTERY_TIME` | 20:00 | Start der täglichen Lotterie (Ziehung 1 Minute vorher) |

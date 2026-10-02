@@ -2,9 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Bet = require('../models/Bet');
+const Position = require('../models/Position');
 const { requireAdmin, requireStaff } = require('../middleware');
 const { PackGrant } = require('../models/Tcg');
 const roles = require('../services/roles');
+const betService = require('../services/betService');
+const { verdictRole } = require('../lib/verdict');
+const { UserError, str } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
@@ -47,6 +51,54 @@ router.get('/admin', requireStaff, async (req, res) => {
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
     tradeTax: tradeService.settings.taxPercent,
   });
+});
+
+// ---------- Streitfälle: Wettersteller und Schiedsrichter sind sich nicht einig ----------
+// Hier gibt ein Dev die entscheidende Stimme ab. An einem eigenen Streitfall (als Ersteller oder
+// Schiedsrichter) darf auch ein Dev nicht entscheiden – dafür braucht es einen anderen Dev.
+
+router.get('/admin/streitfaelle', requireStaff, async (req, res) => {
+  const bets = await Bet.find(betService.disputedFilter()).sort({ updatedAt: 1, _id: 1 }).limit(100).lean();
+  // Eigene Einsätze: kein Hinderungsgrund, aber ein Interessenkonflikt, den der Dev sehen soll
+  const staked = await Position.find({ user: req.user._id, bet: { $in: bets.map((b) => b._id) } }).select('bet side').lean();
+  const myStake = new Map(staked.map((p) => [String(p.bet), p.side]));
+  res.render('streitfaelle', {
+    title: 'Streitfälle',
+    bets: bets.map((bet) => ({
+      ...bet,
+      mine: verdictRole(bet, req.user) !== 'dev', // selbst Ersteller oder Schiedsrichter
+      myStake: myStake.get(String(bet._id)) || null,
+    })),
+    noteMin: betService.NOTE_MIN,
+    noteMax: betService.NOTE_MAX,
+  });
+});
+
+router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res) => {
+  const outcome = str(req.body.outcome);
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw new UserError('Wette nicht gefunden.');
+    if (!outcome) throw new UserError('Bitte wähle aus, welches Ergebnis gilt.');
+    const r = await betService.resolveBet({ actor: req.user, betId: req.params.id, outcome, note: str(req.body.note) });
+    if (r.kind !== 'entschieden') {
+      // Als Beteiligter zählt die Stimme nur als eine von zwei – der Streitfall bleibt offen
+      req.flash('info', 'Deine Stimme wurde als Beteiligter gezählt. Diesen Streitfall muss ein anderer Dev entscheiden.');
+    } else if (r.outcome === 'annulliert') {
+      req.flash('success', 'Die Wette wurde annulliert. Alle Einsätze wurden erstattet.');
+    } else {
+      // Provision teilen sich Wettersteller und Schiedsrichter
+      const fee = r.refereeFee
+        ? ` Provision: ${euro(r.creatorFee)} für den Wettersteller und ${euro(r.refereeFee)} für den Schiedsrichter.`
+        : r.creatorFee
+          ? ` Provision für den Wettersteller: ${euro(r.creatorFee)}.`
+          : '';
+      req.flash('success', `Ergebnis „${r.label}“ festgelegt. ${euro(r.paidTotal)} wurden an ${r.winnerCount} Gewinner ausgezahlt.${fee}`);
+    }
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/admin/streitfaelle');
 });
 
 // ---------- Handel: Steuer ----------

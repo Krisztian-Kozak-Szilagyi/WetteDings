@@ -11,7 +11,7 @@
     <span class="muted small"><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %><% if (bet.commentCount) { %> · <%= bet.commentCount %> <%= bet.commentCount === 1 ? 'Kommentar' : 'Kommentare' %><% } %></span>
   </div>
   <h3 class="bet-card-title"><%= bet.title %></h3>
-  <p class="muted small">von <%- userLink(bet.creatorName, { nested: true }) %><%= bet.type === 'optionen' ? ' · ' + bet.options.length + ' Optionen' : '' %></p>
+  <p class="muted small">von <%- userLink(bet.creatorName, { nested: true }) %><% if (bet.refereeName) { %> · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %><% } %><%= bet.type === 'optionen' ? ' · ' + bet.options.length + ' Optionen' : '' %></p>
   <%- include('bar', { bet }) %>
   <ul class="opt-list">
     <% shown.forEach((o) => { %>
