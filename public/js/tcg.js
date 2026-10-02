@@ -27,14 +27,16 @@
   }
 
   // ---------- Filter der Sammlung ----------
+  // Jeder Filter wirkt nur auf das Raster in seiner .card (die Tauschseite hat zwei Raster)
   $all('[data-tcg-filter]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var key = btn.getAttribute('data-tcg-filter');
-      $all('[data-tcg-filter]').forEach(function (b) {
+      var scope = btn.closest('.card') || document;
+      $all('[data-tcg-filter]', scope).forEach(function (b) {
         b.classList.toggle('active', b === btn);
         b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
       });
-      $all('.tcg-grid .tcg-slot').forEach(function (slot) {
+      $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
         slot.hidden = key !== 'all' && slot.getAttribute('data-rarity') !== key;
       });
     });

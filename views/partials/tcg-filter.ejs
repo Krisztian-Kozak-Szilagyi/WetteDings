@@ -1,0 +1,7 @@
+<%# Seltenheits-Filter für das Kartenraster in derselben .card (public/js/tcg.js) %>
+<div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
+  <button type="button" class="chip active" data-tcg-filter="all" role="tab" aria-selected="true">Alle</button>
+  <% rarities.forEach((r) => { %>
+    <button type="button" class="chip" data-tcg-filter="<%= r.key %>" role="tab" aria-selected="false"><%= r.label %></button>
+  <% }) %>
+</div>

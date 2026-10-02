@@ -26,51 +26,12 @@
 <div class="card" id="sammlung">
   <div class="tcg-coll-head">
     <h2>Meine Sammlung</h2>
-    <div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
-      <button type="button" class="chip active" data-tcg-filter="all" role="tab" aria-selected="true">Alle</button>
-      <% rarities.forEach((r) => { %>
-        <button type="button" class="chip" data-tcg-filter="<%= r.key %>" role="tab" aria-selected="false"><%= r.label %></button>
-      <% }) %>
-    </div>
+    <%- include('partials/tcg-filter') %>
   </div>
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
-  <div class="tcg-grid tcg-album">
-    <% cards.forEach((c) => { const n = counts[c.id] || 0; const r = rarityByKey[c.rarity]; %>
-      <% const lk = lockedByCard[c.id]; const lockLabel = lk ? (lk.reason === 'handel' ? 'Im Handel' : 'Auf Quest') : ''; %>
-      <% const prot = protectedIds.has(c.id); const fav = favoriteIds.has(c.id); %>
-      <% if (n && lk && lk.n >= n) { %>
-        <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
-          <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
-          <span class="tcg-exam-badge"><%= lockLabel %></span>
-          <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
-          <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-        </div>
-      <% } else if (n) { %>
-        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
-          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>"
-          data-image="<%= c.image %>" data-count="<%= n - (lk ? lk.n : 0) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"
-          data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>"
-          aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">
-          <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-          <% if (prot || fav) { %>
-            <span class="tcg-marks">
-              <% if (prot) { %><span class="tcg-mark tcg-mark-lock" title="Geschützt"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M17 9V7A5 5 0 0 0 7 7v2H5v12h14V9h-2Zm-8 0V7a3 3 0 0 1 6 0v2H9Z"/></svg></span><% } %>
-              <% if (fav) { %><span class="tcg-mark tcg-mark-fav" title="Favorit"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="m12 2 3 6.6 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.2l1.4-7L2 9.4l7-.8L12 2Z"/></svg></span><% } %>
-            </span>
-          <% } %>
-          <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
-          <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-        </button>
-      <% } else { %>
-        <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Noch nicht gezogen">
-          <div class="tcg-locked-inner"><span>?</span></div>
-          <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden ? '???' : r.label %></span>
-        </div>
-      <% } %>
-    <% }) %>
-  </div>
+  <%- include('partials/tcg-grid', { mode: 'album' }) %>
 </div>
 
 <!-- Karte vergrößern -->

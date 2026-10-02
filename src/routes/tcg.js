@@ -2,8 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const User = require('../models/User');
 const { TcgOpening } = require('../models/Tcg');
-const { TcgCard } = require('../models/Tcg');
-const { lockedDocs } = require('../tcg/locks');
+const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
@@ -19,32 +18,6 @@ const wantsJson = (req) => (req.get('Accept') || '').includes('application/json'
 function cardView(card) {
   const r = catalog.rarityByKey[card.rarity];
   return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, sell: euro(r.sell) };
-}
-
-/** Sammlung eines Nutzers mit allen Kennzahlen (für TCG-Seite und Album) */
-async function collection(user) {
-  const [owned, locked] = await Promise.all([tcg.inventory(user._id), lockedDocs(user._id)]);
-  // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
-  const lockedByCard = {};
-  for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card').lean()) {
-    const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason: locked.reasons.get(String(d._id)) });
-    e.n += 1;
-  }
-  const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
-  const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
-  // Geschützte Karten zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft
-  const protectedIds = new Set(user.tcgProtected || []);
-  const dups = owned.filter((o) => !protectedIds.has(o._id));
-  return {
-    counts,
-    lockedByCard,
-    protectedIds,
-    uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
-    cardCount: owned.reduce((s, o) => s + o.n, 0),
-    collectionValue: owned.reduce((s, o) => s + sell(o) * o.n, 0),
-    dupCount: dups.reduce((s, o) => s + o.n - 1, 0),
-    dupValue: dups.reduce((s, o) => s + sell(o) * (o.n - 1), 0),
-  };
 }
 
 router.get('/tcg', async (req, res) => {

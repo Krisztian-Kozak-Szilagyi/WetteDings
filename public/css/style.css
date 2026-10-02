@@ -757,6 +757,55 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .trade-history li { display: flex; justify-content: space-between; gap: 10px; }
 @media (max-width: 560px) { .trade-item { grid-template-columns: 48px 1fr; } .trade-item img { width: 48px; } .trade-actions { grid-column: 1 / -1; justify-content: flex-start; } }
 
+/* Tausch: zwei Karten mit Pfeil */
+.trade-item.trade-swap { grid-template-columns: 104px 1fr auto; }
+.trade-list-sm .trade-item.trade-swap { grid-template-columns: 104px 1fr; }
+.trade-thumbs { display: flex; align-items: center; gap: 4px; }
+.trade-item .trade-thumbs img { width: 44px; margin: 0; }
+.trade-thumbs img { box-shadow: 0 0 0 2px var(--rar, transparent); }
+.trade-swap-icon { flex: none; color: var(--muted); }
+@media (max-width: 560px) { .trade-item.trade-swap, .trade-list-sm .trade-item.trade-swap { grid-template-columns: 96px 1fr; } .trade-item .trade-thumbs img { width: 40px; } }
+.trade-help { margin: 0 0 14px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Handelsdialog */
+.trade-tabs.trade-tabs-3 { grid-template-columns: repeat(3, 1fr); }
+.trade-dialog {
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px; background: var(--surface); color: var(--text);
+  width: min(620px, 100vw - 24px); max-height: calc(100dvh - 24px); box-shadow: var(--shadow);
+}
+.trade-dialog::backdrop { background: rgba(3, 6, 15, .7); backdrop-filter: blur(3px); }
+.trade-dialog[open] { animation: tcg-pop .25s ease; }
+.trade-dialog-body { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 22px; align-items: start; }
+.trade-dialog-body > img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 2px var(--rar, transparent), 0 8px 24px rgba(0, 0, 0, .25); }
+.trade-dialog h2 { margin: 0 0 6px; padding-right: 36px; }
+.trade-dialog .form { gap: 10px; }
+.trade-dialog-close {
+  position: absolute; top: 10px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: 0;
+  background: var(--surface-2); color: var(--text); font-size: 1.5rem; line-height: 1; cursor: var(--cur-pointer);
+}
+@media (max-width: 560px) {
+  .trade-dialog { padding: 16px; }
+  .trade-dialog-body { grid-template-columns: 1fr; gap: 12px; }
+  .trade-dialog-body > img { width: 120px; justify-self: center; }
+}
+
+/* Tauschseite: Karten per Radio-Button auswählen */
+.trade-swap-grids { display: grid; gap: 20px; grid-template-columns: 1fr; margin-bottom: 20px; }
+@media (min-width: 960px) { .trade-swap-grids { grid-template-columns: 1fr 1fr; align-items: start; } }
+.trade-swap-grids .tcg-grid { grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); max-height: 70vh; overflow-y: auto; padding: 6px 4px; }
+.tcg-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.tcg-pick img { outline: 3px solid transparent; outline-offset: 2px; }
+.tcg-pick:has(input:checked) img { outline-color: var(--primary); }
+.tcg-pick:has(input:focus-visible) img { outline-color: var(--text); }
+.tcg-pick:has(input:checked) .tcg-slot-label { color: var(--text); }
+.trade-swap-extra { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
+.trade-swap-extra .field { margin: 0; }
+.trade-extra-from { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.trade-extra-from legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+.trade-extra-from label { display: flex; align-items: center; gap: 6px; cursor: var(--cur-pointer); }
+.trade-swap-submit .btn { margin-top: 4px; }
+.profil-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
 /* ========== IHK (Mini-Game) ========== */
 .ihk-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ihk-stage {

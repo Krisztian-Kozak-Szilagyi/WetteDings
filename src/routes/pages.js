@@ -6,6 +6,7 @@ const { str } = require('../lib/util');
 const { requireLogin } = require('../middleware');
 const coinEngine = require('../coin/engine');
 const { sellValueExpr, inventory } = require('../tcg/tcgService');
+const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 
 const router = express.Router();
@@ -92,6 +93,22 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     cardValue: owned.reduce((s, o) => s + (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell * o.n : 0), 0),
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: (profile.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && has.has(c.id)),
+    rarityByKey: catalog.rarityByKey,
+  });
+});
+
+// Sammlung eines Mitglieds (nur ansehen); bei fremden Sammlungen führt ein Klick auf eine Karte zum Tauschangebot
+router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username').lean();
+  if (!profile) return res.status(404).render('error', { title: 'Sammlung', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
+  const isMe = profile._id.equals(req.user._id);
+  res.render('profil-sammlung', {
+    title: `Sammlung von ${profile.username}`,
+    profile,
+    isMe,
+    ...(await collection(profile)),
+    cards: catalog.CARDS,
+    rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
   });
 });
