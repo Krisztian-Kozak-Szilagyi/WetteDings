@@ -96,7 +96,8 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       [res.locals.tradeIncoming, res.locals.tradeMarketNew, res.locals.newPacks, res.locals.patchNew] = await Promise.all([
-        tradeService.incomingCount(req.user._id),
+        // rot: Angebote an mich + abgeschlossene Geschäfte, von denen ich noch nichts weiß
+        Promise.all([tradeService.incomingCount(req.user._id), tradeService.newDealsCount(req.user)]).then(([a, b]) => a + b),
         tradeService.marketNewCount(req.user),
         tcgService.newPackCount(req.user), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
         forumService.patchNewCount(req.user), // Patchnotes seit dem letzten Lesen

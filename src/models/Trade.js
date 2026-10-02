@@ -37,6 +37,7 @@ const tradeSchema = new Schema(
     expiresAt: { type: Date, required: true },
     buyer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     buyerName: { type: String, default: null },
+    closedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // wer gekauft bzw. den Tausch angenommen hat – die andere Seite wird benachrichtigt
     taxPercent: { type: Number, default: 0 },
     tax: { type: Number, default: 0 }, // Cent
     closedAt: { type: Date, default: null },

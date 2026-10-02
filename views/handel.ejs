@@ -23,6 +23,23 @@
 
 <div class="trade-layout">
   <section class="trade-main">
+    <% if (newDeals.length) { %>
+      <div class="card card-accent" id="neu">
+        <h2>Neu für dich <span class="nav-badge nav-badge-inline"><%= newDeals.length %></span></h2>
+        <ul class="trade-news">
+          <% newDeals.forEach((t) => { const c = line(t.card).c; const iSold = String(t.seller) === me; const partner = iSold ? t.buyerName : t.sellerName; %>
+            <li class="<%= t.isNew ? 'is-new' : '' %>">
+              <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; %>
+                <span><%- userLink(partner) %> hat deinen Tausch angenommen: <strong><%= iSold ? c.name : w.name %></strong> gegen <strong><%= iSold ? w.name : c.name %></strong>.</span>
+              <% } else { %>
+                <span><%- userLink(partner) %> hat deine Karte <strong><%= c.name %></strong> für <strong><%= euro(t.price) %></strong> gekauft<% if (t.tax) { %> (du erhältst <%= euro(t.price - t.tax) %>)<% } %>.</span>
+              <% } %>
+              <span class="muted small nowrap"><%= date(t.closedAt) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% } %>
     <div class="card" id="eingang">
       <h2>Angebote an dich <% if (incoming.length) { %><span class="nav-badge nav-badge-inline"><%= incoming.length %></span><% } %></h2>
       <% if (!incoming.length) { %>
@@ -80,14 +97,26 @@
       <% } %>
     </div>
 
-    <div class="card" id="markt">
-      <h2>Markt</h2>
+    <div class="card" id="markt" data-market>
+      <div class="tcg-coll-head">
+        <h2>Markt</h2>
+        <% if (market.length) { %>
+          <input type="search" class="market-search" data-market-search maxlength="40" placeholder="Karte suchen …" aria-label="Markt nach Kartenname durchsuchen">
+        <% } %>
+      </div>
       <% if (!market.length) { %>
         <p class="muted">Auf dem Markt ist gerade nichts im Angebot.</p>
       <% } else { %>
+        <div class="tcg-filter market-filter" role="tablist" aria-label="Markt nach Seltenheit filtern">
+          <button type="button" class="chip active" data-market-rarity="all" role="tab" aria-selected="true">Alle</button>
+          <% rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).forEach((r) => { %>
+            <button type="button" class="chip" data-market-rarity="<%= r.key %>" role="tab" aria-selected="false"><%= r.label %></button>
+          <% }) %>
+        </div>
+        <p class="muted" data-market-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
         <ul class="trade-list">
           <% market.forEach((t) => { const { c, r } = line(t.card); const lacks = t.price - bal; %>
-            <li class="trade-item r-<%= c.rarity %>">
+            <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
               <%- include('partials/trade-thumbs', { a: c }) %>
               <div class="trade-info">
                 <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
@@ -186,14 +215,14 @@
           <% history.forEach((t) => { const { c } = line(t.card); const sold = String(t.seller) === me; %>
             <li>
               <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; const x = extra(t); const got = sold ? w : c; const gave = sold ? c : w; %>
-                <span>Getauscht mit <%= sold ? t.buyerName : t.sellerName %>: <strong><%= gave.name %></strong> gegen <strong><%= got.name %></strong></span>
+                <span>Getauscht mit <%- userLink(sold ? t.buyerName : t.sellerName) %>: <strong><%= gave.name %></strong> gegen <strong><%= got.name %></strong><br><span class="muted small"><%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></span>
                 <% if (t.price) { %>
                   <span class="<%= x.iPay ? 'neg' : 'pos' %> nowrap"><%= x.iPay ? '−' + euro(t.price) : '+' + euro(t.price - t.tax) %></span>
                 <% } else { %>
                   <span class="muted nowrap">±0</span>
                 <% } %>
               <% } else { %>
-                <span><%= sold ? 'Verkauft an ' + t.buyerName : 'Gekauft von ' + t.sellerName %>: <strong><%= c.name %></strong></span>
+                <span><%= sold ? 'Verkauft an ' : 'Gekauft von ' %><%- userLink(sold ? t.buyerName : t.sellerName) %>: <strong><%= c.name %></strong><br><span class="muted small"><%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></span>
                 <span class="<%= sold ? 'pos' : 'neg' %> nowrap"><%= sold ? '+' + euro(t.price - t.tax) : '−' + euro(t.price) %></span>
               <% } %>
             </li>

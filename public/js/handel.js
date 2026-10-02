@@ -37,6 +37,35 @@
     });
   }
 
+  // ---------- Markt: nach Seltenheit und Kartenname filtern ----------
+  var marketBox = $('[data-market]');
+  if (marketBox && $('[data-market-item]', marketBox)) {
+    var marketSearch = $('[data-market-search]', marketBox);
+    var marketEmpty = $('[data-market-empty]', marketBox);
+    var marketRarity = 'all';
+    var filterMarket = function () {
+      var q = (marketSearch.value || '').trim().toLowerCase();
+      var shown = 0;
+      $all('[data-market-item]', marketBox).forEach(function (li) {
+        var ok = (marketRarity === 'all' || li.getAttribute('data-rarity') === marketRarity) && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
+        li.hidden = !ok;
+        if (ok) shown++;
+      });
+      marketEmpty.hidden = shown > 0;
+    };
+    $all('[data-market-rarity]', marketBox).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        marketRarity = btn.getAttribute('data-market-rarity');
+        $all('[data-market-rarity]', marketBox).forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+        });
+        filterMarket();
+      });
+    });
+    marketSearch.addEventListener('input', filterMarket);
+  }
+
   // ---------- Verhandlung: Nachrichten live nachladen ----------
   var chat = $('[data-chat]');
   if (chat) {

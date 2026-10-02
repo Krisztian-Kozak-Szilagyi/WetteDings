@@ -1650,3 +1650,11 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .forum-row-last { min-width: 0; }
 .forum-row-last a { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .forum-row-last br { display: none; }
+
+/* Handel: Markt-Filter, neue Geschäfte */
+.market-search[type="search"] { width: min(220px, 50vw); height: 36px; min-height: 0; padding: 4px 12px; }
+.market-filter { margin: 10px 0 12px; }
+.trade-item[hidden] { display: none; }
+.trade-news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.trade-news li { display: flex; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; }
+.trade-history li.is-new { box-shadow: inset 3px 0 0 var(--primary); padding-left: 10px; }

@@ -16,9 +16,11 @@ router.get('/handel', async (req, res) => {
   const [data] = await Promise.all([
     trade.overview(req.user),
     // Besuch merken: der Markt gilt ab jetzt als gesehen
-    User.updateOne({ _id: req.user._id }, { $set: { marketSeenAt: new Date() } }),
+    User.updateOne({ _id: req.user._id }, { $set: { marketSeenAt: new Date(), dealsSeenAt: new Date() } }),
   ]);
   res.locals.tradeMarketNew = 0;
+  // die gerade gezeigten neuen Geschäfte zählen im Abzeichen nicht mehr mit
+  res.locals.tradeIncoming = Math.max(0, (res.locals.tradeIncoming || 0) - data.newDeals.length);
 
   res.render('handel', {
     title: 'Handel',

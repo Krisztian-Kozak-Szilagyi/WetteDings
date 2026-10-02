@@ -116,6 +116,18 @@ const incomingFilter = (userId) => ({
 });
 const incomingCount = (userId) => Trade.countDocuments(incomingFilter(userId));
 
+/**
+ * Abgeschlossene Geschäfte, über die ein Mitglied noch nicht Bescheid weiß: Jemand anderes hat seine
+ * Karte gekauft oder seinen Tausch-Vorschlag angenommen (closedBy ist die handelnde Seite).
+ */
+const newDealsFilter = (user) => ({
+  status: 'verkauft',
+  $or: [{ seller: user._id }, { buyer: user._id }],
+  closedBy: { $nin: [null, user._id] },
+  closedAt: { $gt: user.dealsSeenAt || user.createdAt },
+});
+const newDealsCount = (user) => Trade.countDocuments(newDealsFilter(user));
+
 /** Offene Markt-Angebote anderer, die seit dem letzten Besuch der Handelsseite eingestellt wurden */
 const marketNewFilter = (user) => ({
   ...openFilter(),
@@ -133,11 +145,15 @@ async function overview(user) {
     Trade.find({ ...open, to: me }).select('-messages').sort({ createdAt: -1 }).lean(),
     Trade.find({ ...open, kind: 'markt', seller: { $ne: me } }).sort({ createdAt: -1 }).limit(200).lean(),
     Trade.find({ ...open, seller: me }).select('-messages').sort({ createdAt: -1 }).lean(),
-    Trade.find({ status: 'verkauft', $or: [{ seller: me }, { buyer: me }] }).sort({ closedAt: -1 }).limit(10).lean(),
+    Trade.find({ status: 'verkauft', $or: [{ seller: me }, { buyer: me }] }).select('-messages').sort({ closedAt: -1 }).limit(15).lean(),
     collection(user),
     User.find({ _id: { $ne: me }, deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
   ]);
-  return { incoming, market, mine, history, coll, users };
+  // neu für dieses Mitglied: von der anderen Seite abgeschlossen, seit dem letzten Besuch
+  const seen = user.dealsSeenAt || user.createdAt;
+  const isNewDeal = (t) => !!t.closedBy && String(t.closedBy) !== String(me) && t.closedAt > seen;
+  const deals = history.map((t) => ({ ...t, isNew: isNewDeal(t) }));
+  return { incoming, market, mine, history: deals, newDeals: deals.filter((t) => t.isNew), coll, users };
 }
 
 // ---------- Aktionen ----------
@@ -244,7 +260,7 @@ async function buy({ user, tradeId }) {
     const moved = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
     if (moved.modifiedCount !== 1) throw new UserError('Die Karte ist nicht mehr verfügbar.');
 
-    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, taxPercent: settings.taxPercent, tax: money.tax, closedAt: new Date() });
+    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: settings.taxPercent, tax: money.tax, closedAt: new Date() });
     await trade.save({ session });
     return { trade, tax: money.tax };
   });
@@ -299,6 +315,7 @@ async function acceptSwap({ user, tradeId, version }) {
       status: 'verkauft',
       buyer: trade.to, // beim Tausch immer der Empfänger, egal wer zuletzt angenommen hat
       buyerName: trade.toName,
+      closedBy: user._id, // wer angenommen hat
       wantCardDoc: doc._id,
       taxPercent: settings.taxPercent,
       tax: money ? money.tax : 0,
@@ -408,6 +425,8 @@ module.exports = {
   termsText,
   incomingFilter,
   incomingCount,
+  newDealsFilter,
+  newDealsCount,
   marketNewFilter,
   marketNewCount,
   overview,

@@ -115,3 +115,12 @@ test('Geldfluss: Tausch ohne Aufpreis bewegt kein Geld, mit Aufpreis je nach Ric
   assert.deepEqual(trade.settlement({ ...base, price: 999, extraFrom: 'seller' }, { taxPercent: 5 }), { payer: 's', payee: 't', amount: 999, tax: 49 });
   assert.deepEqual(trade.settlement({ ...base, price: 999, extraFrom: 'to' }, { taxPercent: 5 }), { payer: 't', payee: 's', amount: 999, tax: 49 });
 });
+
+test('Neue Geschäfte: nur von der anderen Seite abgeschlossene, seit dem letzten Besuch', () => {
+  const seen = new Date('2026-03-01');
+  const f = trade.newDealsFilter({ _id: 'u1', createdAt: new Date('2026-01-01'), dealsSeenAt: seen });
+  assert.equal(f.status, 'verkauft');
+  assert.deepEqual(f.$or, [{ seller: 'u1' }, { buyer: 'u1' }]);
+  assert.deepEqual(f.closedBy, { $nin: [null, 'u1'] }); // eigene Käufe und alte Geschäfte ohne Angabe zählen nicht
+  assert.equal(f.closedAt.$gt, seen);
+});

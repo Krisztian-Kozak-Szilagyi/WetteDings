@@ -12,6 +12,8 @@ const userSchema = new Schema(
     lastBonusDay: { type: String, default: null },
     // Zeitpunkt des letzten Besuchs der Handelsseite (für das Markt-Abzeichen im Menü)
     marketSeenAt: { type: Date, default: null },
+    // bis wann abgeschlossene Geschäfte (Karte verkauft, Tausch angenommen) schon gesehen wurden
+    dealsSeenAt: { type: Date, default: null },
     // Letzter Besuch der TCG-Seite bzw. der Patchnotes (für die Abzeichen "neue Packs" / "neue Patchnotes")
     packsSeenAt: { type: Date, default: null },
     patchSeenAt: { type: Date, default: null },
