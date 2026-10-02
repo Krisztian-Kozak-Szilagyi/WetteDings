@@ -126,7 +126,7 @@
 
 <div class="card" id="mods">
   <h2>Mods</h2>
-  <p class="muted">Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.</p>
+  <p class="muted">Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.</p>
   <% { const list = users.filter((u) => u.role === 'mod'); %>
   <% if (!list.length) { %>
     <p class="muted">Aktuell gibt es keine Mods.</p>

@@ -76,8 +76,15 @@ const can = {
   /** Themen eröffnen: in Team-Bereichen nur Admin/Dev */
   createThread: (user, cat) => !cat.staffOnly || user.isStaff,
   reply: (user, thread) => !thread.locked || user.canModerate,
-  /** Bereiche anlegen/ändern */
-  manage: (user) => user.isStaff,
+  /** Bereiche anlegen: die ganze Moderation (auch Mods – das Forum zu pflegen ist ihre Aufgabe) */
+  manage: (user) => !!user.canModerate,
+  /**
+   * Einen bestimmten Bereich ändern/löschen bzw. darin Unterbereiche anlegen.
+   * Team-Bereiche ("Admin & Dev" samt Unterbereichen) sind geschützt: dort nur Admin/Dev.
+   */
+  manageCategory: (user, cat, parent) => !!user.isStaff || (!!user.isMod && !cat.staffOnly && !(parent && parent.staffOnly)),
+  /** Einen Bereich zum Team-Bereich machen (oder das zurücknehmen): nur Admin/Dev */
+  setStaffOnly: (user) => !!user.isStaff,
   editPost(user, post, thread) {
     if (post.deleted) return false;
     if (user.canModerate) return true;

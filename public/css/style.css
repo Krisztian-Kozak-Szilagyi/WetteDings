@@ -1636,3 +1636,6 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 @media (prefers-reduced-motion: reduce) {
   .role-say, .role-say-label::before, .role-say-label::after { animation: none; }
 }
+
+/* Bereich bearbeiten: Abstand zwischen "Speichern" und "Bereich löschen" */
+.forum-cat-delete { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }

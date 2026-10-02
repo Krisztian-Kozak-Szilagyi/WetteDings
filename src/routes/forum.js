@@ -75,7 +75,15 @@ router.get('/forum', async (req, res) => {
       const own = withStats(c);
       return { ...own, subs, unread: own.stats.unread + subs.reduce((n, s) => n + s.stats.unread, 0) };
     });
-  res.render('forum', { title: 'Forum', roots, reports, canManage: forum.can.manage(req.user), allCats: cats });
+  res.render('forum', {
+    title: 'Forum',
+    roots,
+    reports,
+    canManage: forum.can.manage(req.user),
+    canSetStaffOnly: forum.can.setStaffOnly(req.user),
+    // Hauptbereiche, unter denen dieses Mitglied Unterbereiche anlegen darf
+    parentChoices: cats.filter((c) => !c.parent && forum.can.manageCategory(req.user, c, null)),
+  });
 });
 
 // ---------- Bereich ----------
@@ -107,7 +115,8 @@ router.get('/forum/k/:id', async (req, res) => {
     pages,
     total,
     canCreate: forum.can.createThread(req.user, cat),
-    canManage: forum.can.manage(req.user),
+    canManage: forum.can.manageCategory(req.user, cat, parent),
+    canSetStaffOnly: forum.can.setStaffOnly(req.user),
     myTags: tagsFor(forum.roleOfUser(req.user)),
     titleMax: forum.TITLE_MAX,
     bodyMax: forum.BODY_MAX,
@@ -235,7 +244,7 @@ function categoryInput(req) {
   return {
     title,
     description: str(req.body.description).trim().slice(0, 200),
-    staffOnly: req.body.staffOnly === '1',
+    staffOnly: forum.can.setStaffOnly(req.user) && req.body.staffOnly === '1', // Mods können keine Team-Bereiche anlegen
     order: Math.max(0, Math.min(999, Number.parseInt(req.body.order, 10) || 0)),
   };
 }
@@ -250,6 +259,7 @@ router.post('/forum/bereiche', (req, res, next) => {
       parent = valid(parentId) ? await ForumCategory.findById(parentId).lean() : null;
       if (!parent) throw new UserError('Den übergeordneten Bereich gibt es nicht.');
       if (parent.parent) throw new UserError('Unterbereiche können keine eigenen Unterbereiche haben.');
+      if (!forum.can.manageCategory(req.user, parent, null)) throw new UserError('In Team-Bereichen legen nur Admin und Devs Unterbereiche an.');
     }
     await ForumCategory.create({ ...data, parent: parent ? parent._id : null });
     req.flash('success', `Bereich „${data.title}“ angelegt.`);
@@ -260,17 +270,21 @@ router.post('/forum/bereiche', (req, res, next) => {
 router.post('/forum/bereiche/:id', (req, res, next) => {
   if (!forum.can.manage(req.user)) return next('route');
   return act(req, res, `/forum/k/${req.params.id}`, async () => {
-    if (!valid(req.params.id)) throw new UserError('Diesen Bereich gibt es nicht.');
+    const cat = valid(req.params.id) ? await ForumCategory.findById(req.params.id).lean() : null;
+    if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
+    const parent = cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
+    if (!forum.can.manageCategory(req.user, cat, parent)) throw new UserError('Team-Bereiche können nur Admin und Devs ändern.');
     if (req.body.action === 'loeschen') {
-      const [threads, subs, cat] = await Promise.all([ForumThread.countDocuments({ category: req.params.id, deleted: false }), ForumCategory.countDocuments({ parent: req.params.id }), ForumCategory.findById(req.params.id).lean()]);
-      if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
+      const [threads, subs] = await Promise.all([ForumThread.countDocuments({ category: cat._id, deleted: false }), ForumCategory.countDocuments({ parent: cat._id })]);
       if (cat.key) throw new UserError('Dieser Bereich wird von der Seite gebraucht und kann nicht gelöscht werden.');
       if (threads || subs) throw new UserError('Nur leere Bereiche (ohne Themen und Unterbereiche) können gelöscht werden.');
       await ForumCategory.deleteOne({ _id: cat._id });
       req.flash('info', `Bereich „${cat.title}“ gelöscht.`);
       return cat.parent ? `/forum/k/${cat.parent}` : '/forum';
     }
-    await ForumCategory.updateOne({ _id: req.params.id }, { $set: categoryInput(req) });
+    const data = categoryInput(req);
+    if (!forum.can.setStaffOnly(req.user)) delete data.staffOnly; // Mods ändern den Team-Status nicht
+    await ForumCategory.updateOne({ _id: cat._id }, { $set: data });
     req.flash('success', 'Bereich gespeichert.');
     return null;
   });

@@ -54,8 +54,16 @@ test('Rechte: bearbeiten, löschen, Team-Bereiche, geschlossene Themen', () => {
   // Team-Bereich: nur Admin/Dev eröffnen Themen; geschlossene Themen: nur die Moderation antwortet
   assert.ok(!can.createThread(member, { staffOnly: true }) && !can.createThread(mod, { staffOnly: true }) && can.createThread(dev, { staffOnly: true }) && can.createThread(member, { staffOnly: false }));
   assert.ok(!can.reply(member, { locked: true }) && can.reply(mod, { locked: true }) && can.reply(member, open));
-  // Original gelöschter Beiträge und Bereiche verwalten: nur Admin/Dev
-  assert.ok(can.seeOriginal(dev) && !can.seeOriginal(mod) && can.manage(dev) && !can.manage(mod));
+  // Original gelöschter Beiträge: nur Admin/Dev
+  assert.ok(can.seeOriginal(dev) && !can.seeOriginal(mod));
+  // Bereiche verwalten: auch Mods – außer in Team-Bereichen (auch deren Unterbereiche) und ohne den Team-Status zu setzen
+  assert.ok(can.manage(dev) && can.manage(mod) && !can.manage(member));
+  const team = { staffOnly: true };
+  const normal = { staffOnly: false };
+  assert.ok(can.manageCategory(mod, normal, null) && can.manageCategory(mod, normal, normal));
+  assert.ok(!can.manageCategory(mod, team, null) && !can.manageCategory(mod, normal, team));
+  assert.ok(can.manageCategory(dev, team, null) && !can.manageCategory(member, normal, null));
+  assert.ok(can.setStaffOnly(dev) && !can.setStaffOnly(mod));
 });
 
 test('Ungelesen: neuer als der letzte Besuch oder noch nie geöffnet', () => {
