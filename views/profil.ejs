@@ -39,6 +39,9 @@
 <% if (ban) { %>
   <p class="ban-note">Dieser Spieler war bereits gebannt, gebannt von: <%= ban.by || '–' %>, Grund: <%= ban.reason || '–' %></p>
 <% } %>
+<% if (top1) { %>
+  <p class="top1-note">Dieser Spieler war <%= top1 %> lang Top 1.</p>
+<% } %>
 
 <div class="stats stats-4">
   <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>

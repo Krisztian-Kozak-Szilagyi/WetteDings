@@ -471,6 +471,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .device-level-1 { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 /* Profil: Sperr-Vermerk unter dem Namen – schlichter Text ohne Kasten */
 .ban-note { margin: -8px 0 16px; color: var(--nein); font-size: .92rem; font-weight: 600; overflow-wrap: anywhere; }
+.top1-note { margin: -8px 0 16px; color: var(--muted); font-size: .92rem; font-weight: 600; }
+.ban-note + .top1-note { margin-top: -12px; }
 /* Moderations-Menü (Profil, nur Admin): Knopf mit aufklappendem Ban-Formular */
 .mod-menu { position: relative; }
 .mod-menu > summary { list-style: none; }

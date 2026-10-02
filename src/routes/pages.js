@@ -6,8 +6,8 @@ const { str } = require('../lib/util');
 const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
-const coinEngine = require('../coin/engine');
-const { sellValueExpr, inventory } = require('../tcg/tcgService');
+const rankService = require('../services/rankService');
+const { inventory } = require('../tcg/tcgService');
 const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 
@@ -16,53 +16,7 @@ const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
 // Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer
 router.get('/rangliste', requireLogin, async (req, res) => {
-  // Gesamtvermögen = Kontostand + offene Einsätze + Wert der Samantha Coins zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis)
-  const centsPerUnit = coinEngine.isRunning() ? (coinEngine.getPrice() * 100) / 1e8 : 0;
-  const leaders = await User.aggregate([
-    { $match: { deletedAt: null } }, // gelöschte Konten erscheinen nicht
-    {
-      $lookup: {
-        from: 'positions',
-        let: { uid: '$_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$user', '$$uid'] }, payout: null } },
-          { $group: { _id: null, s: { $sum: '$amount' } } },
-        ],
-        as: 'open',
-      },
-    },
-    {
-      $lookup: {
-        from: 'coinholdings',
-        localField: '_id',
-        foreignField: 'user',
-        as: 'coins',
-      },
-    },
-    {
-      $lookup: {
-        from: 'tcgcards',
-        let: { uid: '$_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$user', '$$uid'] } } },
-          { $group: { _id: null, s: { $sum: sellValueExpr() } } },
-        ],
-        as: 'cards',
-      },
-    },
-    // ungeöffnete Booster Packs zählen zum aktuellen Packpreis bei den Karten mit
-    { $lookup: { from: 'tcgpacks', localField: '_id', foreignField: 'user', as: 'packs' } },
-    {
-      $addFields: {
-        inPlay: { $ifNull: [{ $first: '$open.s' }, 0] },
-        coinValue: { $floor: { $multiply: [{ $ifNull: [{ $sum: '$coins.units' }, 0] }, centsPerUnit] } },
-        cardValue: { $add: [{ $ifNull: [{ $first: '$cards.s' }, 0] }, { $multiply: [{ $size: '$packs' }, tcgSettings.getPackPrice()] }] },
-      },
-    },
-    { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue'] } } },
-    { $sort: { total: -1, createdAt: 1 } },
-    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, total: 1 } },
-  ]);
+  const leaders = await rankService.ranking();
   // Platz über alle Mitglieder; die Suche filtert danach, damit der Platz stimmt
   leaders.forEach((u, i) => {
     u.rank = i + 1;
@@ -75,7 +29,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower createdAt tcgFavorites bannedUntil banReason bannedAt bannedByName').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const [owned, mine, statsAgg] = await Promise.all([
     inventory(profile._id),
@@ -94,6 +48,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), by: profile.bannedByName, reason: profile.banReason } : null,
     canBan: req.user.isAdmin && !config.adminUsernames.includes(profile.usernameLower),
     maxBanHours: deviceLogic.MAX_BAN_HOURS,
+    // Zeit auf Platz 1 der Rangliste als Text; leer, wenn das Mitglied nie Erster war
+    top1: rankService.top1Text(profile.top1Seconds),
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,

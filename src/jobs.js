@@ -2,6 +2,7 @@ const config = require('./config');
 const Bet = require('./models/Bet');
 const { resolveBet, SYSTEM_ACTOR } = require('./services/betService');
 const { runLottery } = require('./services/lotteryService');
+const rankService = require('./services/rankService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -41,6 +42,11 @@ function startJobs() {
   const lottery = () => runLottery().catch((err) => console.error('Lotterie-Fehler:', err));
   lottery();
   setInterval(lottery, 15 * 1000).unref();
+
+  // Rangliste: jede Minute festhalten, wer gerade auf Platz 1 steht (Anzeige im Profil)
+  const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));
+  top1();
+  setInterval(top1, rankService.TICK_MS).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };
