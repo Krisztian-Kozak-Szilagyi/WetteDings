@@ -1,0 +1,14 @@
+# Nur das, was die App zum Laufen braucht, kommt ins Image
+.git
+.github
+.claude
+node_modules
+test
+deploy
+.env
+.env.*
+*.log
+*.md
+Dockerfile
+.dockerignore
+ecosystem.config.js

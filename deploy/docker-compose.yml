@@ -1,0 +1,32 @@
+# Betrieb als Container auf dem Server. Diese Datei wird beim Deployment nach /var/www/wettstube kopiert
+# und liegt dort neben der .env (die Einstellungen und Geheimnisse bleiben also auf dem Server).
+#
+# IMAGE      Adresse des Images in der GitHub-Registry (setzt das Deployment)
+# IMAGE_TAG  Version = Commit; für ein Zurückrollen von Hand:
+#            IMAGE=… IMAGE_TAG=<älterer Commit> docker compose up -d
+services:
+  app:
+    image: ${IMAGE:?IMAGE fehlt}:${IMAGE_TAG:-latest}
+    container_name: wettstube
+    restart: unless-stopped
+    init: true # leitet Signale sauber weiter, damit der Kurs beim Stoppen gespeichert wird
+    env_file: .env
+    environment:
+      # im Container auf allen Schnittstellen lauschen – von außen ist nur 127.0.0.1:3100 erreichbar (Nginx davor)
+      HOST: 0.0.0.0
+      PORT: 3100
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:3100:3100'
+    stop_grace_period: 20s
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3100/regeln').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'

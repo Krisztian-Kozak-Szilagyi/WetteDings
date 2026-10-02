@@ -1,17 +1,24 @@
-# Automatisches Deployment: Alles, was auf main landet, wird getestet und – wenn die Tests grün sind –
-# auf den Server übertragen; danach wird die App neu gestartet und geprüft, ob sie antwortet.
+# Automatisches Deployment: Alles, was auf main landet, wird getestet, als Container-Image gebaut und –
+# wenn die Tests grün sind – auf den Server gebracht; danach wird geprüft, ob die App antwortet.
+#
+# Zwei Betriebsarten, umschaltbar über die Repository-Variable DEPLOY_MODE
+# (GitHub → Settings → Secrets and variables → Actions → Reiter "Variables"):
+#   pm2     (Standard, auch wenn die Variable fehlt): Dateien per rsync, Neustart mit pm2
+#   docker  Der Server holt das fertige Image aus der GitHub-Registry und startet es per docker compose
+# Das Umschalten räumt die jeweils andere Betriebsart selbst auf (Port 3100 kann nur einer belegen).
 #
 # Benötigte Secrets (GitHub → Settings → Secrets and variables → Actions):
 #   DEPLOY_HOST         Adresse des Servers
 #   DEPLOY_USER         SSH-Benutzer
 #   DEPLOY_SSH_KEY      privater SSH-Schlüssel nur für dieses Deployment
-#   DEPLOY_KNOWN_HOSTS  Ausgabe von: ssh-keyscan <Adresse des Servers>
-# Solange die Secrets fehlen, laufen nur die Tests – es wird nichts übertragen.
+#   DEPLOY_KNOWN_HOSTS  öffentlicher Host-Schlüssel des Servers ("<Adresse> ssh-ed25519 …")
+# Solange die Secrets fehlen, wird nur getestet und gebaut – es wird nichts übertragen.
 name: Deploy
 
 on:
   push:
     branches: [main]
+  workflow_dispatch: # von Hand starten: Actions → Deploy → Run workflow
 
 # nie zwei Deployments gleichzeitig; ein laufendes wird zu Ende geführt
 concurrency:
@@ -20,6 +27,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   test:
@@ -34,23 +42,80 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  deploy:
-    name: Auf den Server übertragen
+  image:
+    name: Container-Image bauen
     needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.meta.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image-Adresse (klein geschrieben)
+        id: meta
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true # erst lokal laden und prüfen, hochgeladen wird danach
+          tags: |
+            ${{ steps.meta.outputs.name }}:${{ github.sha }}
+            ${{ steps.meta.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Startet das Image mit einer leeren Wegwerf-Datenbank und prüft, ob die Seite antwortet.
+      # Ein Image, das nicht hochfährt, kommt so gar nicht erst in die Registry.
+      - name: Probelauf des Images
+        env:
+          IMAGE: ${{ steps.meta.outputs.name }}:${{ github.sha }}
+        run: |
+          docker network create probe
+          docker run -d --name probe-db --network probe mongo:7 --replSet rs0
+          for i in $(seq 1 30); do
+            docker exec probe-db mongosh --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate().ok }' >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker run -d --name probe-app --network probe -p 3100:3100 \
+            -e MONGODB_URI='mongodb://probe-db:27017/probe?replicaSet=rs0&directConnection=true' \
+            -e SESSION_SECRET="$(openssl rand -hex 32)" -e HOST=0.0.0.0 -e PORT=3100 "$IMAGE"
+          for i in $(seq 1 45); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3100/regeln; then echo 'Image startet und antwortet.'; exit 0; fi
+            sleep 2
+          done
+          echo 'Das Image antwortet nicht.' >&2
+          docker logs probe-app >&2 || true
+          exit 1
+
+      - name: Image hochladen
+        run: docker push --all-tags "${{ steps.meta.outputs.name }}"
+
+  deploy:
+    name: Auf den Server bringen
+    needs: [test, image]
     runs-on: ubuntu-latest
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_MODE: ${{ vars.DEPLOY_MODE || 'pm2' }}
       APP_DIR: /var/www/wettstube
       PM2_NAME: wettstube
+      IMAGE: ${{ needs.image.outputs.name }}
+      IMAGE_TAG: ${{ github.sha }}
     steps:
       - name: Secrets vorhanden?
         id: ready
         run: |
           if [ -n "$DEPLOY_HOST" ] && [ -n "$DEPLOY_USER" ] && [ -n "$DEPLOY_SSH_KEY" ] && [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Betriebsart: $DEPLOY_MODE"
           else
             echo "::notice::Deployment übersprungen – die DEPLOY_*-Secrets sind noch nicht eingerichtet."
           fi
@@ -66,36 +131,70 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host server\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n' "$DEPLOY_HOST" "$DEPLOY_USER" > ~/.ssh/config
 
-      - name: Sicherung auf dem Server
-        if: steps.ready.outputs.ok == 'true'
-        run: |
-          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
-            "cd '$APP_DIR' && tar czf /root/wettstube-backup-deploy.tgz server.js package.json package-lock.json src views public/css public/js"
+      # ---------------- Betriebsart pm2 ----------------
+      - name: 'pm2: Sicherung auf dem Server'
+        if: steps.ready.outputs.ok == 'true' && env.DEPLOY_MODE != 'docker'
+        run: ssh server "cd '$APP_DIR' && tar czf /root/wettstube-backup-deploy.tgz server.js package.json package-lock.json src views public/css public/js"
 
       # --delete: entfernte Dateien verschwinden auch auf dem Server (z. B. gelöschte Karten oder Seiten).
       # .env und node_modules liegen daneben und werden nicht angefasst.
-      - name: Dateien übertragen
-        if: steps.ready.outputs.ok == 'true'
-        run: |
-          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
-            server.js package.json package-lock.json src views public \
-            "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
+      - name: 'pm2: Dateien übertragen'
+        if: steps.ready.outputs.ok == 'true' && env.DEPLOY_MODE != 'docker'
+        run: rsync -az --delete server.js package.json package-lock.json ecosystem.config.js src views public scripts "server:$APP_DIR/"
 
-      - name: Abhängigkeiten, Neustart, Kontrolle
-        if: steps.ready.outputs.ok == 'true'
+      - name: 'pm2: Abhängigkeiten und Neustart'
+        if: steps.ready.outputs.ok == 'true' && env.DEPLOY_MODE != 'docker'
         run: |
-          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "
+          ssh server "
             set -e
             cd '$APP_DIR'
+            # falls vorher der Container lief: stoppen, damit Port 3100 frei ist
+            if command -v docker >/dev/null 2>&1 && [ -f docker-compose.yml ]; then IMAGE=unused docker compose down || true; fi
             npm ci --omit=dev --no-audit --no-fund
-            pm2 restart '$PM2_NAME' --update-env
-            # warten, bis die App wieder antwortet (Start inkl. Datenbank und Kurs-Engine)
-            for i in \$(seq 1 30); do
+            if pm2 describe '$PM2_NAME' >/dev/null 2>&1; then pm2 restart '$PM2_NAME' --update-env; else pm2 start ecosystem.config.js; fi
+            pm2 save
+          "
+
+      # ---------------- Betriebsart docker ----------------
+      - name: 'docker: Compose-Datei übertragen'
+        if: steps.ready.outputs.ok == 'true' && env.DEPLOY_MODE == 'docker'
+        run: rsync -az deploy/docker-compose.yml "server:$APP_DIR/docker-compose.yml"
+
+      # Der Server meldet sich nur für diesen Lauf an der Registry an (kurzlebiges Token über die Standardeingabe)
+      - name: 'docker: Image holen und starten'
+        if: steps.ready.outputs.ok == 'true' && env.DEPLOY_MODE == 'docker'
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | ssh server "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
+          ssh server "
+            set -e
+            cd '$APP_DIR'
+            export IMAGE='$IMAGE' IMAGE_TAG='$IMAGE_TAG'
+            docker compose pull
+            # falls vorher pm2 lief: stoppen, damit Port 3100 frei ist (erst jetzt, das Image liegt schon bereit)
+            if command -v pm2 >/dev/null 2>&1 && pm2 describe '$PM2_NAME' >/dev/null 2>&1; then pm2 delete '$PM2_NAME'; pm2 save --force; fi
+            docker compose up -d --remove-orphans
+            # merken, welche Version läuft (für einen Neustart von Hand)
+            printf 'IMAGE=%s\nIMAGE_TAG=%s\n' '$IMAGE' '$IMAGE_TAG' > .image
+            docker logout ghcr.io
+            # alte Images aufräumen, die letzten bleiben für ein schnelles Zurückrollen
+            docker image prune -af --filter 'until=336h' >/dev/null || true
+          "
+
+      # ---------------- Kontrolle (beide Betriebsarten) ----------------
+      - name: Antwortet die App?
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          ssh server "
+            for i in \$(seq 1 40); do
               if curl -fsS -o /dev/null http://127.0.0.1:3100/regeln; then echo 'App antwortet.'; exit 0; fi
               sleep 2
             done
             echo 'Die App antwortet nach dem Neustart nicht.' >&2
-            pm2 logs '$PM2_NAME' --lines 30 --nostream >&2 || true
+            if [ '$DEPLOY_MODE' = 'docker' ]; then docker logs --tail 40 wettstube >&2 || true; else pm2 logs '$PM2_NAME' --lines 40 --nostream >&2 || true; fi
             exit 1
           "
