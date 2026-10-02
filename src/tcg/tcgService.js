@@ -34,6 +34,12 @@ async function buyPack({ user, type, count = 1 }) {
   });
 }
 
+/** Karten als "schon besessen" merken (Album, "Neu" beim Packöffnen). Optional in einer Transaktion. */
+async function markSeen(userId, cardIds, session) {
+  const ids = [...new Set(cardIds.filter(Boolean))];
+  if (ids.length) await User.updateOne({ _id: userId }, { $addToSet: { tcgSeen: { $each: ids } } }, { session });
+}
+
 /** Booster Packs verschenken (Quest-Fund, Admin). Optional innerhalb einer laufenden Transaktion. */
 async function grantPacks({ userId, type, count = 1, source, session }) {
   const t = packType(type);
@@ -60,8 +66,17 @@ async function openPack({ user, type }) {
       drawn.map((c) => ({ user: user._id, card: c.id, rarity: c.rarity, opening: opening._id })),
       { session }
     );
+    // "Neu" = noch nie besessen; zieht ein Pack dieselbe neue Karte doppelt, ist nur die erste neu
+    const me = await User.findById(user._id).select('tcgSeen').session(session).lean();
+    const seen = new Set((me && me.tcgSeen) || []);
+    const isNew = drawn.map((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+    await markSeen(user._id, drawn.map((c) => c.id), session);
     const packsLeft = await TcgPack.countDocuments({ user: user._id, type: t.key }).session(session);
-    return { cards: drawn, packsLeft, openingId: opening._id };
+    return { cards: drawn, isNew, packsLeft, openingId: opening._id };
   });
 }
 
@@ -206,4 +221,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

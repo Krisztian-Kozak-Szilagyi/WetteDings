@@ -6,6 +6,8 @@
   //       'pick'  – Auswahl per Radio-Button (pickName, picked), funktioniert ohne JS
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
   // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
+  // seenIds: schon einmal besessene Karten – fehlen sie, werden sie durchsichtig statt als "?" gezeigt
+  const seenIds = locals.seenIds || new Set();
   const showMissing = locals.showMissing !== false;
   const locks = locals.lockedByCard || {};
   const isAlbum = mode === 'album';
@@ -65,6 +67,11 @@
           <% inner() %>
         </div>
       <% } %>
+    <% } else if (seenIds.has(c.id)) { %>
+      <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen">
+        <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – früher besessen" loading="lazy" width="720" height="1008">
+        <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+      </div>
     <% } else { %>
       <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Noch nicht gezogen">
         <div class="tcg-locked-inner"><span>?</span></div>

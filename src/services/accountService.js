@@ -115,6 +115,7 @@ async function deleteAccount({ user, password }) {
           realName: null,
           tcgProtected: [],
           tcgFavorites: [],
+          tcgSeen: [],
         },
         $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
       },

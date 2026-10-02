@@ -256,6 +256,13 @@
       img.src = c.image;
       img.alt = c.name + ' (' + c.rarityLabel + ')';
       btn.querySelector('.tcg-flip-label span:last-child').textContent = c.rarityLabel + ' · ' + c.sell;
+      // noch nie besessen: "Neu"-Marke unter der Karte (sichtbar, sobald die Karte aufgedeckt ist)
+      if (c.isNew) {
+        var neu = document.createElement('span');
+        neu.className = 'tcg-new-badge';
+        neu.textContent = 'Neu';
+        btn.querySelector('.tcg-flip-label').appendChild(neu);
+      }
       btn.addEventListener('click', function () { flip(btn, c); });
       cardsBox.appendChild(btn);
     });

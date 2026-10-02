@@ -9,6 +9,7 @@ const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
+const { markSeen } = require('../tcg/tcgService');
 
 const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -259,6 +260,7 @@ async function buy({ user, tradeId }) {
 
     const moved = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
     if (moved.modifiedCount !== 1) throw new UserError('Die Karte ist nicht mehr verfügbar.');
+    await markSeen(user._id, [trade.card], session);
 
     Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: settings.taxPercent, tax: money.tax, closedAt: new Date() });
     await trade.save({ session });
@@ -310,6 +312,8 @@ async function acceptSwap({ user, tradeId, version }) {
     const given = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: trade.to } }, { session });
     const taken = await TcgCard.updateOne({ _id: doc._id, user: trade.to }, { $set: { user: trade.seller } }, { session });
     if (given.modifiedCount !== 1 || taken.modifiedCount !== 1) throw new UserError('Eine der Karten ist nicht mehr verfügbar.');
+    await markSeen(trade.to, [trade.card], session);
+    await markSeen(trade.seller, [trade.wantCard], session);
 
     Object.assign(trade, {
       status: 'verkauft',

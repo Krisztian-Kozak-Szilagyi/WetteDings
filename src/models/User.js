@@ -22,6 +22,9 @@ const userSchema = new Schema(
     // TCG: Karten-IDs, deren Duplikate nicht mitverkauft werden, und bis zu 4 Favoriten für die TCG-Seite
     tcgProtected: { type: [String], default: [] },
     tcgFavorites: { type: [String], default: [] },
+    // TCG: Karten-IDs, die man schon einmal besessen hat (auch nach Verkauf) – Album zeigt sie durchsichtig,
+    // beim Packöffnen sind die übrigen "Neu". Fehlt das Feld (Altbestand), füllt es die Migration beim Start.
+    tcgSeen: { type: [String], default: undefined },
     // Letzte Namensänderung (Wartezeit bis zur nächsten)
     usernameChangedAt: { type: Date, default: null },
     // Einwilligung in die Übermittlung der Chat-Nachrichten an den KI-Dienst (Support-Chat)

@@ -62,6 +62,8 @@ router.get('/tcg/album', async (req, res) => {
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
     favoriteIds: new Set(req.user.tcgFavorites || []),
+    // schon einmal besessene Karten: durchsichtig statt "?"
+    seenIds: new Set(req.user.tcgSeen || []),
     maxFavorites: tcg.MAX_FAVORITES,
   });
 });
@@ -85,7 +87,7 @@ router.post('/tcg/kaufen', async (req, res) => {
 router.post('/tcg/oeffnen', async (req, res) => {
   try {
     const r = await tcg.openPack({ user: req.user, type: str(req.body.type) });
-    if (wantsJson(req)) return res.json({ cards: r.cards.map(cardView), packsLeft: r.packsLeft });
+    if (wantsJson(req)) return res.json({ cards: r.cards.map((c, i) => ({ ...cardView(c), isNew: !!r.isNew[i] })), packsLeft: r.packsLeft });
     req.flash('success', `Booster Pack geöffnet: ${r.cards.map((c) => `${c.name} (${catalog.rarityByKey[c.rarity].label})`).join(', ')}.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;

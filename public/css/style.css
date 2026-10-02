@@ -1222,6 +1222,15 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
   font-size: .8rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--rar);
 }
 .tcg-locked { cursor: var(--cur-default); }
+/* Album: früher besessene Karte – durchsichtig und grau statt "?" */
+.tcg-seen img { display: block; width: 100%; height: auto; border-radius: 9px; opacity: .35; filter: grayscale(1); }
+/* Packöffnen: noch nie besessene Karte – Marke in der Zeile unter der Karte, erst nach dem Aufdecken */
+.tcg-new-badge {
+  display: none; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  background: #22c55e; color: #052e16; font-size: .72rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(34, 197, 94, .65);
+}
+.tcg-flip.flipped .tcg-new-badge { display: inline-block; }
 .tcg-in-exam { cursor: var(--cur-no); }
 .tcg-in-exam img { filter: grayscale(1) brightness(.75); }
 .tcg-exam-badge {
