@@ -45,7 +45,7 @@
             <tbody>
               <% entries.forEach((e) => { %>
                 <tr class="<%= String(e.user) === String(currentUser._id) ? 'me' : '' %>">
-                  <td><%= e.username %><%- roleBadge(e.username) %></td>
+                  <td><%- userLink(e.username) %></td>
                   <td class="num"><%= e.tickets %></td>
                   <td class="num"><%= Math.round((e.tickets / round.tickets) * 100) %> %</td>
                   <td class="hide-sm muted small"><%= e.ranges.map((r) => r.from === r.to ? r.from : r.from + '–' + r.to).join(', ') %></td>
@@ -71,7 +71,7 @@
                   <td>#<%= h.number %></td>
                   <td class="nowrap"><%= date(h.drawnAt) %></td>
                   <td class="num"><%= euro(h.pot) %></td>
-                  <td><%= h.winnerName || '– (keine Lose)' %></td>
+                  <td><% if (h.winnerName) { %><%- userLink(h.winnerName) %><% } else { %>– (keine Lose)<% } %></td>
                   <td class="num hide-sm"><%= h.winningTicket ? h.winningTicket + ' / ' + h.tickets : '–' %></td>
                 </tr>
               <% }) %>

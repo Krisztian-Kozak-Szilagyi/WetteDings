@@ -25,8 +25,8 @@
           <% entries.forEach((e) => { %>
             <tr class="<%= e.isNew ? 'me' : '' %>">
               <td class="nowrap"><%= dateSec(e.createdAt) %><% if (e.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
-              <td><%= e.byName %><%- roleBadge(e.byName) %></td>
-              <td><%= e.toName %><%- roleBadge(e.toName) %></td>
+              <td><%- userLink(e.byName) %></td>
+              <td><%- userLink(e.toName) %></td>
               <td><%= e.typeLabel %></td>
               <td class="num"><%= e.count %></td>
             </tr>

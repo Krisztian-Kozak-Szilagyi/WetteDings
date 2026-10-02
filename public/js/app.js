@@ -365,6 +365,19 @@
   }
 })();
 
+// Namen innerhalb eines anderen Links (z. B. Wett-Karte): eigener Klick führt zum Profil statt zur Wette
+(function () {
+  function go(e) {
+    var el = e.target.closest && e.target.closest('[data-user-link]');
+    if (!el || (e.type === 'keydown' && e.key !== 'Enter')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.location.href = el.getAttribute('data-user-link');
+  }
+  document.addEventListener('click', go, true);
+  document.addEventListener('keydown', go, true);
+})();
+
 // Rangliste: SVG-Filter für den lodernden Namen auf Platz 1
 (function () {
   if (!document.querySelector('.flame-name') || document.getElementById('bfw-flame-defs')) return;

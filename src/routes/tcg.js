@@ -99,6 +99,7 @@ router.post('/tcg/oeffnen', async (req, res) => {
 async function albumAction(req, res, fn) {
   try {
     req.flash('success', await fn());
+    await tcg.pruneCardLists(req.user); // verkaufte Karten sind keine Favoriten/geschützten Karten mehr
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

@@ -33,13 +33,18 @@
   <% } else { %>
     <div class="tcg-grid tcg-favs">
       <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
-        <div class="tcg-slot r-<%= c.rarity %>">
-          <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.hidden ? '???' : r.label %>" loading="lazy" width="720" height="1008">
+        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card
+          data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
+          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= ownedCounts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+          <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-        </div>
+        </button>
       <% }) %>
     </div>
   <% } %>
 </div>
 
+<%- include('partials/card-zoom') %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

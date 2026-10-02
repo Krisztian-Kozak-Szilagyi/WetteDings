@@ -40,7 +40,7 @@
     <article class="card pn-note" id="p-<%= n._id %>">
       <div class="pn-head">
         <h2><%= n.title %><% if (n.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></h2>
-        <span class="muted small"><%= n.authorName %><%- roleBadge(n.authorName) %> · <%= date(n.createdAt) %></span>
+        <span class="muted small"><%- userLink(n.authorName) %> · <%= date(n.createdAt) %></span>
       </div>
       <div class="pn-body prose"><%- n.html %></div>
 
@@ -64,7 +64,7 @@
             <% n.comments.forEach((c) => { const mine = String(c.user) === String(currentUser._id); %>
               <li class="comment <%= mine ? 'is-mine' : '' %>">
                 <div class="comment-head">
-                  <strong><%= c.username %></strong><%- roleBadge(c.username) %>
+                  <strong><%- userLink(c.username) %></strong>
                   <% if (mine || currentUser.isAdmin) { %>
                     <form method="post" action="/patchnotes/<%= n._id %>/kommentar/<%= c._id %>/loeschen" class="comment-delete" data-confirm="Kommentar wirklich löschen?">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">

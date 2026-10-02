@@ -75,8 +75,9 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 router.get('/profil/:name', requireLogin, async (req, res) => {
   const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username createdAt tcgFavorites').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
-  const [owned, statsAgg] = await Promise.all([
+  const [owned, mine, statsAgg] = await Promise.all([
     inventory(profile._id),
+    inventory(req.user._id), // eigene Karten: "du besitzt …" in der großen Ansicht
     Position.aggregate([
       { $match: { user: profile._id, payout: { $ne: null } } },
       { $group: { _id: null, won: { $sum: { $cond: [{ $gt: ['$payout', '$amount'] }, 1, 0] } }, lost: { $sum: { $cond: [{ $eq: ['$payout', 0] }, 1, 0] } } } },
@@ -94,6 +95,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: (profile.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && has.has(c.id)),
     rarityByKey: catalog.rarityByKey,
+    ownedCounts: Object.fromEntries(mine.map((o) => [o._id, o.n])),
   });
 });
 

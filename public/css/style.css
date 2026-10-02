@@ -1557,3 +1557,8 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 .account-grid > .card { margin: 0; }
 @media (max-width: 760px) { .account-grid { grid-template-columns: 1fr; } }
+
+/* Namen als Profil-Links: unauffällig, erst beim Überfahren unterstrichen */
+.user-link { color: inherit; text-decoration: none; cursor: var(--cur-pointer); }
+.user-link:hover, .user-link:focus-visible { text-decoration: underline; color: var(--primary); }
+[data-zoom-card] { cursor: var(--cur-zoom-in); }

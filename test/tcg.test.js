@@ -144,3 +144,12 @@ test('Regeln und Anleitung nutzen dieselbe Fähigkeiten-Tabelle', () => {
   const partial = view('partials/ihk-faehigkeiten.ejs');
   for (const name of ['Mauch (Spell)', 'Sigrist (Spell)', 'Hugo / Lilly', 'Hermann']) assert.ok(partial.includes(name), name);
 });
+
+test('Namen als Profil-Links: maskiert, verschachtelt als span, gelöschte Konten ohne Link', () => {
+  const { userLink } = require('../src/services/roles');
+  assert.equal(userLink('Max.M-1'), '<a class="user-link" href="/profil/Max.M-1">Max.M-1</a>');
+  assert.ok(userLink('Max', { nested: true }).startsWith('<span class="user-link" data-user-link="/profil/Max"'));
+  assert.equal(userLink('<b>x'), '<a class="user-link" href="/profil/%3Cb%3Ex">&lt;b&gt;x</a>');
+  assert.equal(userLink('geloescht-ab12cd34'), 'geloescht-ab12cd34');
+  assert.equal(userLink(''), '');
+});

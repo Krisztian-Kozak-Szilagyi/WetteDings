@@ -155,11 +155,28 @@ async function toggleCard(user, field, cardId, check) {
 /** Schutz vor dem Duplikat-Verkauf umschalten */
 const toggleProtected = ({ user, cardId }) => toggleCard(user, 'tcgProtected', cardId);
 
-/** Favorit (Anzeige auf der TCG-Seite) umschalten – höchstens MAX_FAVORITES */
-const toggleFavorite = ({ user, cardId }) =>
-  toggleCard(user, 'tcgFavorites', cardId, () => {
-    if ((user.tcgFavorites || []).length >= MAX_FAVORITES) throw new UserError(`Du kannst höchstens ${MAX_FAVORITES} Favoriten zeigen. Entferne zuerst einen.`);
+/**
+ * Favoriten und geschützte Karten, die man nicht mehr besitzt (verkauft, getauscht), aus den Listen entfernen.
+ * Gibt die bereinigten Listen zurück. Ohne das würden verkaufte Karten weiter Favoriten-Plätze belegen.
+ */
+async function pruneCardLists(user) {
+  const lists = { tcgFavorites: user.tcgFavorites || [], tcgProtected: user.tcgProtected || [] };
+  const ids = [...new Set([...lists.tcgFavorites, ...lists.tcgProtected])];
+  if (!ids.length) return lists;
+  const owned = new Set(await TcgCard.distinct('card', { user: user._id, card: { $in: ids } }));
+  const gone = ids.filter((id) => !owned.has(id));
+  if (!gone.length) return lists;
+  await User.updateOne({ _id: user._id }, { $pull: { tcgFavorites: { $in: gone }, tcgProtected: { $in: gone } } });
+  return { tcgFavorites: lists.tcgFavorites.filter((id) => owned.has(id)), tcgProtected: lists.tcgProtected.filter((id) => owned.has(id)) };
+}
+
+/** Favorit (Anzeige auf der TCG-Seite) umschalten – höchstens MAX_FAVORITES (gezählt werden nur Karten, die man noch besitzt) */
+async function toggleFavorite({ user, cardId }) {
+  const { tcgFavorites } = await pruneCardLists(user);
+  return toggleCard({ ...user, tcgFavorites }, 'tcgFavorites', cardId, () => {
+    if (tcgFavorites.length >= MAX_FAVORITES) throw new UserError(`Du kannst höchstens ${MAX_FAVORITES} Favoriten zeigen. Entferne zuerst einen.`);
   });
+}
 
 /** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch der TCG-Seite – für das Abzeichen im Menü */
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
@@ -189,4 +206,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { MAX_FAVORITES, MAX_PACKS_PER_PURCHASE,toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

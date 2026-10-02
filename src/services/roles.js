@@ -64,4 +64,20 @@ function roleBadge(username) {
   return out;
 }
 
-module.exports = { REAL_NAME_MAX, load, roleOf, setDev, setRealName, roleBadge };
+/**
+ * Benutzername als Link zum Profil samt Zusätzen (echter Name, DEV-Abzeichen) – fertiges HTML.
+ * nested = true: innerhalb eines anderen Links (z. B. Wett-Karte) – dort ist ein <a> nicht erlaubt,
+ * deshalb ein <span>, den app.js anklickbar macht. Gelöschte Konten haben kein Profil.
+ */
+function userLink(username, { nested = false } = {}) {
+  const name = String(username || '');
+  if (!name) return '';
+  const extra = roleBadge(name);
+  if (/^geloescht-/i.test(name)) return esc(name);
+  const href = `/profil/${encodeURIComponent(name)}`;
+  return nested
+    ? `<span class="user-link" data-user-link="${href}" role="link" tabindex="0">${esc(name)}</span>${extra}`
+    : `<a class="user-link" href="${href}">${esc(name)}</a>${extra}`;
+}
+
+module.exports = { REAL_NAME_MAX, load, roleOf, setDev, setRealName, roleBadge, userLink };

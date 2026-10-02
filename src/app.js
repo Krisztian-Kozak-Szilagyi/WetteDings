@@ -78,7 +78,8 @@ function createApp() {
     newPacks: 0,
     patchNew: 0,
     packLogNew: 0,
-    roleBadge: roles.roleBadge, // Abzeichen neben Namen (Admin rot, Dev grün)
+    roleBadge: roles.roleBadge,
+    userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
     currentPath: '',
     flash: null,
     csrfToken: '',

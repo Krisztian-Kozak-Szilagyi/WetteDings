@@ -34,7 +34,7 @@
       <div data-live="bet-head">
       <div class="bet-card-top">
         <span class="badge badge-<%= st.key %>"><%= st.label %></span>
-        <span class="muted small">von <strong><%= bet.creatorName %></strong><%- roleBadge(bet.creatorName) %> · <%= date(bet.createdAt) %></span>
+        <span class="muted small">von <strong><%- userLink(bet.creatorName) %></strong> · <%= date(bet.createdAt) %></span>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
       <% if (bet.description) { %>
@@ -91,7 +91,7 @@
       <% if (bet.status === 'entschieden') { %>
         <div class="result result-win">
           <strong>Ergebnis: <%= optionLabel(bet, bet.outcome) %></strong>
-          <span>eingetragen von <%= bet.resolvedByName %> · <%= date(bet.resolvedAt) %></span>
+          <span>eingetragen von <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
           <% if (bet.resolutionNote) { %><span class="result-note"><b>Begründung:</b> <%= bet.resolutionNote %></span><% } %>
           <% if (bet.refunded) { %><span>Da es keine Gegenseite gab, wurden alle Einsätze erstattet.</span><% } %>
           <% if (bet.creatorFee) { %><span>Provision an <%= bet.creatorName %>: <%= euro(bet.creatorFee) %> (<%= feePct %> % vom Topf)</span><% } %>
@@ -99,7 +99,7 @@
       <% } else if (bet.status === 'annulliert') { %>
         <div class="result result-void">
           <strong>Annulliert – alle Einsätze wurden erstattet.</strong>
-          <span>von <%= bet.resolvedByName %> · <%= date(bet.resolvedAt) %></span>
+          <span>von <%- userLink(bet.resolvedByName) %> · <%= date(bet.resolvedAt) %></span>
           <% const why = bet.resolutionNote || bet.voidReason; if (why) { %><span class="result-note"><b>Begründung:</b> <%= why %></span><% } %>
         </div>
       <% } else if (st.key === 'wartend') { %>
@@ -141,7 +141,7 @@
           <tbody>
             <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; %>
               <tr class="<%= myPosition && String(p._id) === String(myPosition._id) ? 'me' : '' %>">
-                <td><%= p.username %><%- roleBadge(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
+                <td><%- userLink(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
                 <td><span class="pill <%= optClass(bet, p.side) %>"><%= optionLabel(bet, p.side) %></span></td>
                 <td class="num"><%= euro(p.amount) %></td>
                 <td class="num">
@@ -172,7 +172,7 @@
                const canDelete = !c.deleted && currentUser && (mine || currentUser.isAdmin); %>
             <li class="comment <%= c.deleted ? 'is-deleted' : '' %> <%= mine ? 'is-mine' : '' %>" id="k-<%= c._id %>">
               <div class="comment-head">
-                <strong><%= c.username %></strong><%- roleBadge(c.username) %>
+                <strong><%- userLink(c.username) %></strong>
                 <% if (String(c.user) === String(bet.creator)) { %><span class="tag">Wettersteller</span><% } %>
                 <% if (side) { %><span class="pill <%= optClass(bet, side) %>"><%= optionLabel(bet, side) %></span><% } %>
                 <time class="muted small" datetime="<%= new Date(c.createdAt).toISOString() %>" title="<%= date(c.createdAt) %>"><%= relTime(c.createdAt) %></time>

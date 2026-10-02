@@ -131,7 +131,7 @@
                const info = cardById[bestCard.card]; const r = rarityByKey[bestCard.rarity]; %>
             <li class="r-<%= bestCard.rarity %>">
               <span class="tcg-dot"></span>
-              <span><strong><%= o.username %></strong><%- roleBadge(o.username) %> zog <strong><%= info ? info.name : bestCard.card %></strong> (<%= r ? r.label : bestCard.rarity %>)</span>
+              <span><strong><%- userLink(o.username) %></strong> zog <strong><%= info ? info.name : bestCard.card %></strong> (<%= r ? r.label : bestCard.rarity %>)</span>
               <span class="muted small nowrap"><%= relTime(o.createdAt) %></span>
             </li>
           <% }) %>
