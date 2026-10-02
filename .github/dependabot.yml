@@ -13,6 +13,11 @@ updates:
     groups:
       kleine-updates: # Minor- und Patch-Versionen in einem gemeinsamen PR
         update-types: [minor, patch]
+    # Große Versionssprünge (z. B. mongoose 8 → 9) ändern oft das Verhalten und gehen hier sofort live.
+    # Sie werden deshalb nicht automatisch vorgeschlagen, sondern bei Bedarf bewusst von Hand gemacht.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
@@ -28,3 +33,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # Bei der Node-Version im Container bleiben wir auf der LTS-Linie; ein Wechsel ist eine bewusste Entscheidung
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
