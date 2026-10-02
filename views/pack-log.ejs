@@ -36,7 +36,7 @@
     </div>
   <% } %>
   <% if (pages > 1) { const link = (p) => '/admin/pack-log?' + new URLSearchParams({ ...(q ? { suche: q } : {}), seite: p }); %>
-    <div class="pager">
+    <div class="log-pager">
       <% if (page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(page - 1) %>">← Neuere</a><% } %>
       <span class="muted small">Seite <%= page %> / <%= pages %></span>
       <% if (page < pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(page + 1) %>">Ältere →</a><% } %>

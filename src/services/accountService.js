@@ -109,6 +109,7 @@ async function deleteAccount({ user, password }) {
           balance: 0,
           deletedAt: new Date(),
           role: null,
+          realName: null,
           tcgProtected: [],
           tcgFavorites: [],
         },

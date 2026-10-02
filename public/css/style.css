@@ -1499,8 +1499,8 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 /* Rollen-Abzeichen neben Namen: "DEV" mit Glitch-Effekt – grün für Devs, rot für den Admin */
 .role-badge {
   --role: #22e07a;
-  position: relative; display: inline-block; vertical-align: 1px; margin-left: 6px; padding: 1px 5px 0;
-  font: 800 .62rem/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .08em;
+  position: relative; display: inline-block; vertical-align: middle; margin-left: 6px; padding: 1px 5px 0;
+  font: 800 max(.62rem, .56em)/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .08em;
   color: var(--role); border: 1px solid var(--role); border-radius: 4px;
   background: color-mix(in srgb, var(--role) 12%, transparent);
   text-shadow: 0 0 6px color-mix(in srgb, var(--role) 70%, transparent);
@@ -1539,4 +1539,7 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 }
 
 /* Pack-Log: Blättern */
-.pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; }
+.log-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; }
+
+/* Echter Name in Klammern neben dem Benutzernamen: etwas grauer und leichter */
+.real-name { color: var(--muted); font-weight: 500; font-size: .88em; -webkit-text-fill-color: currentColor; text-shadow: none; }

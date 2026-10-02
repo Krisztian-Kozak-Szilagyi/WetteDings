@@ -11,6 +11,7 @@ const { coinValueCents } = require('../coin/tradeService');
 const { cardValueCents } = require('../tcg/tcgService');
 const account = require('../services/accountService');
 const { UserError } = require('../lib/util');
+const roles = require('../services/roles');
 
 const router = express.Router();
 
@@ -57,7 +58,16 @@ router.get('/konto', requireLogin, async (req, res) => {
     pwErrors: [],
     renameDays: account.RENAME_COOLDOWN_DAYS,
     nextRenameAt: account.nextRenameAt(req.user),
+    realNameMax: roles.REAL_NAME_MAX,
   });
+});
+
+// Echter Name (freiwillig): erscheint überall in Klammern neben dem Benutzernamen; leer = entfernen
+router.post('/konto/echter-name', requireLogin, async (req, res) => {
+  const saved = await roles.setRealName(req.user._id, str(req.body.realName));
+  if (saved === false) req.flash('error', `Der Name darf 2–${roles.REAL_NAME_MAX} Zeichen lang sein und nur Buchstaben, Leerzeichen, Bindestrich, Apostroph und Punkt enthalten.`);
+  else req.flash('success', saved ? `Dein echter Name „${saved}“ wird jetzt neben deinem Benutzernamen angezeigt.` : 'Dein echter Name wird nicht mehr angezeigt.');
+  res.redirect('/konto#name');
 });
 
 router.post('/konto/name', requireLogin, async (req, res) => {
