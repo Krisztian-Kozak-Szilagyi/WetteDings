@@ -41,11 +41,13 @@
         <div class="nav-user">
           <% if (currentUser) { %>
             <a class="balance-chip" href="/konto" title="Mein Konto" data-live="balance">
-              <span class="balance-name"><%= currentUser.username %></span>
-              <strong><%= euro(currentUser.balance) %></strong>
+              <span class="balance-text">
+                <span class="balance-name"><%= currentUser.username %></span>
+                <strong><%= euro(currentUser.balance) %></strong>
+              </span>
+              <%# Platzhalter für das Profilbild (noch nicht änderbar) %>
+              <img class="avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="34" height="34">
             </a>
-            <%# Platzhalter für das Profilbild (noch nicht änderbar): Anfangsbuchstabe des Namens %>
-            <a class="avatar" href="/konto" title="Mein Konto" aria-hidden="true" tabindex="-1"><%= currentUser.username.slice(0, 1).toUpperCase() %></a>
             <form method="post" action="/abmelden">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button class="btn btn-ghost btn-sm" type="submit">Abmelden</button>
