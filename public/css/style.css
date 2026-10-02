@@ -688,7 +688,8 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 
 /* ========== Support-Chat ========== */
 /* Steht zwischen Inhalt und Fußzeile: klebt beim Scrollen unten rechts, bleibt aber über der Fußzeile */
-.support { position: sticky; bottom: 0; z-index: 90; height: 0; }
+/* unter der Kopfleiste (z-index 50), damit das aufgeklappte Menü den Chat-Knopf überdeckt */
+.support { position: sticky; bottom: 0; z-index: 40; height: 0; }
 .support-fab {
   position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; padding: 6px 18px 6px 6px; cursor: var(--cur-pointer);
   border: 1px solid rgba(233, 199, 102, .55); border-radius: 999px; color: #fff; font: inherit; text-align: left;
