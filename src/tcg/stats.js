@@ -1,5 +1,5 @@
 // Werte der Karten, wie sie auf den Bildern stehen: [Speed, FIA, FIS, BWL].
-// Neue Karten können ihre Werte stattdessen im Dateinamen tragen: "name-3-gold_36-39-21-12.png"
+// Neue Karten können ihre Werte stattdessen im Dateinamen tragen: "name-3-gold_36-39-21-12.webp"
 // (Reihenfolge ebenfalls Speed-FIA-FIS-BWL). Karten mit FIA/FIS/BWL = 0 sind Items, keine Charaktere.
 module.exports = {
   'adrian-1-crumpled': [20, 10, 20, 28],

@@ -40,7 +40,7 @@ Deutschsprachige, responsive Wett- und Spielplattform für eine geschlossene Gru
 - **Sechs Seltenheiten** mit festen Chancen pro Karte: Crumpled 58,12 % · BFWler 28 % · Gold 11 % · Holo 2,5 % · Bockhaber 0,3 % · Glitch 0,08 %. Erst wird die Seltenheit gezogen, dann gleichverteilt eine Karte dieser Seltenheit.
 - **Verkaufswerte:** 5 € / 20 € / 40 € / 150 € / 1.000 € / 3.000 €. Im Schnitt ist ein Pack weniger wert als sein Preis – es geht ums Sammeln.
 - Sammlung mit Filter, fehlende Karten als „?“, Großansicht mit 3D-Neigung und Holo-/Gold-/Glitch-Effekten, Verkauf einzeln oder aller Duplikate.
-- **Karten = Bilddateien** in `public/img/tcg` nach dem Schema `<name>[-<nr>]-<seltenheit>.png` (z. B. `krisz-6-glitch.png`). Neue Karte: Datei ablegen und Server neu starten.
+- **Karten = Bilddateien** in `public/img/tcg` nach dem Schema `<name>[-<nr>]-<seltenheit>.webp` (z. B. `krisz-6-glitch.webp`). Neue Karte: Datei ablegen (auch als PNG möglich, `npm run webp` wandelt sie in WebP um) und Server neu starten.
 
 ### Konto, Bonus & Rangliste
 - **Registrierung nur mit Einladungscode** (Format `XXXX-XXXX`, 30 Minuten gültig, für genau eine Person).

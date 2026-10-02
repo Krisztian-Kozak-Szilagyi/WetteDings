@@ -16,7 +16,7 @@ function imageUrl(file) {
   return `${IMAGE_URL}/${file}${v}`;
 }
 
-const PACK_IMAGE = imageUrl('bfw-holdings-booster-pack.png');
+const PACK_IMAGE = imageUrl('bfw-holdings-booster-pack.webp');
 const CARDS_PER_PACK = 3;
 
 // Booster-Pack-Arten. Später kommen weitere dazu (eigener Schlüssel, Name und Bild).
@@ -77,9 +77,10 @@ function prettyName(slug) {
 }
 
 /**
- * Karten aus den Dateinamen in public/img/tcg lesen: "<name>[-<nr>]-<seltenheit>.png",
- * z. B. "krisz-6-glitch.png" oder "bfw-energy-gold.png". Neue Karten = einfach Datei ablegen.
- * Optional mit Werten (Speed-FIA-FIS-BWL): "anna-3-gold_36-39-21-12.png" – die Karten-ID bleibt "anna-3-gold".
+ * Karten aus den Dateinamen in public/img/tcg lesen: "<name>[-<nr>]-<seltenheit>.webp",
+ * z. B. "krisz-6-glitch.webp" oder "bfw-energy-gold.webp". Neue Karten = einfach Datei ablegen
+ * (PNG geht auch; "npm run webp" wandelt sie um).
+ * Optional mit Werten (Speed-FIA-FIS-BWL): "anna-3-gold_36-39-21-12.webp" – die Karten-ID bleibt "anna-3-gold".
  */
 function loadCards(dir = IMAGE_DIR) {
   const pattern = new RegExp(`^(.+?)(?:-\\d+)?-(${RARITIES.map((r) => r.key).join('|')})(?:_(\\d+)-(\\d+)-(\\d+)-(\\d+))?\\.(png|jpe?g|webp)$`, 'i');
