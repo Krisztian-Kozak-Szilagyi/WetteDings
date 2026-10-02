@@ -8,7 +8,7 @@ const { PackGrant } = require('../models/Tcg');
 const roles = require('../services/roles');
 const betService = require('../services/betService');
 const { verdictRole } = require('../lib/verdict');
-const { UserError, str, safeRedirect } = require('../lib/util');
+const { UserError, str } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
@@ -120,24 +120,27 @@ router.post('/admin/geraete/:id', requireAdmin, async (req, res) => {
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
+const profilePath = (username) => `/profil/${encodeURIComponent(username)}`;
+
 router.post('/admin/sperren', requireAdmin, async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  let back = '/admin#ban';
   try {
     if (!mongoose.isValidObjectId(userId)) throw new UserError('Bitte ein Mitglied auswählen.');
     const r = await deviceService.ban({ userId, hours: str(req.body.hours), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
     req.flash('success', `${r.username} ist gebannt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
+    if (req.body.zurueck === 'profil') back = profilePath(r.username); // vom Profil aus gebannt: dorthin zurück
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  // vom Profil aus gebannt: dorthin zurück
-  res.redirect(safeRedirect(req.body.zurueck, '/admin#ban'));
+  res.redirect(back);
 });
 
 router.post('/admin/sperren/:id/aufheben', requireAdmin, async (req, res) => {
   const user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id) : null;
   req.flash(user ? 'success' : 'error', user ? `Der Ban von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
-  res.redirect(safeRedirect(req.body.zurueck, '/admin#banliste'));
+  res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : '/admin#banliste');
 });
 
 // ---------- Handel: Steuer ----------

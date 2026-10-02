@@ -24,10 +24,21 @@ function parseEuro(input) {
   return parseInt(whole, 10) * 100 + parseInt((frac + '00').slice(0, 2), 10);
 }
 
+/** Zeigt die Adresse auf diese Seite selbst? (nur Pfade wie "/konto", keine fremden Hosts) */
+function isLocalUrl(target) {
+  const t = str(target);
+  if (!t.startsWith('/') || t.startsWith('//') || t.startsWith('/\\')) return false;
+  try {
+    return new URL(t, 'https://lokal.invalid').origin === 'https://lokal.invalid';
+  } catch {
+    return false;
+  }
+}
+
 /** Sicheres Weiterleitungsziel (nur lokale Pfade) */
 function safeRedirect(target, fallback = '/') {
   const t = str(target);
-  return t.startsWith('/') && !t.startsWith('//') && !t.startsWith('/\\') ? t : fallback;
+  return isLocalUrl(t) ? t : fallback;
 }
 
-module.exports = { UserError, str, escapeRegex, parseEuro, safeRedirect };
+module.exports = { UserError, str, escapeRegex, parseEuro, isLocalUrl, safeRedirect };

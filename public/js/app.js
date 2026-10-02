@@ -401,7 +401,9 @@
     if (!el || (e.type === 'keydown' && e.key !== 'Enter')) return;
     e.preventDefault();
     e.stopPropagation();
-    window.location.href = el.getAttribute('data-user-link');
+    // nur Profil-Seiten dieser Plattform
+    var href = el.getAttribute('data-user-link') || '';
+    if (/^\/profil\/[^/\\]+$/.test(href)) window.location.assign(href);
   }
   document.addEventListener('click', go, true);
   document.addEventListener('keydown', go, true);

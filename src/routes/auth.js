@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { registerUser } = require('../services/betService');
-const { str, safeRedirect, UserError } = require('../lib/util');
+const { str, isLocalUrl, safeRedirect, UserError } = require('../lib/util');
 const { normalizeCode } = require('../services/codeService');
 const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../services/usernameRules');
 const config = require('../config');
@@ -124,7 +124,10 @@ router.post('/anmelden', authLimiter, async (req, res) => {
 
   await startSession(req, user._id);
   req.flash('success', `Schön, dass du da bist, ${user.username}!`);
-  res.redirect(weiter);
+  // nur auf Seiten dieser Plattform weiterleiten
+  const target = str(req.body.weiter);
+  if (isLocalUrl(target)) return res.redirect(target);
+  res.redirect('/');
 });
 
 // Der Browser meldet einmal pro Sitzung seinen Fingerabdruck (public/js/device.js). "alt" ist die Geräte-Kennung

@@ -369,7 +369,9 @@ async function deleteBet({ actor, betId }) {
     await Ledger.updateMany({ bet: betId }, { $set: { bet: null } }, { session });
     await Bet.deleteOne({ _id: betId }, { session });
   });
-  console.log(`Wette "${bet.title}" (${betId}) gelöscht von ${actor.username}${wasOpen ? ' – Einsätze erstattet' : ''}.`);
+  // Titel ohne Zeilenumbrüche ins Protokoll (er stammt von Nutzern)
+  const logTitle = String(bet.title).replace(/[\r\n]+/g, ' ');
+  console.log(`Wette "${logTitle}" (${betId}) gelöscht von ${actor.username}${wasOpen ? ' – Einsätze erstattet' : ''}.`);
   return { title: bet.title, refunded: wasOpen };
 }
 

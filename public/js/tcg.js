@@ -192,7 +192,9 @@
     document.body.classList.add('tcg-noscroll');
     hint.textContent = 'Pack wird geöffnet …';
     var packImg = packBtn.querySelector('img');
-    if (packImg && form.getAttribute('data-image')) packImg.src = form.getAttribute('data-image');
+    // nur eigene Bilder (Pfad unter /img/) übernehmen
+    var packSrc = form.getAttribute('data-image') || '';
+    if (packImg && /^\/img\/[\w./?=%-]+$/.test(packSrc)) packImg.src = packSrc;
 
     fetch(form.action, {
       method: 'POST',

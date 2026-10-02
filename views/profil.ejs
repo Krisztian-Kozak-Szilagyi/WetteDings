@@ -5,14 +5,14 @@
   <div class="ihk-title">
     <h1><%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
     <a class="btn btn-ghost btn-sm" href="/rangliste">← Zur Rangliste</a>
-    <% if (canBan) { const back = '/profil/' + encodeURIComponent(profile.username); %>
+    <% if (canBan) { %>
       <details class="mod-menu" data-dropdown>
         <summary class="btn btn-ghost btn-sm">Moderation</summary>
         <div class="mod-menu-panel">
           <form method="post" action="/admin/sperren" class="form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich bannen?">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="hidden" name="user" value="<%= profile._id %>">
-            <input type="hidden" name="zurueck" value="<%= back %>">
+            <input type="hidden" name="zurueck" value="profil">
             <label class="field admin-tcg-pack">
               <span>Dauer in Stunden <em>(0 = dauerhaft)</em></span>
               <input type="number" name="hours" min="0" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
@@ -26,7 +26,7 @@
           <% if (ban && ban.active) { %>
             <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= profile.username %> wirklich entbannen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="hidden" name="zurueck" value="<%= back %>">
+              <input type="hidden" name="zurueck" value="profil">
               <button class="btn btn-ghost btn-block" type="submit">Unban</button>
             </form>
           <% } %>

@@ -3,6 +3,7 @@ const express = require('express');
 const helmet = require('helmet');
 const compression = require('compression');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const config = require('./config');
@@ -96,6 +97,20 @@ function createApp() {
     flash: null,
     csrfToken: '',
   });
+
+  // Allgemeine Bremse gegen Überlastung: höchstens 600 Anfragen pro Minute – je angemeldetem Mitglied, sonst je
+  // IP-Adresse (im Schulnetz teilen sich viele eine IP, deshalb zählt bei Angemeldeten das Konto). Bilder, CSS
+  // und Skripte sind davon nicht betroffen (sie werden weiter oben ausgeliefert).
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      limit: 600,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      keyGenerator: (req) => (req.session && req.session.userId ? `u:${req.session.userId}` : rateLimit.ipKeyGenerator ? rateLimit.ipKeyGenerator(req.ip) : req.ip),
+      message: 'Zu viele Anfragen. Bitte warte einen Moment.',
+    })
+  );
 
   app.use(flash);
   app.use(loadUser);
