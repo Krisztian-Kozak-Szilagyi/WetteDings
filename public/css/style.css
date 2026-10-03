@@ -3597,3 +3597,13 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 }
 .ihk-start-tile:not(:disabled):hover .ihk-start-arrow { transform: translateX(4px); }
 @media (prefers-reduced-motion: reduce) { .ihk-start-stamp, .ihk-start-arrow { transition: none; } }
+
+/* IHK: Abstand unter der Spielfläche, Kopfzeile der Kartenwahl kompakt (Start-Kachel flacher, mittig neben dem Titel) */
+.ihk-stage { margin-bottom: 36px; }
+.ihk-pick-head { align-items: center; margin-bottom: 16px; }
+.ihk-start-tile { min-height: 76px; padding: 12px 18px; gap: 16px; }
+.ihk-start-art { width: 48px; height: 54px; }
+.ihk-start-doc { width: 40px; height: 48px; top: 3px; }
+.ihk-start-stamp { font-size: 10px; padding: 2px 5px; }
+.ihk-start-title { font-size: 20px; }
+.ihk-start-arrow { width: 36px; height: 36px; font-size: 16px; }
