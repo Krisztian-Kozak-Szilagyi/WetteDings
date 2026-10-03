@@ -77,6 +77,7 @@ function createApp() {
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
+    blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     tradeIncoming: 0,
