@@ -4,6 +4,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 const test = require('node:test');
 const assert = require('node:assert');
 const { diffSettings, configValues } = require('../src/stats/settingsLog');
+const { soldMeta } = require('../src/tcg/tcgService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
   const before = { packPrice: 8000, weight: { gold: 1100, holo: 250 }, rewards: [1500, 2500] };
@@ -24,4 +25,18 @@ test('Einstellungs-Verlauf: neue und weggefallene Werte', () => {
 test('Einstellungs-Verlauf: .env-Werte beim Start', () => {
   const v = configValues();
   assert.ok(Number.isInteger(v.startBalance) && Number.isInteger(v.duelFeePercent) && Array.isArray(v.bonusTiers));
+});
+
+test('Kartenverkauf: Exemplare je Karte zusammengefasst', () => {
+  const docs = [
+    { card: 'anna-1', rarity: 'crumpled' },
+    { card: 'ben-3', rarity: 'gold' },
+    { card: 'anna-1', rarity: 'crumpled' },
+  ];
+  assert.deepEqual(soldMeta(docs), {
+    cards: [
+      { card: 'anna-1', rarity: 'crumpled', count: 2 },
+      { card: 'ben-3', rarity: 'gold', count: 1 },
+    ],
+  });
 });

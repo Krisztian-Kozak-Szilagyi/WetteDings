@@ -8,6 +8,8 @@ const ledgerSchema = new Schema(
     amount: { type: Number, required: true }, // Cent, negativ = Abbuchung
     bet: { type: Schema.Types.ObjectId, ref: 'Bet', default: null },
     betTitle: { type: String, default: null },
+    // Details für die Statistik, z. B. verkaufte Karten { cards: [{ card, rarity, count }] } oder gekaufte Packs
+    meta: { type: Schema.Types.Mixed, default: undefined },
   },
   { timestamps: true }
 );
