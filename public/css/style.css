@@ -910,7 +910,10 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .nego-card { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .nego-card > span:last-child { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
 .nego-card figcaption { font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.nego-card .trade-thumb img { width: min(160px, 100%); border-radius: 9px; }
+/* Breite am Knopf, nicht am Bild: sonst hängt die Prozentbreite des Bildes am Knopf und umgekehrt – der Knopf wird
+   spaltenbreit und die Karte rutscht nach links (Issue #39) */
+.nego-card .trade-thumb { width: min(160px, 100%); }
+.nego-card .trade-thumb img { width: 100%; border-radius: 9px; }
 .nego-swap { color: var(--muted); }
 .nego-terms { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 14px; }
 .nego-terms-label { font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
