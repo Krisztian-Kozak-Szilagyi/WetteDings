@@ -4,6 +4,7 @@ const { TcgCard, TcgOpening } = require('./models/Tcg');
 const { IhkRun } = require('./models/Ihk');
 const { Trade } = require('./models/Trade');
 const User = require('./models/User');
+const Ledger = require('./models/Ledger');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -75,6 +76,15 @@ async function migrate() {
     );
     console.log(`Migration: "schon besessen" für ${ids.length} Konto/Konten nachgetragen.`);
   }
+
+  // Gelöschte Konten, auf denen sich (vor dem Fix in payOut) noch Auszahlungen gesammelt haben: Guthaben verfällt,
+  // mit Buchung, damit die Summe aller Buchungen weiter der Geldmenge entspricht
+  const shells = await User.find({ deletedAt: { $ne: null }, balance: { $gt: 0 } }).select('_id balance').lean();
+  for (const u of shells) {
+    const done = await User.updateOne({ _id: u._id, balance: u.balance }, { $set: { balance: 0 } });
+    if (done.modifiedCount) await Ledger.create({ user: u._id, type: 'konto_geloescht', amount: -u.balance });
+  }
+  if (shells.length) console.log(`Migration: Guthaben von ${shells.length} gelöschten Konto/Konten verfallen lassen.`);
 }
 
 module.exports = { migrate };

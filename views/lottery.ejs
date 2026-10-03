@@ -71,7 +71,7 @@
                   <td>#<%= h.number %></td>
                   <td class="nowrap"><%= date(h.drawnAt) %></td>
                   <td class="num"><%= euro(h.pot) %></td>
-                  <td><% if (h.winnerName) { %><%- userLink(h.winnerName) %><% } else { %>– (keine Lose)<% } %></td>
+                  <td><% if (h.winnerName) { %><%- userLink(h.winnerName) %><% } else if (h.tickets > 0) { %>– (Topf verfallen)<% } else { %>– (keine Lose)<% } %></td>
                   <td class="num hide-sm"><%= h.winningTicket ? h.winningTicket + ' / ' + h.tickets : '–' %></td>
                 </tr>
               <% }) %>

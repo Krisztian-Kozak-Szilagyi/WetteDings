@@ -98,6 +98,34 @@ async function buyTickets({ user, count }) {
   });
 }
 
+/** Losnummer des k-ten Loses (1-basiert) über die Losnummern-Bereiche mehrerer Einträge, der Reihe nach */
+function ticketAt(entries, k) {
+  let left = k;
+  for (const e of entries) {
+    for (const r of e.ranges) {
+      const n = r.to - r.from + 1;
+      if (left <= n) return r.from + left - 1;
+      left -= n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Gewinner unter den Losen noch bestehender Konten auslosen – Lose gelöschter Konten nehmen nicht teil.
+ * Gibt { entry, ticket } zurück oder null, wenn kein Los mehr im Spiel ist (der Topf verfällt dann).
+ */
+async function drawAmongActive(round, session) {
+  const entries = await LotteryEntry.find({ round: round._id }).sort({ _id: 1 }).session(session);
+  const goneDocs = await User.find({ _id: { $in: entries.map((e) => e.user) }, deletedAt: { $ne: null } }).select('_id').session(session).lean();
+  const gone = new Set(goneDocs.map((u) => String(u._id)));
+  const active = entries.filter((e) => !gone.has(String(e.user)) && e.tickets > 0);
+  const total = active.reduce((s, e) => s + e.tickets, 0);
+  if (!total) return null;
+  const ticket = ticketAt(active, crypto.randomInt(1, total + 1));
+  return { entry: active.find((e) => e.ranges.some((r) => r.from <= ticket && ticket <= r.to)), ticket };
+}
+
 /** Zieht eine fällige Runde. Gibt das Ergebnis zurück oder null, wenn nichts fällig war. */
 async function drawDueRound(now = new Date()) {
   const result = await inTransaction(async (session) => {
@@ -106,13 +134,10 @@ async function drawDueRound(now = new Date()) {
 
     let winner = null;
     let winningTicket = null;
-    if (round.tickets > 0) {
-      winningTicket = crypto.randomInt(1, round.tickets + 1);
-      winner = await LotteryEntry.findOne({
-        round: round._id,
-        ranges: { $elemMatch: { from: { $lte: winningTicket }, to: { $gte: winningTicket } } },
-      }).session(session);
-      if (!winner) throw new Error(`Los ${winningTicket} in Runde ${round.number} nicht gefunden.`);
+    const drawn = round.tickets > 0 ? await drawAmongActive(round, session) : null;
+    if (drawn) {
+      winner = drawn.entry;
+      winningTicket = drawn.ticket;
       await User.updateOne({ _id: winner.user }, { $inc: { balance: round.pot } }, { session });
       await Ledger.create([{ user: winner.user, type: 'lotto_gewinn', amount: round.pot }], { session });
     }
@@ -148,10 +173,12 @@ async function runLottery() {
     console.log(
       r.winnerName
         ? `Lotterie #${r.number}: Los ${r.winningTicket} von ${r.tickets} gewinnt – ${r.winnerName} erhält ${(r.pot / 100).toFixed(2)} €.`
-        : `Lotterie #${r.number}: keine Lose verkauft.`
+        : r.tickets
+          ? `Lotterie #${r.number}: alle Lose gehören gelöschten Konten – der Topf verfällt.`
+          : `Lotterie #${r.number}: keine Lose verkauft.`
     );
   }
   await ensureOpenRound();
 }
 
-module.exports = { drawTime, nextDrawAfter, ensureOpenRound, buyTickets, drawDueRound, runLottery };
+module.exports = { ticketAt, drawTime, nextDrawAfter, ensureOpenRound, buyTickets, drawDueRound, runLottery };

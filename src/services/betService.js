@@ -235,18 +235,28 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
   );
   if (updated.modifiedCount !== 1) throw new UserError('Diese Wette ist bereits abgeschlossen.');
 
+  // Gelöschte Konten bekommen nichts mehr gutgeschrieben: Ihr Anteil verfällt und verlässt die Wirtschaft
+  // (an der Position bleibt er vermerkt). Sonst sammelte sich Guthaben auf Konten, die niemand mehr nutzen kann.
+  const recipients = [...positions.map((p) => p.user), bet.creator, bet.referee].filter(Boolean);
+  const goneDocs = await User.find({ _id: { $in: recipients }, deletedAt: { $ne: null } }).select('_id').session(session).lean();
+  const gone = new Set(goneDocs.map((u) => String(u._id)));
+  const isGone = (id) => gone.has(String(id));
+
   const userOps = [];
   const positionOps = [];
   const ledgerDocs = [];
   let paidTotal = 0;
   let winnerCount = 0;
+  let forfeited = 0;
 
   for (const p of positions) {
     const payout = payouts.get(String(p._id)) || 0;
     positionOps.push({
       updateOne: { filter: { _id: p._id }, update: { $set: { payout, settledAt: now } } },
     });
-    if (payout > 0) {
+    if (payout > 0 && isGone(p.user)) {
+      forfeited += payout;
+    } else if (payout > 0) {
       userOps.push({ updateOne: { filter: { _id: p.user }, update: { $inc: { balance: payout } } } });
       ledgerDocs.push({
         user: p.user,
@@ -260,11 +270,13 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
     }
   }
 
-  if (feeShare.creator > 0) {
+  if (feeShare.creator > 0 && isGone(bet.creator)) forfeited += feeShare.creator;
+  else if (feeShare.creator > 0) {
     userOps.push({ updateOne: { filter: { _id: bet.creator }, update: { $inc: { balance: feeShare.creator } } } });
     ledgerDocs.push({ user: bet.creator, type: 'provision', amount: feeShare.creator, bet: bet._id, betTitle: bet.title });
   }
-  if (feeShare.referee > 0) {
+  if (feeShare.referee > 0 && isGone(bet.referee)) forfeited += feeShare.referee;
+  else if (feeShare.referee > 0) {
     userOps.push({ updateOne: { filter: { _id: bet.referee }, update: { $inc: { balance: feeShare.referee } } } });
     ledgerDocs.push({ user: bet.referee, type: 'provision_schiri', amount: feeShare.referee, bet: bet._id, betTitle: bet.title });
   }
@@ -279,6 +291,7 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
     refunded,
     paidTotal,
     winnerCount,
+    forfeited,
     fee,
     creatorFee: feeShare.creator,
     refereeFee: feeShare.referee,

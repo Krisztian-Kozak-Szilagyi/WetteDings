@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { drawTime, nextDrawAfter } = require('../src/services/lotteryService');
+const { drawTime, nextDrawAfter, ticketAt } = require('../src/services/lotteryService');
 
 test('Ziehung 1 Minute vor dem Lotterie-Start', () => {
   assert.equal(drawTime(), '19:59');
@@ -20,4 +20,12 @@ test('Nächste Ziehung (deutsche Zeit, sommer- und winterzeitsicher)', () => {
   assert.equal(nextDrawAfter(Date.parse('2026-10-24T18:00:00Z')).toISOString(), '2026-10-25T18:59:00.000Z');
   // Monatswechsel
   assert.equal(nextDrawAfter(Date.parse('2026-10-31T19:00:00Z')).toISOString(), '2026-11-01T18:59:00.000Z');
+});
+
+test('Ziehung ohne gelöschte Konten: k-tes Los über mehrere Bereiche', () => {
+  // Lose 1–3 und 7–8 gehören Anna, 9–10 Ben (4–6 einem gelöschten Konto, nicht in der Liste)
+  const entries = [{ ranges: [{ from: 1, to: 3 }, { from: 7, to: 8 }] }, { ranges: [{ from: 9, to: 10 }] }];
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map((k) => ticketAt(entries, k)), [1, 2, 3, 7, 8, 9, 10]);
+  assert.equal(ticketAt(entries, 8), null);
+  assert.equal(ticketAt([], 1), null);
 });
