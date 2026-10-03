@@ -6,6 +6,7 @@ const assert = require('node:assert');
 const { diffSettings, configValues } = require('../src/stats/settingsLog');
 const { soldMeta } = require('../src/tcg/tcgService');
 const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
+const { quantile, distribution } = require('../src/stats/snapshot');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
   const before = { packPrice: 8000, weight: { gold: 1100, holo: 250 }, rewards: [1500, 2500] };
@@ -69,4 +70,28 @@ test('Aktivität: nur Seitenaufrufe und Formulare zählen', () => {
   assert.equal(isPageRequest(req('GET', {}, 'json')), false);
   assert.equal(isPageRequest(req('GET')), true);
   assert.equal(isPageRequest(req('DELETE', { 'sec-fetch-dest': 'document' })), false);
+});
+
+test('Snapshot: Perzentile', () => {
+  const v = [0, 10, 20, 30, 40];
+  assert.equal(quantile(v, 0.5), 20);
+  assert.equal(quantile(v, 0.9), 36);
+  assert.equal(quantile([], 0.5), 0);
+});
+
+test('Snapshot: Vermögensverteilung', () => {
+  const equal = distribution([100, 100, 100, 100]);
+  assert.equal(equal.gini, 0);
+  assert.equal(equal.mean, 100);
+  assert.equal(equal.top10Share, 0.25); // reichste 10 % = 1 von 4
+
+  // einer besitzt alles: Gini = (n − 1) / n
+  const one = distribution([0, 0, 0, 400]);
+  assert.equal(one.gini, 0.75);
+  assert.equal(one.top10Share, 1);
+  assert.equal(one.median, 0);
+  assert.equal(one.max, 400);
+
+  assert.deepEqual(distribution([]).count, 0);
+  assert.equal(distribution([0, 0]).gini, 0);
 });
