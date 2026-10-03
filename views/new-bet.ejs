@@ -1,18 +1,20 @@
 <%- include('partials/head') %>
 
-<div class="narrow">
-  <div class="card">
-    <h1>Neue Wette aufstellen</h1>
-    <p class="muted">Formuliere eine Frage oder Aussage, die später eindeutig entschieden werden kann. Die anderen setzen auf die Optionen – du und ein Schiedsrichter deiner Wahl bestätigen am Ende gemeinsam, was eingetreten ist.</p>
-
-    <div class="info-box">
-      <strong>Das Ergebnis entscheidet ihr zu zweit.</strong>
-      <span>Du wählst ein weiteres Mitglied als <strong>Schiedsrichter</strong>. Am Ende tragt ihr beide ein, was eingetreten ist – ausgezahlt wird nur, wenn ihr <strong>einstimmig</strong> seid. Seid ihr euch nicht einig, entscheidet ein Dev.</span>
+<div class="new-bet">
+    <div class="new-bet-head">
+      <h1>Neue Wette aufstellen</h1>
+      <p>Eine Frage oder Aussage, die später eindeutig entschieden werden kann.</p>
     </div>
 
-    <div class="info-box">
-      <strong>Ihr beide setzt nicht mit – dafür gibt es Provision.</strong>
-      <span>Sobald das Ergebnis feststeht, gehen <strong><%= feePercent %> % vom Topf</strong> an euch: je die Hälfte für dich und deinen Schiedsrichter (nicht bei Annullierung oder wenn alle ihren Einsatz zurückbekommen).</span>
+    <div class="new-bet-facts">
+      <div class="fact-box">
+        <strong>Ihr entscheidet zu zweit</strong>
+        <span>Du und dein Schiedsrichter tragt das Ergebnis ein. Ausgezahlt wird nur bei Einigkeit – sonst entscheidet ein Dev.</span>
+      </div>
+      <div class="fact-box">
+        <strong><%= feePercent %> % vom Topf als Provision</strong>
+        <span>Ihr beide setzt nicht mit und teilt euch die Provision je zur Hälfte (nicht bei Annullierung oder wenn alle ihren Einsatz zurückbekommen).</span>
+      </div>
     </div>
 
     <% if (errors.length) { %>
@@ -25,13 +27,13 @@
       <label class="field">
         <span>Frage / Aussage</span>
         <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Wer gewinnt am Samstag: Bayern oder Dortmund?">
-        <small class="muted">Der Titel kann später nur noch von einem Admin geändert werden.</small>
+        <small class="muted">Später nur noch von einem Admin änderbar.</small>
       </label>
 
       <label class="field">
         <span>Details &amp; Regeln <em class="muted">(optional)</em></span>
         <textarea name="description" rows="3" maxlength="2000" placeholder="Wie wird entschieden? Was gilt bei Verlängerung, Absage usw.?"><%= values.description %></textarea>
-        <small class="muted">Die Beschreibung kannst du später noch bearbeiten – Änderungen werden für alle sichtbar protokolliert.</small>
+        <small class="muted">Später bearbeitbar – Änderungen werden für alle sichtbar protokolliert.</small>
       </label>
 
       <fieldset class="field">
@@ -65,6 +67,7 @@
         <small class="muted">Mindestens <%= minOptions %>, höchstens <%= maxOptions %> Optionen. <strong>Nach dem Veröffentlichen können keine Optionen mehr hinzugefügt oder geändert werden.</strong></small>
       </div>
 
+      <div class="new-bet-grid">
       <label class="field">
         <span>Sichtbar für</span>
         <select name="group">
@@ -84,7 +87,7 @@
             <option value="<%= u._id %>" <%= values.referee === String(u._id) ? 'selected' : '' %>><%= u.username %></option>
           <% }) %>
         </select>
-        <small class="muted">Dieses Mitglied bestätigt am Ende gemeinsam mit dir das Ergebnis. Es kann bei dieser Wette <strong>nicht mitsetzen</strong> und lässt sich später nicht mehr wechseln – wähle also jemanden, der das Ereignis zuverlässig beurteilen kann.</small>
+        <small class="muted">Bestätigt mit dir das Ergebnis, setzt <strong>nicht mit</strong> und ist später nicht änderbar.</small>
         <% if (!candidates.length) { %>
           <small class="neg">Es gibt bisher kein weiteres Mitglied, das als Schiedsrichter einspringen könnte.</small>
         <% } %>
@@ -93,20 +96,21 @@
       <label class="field">
         <span>Einsatzschluss</span>
         <input type="datetime-local" name="deadline" value="<%= values.deadline %>" min="<%= minDeadline %>" required>
-        <small class="muted">Letzter Zeitpunkt, zu dem noch gesetzt werden kann. Danach sind keine Einsätze mehr möglich.</small>
+        <small class="muted">Danach sind keine Einsätze mehr möglich.</small>
       </label>
 
       <label class="field">
         <span>Auswertung</span>
         <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required>
-        <small class="muted">Wann das Ergebnis bekanntgegeben wird. Frühestens zum Einsatzschluss.</small>
+        <small class="muted">Wann das Ergebnis feststeht. Frühestens zum Einsatzschluss.</small>
       </label>
+      </div>
 
-      <p class="muted small">Mit dem Veröffentlichen bestätigst du die <a href="/regeln" target="_blank">Regeln</a> – insbesondere, dass du den Ausgang der Wette nicht manipulierst.</p>
-
-      <button class="btn btn-primary btn-block btn-lg" type="submit">Wette veröffentlichen</button>
+      <div class="new-bet-submit">
+        <p>Mit dem Veröffentlichen bestätigst du die <a href="/regeln" target="_blank">Regeln</a> – insbesondere, dass du den Ausgang nicht manipulierst.</p>
+        <button class="btn btn-primary btn-lg" type="submit">Wette veröffentlichen</button>
+      </div>
     </form>
-  </div>
 </div>
 
 <%- include('partials/foot') %>
