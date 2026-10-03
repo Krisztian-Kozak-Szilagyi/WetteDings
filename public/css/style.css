@@ -3607,3 +3607,12 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .ihk-start-title { font-size: 20px; }
 .ihk-start-arrow { width: 36px; height: 36px; font-size: 16px; }
 .ihk-stage { overflow: visible; } /* sonst wird die oberste Quest beim Anheben (hover) oben abgeschnitten */
+
+/* Black Market: Neon-Schrift, die wie eine alte Leuchtreklame flackert (nur geöffnet; geschlossen grau, ohne Leuchten) */
+.bm .bm-title h2 { color: var(--color-neutral-300); text-shadow: none; }
+.bm.is-open .bm-title h2 { color: #f3e8ff; text-shadow: 0 0 6px #c084fc, 0 0 22px #a855f7, 0 0 44px #7e22ce; animation: bm-neon 5s infinite; }
+@keyframes bm-neon {
+  0%, 19%, 21%, 23%, 55%, 57%, 100% { opacity: 1; text-shadow: 0 0 6px #c084fc, 0 0 22px #a855f7, 0 0 44px #7e22ce; }
+  20%, 22%, 56% { opacity: .55; text-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { .bm.is-open .bm-title h2 { animation: none; } }
