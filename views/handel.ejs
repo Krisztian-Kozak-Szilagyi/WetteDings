@@ -3,7 +3,7 @@
   const bal = currentUser.balance;
   const me = String(currentUser._id);
   // Folierte Karte: Hinweis mit Datum (die Folie geht mit der Karte an den Käufer)
-  const foilTag = (t) => { if (t.foiledAt) { %> <span class="foil-tag" title="Foliert am <%= dayDate(t.foiledAt) %> – steigt täglich im Wert, kann nicht an die Bank verkauft oder auf Quests geschickt werden">Foliert · <%= dayDate(t.foiledAt) %></span><% } };
+  const foilTag = (at) => { if (at) { %> <span class="foil-tag" title="Foliert am <%= dayDate(at) %> – steigt täglich im Wert, kann nicht an die Bank verkauft oder auf Quests geschickt werden">Foliert · <%= dayDate(at) %></span><% } };
   const line = (id) => { const c = cardInfo(id); return { c, r: rarityByKey[c.rarity] || { label: '' } }; };
   const taxText = String(taxPercent).replace('.', ',');
   // Aufpreis eines Tauschs aus meiner Sicht: { iPay, text }
@@ -13,7 +13,7 @@
     return { iPay, text: iPay ? 'du zahlst ' + euro(t.price) + ' drauf' : 'du bekommst ' + euro(t.price - taxFor(t.price)) + ' drauf' + (taxFor(t.price) ? ' (nach Steuer)' : '') };
   };
   // Hinweis, ob ich die Karte schon besitze
-  const ownTag = (id) => { const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
+  const ownTag = (id) => { if (String(id).startsWith('item:')) return; const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
   // Stand einer Tausch-Verhandlung aus meiner Sicht: am Zug / wartet, dazu "Neu" bei ungelesener Aktivität
   const swapState = (t, role) => { const turn = canAccept(t, role); %><span class="own-tag<%= turn ? ' own-new' : '' %>"><%= turn ? 'Du bist am Zug' : 'Wartet auf ' + (role === 'seller' ? t.toName : t.sellerName) %></span><% if (isUnread(t, role)) { %> <span class="nav-badge nav-badge-inline" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } };
 %>
@@ -97,13 +97,13 @@
       <h4>Angebote an dich <span class="nav-badge nav-badge-inline"><%= incoming.length %></span></h4>
         <ul class="trade-list trade-incoming">
           <% incoming.forEach((t) => { const { c, r } = line(t.card); %>
-            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
+            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
               <li class="trade-item trade-swap">
                 <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Tausch · von <%= t.sellerName %></span>
-                  <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
-                  <span class="trade-title">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
+                  <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
+                  <span class="trade-title">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span><% foilTag(t.wantFoiledAt) %></span>
                   <span class="trade-meta"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %> · <% swapState(t, 'to') %></span>
                   <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest, Handel oder foliert).</span><% } %>
                 </div>
@@ -127,7 +127,7 @@
                 <%- include('partials/trade-thumbs', { a: c }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Privat · von <%= t.sellerName %></span>
-                  <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
+                  <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
                   <span class="trade-meta">läuft ab <%= relTime(t.expiresAt) %></span>
                 </div>
                 <div class="trade-actions">
@@ -170,8 +170,8 @@
             <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
               <%- include('partials/trade-thumbs', { a: c }) %>
               <div class="trade-info">
-                <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
-                <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(foil.cardValue(r.sell || 0, t.foiledAt)) %></span>
+                <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
+                <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(c.isItem ? c.sell : foil.cardValue(r.sell || 0, t.foiledAt)) %></span>
               </div>
               <div class="trade-actions">
                 <span class="trade-price"><%= euro(t.price) %></span>
@@ -224,7 +224,7 @@
             <li class="my-offer">
               <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
               <div class="my-offer-info">
-                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong><% foilTag(t) %>
+                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong><% foilTag(t.foiledAt) %><% foilTag(t.wantFoiledAt) %>
                 <span><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %> · läuft ab <%= relTime(t.expiresAt) %></span>
                 <% if (w) { %>
                   <span><%= extra(t).text %></span>

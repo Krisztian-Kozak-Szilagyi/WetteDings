@@ -4,6 +4,9 @@
 const crypto = require('crypto');
 const { Item } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
+const { Trade, openFilter } = require('../models/Trade');
+const User = require('../models/User');
+const Ledger = require('../models/Ledger');
 const { lockedDocs, claim } = require('../tcg/locks');
 const { inTransaction } = require('../services/betService');
 const { notify } = require('../services/notifyService');
@@ -11,23 +14,83 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const foil = require('./foil');
 
-// Gegenstands-Arten. Später kommen weitere dazu (eigener Schlüssel, Name, Beschreibung).
+// Gegenstands-Arten. Später kommen weitere dazu (eigener Schlüssel, Name, Bild, Beschreibung).
+// sell = Ankaufspreis der Bank in Cent.
 const ITEM_TYPES = [
   {
     key: 'folie',
     label: 'Folie',
-    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden – nur behalten oder handeln.',
+    sell: 1000,
+    image: '/img/items/folie.svg',
+    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden – nur behalten, verkaufen im Handel oder tauschen. Die Folie selbst kannst du auch handeln oder der Bank verkaufen.',
   },
 ];
 const itemTypeByKey = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
 
 const MAX_GRANT = 50;
+const MAX_SELL = 100;
 
-/** Gegenstände eines Nutzers: [{ ...Art, count }] (alle Arten, auch mit 0) */
+// Im Handel steht ein Gegenstand wie eine Karte: Trade.card = "item:<Art>", Trade.cardDoc = das Item-Dokument
+const ITEM_PREFIX = 'item:';
+const itemCardId = (key) => ITEM_PREFIX + key;
+/** Gegenstands-Art zu einer Handels-"Karten"-ID – oder null, wenn es eine echte Karte ist */
+const itemByCardId = (id) => (typeof id === 'string' && id.startsWith(ITEM_PREFIX) ? ITEM_TYPES.find((t) => itemCardId(t.key) === id) || null : null);
+/** Anzeige-Daten wie bei einer Karte (Name, Bild, "Seltenheit" item) */
+const itemCard = (t) => ({ id: itemCardId(t.key), name: t.label, rarity: 'item', image: t.image, isItem: true, sell: t.sell });
+/** "Seltenheit" der Gegenstände für die Handelsansicht */
+const ITEM_RARITY = { key: 'item', label: 'Gegenstand', rank: -1, sell: ITEM_TYPES[0].sell };
+
+/** Item-IDs eines Nutzers, die gerade in einem offenen Handelsangebot stehen */
+async function lockedItemIds(userId, session) {
+  const trades = await Trade.find({ ...openFilter(), seller: userId, card: { $regex: '^item:' } }).select('cardDoc').session(session || null).lean();
+  return new Set(trades.map((t) => String(t.cardDoc)));
+}
+
+/** Freie Gegenstände einer Art (nicht im Handel), älteste zuerst */
+async function freeItems(userId, type, session) {
+  const [docs, locked] = await Promise.all([
+    Item.find({ user: userId, type }).sort({ createdAt: 1 }).select('_id').session(session || null).lean(),
+    lockedItemIds(userId, session),
+  ]);
+  return docs.filter((d) => !locked.has(String(d._id)));
+}
+
+/** Gegenstände per Schreibzugriff beanspruchen (gleichzeitiger Verkauf/Handel/Folieren kollidiert, siehe tcg/locks.claim) */
+async function claimItems(docs, userId, session) {
+  const ids = docs.map((d) => d._id);
+  const res = await Item.updateMany({ _id: { $in: ids }, user: userId }, { $set: { lastClaimedAt: new Date() } }, { session });
+  if (res.matchedCount !== ids.length) throw new UserError('Dein Inventar hat sich geändert. Bitte versuche es erneut.');
+}
+
+/** Gegenstände eines Nutzers: [{ ...Art, count, inTrade }] (alle Arten, auch mit 0) */
 async function itemInventory(userId) {
-  const agg = await Item.aggregate([{ $match: { user: userId } }, { $group: { _id: '$type', n: { $sum: 1 } } }]);
-  const counts = Object.fromEntries(agg.map((a) => [a._id, a.n]));
-  return ITEM_TYPES.map((t) => ({ ...t, count: counts[t.key] || 0 }));
+  const [agg, locked] = await Promise.all([Item.find({ user: userId }).select('type').lean(), lockedItemIds(userId)]);
+  const counts = {};
+  const inTrade = {};
+  for (const d of agg) {
+    counts[d.type] = (counts[d.type] || 0) + 1;
+    if (locked.has(String(d._id))) inTrade[d.type] = (inTrade[d.type] || 0) + 1;
+  }
+  return ITEM_TYPES.map((t) => ({ ...t, count: counts[t.key] || 0, inTrade: inTrade[t.key] || 0 }));
+}
+
+/** Gegenstände an die Bank verkaufen (nur freie, nicht im Handel) */
+async function sellItems({ user, type, count = 1 }) {
+  const t = itemTypeByKey[type];
+  if (!t) throw new UserError('Diesen Gegenstand gibt es nicht.');
+  if (!Number.isInteger(count) || count < 1 || count > MAX_SELL) throw new UserError(`Du kannst 1 bis ${MAX_SELL} Stück auf einmal verkaufen.`);
+  return inTransaction(async (session) => {
+    const free = await freeItems(user._id, t.key, session);
+    if (free.length < count) throw new UserError(free.length ? `Du hast nur ${free.length} freie ${t.label} (der Rest steht im Handel).` : `Du hast keine freie ${t.label}.`);
+    const docs = free.slice(0, count);
+    await claimItems(docs, user._id, session);
+    const res = await Item.deleteMany({ _id: { $in: docs.map((d) => d._id) }, user: user._id }, { session });
+    if (res.deletedCount !== count) throw new UserError('Dein Inventar hat sich geändert. Bitte versuche es erneut.');
+    const proceeds = t.sell * count;
+    await User.updateOne({ _id: user._id }, { $inc: { balance: proceeds } }, { session });
+    await Ledger.create([{ user: user._id, type: 'item_verkauf', amount: proceeds, betTitle: `${count}× ${t.label}`, meta: { item: t.key, count } }], { session });
+    return { type: t, count, proceeds };
+  });
 }
 
 /** Gegenstände verschenken (Admin/Dev oder Fund). Optional in einer laufenden Transaktion. */
@@ -89,8 +152,11 @@ async function foilCard({ user, cardId }) {
     const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id').session(session).lean();
     const doc = docs.find((d) => !locked.reasons.has(String(d._id)));
     if (!doc) throw new UserError(docs.length ? 'Alle unfolierten Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Du hast kein unfoliertes Exemplar dieser Karte.');
-    const used = await Item.findOneAndDelete({ user: user._id, type: 'folie' }, { sort: { createdAt: 1 }, session });
-    if (!used) throw new UserError('Du hast keine Folie mehr.');
+    // eine freie Folie (nicht im Handel) verbrauchen
+    const [used] = await freeItems(user._id, 'folie', session);
+    if (!used) throw new UserError('Du hast keine freie Folie mehr (oder sie steht im Handel).');
+    await claimItems([used], user._id, session);
+    await Item.deleteOne({ _id: used._id, user: user._id }, { session });
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: new Date() } }, { session });
     return String(doc._id);
@@ -124,4 +190,4 @@ async function rollGradingFoil({ userId, session, roll = () => crypto.randomInt(
 const notifyGift = (userIds, t, count) =>
   notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
 
-module.exports = { ITEM_TYPES, itemTypeByKey, MAX_GRANT, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };
+module.exports = { ITEM_TYPES, itemTypeByKey, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

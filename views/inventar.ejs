@@ -51,15 +51,36 @@
         <div class="inv-item<%= it.count ? '' : ' is-empty' %>">
           <span class="inv-item-icon"><%- foilIcon %></span>
           <div class="inv-item-text">
-            <strong><%= it.label %> <span class="inv-count"><%= it.count %></span></strong>
+            <strong><%= it.label %> <span class="inv-count"><%= it.count %></span><% if (it.inTrade) { %> <span class="muted small">davon <%= it.inTrade %> im Handel</span><% } %></strong>
             <span class="muted small"><%= it.text %></span>
             <% if (it.key === 'folie') { %>
               <span class="muted small">Wert einer folierten Karte: sofort +<%= pct(foilSettings.bonusPercent) %> %, danach jeden Tag +<%= pct(foilSettings.dailyPercent) %> % vom Verkaufswert. Die Folie lässt sich jederzeit abziehen – dann ist sie aber kaputt.</span>
             <% } %>
           </div>
         </div>
+        <% const free = it.count - it.inTrade; %>
+        <% if (free > 0) { %>
+          <div class="inv-item-actions">
+            <form method="post" action="/inventar/verkaufen" data-confirm="1× <%= it.label %> für <%= euro(it.sell) %> an die Bank verkaufen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="type" value="<%= it.key %>">
+              <input type="hidden" name="count" value="1">
+              <button class="btn btn-ghost btn-sm" type="submit">1 verkaufen · <%= euro(it.sell) %></button>
+            </form>
+            <details class="foil-trade">
+              <summary>Im Handel anbieten</summary>
+              <form method="post" action="/handel/angebot" class="form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="item" value="<%= it.key %>">
+                <label class="field"><span>Preis in € (für 1 Stück)</span><input type="text" name="price" inputmode="decimal" value="<%= (it.sell / 100).toFixed(2).replace('.', ',') %>" required></label>
+                <label class="field"><span>An (leer = für alle auf dem Markt)</span><input type="text" name="to" autocomplete="off" maxlength="30"></label>
+                <button class="btn btn-primary btn-sm" type="submit">Anbieten</button>
+              </form>
+            </details>
+          </div>
+        <% } %>
         <% if (it.key === 'folie') { %>
-          <% if (!it.count) { %>
+          <% if (!free) { %>
             <p class="muted small inv-hint">Du hast gerade keine Folie. Mit etwas Glück bleibt beim Versiegeln im Grading-Shop eine übrig.</p>
           <% } else if (!foilable.length) { %>
             <p class="muted small inv-hint">Du hast keine freie, unfolierte Karte zum Folieren.</p>
@@ -117,7 +138,15 @@
               <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
             <% } else { %>
               <details class="foil-trade">
-                <summary>Im Handel anbieten</summary>
+                <summary>Tauschen</summary>
+                <form method="get" action="/handel/tausch" class="form">
+                  <input type="hidden" name="karte" value="f:<%= f.id %>">
+                  <label class="field"><span>Mit wem?</span><input type="text" name="an" autocomplete="off" maxlength="30" required></label>
+                  <button class="btn btn-primary btn-sm" type="submit">Weiter zur Kartenwahl</button>
+                </form>
+              </details>
+              <details class="foil-trade">
+                <summary>Verkaufen (Handel)</summary>
                 <form method="post" action="/handel/angebot" class="form">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <input type="hidden" name="card" value="<%= f.card.id %>">

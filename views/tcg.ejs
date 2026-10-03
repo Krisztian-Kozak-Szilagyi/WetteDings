@@ -52,7 +52,6 @@
           <button class="btn btn-primary btn-glow" type="submit" data-qty-submit <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
         </div>
         <span class="tcg-hero-note">Verfügbar: <span data-tcg-balance><%= euro(currentUser.balance) %></span></span>
-        <% if (!canAfford) { %><span class="small neg">Dein Guthaben reicht gerade für kein Pack.</span><% } %>
       </div>
     </form>
   </section>

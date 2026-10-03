@@ -89,6 +89,8 @@ async function tradeLog(query, seenAt) {
     .lean();
   const card = (id) => {
     const c = tcgCatalog.cardById[id];
+    const item = itemService.itemByCardId(id);
+    if (item) return `${item.label} (Gegenstand)`;
     return c ? `${c.name} (${tcgCatalog.rarityByKey[c.rarity].label})` : id;
   };
   const seen = seenAt ? new Date(seenAt).getTime() : 0;

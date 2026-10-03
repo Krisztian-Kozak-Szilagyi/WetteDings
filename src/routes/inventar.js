@@ -27,7 +27,6 @@ router.get('/inventar', async (req, res) => {
     title: 'Inventar',
     packs,
     itemList,
-    foilCount: (itemList.find((i) => i.key === 'folie') || { count: 0 }).count,
     foiled,
     foilable,
     foilSettings: foil.settings,
@@ -53,6 +52,15 @@ router.post('/inventar/folieren', (req, res) =>
   act(req, res, async () => {
     const copyId = await items.foilCard({ user: req.user, cardId: str(req.body.card) });
     return `/inventar?neu=${copyId}#folierte`;
+  })
+);
+
+// Gegenstände an die Bank verkaufen
+router.post('/inventar/verkaufen', (req, res) =>
+  act(req, res, async () => {
+    const count = Number.parseInt(str(req.body.count), 10);
+    await items.sellItems({ user: req.user, type: str(req.body.type), count: Number.isInteger(count) ? count : 1 });
+    return '/inventar#gegenstaende';
   })
 );
 

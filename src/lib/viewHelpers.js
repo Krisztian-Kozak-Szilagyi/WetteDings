@@ -97,6 +97,7 @@ const ledgerLabels = {
   lotto_gewinn: 'Lotteriegewinn',
   tcg_pack: 'Booster Pack gekauft',
   tcg_verkauf: 'TCG-Karte verkauft',
+  item_verkauf: 'Gegenstand verkauft',
   ihk_lohn: 'IHK-Quest geschafft',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
