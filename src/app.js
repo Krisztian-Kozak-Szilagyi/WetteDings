@@ -164,6 +164,7 @@ function createApp() {
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
   app.use(require('./routes/admin'));
+  app.use(require('./routes/stats'));
   app.use(require('./routes/coin'));
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));

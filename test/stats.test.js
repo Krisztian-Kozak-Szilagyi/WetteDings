@@ -7,6 +7,7 @@ const { diffSettings, configValues } = require('../src/stats/settingsLog');
 const { soldMeta } = require('../src/tcg/tcgService');
 const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
 const { quantile, distribution } = require('../src/stats/snapshot');
+const { addDays, dayList, weekday, period, retention, effectiveChances } = require('../src/stats/statsService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
   const before = { packPrice: 8000, weight: { gold: 1100, holo: 250 }, rewards: [1500, 2500] };
@@ -94,4 +95,47 @@ test('Snapshot: Vermögensverteilung', () => {
 
   assert.deepEqual(distribution([]).count, 0);
   assert.equal(distribution([0, 0]).gini, 0);
+});
+
+test('Statistik: Tage rechnen', () => {
+  assert.equal(addDays('2026-02-28', 1), '2026-03-01');
+  assert.equal(addDays('2026-01-01', -1), '2025-12-31');
+  assert.deepEqual(dayList('2026-10-30', '2026-11-02'), ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
+  assert.equal(weekday('2026-10-05'), 0); // Montag
+  assert.equal(weekday('2026-10-04'), 6); // Sonntag
+});
+
+test('Statistik: Zeitraum in deutscher Zeit', () => {
+  const p = period(7, new Date('2026-10-03T22:30:00Z')); // in Berlin schon der 4.10.
+  assert.equal(p.to, '2026-10-04');
+  assert.equal(p.from, '2026-09-28');
+  assert.equal(p.days.length, 7);
+  assert.equal(p.since.toISOString(), '2026-09-27T22:00:00.000Z');
+  assert.equal(period(12345).range, 30); // unbekannter Zeitraum -> Standard
+});
+
+test('Statistik: Retention nur für erreichte Stichtage', () => {
+  const cohort = [
+    { user: 'a', day: '2026-10-01' },
+    { user: 'b', day: '2026-10-01' },
+    { user: 'c', day: '2026-10-09' },
+  ];
+  const active = new Map([
+    ['a', new Set(['2026-10-02', '2026-10-08'])],
+    ['b', new Set(['2026-10-03'])],
+    ['c', new Set(['2026-10-10'])],
+  ]);
+  const [d1, d7] = retention(cohort, active, [1, 7], '2026-10-10');
+  assert.deepEqual(d1, { offset: 1, eligible: 3, retained: 2, rate: 2 / 3 });
+  assert.deepEqual(d7, { offset: 7, eligible: 2, retained: 1, rate: 0.5 });
+});
+
+test('Statistik: Soll-Chancen fallen bei fehlenden Karten auf die nächstniedrigere Seltenheit', () => {
+  const rarities = [
+    { key: 'a', weight: 70 },
+    { key: 'b', weight: 20 },
+    { key: 'c', weight: 10 },
+  ];
+  assert.deepEqual(effectiveChances(rarities, [{ rarity: 'a' }, { rarity: 'b' }]), { a: 0.7, b: 0.3, c: 0 });
+  assert.deepEqual(effectiveChances(rarities, [{ rarity: 'a' }, { rarity: 'c' }]), { a: 0.9, b: 0, c: 0.1 });
 });
