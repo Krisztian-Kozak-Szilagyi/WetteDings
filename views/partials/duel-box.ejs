@@ -10,7 +10,7 @@
     <span class="duel-sep">VS</span>
     <span class="duel-name"><%- userLink(d.opponentName) %></span>
   </div>
-  <p class="duel-line">Einsatz: <strong><%= euro(d.stake) %></strong> pro Person · Topf <strong><%= euro(d.stake * 2) %></strong> · Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong> (bekommt <%= bet.creatorFeePercent %> % vom Topf)</p>
+  <p class="duel-line">Einsatz: <strong><%= euro(d.stake) %></strong> pro Person · Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong></p>
   <% if (pending) { %>
     <ul class="duel-steps">
       <li class="<%= d.opponentAcceptedAt ? 'is-done' : '' %>"><%= d.opponentName %>: <%= d.opponentAcceptedAt ? 'angenommen ✓' : 'Antwort steht aus' %></li>
@@ -34,8 +34,6 @@
         <button class="btn btn-ghost" type="submit">Herausforderung zurückziehen</button>
       </form>
     <% } %>
-  <% } else if (d.state === 'aktiv' && bet.status === 'offen') { %>
-    <p class="muted small">Das Duell läuft. Zum Termin der Auswertung trägt <%= bet.refereeName %> ein, wer gewonnen hat – mitwetten können andere nicht.</p>
   <% } %>
   <% if (d.state === 'aktiv') { %>
     <div class="duel-tip-area">

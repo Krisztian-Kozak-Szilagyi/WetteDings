@@ -106,6 +106,7 @@
         </div>
       </div>
 
+      <% if (!bet.duel) { %>
       <div class="stats stats-2">
         <div class="stat"><span class="stat-label">Topf</span><span class="stat-value"><%= euro(total) %></span></div>
         <div class="stat"><span class="stat-label">Teilnehmende</span><span class="stat-value"><%= bet.participants %></span></div>
@@ -122,6 +123,7 @@
       </div>
       <%- include('partials/bar', { bet, big: true }) %>
       <% if (!total && !settled) { %><p class="muted small">Noch keine Einsätze – sei die erste Person, die setzt!</p><% } %>
+      <% } %>
 
       <%
         // Wie das Ergebnis zustande kam (alte Wetten ohne resolvedVia: Ersteller bzw. Admin)
@@ -197,6 +199,7 @@
       <% } %>
     </div>
 
+    <% if (!bet.duel) { %>
     <div class="card" data-live="participants">
       <h2>Teilnehmende</h2>
       <% if (!positions.length) { %>
@@ -227,6 +230,7 @@
       </div>
       <% } %>
     </div>
+    <% } %>
 
     <div class="card" id="kommentare">
       <h2>Kommentare <span class="muted" data-live="comment-count">(<%= bet.commentCount || 0 %>)</span></h2>
