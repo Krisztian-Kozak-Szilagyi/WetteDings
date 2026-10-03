@@ -484,6 +484,33 @@ const LOG_PAGE = 50;
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Neue Vergaben anderer seit dem letzten Blick ins Log (Abzeichen für den Admin) */
+// Karte aus der Sammlung eines Mitglieds entfernen (z. B. versehentlich vergeben) – landet wie jede Vergabe im Log
+// und beim Admin als Hinweis am Menüpunkt
+router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const card = tcgCatalog.cardById[str(req.body.card)];
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const user = mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!card) {
+    req.flash('error', 'Bitte eine Karte auswählen.');
+  } else if (!user) {
+    req.flash('error', 'Bitte ein Mitglied auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 50) {
+    req.flash('error', 'Es können 1 bis 50 Exemplare entfernt werden.');
+  } else {
+    try {
+      const { removed, remaining } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
+      const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
+      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed });
+      req.flash('success', `${removed}× ${label} bei ${user.username} entfernt (noch ${remaining} im Besitz).`);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
+  }
+  res.redirect(GRANT_URL);
+});
+
 const packLogNewCount = (user) => PackGrant.countDocuments({ by: { $ne: user._id }, createdAt: { $gt: user.packLogSeenAt || new Date(0) } });
 
 router.get('/admin/pack-log', requireStaff, async (req, res) => {

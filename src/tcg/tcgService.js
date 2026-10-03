@@ -77,6 +77,33 @@ async function grantCards({ userIds, cardId, count = 1 }) {
   return card;
 }
 
+/**
+ * Exemplare einer Karte aus der Sammlung eines Mitglieds entfernen (Admin/Dev, z. B. nach einem Fehler).
+ * Gesperrte Exemplare (laufende Quest, offenes Handelsangebot) bleiben unangetastet.
+ * Gibt { card, removed, remaining } zurück.
+ */
+async function revokeCards({ userId, cardId, count = 1 }) {
+  const card = catalog.cardById[cardId];
+  if (!card) throw new UserError('Diese Karte gibt es nicht.');
+  const result = await inTransaction(async (session) => {
+    const owned = await TcgCard.find({ user: userId, card: card.id }).sort({ createdAt: -1 }).session(session).lean();
+    if (!owned.length) throw new UserError('Das Mitglied besitzt diese Karte nicht.');
+    const locked = await lockedDocs(userId, session);
+    const free = owned.filter((d) => !isLocked(locked, d));
+    if (free.length < count) {
+      const lockedN = owned.length - free.length;
+      throw new UserError(`Das Mitglied hat nur ${free.length} freie${lockedN ? ` (dazu ${lockedN} gesperrte: Quest oder Handelsangebot)` : ''} Exemplar(e) dieser Karte.`);
+    }
+    const ids = free.slice(0, count).map((d) => d._id);
+    const res = await TcgCard.deleteMany({ _id: { $in: ids }, user: userId }, { session });
+    if (res.deletedCount !== ids.length) throw new UserError('Der Bestand hat sich geändert. Bitte versuche es erneut.');
+    return { card, removed: ids.length, remaining: owned.length - ids.length };
+  });
+  // Favoriten/Schutz aufräumen, falls das letzte Exemplar weg ist
+  if (!result.remaining) await User.updateOne({ _id: userId }, { $pull: { tcgFavorites: card.id, tcgProtected: card.id } });
+  return result;
+}
+
 /** Ein Booster Pack aus dem Inventar öffnen (das älteste dieser Art). Gibt die gezogenen Karten zurück. */
 async function openPack({ user, type }) {
   const t = packType(type);
@@ -251,4 +278,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { soldMeta, MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { soldMeta, MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
