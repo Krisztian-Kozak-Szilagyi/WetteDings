@@ -1,10 +1,13 @@
-# Tests für Pull Requests: Vor dem Zusammenführen ist sichtbar, ob die Tests grün sind.
-# (Auf main laufen die Tests im Deployment, siehe deploy.yml.)
+# Tests für Pull Requests (nach test und main) und für jeden Push auf den Test-Branch: vor dem Zusammenführen
+# ist sichtbar, ob die Tests grün sind. (Auf main laufen die Tests im Deployment, siehe deploy.yml.)
+# Ablauf: Feature-Branches -> test (lokal ausprobieren) -> main (geht automatisch live).
 name: Tests
 
 on:
+  push:
+    branches: [test]
   pull_request:
-    branches: [main]
+    branches: [main, test]
 
 permissions:
   contents: read
