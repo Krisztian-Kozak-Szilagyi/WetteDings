@@ -7,7 +7,7 @@ const { diffSettings, configValues } = require('../src/stats/settingsLog');
 const { soldMeta } = require('../src/tcg/tcgService');
 const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
 const { quantile, distribution } = require('../src/stats/snapshot');
-const { addDays, dayList, weekday, period, retention, effectiveChances } = require('../src/stats/statsService');
+const { addDays, dayList, weekday, isoWeek, period, buckets, aggregate, delta, retention, effectiveChances, pullVerdict } = require('../src/stats/statsService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
   const before = { packPrice: 8000, weight: { gold: 1100, holo: 250 }, rewards: [1500, 2500] };
@@ -138,4 +138,56 @@ test('Statistik: Soll-Chancen fallen bei fehlenden Karten auf die nächstniedrig
   ];
   assert.deepEqual(effectiveChances(rarities, [{ rarity: 'a' }, { rarity: 'b' }]), { a: 0.7, b: 0.3, c: 0 });
   assert.deepEqual(effectiveChances(rarities, [{ rarity: 'a' }, { rarity: 'c' }]), { a: 0.9, b: 0, c: 0.1 });
+});
+
+test('Statistik: Vorzeitraum und Tagesgrenzen', () => {
+  const now = new Date('2026-10-03T10:00:00Z');
+  const prev = period(7, now, 1);
+  assert.equal(prev.to, '2026-09-26');
+  assert.equal(prev.from, '2026-09-20');
+  assert.equal(prev.until.toISOString(), period(7, now).since.toISOString()); // lückenlos aneinander
+});
+
+test('Statistik: Kalenderwochen nach ISO 8601', () => {
+  assert.deepEqual(isoWeek('2026-10-03'), { year: 2026, week: 40 });
+  assert.deepEqual(isoWeek('2027-01-01'), { year: 2026, week: 53 }); // Freitag gehört noch zur letzten Woche 2026
+  assert.deepEqual(isoWeek('2024-12-30'), { year: 2025, week: 1 });
+});
+
+test('Statistik: Bündelung nach Tag, Woche, Monat', () => {
+  assert.equal(buckets(dayList('2026-09-04', '2026-10-03')).unit, 'tag');
+  const w = buckets(dayList('2026-09-28', '2026-10-11'));
+  assert.equal(w.unit, 'tag');
+  const weeks = buckets(dayList('2026-07-06', '2026-10-03'));
+  assert.equal(weeks.unit, 'woche');
+  assert.equal(weeks.list[0].label, 'KW 28');
+  assert.equal(weeks.list[weeks.list.length - 1].days.length, 6); // Mo–Sa der laufenden Woche
+  const months = buckets(dayList('2025-10-04', '2026-10-03'));
+  assert.equal(months.unit, 'monat');
+  assert.equal(months.list.length, 13);
+  assert.equal(months.list[12].long, 'Oktober 2026');
+});
+
+test('Statistik: Werte je Abschnitt zusammenfassen', () => {
+  const days = ['a', 'b', 'c', 'd'];
+  const list = [{ days: ['a', 'b'] }, { days: ['c', 'd'] }];
+  assert.deepEqual(aggregate([1, 2, 3, null], days, list, 'sum'), [3, 3]);
+  assert.deepEqual(aggregate([1, 2, 3, null], days, list, 'last'), [2, 3]);
+  assert.deepEqual(aggregate([1, 3, 4, 0], days, list, 'avg'), [2, 2]);
+  assert.deepEqual(aggregate([null, null, 5, null], days, list, 'last'), [null, 5]);
+});
+
+test('Statistik: Vergleich mit dem Vorzeitraum', () => {
+  assert.deepEqual(delta(120, 100, { unit: 'count' }), { dir: 'up', rel: 0.2 });
+  assert.deepEqual(delta(50, 0, { unit: 'count' }), { dir: 'up', isNew: true });
+  assert.deepEqual(delta(-500, 2000, { unit: 'euro', signed: true }), { dir: 'down', abs: -2500 });
+  assert.equal(delta(0.42, 0.4, { unit: 'percent' }).dir, 'up');
+  assert.equal(delta(null, 5, { unit: 'count' }), null);
+});
+
+test('Statistik: Drop-Raten erst ab genug Daten bewerten', () => {
+  assert.equal(pullVerdict(0, 15, 0.025), 'wenig-daten'); // 0,4 erwartet
+  assert.equal(pullVerdict(580, 1000, 0.58), 'im-rahmen');
+  assert.equal(pullVerdict(700, 1000, 0.58), 'zu-oft');
+  assert.equal(pullVerdict(10, 1000, 0.11), 'zu-selten');
 });
