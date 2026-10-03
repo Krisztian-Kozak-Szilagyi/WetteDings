@@ -8,6 +8,7 @@ const stats = require('../stats/statsService');
 const router = express.Router();
 
 const numFmt = new Intl.NumberFormat('de-DE');
+const dec = (v, max = 1, min = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: min, maximumFractionDigits: max });
 
 /**
  * Wert einer Kennzahl oder Tabellenzelle anzeigen. cell: { value, unit, signed, digits } oder ein Text.
@@ -22,17 +23,31 @@ function fmt(cell) {
   switch (unit) {
     case 'euro':
       return sign + euro(value);
+    case 'price':
+      return value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: value >= 1 ? 2 : 4, maximumFractionDigits: value >= 1 ? 2 : 6 });
     case 'percent':
-      return sign + (value * 100).toLocaleString('de-DE', { maximumFractionDigits: digits ?? 1 }) + ' %';
+      return sign + dec(value * 100, digits ?? 1) + ' %';
     case 'ratio':
-      return sign + value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+      return sign + dec(value, 3, 2);
     case 'number':
-      return sign + value.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+      return sign + dec(value, 1);
     case 'count':
       return sign + numFmt.format(value);
     default:
       return String(value);
   }
+}
+
+/** Veränderung gegenüber dem Vorzeitraum als Text, z. B. "+12 %", "+120,00 €" oder "+3,2 Pp." */
+function fmtDelta(k) {
+  const d = k.delta;
+  if (!d) return null;
+  if (d.isNew) return 'neu';
+  if (d.dir === 'flat') return '± 0';
+  const sign = d.dir === 'up' ? '+' : '−';
+  if (d.abs !== undefined) return sign + euro(Math.abs(d.abs));
+  if (d.points !== undefined) return k.unit === 'percent' ? `${sign}${dec(Math.abs(d.points) * 100, 1)} Pp.` : sign + dec(Math.abs(d.points), 3, 2);
+  return `${sign}${dec(Math.abs(d.rel) * 100, 0)} %`;
 }
 
 router.get('/admin/statistik', requireStaff, async (req, res) => {
@@ -46,9 +61,15 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
     active: key,
     data,
     fmt,
+    fmtDelta,
     date,
     // Für die Diagramme im Browser (public/js/stats.js)
-    chartData: { days: data.period.days, markers: data.markers.map((m) => ({ day: m.day, label: m.label, kind: m.kind })), charts: data.charts || [] },
+    chartData: {
+      labels: data.labels,
+      longLabels: data.longLabels,
+      markers: data.markers.filter((m) => m.i !== undefined).map((m) => ({ i: m.i, short: m.short, label: m.label, kind: m.kind })),
+      charts: data.blocks.flatMap((b) => b.charts).filter((c) => !c.empty),
+    },
   });
 });
 

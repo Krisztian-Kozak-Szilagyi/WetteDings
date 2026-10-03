@@ -1,5 +1,6 @@
-// Auswertungen für die Statistik-Seite (Admin/Dev). Jede Funktion liefert für einen Bereich Kennzahlen,
-// Diagramm-Daten (je Tag) und Tabellen. Zeiträume und Tage gelten in deutscher Zeit.
+// Auswertungen für die Statistik-Seite (Admin/Dev). Jeder Reiter besteht aus Themenblöcken, die je eine
+// Balancing-Frage beantworten – mit eigenen Kennzahlen, Verläufen und Tabellen. Kennzahlen über den Zeitraum
+// werden mit dem gleich langen Zeitraum davor verglichen. Tage gelten in deutscher Zeit.
 const config = require('../config');
 const User = require('../models/User');
 const Bet = require('../models/Bet');
@@ -30,27 +31,29 @@ const TZ = config.timezone;
 const RANGES = [7, 30, 90, 365];
 const DEFAULT_RANGE = 30;
 const SECTIONS = [
+  { key: 'uebersicht', label: 'Übersicht' },
   { key: 'wirtschaft', label: 'Wirtschaft' },
-  { key: 'spieler', label: 'Spieler & Aktivität' },
+  { key: 'spieler', label: 'Spieler' },
   { key: 'tcg', label: 'TCG & Handel' },
-  { key: 'spiele', label: 'Wetten, IHK, Coin, Lotterie' },
+  { key: 'spiele', label: 'Spiele' },
 ];
 
-// Buchungsarten nach Bereich: Die Summe je Bereich zeigt, wie viel Geld dort entsteht (+) oder verschwindet (−)
+// Buchungsarten nach Bereich. Die Summe je Bereich zeigt, wie viel Geld dort entsteht (+) oder verschwindet (−);
+// Umbuchungen zwischen Spielern (Einsätze → Gewinne, Kauf → Verkauf) heben sich bis auf den Verlust auf.
 const LEDGER_GROUPS = [
-  { key: 'start', label: 'Startguthaben', types: ['startguthaben'] },
-  { key: 'bonus', label: 'Tagesbonus', types: ['bonus'] },
-  { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'] },
-  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'black_market'] },
-  { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'] },
-  { key: 'wetten', label: 'Wetten', types: ['einsatz', 'auszahlung', 'erstattung', 'provision', 'provision_schiri'] },
-  { key: 'lotterie', label: 'Lotterie', types: ['lotto_los', 'lotto_gewinn'] },
-  { key: 'handel', label: 'Handel (Steuer)', types: ['handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'] },
-  { key: 'loeschung', label: 'Gelöschte Konten', types: ['konto_geloescht'] },
+  { key: 'start', label: 'Startguthaben', types: ['startguthaben'], hint: 'neue Mitglieder' },
+  { key: 'bonus', label: 'Tagesbonus', types: ['bonus'], hint: 'für Mitglieder unter der Bonus-Grenze' },
+  { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'], hint: 'geschaffte Quests' },
+  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'black_market'], hint: 'Verkäufe an die Bank − Packs und Black Market' },
+  { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'], hint: 'Verkäufe − Käufe (Kursgewinne/-verluste)' },
+  { key: 'wetten', label: 'Wetten', types: ['einsatz', 'auszahlung', 'erstattung', 'provision', 'provision_schiri'], hint: 'noch offene Einsätze und verfallene Gewinne' },
+  { key: 'lotterie', label: 'Lotterie', types: ['lotto_los', 'lotto_gewinn'], hint: 'noch nicht gezogene und verfallene Töpfe' },
+  { key: 'handel', label: 'Handel', types: ['handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'], hint: 'Handelssteuer' },
+  { key: 'loeschung', label: 'Gelöschte Konten', types: ['konto_geloescht'], hint: 'verfallenes Guthaben' },
 ];
 const groupOfType = Object.fromEntries(LEDGER_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 
-// ---------- Tage ----------
+// ---------- Tage, Zeiträume, Bündelung ----------
 
 /** Tag ("YYYY-MM-DD") um n Tage verschoben */
 function addDays(day, n) {
@@ -71,24 +74,109 @@ function weekday(day) {
   return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
 }
 
-/** Zeitraum aus der Anzahl Tage: { days, from, to, since } – since = Beginn des ersten Tages */
-function period(rangeDays, now = new Date()) {
+/** Kalenderwoche nach ISO 8601: { year, week } */
+function isoWeek(day) {
+  const thursday = addDays(day, 3 - weekday(day)); // der Donnerstag der Woche bestimmt das Jahr
+  const year = Number(thursday.slice(0, 4));
+  const firstThursday = addDays(`${year}-01-04`, 3 - weekday(`${year}-01-04`));
+  const diff = (Date.parse(thursday) - Date.parse(firstThursday)) / 86400000;
+  return { year, week: 1 + Math.round(diff / 7) };
+}
+
+/**
+ * Zeitraum mit n Tagen bis heute; back = 1 liefert den gleich langen Zeitraum davor (für Vergleiche).
+ * since/until: Beginn des ersten bzw. Ende des letzten Tages (als Zeitpunkte für Abfragen).
+ */
+function period(rangeDays, now = new Date(), back = 0) {
   const n = RANGES.includes(rangeDays) ? rangeDays : DEFAULT_RANGE;
-  const to = dayAndHour(now).day;
+  const to = addDays(dayAndHour(now).day, -n * back);
   const from = addDays(to, -(n - 1));
-  return { range: n, from, to, days: dayList(from, to), since: parseZonedLocal(`${from}T00:00`, TZ) };
+  return {
+    range: n,
+    from,
+    to,
+    days: dayList(from, to),
+    since: parseZonedLocal(`${from}T00:00`, TZ),
+    until: parseZonedLocal(`${addDays(to, 1)}T00:00`, TZ),
+  };
+}
+
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const short = (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}.`;
+const long = (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
+
+/**
+ * Tage zu Abschnitten für die Diagramme bündeln: bis 31 Tage je Tag, bis 120 Tage je Woche, darüber je Monat.
+ * -> { unit: 'tag' | 'woche' | 'monat', list: [{ key, label, long, days }] }
+ */
+function buckets(days) {
+  const unit = days.length <= 31 ? 'tag' : days.length <= 120 ? 'woche' : 'monat';
+  const list = [];
+  for (const d of days) {
+    let key;
+    let label;
+    if (unit === 'tag') {
+      key = d;
+      label = short(d);
+    } else if (unit === 'woche') {
+      const w = isoWeek(d);
+      key = `${w.year}-W${w.week}`;
+      label = `KW ${w.week}`;
+    } else {
+      key = d.slice(0, 7);
+      label = `${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)} ${d.slice(2, 4)}`;
+    }
+    const last = list[list.length - 1];
+    if (last && last.key === key) last.days.push(d);
+    else list.push({ key, label, days: [d] });
+  }
+  for (const b of list) {
+    const first = b.days[0];
+    const lastDay = b.days[b.days.length - 1];
+    b.long = unit === 'tag' ? long(first) : unit === 'woche' ? `${b.label} · ${short(first)}–${long(lastDay)}` : `${MONTHS[Number(first.slice(5, 7)) - 1]} ${first.slice(0, 4)}`;
+  }
+  return { unit, list };
+}
+
+/**
+ * Tageswerte je Abschnitt zusammenfassen. agg: 'sum' (Mengen je Tag), 'last' (Bestände wie Geldmenge oder
+ * Kurs: letzter bekannter Wert) oder 'avg' (Durchschnitt je Tag, z. B. aktive Mitglieder).
+ */
+function aggregate(values, days, list, agg = 'sum') {
+  const index = Object.fromEntries(days.map((d, i) => [d, i]));
+  return list.map((b) => {
+    const vals = b.days.map((d) => values[index[d]]).filter((v) => v !== null && v !== undefined);
+    if (!vals.length) return agg === 'sum' ? 0 : null;
+    if (agg === 'last') return vals[vals.length - 1];
+    const sum = vals.reduce((s, v) => s + v, 0);
+    return agg === 'avg' ? sum / b.days.length : sum;
+  });
+}
+
+/**
+ * Veränderung gegenüber dem Vorzeitraum: Beträge mit Vorzeichen (Zuflüsse) als Differenz, Anteile in
+ * Prozentpunkten, alles andere relativ. -> { dir, abs | points | rel | isNew } oder null (kein Vergleich möglich)
+ */
+function delta(cur, prev, { unit, signed } = {}) {
+  if (typeof cur !== 'number' || typeof prev !== 'number') return null;
+  const dir = cur > prev ? 'up' : cur < prev ? 'down' : 'flat';
+  if (unit === 'euro' && signed) return { dir, abs: cur - prev };
+  if (unit === 'percent' || unit === 'ratio') return { dir, points: cur - prev };
+  if (prev === 0) return cur === 0 ? { dir, rel: 0 } : { dir, isNew: true };
+  return { dir, rel: (cur - prev) / Math.abs(prev) };
 }
 
 /** Mongo-Ausdruck: Tag eines Datumsfelds in deutscher Zeit */
 const dayOf = (field) => ({ $dateToString: { format: '%Y-%m-%d', date: field, timezone: TZ } });
-
-/** Werte je Tag aus { day: value } in der Reihenfolge der Tage (fehlende Tage = 0 bzw. fallback) */
+/** Filter: Datumsfeld im Zeitraum */
+const inP = (p, field = 'createdAt') => ({ [field]: { $gte: p.since, $lt: p.until } });
+/** Werte je Tag aus { day: value } in der Reihenfolge der Tage (fehlende Tage = fallback) */
 const byDays = (days, map, fallback = 0) => days.map((d) => (map[d] === undefined ? fallback : map[d]));
-
 /** Liste von { _id, … } zu { _id: wert } */
 const toMap = (rows, key = 'n') => Object.fromEntries(rows.map((r) => [r._id, r[key]]));
-
 const pct = (part, total) => (total ? part / total : null);
+const sumBy = (rows, key) => rows.reduce((s, r) => s + (r[key] || 0), 0);
+const avg = (sum, n) => (n ? sum / n : null);
 
 // ---------- Retention ----------
 
@@ -105,193 +193,7 @@ function retention(cohort, activeDays, offsets, today) {
   });
 }
 
-// ---------- Markierungen ----------
-
-const AREA_LABELS = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', config: '.env' };
-
-/** Einstellungsänderungen und Patchnotes im Zeitraum – Markierungen in allen Verläufen */
-async function markers(p) {
-  const patchCat = await ForumCategory.findOne({ key: 'patchnotes' }).select('_id').lean();
-  const [changes, patches] = await Promise.all([
-    SettingsChange.find({ createdAt: { $gte: p.since } }).sort({ createdAt: 1 }).lean(),
-    patchCat ? ForumThread.find({ category: patchCat._id, deleted: false, createdAt: { $gte: p.since } }).select('title createdAt').sort({ createdAt: 1 }).lean() : [],
-  ]);
-  const list = [
-    ...changes.map((c) => ({
-      day: dayAndHour(c.createdAt).day,
-      at: c.createdAt,
-      kind: 'einstellung',
-      label: `${AREA_LABELS[c.area] || c.area}: ${c.changes.length} Wert${c.changes.length === 1 ? '' : 'e'} geändert`,
-      detail: c.changes.slice(0, 12).map((x) => `${x.path}: ${JSON.stringify(x.from)} → ${JSON.stringify(x.to)}`),
-      by: c.byName || 'Serverstart',
-    })),
-    ...patches.map((t) => ({ day: dayAndHour(t.createdAt).day, at: t.createdAt, kind: 'patch', label: `Patchnotes: ${t.title}`, detail: [], by: null })),
-  ];
-  return list.sort((a, b) => a.at - b.at);
-}
-
-// ---------- Wirtschaft ----------
-
-async function economy(p) {
-  const [flows, before, snapshots, players, typeTotals] = await Promise.all([
-    Ledger.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
-    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
-    StatDaily.find({ _id: { $gte: p.from } }).select('_id wealth users').sort({ _id: 1 }).lean(),
-    ranking(),
-    Ledger.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
-  ]);
-
-  // Netto je Bereich und Tag, dazu die Geldmenge (alle Buchungen bis Tagesende)
-  const net = Object.fromEntries(LEDGER_GROUPS.map((g) => [g.key, {}]));
-  const dayNet = {};
-  for (const f of flows) {
-    const g = groupOfType[f._id.t];
-    if (g) net[g][f._id.d] = (net[g][f._id.d] || 0) + f.s;
-    dayNet[f._id.d] = (dayNet[f._id.d] || 0) + f.s;
-  }
-  let supply = before[0] ? before[0].s : 0;
-  const supplySeries = p.days.map((d) => (supply += dayNet[d] || 0));
-
-  const totals = players.map((x) => x.total);
-  const dist = distribution(totals);
-  const balanceSum = players.reduce((s, x) => s + x.balance, 0);
-  const fromSnap = (fn) => byDays(p.days, Object.fromEntries(snapshots.map((s) => [s._id, fn(s)])), null);
-  const periodNet = Object.values(dayNet).reduce((s, x) => s + x, 0);
-
-  return {
-    kpis: [
-      { label: 'Guthaben gesamt', value: balanceSum, unit: 'euro', hint: 'Summe aller Kontostände' },
-      { label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + Einsätze + Coins + Karten' },
-      { label: 'Median-Vermögen', value: dist.median, unit: 'euro' },
-      { label: 'Gini', value: dist.gini, unit: 'ratio', hint: '0 = alle gleich, 1 = einer besitzt alles' },
-      { label: 'Reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'Anteil am Gesamtvermögen' },
-      { label: 'Netto-Geldzufluss', value: periodNet, unit: 'euro', signed: true, hint: `im Zeitraum (${p.range} Tage)` },
-      { label: 'Bonusberechtigt', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern` },
-    ],
-    charts: [
-      {
-        id: 'geldmenge',
-        title: 'Geldmenge (Summe aller Buchungen)',
-        // Abgleich: Kontostände (ohne gelöschte Konten) gegen die Summe aller Buchungen
-        diff: balanceSum - supplySeries[supplySeries.length - 1],
-        type: 'line',
-        unit: 'euro',
-        series: [{ name: 'Geldmenge', values: supplySeries }],
-      },
-      {
-        id: 'zufluss',
-        title: 'Netto-Geldzufluss je Bereich und Tag',
-        note: 'Über 0: Geld entsteht (Quelle). Unter 0: Geld verschwindet (Senke).',
-        type: 'stacked',
-        unit: 'euro',
-        series: LEDGER_GROUPS.filter((g) => Object.keys(net[g.key]).length).map((g) => ({ name: g.label, values: byDays(p.days, net[g.key]) })),
-      },
-      { id: 'gini', title: 'Gini-Koeffizient (Tages-Snapshot)', type: 'line', unit: 'ratio', series: [{ name: 'Gini', values: fromSnap((s) => s.wealth.total && s.wealth.total.gini) }] },
-      {
-        id: 'median',
-        title: 'Median-Vermögen (Tages-Snapshot)',
-        type: 'line',
-        unit: 'euro',
-        series: [{ name: 'Median', values: fromSnap((s) => s.wealth.total && s.wealth.total.median) }],
-      },
-    ],
-    tables: [
-      {
-        title: 'Buchungen im Zeitraum',
-        head: ['Art', 'Bereich', { label: 'Anzahl', num: true }, { label: 'Summe', num: true }],
-        rows: typeTotals
-          .sort((a, b) => a.s - b.s)
-          .map((t) => [
-            ledgerLabels[t._id] || t._id,
-            (LEDGER_GROUPS.find((g) => g.key === groupOfType[t._id]) || {}).label || '–',
-            { value: t.n, unit: 'count' },
-            { value: t.s, unit: 'euro', signed: true },
-          ]),
-      },
-      {
-        title: 'Vermögensverteilung jetzt',
-        head: ['Kennzahl', { label: 'Wert', num: true }],
-        rows: [
-          ['Mitglieder', { value: dist.count, unit: 'count' }],
-          ['Mittelwert', { value: dist.mean, unit: 'euro' }],
-          ['10. Perzentil', { value: dist.p10, unit: 'euro' }],
-          ['Median', { value: dist.median, unit: 'euro' }],
-          ['90. Perzentil', { value: dist.p90, unit: 'euro' }],
-          ['99. Perzentil', { value: dist.p99, unit: 'euro' }],
-          ['Höchstes', { value: dist.max, unit: 'euro' }],
-          ['davon Coins', { value: players.reduce((s, x) => s + x.coinValue, 0), unit: 'euro' }],
-          ['davon Karten & Packs', { value: players.reduce((s, x) => s + x.cardValue, 0), unit: 'euro' }],
-          ['davon offene Einsätze', { value: players.reduce((s, x) => s + x.inPlay, 0), unit: 'euro' }],
-        ],
-      },
-    ],
-  };
-}
-
-// ---------- Spieler & Aktivität ----------
-
-async function players(p, now = new Date()) {
-  const today = p.to;
-  const monthFrom = addDays(today, -29);
-  const actFrom = p.from < monthFrom ? p.from : monthFrom;
-  const [members, banned, signups, cohortUsers, activity] = await Promise.all([
-    User.countDocuments({ deletedAt: null }),
-    User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
-    User.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
-    User.find({ createdAt: { $gte: p.since } }).select('_id createdAt').lean(),
-    UserActivity.find({ day: { $gte: actFrom } }).select('user day views actions logins areas hours').lean(),
-  ]);
-
-  const activeByDay = {};
-  const activeDays = new Map();
-  const areas = {};
-  const heat = Array.from({ length: 7 }, () => Array(24).fill(0));
-  let views = 0;
-  let actions = 0;
-  const wau = new Set();
-  const mau = new Set();
-  for (const a of activity) {
-    const uid = String(a.user);
-    if (!activeDays.has(uid)) activeDays.set(uid, new Set());
-    activeDays.get(uid).add(a.day);
-    if (a.day >= addDays(today, -6)) wau.add(uid);
-    if (a.day >= monthFrom) mau.add(uid);
-    if (a.day < p.from) continue;
-    activeByDay[a.day] = (activeByDay[a.day] || 0) + 1;
-    views += a.views || 0;
-    actions += a.actions || 0;
-    for (const [k, n] of Object.entries(a.areas || {})) areas[k] = (areas[k] || 0) + n;
-    for (const h of a.hours || []) heat[weekday(a.day)][h]++;
-  }
-  const cohort = cohortUsers.map((u) => ({ user: u._id, day: dayAndHour(u.createdAt).day }));
-  const ret = retention(cohort, activeDays, [1, 7, 30], today);
-  const areaTotal = Object.values(areas).reduce((s, n) => s + n, 0);
-  const firstActivity = activity.reduce((m, a) => (!m || a.day < m ? a.day : m), null);
-
-  return {
-    kpis: [
-      { label: 'Mitglieder', value: members, unit: 'count', hint: banned ? `davon ${banned} gesperrt` : null },
-      { label: 'Neu im Zeitraum', value: cohortUsers.length, unit: 'count' },
-      { label: 'Aktiv heute', value: activeByDay[today] || 0, unit: 'count' },
-      { label: 'Aktiv 7 Tage', value: wau.size, unit: 'count', hint: members ? `${Math.round((wau.size / members) * 100)} % der Mitglieder` : null },
-      { label: 'Aktiv 30 Tage', value: mau.size, unit: 'count', hint: members ? `${Math.round((mau.size / members) * 100)} % der Mitglieder` : null },
-      { label: 'Aufrufe / Aktionen', value: `${views} / ${actions}`, unit: 'text', hint: 'im Zeitraum' },
-    ],
-    since: firstActivity,
-    charts: [
-      { id: 'dau', title: 'Aktive Mitglieder je Tag', type: 'line', unit: 'count', series: [{ name: 'Aktiv', values: byDays(p.days, activeByDay) }] },
-      { id: 'neu', title: 'Registrierungen je Tag', type: 'bars', unit: 'count', series: [{ name: 'Registrierungen', values: byDays(p.days, toMap(signups)) }] },
-    ],
-    retention: ret,
-    areas: Object.entries(areas)
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, n]) => ({ key, n, share: pct(n, areaTotal) })),
-    heat,
-    heatMax: Math.max(1, ...heat.flat()),
-  };
-}
-
-// ---------- TCG & Handel ----------
+// ---------- Drop-Raten ----------
 
 /**
  * Tatsächliche Chance je Seltenheit: Gibt es zu einer Seltenheit (noch) keine Karte, fällt die Ziehung auf die
@@ -310,20 +212,275 @@ function effectiveChances(rarities, cards) {
   return out;
 }
 
+/**
+ * Weicht die gezogene Anzahl auffällig vom Erwartungswert ab? Normalnäherung der Binomialverteilung:
+ * |z| > 3 gilt als auffällig. Bei weniger als 5 erwarteten Karten ist keine Aussage möglich.
+ * -> 'wenig-daten' | 'im-rahmen' | 'zu-oft' | 'zu-selten'
+ */
+function pullVerdict(count, total, chance) {
+  const expected = total * chance;
+  if (expected < 5 || chance <= 0 || chance >= 1) return 'wenig-daten';
+  const z = (count - expected) / Math.sqrt(total * chance * (1 - chance));
+  return z > 3 ? 'zu-oft' : z < -3 ? 'zu-selten' : 'im-rahmen';
+}
+
+// ---------- Markierungen ----------
+
+const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', config: '.env' };
+
+/** Einstellungsänderungen und Patchnotes im Zeitraum – Markierungen in allen Verläufen */
+async function markers(p) {
+  const patchCat = await ForumCategory.findOne({ key: 'patchnotes' }).select('_id').lean();
+  const [changes, patches] = await Promise.all([
+    SettingsChange.find(inP(p)).sort({ createdAt: 1 }).lean(),
+    patchCat ? ForumThread.find({ category: patchCat._id, deleted: false, ...inP(p) }).select('title createdAt').sort({ createdAt: 1 }).lean() : [],
+  ]);
+  const list = [
+    ...changes.map((c) => ({
+      day: dayAndHour(c.createdAt).day,
+      at: c.createdAt,
+      kind: 'einstellung',
+      short: AREA_SHORT[c.area] || c.area,
+      label: `${AREA_SHORT[c.area] || c.area}: ${c.changes.length} Wert${c.changes.length === 1 ? '' : 'e'} geändert`,
+      detail: c.changes.slice(0, 12).map((x) => `${x.path}: ${JSON.stringify(x.from)} → ${JSON.stringify(x.to)}`),
+      by: c.byName || 'Serverstart',
+    })),
+    ...patches.map((t) => ({ day: dayAndHour(t.createdAt).day, at: t.createdAt, kind: 'patch', short: 'Patch', label: t.title, detail: [], by: null })),
+  ];
+  return list.sort((a, b) => a.at - b.at);
+}
+
+// ---------- Wirtschaft ----------
+
+async function economy(p) {
+  const [flows, before, snapshots, players, typeTotals, activeDays] = await Promise.all([
+    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
+    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
+    StatDaily.find({ _id: { $gte: p.from, $lte: p.to } }).select('_id wealth').sort({ _id: 1 }).lean(),
+    ranking(),
+    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
+    UserActivity.countDocuments({ day: { $gte: p.from, $lte: p.to } }),
+  ]);
+
+  // Netto je Bereich und Tag, dazu die Geldmenge (alle Buchungen bis Tagesende)
+  const net = Object.fromEntries(LEDGER_GROUPS.map((g) => [g.key, {}]));
+  const dayNet = {};
+  for (const f of flows) {
+    const g = groupOfType[f._id.t];
+    if (g) net[g][f._id.d] = (net[g][f._id.d] || 0) + f.s;
+    dayNet[f._id.d] = (dayNet[f._id.d] || 0) + f.s;
+  }
+  let supply = before[0] ? before[0].s : 0;
+  const supplySeries = p.days.map((d) => (supply += dayNet[d] || 0));
+  const periodNet = Object.values(dayNet).reduce((s, x) => s + x, 0);
+
+  const dist = distribution(players.map((x) => x.total));
+  const balanceSum = sumBy(players, 'balance');
+  const fromSnap = (fn) => byDays(p.days, Object.fromEntries(snapshots.map((s) => [s._id, fn(s)])), null);
+
+  // Bilanz je Bereich: Quellen (Geld entsteht) und Senken (Geld verschwindet)
+  const groupTotals = LEDGER_GROUPS.map((g) => ({ ...g, value: Object.values(net[g.key]).reduce((s, x) => s + x, 0) })).filter((g) => g.value !== 0);
+  const supplyNow = supplySeries[supplySeries.length - 1];
+
+  return [
+    {
+      id: 'geldmenge',
+      title: 'Geldmenge',
+      question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es?',
+      kpis: [
+        { id: 'guthaben', label: 'Guthaben gesamt', value: balanceSum, unit: 'euro', hint: 'Summe aller Kontostände (jetzt)' },
+        { id: 'zufluss', label: 'Netto-Geldzufluss', value: periodNet, unit: 'euro', signed: true, compare: true, hint: 'Neu entstandenes minus verschwundenes Geld im Zeitraum' },
+        { id: 'zufluss-tag', label: 'Zufluss je Tag', value: Math.round(periodNet / p.range), unit: 'euro', signed: true, compare: true },
+        {
+          id: 'zufluss-spieler',
+          label: 'Zufluss je Spielertag',
+          value: activeDays ? Math.round(periodNet / activeDays) : null,
+          unit: 'euro',
+          signed: true,
+          compare: true,
+          hint: 'Netto-Zufluss geteilt durch die Summe der aktiven Mitglieder je Tag',
+        },
+      ],
+      flow: {
+        sources: groupTotals.filter((g) => g.value > 0).sort((a, b) => b.value - a.value),
+        sinks: groupTotals.filter((g) => g.value < 0).sort((a, b) => a.value - b.value),
+      },
+      charts: [
+        { id: 'geldmenge', title: 'Geldmenge', type: 'line', unit: 'euro', agg: 'last', wide: true, series: [{ name: 'Geldmenge', values: supplySeries }] },
+        {
+          id: 'zufluss',
+          title: 'Netto-Geldzufluss je Bereich',
+          note: 'Über 0: Geld entsteht. Unter 0: Geld verschwindet.',
+          type: 'stacked',
+          unit: 'euro',
+          agg: 'sum',
+          wide: true,
+          series: LEDGER_GROUPS.filter((g) => Object.keys(net[g.key]).length).map((g) => ({ name: g.label, values: byDays(p.days, net[g.key]) })),
+        },
+      ],
+      // Abgleich: Kontostände gegen die Summe aller Buchungen (nur sinnvoll, wenn der Zeitraum bis heute reicht)
+      warning: balanceSum !== supplyNow && p.to === dayAndHour().day ? { diff: balanceSum - supplyNow } : null,
+      tables: [
+        {
+          title: 'Alle Buchungsarten im Zeitraum',
+          collapsed: true,
+          head: ['Art', 'Bereich', { label: 'Anzahl', num: true }, { label: 'Summe', num: true }],
+          rows: typeTotals
+            .sort((a, b) => a.s - b.s)
+            .map((t) => [
+              ledgerLabels[t._id] || t._id,
+              (LEDGER_GROUPS.find((g) => g.key === groupOfType[t._id]) || {}).label || '–',
+              { value: t.n, unit: 'count' },
+              { value: t.s, unit: 'euro', signed: true },
+            ]),
+        },
+      ],
+    },
+    {
+      id: 'verteilung',
+      title: 'Vermögensverteilung',
+      question: 'Wie ungleich ist das Vermögen verteilt – und wer bekommt den Tagesbonus?',
+      kpis: [
+        { id: 'vermoegen', label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
+        { id: 'median', label: 'Median-Vermögen', value: dist.median, unit: 'euro', hint: 'Die Hälfte der Mitglieder hat weniger (jetzt)' },
+        { id: 'gini', label: 'Gini-Koeffizient', value: dist.gini, unit: 'ratio', hint: '0 = alle gleich reich, 1 = einer besitzt alles (jetzt)' },
+        { id: 'top10', label: 'Anteil reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'am Gesamtvermögen (jetzt)' },
+        { id: 'bonus', label: 'Bonusberechtigt', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
+      ],
+      charts: [
+        { id: 'gini', title: 'Gini-Koeffizient', type: 'line', unit: 'ratio', agg: 'last', series: [{ name: 'Gini', values: fromSnap((s) => s.wealth.total && s.wealth.total.gini) }] },
+        { id: 'median', title: 'Median-Vermögen', type: 'line', unit: 'euro', agg: 'last', series: [{ name: 'Median', values: fromSnap((s) => s.wealth.total && s.wealth.total.median) }] },
+      ],
+      notes: snapshots.length ? [] : ['Gini und Median im Verlauf kommen aus den Tages-Snapshots, die erst seit dem Statistik-Update aufgenommen werden.'],
+      tables: [
+        {
+          title: 'Verteilung und Zusammensetzung (jetzt)',
+          head: ['Kennzahl', { label: 'Wert', num: true }],
+          rows: [
+            ['10. Perzentil', { value: dist.p10, unit: 'euro' }],
+            ['Median', { value: dist.median, unit: 'euro' }],
+            ['Mittelwert', { value: dist.mean, unit: 'euro' }],
+            ['90. Perzentil', { value: dist.p90, unit: 'euro' }],
+            ['99. Perzentil', { value: dist.p99, unit: 'euro' }],
+            ['Höchstes Vermögen', { value: dist.max, unit: 'euro' }],
+            ['Anteil Guthaben', { value: pct(balanceSum, dist.sum), unit: 'percent' }],
+            ['Anteil offene Einsätze', { value: pct(sumBy(players, 'inPlay'), dist.sum), unit: 'percent' }],
+            ['Anteil Coins', { value: pct(sumBy(players, 'coinValue'), dist.sum), unit: 'percent' }],
+            ['Anteil Karten & Packs', { value: pct(sumBy(players, 'cardValue'), dist.sum), unit: 'percent' }],
+          ],
+        },
+      ],
+    },
+  ];
+}
+
+// ---------- Spieler ----------
+
+async function playersSection(p, now = new Date()) {
+  const today = dayAndHour(now).day;
+  const monthFrom = addDays(today, -29);
+  const actFrom = [p.from, monthFrom].sort()[0];
+  const [members, banned, signups, cohortUsers, activity] = await Promise.all([
+    User.countDocuments({ deletedAt: null }),
+    User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
+    User.aggregate([{ $match: inP(p) }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
+    User.find(inP(p)).select('_id createdAt').lean(),
+    // Für die Retention zählt auch Aktivität nach dem Zeitraum (bis heute)
+    UserActivity.find({ day: { $gte: actFrom } }).select('user day views actions areas hours').lean(),
+  ]);
+
+  const activeByDay = {};
+  const activeDays = new Map();
+  const areas = {};
+  const heat = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let views = 0;
+  let actions = 0;
+  const wau = new Set();
+  const mau = new Set();
+  for (const a of activity) {
+    const uid = String(a.user);
+    if (!activeDays.has(uid)) activeDays.set(uid, new Set());
+    activeDays.get(uid).add(a.day);
+    if (a.day >= addDays(today, -6)) wau.add(uid);
+    if (a.day >= monthFrom) mau.add(uid);
+    if (a.day < p.from || a.day > p.to) continue;
+    activeByDay[a.day] = (activeByDay[a.day] || 0) + 1;
+    views += a.views || 0;
+    actions += a.actions || 0;
+    for (const [k, n] of Object.entries(a.areas || {})) areas[k] = (areas[k] || 0) + n;
+    for (const h of a.hours || []) heat[weekday(a.day)][h]++;
+  }
+  const cohort = cohortUsers.map((u) => ({ user: u._id, day: dayAndHour(u.createdAt).day }));
+  const [d1, d7, d30] = retention(cohort, activeDays, [1, 7, 30], today);
+  const areaTotal = Object.values(areas).reduce((s, n) => s + n, 0);
+  const playerDays = Object.values(activeByDay).reduce((s, n) => s + n, 0);
+  const retKpi = (r, id) => ({
+    id,
+    label: `Wieder aktiv nach ${r.offset} Tag${r.offset === 1 ? '' : 'en'}`,
+    value: r.rate,
+    unit: 'percent',
+    compare: true,
+    hint: r.eligible ? `${r.retained} von ${r.eligible} neuen Mitgliedern` : 'noch niemand lange genug dabei',
+  });
+
+  return [
+    {
+      id: 'aktivitaet',
+      title: 'Aktivität',
+      question: 'Wie viele spielen – und wann?',
+      kpis: [
+        { id: 'mitglieder', label: 'Mitglieder', value: members, unit: 'count', hint: banned ? `davon ${banned} gesperrt (jetzt)` : 'jetzt' },
+        { id: 'aktiv-tag', label: 'Ø aktiv je Tag', value: playerDays / p.range, unit: 'number', compare: true },
+        { id: 'aktiv-7', label: 'Aktiv letzte 7 Tage', value: wau.size, unit: 'count', hint: members ? `${Math.round((wau.size / members) * 100)} % der Mitglieder` : null },
+        { id: 'aktiv-30', label: 'Aktiv letzte 30 Tage', value: mau.size, unit: 'count', hint: members ? `${Math.round((mau.size / members) * 100)} % der Mitglieder` : null },
+        { id: 'aufrufe', label: 'Seitenaufrufe', value: views, unit: 'count', compare: true },
+        { id: 'aktionen', label: 'Aktionen', value: actions, unit: 'count', compare: true, hint: 'abgeschickte Formulare: setzen, kaufen, posten …' },
+      ],
+      charts: [{ id: 'dau', title: 'Aktive Mitglieder je Tag', type: 'line', unit: 'number', agg: 'avg', wide: true, series: [{ name: 'Aktiv', values: byDays(p.days, activeByDay) }] }],
+      heat: playerDays ? { rows: heat, max: Math.max(1, ...heat.flat()) } : null,
+      notes: activity.length ? [] : ['Aktivitätsdaten werden erst seit dem Statistik-Update gesammelt – die Werte füllen sich ab jetzt Tag für Tag.'],
+    },
+    {
+      id: 'wachstum',
+      title: 'Neue Mitglieder & Bindung',
+      question: 'Kommen neue Mitglieder dazu – und bleiben sie?',
+      kpis: [{ id: 'neu', label: 'Neue Mitglieder', value: cohortUsers.length, unit: 'count', compare: true }, retKpi(d1, 'ret1'), retKpi(d7, 'ret7'), retKpi(d30, 'ret30')],
+      charts: [{ id: 'neu', title: 'Registrierungen', type: 'bars', unit: 'count', agg: 'sum', wide: true, series: [{ name: 'Registrierungen', values: byDays(p.days, toMap(signups)) }] }],
+    },
+    {
+      id: 'bereiche',
+      title: 'Bereichsnutzung',
+      question: 'Welche Bereiche werden genutzt?',
+      hbars: {
+        items: Object.entries(areas)
+          .sort((a, b) => b[1] - a[1])
+          .map(([key, n]) => ({ key, share: pct(n, areaTotal), text: `${n} · ${Math.round(pct(n, areaTotal) * 100)} %` })),
+      },
+      notes: areaTotal ? [] : ['Noch keine Daten im Zeitraum.'],
+    },
+  ];
+}
+
+// ---------- TCG & Handel ----------
+
+const KIND_LABELS = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
+
 async function tcg(p, now = new Date()) {
   const rarities = catalog.RARITIES;
-  const [pulls, openingsByDay, inCirculation, packsUnopened, sales, trades, marketSales, bmDays] = await Promise.all([
-    TcgOpening.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $unwind: '$cards' }, { $group: { _id: '$cards.rarity', n: { $sum: 1 } } }]),
-    TcgOpening.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
+  const [pulls, openingsByDay, inCirculation, packsUnopened, packSales, bankSales, bankPayout, trades, marketSales, bmDays] = await Promise.all([
+    TcgOpening.aggregate([{ $match: inP(p) }, { $unwind: '$cards' }, { $group: { _id: '$cards.rarity', n: { $sum: 1 } } }]),
+    TcgOpening.aggregate([{ $match: inP(p) }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
     TcgCard.aggregate([{ $group: { _id: '$rarity', n: { $sum: 1 } } }]),
     TcgPack.countDocuments(),
+    Ledger.aggregate([{ $match: { type: 'tcg_pack', ...inP(p) } }, { $group: { _id: null, s: { $sum: { $abs: '$amount' } } } }]),
     Ledger.aggregate([
-      { $match: { type: 'tcg_verkauf', createdAt: { $gte: p.since }, 'meta.cards': { $exists: true } } },
+      { $match: { type: 'tcg_verkauf', ...inP(p), 'meta.cards': { $exists: true } } },
       { $unwind: '$meta.cards' },
       { $group: { _id: '$meta.cards.rarity', n: { $sum: '$meta.cards.count' } } },
     ]),
+    Ledger.aggregate([{ $match: { type: 'tcg_verkauf', ...inP(p) } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     Trade.aggregate([
-      { $match: { createdAt: { $gte: p.since } } },
+      { $match: inP(p) },
       {
         $group: {
           _id: { kind: '$kind', status: { $cond: [{ $and: [{ $eq: ['$status', 'offen'] }, { $lte: ['$expiresAt', now] }] }, 'abgelaufen', '$status'] } },
@@ -333,15 +490,15 @@ async function tcg(p, now = new Date()) {
         },
       },
     ]),
-    Trade.find({ status: 'verkauft', kind: { $in: ['markt', 'privat'] }, closedAt: { $gte: p.since } }).select('card price').lean(),
-    BlackMarket.find({ _id: { $gte: p.from } }).lean(),
+    Trade.find({ status: 'verkauft', kind: { $in: ['markt', 'privat'] }, ...inP(p, 'closedAt') }).select('card price').lean(),
+    BlackMarket.find({ _id: { $gte: p.from, $lte: p.to } }).lean(),
   ]);
 
   const pullMap = toMap(pulls);
-  const pullTotal = pulls.reduce((s, r) => s + r.n, 0);
+  const pullTotal = sumBy(pulls, 'n');
   const chances = effectiveChances(rarities, catalog.CARDS);
   const circ = toMap(inCirculation);
-  const sold = toMap(sales);
+  const sold = toMap(bankSales);
   const ev = catalog.expectedPackValue();
   const packPrice = tcgSettings.getPackPrice();
 
@@ -352,108 +509,126 @@ async function tcg(p, now = new Date()) {
     if (c) (prices[c.rarity] = prices[c.rarity] || []).push(t.price);
   }
 
-  const kinds = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
-  const tradeRow = (kind) => {
-    const rows = trades.filter((t) => t._id.kind === kind);
-    const n = (status) => (rows.find((r) => r._id.status === status) || {}).n || 0;
-    const all = rows.reduce((s, r) => s + r.n, 0);
-    return [
-      kinds[kind],
-      { value: all, unit: 'count' },
-      { value: n('verkauft'), unit: 'count' },
-      { value: pct(n('verkauft'), all), unit: 'percent' },
-      { value: n('abgelehnt') + n('zurueckgezogen'), unit: 'count' },
-      { value: n('abgelaufen'), unit: 'count' },
-      { value: rows.reduce((s, r) => s + r.volume, 0), unit: 'euro' },
-      { value: rows.reduce((s, r) => s + r.tax, 0), unit: 'euro' },
-    ];
-  };
+  const tradeCount = (kind, status) => sumBy(trades.filter((t) => (!kind || t._id.kind === kind) && (!status || t._id.status === status)), 'n');
+  const closed = tradeCount(null, 'verkauft');
+  const created = tradeCount();
 
   const bmOffers = bmDays.flatMap((d) => d.offers);
   const bmSold = bmOffers.filter((o) => o.buyer);
-  const openingsTotal = openingsByDay.reduce((s, r) => s + r.n, 0);
 
-  return {
-    kpis: [
-      { label: 'Packpreis', value: packPrice, unit: 'euro' },
-      { label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: 'Bank-Verkaufswert der 3 Karten' },
-      { label: 'Rückfluss', value: pct(ev, packPrice), unit: 'percent', hint: 'Erwartungswert ÷ Packpreis' },
-      { label: 'Packs geöffnet', value: openingsTotal, unit: 'count', hint: 'im Zeitraum' },
-      { label: 'Karten im Umlauf', value: inCirculation.reduce((s, r) => s + r.n, 0), unit: 'count' },
-      { label: 'Ungeöffnete Packs', value: packsUnopened, unit: 'count' },
-    ],
-    charts: [{ id: 'packs', title: 'Geöffnete Packs je Tag', type: 'bars', unit: 'count', series: [{ name: 'Packs', values: byDays(p.days, toMap(openingsByDay)) }] }],
-    tables: [
-      {
-        title: 'Pull-Raten: Ist gegen Soll',
-        note: `${pullTotal} gezogene Karten im Zeitraum. Soll = aktuell eingestellte Chance (fehlen Karten einer Seltenheit, zählt sie zur nächstniedrigeren). Wurden die Chancen im Zeitraum geändert, siehe Markierungen.`,
-        head: ['Seltenheit', { label: 'Soll', num: true }, { label: 'Ist', num: true }, { label: 'Abweichung', num: true }, { label: 'Gezogen', num: true }],
+  return [
+    {
+      id: 'packs',
+      title: 'Booster Packs',
+      question: 'Lohnt sich ein Pack – und wie viele werden gekauft?',
+      kpis: [
+        { id: 'packpreis', label: 'Packpreis', value: packPrice, unit: 'euro', hint: 'aktuell eingestellt' },
+        { id: 'ev', label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: 'Bank-Verkaufswert der 3 Karten im Mittel (aktuelle Chancen und Preise)' },
+        { id: 'rueckfluss', label: 'Pack-Rückfluss', value: pct(ev, packPrice), unit: 'percent', hint: 'Erwartungswert ÷ Packpreis. Unter 100 %: Packs ziehen im Mittel Geld aus dem Spiel.' },
+        { id: 'pack-umsatz', label: 'Pack-Umsatz', value: packSales[0] ? packSales[0].s : 0, unit: 'euro', compare: true },
+        { id: 'geoeffnet', label: 'Packs geöffnet', value: sumBy(openingsByDay, 'n'), unit: 'count', compare: true },
+        { id: 'ungeoeffnet', label: 'Ungeöffnete Packs', value: packsUnopened, unit: 'count', hint: 'in allen Inventaren (jetzt)' },
+      ],
+      charts: [{ id: 'packs', title: 'Geöffnete Packs', type: 'bars', unit: 'count', agg: 'sum', wide: true, series: [{ name: 'Packs', values: byDays(p.days, toMap(openingsByDay)) }] }],
+    },
+    {
+      id: 'drops',
+      title: 'Drop-Raten',
+      question: 'Stimmen die gezogenen Seltenheiten mit den eingestellten Chancen überein?',
+      pulls: {
+        total: pullTotal,
         rows: rarities.map((r) => {
-          const ist = pct(pullMap[r.key] || 0, pullTotal);
-          return [
-            r.label + (r.hidden ? ' (geheim)' : ''),
-            { value: chances[r.key], unit: 'percent', digits: 2 },
-            { value: ist, unit: 'percent', digits: 2 },
-            { value: ist === null || !chances[r.key] ? null : ist / chances[r.key] - 1, unit: 'percent', signed: true },
-            { value: pullMap[r.key] || 0, unit: 'count' },
-          ];
+          const count = pullMap[r.key] || 0;
+          return {
+            label: r.label + (r.hidden ? ' (geheim)' : ''),
+            chance: chances[r.key],
+            share: pct(count, pullTotal),
+            expected: pullTotal * chances[r.key],
+            count,
+            verdict: pullVerdict(count, pullTotal, chances[r.key]),
+          };
         }),
       },
-      {
-        title: 'Karten je Seltenheit',
-        note: 'Bank-Verkäufe erst ab dem Update mit Karten-Details im Kontoauszug.',
-        head: ['Seltenheit', { label: 'Bankwert', num: true }, { label: 'Im Umlauf', num: true }, { label: 'An Bank verkauft', num: true }, { label: 'Ø Marktpreis', num: true }, { label: 'Markt ÷ Bank', num: true }],
-        rows: rarities.map((r) => {
-          const list = (prices[r.key] || []).sort((a, b) => a - b);
-          const median = list.length ? quantile(list, 0.5) : null;
-          return [
-            r.label,
-            { value: r.sell, unit: 'euro' },
-            { value: circ[r.key] || 0, unit: 'count' },
-            { value: sold[r.key] || 0, unit: 'count' },
-            { value: median, unit: 'euro', hint: list.length ? `Median aus ${list.length}` : null },
-            { value: median === null || !r.sell ? null : median / r.sell, unit: 'ratio' },
-          ];
-        }),
+    },
+    {
+      id: 'karten',
+      title: 'Karten im Umlauf',
+      question: 'Wie viele Karten gibt es – und wie viele gehen an die Bank zurück?',
+      kpis: [
+        { id: 'umlauf', label: 'Karten im Umlauf', value: sumBy(inCirculation, 'n'), unit: 'count', hint: 'jetzt' },
+        { id: 'bank-verkauft', label: 'An die Bank verkauft', value: sumBy(bankSales, 'n'), unit: 'count', compare: true, hint: 'erst seit dem Update mit Karten-Details im Kontoauszug' },
+        { id: 'bank-auszahlung', label: 'Bank-Auszahlungen', value: bankPayout[0] ? bankPayout[0].s : 0, unit: 'euro', compare: true },
+      ],
+      tables: [
+        {
+          title: 'Je Seltenheit',
+          head: ['Seltenheit', { label: 'Bankwert', num: true }, { label: 'Im Umlauf', num: true }, { label: 'An Bank verkauft', num: true }],
+          zeroCols: [2, 3],
+          rows: rarities.map((r) => [r.label, { value: r.sell, unit: 'euro' }, { value: circ[r.key] || 0, unit: 'count' }, { value: sold[r.key] || 0, unit: 'count' }]),
+        },
+      ],
+    },
+    {
+      id: 'handel',
+      title: 'Handel zwischen Mitgliedern',
+      question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank?',
+      kpis: [
+        { id: 'angebote', label: 'Neue Angebote', value: created, unit: 'count', compare: true },
+        { id: 'abschluesse', label: 'Abgeschlossene Geschäfte', value: closed, unit: 'count', compare: true },
+        { id: 'abschlussquote', label: 'Abschlussquote', value: pct(closed, created), unit: 'percent', compare: true },
+        { id: 'handelsumsatz', label: 'Handelsumsatz', value: sumBy(trades, 'volume'), unit: 'euro', compare: true, hint: 'Kaufpreise und Aufpreise' },
+        { id: 'steuer', label: 'Steuer', value: sumBy(trades, 'tax'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
+      ],
+      hbars: {
+        title: 'Abschlussquote je Art',
+        items: Object.keys(KIND_LABELS)
+          .filter((k) => tradeCount(k))
+          .map((k) => ({ label: KIND_LABELS[k], share: pct(tradeCount(k, 'verkauft'), tradeCount(k)), text: `${tradeCount(k, 'verkauft')} von ${tradeCount(k)}` })),
       },
-      {
-        title: 'Handel im Zeitraum (nach Erstellung)',
-        head: ['Art', { label: 'Erstellt', num: true }, { label: 'Abgeschlossen', num: true }, { label: 'Quote', num: true }, { label: 'Abgelehnt/zurück', num: true }, { label: 'Abgelaufen', num: true }, { label: 'Umsatz', num: true }, { label: 'Steuer', num: true }],
-        rows: Object.keys(kinds).map(tradeRow),
-      },
-      {
-        title: 'Black Market',
-        head: ['Kennzahl', { label: 'Wert', num: true }],
-        rows: [
-          ['Tage mit Angebot', { value: bmDays.length, unit: 'count' }],
-          ['Angebote', { value: bmOffers.length, unit: 'count' }],
-          ['Verkauft', { value: bmSold.length, unit: 'count', hint: bmOffers.length ? `${Math.round((bmSold.length / bmOffers.length) * 100)} %` : null }],
-          ['Umsatz', { value: bmSold.reduce((s, o) => s + o.price, 0), unit: 'euro' }],
-        ],
-      },
-    ],
-  };
+      tables: [
+        {
+          title: 'Marktpreise gegenüber dem Bankwert',
+          note: 'Median der Verkaufspreise auf dem Markt und privat. Über 1: Karten sind den Mitgliedern mehr wert als die Bank zahlt.',
+          head: ['Seltenheit', { label: 'Bankwert', num: true }, { label: 'Verkäufe', num: true }, { label: 'Median-Preis', num: true }, { label: 'Markt ÷ Bank', num: true }],
+          zeroCols: [2],
+          rows: rarities.map((r) => {
+            const list = (prices[r.key] || []).sort((a, b) => a - b);
+            const median = list.length ? quantile(list, 0.5) : null;
+            return [r.label, { value: r.sell, unit: 'euro' }, { value: list.length, unit: 'count' }, { value: median, unit: 'euro' }, { value: median === null || !r.sell ? null : median / r.sell, unit: 'ratio' }];
+          }),
+        },
+      ],
+      notes: created ? [] : ['Keine Handelsangebote im Zeitraum.'],
+    },
+    {
+      id: 'blackmarket',
+      title: 'Black Market',
+      question: 'Wird der Black Market angenommen?',
+      kpis: [
+        { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
+        { id: 'bm-quote', label: 'Verkaufte Karten', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
+        { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
+      ],
+    },
+  ];
 }
 
-// ---------- Wetten, IHK, Coin, Lotterie ----------
+// ---------- Spiele: Wetten, IHK, Coin, Lotterie ----------
+
+const VIA_LABELS = { einstimmig: 'Einstimmig', dev: 'Dev-Entscheid', system: 'Automatisch annulliert', ersteller: 'Ersteller allein', schiedsrichter: 'Schiedsrichter (Duell)' };
 
 async function games(p) {
-  const [newBets, stakes, resolved, betStats, duels, tips, runs, coinDays, coinVol, coinNet, rounds] = await Promise.all([
-    Bet.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
-    Ledger.aggregate([{ $match: { type: 'einsatz', createdAt: { $gte: p.since } } }, { $group: { _id: dayOf('$createdAt'), s: { $sum: { $abs: '$amount' } } } }]),
-    Bet.aggregate([
-      { $match: { resolvedAt: { $gte: p.since } } },
-      { $group: { _id: { via: '$resolvedVia', status: '$status' }, n: { $sum: 1 }, refunded: { $sum: { $cond: ['$refunded', 1, 0] } } } },
-    ]),
-    Bet.aggregate([
-      { $match: { createdAt: { $gte: p.since } } },
-      { $lookup: { from: 'positions', localField: '_id', foreignField: 'bet', as: 'pos' } },
-      { $group: { _id: null, bets: { $sum: 1 }, players: { $sum: { $size: '$pos' } } } },
-    ]),
-    Bet.aggregate([{ $match: { 'duel.state': { $exists: true }, createdAt: { $gte: p.since } } }, { $group: { _id: { state: '$duel.state', status: '$status' }, n: { $sum: 1 } } }]),
-    DuelTip.countDocuments({ createdAt: { $gte: p.since } }),
+  const [newBets, stakes, resolved, betStats, devDisputes, duels, tips, runs, coinDays, coinVol, rounds] = await Promise.all([
+    Bet.aggregate([{ $match: inP(p) }, { $group: { _id: dayOf('$createdAt'), n: { $sum: 1 } } }]),
+    Ledger.aggregate([{ $match: { type: 'einsatz', ...inP(p) } }, { $group: { _id: dayOf('$createdAt'), s: { $sum: { $abs: '$amount' } } } }]),
+    Bet.aggregate([{ $match: inP(p, 'resolvedAt') }, { $group: { _id: { via: '$resolvedVia', status: '$status' }, n: { $sum: 1 } } }]),
+    Bet.aggregate([{ $match: inP(p) }, { $lookup: { from: 'positions', localField: '_id', foreignField: 'bet', as: 'pos' } }, { $group: { _id: null, bets: { $sum: 1 }, players: { $sum: { $size: '$pos' } } } }]),
+    // Streitfall = beide Stimmen abgegeben, ein Dev hat entschieden
+    Bet.countDocuments({ ...inP(p, 'resolvedAt'), 'votes.1': { $exists: true }, resolvedVia: 'dev' }),
+    Bet.aggregate([{ $match: { 'duel.state': { $exists: true }, ...inP(p) } }, { $group: { _id: { state: '$duel.state', status: '$status' }, n: { $sum: 1 } } }]),
+    DuelTip.countDocuments(inP(p)),
     IhkRun.aggregate([
-      { $match: { status: 'fertig', endsAt: { $gte: p.since } } },
+      { $match: { status: 'fertig', ...inP(p, 'endsAt') } },
       {
         $group: {
           _id: { quest: '$quest', difficulty: '$difficulty' },
@@ -461,47 +636,33 @@ async function games(p) {
           ok: { $sum: { $cond: ['$success', 1, 0] } },
           reward: { $sum: '$reward' },
           packs: { $sum: { $cond: [{ $ne: ['$pack', null] }, 1, 0] } },
-          hybrid: { $max: { $cond: [{ $ne: ['$total2', null] }, 1, 0] } },
+          hybrid: { $max: { $cond: [{ $gt: ['$total2', null] }, 1, 0] } },
         },
       },
     ]),
-    CoinHour.aggregate([{ $match: { t: { $gte: p.since } } }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }]),
-    CoinTrade.aggregate([{ $match: { createdAt: { $gte: p.since } } }, { $group: { _id: { d: dayOf('$createdAt'), side: '$side' }, s: { $sum: '$cents' }, users: { $addToSet: '$user' } } }]),
-    Ledger.aggregate([{ $match: { type: { $in: ['coin_kauf', 'coin_verkauf'] }, createdAt: { $gte: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
-    LotteryRound.find({ status: 'gezogen', drawnAt: { $gte: p.since } }).sort({ drawnAt: 1 }).lean(),
+    CoinHour.aggregate([{ $match: inP(p, 't') }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }, { $sort: { _id: 1 } }]),
+    CoinTrade.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), side: '$side' }, s: { $sum: '$cents' }, users: { $addToSet: '$user' } } }]),
+    LotteryRound.find({ status: 'gezogen', ...inP(p, 'drawnAt') }).sort({ drawnAt: 1 }).lean(),
   ]);
 
   // Wetten
-  const disputedEver = await Bet.countDocuments({ createdAt: { $gte: p.since }, 'votes.1': { $exists: true }, resolvedVia: 'dev' });
-  const viaLabels = { einstimmig: 'Einstimmig', dev: 'Dev-Entscheid', system: 'Automatisch (System)', ersteller: 'Ersteller allein', schiedsrichter: 'Schiedsrichter (Duell)' };
-  const resolvedTotal = resolved.reduce((s, r) => s + r.n, 0);
-  const viaRows = Object.entries(viaLabels).map(([via, label]) => {
-    const rows = resolved.filter((r) => r._id.via === via);
-    const n = rows.reduce((s, r) => s + r.n, 0);
-    return [
-      label,
-      { value: n, unit: 'count' },
-      { value: pct(n, resolvedTotal), unit: 'percent' },
-      { value: rows.filter((r) => r._id.status === 'annulliert').reduce((s, r) => s + r.n, 0), unit: 'count' },
-      { value: rows.reduce((s, r) => s + r.refunded, 0), unit: 'count' },
-    ];
-  });
+  const resolvedTotal = sumBy(resolved, 'n');
   const bs = betStats[0] || { bets: 0, players: 0 };
-  const stakeTotal = stakes.reduce((s, r) => s + r.s, 0);
+  const duelCount = (state, status) => (duels.find((d) => d._id.state === state && d._id.status === status) || {}).n || 0;
 
   // IHK
-  const runTotal = runs.reduce((s, r) => s + r.n, 0);
-  const okTotal = runs.reduce((s, r) => s + r.ok, 0);
+  const runTotal = sumBy(runs, 'n');
+  const okTotal = sumBy(runs, 'ok');
   const byLevel = DIFFICULTIES.map((d) => {
     const rows = runs.filter((r) => r._id.difficulty === d.level);
-    const n = rows.reduce((s, r) => s + r.n, 0);
-    const ok = rows.reduce((s, r) => s + r.ok, 0);
+    const n = sumBy(rows, 'n');
+    const ok = sumBy(rows, 'ok');
     return [
       `${d.level} · ${d.label}`,
       { value: n, unit: 'count' },
       { value: pct(ok, n), unit: 'percent' },
-      { value: ok ? Math.round(rows.reduce((s, r) => s + r.reward, 0) / ok) : null, unit: 'euro' },
-      { value: pct(rows.reduce((s, r) => s + r.packs, 0), ok), unit: 'percent' },
+      { value: ok ? Math.round(sumBy(rows, 'reward') / ok) : null, unit: 'euro' },
+      { value: pct(sumBy(rows, 'packs'), ok), unit: 'percent' },
       { value: ihk.packChanceFor(d.level) / 100, unit: 'percent' },
     ];
   });
@@ -529,90 +690,203 @@ async function games(p) {
     vol[r._id.side][r._id.d] = r.s;
     for (const u of r.users) traders.add(String(u));
   }
-  const coinPlayerNet = coinNet[0] ? coinNet[0].s : 0;
+  const buys = Object.values(vol.kauf).reduce((s, x) => s + x, 0);
+  const sells = Object.values(vol.verkauf).reduce((s, x) => s + x, 0);
 
   // Lotterie
-  const lotteryDays = {};
-  for (const r of rounds) lotteryDays[dayAndHour(r.drawnAt).day] = (lotteryDays[dayAndHour(r.drawnAt).day] || 0) + r.pot;
-  const forfeitedPots = rounds.filter((r) => r.tickets > 0 && !r.winner);
+  const pots = {};
+  for (const r of rounds) {
+    const d = dayAndHour(r.drawnAt).day;
+    pots[d] = (pots[d] || 0) + r.pot;
+  }
+  const forfeited = rounds.filter((r) => r.tickets > 0 && !r.winner);
 
+  return [
+    {
+      id: 'wetten',
+      title: 'Wetten & Duelle',
+      question: 'Wie viel wird gewettet – und wie enden die Wetten?',
+      kpis: [
+        { id: 'wetten-neu', label: 'Neue Wetten', value: bs.bets, unit: 'count', compare: true },
+        { id: 'einsaetze', label: 'Einsätze', value: sumBy(stakes, 's'), unit: 'euro', compare: true },
+        { id: 'teilnehmer', label: 'Ø Teilnehmer je Wette', value: avg(bs.players, bs.bets), unit: 'number', compare: true },
+        { id: 'streitfaelle', label: 'Streitfälle (Dev)', value: devDisputes, unit: 'count', compare: true, hint: 'Ersteller und Schiedsrichter uneinig, ein Dev hat entschieden' },
+        { id: 'duelle', label: 'Duelle angefragt', value: sumBy(duels, 'n'), unit: 'count', compare: true, hint: `${duelCount('aktiv', 'entschieden')} entschieden, ${duelCount('angefragt', 'annulliert')} abgelehnt oder verfallen` },
+        { id: 'tipps', label: 'Zuschauer-Tipps', value: tips, unit: 'count', compare: true },
+      ],
+      charts: [
+        { id: 'einsaetze', title: 'Einsätze', type: 'bars', unit: 'euro', agg: 'sum', series: [{ name: 'Einsätze', values: byDays(p.days, toMap(stakes, 's')) }] },
+        { id: 'wetten', title: 'Neue Wetten', type: 'bars', unit: 'count', agg: 'sum', series: [{ name: 'Wetten', values: byDays(p.days, toMap(newBets)) }] },
+      ],
+      hbars: {
+        title: `Entscheidungswege (${resolvedTotal} abgeschlossene Wetten)`,
+        items: Object.entries(VIA_LABELS)
+          .map(([via, label]) => {
+            const rows = resolved.filter((r) => r._id.via === via);
+            const n = sumBy(rows, 'n');
+            const voided = sumBy(rows.filter((r) => r._id.status === 'annulliert'), 'n');
+            return { label, share: pct(n, resolvedTotal), text: `${n}${voided ? ` · ${voided} annulliert` : ''}`, n };
+          })
+          .filter((x) => x.n),
+      },
+    },
+    {
+      id: 'ihk',
+      title: 'IHK-Quests',
+      question: 'Sind Quests zu leicht oder zu schwer – und was werfen sie ab?',
+      kpis: [
+        { id: 'ihk-laeufe', label: 'Abgeschlossene Läufe', value: runTotal, unit: 'count', compare: true },
+        { id: 'ihk-erfolg', label: 'IHK-Erfolgsquote', value: pct(okTotal, runTotal), unit: 'percent', compare: true },
+        { id: 'ihk-loehne', label: 'Ausgezahlte Löhne', value: sumBy(runs, 'reward'), unit: 'euro', compare: true, hint: 'Geldquelle' },
+        { id: 'ihk-packs', label: 'Gefundene Packs', value: sumBy(runs, 'packs'), unit: 'count', compare: true },
+      ],
+      tables: [
+        {
+          title: 'Nach Schwierigkeit',
+          head: ['Schwierigkeit', { label: 'Läufe', num: true }, { label: 'Erfolg', num: true }, { label: 'Ø Lohn', num: true }, { label: 'Pack-Drops', num: true }, { label: 'Pack-Chance (Soll)', num: true }],
+          zeroCols: [1],
+          rows: byLevel,
+        },
+        { title: 'Nach Quest', head: ['Quest', { label: 'Läufe', num: true }, { label: 'Erfolg', num: true }, { label: 'Löhne', num: true }], rows: questRows },
+      ],
+      notes: runTotal ? [] : ['Keine abgeschlossenen Quests im Zeitraum.'],
+    },
+    {
+      id: 'coin',
+      title: 'Samantha Coin',
+      question: 'Wie entwickelt sich der Kurs – und gewinnen oder verlieren die Spieler?',
+      kpis: [
+        { id: 'kurs', label: 'Kurs am Ende', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
+        { id: 'coin-netto', label: 'Coin: Netto der Spieler', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum. Positiv: Coins bringen Geld ins Spiel.' },
+        { id: 'coin-kaeufe', label: 'Käufe', value: buys, unit: 'euro', compare: true },
+        { id: 'coin-verkaeufe', label: 'Verkäufe', value: sells, unit: 'euro', compare: true },
+        { id: 'coin-haendler', label: 'Händler', value: traders.size, unit: 'count', compare: true },
+      ],
+      charts: [
+        { id: 'kurs', title: 'Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
+        {
+          id: 'coinvolumen',
+          title: 'Handelsvolumen',
+          type: 'bars',
+          unit: 'euro',
+          agg: 'sum',
+          series: [
+            { name: 'Käufe', values: byDays(p.days, vol.kauf) },
+            { name: 'Verkäufe', values: byDays(p.days, vol.verkauf) },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'lotterie',
+      title: 'Lotterie',
+      question: 'Wie groß sind die Töpfe – und wie viele machen mit?',
+      kpis: [
+        { id: 'runden', label: 'Ziehungen', value: rounds.length, unit: 'count', compare: true },
+        { id: 'topf', label: 'Ø Topf', value: rounds.length ? Math.round(sumBy(rounds, 'pot') / rounds.length) : null, unit: 'euro', compare: true },
+        { id: 'lose', label: 'Ø Lose je Ziehung', value: avg(sumBy(rounds, 'tickets'), rounds.length), unit: 'number', compare: true },
+        { id: 'lotto-teilnehmer', label: 'Ø Teilnehmer', value: avg(sumBy(rounds, 'participants'), rounds.length), unit: 'number', compare: true },
+        { id: 'verfallen', label: 'Verfallene Töpfe', value: sumBy(forfeited, 'pot'), unit: 'euro', compare: true, hint: 'alle Lose gehörten gelöschten Konten' },
+      ],
+      charts: [{ id: 'lotterie', title: 'Topf je Ziehung', type: 'bars', unit: 'euro', agg: 'sum', wide: true, series: [{ name: 'Topf', values: byDays(p.days, pots) }] }],
+    },
+  ];
+}
+
+// ---------- Übersicht ----------
+
+// Kennzahlen der Übersicht: [Reiter, Kennzahl-ID]
+const OVERVIEW_KPIS = [
+  ['spieler', 'aktiv-tag'],
+  ['spieler', 'neu'],
+  ['spieler', 'ret7'],
+  ['wirtschaft', 'zufluss'],
+  ['wirtschaft', 'zufluss-spieler'],
+  ['wirtschaft', 'gini'],
+  ['tcg', 'rueckfluss'],
+  ['tcg', 'abschluesse'],
+  ['spiele', 'einsaetze'],
+  ['spiele', 'ihk-erfolg'],
+  ['spiele', 'coin-netto'],
+  ['spiele', 'topf'],
+];
+
+async function overview(p, now) {
+  const [wirtschaft, spieler, tcgBlocks, spiele] = await Promise.all([economy(p), playersSection(p, now), tcg(p, now), games(p)]);
+  const parts = { wirtschaft, spieler, tcg: tcgBlocks, spiele };
+  const find = (section, id) => {
+    for (const b of parts[section]) {
+      const k = (b.kpis || []).find((x) => x.id === id);
+      if (k) return { ...k, href: { bereich: section, block: b.id } };
+    }
+    return null;
+  };
+  const chart = (section, id) => parts[section].flatMap((b) => b.charts || []).find((c) => c.id === id);
+  return [
+    {
+      id: 'auf-einen-blick',
+      title: 'Auf einen Blick',
+      question: 'Die wichtigsten Werte im Vergleich zum Zeitraum davor. Ein Klick auf eine Kachel führt zum Bereich.',
+      kpis: OVERVIEW_KPIS.map(([s, id]) => find(s, id)).filter(Boolean),
+      charts: [
+        { ...chart('wirtschaft', 'geldmenge'), wide: false },
+        { ...chart('spieler', 'dau'), wide: false },
+      ],
+    },
+    { id: 'aenderungen', title: 'Änderungen im Zeitraum', question: 'Was wurde wann geändert? Änderungen erscheinen als Markierungen in allen Verläufen.', timeline: true },
+  ];
+}
+
+const LOADERS = { uebersicht: overview, wirtschaft: economy, spieler: playersSection, tcg, spiele: games };
+
+/** Zeitreihen eines Diagramms auf die Abschnitte (Tag/Woche/Monat) bündeln */
+function bucketChart(chart, p, list) {
+  const series = chart.series.map((s) => ({ name: s.name, values: aggregate(s.values, p.days, list, chart.agg) }));
+  const empty = !series.some((s) => s.values.some((v) => v !== null && v !== 0));
+  return { ...chart, series, empty };
+}
+
+/** Daten eines Reiters: Blöcke mit Vergleichswerten, gebündelten Verläufen und Markierungen */
+async function section(key, rangeDays, now = new Date()) {
+  const load = LOADERS[key] || LOADERS.uebersicht;
+  const p = period(rangeDays, now);
+  const prev = period(rangeDays, now, 1);
+  const [blocks, prevBlocks, marks] = await Promise.all([load(p, now), load(prev, now), markers(p)]);
+
+  const prevKpis = new Map(prevBlocks.flatMap((b) => (b.kpis || []).map((k) => [k.id, k.value])));
+  const { unit, list } = buckets(p.days);
+  const bucketOf = Object.fromEntries(list.flatMap((b, i) => b.days.map((d) => [d, i])));
+
+  for (const b of blocks) {
+    for (const k of b.kpis || []) if (k.compare) k.delta = delta(k.value, prevKpis.get(k.id), k);
+    b.charts = (b.charts || []).map((c) => bucketChart(c, p, list));
+  }
   return {
-    kpis: [
-      { label: 'Neue Wetten', value: bs.bets, unit: 'count' },
-      { label: 'Einsätze', value: stakeTotal, unit: 'euro' },
-      { label: 'Ø Teilnehmer je Wette', value: bs.bets ? Math.round((bs.players / bs.bets) * 10) / 10 : null, unit: 'number' },
-      { label: 'Per Dev entschieden', value: disputedEver, unit: 'count', hint: 'Streitfälle mit beiden Stimmen' },
-      { label: 'IHK-Läufe', value: runTotal, unit: 'count', hint: runTotal ? `${Math.round((okTotal / runTotal) * 100)} % geschafft` : null },
-      { label: 'Coin: Netto der Spieler', value: coinPlayerNet, unit: 'euro', signed: true, hint: 'Verkäufe − Käufe (realisiert)' },
-      { label: 'Lotterie-Runden', value: rounds.length, unit: 'count', hint: forfeitedPots.length ? `${forfeitedPots.length} Topf verfallen` : null },
-    ],
-    charts: [
-      { id: 'einsaetze', title: 'Einsätze je Tag', type: 'bars', unit: 'euro', series: [{ name: 'Einsätze', values: byDays(p.days, toMap(stakes, 's')) }] },
-      { id: 'wetten', title: 'Neue Wetten je Tag', type: 'bars', unit: 'count', series: [{ name: 'Wetten', values: byDays(p.days, toMap(newBets)) }] },
-      { id: 'kurs', title: 'Coin-Kurs (Tagesschluss)', type: 'line', unit: 'price', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
-      {
-        id: 'coinvolumen',
-        title: 'Coin-Handelsvolumen je Tag',
-        type: 'bars',
-        unit: 'euro',
-        series: [
-          { name: 'Käufe', values: byDays(p.days, vol.kauf) },
-          { name: 'Verkäufe', values: byDays(p.days, vol.verkauf) },
-        ],
-      },
-      { id: 'lotterie', title: 'Lotterie-Topf je Ziehung', type: 'bars', unit: 'euro', series: [{ name: 'Topf', values: byDays(p.days, lotteryDays) }] },
-    ],
-    tables: [
-      {
-        title: 'Abgeschlossene Wetten nach Entscheidungsweg',
-        head: ['Weg', { label: 'Wetten', num: true }, { label: 'Anteil', num: true }, { label: 'davon annulliert', num: true }, { label: 'Einsätze erstattet', num: true }],
-        rows: viaRows,
-      },
-      {
-        title: 'Duelle',
-        head: ['Status', { label: 'Anzahl', num: true }],
-        rows: [
-          ...[
-            ['Wartet auf Zusage', 'angefragt', 'offen'],
-            ['Abgelehnt oder verfallen', 'angefragt', 'annulliert'],
-            ['Läuft', 'aktiv', 'offen'],
-            ['Entschieden', 'aktiv', 'entschieden'],
-            ['Annulliert', 'aktiv', 'annulliert'],
-          ].map(([label, state, status]) => [label, { value: (duels.find((d) => d._id.state === state && d._id.status === status) || {}).n || 0, unit: 'count' }]),
-          ['Zuschauer-Tipps', { value: tips, unit: 'count' }],
-        ],
-      },
-      {
-        title: 'IHK nach Schwierigkeit',
-        head: ['Schwierigkeit', { label: 'Läufe', num: true }, { label: 'Erfolg', num: true }, { label: 'Ø Lohn', num: true }, { label: 'Pack-Drops', num: true }, { label: 'Pack-Chance (Soll)', num: true }],
-        rows: byLevel,
-      },
-      { title: 'IHK nach Quest', head: ['Quest', { label: 'Läufe', num: true }, { label: 'Erfolg', num: true }, { label: 'Löhne', num: true }], rows: questRows },
-      {
-        title: 'Coin & Lotterie',
-        head: ['Kennzahl', { label: 'Wert', num: true }],
-        rows: [
-          ['Coin-Händler im Zeitraum', { value: traders.size, unit: 'count' }],
-          ['Coin-Käufe', { value: Object.values(vol.kauf).reduce((s, x) => s + x, 0), unit: 'euro' }],
-          ['Coin-Verkäufe', { value: Object.values(vol.verkauf).reduce((s, x) => s + x, 0), unit: 'euro' }],
-          ['Ø Lotterie-Topf', { value: rounds.length ? Math.round(rounds.reduce((s, r) => s + r.pot, 0) / rounds.length) : null, unit: 'euro' }],
-          ['Ø Lose je Runde', { value: rounds.length ? Math.round((rounds.reduce((s, r) => s + r.tickets, 0) / rounds.length) * 10) / 10 : null, unit: 'number' }],
-          ['Ø Teilnehmer je Runde', { value: rounds.length ? Math.round((rounds.reduce((s, r) => s + r.participants, 0) / rounds.length) * 10) / 10 : null, unit: 'number' }],
-          ['Verfallene Töpfe', { value: forfeitedPots.reduce((s, r) => s + r.pot, 0), unit: 'euro' }],
-        ],
-      },
-    ],
+    period: p,
+    previous: prev,
+    bucketUnit: unit,
+    labels: list.map((b) => b.label),
+    longLabels: list.map((b) => b.long),
+    markers: marks.map((m) => ({ ...m, i: bucketOf[m.day] })),
+    blocks,
   };
 }
 
-const LOADERS = { wirtschaft: economy, spieler: players, tcg, spiele: games };
-
-/** Daten eines Bereichs samt Markierungen */
-async function section(key, rangeDays) {
-  const p = period(rangeDays);
-  const load = LOADERS[key] || LOADERS.wirtschaft;
-  const [data, marks] = await Promise.all([load(p), markers(p)]);
-  return { period: p, markers: marks, ...data };
-}
-
-module.exports = { SECTIONS, RANGES, DEFAULT_RANGE, LEDGER_GROUPS, addDays, dayList, weekday, period, retention, effectiveChances, section };
+module.exports = {
+  SECTIONS,
+  RANGES,
+  DEFAULT_RANGE,
+  LEDGER_GROUPS,
+  addDays,
+  dayList,
+  weekday,
+  isoWeek,
+  period,
+  buckets,
+  aggregate,
+  delta,
+  retention,
+  effectiveChances,
+  pullVerdict,
+  section,
+};
