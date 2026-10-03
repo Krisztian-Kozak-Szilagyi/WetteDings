@@ -1879,6 +1879,10 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .stats-chip-body ul { margin: 4px 0 0; padding-left: 18px; }
 .stats-chip-body code { overflow-wrap: anywhere; }
 
+/* Auswahl eines Mitglieds */
+.stats-member-pick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-bottom: 16px; }
+.stats-member-pick .field { margin: 0; flex: 0 1 280px; }
+
 /* Sprungleiste zu den Themen */
 .stats-subnav {
   position: sticky; top: 64px; z-index: 30; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;

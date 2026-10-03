@@ -7,6 +7,7 @@ const { diffSettings, configValues } = require('../src/stats/settingsLog');
 const { soldMeta } = require('../src/tcg/tcgService');
 const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
 const { quantile, distribution } = require('../src/stats/snapshot');
+const { packLuck } = require('../src/stats/memberStats');
 const { addDays, dayList, weekday, isoWeek, period, buckets, aggregate, delta, retention, effectiveChances, pullVerdict } = require('../src/stats/statsService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
@@ -190,4 +191,14 @@ test('Statistik: Drop-Raten erst ab genug Daten bewerten', () => {
   assert.equal(pullVerdict(580, 1000, 0.58), 'im-rahmen');
   assert.equal(pullVerdict(700, 1000, 0.58), 'zu-oft');
   assert.equal(pullVerdict(10, 1000, 0.11), 'zu-selten');
+});
+
+test('Mitglied: Pack-Glück im Verhältnis zum Erwartungswert', () => {
+  const rarities = [
+    { key: 'a', weight: 90, sell: 100 },
+    { key: 'b', weight: 10, sell: 1000 },
+  ]; // Erwartungswert je Karte: 190
+  assert.equal(packLuck([], rarities), null);
+  assert.equal(packLuck([{ rarity: 'a' }, { rarity: 'a' }], rarities), 200 / 380);
+  assert.equal(packLuck([{ rarity: 'b' }, { rarity: 'a' }], rarities), 1100 / 380);
 });

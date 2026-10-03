@@ -1,9 +1,11 @@
 // Statistik-Seite für Admin und Devs: Kennzahlen und Verläufe für das Balancing (siehe stats/statsService)
 const express = require('express');
+const User = require('../models/User');
 const { requireStaff } = require('../middleware');
 const { str } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const stats = require('../stats/statsService');
+const { ranking } = require('../services/rankService');
 
 const router = express.Router();
 
@@ -53,12 +55,27 @@ function fmtDelta(k) {
 router.get('/admin/statistik', requireStaff, async (req, res) => {
   const key = stats.SECTIONS.some((s) => s.key === req.query.bereich) ? req.query.bereich : stats.SECTIONS[0].key;
   const range = Number(str(req.query.tage)) || stats.DEFAULT_RANGE;
-  const data = await stats.section(key, range);
+  // Reiter "Mitglied": ohne (gültiges) Mitglied erst die Auswahl zeigen
+  let member = null;
+  let members = [];
+  if (key === 'mitglied') {
+    const name = str(req.query.spieler).trim();
+    if (name) member = await User.findOne({ usernameLower: name.toLowerCase(), deletedAt: null }).select('username usernameLower createdAt').lean();
+    members = await ranking(); // Auswahl und Namensvorschläge
+    if (name && !member) res.locals.flash = { type: 'error', message: `Das Mitglied „${name}“ gibt es nicht.` };
+  }
+  if (key === 'mitglied' && !member) {
+    return res.render('statistik', { title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
+  }
+  const data = await stats.section(key, range, new Date(), { user: member });
   res.render('statistik', {
     title: 'Statistik',
     sections: stats.SECTIONS,
     ranges: stats.RANGES,
     active: key,
+    range: data.period.range,
+    member,
+    members,
     data,
     fmt,
     fmtDelta,
