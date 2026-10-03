@@ -243,3 +243,17 @@ test('Export: ganze Datei mit Kopf, Abschnitten und tagesgenauen Verläufen', ()
   assert.ok(!exportCsv.toCsv(data, { title: 'x', blockId: 'packs' }).includes('Änderungen im Zeitraum'));
   assert.equal(exportCsv.fileName(['mitglied', 'Jörg Ü', 'packs'], data.period, 'csv'), 'statistik-mitglied-joerg-ue-packs-2026-10-01_2026-10-02.csv');
 });
+
+test('Gini: Einordnung im Ländervergleich', () => {
+  const { compareGini } = require('../src/stats/giniReference');
+  assert.equal(compareGini(null), null);
+  assert.equal(compareGini(0.68).text, 'so ungleich wie Deutschland (0,68)');
+  assert.equal(compareGini(0.7).text, 'zwischen Deutschland (0,68) und USA (0,74)');
+  assert.match(compareGini(0.2).text, /^gleicher verteilt als in allen Vergleichsländern \(niedrigster: Slowakei/);
+  assert.match(compareGini(0.95).text, /^ungleicher verteilt als in allen Vergleichsländern \(höchster: Brasilien/);
+  const rows = compareGini(0.7, 'BfW').rows;
+  const self = rows.findIndex((r) => r.self);
+  assert.equal(rows[self].name, 'BfW');
+  assert.equal(rows[self - 1].name, 'Deutschland');
+  assert.equal(rows[self + 1].name, 'USA');
+});

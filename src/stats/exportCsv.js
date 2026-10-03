@@ -68,6 +68,12 @@ function blockParts(block, days) {
       rows: [['Bereich', 'Art', 'Betrag (€)', 'Erklärung'], ...[...block.flow.sources, ...block.flow.sinks].map((g) => [g.label, g.value > 0 ? 'Quelle' : 'Senke', value(g.value, 'euro'), g.hint || ''])],
     });
   }
+  if (block.giniCompare) {
+    parts.push({
+      title: 'Ländervergleich (Vermögens-Gini)',
+      rows: [['Land', 'Gini', 'Quelle'], ...block.giniCompare.rows.map((r) => [r.name, value(r.gini, 'ratio'), r.self ? 'Plattform (jetzt)' : block.giniCompare.source])],
+    });
+  }
   if (block.pulls) {
     parts.push({
       title: 'Drop-Raten',
