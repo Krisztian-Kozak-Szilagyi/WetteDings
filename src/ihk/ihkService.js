@@ -12,6 +12,7 @@ const tcgService = require('../tcg/tcgService');
 const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
 const { resolveAll, who, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
+const { logSettingsChange } = require('../stats/settingsLog');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
 // Anzahl Arbeitstakte = 10 + Speed/10 (Speed 10 → 11, 35 → 13,5, 99 → 19,9). Speed hilft also,
@@ -66,7 +67,9 @@ async function loadSettings() {
 
 async function saveSettings({ open, dailyLimit, durations, rewards, required, packChances, hybrid, admin }) {
   await IhkSettings.updateOne({ _id: 'ihk' }, { $set: { open, dailyLimit, durations, rewards, required, packChances, hybrid, updatedByName: admin.username } }, { upsert: true });
+  const before = JSON.parse(JSON.stringify(settings));
   Object.assign(settings, { open, dailyLimit, durations, rewards, required, packChances, hybrid });
+  await logSettingsChange({ area: 'ihk', before, after: settings, by: admin });
 }
 
 // ---------- Simulation ----------

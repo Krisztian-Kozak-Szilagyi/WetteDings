@@ -1,6 +1,7 @@
 const config = require('../config');
 const catalog = require('./catalog');
 const { TcgSettings } = require('../models/Tcg');
+const { logSettingsChange } = require('../stats/settingsLog');
 
 const SETTINGS_ID = 'tcg';
 let packPrice = config.tcgPackPrice;
@@ -53,6 +54,15 @@ async function load() {
   apply(await TcgSettings.findById(SETTINGS_ID).lean());
 }
 
+/** Aktuell geltende Werte (für den Einstellungs-Verlauf) */
+function current() {
+  return {
+    packPrice,
+    sell: Object.fromEntries(catalog.RARITIES.map((r) => [r.key, r.sell])),
+    weight: Object.fromEntries(catalog.RARITIES.map((r) => [r.key, r.weight])),
+  };
+}
+
 /**
  * Neue Werte speichern und sofort anwenden.
  * packCents: Packpreis in Cent, sell: { crumpled: Cent, … }, weight: { crumpled: 1/10.000, … }
@@ -61,7 +71,9 @@ async function save({ packCents, sell, weight, admin }) {
   if (!validWeights(weight)) throw new Error('Ungültige Chancen.');
   const doc = { packPrice: packCents, sell, weight, updatedByName: admin.username };
   await TcgSettings.updateOne({ _id: SETTINGS_ID }, { $set: doc }, { upsert: true });
+  const before = current();
   apply(doc);
+  await logSettingsChange({ area: 'tcg', before, after: current(), by: admin });
 }
 
 async function lastUpdate() {
