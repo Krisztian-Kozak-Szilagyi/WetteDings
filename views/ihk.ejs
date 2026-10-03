@@ -157,7 +157,19 @@
         <span class="kicker kicker-muted">Team aufstellen</span>
         <h2>Deine Karten</h2>
       </div>
-      <button class="btn btn-primary" type="submit" data-ihk-start disabled>Quest starten</button>
+      <%# Großer Start-Knopf im Stil der Album-Kachel (TCG): Auftragsmappe mit Stempel, der beim Darüberfahren aufsetzt %>
+      <button class="ihk-start-tile" type="submit" data-ihk-start disabled>
+        <span class="ihk-start-art" aria-hidden="true">
+          <svg class="ihk-start-doc" width="54" height="64" viewBox="0 0 54 64"><rect x="1" y="1" width="52" height="62" rx="6"/><path d="M11 16h32M11 25h32M11 34h20"/></svg>
+          <span class="ihk-start-stamp">IHK</span>
+        </span>
+        <span class="ihk-start-text">
+          <span class="kicker">Auftrag annehmen</span>
+          <span class="ihk-start-title">Quest starten</span>
+          <span class="ihk-start-hint">Wähle eine Quest und eine Karte</span>
+        </span>
+        <span class="ihk-start-arrow" aria-hidden="true">→</span>
+      </button>
     </div>
     <div class="ihk-pick-grid">
       <% cards.forEach((c) => { %>

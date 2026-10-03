@@ -3555,3 +3555,45 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .ihk-vs { display: none; }
   .ihk-pick-stats { grid-template-columns: 1fr 1fr; }
 }
+
+/* IHK: Spielfläche und innere Kästen ohne Rahmen, Hintergrund und Schatten (Krisztian) */
+.ihk-stage, .ihk-quest, .ihk-offer:hover, .ihk-timer, .ihk-fight, .ihk-result,
+.ihk-slot, .ihk-player .ihk-slot-card, .ihk-slot-enemy { border: 0; background: none; box-shadow: none; }
+.ihk-stage { padding: 0; }
+/* leere Felder bleiben als gestrichelter Umriss erkennbar (sonst sieht man nicht, wohin die Karte soll) */
+.ihk-slot:not(:has(img)) { outline: 1px dashed var(--color-neutral-700); outline-offset: -1px; }
+.ihk-slot.is-drop-hint { outline-color: var(--color-accent-300); }
+.ihk-slot img { border-radius: 14px; }
+.ihk-offer.is-selected { box-shadow: none; outline: 1px solid var(--color-accent-300); outline-offset: 2px; }
+.ihk-pick-head { padding-top: 10px; border-top: 2px solid var(--color-divider); }
+
+/* Start-Knopf im Stil der Album-Kachel */
+.ihk-start-tile {
+  position: relative; display: flex; align-items: center; gap: 20px; width: min(100%, 380px); min-height: 112px; padding: 18px 22px;
+  border: 0; border-radius: var(--radius-lg); overflow: hidden; color: var(--text); font: inherit; text-align: left; cursor: var(--cur-pointer);
+  background: radial-gradient(120% 90% at 0% 50%, var(--color-accent-800), transparent 70%), linear-gradient(180deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-800); transition: box-shadow .25s ease, opacity .25s ease;
+}
+.ihk-start-tile:not(:disabled):hover, .ihk-start-tile:not(:disabled):focus-visible { outline: 0; box-shadow: 0 0 0 1px var(--color-accent), 0 0 40px color-mix(in srgb, var(--color-accent) 25%, transparent); }
+.ihk-start-tile:disabled { cursor: var(--cur-no); opacity: .55; filter: grayscale(.4); }
+.ihk-start-art { position: relative; flex: none; width: 64px; height: 72px; }
+.ihk-start-doc { position: absolute; left: 0; top: 4px; fill: var(--color-bg); stroke: var(--color-neutral-600); stroke-width: 1.5; stroke-linecap: round; transform: rotate(-6deg); }
+.ihk-start-stamp {
+  position: absolute; right: -2px; bottom: 0; padding: 3px 7px; border: 2px solid var(--color-accent-300); border-radius: 6px;
+  font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--color-accent-300); background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  transform: rotate(-12deg) translateY(-18px) scale(1.25); opacity: .35; transition: transform .35s cubic-bezier(.2, .8, .2, 1), opacity .35s ease, box-shadow .35s ease;
+}
+.ihk-start-tile:not(:disabled) .ihk-start-stamp { opacity: .7; }
+.ihk-start-tile:not(:disabled):hover .ihk-start-stamp, .ihk-start-tile:not(:disabled):focus-visible .ihk-start-stamp {
+  transform: rotate(-12deg); opacity: 1; box-shadow: 0 0 16px var(--color-accent);
+}
+.ihk-start-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.ihk-start-title { font-size: 22px; font-weight: 500; letter-spacing: -.02em; }
+.ihk-start-hint { font-size: 12px; color: var(--color-neutral-500); }
+.ihk-start-tile:not(:disabled) .ihk-start-hint { display: none; }
+.ihk-start-arrow {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none;
+  border-radius: 50%; border: 1px solid var(--color-accent); color: var(--color-accent); font-size: 18px; transition: transform .25s ease;
+}
+.ihk-start-tile:not(:disabled):hover .ihk-start-arrow { transform: translateX(4px); }
+@media (prefers-reduced-motion: reduce) { .ihk-start-stamp, .ihk-start-arrow { transition: none; } }
