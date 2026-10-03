@@ -12,7 +12,7 @@ const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
 const Group = require('../models/Group');
 const roles = require('./roles');
-const { CoinHolding, CoinTrade } = require('../models/Coin');
+const { CoinHolding } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
 const { GradingShop, GradingJob } = require('../models/Grading');
 const { Trade } = require('../models/Trade');
@@ -92,6 +92,9 @@ async function rename({ user, username }) {
  * Konto löschen (Art. 17 DSGVO). Alle persönlichen Angaben und der eigene Spielstand werden entfernt.
  * Das Nutzer-Dokument bleibt als leere Hülle mit neutralem Namen bestehen, damit gemeinsame Wetten
  * (Einsätze, Töpfe, Auszahlungen) für die anderen Mitglieder nachvollziehbar und abrechenbar bleiben.
+ * Aus demselben Grund bleiben die rein spielbezogenen Verläufe (Kontoauszug, Coin-Trades, Pack-Öffnungen,
+ * abgeschlossene IHK-Quests) an der anonymen Hülle stehen – sonst würde sich die Statistik (Geldquellen
+ * und -senken, Pull-Raten, Erfolgsquoten) rückwirkend ändern. Personenbezogene Angaben enthalten sie nicht.
  */
 async function deleteAccount({ user, password }) {
   if (user.isAdmin) throw new UserError('Admin-Konten können nicht gelöscht werden. Entferne zuerst die Admin-Rechte.');
@@ -102,7 +105,8 @@ async function deleteAccount({ user, password }) {
   const anon = `geloescht-${String(id).slice(-8)}`;
   await inTransaction(async (session) => {
     const opt = { session };
-    await User.updateOne(
+    // Vorher-Stand zurückgeben: das restliche Guthaben wird unten als Abgang gebucht
+    const old = await User.findOneAndUpdate(
       { _id: id },
       {
         $set: {
@@ -120,17 +124,18 @@ async function deleteAccount({ user, password }) {
         },
         $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
       },
-      opt
+      { ...opt, projection: { balance: 1 } }
     );
+    // Das verfallene Guthaben verlässt die Wirtschaft: als Buchung festhalten, damit die Geldmenge
+    // (Summe aller Buchungen) weiter zu den Kontoständen passt
+    if (old && old.balance > 0) await Ledger.create([{ user: id, type: 'konto_geloescht', amount: -old.balance }], opt);
     await propagateName(id, user.username, anon, session);
     await Promise.all([
       TcgCard.deleteMany({ user: id }, opt),
       TcgPack.deleteMany({ user: id }, opt),
-      TcgOpening.deleteMany({ user: id }, opt),
       CoinHolding.deleteMany({ user: id }, opt),
-      CoinTrade.deleteMany({ user: id }, opt),
-      Ledger.deleteMany({ user: id }, opt),
-      IhkRun.deleteMany({ user: id }, opt),
+      // laufende Quest abbrechen (ihre Karte gibt es nicht mehr); abgeschlossene bleiben für die Statistik
+      IhkRun.deleteMany({ user: id, status: 'laeuft' }, opt),
       IhkState.deleteOne({ _id: id }, opt),
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),

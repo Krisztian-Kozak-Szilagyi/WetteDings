@@ -4,6 +4,7 @@ const { resolveBet, SYSTEM_ACTOR } = require('./services/betService');
 const { runLottery } = require('./services/lotteryService');
 const rankService = require('./services/rankService');
 const duelService = require('./services/duelService');
+const { takeDailySnapshot } = require('./stats/snapshot');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -53,6 +54,11 @@ function startJobs() {
   const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));
   top1();
   setInterval(top1, rankService.TICK_MS).unref();
+
+  // Statistik: einmal pro Tag den Stand der Wirtschaft festhalten (stündlich prüfen, ob der Tag schon erfasst ist)
+  const snapshot = () => takeDailySnapshot().catch((err) => console.error('Statistik-Fehler:', err));
+  setTimeout(snapshot, 30 * 1000).unref();
+  setInterval(snapshot, 60 * 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };

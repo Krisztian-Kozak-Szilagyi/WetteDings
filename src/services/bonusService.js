@@ -6,6 +6,7 @@ const BonusSettings = require('../models/BonusSettings');
 const { GradingShop } = require('../models/Grading');
 const { toZonedLocalInput } = require('../lib/time');
 const { inTransaction } = require('./betService');
+const { logSettingsChange } = require('../stats/settingsLog');
 
 // Tagesbonus in Cent – für alle gleich, unabhängig vom Vermögen. Im Admin-Panel änderbar.
 const settings = { amount: config.dailyBonus };
@@ -17,7 +18,9 @@ async function loadSettings() {
 
 async function saveSettings({ amount, admin }) {
   await BonusSettings.updateOne({ _id: 'bonus' }, { $set: { amount, updatedByName: admin.username } }, { upsert: true });
+  const before = { ...settings };
   settings.amount = amount;
+  await logSettingsChange({ area: 'bonus', before, after: settings, by: admin });
 }
 
 /**

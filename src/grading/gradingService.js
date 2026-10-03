@@ -6,6 +6,7 @@ const { inTransaction } = require('../services/betService');
 const { today } = require('../services/bonusService');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
+const { logSettingsChange } = require('../stats/settingsLog');
 const catalog = require('../tcg/catalog');
 
 // ---------- Spielregeln (Demo-Werte) ----------
@@ -49,9 +50,14 @@ function apply(doc) {
 async function loadSettings() {
   apply(await GradingSettings.findById('grading').lean());
 }
+/** Aktuell geltende Werte (für den Einstellungs-Verlauf) */
+const current = () => JSON.parse(JSON.stringify({ ...settings, pay: PAY }));
+
 async function saveSettings({ admin, ...values }) {
   await GradingSettings.updateOne({ _id: 'grading' }, { $set: { ...values, updatedByName: admin.username } }, { upsert: true });
+  const before = current();
   apply(values);
+  await logSettingsChange({ area: 'grading', before, after: current(), by: admin });
 }
 
 // ---------- Auftrag auswürfeln ----------

@@ -10,6 +10,7 @@ const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
 const { markSeen } = require('../tcg/tcgService');
+const { logSettingsChange } = require('../stats/settingsLog');
 
 const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -27,7 +28,9 @@ async function loadSettings() {
 
 async function saveSettings({ taxPercent, admin }) {
   await TradeSettings.updateOne({ _id: 'handel' }, { $set: { taxPercent, updatedByName: admin.username } }, { upsert: true });
+  const before = { ...settings };
   settings.taxPercent = taxPercent;
+  await logSettingsChange({ area: 'handel', before, after: settings, by: admin });
 }
 
 /** Steuer in Cent (abgerundet), die dem Empfänger des Geldes abgezogen wird */

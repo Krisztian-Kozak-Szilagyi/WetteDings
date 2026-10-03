@@ -100,6 +100,7 @@ const ledgerLabels = {
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
   black_market: 'Karte gekauft (Black Market)',
+  konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
   grading_lohn: 'Grading-Auftrag erledigt',
   grading_ausbau: 'Grading-Shop ausgebaut',
 };
