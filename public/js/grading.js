@@ -61,6 +61,24 @@
     e.style.width = s.r * 1.6 + '%';
     return { el: e, side: s.side, hp: 1, need: 90 + s.r * 8 };
   });
+  var SAVE_KEY = 'grading-putzstand-' + job.cert;
+  try {
+    var saved = JSON.parse(sessionStorage.getItem(SAVE_KEY) || 'null');
+    if (Array.isArray(saved) && saved.length === spots.length) {
+      spots.forEach(function (s, i) {
+        s.hp = clamp(Number(saved[i]) || 0, 0, 1);
+        s.el.style.setProperty('--hp', Math.pow(s.hp, 0.6).toFixed(3));
+        if (!s.hp) s.el.classList.add('is-clean');
+      });
+    }
+  } catch (err) { /* ohne Speicher geht es auch */ }
+  var saveTimer = null;
+  function saveClean() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try { sessionStorage.setItem(SAVE_KEY, JSON.stringify(spots.map(function (s) { return +s.hp.toFixed(3); }))); } catch (err) { /* egal */ }
+    }, 300);
+  }
 
   // Slab (Schutzhülle) – erscheint beim Versiegeln
   var slabBox = el('div', 'gr-slabbox', obj);
@@ -130,7 +148,6 @@
   var baseZoom = 1;
   var ox = 0;
   var oy = 0;
-  var loupeBtn = bench.querySelector('[data-gr-loupe]');
   function applyZoom() {
     zoomEl.style.setProperty('--z', (zoom * baseZoom).toFixed(3));
     var w = obj.offsetWidth;
@@ -139,7 +156,6 @@
     ox = clamp(ox, -w / 2, w / 2);
     oy = clamp(oy, -h / 2, h / 2);
     zoomEl.style.transform = 'translate(' + ox.toFixed(1) + 'px, ' + oy.toFixed(1) + 'px)';
-    loupeBtn.classList.toggle('is-on', zoom > 1);
   }
   function setZoom(z, px, py) {
     z = clamp(z, 1, 2.6);
@@ -162,7 +178,6 @@
     e.preventDefault();
     setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
   }, { passive: false });
-  loupeBtn.addEventListener('click', function () { setZoom(zoom > 1 ? 1 : 2.2); });
 
   // ---------- Maus-Werkzeug: Drehen oder Putzen ----------
   var mode = 'rotate';
@@ -212,7 +227,10 @@
       s.el.style.setProperty('--hp', Math.pow(s.hp, 0.6).toFixed(3));
       if (!s.hp) s.el.classList.add('is-clean');
     });
-    if (hit) foam(x, y);
+    if (hit) {
+      foam(x, y);
+      saveClean();
+    }
   }
 
   /** Sauberkeit in Prozent (wird beim Zurückschicken mitgeschickt) */
@@ -224,7 +242,7 @@
 
   // ---------- Zeiger ----------
   stage.addEventListener('pointerdown', function (e) {
-    if (sent || e.button > 0 || e.target.closest('.gr-tools, .gr-modes')) return;
+    if (sent || e.button > 0 || e.target.closest('.gr-modes')) return;
     e.preventDefault(); // keine Textauswahl beim Ziehen (die färbte die ganze Seite dunkel)
     drag = { x: e.clientX, y: e.clientY };
     tween = null;
@@ -273,21 +291,13 @@
     tweenTo(clamp(rx + map[e.key][0], -65, 65), ry + map[e.key][1], 220);
   });
 
-  // Werkzeuge
-  bench.querySelector('[data-gr-flip]').addEventListener('click', function () {
-    tweenTo(0, Math.round((ry + 180) / 180) * 180, 700);
-  });
-  bench.querySelector('[data-gr-reset]').addEventListener('click', function () {
-    setZoom(1);
-    tweenTo(0, Math.round(ry / 360) * 360, 600);
-  });
 
   // ---------- Arbeitsschritte ----------
   var steps = (job.steps || ['clean']).concat(['send']);
   var step = null;
   var HINTS = {
-    clean: { clean: 'Putzen: mit gedrückter Maustaste über die Flecken reiben', rotate: 'Drehen: ziehen, um die Karte zu wenden · Mausrad = Lupe' },
-    grade: { clean: 'Putzen: mit gedrückter Maustaste reiben', rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Lupe' },
+    clean: { clean: 'Putzen: mit gedrückter Maustaste über die Flecken reiben', rotate: 'Drehen: ziehen, um die Karte zu wenden · Mausrad = Zoom' },
+    grade: { clean: 'Putzen: mit gedrückter Maustaste reiben', rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom' },
     slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
     send: { clean: 'Fertig – ab zum Kunden!', rotate: 'Fertig – ab zum Kunden!' },
   };
@@ -438,6 +448,7 @@
     e.preventDefault();
     sent = true;
     form.elements.clean.value = String(cleanliness());
+    try { sessionStorage.removeItem(SAVE_KEY); } catch (err) { /* egal */ }
     form.querySelector('button[type="submit"]').disabled = true;
     obj.classList.add('is-sent');
     setTimeout(function () { form.submit(); }, reduceMotion ? 0 : 850);
