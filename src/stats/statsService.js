@@ -872,7 +872,8 @@ function bucketChart(chart, p, list) {
  */
 async function section(key, rangeDays, now = new Date(), opts = {}) {
   // Nur eigene Einträge: ein Schlüssel wie "constructor" aus der Adresse darf keine fremde Funktion aufrufen
-  const load = Object.prototype.hasOwnProperty.call(LOADERS, key) ? LOADERS[key] : LOADERS.uebersicht;
+  const own = Object.prototype.hasOwnProperty.call(LOADERS, key) ? LOADERS[key] : null;
+  const load = typeof own === 'function' ? own : LOADERS.uebersicht;
   const p = period(rangeDays, now);
   const prev = period(rangeDays, now, 1);
   const [blocks, prevBlocks, marks] = await Promise.all([load(p, now, opts), load(prev, now, opts), markers(p)]);
