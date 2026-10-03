@@ -21,6 +21,49 @@
   <span class="muted">Handelssteuer: <strong><%= taxText %> %</strong> – wird dem vom Erlös abgezogen, der das Geld bekommt</span>
 </div>
 
+<% { const bm = blackMarket; const left = bm.offers.filter((o) => !o.buyer).length; %>
+<details class="card fold black-market<%= bm.open ? ' is-open' : '' %>" id="blackmarket">
+  <summary>
+    <h2>Black Market
+      <% if (bm.open) { %><span class="bm-state bm-state-open">Geöffnet bis <%= bm.closeTime %> Uhr · noch <%= left %> von <%= bm.offers.length %></span>
+      <% } else { %><span class="bm-state">Geschlossen</span><% } %>
+    </h2>
+    <span class="fold-arrow" aria-hidden="true"></span>
+  </summary>
+  <% if (!bm.open) { %>
+    <p class="muted">Täglich von <strong><%= bm.openTime %></strong> bis <strong><%= bm.closeTime %> Uhr</strong>: vier seltene Karten (Gold bis Glitch), jede gibt es nur einmal – wer zuerst kauft, bekommt sie.</p>
+    <p>Öffnet in <strong data-countdown="<%= bm.opensAt.getTime() %>">–</strong></p>
+  <% } else { %>
+    <p class="muted">Vier Karten, jede nur einmal zu haben – wer zuerst kauft, bekommt sie. Preis: <%= bm.percent %> % des Verkaufswerts. Schließt in <strong data-countdown="<%= bm.closesAt.getTime() %>">–</strong>.</p>
+    <div class="bm-grid">
+      <% bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; %>
+        <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
+          <button type="button" class="tcg-slot r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
+            data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= coll.counts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+            <img src="<%= c.image %>" alt="" width="720" height="1008">
+            <% if (sold) { %><span class="tcg-exam-badge">Verkauft</span><% } %>
+            <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+          </button>
+          <div class="bm-info">
+            <strong><%= c.name %></strong>
+            <% ownTag(c.id) %>
+            <% if (sold) { %>
+              <span class="muted small">an <%- userLink(o.buyerName) %></span>
+            <% } else { %>
+              <form method="post" action="/handel/black-market" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(o.price) %> kaufen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="index" value="<%= i %>">
+                <button class="btn btn-primary btn-sm btn-block" type="submit" <%= bal < o.price ? 'disabled title="Guthaben reicht nicht"' : '' %>>Kaufen · <%= euro(o.price) %></button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</details>
+<% } %>
+
 <div class="trade-layout">
   <section class="trade-main">
     <% if (newDeals.length) { %>

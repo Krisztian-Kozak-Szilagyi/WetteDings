@@ -487,6 +487,17 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .device-done { margin-top: 14px; }
 /* IHK: Schwierigkeit/Hybrid in der vergrößerten Quest-Ansicht (über den Knöpfen) */
 .ihk-zoom-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+/* Handel: Black Market (täglich 16:30–19:00) */
+.black-market { border-color: color-mix(in srgb, #a855f7 45%, var(--border)); background: linear-gradient(160deg, color-mix(in srgb, #a855f7 10%, var(--surface)), var(--surface) 55%); }
+.black-market > summary h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.bm-state { font-size: .78rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.bm-state-open { background: rgba(168, 85, 247, .16); color: #c084fc; border-color: rgba(168, 85, 247, .45); }
+.bm-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+.bm-offer { display: flex; flex-direction: column; gap: 8px; }
+.bm-offer .tcg-slot { position: relative; padding: 0; border: 0; background: none; }
+.bm-offer.is-sold .tcg-slot img { filter: grayscale(1) brightness(.6); }
+.bm-info { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.bm-info form { width: 100%; margin: 0; }
 /* Admin: Handel-Log */
 #handellog .leader-search { margin: 0 0 10px; flex-wrap: wrap; }
 .trade-log td { vertical-align: top; }

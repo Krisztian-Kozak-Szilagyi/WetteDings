@@ -4,6 +4,7 @@ const { requireLogin } = require('../middleware');
 const catalog = require('../tcg/catalog');
 const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
+const blackMarket = require('../tcg/blackMarket');
 const { str, parseEuro, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -13,8 +14,9 @@ router.use('/handel', requireLogin);
 const cardInfo = (id) => catalog.cardById[id] || { id, name: id, rarity: 'crumpled', image: '' };
 
 router.get('/handel', async (req, res) => {
-  const [data] = await Promise.all([
+  const [data, market] = await Promise.all([
     trade.overview(req.user),
+    blackMarket.today(), // Black Market (16:30–19:00): vier Karten, jede nur einmal
     // Besuch merken: der Markt gilt ab jetzt als gesehen
     User.updateOne({ _id: req.user._id }, { $set: { marketSeenAt: new Date(), dealsSeenAt: new Date() } }),
   ]);
@@ -36,7 +38,20 @@ router.get('/handel', async (req, res) => {
     termsText: trade.termsText,
     privateHours: trade.PRIVATE_HOURS,
     marketDays: trade.MARKET_DAYS,
+    blackMarket: { ...market, openTime: blackMarket.OPEN, closeTime: blackMarket.CLOSE, percent: blackMarket.PRICE_PERCENT },
   });
+});
+
+// Black Market: eine der vier Karten kaufen
+router.post('/handel/black-market', async (req, res) => {
+  try {
+    const r = await blackMarket.buy({ user: req.user, index: str(req.body.index) });
+    req.flash('success', `Gekauft: ${r.card.name} (${catalog.rarityByKey[r.card.rarity].label}) für ${euro(r.price)}. Die Karte liegt in deinem Album.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/handel#blackmarket');
 });
 
 /** Tauschangebot zusammenstellen: links die eigenen freien Karten, rechts die Sammlung des Mitspielers */
