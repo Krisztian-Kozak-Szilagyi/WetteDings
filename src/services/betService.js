@@ -10,6 +10,8 @@ const { verdictRole, devMayDecide, evaluateVotes } = require('../lib/verdict');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
 const { assertUsernameAllowed } = require('./usernameRules');
+const notifyService = require('./notifyService');
+const { euro } = require('../lib/viewHelpers');
 
 const SYSTEM_ACTOR = { system: true, username: 'System' };
 const NOTE_MIN = 5;
@@ -282,6 +284,7 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
   }
 
   if (positionOps.length) await Position.bulkWrite(positionOps, { session });
+  const notes = resultNotes({ bet, positions, payouts, refunded, outcome, label: winner ? winner.label : null, note, actor, feeShare, isGone });
   if (userOps.length) await User.bulkWrite(userOps, { session });
   if (ledgerDocs.length) await Ledger.insertMany(ledgerDocs, { session });
 
@@ -297,7 +300,49 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
     refereeFee: feeShare.referee,
     outcome,
     label: winner ? winner.label : null,
+    notes, // Benachrichtigungen – resolveBet verschickt sie nach der Transaktion
   };
+}
+
+/**
+ * Benachrichtigungen zum Ergebnis: jeder Mitwettende (Gewinn, Verlust oder Erstattung), dazu Wettersteller und
+ * Schiedsrichter ohne eigenen Einsatz. Wer entschieden hat und gelöschte Konten bekommen nichts.
+ */
+function resultNotes({ bet, positions, payouts, refunded, outcome, label, note, actor, feeShare, isGone }) {
+  const title = notifyService.short(bet.title);
+  const actorId = actor && !actor.system ? String(actor._id) : null;
+  const skip = (id) => !id || String(id) === actorId || isGone(id);
+  const per = new Map(); // je Mitglied: Einsatz und Auszahlung (man kann mehrfach setzen)
+  for (const p of positions) {
+    const e = per.get(String(p.user)) || { user: p.user, stake: 0, payout: 0 };
+    e.stake += p.amount;
+    e.payout += payouts.get(String(p._id)) || 0;
+    per.set(String(p.user), e);
+  }
+  const notes = [];
+  for (const e of per.values()) {
+    if (skip(e.user)) continue;
+    let text;
+    if (outcome === 'annulliert') {
+      text = bet.duel
+        ? `Duell „${title}“: ${note} Dein Einsatz von ${euro(e.stake)} wurde erstattet.`
+        : `Die Wette „${title}“ wurde annulliert – dein Einsatz von ${euro(e.stake)} wurde erstattet.`;
+    } else if (refunded) {
+      text = `„${title}“ endete mit „${label}“, aber ohne Gegenseite – dein Einsatz von ${euro(e.stake)} wurde erstattet.`;
+    } else if (e.payout > 0) {
+      text = `Gewonnen! „${title}“ endete mit „${label}“ – du bekommst ${euro(e.payout)}.`;
+    } else {
+      text = `Verloren: „${title}“ endete mit „${label}“ (Einsatz ${euro(e.stake)}).`;
+    }
+    notes.push({ user: e.user, text });
+  }
+  // Wettersteller und Schiedsrichter ohne eigenen Einsatz
+  for (const [id, fee] of [[bet.creator, feeShare.creator], [bet.referee, feeShare.referee]]) {
+    if (skip(id) || per.has(String(id)) || notes.some((n) => String(n.user) === String(id))) continue;
+    const base = outcome === 'annulliert' ? `Die Wette „${title}“ wurde annulliert.` : `Die Wette „${title}“ ist entschieden: „${label}“.`;
+    notes.push({ user: id, text: fee > 0 ? `${base} Deine Provision: ${euro(fee)}.` : base });
+  }
+  return notes;
 }
 
 /**
@@ -312,14 +357,14 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
  *
  * Rückgabe: { kind: 'entschieden' | 'offen' | 'streitig', … }
  */
-async function resolveBet({ actor, betId, outcome, note }) {
+async function resolveBet({ actor, betId, outcome, note, quietFor = null }) {
   const text = String(note || '').trim().replace(/\r\n/g, '\n');
   if (text.length < NOTE_MIN) {
     throw new UserError(`Bitte begründe das Ergebnis (mindestens ${NOTE_MIN} Zeichen), damit es später nachvollziehbar ist.`);
   }
   if (text.length > NOTE_MAX) throw new UserError(`Die Begründung darf höchstens ${NOTE_MAX} Zeichen lang sein.`);
 
-  return inTransaction(async (session) => {
+  const result = await inTransaction(async (session) => {
     const now = new Date();
     const bet = await Bet.findById(betId).session(session);
     if (!bet) throw new UserError('Wette nicht gefunden.');
@@ -376,6 +421,13 @@ async function resolveBet({ actor, betId, outcome, note }) {
       other: role === 'creator' ? bet.refereeName : bet.creatorName,
     };
   });
+  if (result.notes) {
+    const href = `/wetten/${betId}`;
+    // quietFor: wer die Absage selbst ausgelöst hat (System-Aktion im Namen eines Mitglieds) bekommt keine Meldung
+    await Promise.all(result.notes.filter((n) => !quietFor || String(n.user) !== String(quietFor)).map((n) => notifyService.notify(n.user, { area: 'Wetten', href, text: n.text })));
+    delete result.notes;
+  }
+  return result;
 }
 
 /**
@@ -396,6 +448,8 @@ async function deleteBet({ actor, betId }) {
     await Ledger.updateMany({ bet: betId }, { $set: { bet: null } }, { session });
     await Bet.deleteOne({ _id: betId }, { session });
   });
+  // Benachrichtigungen zeigen nicht mehr auf die gelöschte Wette, sondern auf den Kontoauszug
+  await notifyService.retarget(`/wetten/${betId}`, '/konto/auszug');
   // Titel ohne Zeilenumbrüche ins Protokoll (er stammt von Nutzern)
   const logTitle = String(bet.title).replace(/\n|\r/g, ' ');
   const logActor = String(actor.username).replace(/\n|\r/g, ' ');
@@ -463,6 +517,7 @@ module.exports = {
   closeBet,
   editBet,
   resolveBet,
+  resultNotes,
   deleteBet,
   disputedFilter,
   disputedCount,

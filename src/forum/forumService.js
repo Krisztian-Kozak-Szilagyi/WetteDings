@@ -4,6 +4,7 @@ const PatchNote = require('../models/PatchNote');
 const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Forum');
 const { tagsFor, tagsIn, sanitizeTags } = require('./render');
 const { UserError } = require('../lib/util');
+const { notify, short } = require('../services/notifyService');
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 120;
@@ -161,6 +162,15 @@ async function reply({ user, threadId, body }) {
   const post = await ForumPost.create({ thread: thread._id, author: user._id, authorName: user.username, body: b });
   await ForumThread.updateOne({ _id: thread._id }, { $inc: { replyCount: 1 }, $set: { lastPostAt: now, lastPostBy: user._id, lastPostByName: user.username }, $addToSet: { participants: user._id } });
   await markRead(user._id, thread._id, now);
+  const title = short(thread.title);
+  await notify(thread.author, {
+    area: 'Forum',
+    href: `/forum/t/${thread._id}`,
+    key: `forum:${thread._id}`,
+    except: user,
+    text: `${user.username} hat in deinem Thema „${title}“ geantwortet.`,
+    many: (n) => `${n} neue Antworten in deinem Thema „${title}“.`,
+  });
   return { thread, post };
 }
 

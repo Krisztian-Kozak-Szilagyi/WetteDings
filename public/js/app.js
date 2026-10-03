@@ -506,6 +506,46 @@
   });
 })();
 
+// Glocke: "Als gelesen markieren" und "Alle gelesen" im Hintergrund schicken – das Menü bleibt offen.
+// Schlägt die Anfrage fehl, wird das Formular normal abgeschickt (Seite lädt neu).
+(function () {
+  var bell = document.querySelector('[data-bell]');
+  if (!bell || !window.fetch) return;
+  var count = bell.querySelector('[data-bell-count]');
+  var all = bell.querySelector('[data-bell-all]');
+  function markRead(row) {
+    row.classList.remove('is-unread');
+    var f = row.querySelector('[data-bell-form]');
+    if (f) f.remove();
+  }
+  function setUnread(n) {
+    count.textContent = n > 99 ? '99+' : String(n);
+    count.hidden = !n;
+    all.hidden = !n;
+    bell.querySelector('summary').setAttribute('aria-label', 'Benachrichtigungen' + (n ? ' (' + n + ' ungelesen)' : ''));
+  }
+  bell.addEventListener('submit', function (e) {
+    var form = e.target.closest('[data-bell-form]');
+    if (!form) return;
+    e.preventDefault();
+    var isAll = form.hasAttribute('data-bell-all');
+    var row = form.closest('[data-bell-row]');
+    fetch(form.action, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(new FormData(form)).toString(),
+      credentials: 'same-origin',
+    })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (data) {
+        if (isAll) bell.querySelectorAll('[data-bell-row].is-unread').forEach(markRead);
+        else if (row) markRead(row);
+        setUnread(Number(data.unread) || 0);
+      })
+      .catch(function () { form.submit(); });
+  });
+})();
+
 // Namen innerhalb eines anderen Links (z. B. Wett-Karte): eigener Klick führt zum Profil statt zur Wette
 (function () {
   function go(e) {

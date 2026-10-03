@@ -4,6 +4,7 @@ const { TcgCard, TcgOpening, TcgPack } = require('../models/Tcg');
 const { lockedDocs, isLocked } = require('./locks');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
+const { notify } = require('../services/notifyService');
 const catalog = require('./catalog');
 const settings = require('./settings');
 
@@ -51,10 +52,14 @@ async function markSeen(userId, cardIds, session) {
   if (ids.length) await User.updateOne({ _id: userId }, { $addToSet: { tcgSeen: { $each: ids } } }, { session });
 }
 
+const packGiftText = (t, count) => `Du hast ${count > 1 ? count + '× ' : 'ein '}${t.label} geschenkt bekommen.`;
+
 /** Booster Packs verschenken (Quest-Fund, Admin). Optional innerhalb einer laufenden Transaktion. */
 async function grantPacks({ userId, type, count = 1, source, session }) {
   const t = packType(type);
   await TcgPack.insertMany(Array.from({ length: count }, () => ({ user: userId, type: t.key, source, cost: 0 })), { session });
+  // Quest-Funde sieht man beim Abholen selbst; Geschenke vom Team kommen in die Glocke
+  if (source === 'admin') await notify(userId, { area: 'TCG', href: '/tcg', text: packGiftText(t, count) });
   return t;
 }
 
@@ -62,6 +67,7 @@ async function grantPacks({ userId, type, count = 1, source, session }) {
 async function grantPacksToMany({ userIds, type, count = 1, source = 'admin' }) {
   const t = packType(type);
   await TcgPack.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, type: t.key, source, cost: 0 }))));
+  await notify(userIds, { area: 'TCG', href: '/tcg', text: packGiftText(t, count) });
   return t;
 }
 
@@ -74,6 +80,7 @@ async function grantCards({ userIds, cardId, count = 1 }) {
   if (!card) throw new UserError('Diese Karte gibt es nicht.');
   await TcgCard.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, card: card.id, rarity: card.rarity }))));
   await User.updateMany({ _id: { $in: userIds } }, { $addToSet: { tcgSeen: card.id } });
+  await notify(userIds, { area: 'TCG', href: '/tcg/album', text: `Du hast ${count > 1 ? count + '× ' : ''}die Karte „${card.name}“ geschenkt bekommen.` });
   return card;
 }
 
@@ -101,6 +108,7 @@ async function revokeCards({ userId, cardId, count = 1 }) {
   });
   // Favoriten/Schutz aufräumen, falls das letzte Exemplar weg ist
   if (!result.remaining) await User.updateOne({ _id: userId }, { $pull: { tcgFavorites: card.id, tcgProtected: card.id } });
+  await notify(userId, { area: 'TCG', href: '/tcg/album', text: `Das Team hat ${result.removed > 1 ? result.removed + ' Exemplare' : 'ein Exemplar'} von „${card.name}“ aus deiner Sammlung entfernt.` });
   return result;
 }
 

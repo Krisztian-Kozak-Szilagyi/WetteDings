@@ -215,18 +215,30 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 .bell-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--color-divider); font-size: 14px; font-weight: 500; }
 .bell-list { max-height: min(440px, 70vh); overflow: auto; display: flex; flex-direction: column; }
 .bell-empty { margin: 0; padding: 18px 16px; font-size: 13px; color: var(--muted); }
+.bell-readall { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--color-accent-300); cursor: var(--cur-pointer); }
+.bell-readall:hover { color: var(--color-accent-200); text-decoration: underline; }
+.bell-row { position: relative; display: flex; align-items: stretch; border-bottom: 1px solid var(--color-divider); }
+.bell-row:last-child { border-bottom: 0; }
+.bell-row.is-unread { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
 .bell-item {
-  display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 12px; align-items: start;
-  padding: 12px 16px; border-bottom: 1px solid var(--color-divider); color: var(--text);
-  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+  flex: 1; min-width: 0; display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 12px 16px; color: var(--color-neutral-400);
 }
-.bell-item:last-child { border-bottom: 0; }
+.bell-row.is-unread .bell-item { color: var(--text); padding-right: 4px; }
 .bell-item:hover { color: var(--text); background: color-mix(in srgb, var(--text) 4%, transparent); }
-.bell-dot { width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); }
-.bell-dot.is-live { background: #c084fc; box-shadow: 0 0 8px #a855f7; }
+.bell-dot { width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: transparent; }
+.bell-row.is-unread .bell-dot { background: var(--color-accent-300); box-shadow: 0 0 8px var(--color-accent); }
 .bell-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.bell-area { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
-.bell-text { font-size: 13px; line-height: 1.45; text-wrap: pretty; }
+.bell-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--color-neutral-500); }
+.bell-area { letter-spacing: .08em; text-transform: uppercase; }
+.bell-when { white-space: nowrap; }
+.bell-text { font-size: 13px; line-height: 1.45; text-wrap: pretty; overflow-wrap: anywhere; }
+.bell-mark { display: flex; align-items: center; padding: 0 10px 0 2px; }
+.bell-mark button {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0;
+  border: 1px solid var(--color-neutral-800); border-radius: 8px; background: none; color: var(--color-neutral-400); cursor: var(--cur-pointer);
+}
+.bell-mark button:hover, .bell-mark button:focus-visible { color: var(--color-accent-300); border-color: var(--color-accent-700); }
 
 /* Profil-Menü */
 .user-menu { position: relative; }

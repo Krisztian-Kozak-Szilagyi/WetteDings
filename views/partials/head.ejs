@@ -18,7 +18,6 @@
     // Menüpunkte samt Abzeichen – einmal aufgebaut, oben in der Leiste und (Handy/Tablet) im Profil-Menü gezeigt
     const cap = (n) => (n > 99 ? '99+' : n);
     const navItems = [];
-    const notes = []; // Glocke: aus den Zählern der Menüpunkte
     if (currentUser) {
       // Abzeichen: neue Gruppen-Wetten (eigene Farbe) haben Vorrang vor neuen öffentlichen; fehlende eigene Stimmen zählen immer
       const betRed = betVotePending + (betNewGroup ? 0 : betNewPublic);
@@ -49,22 +48,6 @@
         navItems.push({ href: '/admin', label: currentUser.isAdmin ? 'Admin' : 'Dev', active: currentPath.startsWith('/admin'), badges: adminBadges });
       }
 
-      if (betVotePending) notes.push({ area: 'Wetten', href: '/', text: betVotePending === 1 ? 'In einer Wette fehlt deine Stimme zum Ergebnis.' : 'In ' + betVotePending + ' Wetten fehlt deine Stimme zum Ergebnis.' });
-      if (betNewGroup) notes.push({ area: 'Wetten', href: '/', text: betNewGroup === 1 ? 'Neue Wette in deinen Gruppen.' : betNewGroup + ' neue Wetten in deinen Gruppen.' });
-      if (betNewPublic) notes.push({ area: 'Wetten', href: '/', text: betNewPublic === 1 ? 'Eine neue Wette ist offen.' : betNewPublic + ' neue Wetten sind offen.' });
-      if (tradeIncoming) notes.push({ area: 'Handel', href: '/handel', text: tradeIncoming === 1 ? 'Ein Angebot oder Geschäft wartet auf dich.' : tradeIncoming + ' Angebote oder Geschäfte warten auf dich.' });
-      if (tradeMarketNew) notes.push({ area: 'Handel', href: '/handel', text: tradeMarketNew === 1 ? 'Neue Karte auf dem Markt.' : tradeMarketNew + ' neue Karten auf dem Markt.' });
-      if (blackMarketOpen()) notes.push({ area: 'Handel', href: '/handel', text: 'Der Black Market hat geöffnet.', live: true });
-      if (newPacks) notes.push({ area: 'TCG', href: '/tcg', text: newPacks === 1 ? 'Du hast ein neues Booster Pack.' : 'Du hast ' + newPacks + ' neue Booster Packs.' });
-      if (forumMine) notes.push({ area: 'Forum', href: '/forum', text: forumMine === 1 ? 'Neue Antwort in einem deiner Themen.' : 'Neue Antworten in ' + forumMine + ' deiner Themen.' });
-      if (forumOther) notes.push({ area: 'Forum', href: '/forum', text: forumOther === 1 ? 'Ein Thema hat neue Beiträge.' : forumOther + ' Themen haben neue Beiträge.' });
-      if (patchNew) notes.push({ area: 'Forum', href: '/patchnotes', text: 'Neue Patchnotes sind da.' });
-      if (currentUser.isStaff) {
-        if (betDisputes) notes.push({ area: 'Team', href: '/admin', text: betDisputes === 1 ? 'Eine strittige Wette wartet auf Entscheidung.' : betDisputes + ' strittige Wetten warten auf Entscheidung.' });
-        if (tradeAlerts) notes.push({ area: 'Team', href: '/admin', text: tradeAlerts + ' Geschäfte zwischen Mehrfach-Konten.' });
-        if (deviceAlerts) notes.push({ area: 'Team', href: '/admin', text: deviceAlerts + ' Hinweise auf Mehrfach-Konten.' });
-        if (packLogNew) notes.push({ area: 'Team', href: '/admin', text: packLogNew + ' neue Einträge im Vergabe-Log.' });
-      }
     }
     const navLink = (it) => {
       let h = '<a href="' + it.href + '"' + (it.active ? ' class="active" aria-current="page"' : '') + '>' + it.label;
@@ -87,26 +70,45 @@
 
       <div class="nav-user">
         <% if (currentUser) { %>
-          <%# Glocke: fasst die Abzeichen der Menüpunkte zusammen; Klick führt zum Bereich %>
-          <details class="bell" data-dropdown>
-            <summary class="bell-btn" title="Benachrichtigungen" aria-label="Benachrichtigungen<%= notes.length ? ' (' + notes.length + ')' : '' %>">
+          <%# Glocke: persönliche Benachrichtigungen; bleiben ungelesen, bis man sie anklickt oder als gelesen markiert.
+              Die Formulare schickt app.js im Hintergrund ([data-bell-form]), ohne JavaScript lädt die Seite neu. %>
+          <details class="bell" data-dropdown data-bell>
+            <summary class="bell-btn" title="Benachrichtigungen" aria-label="Benachrichtigungen<%= bellUnread ? ' (' + bellUnread + ' ungelesen)' : '' %>">
               <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"/></svg>
-              <% if (notes.length) { %><span class="bell-count"><%= cap(notes.length) %></span><% } %>
+              <span class="bell-count" data-bell-count<%= bellUnread ? '' : ' hidden' %>><%= cap(bellUnread) %></span>
             </summary>
             <div class="bell-panel">
-              <div class="bell-head"><span>Benachrichtigungen</span></div>
+              <div class="bell-head">
+                <span>Benachrichtigungen</span>
+                <form method="post" action="/benachrichtigungen/alle-gelesen" data-bell-form data-bell-all<%= bellUnread ? '' : ' hidden' %>>
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="zurueck" value="<%= currentPath %>">
+                  <button type="submit" class="bell-readall">Alle gelesen</button>
+                </form>
+              </div>
               <div class="bell-list">
-                <% if (!notes.length) { %>
-                  <p class="bell-empty">Alles gelesen – nichts Neues.</p>
+                <% if (!bellNotes.length) { %>
+                  <p class="bell-empty">Noch keine Benachrichtigungen.</p>
                 <% } %>
-                <% notes.forEach((n) => { %>
-                  <a class="bell-item" href="<%= n.href %>">
-                    <span class="bell-dot<%= n.live ? ' is-live' : '' %>"></span>
-                    <span class="bell-body">
-                      <span class="bell-area"><%= n.area %></span>
-                      <span class="bell-text"><%= n.text %></span>
-                    </span>
-                  </a>
+                <% bellNotes.forEach((n) => { %>
+                  <div class="bell-row<%= n.readAt ? '' : ' is-unread' %>" data-bell-row>
+                    <a class="bell-item" href="/benachrichtigungen/<%= n._id %>">
+                      <span class="bell-dot"></span>
+                      <span class="bell-body">
+                        <span class="bell-meta"><span class="bell-area"><%= n.area %></span><span class="bell-when"><%= relTime(n.at) %></span></span>
+                        <span class="bell-text"><%= n.text %></span>
+                      </span>
+                    </a>
+                    <% if (!n.readAt) { %>
+                      <form method="post" action="/benachrichtigungen/<%= n._id %>/gelesen" class="bell-mark" data-bell-form>
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="zurueck" value="<%= currentPath %>">
+                        <button type="submit" title="Als gelesen markieren" aria-label="Als gelesen markieren">
+                          <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>
+                        </button>
+                      </form>
+                    <% } %>
+                  </div>
                 <% }) %>
               </div>
             </div>
@@ -121,7 +123,7 @@
                 <strong><%= euro(currentUser.balance) %></strong>
               </span>
               <img class="avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="34" height="34">
-              <% if (notes.length) { %><span class="menu-dot" aria-hidden="true"></span><% } %>
+              <% if (navItems.some((it) => it.badges.length)) { %><span class="menu-dot" aria-hidden="true"></span><% } %>
             </summary>
             <div class="user-menu-list" role="menu">
               <div class="menu-nav">

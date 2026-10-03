@@ -149,6 +149,7 @@ async function deleteAccount({ user, password }) {
       ForumThread.updateMany({ upvotes: id }, { $pull: { upvotes: id } }, opt),
       ForumRead.deleteMany({ user: id }, opt),
       ForumReport.deleteMany({ by: id }, opt),
+      require('../models/Notification').deleteMany({ user: id }, opt),
       // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus
       Group.updateMany({ owner: id }, { $set: { deleted: true } }, opt),
       Group.updateMany({ members: id, owner: { $ne: id } }, { $pull: { members: id } }, opt),

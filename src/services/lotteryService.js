@@ -13,6 +13,8 @@ const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { inTransaction } = require('./betService');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
+const { euro } = require('../lib/viewHelpers');
+const { notify } = require('./notifyService');
 
 const MIN = 60 * 1000;
 
@@ -156,8 +158,12 @@ async function drawDueRound(now = new Date()) {
       { session }
     );
     if (updated.modifiedCount !== 1) return null;
-    return { number: round.number, drawAt: round.drawAt, pot: round.pot, tickets: round.tickets, winningTicket, winnerName: winner ? winner.username : null };
+    return { number: round.number, drawAt: round.drawAt, pot: round.pot, tickets: round.tickets, winningTicket, winnerName: winner ? winner.username : null, winnerId: winner ? winner.user : null };
   });
+
+  if (result && result.winnerId) {
+    await notify(result.winnerId, { area: 'Lotterie', href: '/lotterie', text: `Glückwunsch! Dein Los ${result.winningTicket} hat die Lotterie #${result.number} gewonnen – ${euro(result.pot)} gehen an dich.` });
+  }
 
   if (result) {
     // Nächste Runde startet 1 Minute nach der (geplanten) Ziehung – bzw. sofort, falls die Ziehung verspätet war

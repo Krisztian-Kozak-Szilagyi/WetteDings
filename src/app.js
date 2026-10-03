@@ -17,6 +17,7 @@ const groupService = require('./services/groupService');
 const roles = require('./services/roles');
 const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
+const notifyService = require('./services/notifyService');
 const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -93,6 +94,8 @@ function createApp() {
     betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
     tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
+    bellNotes: [], // Glocke: Benachrichtigungen (ungelesene und die neuesten gelesenen)
+    bellUnread: 0,
     deviceProbe: false,
     roleBadge: roles.roleBadge,
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
@@ -126,7 +129,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -140,6 +143,7 @@ function createApp() {
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
+        notifyService.forBell(u._id), // Glocke
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
@@ -155,6 +159,8 @@ function createApp() {
         packLogNew,
         deviceAlerts,
         tradeAlerts,
+        bellNotes: bell.list,
+        bellUnread: bell.unread,
       });
     }
     next();
@@ -165,6 +171,7 @@ function createApp() {
   app.use(require('./routes/auth'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
+  app.use(require('./routes/notify'));
   app.use(require('./routes/admin'));
   app.use(require('./routes/stats'));
   app.use(require('./routes/coin'));

@@ -11,6 +11,7 @@ const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
 const { markSeen } = require('../tcg/tcgService');
 const { logSettingsChange } = require('../stats/settingsLog');
+const { notify } = require('../services/notifyService');
 
 const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -37,6 +38,7 @@ async function saveSettings({ taxPercent, admin }) {
 const taxFor = (price, percent = settings.taxPercent) => Math.floor((price * Math.min(100, Math.max(0, percent))) / 100);
 
 const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
+const swapHref = (trade) => `/handel/verhandlung/${trade._id}`;
 
 // ---------- Reine Regeln (ohne Datenbank, getestet) ----------
 /**
@@ -194,7 +196,7 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
   const hours = kind === 'markt' ? MARKET_DAYS * 24 : PRIVATE_HOURS;
   try {
     // Sperrprüfung und Angebot in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder auf eine Quest geschickt wird
-    return await inTransaction(async (session) => {
+    const created = await inTransaction(async (session) => {
       const { doc, owned } = await freeCopy(user._id, cardId, session);
       if (!doc) throw new UserError(owned ? 'Alle Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Diese Karte besitzt du nicht.');
       await claim([doc], user._id, session);
@@ -228,6 +230,12 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
       );
       return trade;
     });
+    if (kind === 'privat') {
+      await notify(to._id, { area: 'Handel', href: '/handel', text: `${user.username} bietet dir „${cardName(cardId)}“ für ${euro(price)} an.` });
+    } else if (kind === 'tausch') {
+      await notify(to._id, { area: 'Handel', href: swapHref(created), text: `${user.username} möchte „${cardName(cardId)}“ gegen deine „${cardName(wantCardId)}“ tauschen (${termsText(created)}).` });
+    }
+    return created;
   } catch (err) {
     if (err.code === 11000) throw new UserError('Dieses Exemplar ist schon im Handel.');
     throw err;
@@ -251,7 +259,7 @@ async function transfer(money, { title, payerType, payeeType, payerMsg }, sessio
 /** Kaufen/Annehmen (Markt und privat): Käufer zahlt den Preis, Verkäufer bekommt Preis − Steuer, die Karte wechselt den Besitzer */
 async function buy({ user, tradeId }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
-  return inTransaction(async (session) => {
+  const result = await inTransaction(async (session) => {
     const trade = await Trade.findOne({ _id: tradeId, ...openFilter() }).session(session);
     if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
     if (trade.kind === 'tausch') throw new UserError('Ein Tauschangebot kann man nicht kaufen.');
@@ -269,6 +277,9 @@ async function buy({ user, tradeId }) {
     await trade.save({ session });
     return { trade, tax: money.tax };
   });
+  const { trade } = result;
+  await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat deine Karte „${cardName(trade.card)}“ für ${euro(trade.price)} gekauft.` });
+  return result;
 }
 
 /**
@@ -278,7 +289,7 @@ async function buy({ user, tradeId }) {
  */
 async function acceptSwap({ user, tradeId, version }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
-  return inTransaction(async (session) => {
+  const result = await inTransaction(async (session) => {
     const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', ...openFilter() }).session(session);
     const role = trade && roleOf(trade, user._id);
     if (!role) throw new UserError('Dieses Angebot gibt es nicht mehr.');
@@ -331,6 +342,11 @@ async function acceptSwap({ user, tradeId, version }) {
     await trade.save({ session });
     return { trade, money, role };
   });
+  const { trade, role } = result;
+  // die andere Seite: Was bekommt sie?
+  const [other, gets, gives] = role === 'to' ? [trade.seller, trade.wantCard, trade.card] : [trade.to, trade.card, trade.wantCard];
+  await notify(other, { area: 'Handel', href: swapHref(trade), text: `${user.username} hat den Tausch angenommen: Du bekommst „${cardName(gets)}“ für „${cardName(gives)}“.` });
+  return result;
 }
 
 // ---------- Verhandlung beim Tausch ----------
@@ -369,6 +385,14 @@ async function sendMessage({ user, tradeId, text }) {
     { $push: { messages: { $each: [{ from: role, text: clean }], $slice: -MAX_MESSAGES } }, $set: { activityAt: now, [seenField(role)]: now } }
   );
   if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot ist nicht mehr offen.');
+  const card = cardName(trade.card);
+  await notify(role === 'seller' ? trade.to : trade.seller, {
+    area: 'Handel',
+    href: swapHref(trade),
+    key: `handel:${trade._id}:nachricht`,
+    text: `${user.username} hat dir in der Verhandlung um „${card}“ geschrieben.`,
+    many: (n) => `${n} neue Nachrichten in der Verhandlung um „${card}“.`,
+  });
 }
 
 /**
@@ -401,6 +425,11 @@ async function changeTerms({ user, tradeId, price, extraFrom, version }) {
     }
   );
   if (res.modifiedCount !== 1) throw new UserError('Die Bedingungen wurden gerade geändert. Bitte schau sie dir noch einmal an.');
+  await notify(role === 'seller' ? trade.to : trade.seller, {
+    area: 'Handel',
+    href: swapHref(trade),
+    text: `${actor} macht einen Gegenvorschlag zum Tausch um „${cardName(trade.card)}“: ${termsText(trade, { price, extraFrom: valid.extraFrom })}.`,
+  });
 }
 
 /** Verkäufer zieht zurück bzw. Empfänger lehnt ab – die Karte wird wieder frei */
@@ -408,8 +437,13 @@ async function close({ user, tradeId, action }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
   const who = action === 'ablehnen' ? { to: user._id } : { seller: user._id };
   const status = action === 'ablehnen' ? 'abgelehnt' : 'zurueckgezogen';
-  const res = await Trade.updateOne({ _id: tradeId, status: 'offen', ...who }, { $set: { status, closedAt: new Date() } });
-  if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  const trade = await Trade.findOneAndUpdate({ _id: tradeId, status: 'offen', ...who }, { $set: { status, closedAt: new Date() } }).select('kind seller to card expiresAt').lean();
+  if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  if (action === 'ablehnen') {
+    await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat dein Angebot „${cardName(trade.card)}“ abgelehnt.` });
+  } else if (trade.to && trade.expiresAt > new Date()) {
+    await notify(trade.to, { area: 'Handel', href: '/handel', text: `${user.username} hat das Angebot „${cardName(trade.card)}“ zurückgezogen.` });
+  }
 }
 
 module.exports = {
