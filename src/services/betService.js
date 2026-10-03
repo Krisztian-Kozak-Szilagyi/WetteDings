@@ -6,7 +6,7 @@ const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
 const { computePayouts, splitFee } = require('../lib/payout');
-const { verdictRole, evaluateVotes } = require('../lib/verdict');
+const { verdictRole, devMayDecide, evaluateVotes } = require('../lib/verdict');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
 const { assertUsernameAllowed } = require('./usernameRules');
@@ -322,13 +322,17 @@ async function resolveBet({ actor, betId, outcome, note }) {
     if (!role) throw new UserError('Nur der Wettersteller, der Schiedsrichter oder ein Dev kann diese Wette abschließen.');
     const winner = bet.options.find((o) => o.key === outcome) || null;
     if (outcome !== 'annulliert' && !winner) throw new UserError('Ungültiges Ergebnis.');
+    if (role === 'dev' && !devMayDecide(bet, outcome, now)) {
+      throw new UserError('Ein Ergebnis kannst du als Dev erst festlegen, wenn die Wette strittig ist oder der Auswertungstermin vorbei ist. Annullieren geht jederzeit.');
+    }
 
     const vote = { role, by: actor.system ? null : actor._id, byName: actor.username, outcome, note: text, at: now };
     // Je Rolle zählt nur die letzte Stimme
     const votes = [...(bet.toObject().votes || []).filter((v) => v.role !== role), vote];
     const hasReferee = !!bet.referee;
 
-    // Das System (automatische Annullierung) und Devs entscheiden sofort – Devs lösen damit Streitfälle.
+    // Das System (automatische Annullierung) und Devs entscheiden sofort – Devs lösen damit Streitfälle
+    // oder liegengebliebene Wetten (wann sie dürfen: devMayDecide).
     if (role === 'system' || role === 'dev') {
       return payOut({ session, bet, outcome, note: text, actor, votes, via: role, now });
     }
