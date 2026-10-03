@@ -178,6 +178,15 @@
     e.preventDefault();
     setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
   }, { passive: false });
+  // Knöpfe für Geräte ohne Mausrad: vergrößern, verkleinern, alles zurücksetzen
+  bench.querySelectorAll('[data-gr-zoom-step]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var k = Number(btn.getAttribute('data-gr-zoom-step'));
+      if (k) return setZoom(zoom * (k > 0 ? 1.25 : 1 / 1.25));
+      setZoom(1);
+      tweenTo(-10, Math.round(ry / 360) * 360 + 18, 450);
+    });
+  });
 
   // ---------- Maus-Werkzeug: Drehen oder Putzen ----------
   var mode = 'rotate';
@@ -242,7 +251,7 @@
 
   // ---------- Zeiger ----------
   stage.addEventListener('pointerdown', function (e) {
-    if (sent || e.button > 0 || e.target.closest('.gr-modes')) return;
+    if (sent || e.button > 0 || e.target.closest('.gr-modes, .gr-zoom-btns')) return;
     e.preventDefault(); // keine Textauswahl beim Ziehen (die färbte die ganze Seite dunkel)
     drag = { x: e.clientX, y: e.clientY };
     tween = null;
