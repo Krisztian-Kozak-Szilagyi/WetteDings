@@ -14,6 +14,8 @@ const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
+const bonusService = require('../services/bonusService');
+const grading = require('../grading/gradingService');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
@@ -220,6 +222,20 @@ router.post('/admin/handel', requireAdmin, async (req, res) => {
     req.flash('success', `Handelssteuer auf ${String(taxPercent).replace('.', ',')} % gesetzt.`);
   }
   res.redirect('/admin#handel');
+});
+
+// ---------- Tagesbonus und Grading-Shop ----------
+router.post('/admin/bonus', requireAdmin, async (req, res) => {
+  const raw = typeof req.body.amount === 'string' ? req.body.amount.trim() : '';
+  const amount = /^0+([.,]0*)?$/.test(raw) ? 0 : centsOrNull(raw);
+  if (amount === null || amount > 10000000) {
+    req.flash('error', 'Bitte einen gültigen Tagesbonus angeben (0 bis 100.000 €).');
+  } else {
+    await bonusService.saveSettings({ amount, admin: req.user });
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', admin: req.user });
+    req.flash('success', `Tagesbonus auf ${euro(amount)} gesetzt.`);
+  }
+  res.redirect('/admin#bonus');
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------

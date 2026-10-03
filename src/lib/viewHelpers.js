@@ -100,6 +100,8 @@ const ledgerLabels = {
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
   black_market: 'Karte gekauft (Black Market)',
+  grading_lohn: 'Grading-Auftrag erledigt',
+  grading_ausbau: 'Grading-Shop ausgebaut',
 };
 
 /** Coin-Kurs mit passender Genauigkeit, z. B. 12,34 € oder 0,004512 € */

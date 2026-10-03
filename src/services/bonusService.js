@@ -2,10 +2,23 @@ const config = require('../config');
 const User = require('../models/User');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
+const BonusSettings = require('../models/BonusSettings');
+const { GradingShop } = require('../models/Grading');
 const { toZonedLocalInput } = require('../lib/time');
 const { inTransaction } = require('./betService');
-const { coinValueCents } = require('../coin/tradeService');
-const { cardValueCents } = require('../tcg/tcgService');
+
+// Tagesbonus in Cent – für alle gleich, unabhängig vom Vermögen. Im Admin-Panel änderbar.
+const settings = { amount: config.dailyBonus };
+
+async function loadSettings() {
+  const doc = await BonusSettings.findById('bonus').lean();
+  if (doc && Number.isInteger(doc.amount) && doc.amount >= 0) settings.amount = doc.amount;
+}
+
+async function saveSettings({ amount, admin }) {
+  await BonusSettings.updateOne({ _id: 'bonus' }, { $set: { amount, updatedByName: admin.username } }, { upsert: true });
+  settings.amount = amount;
+}
 
 /**
  * Aktueller "Bonustag" als "YYYY-MM-DD". Ein Bonustag beginnt um config.bonusTime (deutsche Zeit),
@@ -19,12 +32,6 @@ function today(now = new Date()) {
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }
 
-/** Bonus in Cent für ein Gesamtvermögen in Cent (0, wenn keine Stufe passt) */
-function bonusFor(total) {
-  const tier = config.bonusTiers.find((t) => total < t.below);
-  return tier ? tier.amount : 0;
-}
-
 /** Summe der Einsätze in noch offenen (nicht abgerechneten) Wetten */
 async function openStakes(userId) {
   const agg = await Position.aggregate([{ $match: { user: userId, payout: null } }, { $group: { _id: null, s: { $sum: '$amount' } } }]);
@@ -34,18 +41,15 @@ async function openStakes(userId) {
 /**
  * Prüft einmal pro Tag (beim ersten Seitenaufruf), ob der Nutzer einen Tagesbonus bekommt,
  * und schreibt ihn gut. Gibt { amount, balance } zurück, wenn etwas gutgeschrieben wurde.
- * Der Tag wird atomar markiert – auch bei parallelen Anfragen gibt es den Bonus nur einmal.
+ * Wer im Grading-Shop arbeitet, bekommt keinen Bonus. Der Tag wird atomar markiert – auch bei
+ * parallelen Anfragen gibt es den Bonus nur einmal.
  */
 async function maybeGrantDailyBonus(user) {
   const day = today();
   if (user.lastBonusDay === day) return null;
 
-  // Gesamtvermögen: verfügbar + offene Einsätze + Wert der Samantha Coins + Verkaufswert der TCG-Karten
-  const [stakes, coins, cards] = await Promise.all([openStakes(user._id), coinValueCents(user._id), cardValueCents(user._id)]);
-  const total = user.balance + stakes + coins + cards;
-  const amount = bonusFor(total);
-
-  if (!amount) {
+  const amount = settings.amount;
+  if (!amount || (await GradingShop.exists({ _id: user._id, active: true }))) {
     await User.updateOne({ _id: user._id, lastBonusDay: { $ne: day } }, { $set: { lastBonusDay: day } });
     return null;
   }
@@ -62,4 +66,4 @@ async function maybeGrantDailyBonus(user) {
   });
 }
 
-module.exports = { maybeGrantDailyBonus, bonusFor, today, openStakes };
+module.exports = { settings, loadSettings, saveSettings, maybeGrantDailyBonus, today, openStakes };

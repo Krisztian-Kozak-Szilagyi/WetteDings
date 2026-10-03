@@ -331,6 +331,23 @@
   </form>
 </div>
 
+<details class="card fold" id="bonus">
+  <summary><h2>Tagesbonus &amp; Grading</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Der Tagesbonus gilt für alle Mitglieder gleich (unabhängig vom Vermögen) – außer für die, die gerade im Grading-Shop arbeiten. Gilt ab dem nächsten Bonustag (<%= bonusTime %> Uhr).</p>
+  <form method="post" action="/admin/bonus" class="form admin-tcg-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Tagesbonus in € (0 = keiner)</span>
+      <input type="text" name="amount" inputmode="decimal" value="<%= (dailyBonus() / 100).toFixed(2).replace('.', ',') %>" required>
+    </label>
+    <label class="check admin-ihk-open">
+      <input type="checkbox" name="gradingOpen" value="1" <%= gradingOpen() ? 'checked' : '' %>>
+      <span><strong>Grading-Shop für alle Mitglieder verfügbar</strong> – sonst sehen nur Admins den Menüpunkt „Grading“.</span>
+    </label>
+    <button class="btn btn-primary" type="submit">Speichern</button>
+  </form>
+</details>
+
 <details class="card fold" id="ihk">
   <summary><h2>IHK: Limit &amp; Lohn</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>

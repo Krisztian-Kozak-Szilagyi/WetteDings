@@ -70,7 +70,8 @@ function createApp() {
     startBalance: config.startBalance,
     autoVoidDays: config.autoVoidDays,
     creatorFeePercent: config.creatorFeePercent,
-    bonusTiers: config.bonusTiers,
+    dailyBonus: () => require('./services/bonusService').settings.amount, // Tagesbonus (Admin-Panel)
+    gradingOpen: () => require('./grading/gradingService').settings.open, // Grading-Shop für alle freigegeben?
     bonusTime: config.bonusTime,
     lotteryTicketPrice: config.lotteryTicketPrice,
     lotteryTime: config.lotteryTime,
@@ -169,6 +170,7 @@ function createApp() {
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
   app.use(require('./routes/trade'));
+  app.use(require('./routes/grading'));
 
   app.use((req, res) => {
     res.status(404).render('error', {
