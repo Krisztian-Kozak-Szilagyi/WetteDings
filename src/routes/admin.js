@@ -33,7 +33,7 @@ const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen auf einen Blick.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer und IHK einstellen.' },
-  { key: 'team', label: 'Team & Zugang', icon: 'users', description: 'Devs und Mods ernennen und Registrierungscodes erzeugen.', adminOnly: true },
+  { key: 'team', label: 'Team & Einladungen', icon: 'users', description: 'Neue Mitglieder per Code einladen und – als Admin – Devs und Mods ernennen.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Vergabe-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
@@ -495,15 +495,17 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
   res.redirect(panelUrl('team', role === 'mod' ? 'mods' : 'devs'));
 });
 
-router.post('/admin/codes', requireAdmin, async (req, res) => {
+// ---------- Einladungen: Registrierungscodes (Admin und Devs) ----------
+router.post('/admin/codes', requireStaff, async (req, res) => {
   const code = await createCode(req.user);
-  req.flash('success', `Neuer Registrierungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
+  req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
   res.redirect(panelUrl('team', 'codes'));
 });
 
-router.post('/admin/codes/:id/loeschen', requireAdmin, async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await revokeCode(req.params.id);
-  req.flash('info', 'Code gelöscht.');
+// Der Admin löscht jeden Code, Devs nur ihre eigenen
+router.post('/admin/codes/:id/loeschen', requireStaff, async (req, res) => {
+  const ok = mongoose.isValidObjectId(req.params.id) && (await revokeCode(req.params.id, req.user));
+  req.flash(ok ? 'info' : 'error', ok ? 'Code gelöscht.' : 'Diesen Code kannst du nicht löschen – nur der Admin oder wer ihn erzeugt hat.');
   res.redirect(panelUrl('team', 'codes'));
 });
 

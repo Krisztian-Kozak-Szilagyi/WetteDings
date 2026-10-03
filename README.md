@@ -43,7 +43,7 @@ Deutschsprachige, responsive Wett- und Spielplattform für eine geschlossene Gru
 - **Karten = Bilddateien** in `public/img/tcg` nach dem Schema `<name>[-<nr>]-<seltenheit>.webp` (z. B. `krisz-6-glitch.webp`). Neue Karte: Datei ablegen (auch als PNG möglich, `npm run webp` wandelt sie in WebP um) und Server neu starten.
 
 ### Konto, Bonus & Rangliste
-- **Registrierung nur mit Einladungscode** (Format `XXXX-XXXX`, 30 Minuten gültig, für genau eine Person).
+- **Registrierung nur mit Einladungscode** (Format `XXXX-XXXX`, 30 Minuten gültig, für genau eine Person). Codes erzeugen Admin und Devs im Panel (Reiter „Team & Einladungen“); Devs löschen nur ihre eigenen.
 - **Nur für Mitglieder:** Ohne Anmeldung sind nur Startseite, Regeln, Impressum, Datenschutz sowie Anmelden/Registrieren sichtbar. Geteilte Wett-Links führen nach der Anmeldung direkt zur Wette.
 - **Tagesbonus** nach Gesamtvermögen (verfügbar + offene Einsätze + Coins + Kartenwert): unter 500 € +150 €, unter 1.000 € +100 €, ab 1.000 € kein Bonus. Gutschrift beim ersten Seitenaufruf ab 07:45 Uhr (deutsche Zeit).
 - **Mein Konto:** Guthaben, Einsätze, Coins, Karten, Gesamtvermögen, Bilanz, eigene Wetten, Kontoauszug, Passwort ändern.
