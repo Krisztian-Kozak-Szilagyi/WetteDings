@@ -46,6 +46,7 @@ const userSchema = new Schema(
     banReason: { type: String, default: '' },
     bannedAt: { type: Date, default: null },
     bannedByName: { type: String, default: null },
+    bannedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // wer gebannt hat (Devs dürfen nur eigene Bans aufheben)
     // Sekunden auf Platz 1 der Rangliste (wird minütlich hochgezählt, siehe services/rankService)
     top1Seconds: { type: Number, default: 0 },
     // Gelöschtes Konto: nur noch eine leere Hülle mit neutralem Namen (siehe services/accountService)

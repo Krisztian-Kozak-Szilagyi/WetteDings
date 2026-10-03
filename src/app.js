@@ -137,7 +137,7 @@ function createApp() {
         forumService.navCounts(u), // Neues in eigenen Themen (rot) und im übrigen Forum
         u.isStaff ? betService.disputedCount() : 0, // nur Devs/Admins: strittige Wetten
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
-        u.isAdmin ? deviceService.alertCount() : 0, // nur Admin: Konten, die sich ein Gerät teilen
+        u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
       ]);
       Object.assign(res.locals, {

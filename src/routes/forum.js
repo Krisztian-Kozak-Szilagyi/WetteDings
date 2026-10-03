@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { ForumCategory, ForumThread, ForumPost, ForumReport } = require('../models/Forum');
 const { requireLogin } = require('../middleware');
+const { requireReauth } = require('../middleware/reauth');
 const forum = require('../forum/forumService');
 const { render, tagsFor } = require('../forum/render');
 const { str, UserError } = require('../lib/util');
@@ -240,10 +241,14 @@ router.get('/forum/meldungen', async (req, res, next) => {
   res.render('forum-meldungen', { title: 'Meldungen', reports: reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null })) });
 });
 
-router.post('/forum/meldungen/:id/erledigt', async (req, res, next) => {
+// Admin und Devs bestätigen Moderationsaktionen mit ihrem Passwort (wie im Panel); Mods nicht
+const staffReauth = requireReauth('/forum/meldungen');
+const reauthForStaff = (req, res, next) => (req.user && req.user.isStaff ? staffReauth(req, res, next) : next());
+
+router.post('/forum/meldungen/:id/erledigt', reauthForStaff, async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
   if (valid(req.params.id)) await ForumReport.updateOne({ _id: req.params.id }, { $set: { done: true } });
-  res.redirect('/forum/meldungen');
+  res.redirect(req.body.zurueck === 'panel' && req.user.isStaff ? '/admin?bereich=moderation#meldungen' : '/forum/meldungen');
 });
 
 // ---------- Bereiche verwalten (Admin/Dev) ----------

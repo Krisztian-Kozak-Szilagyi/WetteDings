@@ -30,20 +30,72 @@
     if (btn) btn.parentElement.remove();
   });
 
+  // Text der Sicherheitsabfrage eines Formulars (data-confirm, bei Ergebnissen mit der gewählten Option)
+  function confirmText(form) {
+    if (form.hasAttribute('data-confirm-resolve')) {
+      var r = form.querySelector('input[name="outcome"]:checked');
+      var tpl = form.getAttribute('data-confirm-resolve') || 'Ergebnis „%s“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.';
+      return tpl.replace('%s', r ? r.dataset.label : '?');
+    }
+    return form.getAttribute('data-confirm') || '';
+  }
+
+  // Passwortabfrage für Moderations- und Spielwerte-Aktionen (Formulare mit data-reauth, nur für Admin/Devs).
+  // Ersetzt dort die Sicherheitsabfrage: der Dialog zeigt deren Text und fragt zusätzlich das Passwort ab.
+  var reauth = document.querySelector('[data-reauth-dialog]');
+  var reauthTarget = null;
+  if (reauth) {
+    var reauthInput = reauth.querySelector('[data-reauth-input]');
+    var reauthText = reauth.querySelector('[data-reauth-text]');
+    reauth.querySelector('[data-reauth-cancel]').addEventListener('click', function () { reauth.close(); });
+    reauth.addEventListener('close', function () { reauthInput.value = ''; });
+    reauth.querySelector('[data-reauth-form]').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!reauthTarget || !reauthInput.value) return;
+      var form = reauthTarget;
+      var field = form.querySelector('input[name="reauth_password"]');
+      if (!field) {
+        field = document.createElement('input');
+        field.type = 'hidden';
+        field.name = 'reauth_password';
+        form.appendChild(field);
+      }
+      field.value = reauthInput.value;
+      form.dataset.reauthOk = '1';
+      reauth.close();
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+  }
+  function askPassword(form) {
+    if (!reauth) return false;
+    reauthTarget = form;
+    var text = confirmText(form);
+    reauthText.textContent = text;
+    reauthText.hidden = !text;
+    reauth.showModal();
+    reauthInput.focus();
+    return true;
+  }
+
   // Sicherheitsabfragen vor unumkehrbaren Aktionen (delegiert, damit sie auch nach Live-Updates greifen)
   document.addEventListener('submit', function (e) {
     var form = e.target;
+    if (form.hasAttribute('data-reauth')) {
+      if (form.dataset.reauthOk === '1') {
+        delete form.dataset.reauthOk; // Passwort ist eingetragen: jetzt wirklich absenden
+        return;
+      }
+      if (askPassword(form)) {
+        e.preventDefault();
+        return;
+      }
+    }
     if (form.hasAttribute('data-confirm') && !window.confirm(form.getAttribute('data-confirm'))) {
       e.preventDefault();
       return;
     }
-    if (form.hasAttribute('data-confirm-resolve')) {
-      var r = form.querySelector('input[name="outcome"]:checked');
-      var label = r ? r.dataset.label : '?';
-      // Der Text steht am Formular, weil er je nach Rolle anders lautet (Stimme abgeben vs. entscheiden)
-      var tpl = form.getAttribute('data-confirm-resolve') || 'Ergebnis „%s“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.';
-      if (!window.confirm(tpl.replace('%s', label))) e.preventDefault();
-    }
+    // Der Text steht am Formular, weil er je nach Rolle anders lautet (Stimme abgeben vs. entscheiden)
+    if (form.hasAttribute('data-confirm-resolve') && !window.confirm(confirmText(form))) e.preventDefault();
   });
 
   // Doppelklicks auf Absenden verhindern
