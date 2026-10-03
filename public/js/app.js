@@ -397,10 +397,17 @@
     var price = Number(form.getAttribute('data-price')) || 0;
     function update() {
       var n = parseInt(input.value, 10) || 0;
-      out.textContent = n > 0 ? n + (n === 1 ? ' Los' : ' Lose') + ' = ' + euro.format((n * price) / 100) : '';
+      out.textContent = n > 0 ? euro.format((n * price) / 100) : '';
     }
     form.querySelectorAll('[data-count]').forEach(function (b) {
       b.addEventListener('click', function () { input.value = b.getAttribute('data-count'); update(); });
+    });
+    form.querySelectorAll('[data-step]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var n = (parseInt(input.value, 10) || 0) + Number(b.getAttribute('data-step'));
+        input.value = Math.min(Number(input.max) || n, Math.max(Number(input.min) || 1, n));
+        update();
+      });
     });
     input.addEventListener('input', update);
     update();
@@ -470,8 +477,16 @@
       var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
       el.textContent = (h ? h + ' Std. ' : '') + String(m).padStart(2, '0') + ' Min. ' + String(sec).padStart(2, '0') + ' Sek.';
     });
+    // Variante mit getrennten Feldern: [data-countdown-parts] mit [data-cd="h|m|s"]
+    document.querySelectorAll('[data-countdown-parts]').forEach(function (el) {
+      var s = Math.max(0, Math.floor((Number(el.getAttribute('data-countdown-parts')) - Date.now()) / 1000));
+      var parts = { h: Math.floor(s / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
+      el.querySelectorAll('[data-cd]').forEach(function (p) {
+        p.textContent = String(parts[p.getAttribute('data-cd')]).padStart(2, '0');
+      });
+    });
   }
-  if (document.querySelector('[data-countdown]')) {
+  if (document.querySelector('[data-countdown], [data-countdown-parts]')) {
     tickCountdowns();
     setInterval(tickCountdowns, 1000);
   }
