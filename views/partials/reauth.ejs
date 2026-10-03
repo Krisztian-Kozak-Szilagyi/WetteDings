@@ -1,0 +1,23 @@
+<%# Passwortabfrage für Moderations- und Spielwerte-Aktionen (Formulare mit data-reauth, Logik in public/js/app.js) %>
+<dialog class="reauth-dialog" data-reauth-dialog aria-labelledby="reauth-title">
+  <form method="dialog" class="form reauth-form" data-reauth-form>
+    <div class="reauth-head">
+      <span class="reauth-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+      </span>
+      <div>
+        <h2 id="reauth-title">Mit Passwort bestätigen</h2>
+        <p class="muted small">Aktionen in Moderation und Spielwerten brauchen dein Passwort.</p>
+      </div>
+    </div>
+    <p class="reauth-text" data-reauth-text hidden></p>
+    <label class="field">
+      <span>Dein Passwort</span>
+      <input type="password" autocomplete="current-password" required data-reauth-input>
+    </label>
+    <div class="reauth-actions">
+      <button type="button" class="btn btn-ghost" data-reauth-cancel>Abbrechen</button>
+      <button type="submit" class="btn btn-primary">Bestätigen</button>
+    </div>
+  </form>
+</dialog>

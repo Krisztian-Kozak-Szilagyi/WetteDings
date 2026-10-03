@@ -201,16 +201,28 @@ function banMessage(ban, date) {
 async function ban({ userId, hours, reason, admin, adminUsernames = [] }) {
   const until = logic.banUntil(hours);
   if (!until) throw new UserError(`Bitte die Dauer in ganzen Stunden angeben (0 = dauerhaft, höchstens ${logic.MAX_BAN_HOURS}).`);
-  const user = await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower');
+  const user = await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower role bannedUntil bannedBy bannedByName').lean();
   if (!user) throw new UserError('Bitte ein Mitglied auswählen.');
-  if (adminUsernames.includes(user.usernameLower)) throw new UserError('Der Admin kann nicht gebannt werden.');
-  await User.updateOne({ _id: user._id }, { $set: { bannedUntil: until, banReason: String(reason || '').trim().slice(0, 200), bannedAt: new Date(), bannedByName: admin.username } });
+  // Wer wen wie lange bannen darf (Admin oder Dev), steht in deviceLogic.banError
+  const error = logic.banError(admin, { ...user, isAdmin: adminUsernames.includes(user.usernameLower) }, hours);
+  if (error) throw new UserError(error);
+  await User.updateOne(
+    { _id: user._id },
+    { $set: { bannedUntil: until, banReason: String(reason || '').trim().slice(0, 200), bannedAt: new Date(), bannedByName: admin.username, bannedBy: admin._id } }
+  );
   await reload();
   return { username: user.username, until };
 }
 
-/** Ban aufheben. Wer wann und warum gebannt hat, bleibt stehen – das Profil zeigt den Vermerk weiterhin. */
-async function unban(userId) {
+/**
+ * Ban aufheben (Admin jeden, Devs nur ihre eigenen). Wer wann und warum gebannt hat, bleibt stehen –
+ * das Profil zeigt den Vermerk weiterhin.
+ */
+async function unban(userId, actor) {
+  const target = await User.findById(userId).select('username bannedBy bannedByName').lean();
+  if (!target) return null;
+  const error = logic.unbanError(actor, target);
+  if (error) throw new UserError(error);
   const user = await User.findOneAndUpdate({ _id: userId }, { $set: { bannedUntil: null } }).select('username').lean();
   await reload();
   return user;
@@ -218,7 +230,7 @@ async function unban(userId) {
 
 /** Aktuell gesperrte Konten samt Zahl ihrer bekannten Geräte */
 async function listBans() {
-  const users = await User.find({ bannedUntil: { $gt: new Date() }, deletedAt: null }).select('username bannedUntil banReason bannedAt bannedByName').sort({ bannedAt: -1 }).lean();
+  const users = await User.find({ bannedUntil: { $gt: new Date() }, deletedAt: null }).select('username bannedUntil banReason bannedAt bannedByName bannedBy').sort({ bannedAt: -1 }).lean();
   const counts = await Promise.all(users.map((u) => Device.countDocuments({ user: u._id })));
   return users.map((u, i) => ({ ...u, devices: counts[i], forever: logic.isForever(u.bannedUntil) }));
 }

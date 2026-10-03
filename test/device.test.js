@@ -65,3 +65,39 @@ test('Gerätebezeichnung aus dem User-Agent', () => {
   assert.equal(d.uaLabel('Mozilla/5.0 (Android 15; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0'), 'Firefox · Android');
   assert.equal(d.uaLabel(undefined), 'Browser · unbekannt');
 });
+
+test('Ban-Rechte: Admin bannt jeden außer Admins, auch dauerhaft', () => {
+  const { banError } = require('../src/device/deviceLogic');
+  const admin = { _id: 'a', isAdmin: true };
+  assert.equal(banError(admin, { _id: 'u', username: 'Anna' }, '0'), null);
+  assert.equal(banError(admin, { _id: 'd', username: 'Dev', role: 'dev' }, '24'), null);
+  assert.match(banError(admin, { _id: 'b', username: 'Boss', isAdmin: true }, '24'), /Admin kann nicht/);
+  assert.match(banError(admin, { _id: 'a', username: 'Ich' }, '24'), /nicht selbst/);
+});
+
+test('Ban-Rechte: Devs bannen befristet, keine Devs, keine fremden Bans überschreiben', () => {
+  const { banError, DEV_MAX_BAN_HOURS } = require('../src/device/deviceLogic');
+  const dev = { _id: 'd1', isAdmin: false };
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  const anna = { _id: 'u', username: 'Anna', role: null };
+  assert.equal(banError(dev, anna, '24', now), null);
+  assert.equal(banError(dev, anna, String(DEV_MAX_BAN_HOURS), now), null);
+  assert.equal(banError(dev, { ...anna, role: 'mod' }, '24', now), null);
+  assert.match(banError(dev, anna, '0', now), /1 bis 168 Stunden/); // kein Dauerban
+  assert.match(banError(dev, anna, '169', now), /1 bis 168 Stunden/);
+  assert.match(banError(dev, { ...anna, role: 'dev' }, '24', now), /keine anderen Devs/);
+  const bannedByAdmin = { ...anna, bannedUntil: new Date(now + 3600e3), bannedBy: 'a', bannedByName: 'Boss' };
+  assert.match(banError(dev, bannedByAdmin, '24', now), /bereits von Boss gebannt/);
+  // eigenen Ban darf der Dev verlängern oder verkürzen; abgelaufene Bans zählen nicht
+  assert.equal(banError(dev, { ...bannedByAdmin, bannedBy: 'd1' }, '48', now), null);
+  assert.equal(banError(dev, { ...bannedByAdmin, bannedUntil: new Date(now - 1000) }, '24', now), null);
+});
+
+test('Ban-Rechte: aufheben – Admin alle, Devs nur eigene', () => {
+  const { unbanError } = require('../src/device/deviceLogic');
+  const target = { username: 'Anna', bannedBy: 'd1', bannedByName: 'Dev1' };
+  assert.equal(unbanError({ _id: 'a', isAdmin: true }, target), null);
+  assert.equal(unbanError({ _id: 'd1' }, target), null);
+  assert.match(unbanError({ _id: 'd2' }, target), /Dev1 vergeben/);
+  assert.match(unbanError({ _id: 'd2' }, { username: 'Alt', bannedBy: null, bannedByName: 'Boss' }), /Boss vergeben/);
+});

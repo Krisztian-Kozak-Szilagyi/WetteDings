@@ -18,7 +18,7 @@ function randomCode() {
   return out;
 }
 
-/** Neuen Code für einen Admin erzeugen (30 Minuten gültig, einmal nutzbar). */
+/** Neuen Code erzeugen – Admin oder Dev lädt damit jemanden ein (30 Minuten gültig, einmal nutzbar). */
 async function createCode(admin) {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -54,9 +54,11 @@ async function listActiveCodes() {
   return RegistrationCode.find({ expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(100).lean();
 }
 
-/** Code vorzeitig löschen */
-async function revokeCode(id) {
-  return RegistrationCode.deleteOne({ _id: id });
+/** Code vorzeitig löschen: der Admin jeden, Devs nur ihre eigenen. Gibt true zurück, wenn gelöscht. */
+async function revokeCode(id, actor) {
+  const filter = actor && !actor.isAdmin ? { _id: id, createdBy: actor._id } : { _id: id };
+  const res = await RegistrationCode.deleteOne(filter);
+  return res.deletedCount === 1;
 }
 
 module.exports = { CODE_TTL_MINUTES, normalizeCode, formatCode, createCode, redeemCode, listActiveCodes, revokeCode };

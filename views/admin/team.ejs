@@ -1,0 +1,93 @@
+<nav class="stats-subnav" aria-label="Abschnitte">
+  <span class="muted small">Springe zu:</span>
+  <a href="#codes">Mitglieder einladen</a><% if (currentUser.isAdmin) { %><a href="#devs">Devs</a><a href="#mods">Mods</a><% } %>
+</nav>
+
+<section class="stats-block" id="codes">
+  <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt <strong>${ttlMinutes} Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
+  <div class="card">
+    <form method="post" action="/admin/codes" class="admin-generate">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-primary" type="submit">+ Einladungscode erzeugen</button>
+    </form>
+    <% if (!codes.length) { %>
+      <p class="muted">Aktuell gibt es keine gültigen Codes.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% codes.forEach((c) => {
+             const minutesLeft = Math.max(0, Math.ceil((new Date(c.expiresAt).getTime() - now) / 60000));
+             const used = !!c.usedAt; %>
+          <li class="code-item <%= used ? 'is-used' : '' %>">
+            <div class="code-main">
+              <code class="code-value"><%= formatCode(c.code) %></code>
+              <% if (used) { %>
+                <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
+              <% } else { %>
+                <span class="badge badge-offen">Gültig · noch <%= minutesLeft %> Min.</span>
+              <% } %>
+            </div>
+            <div class="code-meta muted small">
+              erstellt von <%= c.createdByName %> · <%= date(c.createdAt) %> · läuft ab <%= date(c.expiresAt) %>
+            </div>
+            <div class="code-actions">
+              <% if (!used) { %>
+                <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= formatCode(c.code) %>">Kopieren</button>
+              <% } %>
+              <% if (currentUser.isAdmin || String(c.createdBy) === String(currentUser._id)) { %>
+                <form method="post" action="/admin/codes/<%= c._id %>/loeschen" data-confirm="Diesen Code löschen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+                </form>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+
+<% if (currentUser.isAdmin) { %>
+<% [
+     { key: 'dev', id: 'devs', title: 'Devs', label: 'Dev', text: 'Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), entscheiden Streitfälle, vergeben Booster Packs, bearbeiten Meldungen und Hinweise auf Mehrfach-Konten, laden neue Mitglieder per Code ein und können Mitglieder bis zu 7 Tage bannen (keine Devs, nur eigene Bans aufheben). Sie sehen das Dev-Panel und tragen ein grünes DEV-Abzeichen.' },
+     { key: 'mod', id: 'mods', title: 'Mods', label: 'Mod', text: 'Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.' },
+   ].forEach((r) => { const list = users.filter((u) => u.role === r.key); %>
+  <section class="stats-block" id="<%= r.id %>">
+    <%- blockHead(`${r.title} <span class="panel-badge panel-badge-inline panel-badge-muted">${list.length}</span>`, r.text) %>
+    <div class="card">
+      <% if (!list.length) { %>
+        <p class="muted">Aktuell gibt es keine <%= r.title %>.</p>
+      <% } else { %>
+        <ul class="code-list">
+          <% list.forEach((u) => { %>
+            <li class="code-item code-item-single">
+              <div class="code-main"><strong><%- userLink(u.username, { realName: false }) %></strong></div>
+              <div class="code-actions">
+                <form method="post" action="/admin/rollen" data-confirm="<%= u.username %> die <%= r.label %>-Rolle entziehen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="user" value="<%= u._id %>">
+                  <input type="hidden" name="role" value="<%= r.key %>">
+                  <input type="hidden" name="action" value="entfernen">
+                  <button class="btn btn-danger btn-sm" type="submit">Entfernen</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+      <form method="post" action="/admin/rollen" class="form panel-inline-form" data-confirm="Dieses Mitglied zum <%= r.label %> machen?">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="role" value="<%= r.key %>">
+        <label class="field">
+          <span>Mitglied zum <%= r.label %> machen</span>
+          <select name="user" required>
+            <option value="">– auswählen –</option>
+            <% users.filter((u) => u.role !== r.key).forEach((u) => { %><option value="<%= u._id %>"><%= u.username %><%= u.role ? ' (bisher ' + u.role + ')' : '' %></option><% }) %>
+          </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Zum <%= r.label %> machen</button>
+      </form>
+    </div>
+  </section>
+<% }) %>
+<% } %>

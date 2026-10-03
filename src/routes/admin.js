@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const { requireAdmin, requireStaff } = require('../middleware');
+const { requireReauth } = require('../middleware/reauth');
 const { PackGrant } = require('../models/Tcg');
 const { Trade } = require('../models/Trade');
 const roles = require('../services/roles');
@@ -20,10 +21,37 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
-const { MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
+const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
+const { ForumReport, ForumPost } = require('../models/Forum');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
+
+// ---------- Reiter des Panels ----------
+// adminOnly: Reiter, in dem Devs nichts tun können, wird für sie ausgeblendet
+const PANEL_SECTIONS = [
+  { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen auf einen Blick.' },
+  { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer und IHK einstellen.' },
+  { key: 'team', label: 'Team & Einladungen', icon: 'users', description: 'Neue Mitglieder per Code einladen und – als Admin – Devs und Mods ernennen.' },
+  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Vergabe-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
+];
+const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
+
+/** Adresse im Panel, z. B. panelUrl('moderation', 'ban') -> /admin?bereich=moderation#ban */
+const panelUrl = (bereich, anchor, extra = {}) => `/admin?${new URLSearchParams({ bereich, ...extra })}${anchor ? `#${anchor}` : ''}`;
+
+/** Mitglieder, die der Handelnde bannen kann: nie den Admin oder sich selbst, Devs zusätzlich keine Devs */
+const bannableFor = (actor, users) =>
+  users.filter((u) => !config.adminUsernames.includes(u.usernameLower) && !u._id.equals(actor._id) && (actor.isAdmin || u.role !== 'dev'));
+
+/** Offene Meldungen aus dem Forum samt gemeldetem Beitrag */
+async function openReports() {
+  const reports = await ForumReport.find({ done: false }).sort({ createdAt: -1 }).limit(100).lean();
+  const posts = await ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted').lean();
+  const byId = new Map(posts.map((p) => [String(p._id), p]));
+  return reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null }));
+}
 
 // ---------- Handel-Log (Admin und Devs): wer wem welche Karte gegeben hat und wann ----------
 const TRADE_LOG_PAGE = 50;
@@ -82,52 +110,83 @@ async function tradeLog(query, seenAt) {
 }
 
 router.get('/admin', requireStaff, async (req, res) => {
-  const isAdmin = req.user.isAdmin;
-  const [codes, userCount, openBets, totalBets, users, deviceMatches, bans, trades] = await Promise.all([
-    listActiveCodes(),
-    User.countDocuments(),
-    Bet.countDocuments({ status: 'offen' }),
-    Bet.countDocuments(),
-    User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean(),
-    isAdmin ? deviceService.listAlerts() : [], // Konten mit gemeinsamem Gerät
-    isAdmin ? deviceService.listBans() : [],
-    tradeLog(req.query, req.user.suspiciousSeenAt), // Handel-Log (Admin und Devs): abgeschlossene Verkäufe und Tausche
+  const me = req.user;
+  const isAdmin = me.isAdmin;
+  const sections = sectionsFor(me);
+  const tab = sections.some((s) => s.key === req.query.bereich) ? req.query.bereich : 'uebersicht';
+  const needs = (...tabs) => tabs.includes(tab);
+
+  // Offene Aufgaben – für die Übersicht und die Zähler an den Reitern
+  const [reportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), deviceService.listBans()]);
+  const counts = {
+    disputes: res.locals.betDisputes || 0,
+    reports: reportCount,
+    deviceAlerts: res.locals.deviceAlerts || 0,
+    suspicious: res.locals.tradeAlerts || 0,
+    packLogNew: res.locals.packLogNew || 0,
+    bans: bans.length,
+  };
+  counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts;
+  counts.protokolle = counts.suspicious + counts.packLogNew;
+
+  const users = needs('moderation', 'spielwerte', 'team')
+    ? await User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean()
+    : [];
+  const [stats, reports, deviceMatches, codes, trades] = await Promise.all([
+    needs('uebersicht')
+      ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
+      : null,
+    needs('moderation') ? openReports() : [],
+    needs('moderation') ? deviceService.listAlerts() : [],
+    needs('team') ? listActiveCodes() : [],
+    // Handel-Log: abgeschlossene Verkäufe und Tausche
+    needs('protokolle') ? tradeLog(req.query, me.suspiciousSeenAt) : null,
   ]);
-  // Besuch merken: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
-  const newSuspicious = res.locals.tradeAlerts || 0;
+  // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
+  const newSuspicious = needs('protokolle') ? counts.suspicious : 0;
   if (newSuspicious) {
-    await User.updateOne({ _id: req.user._id }, { $set: { suspiciousSeenAt: new Date() } });
+    await User.updateOne({ _id: me._id }, { $set: { suspiciousSeenAt: new Date() } });
     res.locals.tradeAlerts = 0;
   }
+
   res.render('admin', {
-    title: req.user.isAdmin ? 'Admin' : 'Dev',
-    packLogNew: res.locals.packLogNew || 0,
+    title: isAdmin ? 'Admin-Panel' : 'Dev-Panel',
+    sections,
+    tab,
+    panelUrl,
+    counts,
+    stats,
+    reports,
+    deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
+    bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
+    bannable: needs('moderation') ? bannableFor(me, users) : [],
+    banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
+    // Devs bannen befristet (höchstens 7 Tage), der Admin auch dauerhaft
+    maxBanHours: isAdmin ? MAX_BAN_HOURS : DEV_MAX_BAN_HOURS,
+    users,
+    packTypes: tcgCatalog.PACK_TYPES,
+    // Karten für "Karte vergeben", nach Seltenheit gruppiert
+    grantCards: tcgCatalog.RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    packLogNew: counts.packLogNew,
     codes,
     formatCode,
     ttlMinutes: CODE_TTL_MINUTES,
-    stats: { userCount, openBets, totalBets },
     now: Date.now(),
-    users,
-    packTypes: tcgCatalog.PACK_TYPES,
-    tcg: {
-      packPrice: tcgSettings.getPackPrice(),
-      rarities: tcgCatalog.RARITIES,
-      defaults: tcgCatalog.DEFAULT_SELL,
-      defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
-      totalWeight: tcgCatalog.TOTAL_WEIGHT,
-      expectedPack: Math.round(tcgCatalog.expectedPackValue()),
-      lastUpdate: await tcgSettings.lastUpdate(),
-    },
+    tcg: needs('spielwerte') && isAdmin
+      ? {
+          packPrice: tcgSettings.getPackPrice(),
+          rarities: tcgCatalog.RARITIES,
+          defaults: tcgCatalog.DEFAULT_SELL,
+          defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
+          totalWeight: tcgCatalog.TOTAL_WEIGHT,
+          expectedPack: Math.round(tcgCatalog.expectedPackValue()),
+          lastUpdate: await tcgSettings.lastUpdate(),
+        }
+      : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
     tradeTax: tradeService.settings.taxPercent,
-    deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
-    bans,
-    maxBanHours: MAX_BAN_HOURS,
     trades,
     newSuspicious,
-    // Mitglieder, die gesperrt werden können (der Admin selbst nicht)
-    bannable: users.filter((u) => !config.adminUsernames.includes(u.usernameLower)),
-    banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
   });
 });
 
@@ -152,7 +211,7 @@ router.get('/admin/streitfaelle', requireStaff, async (req, res) => {
   });
 });
 
-router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res) => {
+router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth('/admin/streitfaelle'), async (req, res) => {
   const outcome = str(req.body.outcome);
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw new UserError('Wette nicht gefunden.');
@@ -179,23 +238,24 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res
   res.redirect('/admin/streitfaelle');
 });
 
-// ---------- Mehrfach-Konten: Hinweise abhaken ----------
-router.post('/admin/geraete/:id', requireAdmin, async (req, res) => {
+// ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
+router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
-  res.redirect('/admin#geraete');
+  res.redirect(panelUrl('moderation', 'geraete'));
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
+// Admin und Devs; was ein Dev darf (höchstens 7 Tage, keine Devs, nur eigene Bans aufheben), prüft deviceService
 const profilePath = (username) => `/profil/${encodeURIComponent(username)}`;
 
-router.post('/admin/sperren', requireAdmin, async (req, res) => {
+router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
-  let back = '/admin#ban';
+  let back = panelUrl('moderation', 'ban');
   try {
     if (!mongoose.isValidObjectId(userId)) throw new UserError('Bitte ein Mitglied auswählen.');
     const r = await deviceService.ban({ userId, hours: str(req.body.hours), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
     req.flash('success', `${r.username} ist gebannt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
-    if (req.body.zurueck === 'profil') back = profilePath(r.username); // vom Profil aus gebannt: dorthin zurück
+    back = req.body.zurueck === 'profil' ? profilePath(r.username) : panelUrl('moderation', 'banliste'); // vom Profil aus gebannt: dorthin zurück
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
@@ -203,14 +263,20 @@ router.post('/admin/sperren', requireAdmin, async (req, res) => {
   res.redirect(back);
 });
 
-router.post('/admin/sperren/:id/aufheben', requireAdmin, async (req, res) => {
-  const user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id) : null;
-  req.flash(user ? 'success' : 'error', user ? `Der Ban von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
-  res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : '/admin#banliste');
+router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+  let user = null;
+  try {
+    user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id, req.user) : null;
+    req.flash(user ? 'success' : 'error', user ? `Der Ban von ${user.username} ist aufgehoben.` : 'Mitglied nicht gefunden.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : panelUrl('moderation', 'banliste'));
 });
 
 // ---------- Handel: Steuer ----------
-router.post('/admin/handel', requireAdmin, async (req, res) => {
+router.post('/admin/handel', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const tax = Number(String(typeof req.body.tax === 'string' ? req.body.tax : '').replace(',', '.'));
   if (!Number.isFinite(tax) || tax < 0 || tax > 50) {
     req.flash('error', 'Die Steuer muss zwischen 0 und 50 % liegen.');
@@ -219,11 +285,11 @@ router.post('/admin/handel', requireAdmin, async (req, res) => {
     await tradeService.saveSettings({ taxPercent, admin: req.user });
     req.flash('success', `Handelssteuer auf ${String(taxPercent).replace('.', ',')} % gesetzt.`);
   }
-  res.redirect('/admin#handel');
+  res.redirect(panelUrl('spielwerte', 'handel'));
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
-router.post('/admin/ihk', requireAdmin, async (req, res) => {
+router.post('/admin/ihk', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const dailyLimit = Number.parseInt(typeof req.body.dailyLimit === 'string' ? req.body.dailyLimit : '', 10);
   const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
   // Wertetabelle aus dem Formular: prefix '' = normale Quests, 'hybrid_' = Hybrid-Quests
@@ -250,7 +316,7 @@ router.post('/admin/ihk', requireAdmin, async (req, res) => {
     await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, packChances, hybrid, admin: req.user });
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
-  res.redirect('/admin#ihk');
+  res.redirect(panelUrl('spielwerte', 'ihk'));
 });
 
 // ---------- TCG-Preise und Chancen ----------
@@ -269,7 +335,7 @@ function weightOrNull(value) {
 
 const percentText = (w) => `${(w / 100).toFixed(2).replace('.', ',')} %`;
 
-router.post('/admin/tcg', requireAdmin, async (req, res) => {
+router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const packCents = centsOrNull(req.body.pack);
   const sell = {};
   const weight = {};
@@ -289,7 +355,7 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
   }
   if (error) {
     req.flash('error', error);
-    return res.redirect('/admin#tcg');
+    return res.redirect(panelUrl('spielwerte', 'tcg'));
   }
 
   await tcgSettings.save({ packCents, sell, weight, admin: req.user });
@@ -300,11 +366,13 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
   } else {
     req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
   }
-  res.redirect('/admin#tcg');
+  res.redirect(panelUrl('spielwerte', 'tcg'));
 });
 
-// ---------- TCG: Booster Packs an Mitglieder vergeben ----------
-router.post('/admin/tcg/packs', requireStaff, async (req, res) => {
+// ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
+const GRANT_URL = panelUrl('spielwerte', 'vergeben');
+
+router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
@@ -321,14 +389,95 @@ router.post('/admin/tcg/packs', requireStaff, async (req, res) => {
     await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count });
     req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
   }
-  res.redirect('/admin#packs');
+  res.redirect(GRANT_URL);
 });
 
-// ---------- Pack-Log: eigene Seite, 50 Einträge pro Seite, mit Suche ----------
+/** Alle Mitglieder, die bei einer Vergabe "an alle" etwas bekommen (gelöschte Konten nicht) */
+const allMemberIds = async () => (await User.find({ deletedAt: null }).select('_id').lean()).map((u) => u._id);
+
+// "Bless everyone": jedes Mitglied bekommt count Booster Packs
+router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const type = tcgCatalog.packTypeByKey[req.body.type];
+  const count = Number.parseInt(str(req.body.count), 10);
+  if (!type) {
+    req.flash('error', 'Bitte ein Booster Pack auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 10) {
+    req.flash('error', 'Pro Mitglied können 1 bis 10 Packs vergeben werden.');
+  } else {
+    const ids = await allMemberIds();
+    await tcgService.grantPacksToMany({ userIds: ids, type: type.key, count });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: null, toName: `Alle Mitglieder (${ids.length})`, all: true, recipients: ids.length, kind: 'pack', type: type.key, typeLabel: type.label, count });
+    req.flash('success', `Bless everyone: ${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.`);
+  }
+  res.redirect(GRANT_URL);
+});
+
+// Bestimmte Karte an ein Mitglied oder an alle vergeben
+router.post('/admin/tcg/karte', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const card = tcgCatalog.cardById[str(req.body.card)];
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const toAll = target === 'alle';
+  const user = !toAll && mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!card) {
+    req.flash('error', 'Bitte eine Karte auswählen.');
+  } else if (!toAll && !user) {
+    req.flash('error', 'Bitte ein Mitglied oder „Alle Mitglieder“ auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 5) {
+    req.flash('error', 'Pro Mitglied können 1 bis 5 Exemplare vergeben werden.');
+  } else {
+    const ids = toAll ? await allMemberIds() : [user._id];
+    await tcgService.grantCards({ userIds: ids, cardId: card.id, count });
+    const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
+    await PackGrant.create({
+      by: req.user._id,
+      byName: req.user.username,
+      to: toAll ? null : user._id,
+      toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username,
+      all: toAll,
+      recipients: ids.length,
+      kind: 'karte',
+      type: card.id,
+      typeLabel: label,
+      count,
+    });
+    req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${label} bekommen.` : `${count}× ${label} an ${user.username} vergeben.`);
+  }
+  res.redirect(GRANT_URL);
+});
+
+// ---------- Vergabe-Log (Packs und Karten): eigene Seite, 50 Einträge pro Seite, mit Suche ----------
 const LOG_PAGE = 50;
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Neue Vergaben anderer seit dem letzten Blick ins Log (Abzeichen für den Admin) */
+// Karte aus der Sammlung eines Mitglieds entfernen (z. B. versehentlich vergeben) – landet wie jede Vergabe im Log
+// und beim Admin als Hinweis am Menüpunkt
+router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const card = tcgCatalog.cardById[str(req.body.card)];
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const user = mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!card) {
+    req.flash('error', 'Bitte eine Karte auswählen.');
+  } else if (!user) {
+    req.flash('error', 'Bitte ein Mitglied auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 50) {
+    req.flash('error', 'Es können 1 bis 50 Exemplare entfernt werden.');
+  } else {
+    try {
+      const { removed, remaining } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
+      const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
+      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed });
+      req.flash('success', `${removed}× ${label} bei ${user.username} entfernt (noch ${remaining} im Besitz).`);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
+  }
+  res.redirect(GRANT_URL);
+});
+
 const packLogNewCount = (user) => PackGrant.countDocuments({ by: { $ne: user._id }, createdAt: { $gt: user.packLogSeenAt || new Date(0) } });
 
 router.get('/admin/pack-log', requireStaff, async (req, res) => {
@@ -346,7 +495,7 @@ router.get('/admin/pack-log', requireStaff, async (req, res) => {
     res.locals.packLogNew = 0;
   }
   res.render('pack-log', {
-    title: 'Pack-Log',
+    title: 'Vergabe-Log',
     q,
     total,
     page,
@@ -370,19 +519,21 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
     await roles.setRole(user._id, on ? role : null);
     req.flash('success', on ? `${user.username} ist jetzt ${ROLE_LABEL[role]}.` : `${user.username} ist kein ${ROLE_LABEL[role]} mehr.`);
   }
-  res.redirect(`/admin#${role === 'mod' ? 'mods' : 'devs'}`);
+  res.redirect(panelUrl('team', role === 'mod' ? 'mods' : 'devs'));
 });
 
-router.post('/admin/codes', requireAdmin, async (req, res) => {
+// ---------- Einladungen: Registrierungscodes (Admin und Devs) ----------
+router.post('/admin/codes', requireStaff, async (req, res) => {
   const code = await createCode(req.user);
-  req.flash('success', `Neuer Registrierungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
-  res.redirect('/admin#codes');
+  req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
+  res.redirect(panelUrl('team', 'codes'));
 });
 
-router.post('/admin/codes/:id/loeschen', requireAdmin, async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await revokeCode(req.params.id);
-  req.flash('info', 'Code gelöscht.');
-  res.redirect('/admin#codes');
+// Der Admin löscht jeden Code, Devs nur ihre eigenen
+router.post('/admin/codes/:id/loeschen', requireStaff, async (req, res) => {
+  const ok = mongoose.isValidObjectId(req.params.id) && (await revokeCode(req.params.id, req.user));
+  req.flash(ok ? 'info' : 'error', ok ? 'Code gelöscht.' : 'Diesen Code kannst du nicht löschen – nur der Admin oder wer ihn erzeugt hat.');
+  res.redirect(panelUrl('team', 'codes'));
 });
 
 module.exports = router;

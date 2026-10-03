@@ -1,0 +1,68 @@
+<%
+  const logLink = (extra) => panelUrl('protokolle', 'handellog', { ...(trades.q ? { handelsuche: trades.q } : {}), ...(trades.onlySuspicious ? { verdacht: '1' } : {}), ...extra });
+%>
+<nav class="stats-subnav" aria-label="Abschnitte">
+  <span class="muted small">Springe zu:</span>
+  <a href="#handellog">Handel-Log</a><a href="#packlog">Vergabe-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
+</nav>
+
+<section class="stats-block" id="handellog">
+  <%- blockHead('Handel-Log' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.') %>
+  <div class="card">
+    <form method="get" action="/admin#handellog" class="leader-search" role="search">
+      <input type="hidden" name="bereich" value="protokolle">
+      <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
+      <input type="search" id="handel-suche" name="handelsuche" value="<%= trades.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
+      <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= trades.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
+      <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+      <% if (trades.q || trades.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'handellog') %>">Alle</a><% } %>
+    </form>
+    <p class="muted small"><%= trades.total %> <%= trades.total === 1 ? 'Geschäft' : 'Geschäfte' %><%= trades.onlySuspicious ? ' zwischen Mehrfach-Konten' : '' %><%= trades.q ? ' für „' + trades.q + '“' : '' %> · Seite <%= trades.page %> von <%= trades.pages %></p>
+    <% if (!trades.rows.length) { %>
+      <p class="muted"><%= trades.q ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table trade-log">
+          <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Karte</th><th>Gegenleistung</th><th>Art</th></tr></thead>
+          <tbody>
+            <% trades.rows.forEach((t) => { %>
+              <tr class="<%= t.flagged ? 'trade-flagged' : '' %>">
+                <td class="nowrap"><%= dateSec(t.at) %><% if (t.flagged) { %><br><span class="badge trade-flag" title="Beide Konten werden vom selben Gerät aus benutzt">Mehrfach-Konto</span><% } %><% if (t.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
+                <td><%- userLink(t.from, { realName: false }) %></td>
+                <td><%- userLink(t.to, { realName: false }) %></td>
+                <td><%= t.card %></td>
+                <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
+                <td class="nowrap"><%= t.kind %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+    <% if (trades.pages > 1) { %>
+      <div class="log-pager">
+        <% if (trades.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= logLink({ handelseite: trades.page - 1 }) %>">← Neuere</a><% } %>
+        <span class="muted small">Seite <%= trades.page %> / <%= trades.pages %></span>
+        <% if (trades.page < trades.pages) { %><a class="btn btn-ghost btn-sm" href="<%= logLink({ handelseite: trades.page + 1 }) %>">Ältere →</a><% } %>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="stats-block" id="packlog">
+  <%- blockHead('Vergabe-Log' + (packLogNew ? ` <span class="panel-badge panel-badge-inline">${packLogNew} neu</span>` : ''), 'Jede Vergabe von Booster Packs und Karten durch Admin oder Devs – auch „Bless everyone“: wer, wem, was, wie viele und wann, mit Suche.') %>
+  <a class="card panel-link-card" href="/admin/pack-log">
+    <%- icon('list') %>
+    <div><strong>Vergabe-Log öffnen</strong><span class="muted small"><%= packLogNew ? packLogNew + ' neue Vergaben seit deinem letzten Blick' : 'Alle Vergaben, neueste zuerst' %></span></div>
+    <span aria-hidden="true">→</span>
+  </a>
+</section>
+
+<section class="stats-block" id="einstellungen">
+  <%- blockHead('Einstellungs-Verlauf', 'Jede Änderung an Preisen, Chancen, Steuer und IHK – mit altem und neuem Wert und wer sie gemacht hat.') %>
+  <a class="card panel-link-card" href="/admin/statistik?bereich=uebersicht#aenderungen">
+    <%- icon('trend') %>
+    <div><strong>In der Statistik ansehen</strong><span class="muted small">Unter „Änderungen im Zeitraum“ – dort auch als Markierungen in allen Verläufen.</span></div>
+    <span aria-hidden="true">→</span>
+  </a>
+</section>
