@@ -123,6 +123,17 @@ strong, b { font-weight: 600; }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
+/* Dialog: Fläche über verschwommenem Hintergrund */
+dialog.dialog {
+  width: min(100% - 32px, 460px); max-height: calc(100dvh - 48px); padding: 24px; border: 0; border-radius: var(--radius-lg);
+  background: var(--color-surface); color: var(--text); box-shadow: var(--shadow-lg);
+}
+dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, transparent); backdrop-filter: blur(6px); }
+.dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.dialog-head h2 { margin: 0; font-size: 20px; }
+.dialog-x { width: 36px; height: 36px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-neutral-400); font-size: 20px; line-height: 1; cursor: var(--cur-pointer); }
+.dialog-x:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); }
+
 /* ========== Kopfzeile ========== */
 .topbar {
   position: sticky; top: 0; z-index: 50;
@@ -690,7 +701,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   color: var(--color-neutral-400); white-space: nowrap; font-weight: 500; font-size: 13px;
 }
 .tab:hover { text-decoration: none; color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
-.tab.active { color: var(--text); background: color-mix(in srgb, var(--color-accent) 16%, transparent); box-shadow: inset 0 0 0 1px var(--color-accent-700); }
+.tab.active { color: var(--text); background: var(--color-bg); }
 .search { display: flex; gap: 8px; margin-bottom: 20px; }
 .search input { flex: 1; min-width: 0; }
 
@@ -1263,38 +1274,126 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 @media (prefers-reduced-motion: reduce) { .ihk-hourglass, .is-hit, .is-shake, .ihk-floater { animation: none !important; } }
 
 /* ========== TCG ========== */
-.r-crumpled { --rar: #a8977a; }
-.r-bfwler { --rar: #94a3b8; }
-.r-gold { --rar: #e5b94e; }
-.r-holo { --rar: #e9a8ff; }
-.r-bockhaber { --rar: #b794f6; }
-.r-glitch { --rar: #3cf29a; }
-.r-icon { --rar: #ffffff; }
+.r-crumpled { --rar: var(--r-crumpled); }
+.r-bfwler { --rar: var(--r-bfwler); }
+.r-gold { --rar: var(--r-gold); }
+.r-holo { --rar: var(--r-holo); }
+.r-bockhaber { --rar: var(--r-bockhaber); }
+.r-glitch { --rar: var(--r-glitch); }
+.r-icon { --rar: var(--r-icon); }
 .r-sith { --rar: #ff2d3d; }
 /* Icon ist weiß – goldener Rand, damit es auch auf hellem Grund zu sehen ist */
-.r-icon .tcg-dot, .tcg-badge.r-icon { background: #fff; box-shadow: 0 0 0 1.5px #d9b45a; }
-.tcg-dot { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); background: var(--rar, var(--muted)); border-radius: 2px; flex: none; }
-.r-holo .tcg-dot, .tcg-badge.r-holo { background: linear-gradient(135deg, #ffd1f0, #a8e6ff 50%, #d9b8ff); }
+.tcg-badge.r-icon { background: #fff; box-shadow: 0 0 0 1.5px #d9b45a; }
+.tcg-dot { display: inline-block; width: 8px; height: 8px; transform: rotate(45deg); background: var(--rar, var(--muted)); border-radius: 1px; flex: none; }
+.tcg-badge.r-holo { background: linear-gradient(135deg, #ffd1f0, #a8e6ff 50%, #d9b8ff); }
 
-.tcg-layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
-@media (min-width: 960px) {
-  .tcg-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
-  .tcg-side { position: sticky; top: 80px; }
+/* Seite: Booster-Bühne, Meine Packs, Favoriten + Album-Kachel, Seltene Ziehungen */
+.tcg-page { display: flex; flex-direction: column; gap: 56px; }
+.tcg-hero-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 48px; align-items: center; margin: 0; }
+.tcg-hero-pack { position: relative; display: flex; justify-content: center; padding: 24px 0; }
+.tcg-hero-glow { position: absolute; inset: 10% 15%; background: radial-gradient(closest-side, color-mix(in srgb, var(--color-accent) 45%, transparent), transparent); filter: blur(30px); pointer-events: none; }
+.tcg-hero-pack .tcg-pack-btn { position: relative; width: min(300px, 70%); animation: floaty 6s ease-in-out infinite; }
+.tcg-hero-pack .tcg-pack-btn img { box-shadow: none; filter: drop-shadow(0 30px 40px rgba(0, 0, 0, .6)); }
+.tcg-hero-pack .tcg-pack-btn:not(:disabled):hover { transform: none; filter: brightness(1.08); }
+@keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-10px) rotate(-3deg); } }
+@media (prefers-reduced-motion: reduce) { .tcg-hero-pack .tcg-pack-btn { animation: none; transform: rotate(-4deg); } }
+.tcg-hero-info { display: flex; flex-direction: column; gap: 20px; max-width: 440px; }
+.tcg-hero-info h1 { margin: 0; font-size: clamp(32px, 1.6rem + 2vw, 44px); }
+.tcg-hero-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
+.tcg-hero-note { font-size: 12px; color: var(--color-neutral-500); }
+.kicker { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-accent-300); }
+.kicker-muted { color: var(--color-neutral-500); }
+.tcg-drops-btn {
+  align-self: flex-start; display: flex; align-items: center; gap: 12px; height: 34px; padding: 0 12px 0 14px;
+  border-radius: 999px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-neutral-300);
+  font: inherit; font-size: 13px; cursor: var(--cur-pointer);
 }
-.tcg-main > .stats { margin: 0 0 20px; }
-.tcg-main > .card { margin-bottom: 20px; }
-
-.tcg-shop-form { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; }
-@media (max-width: 520px) { .tcg-shop-form { grid-template-columns: 110px 1fr; gap: 14px; } .tcg-shop-info h2 { font-size: 1.05rem; } }
-.tcg-shop-info .btn { margin-bottom: 6px; }
-.tcg-qty { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
-.tcg-qty .btn { margin: 0; min-width: 36px; }
-.tcg-qty input { width: 72px; text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+.tcg-drops-btn:hover { border-color: var(--color-accent-600); color: var(--text); }
+.tcg-drops-gems { display: flex; gap: 7px; }
+.tcg-drops-gems .tcg-dot { box-shadow: 0 0 6px var(--rar); }
+.tcg-buy { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.tcg-qty { display: flex; align-items: center; height: 44px; border: 1px solid var(--color-divider); border-radius: var(--radius-md); }
+.tcg-qty .btn { min-height: 0; height: 100%; width: 40px; padding: 0; font-size: 18px; border-radius: 0; }
+.tcg-qty .btn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.tcg-qty .tcg-qty-max { width: auto; padding: 0 12px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-400); border-left: 1px solid var(--color-divider); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.tcg-qty input {
+  width: 36px; min-height: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none;
+  text-align: center; font-weight: 500; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.tcg-qty input:focus { box-shadow: none; }
 /* Browser-Pfeile ausblenden – dafür gibt es die Knöpfe − und + daneben */
 .tcg-qty input::-webkit-outer-spin-button, .tcg-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.tcg-qty-label { font-weight: 600; margin-right: 4px; }
+.btn-glow { min-height: 44px; padding: 0 22px; font-size: 15px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+.tcg-mypacks { display: flex; flex-direction: column; gap: 12px; }
+.tcg-mypack {
+  display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--color-accent-900), var(--color-surface)); box-shadow: 0 0 0 1px var(--color-accent-800);
+}
+.tcg-mypack-img { position: relative; width: 44px; height: 60px; flex: none; }
+.tcg-mypack-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.tcg-mypack-img img:first-child { transform: rotate(-8deg) translateX(-4px); opacity: .5; }
+.tcg-mypack-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tcg-mypack-text strong { font-weight: 500; }
+.tcg-mypack-text span { font-size: 12px; color: var(--color-neutral-500); }
+.tcg-mypack form { margin: 0; }
+
+.tcg-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: stretch; }
+.tcg-favs-box { flex: 2 1 520px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.tcg-favs-box h2 { margin: 0; font-size: 25px; }
+.tcg-sub { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-500); }
+.tcg-grid.tcg-favs { gap: 16px; }
+.tcg-favs .tcg-slot img { border-radius: 12px; box-shadow: 0 20px 40px rgba(0, 0, 0, .5), 0 0 0 1px var(--color-neutral-800); transition: transform .25s ease; }
+.tcg-favs .tcg-slot:hover img { transform: translateY(-6px) rotate(-1.5deg); box-shadow: 0 20px 40px rgba(0, 0, 0, .5), 0 0 0 1px var(--color-neutral-800); }
+.tcg-slot.tcg-fav-empty {
+  aspect-ratio: 720 / 1008; border-radius: 12px; display: grid; place-items: center; text-decoration: none;
+  background: repeating-linear-gradient(135deg, var(--color-neutral-900) 0 10px, transparent 10px 20px);
+  box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-600); font-size: 26px; transition: transform .25s ease;
+}
+.tcg-fav-empty:hover { color: var(--color-accent-300); transform: translateY(-6px) rotate(-1.5deg); }
+
+.tcg-album-tile {
+  flex: 1 1 280px; position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px;
+  min-height: 340px; padding: 22px; border-radius: var(--radius-lg); overflow: hidden; color: var(--text);
+  background: radial-gradient(120% 70% at 50% 0%, var(--color-accent-800), transparent 70%), linear-gradient(180deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-800); transition: box-shadow .25s ease;
+}
+.tcg-album-tile:hover { color: var(--text); box-shadow: 0 0 0 1px var(--color-accent), 0 0 40px color-mix(in srgb, var(--color-accent) 25%, transparent); }
+.tcg-fan { position: absolute; left: 50%; top: 28px; width: 0; height: 200px; }
+.tcg-fan img {
+  position: absolute; left: -62px; top: 0; width: 124px; max-width: none; height: auto; border-radius: 9px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .55), 0 0 0 1px var(--color-neutral-800);
+  transform-origin: 50% 120%; transition: transform .45s cubic-bezier(.2, .8, .2, 1);
+}
+.tcg-fan img.is-sample { filter: grayscale(1) brightness(.5); }
+.tcg-fan img:nth-child(1) { transform: translateX(-30px) rotate(-8deg); }
+.tcg-fan img:nth-child(3) { transform: translateX(30px) rotate(8deg); }
+.tcg-album-tile:hover .tcg-fan img:nth-child(1) { transform: translateX(-78px) rotate(-16deg); }
+.tcg-album-tile:hover .tcg-fan img:nth-child(2) { transform: translateY(-10px); }
+.tcg-album-tile:hover .tcg-fan img:nth-child(3) { transform: translateX(78px) rotate(16deg); }
+.tcg-album-foot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.tcg-album-text { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.tcg-album-title { font-size: 24px; font-weight: 500; letter-spacing: -.02em; }
+.tcg-progress { display: flex; align-items: center; gap: 10px; }
+.progress { flex: 1; height: 4px; border-radius: 4px; background: var(--color-neutral-900); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--color-accent); box-shadow: 0 0 10px var(--color-accent); }
+.tcg-progress-num { font-size: 12px; color: var(--color-neutral-400); font-variant-numeric: tabular-nums; }
+.tcg-album-arrow {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none;
+  border-radius: 50%; border: 1px solid var(--color-accent); color: var(--color-accent); font-size: 18px; transition: transform .25s ease;
+}
+.tcg-album-tile:hover .tcg-album-arrow { transform: translateX(4px); }
+.tcg-rare { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.tcg-rare .tcg-feed li { font-size: 14px; }
+.tcg-rare .tcg-feed strong { font-weight: 500; }
+@media (max-width: 640px) {
+  .tcg-page { gap: 40px; }
+  .tcg-hero-form { gap: 16px; }
+  .tcg-grid.tcg-favs { gap: 10px; }
+}
+
 /* Favoriten, Album, Marken */
-.tcg-grid.tcg-favs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tcg-grid.tcg-favs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .tcg-grid.tcg-favs a.tcg-slot { text-decoration: none; }
 .tcg-album-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px 20px; flex-wrap: wrap; }
 .tcg-album-bar p { margin: 0 0 4px; }
@@ -1323,10 +1422,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .pn-comments summary { cursor: var(--cur-pointer); font-weight: 700; margin-bottom: 10px; }
 .pn-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 
-.tcg-packs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.tcg-pack-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; }
-.tcg-pack-item img { display: block; width: 100%; height: auto; border-radius: 5px; }
-.tcg-pack-item form { margin: 0; }
 .tcg-pack-btn { padding: 0; border: 0; background: none; cursor: var(--cur-pointer); border-radius: 10px; transition: transform .2s ease, filter .2s ease; }
 .tcg-pack-btn img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 10px 28px rgba(76, 29, 149, .35); }
 .tcg-pack-btn:not(:disabled):hover { transform: translateY(-4px) rotate(-2deg); filter: brightness(1.08); }
@@ -1385,10 +1480,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .admin-tcg-table input { width: 100%; max-width: 140px; }
 .admin-tcg-form .btn { margin-top: 12px; }
 .admin-tcg-summary { margin: 14px 0 0; }
-.tcg-odds { font-size: .86rem; }
-.tcg-odds th, .tcg-odds td { padding: 8px 4px; }
-.tcg-odds th { font-size: .68rem; letter-spacing: .02em; }
-.tcg-odds td:first-child { font-weight: 600; white-space: nowrap; }
+.tcg-odds { font-size: 13px; font-variant-numeric: tabular-nums; }
+.tcg-odds th, .tcg-odds td { padding: 9px 4px; }
+.tcg-odds td:first-child { font-weight: 500; white-space: nowrap; }
 .tcg-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .tcg-feed li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: .92rem; }
 

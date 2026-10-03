@@ -1,16 +1,25 @@
 (function () {
   'use strict';
 
-  // Mobile Navigation
-  var toggle = document.querySelector('.nav-toggle');
-  var nav = document.getElementById('hauptnavigation');
-  if (toggle && nav) {
-    toggle.addEventListener('click', function () {
-      var open = nav.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      toggle.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
-    });
-  }
+  // Dialoge: [data-dialog-open="id"] öffnet <dialog id>, [data-dialog-close] oder Klick daneben schließt
+  document.addEventListener('click', function (e) {
+    var opener = e.target.closest('[data-dialog-open]');
+    if (opener) {
+      var dlg = document.getElementById(opener.getAttribute('data-dialog-open'));
+      if (dlg && dlg.showModal && !dlg.open) dlg.showModal();
+      return;
+    }
+    var closer = e.target.closest('[data-dialog-close]');
+    if (closer) {
+      var d = closer.closest('dialog');
+      if (d) d.close();
+      return;
+    }
+    if (e.target.tagName === 'DIALOG' && e.target.classList.contains('dialog') && e.target.open) {
+      var r = e.target.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.target.close();
+    }
+  });
 
   // Zugeklappte Karte aufklappen, wenn die Adresse auf sie zeigt (z. B. /admin#tcg nach dem Speichern)
   var openTarget = function () {
