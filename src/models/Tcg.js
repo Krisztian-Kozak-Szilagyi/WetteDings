@@ -25,7 +25,7 @@ const packSchema = new Schema(
 );
 packSchema.index({ user: 1, type: 1, createdAt: 1 });
 
-// Protokoll: wer hat wem wann Booster Packs oder Karten geschenkt (Admin/Dev)
+// Protokoll: wer hat wem wann Booster Packs oder Karten geschenkt oder Karten entzogen (Admin/Dev)
 const packGrantSchema = new Schema(
   {
     by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -34,7 +34,7 @@ const packGrantSchema = new Schema(
     toName: { type: String, required: true }, // bei "an alle": "Alle Mitglieder (n)"
     all: { type: Boolean, default: false }, // an alle Mitglieder vergeben
     recipients: { type: Number, default: 1 }, // Zahl der beschenkten Mitglieder
-    kind: { type: String, enum: ['pack', 'karte'], default: 'pack' },
+    kind: { type: String, enum: ['pack', 'karte', 'entzug'], default: 'pack' }, // entzug = Karte aus der Sammlung entfernt
     type: { type: String, required: true }, // Pack-Art bzw. Karten-ID
     typeLabel: { type: String, required: true },
     count: { type: Number, required: true }, // je Mitglied

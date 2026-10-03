@@ -70,6 +70,32 @@
       </div>
       <button class="btn btn-primary" type="submit">Karte vergeben</button>
     </form>
+
+    <form method="post" data-reauth action="/admin/tcg/karte-entziehen" class="card panel-grant" data-confirm="Diese Karte wirklich aus der Sammlung entfernen?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <h3><%- icon('cards') %> Karte entfernen</h3>
+      <p class="muted small">Entfernt Exemplare aus der Sammlung eines Mitglieds, z. B. nach einer falschen Vergabe. Gesperrte Exemplare (Quest, Handelsangebot) bleiben. Es gibt kein Geld dafür.</p>
+      <label class="field"><span>Karte</span>
+        <select name="card" required>
+          <option value="">– auswählen –</option>
+          <% grantCards.forEach((g) => { %>
+            <optgroup label="<%= g.rarity.label %><%= g.rarity.hidden ? ' (geheim)' : '' %>">
+              <% g.cards.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+            </optgroup>
+          <% }) %>
+        </select>
+      </label>
+      <div class="panel-grant-row">
+        <label class="field"><span>Mitglied</span>
+          <select name="user" required>
+            <option value="">– auswählen –</option>
+            <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+          </select>
+        </label>
+        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      </div>
+      <button class="btn btn-danger" type="submit">Karte entfernen</button>
+    </form>
   </div>
 </section>
 
