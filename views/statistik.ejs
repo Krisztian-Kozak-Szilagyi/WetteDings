@@ -1,10 +1,12 @@
 <%- include('partials/head') %>
 <%
-  const p = data.period;
-  const prev = data.previous;
+  const p = data ? data.period : null;
+  const prev = data ? data.previous : null;
+  const curRange = range;
   const dd = (d) => d.split('-').reverse().join('.');
-  const range = (a) => `${dd(a.from).slice(0, 6)}–${dd(a.to)}`;
-  const link = (bereich, tage, block) => '/admin/statistik?' + new URLSearchParams({ bereich, tage: String(tage) }) + (block ? '#' + block : '');
+  const span = (a) => `${dd(a.from).slice(0, 6)}–${dd(a.to)}`;
+  // Das gewählte Mitglied bleibt beim Wechsel des Zeitraums erhalten
+  const link = (bereich, tage, block) => '/admin/statistik?' + new URLSearchParams({ bereich, tage: String(tage), ...(bereich === 'mitglied' && member ? { spieler: member.username } : {}) }) + (block ? '#' + block : '');
   const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
   const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   const BUCKET = { tag: 'je Tag', woche: 'je Woche', monat: 'je Monat' };
@@ -18,22 +20,63 @@
 
 <div class="page-head stats-head">
   <h1>Statistik</h1>
-  <span class="muted"><%= range(p) %> <span class="small">· verglichen mit <%= range(prev) %></span></span>
+  <% if (data) { %><span class="muted"><%= span(p) %> <span class="small">· verglichen mit <%= span(prev) %></span></span><% } %>
 </div>
 
 <div class="stats-filters">
   <nav class="tabs" aria-label="Bereich">
     <% sections.forEach((s) => { %>
-      <a class="tab <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, p.range) %>"><%= s.label %></a>
+      <a class="tab <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, curRange) %>"><%= s.label %></a>
     <% }) %>
   </nav>
   <nav class="stats-range" aria-label="Zeitraum">
     <% ranges.forEach((r) => { %>
-      <a class="<%= r === p.range ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === p.range) { %>aria-current="true"<% } %>><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
+      <a class="<%= r === curRange ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === curRange) { %>aria-current="true"<% } %>><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
     <% }) %>
   </nav>
 </div>
 
+<% if (active === 'mitglied') { %>
+  <form method="get" action="/admin/statistik" class="stats-member-pick">
+    <input type="hidden" name="bereich" value="mitglied">
+    <input type="hidden" name="tage" value="<%= curRange %>">
+    <label class="field">
+      <span>Mitglied</span>
+      <input type="text" name="spieler" list="stats-members" autocomplete="off" placeholder="Benutzername" value="<%= member ? member.username : '' %>" required>
+    </label>
+    <button class="btn btn-primary" type="submit">Anzeigen</button>
+    <% if (member) { %><a class="btn btn-ghost" href="/profil/<%= encodeURIComponent(member.username) %>">Profil öffnen</a><% } %>
+  </form>
+  <% if (!member) { %>
+    <section class="stats-block">
+      <header class="stats-block-head">
+        <h2>Mitglied auswählen</h2>
+        <p class="muted">Suche oben nach einem Namen oder wähle ein Mitglied aus der Rangliste.</p>
+      </header>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th class="num">#</th><th>Mitglied</th><th class="num">Gesamtvermögen</th><th class="num hide-sm">Guthaben</th><th class="num hide-sm">Karten & Packs</th></tr></thead>
+            <tbody>
+              <% members.forEach((m, i) => { %>
+                <tr>
+                  <td class="num"><%= i + 1 %></td>
+                  <td><a href="/admin/statistik?<%= new URLSearchParams({ bereich: 'mitglied', tage: String(curRange), spieler: m.username }) %>"><%= m.username %></a></td>
+                  <td class="num"><%= fmt({ value: m.total, unit: 'euro' }) %></td>
+                  <td class="num hide-sm"><%= fmt({ value: m.balance, unit: 'euro' }) %></td>
+                  <td class="num hide-sm"><%= fmt({ value: m.cardValue, unit: 'euro' }) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  <% } %>
+  <datalist id="stats-members"><% members.forEach((m) => { %><option value="<%= m.username %>"><% }) %></datalist>
+<% } %>
+
+<% if (data) { %>
 <% if (data.markers.length && active !== 'uebersicht') { %>
   <div class="stats-strip" aria-label="Änderungen im Zeitraum">
     <span class="stats-strip-label">Änderungen:</span>
@@ -65,7 +108,7 @@
     <% if (b.kpis && b.kpis.length) { %>
       <div class="stats-kpis stats-kpis-<%= b.kpis.length %>">
         <% b.kpis.forEach((k) => { const d = fmtDelta(k); const tag = k.href ? 'a' : 'div'; %>
-          <<%= tag %> class="stats-kpi card" <% if (k.href) { %>href="<%= link(k.href.bereich, p.range, k.href.block) %>"<% } %>>
+          <<%= tag %> class="stats-kpi card" <% if (k.href) { %>href="<%= link(k.href.bereich, curRange, k.href.block) %>"<% } %>>
             <span class="stat-label"><%= k.label %> <%- info(k.hint) %></span>
             <span class="stat-value"><%= k.unit === 'text' ? k.value : fmt({ value: k.value, unit: k.unit, signed: k.signed }) %></span>
             <% if (d) { %>
@@ -166,7 +209,7 @@
     <% if (b.heat) { %>
       <div class="card">
         <h3>Wann wird gespielt?</h3>
-        <p class="muted small">Aktive Mitglieder je Wochentag und Stunde (deutsche Zeit). Dunkler = mehr.</p>
+        <p class="muted small">Wie oft in der jeweiligen Stunde gespielt wurde (Tage mit Aktivität, deutsche Zeit). Dunkler = mehr.</p>
         <div class="table-wrap">
           <table class="stats-heat">
             <thead><tr><th></th><% for (let h = 0; h < 24; h++) { %><th><%= h % 3 === 0 ? h : '' %></th><% } %></tr></thead>
@@ -225,4 +268,5 @@
 
 <script type="application/json" id="stats-data"><%- JSON.stringify(chartData).replace(/</g, '\\u003c') %></script>
 <script src="/js/stats.js?v=<%= assetVersion %>" defer></script>
+<% } %>
 <%- include('partials/foot') %>

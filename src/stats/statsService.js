@@ -36,6 +36,7 @@ const SECTIONS = [
   { key: 'spieler', label: 'Spieler' },
   { key: 'tcg', label: 'TCG & Handel' },
   { key: 'spiele', label: 'Spiele' },
+  { key: 'mitglied', label: 'Mitglied' },
 ];
 
 // Buchungsarten nach Bereich. Die Summe je Bereich zeigt, wie viel Geld dort entsteht (+) oder verschwindet (−);
@@ -837,7 +838,15 @@ async function overview(p, now) {
   ];
 }
 
-const LOADERS = { uebersicht: overview, wirtschaft: economy, spieler: playersSection, tcg, spiele: games };
+const LOADERS = {
+  uebersicht: overview,
+  wirtschaft: economy,
+  spieler: playersSection,
+  tcg,
+  spiele: games,
+  // Einzelnes Mitglied (eigene Datei; erst hier laden, weil sie die Hilfsfunktionen dieser Datei nutzt)
+  mitglied: (p, now, opts) => require('./memberStats').member(p, now, opts),
+};
 
 /** Zeitreihen eines Diagramms auf die Abschnitte (Tag/Woche/Monat) bündeln */
 function bucketChart(chart, p, list) {
@@ -846,12 +855,12 @@ function bucketChart(chart, p, list) {
   return { ...chart, series, empty };
 }
 
-/** Daten eines Reiters: Blöcke mit Vergleichswerten, gebündelten Verläufen und Markierungen */
-async function section(key, rangeDays, now = new Date()) {
+/** Daten eines Reiters: Blöcke mit Vergleichswerten, gebündelten Verläufen und Markierungen. opts: { user } für "mitglied" */
+async function section(key, rangeDays, now = new Date(), opts = {}) {
   const load = LOADERS[key] || LOADERS.uebersicht;
   const p = period(rangeDays, now);
   const prev = period(rangeDays, now, 1);
-  const [blocks, prevBlocks, marks] = await Promise.all([load(p, now), load(prev, now), markers(p)]);
+  const [blocks, prevBlocks, marks] = await Promise.all([load(p, now, opts), load(prev, now, opts), markers(p)]);
 
   const prevKpis = new Map(prevBlocks.flatMap((b) => (b.kpis || []).map((k) => [k.id, k.value])));
   const { unit, list } = buckets(p.days);
@@ -889,4 +898,11 @@ module.exports = {
   effectiveChances,
   pullVerdict,
   section,
+  // Für memberStats
+  groupOfType,
+  inP,
+  dayOf,
+  byDays,
+  pct,
+  sumBy,
 };
