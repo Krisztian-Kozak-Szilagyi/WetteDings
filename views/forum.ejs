@@ -30,7 +30,7 @@
     <% } else { %>
       <% roots.forEach((root) => { %>
         <% const addSub = parentChoices.some((c) => String(c._id) === String(root._id)); %>
-        <section class="forum-group forum-box <%= root.staffOnly ? 'is-team' : '' %>">
+        <section class="forum-group forum-box">
           <div class="forum-group-head">
             <h2><a href="/forum/k/<%= root._id %>"><%= root.title %></a></h2>
             <% if (root.staffOnly) { %><span class="forum-team">Team</span><% } %>

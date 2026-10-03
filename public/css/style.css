@@ -3382,12 +3382,8 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .forum-page > p.muted { margin: 0; }
 @media (max-width: 640px) { .forum-head h1, .forum-thread-head h1 { font-size: 30px; } }
 
-/* Forum: Bereiche als eigene Kästen, Unterbereiche eingerückt mit Ordner */
-.forum-box {
-  padding: 18px 18px 8px; border-radius: var(--radius-lg); background: var(--color-surface);
-  box-shadow: 0 0 0 1px var(--color-neutral-800);
-}
-.forum-box.is-team { box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 30px color-mix(in srgb, var(--color-accent) 8%, transparent); }
+/* Forum: Bereiche nur durch Linie und Abstand getrennt, Unterbereiche mit Ordner eingerückt */
+.forum-main { gap: 56px; }
 .forum-box .forum-group-head { align-items: center; padding: 0 6px 12px; }
 .forum-box .forum-group-head h2 { font-size: 20px; }
 .forum-box .forum-rows > li:last-child { border-bottom: 0; }
@@ -3400,11 +3396,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .forum-crow-icon { display: flex; color: var(--color-neutral-500); }
 .forum-crow.is-own .forum-crow-title { color: var(--color-neutral-300); font-weight: 400; }
 .forum-crow.is-own.is-unread .forum-crow-title { color: var(--color-text); font-weight: 500; }
-.forum-crow.is-sub {
-  margin: 6px 0 6px 22px; padding: 12px 10px; border-bottom: 0; border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-bg)); box-shadow: inset 2px 0 0 var(--color-accent-700);
-}
-.forum-crow.is-sub:hover { background: color-mix(in srgb, var(--color-accent) 9%, var(--color-bg)); }
+.forum-crow.is-sub { margin-left: 28px; }
 .forum-crow.is-sub .forum-crow-icon { color: var(--color-accent-300); }
 /* Auf der Bereich-Seite stehen nur Unterbereiche im Kasten – ohne Einrückung */
 .forum-narrow .forum-crow.is-sub { margin-left: 0; }
@@ -3418,5 +3410,5 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .forum-crow .forum-trow-main { grid-column: 2 / -1; }
   .forum-crow .forum-count { grid-column: 2; }
   .forum-crow .forum-crow-last { grid-column: 2 / -1; }
-  .forum-crow.is-sub { margin-left: 10px; }
+  .forum-crow.is-sub { margin-left: 16px; }
 }
