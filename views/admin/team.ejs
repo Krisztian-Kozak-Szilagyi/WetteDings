@@ -1,10 +1,55 @@
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#devs">Devs</a><a href="#mods">Mods</a><a href="#codes">Registrierungscodes</a>
+  <a href="#codes">Mitglieder einladen</a><% if (currentUser.isAdmin) { %><a href="#devs">Devs</a><a href="#mods">Mods</a><% } %>
 </nav>
 
+<section class="stats-block" id="codes">
+  <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt <strong>${ttlMinutes} Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
+  <div class="card">
+    <form method="post" action="/admin/codes" class="admin-generate">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-primary" type="submit">+ Einladungscode erzeugen</button>
+    </form>
+    <% if (!codes.length) { %>
+      <p class="muted">Aktuell gibt es keine gültigen Codes.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% codes.forEach((c) => {
+             const minutesLeft = Math.max(0, Math.ceil((new Date(c.expiresAt).getTime() - now) / 60000));
+             const used = !!c.usedAt; %>
+          <li class="code-item <%= used ? 'is-used' : '' %>">
+            <div class="code-main">
+              <code class="code-value"><%= formatCode(c.code) %></code>
+              <% if (used) { %>
+                <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
+              <% } else { %>
+                <span class="badge badge-offen">Gültig · noch <%= minutesLeft %> Min.</span>
+              <% } %>
+            </div>
+            <div class="code-meta muted small">
+              erstellt von <%= c.createdByName %> · <%= date(c.createdAt) %> · läuft ab <%= date(c.expiresAt) %>
+            </div>
+            <div class="code-actions">
+              <% if (!used) { %>
+                <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= formatCode(c.code) %>">Kopieren</button>
+              <% } %>
+              <% if (currentUser.isAdmin || String(c.createdBy) === String(currentUser._id)) { %>
+                <form method="post" action="/admin/codes/<%= c._id %>/loeschen" data-confirm="Diesen Code löschen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+                </form>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+
+<% if (currentUser.isAdmin) { %>
 <% [
-     { key: 'dev', id: 'devs', title: 'Devs', label: 'Dev', text: 'Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), entscheiden Streitfälle, vergeben Booster Packs, bearbeiten Meldungen und Hinweise auf Mehrfach-Konten und können Mitglieder bis zu 7 Tage bannen (keine Devs, nur eigene Bans aufheben). Sie sehen das Dev-Panel und tragen ein grünes DEV-Abzeichen.' },
+     { key: 'dev', id: 'devs', title: 'Devs', label: 'Dev', text: 'Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), entscheiden Streitfälle, vergeben Booster Packs, bearbeiten Meldungen und Hinweise auf Mehrfach-Konten, laden neue Mitglieder per Code ein und können Mitglieder bis zu 7 Tage bannen (keine Devs, nur eigene Bans aufheben). Sie sehen das Dev-Panel und tragen ein grünes DEV-Abzeichen.' },
      { key: 'mod', id: 'mods', title: 'Mods', label: 'Mod', text: 'Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.' },
    ].forEach((r) => { const list = users.filter((u) => u.role === r.key); %>
   <section class="stats-block" id="<%= r.id %>">
@@ -45,45 +90,4 @@
     </div>
   </section>
 <% }) %>
-
-<section class="stats-block" id="codes">
-  <%- blockHead('Registrierungscodes', `Neue Mitglieder können sich nur mit einem Code registrieren. Jeder Code gilt <strong>${ttlMinutes} Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.`) %>
-  <div class="card">
-    <form method="post" action="/admin/codes" class="admin-generate">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn btn-primary" type="submit">+ Neuen Code erzeugen</button>
-    </form>
-    <% if (!codes.length) { %>
-      <p class="muted">Aktuell gibt es keine gültigen Codes.</p>
-    <% } else { %>
-      <ul class="code-list">
-        <% codes.forEach((c) => {
-             const minutesLeft = Math.max(0, Math.ceil((new Date(c.expiresAt).getTime() - now) / 60000));
-             const used = !!c.usedAt; %>
-          <li class="code-item <%= used ? 'is-used' : '' %>">
-            <div class="code-main">
-              <code class="code-value"><%= formatCode(c.code) %></code>
-              <% if (used) { %>
-                <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
-              <% } else { %>
-                <span class="badge badge-offen">Gültig · noch <%= minutesLeft %> Min.</span>
-              <% } %>
-            </div>
-            <div class="code-meta muted small">
-              erstellt von <%= c.createdByName %> · <%= date(c.createdAt) %> · läuft ab <%= date(c.expiresAt) %>
-            </div>
-            <div class="code-actions">
-              <% if (!used) { %>
-                <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= formatCode(c.code) %>">Kopieren</button>
-              <% } %>
-              <form method="post" action="/admin/codes/<%= c._id %>/loeschen" data-confirm="Diesen Code löschen?">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
-              </form>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } %>
-  </div>
-</section>
+<% } %>
