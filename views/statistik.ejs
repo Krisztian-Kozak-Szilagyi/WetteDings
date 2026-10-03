@@ -158,6 +158,23 @@
       </div>
     <% } %>
 
+    <% if (b.giniCompare) { const gc = b.giniCompare; %>
+      <div class="card">
+        <h3>Ländervergleich</h3>
+        <p>Das Vermögen auf der Plattform ist <strong><%= gc.text %></strong>.</p>
+        <ul class="stats-hbars stats-gini">
+          <% gc.rows.forEach((r) => { %>
+            <li class="<%= r.self ? 'is-self' : '' %>">
+              <span class="stats-hbar-label"><%= r.name %></span>
+              <span class="stats-hbar-track"><span class="stats-hbar" style="width: <%= Math.round(r.gini * 100) %>%"></span></span>
+              <span class="stats-hbar-value"><%= fmt({ value: r.gini, unit: 'ratio' }) %></span>
+            </li>
+          <% }) %>
+        </ul>
+        <p class="muted small">Vermögens-Gini, nicht Einkommens-Gini – Vermögen ist überall deutlich ungleicher verteilt als Einkommen. Quelle: <%= gc.source %>. Bei wenigen Mitgliedern schwankt der Wert der Plattform stark.</p>
+      </div>
+    <% } %>
+
     <% if (b.pulls) { %>
       <div class="card">
         <p class="muted small"><%= b.pulls.total %> gezogene Karten im Zeitraum. Der Balken zeigt die tatsächliche Häufigkeit im Verhältnis zur eingestellten Chance – die Linie in der Mitte ist genau „wie eingestellt“. Erst ab etwa 5 erwarteten Karten ist eine Aussage möglich.</p>

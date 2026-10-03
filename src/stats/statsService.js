@@ -26,6 +26,7 @@ const { parseZonedLocal } = require('../lib/time');
 const { ledgerLabels } = require('../lib/viewHelpers');
 const { dayAndHour } = require('./activity');
 const { distribution, quantile } = require('./snapshot');
+const { compareGini } = require('./giniReference');
 
 const TZ = config.timezone;
 const RANGES = [7, 30, 90, 365];
@@ -282,6 +283,8 @@ async function economy(p) {
   // Bilanz je Bereich: Quellen (Geld entsteht) und Senken (Geld verschwindet)
   const groupTotals = LEDGER_GROUPS.map((g) => ({ ...g, value: Object.values(net[g.key]).reduce((s, x) => s + x, 0) })).filter((g) => g.value !== 0);
   const supplyNow = supplySeries[supplySeries.length - 1];
+  // Ländervergleich erst ab ein paar Mitgliedern sinnvoll
+  const giniCompare = dist.count >= 3 ? compareGini(dist.gini, config.appName) : null;
 
   return [
     {
@@ -340,11 +343,18 @@ async function economy(p) {
     {
       id: 'verteilung',
       title: 'Vermögensverteilung',
-      question: 'Wie ungleich ist das Vermögen verteilt – und wer bekommt den Tagesbonus?',
+      question: 'Wie ungleich ist das Vermögen verteilt – im Vergleich zu echten Ländern – und wer bekommt den Tagesbonus?',
+      giniCompare,
       kpis: [
         { id: 'vermoegen', label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
         { id: 'median', label: 'Median-Vermögen', value: dist.median, unit: 'euro', hint: 'Die Hälfte der Mitglieder hat weniger (jetzt)' },
-        { id: 'gini', label: 'Gini-Koeffizient', value: dist.gini, unit: 'ratio', hint: '0 = alle gleich reich, 1 = einer besitzt alles (jetzt)' },
+        {
+          id: 'gini',
+          label: 'Gini-Koeffizient',
+          value: dist.gini,
+          unit: 'ratio',
+          hint: `0 = alle gleich reich, 1 = einer besitzt alles (jetzt).${giniCompare ? ` Im Ländervergleich: ${giniCompare.text}.` : ''}`,
+        },
         { id: 'top10', label: 'Anteil reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'am Gesamtvermögen (jetzt)' },
         { id: 'bonus', label: 'Bonusberechtigt', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
       ],
