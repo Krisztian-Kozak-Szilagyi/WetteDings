@@ -3412,3 +3412,27 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .forum-crow .forum-crow-last { grid-column: 2 / -1; }
   .forum-crow.is-sub { margin-left: 16px; }
 }
+
+/* Forum: Schreiben, Bearbeiten, Meldungen (Redesign) */
+.forum-write { display: flex; flex-direction: column; gap: 18px; margin: 0; }
+.forum-field { display: flex; flex-direction: column; gap: 8px; }
+.forum-field input[type="text"] { width: 100%; height: 44px; font-size: 15px; }
+.forum-field textarea { width: 100%; min-height: 180px; font-size: 15px; line-height: 1.55; }
+.forum-field .pn-toolbar { margin: 0; }
+.forum-field .pn-toolbar .chip { min-height: 30px; padding: 0 10px; font-size: 12px; font-weight: 500; }
+.forum-field > p, .forum-reply .field > p { margin: 0; font-size: 12px; color: var(--color-neutral-500); }
+.forum-write-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
+.forum-hint {
+  margin: 0; padding: 12px 14px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.55; color: var(--color-neutral-300);
+  box-shadow: inset 0 0 0 1px var(--color-accent-700);
+}
+.forum-reports { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.forum-report { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-top: 1px solid var(--color-divider); }
+.forum-report:last-child { border-bottom: 1px solid var(--color-divider); }
+.forum-report-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.forum-report-head time { font-size: 12px; color: var(--color-neutral-500); }
+.forum-report-reason { margin: 0; font-size: 14px; color: var(--color-neutral-300); }
+.forum-report-post { display: flex; flex-direction: column; gap: 4px; padding-left: 14px; border-left: 2px solid var(--color-neutral-700); }
+.forum-report-post p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--color-neutral-200); overflow-wrap: anywhere; }
+.forum-report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.forum-report-actions form { margin: 0; }
