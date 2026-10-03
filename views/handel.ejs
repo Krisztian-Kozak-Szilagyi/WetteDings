@@ -181,7 +181,7 @@
     <div class="card" id="sammlung">
       <div class="tcg-coll-head">
         <h2>Deine Sammlung</h2>
-        <%- include('partials/tcg-filter') %>
+        <%- include('partials/tcg-filter', { counts: coll.counts }) %>
       </div>
       <% if (!coll.cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>

@@ -18,7 +18,7 @@
     <div class="card">
       <div class="tcg-coll-head">
         <h2>1. Deine Karte</h2>
-        <%- include('partials/tcg-filter') %>
+        <%- include('partials/tcg-filter', { counts: mine.counts }) %>
       </div>
       <% if (!mine.cardCount) { %>
         <p class="muted">Du hast noch keine Karten zum Tauschen.</p>
@@ -30,7 +30,7 @@
     <div class="card">
       <div class="tcg-coll-head">
         <h2>2. Karte von <%= partner.username %></h2>
-        <%- include('partials/tcg-filter') %>
+        <%- include('partials/tcg-filter', { counts: theirs.counts }) %>
       </div>
       <% if (!theirs.cardCount) { %>
         <p class="muted"><%= partner.username %> hat noch keine Karten.</p>

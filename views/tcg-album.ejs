@@ -1,32 +1,24 @@
 <%- include('partials/head') %>
+<% const albumCards = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
 
-<div class="page-head">
-  <div class="ihk-title">
+<div class="album-head">
+  <div class="album-title">
     <h1>Album</h1>
+    <div class="tcg-progress">
+      <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
+      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Verkaufswert <%= euro(collectionValue) %></span>
+    </div>
   </div>
-  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · Verkaufswert <%= euro(collectionValue) %></span>
-</div>
-
-<div class="card tcg-album-bar">
-  <div>
-    <% if (!dupCount) { %>
-      <p class="muted">Du hast keine doppelten Karten, die verkauft werden könnten.</p>
-    <% } else { %>
-      <p>Du hast <strong><%= dupCount %></strong> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> im Wert von <strong><%= euro(dupValue) %></strong>. Von jeder Karte behältst du eine.</p>
-    <% } %>
-    <p class="muted small">Geschützte Karten (Schloss) werden dabei nicht verkauft – auch ihre Duplikate nicht. Tippe eine Karte an, um sie zu schützen oder als Favorit zu zeigen.</p>
-  </div>
-  <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+  <form class="album-dupes" method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett."
+    title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht verkauft – auch ihre Duplikate nicht.">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <button class="btn btn-primary" type="submit" <%= dupCount ? '' : 'disabled' %>>Alle Duplikate verkaufen<%= dupCount ? ' · ' + euro(dupValue) : '' %></button>
+    <span><%= dupCount ? dupCount + (dupCount === 1 ? ' Duplikat' : ' Duplikate') : 'Keine Duplikate' %><% if (dupCount) { %> · <strong><%= euro(dupValue) %></strong><% } %></span>
+    <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
   </form>
 </div>
 
-<div class="card" id="sammlung">
-  <div class="tcg-coll-head">
-    <h2>Meine Sammlung</h2>
-    <%- include('partials/tcg-filter') %>
-  </div>
+<div class="album-body" id="sammlung">
+  <%- include('partials/tcg-filter') %>
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
@@ -44,31 +36,35 @@
       </div>
     </div>
     <div class="tcg-modal-info">
+      <span class="tcg-modal-rarity"><span class="tcg-dot" data-tcg-modal-dot></span><span data-tcg-modal-rarity></span></span>
       <h2 data-tcg-modal-name></h2>
-      <p><span class="tcg-badge" data-tcg-modal-rarity></span> <span class="muted" data-tcg-modal-count></span></p>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="eins">
-        <button class="btn btn-primary btn-block" type="submit">1 verkaufen · <span data-tcg-sell-text></span></button>
-      </form>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-dupes>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="duplikate">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <form method="post" action="/tcg/schuetzen" data-tcg-protect>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <form method="post" action="/tcg/favorit" data-tcg-favorite>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <p class="muted small" data-tcg-protect-note hidden>Geschützt: Die Duplikate dieser Karte werden nicht verkauft. Einzeln verkaufen geht weiterhin.</p>
+      <p class="tcg-modal-status" data-tcg-modal-count></p>
+      <div class="tcg-modal-actions" data-tcg-owned-actions>
+        <form method="post" action="/tcg/favorit" data-tcg-favorite>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/schuetzen" data-tcg-protect>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/verkaufen" data-tcg-sell-dupes>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="duplikate">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="eins">
+          <button class="btn btn-primary btn-block" type="submit">Verkaufen · <span data-tcg-sell-text></span></button>
+        </form>
+        <p class="muted small" data-tcg-protect-note hidden>Geschützt: Die Duplikate dieser Karte werden nicht verkauft. Einzeln verkaufen geht weiterhin.</p>
+      </div>
+      <a class="btn btn-primary btn-block" href="/handel" data-tcg-former-action hidden>Im Handel suchen</a>
     </div>
   </div>
 </dialog>

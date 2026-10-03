@@ -107,14 +107,22 @@
       var rank = parseInt(d.rank, 10) || 0;
       var sell = parseInt(d.sell, 10) || 0;
 
-      tilt.className = 'tcg-zoom r-' + d.rarity;
+      var former = d.former === '1';
+      tilt.className = 'tcg-zoom r-' + d.rarity + (former ? ' is-former' : '');
       $('[data-tcg-modal-img]', modal).src = d.image;
       $('[data-tcg-modal-img]', modal).alt = d.name + ' (' + d.rarityLabel + ')';
       $('[data-tcg-modal-name]', modal).textContent = d.name;
-      var badge = $('[data-tcg-modal-rarity]', modal);
-      badge.textContent = d.rarityLabel;
-      badge.className = 'tcg-badge r-' + d.rarity;
-      $('[data-tcg-modal-count]', modal).textContent = count === 1 ? '1 Stück im Besitz' : count + ' Stück im Besitz';
+      $('[data-tcg-modal-dot]', modal).className = 'tcg-dot r-' + d.rarity;
+      $('[data-tcg-modal-rarity]', modal).textContent = d.rarityLabel + (d.no ? ' · #' + d.no : '');
+      $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
+        : (count === 1 ? '1× im Besitz' : count + '× im Besitz') + (d.protected === '1' ? ' · geschützt' : '');
+      $('[data-tcg-owned-actions]', modal).hidden = former;
+      $('[data-tcg-former-action]', modal).hidden = !former;
+      if (former) {
+        if (typeof modal.showModal === 'function') modal.showModal();
+        else modal.setAttribute('open', '');
+        return;
+      }
 
       sellOne.querySelector('input[name="card"]').value = d.tcgCard;
       $('[data-tcg-sell-text]', sellOne).textContent = d.sellText;
@@ -127,10 +135,10 @@
       // Schutz vor dem Duplikat-Verkauf und Favorit
       var isProtected = d.protected === '1';
       protectForm.querySelector('input[name="card"]').value = d.tcgCard;
-      protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Vor Duplikat-Verkauf schützen';
+      protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Schützen (Schloss)';
       protectNote.hidden = !isProtected;
       favoriteForm.querySelector('input[name="card"]').value = d.tcgCard;
-      favoriteForm.querySelector('button').textContent = d.favorite === '1' ? 'Nicht mehr als Favorit zeigen' : 'Als Favorit zeigen';
+      favoriteForm.querySelector('button').textContent = d.favorite === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
 
       sellDupes.hidden = count < 2 || isProtected;
       if (count > 1 && !isProtected) {
