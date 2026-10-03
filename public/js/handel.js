@@ -5,6 +5,10 @@
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
+  // ---------- Black Market: nach einem Kauf (#blackmarket) aufgeklappt zeigen ----------
+  var bm = $('details#blackmarket');
+  if (bm && window.location.hash === '#blackmarket') bm.open = true;
+
   // ---------- Miniaturen in den Angeboten vergrößern ----------
   var zoom = $('[data-zoom-modal]');
   if (zoom) {

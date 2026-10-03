@@ -23,8 +23,8 @@
 </div>
 
 <% { const bm = blackMarket; const left = bm.offers.filter((o) => !o.buyer).length; const cdAt = (bm.open ? bm.closesAt : bm.opensAt).getTime(); %>
-<section class="bm<%= bm.open ? ' is-open' : '' %>" id="blackmarket">
-  <div class="bm-head">
+<<%= bm.open ? 'details' : 'section' %> class="bm<%= bm.open ? ' is-open' : '' %>" id="blackmarket">
+  <<%= bm.open ? 'summary' : 'div' %> class="bm-head">
     <div class="bm-title">
       <div class="bm-title-row">
         <h2>Black Market</h2>
@@ -37,7 +37,8 @@
       <span><%= bm.open ? 'Schließt in' : 'Öffnet in' %></span>
       <strong data-countdown-parts="<%= cdAt %>"><span data-cd="h">–</span>:<span data-cd="m">–</span>:<span data-cd="s">–</span></strong>
     </div>
-  </div>
+    <% if (bm.open) { %><span class="bm-arrow" aria-hidden="true"></span><% } %>
+  </<%= bm.open ? 'summary' : 'div' %>>
   <% if (bm.open) { %>
     <div class="bm-grid">
       <% bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; %>
@@ -64,12 +65,8 @@
         </div>
       <% }) %>
     </div>
-  <% } else { %>
-    <div class="bm-backs" aria-hidden="true">
-      <% [0, 1, 2, 3].forEach(() => { %><div class="bm-back"><span>?</span></div><% }) %>
-    </div>
   <% } %>
-</section>
+</<%= bm.open ? 'details' : 'section' %>>
 <% } %>
 
 <div class="trade-layout">
