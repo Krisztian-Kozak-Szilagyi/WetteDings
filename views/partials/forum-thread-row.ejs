@@ -1,0 +1,14 @@
+<%# Eine Themenzeile (Bereich, Suche). locals: t (Thema mit unread), sub (optional: Text statt „von … · Datum“) %>
+<li class="forum-trow <%= t.unread ? 'is-unread' : 'is-read' %>">
+  <span class="forum-trow-main">
+    <a class="forum-trow-title forum-stretch" href="/forum/t/<%= t._id %>">
+      <% if (t.pinned) { %><span class="forum-pin" title="Angepinnt"><%- include('forum-icon', { name: 'pin' }) %></span><% } %>
+      <% if (t.locked) { %><span class="forum-lock" title="Geschlossen"><%- include('forum-icon', { name: 'lock', size: 13 }) %></span><% } %>
+      <span class="forum-ellipsis"><%= t.title %></span>
+      <% if (t.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %>
+    </a>
+    <span class="forum-sub"><% if (locals.sub) { %><%= sub %><% } else { %>von <%- userLink(t.authorName) %> · <%= date(t.createdAt) %><% } %></span>
+  </span>
+  <span class="forum-count"><%= t.replyCount %> <%= t.replyCount === 1 ? 'Antwort' : 'Antworten' %><% if (t.upvotes && t.upvotes.length) { %><br><%= t.upvotes.length %> Upvotes<% } %></span>
+  <a class="forum-last" href="/forum/t/<%= t._id %>?seite=letzte" title="Zum letzten Beitrag"><%= t.lastPostByName %> · <%= relTime(t.lastPostAt) %></a>
+</li>

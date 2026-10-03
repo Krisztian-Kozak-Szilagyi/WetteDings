@@ -1,55 +1,50 @@
 <%- include('partials/head') %>
 <% const link = (p) => '/forum/k/' + cat._id + '?seite=' + p; %>
 
-<nav class="forum-crumbs muted small" aria-label="Pfad">
-  <a href="/forum">Forum</a> ›
-  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a> › <% } %>
+<div class="forum-page forum-narrow">
+<nav class="forum-crumbs" aria-label="Pfad">
+  <a href="/forum">Forum</a><span>›</span>
+  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a><span>›</span><% } %>
   <span><%= cat.title %></span>
 </nav>
 
-<div class="page-head">
-  <div>
-    <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="tag">Team</span><% } %></h1>
-    <% if (cat.description) { %><span class="muted"><%= cat.description %></span><% } %>
+<div class="forum-head">
+  <div class="forum-head-text">
+    <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="forum-team">Team</span><% } %></h1>
+    <% if (cat.description) { %><span class="forum-head-desc"><%= cat.description %></span><% } %>
   </div>
-  <% if (canCreate) { %><a class="btn btn-primary btn-sm" href="/forum/k/<%= cat._id %>/neu">+ Neues Thema</a><% } %>
+  <% if (canCreate) { %><a class="btn btn-primary" href="/forum/k/<%= cat._id %>/neu">+ Neues Thema</a><% } %>
 </div>
 
 <% if (subs.length) { %>
-  <section class="card forum-section">
-    <ul class="forum-list">
+  <section class="forum-group">
+    <div class="forum-group-head forum-label">Unterbereiche</div>
+    <ul class="forum-rows">
       <% subs.forEach((c) => { const s = c.stats; %>
-        <li class="forum-row <%= s.unread ? 'is-unread' : 'is-read' %>">
-          <div class="forum-row-main">
-            <a class="forum-row-title" href="/forum/k/<%= c._id %>"><%= c.title %></a>
-            <% if (c.description) { %><span class="muted small"><%= c.description %></span><% } %>
-          </div>
-          <div class="forum-row-count muted small"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></div>
-          <div class="forum-row-last muted small">
-            <% if (s.last) { %><a href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a><br><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %><% } else { %>noch keine Themen<% } %>
-          </div>
+        <li class="forum-crow <%= s.unread ? 'is-unread' : 'is-read' %>">
+          <span class="forum-trow-main">
+            <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
+            <% if (c.description) { %><span class="forum-sub"><%= c.description %></span><% } %>
+          </span>
+          <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
+          <span class="forum-crow-last">
+            <% if (s.last) { %>
+              <a class="forum-last" href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a>
+              <span class="forum-sub"><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %></span>
+            <% } else { %><span class="forum-sub">noch keine Themen</span><% } %>
+          </span>
         </li>
       <% }) %>
     </ul>
   </section>
 <% } %>
 
-<section class="card forum-section">
+<section class="forum-group">
+  <div class="forum-thead"><span>Thema</span><span>Antworten</span><span>Letzter Beitrag</span></div>
   <% if (!threads.length) { %>
-    <p class="muted forum-empty"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Hier gibt es noch keine Themen.' %><%= canCreate ? ' Eröffne das erste über „+ Neues Thema“.' : '' %></p>
+    <p class="forum-empty"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Noch keine Themen.' %><%= canCreate ? ' Mach den Anfang!' : '' %></p>
   <% } else { %>
-    <ul class="forum-list">
-      <% threads.forEach((t) => { %>
-        <li class="forum-row <%= t.unread ? 'is-unread' : 'is-read' %>">
-          <div class="forum-row-main">
-            <a class="forum-row-title" href="/forum/t/<%= t._id %>"><% if (t.pinned) { %><span class="tag">Angepinnt</span> <% } %><% if (t.locked) { %><span class="tag">Geschlossen</span> <% } %><%= t.title %></a>
-            <span class="muted small">von <%- userLink(t.authorName) %> · <%= date(t.createdAt) %></span>
-          </div>
-          <div class="forum-row-count muted small"><%= t.replyCount %> <%= t.replyCount === 1 ? 'Antwort' : 'Antworten' %><% if (t.upvotes.length) { %> · <%= t.upvotes.length %> Upvotes<% } %></div>
-          <div class="forum-row-last muted small"><a href="/forum/t/<%= t._id %>?seite=letzte">Letzter Beitrag</a><br><%= t.lastPostByName %> · <%= relTime(t.lastPostAt) %></div>
-        </li>
-      <% }) %>
-    </ul>
+    <ul class="forum-rows"><% threads.forEach((t) => { %><%- include('partials/forum-thread-row', { t }) %><% }) %></ul>
   <% } %>
   <% if (pages > 1) { %>
     <div class="log-pager">
@@ -84,5 +79,7 @@
     <% } %>
   </details>
 <% } %>
+
+</div>
 
 <%- include('partials/foot') %>

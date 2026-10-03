@@ -6,7 +6,7 @@ const { requireLogin } = require('../middleware');
 const { requireReauth } = require('../middleware/reauth');
 const forum = require('../forum/forumService');
 const { render, tagsFor } = require('../forum/render');
-const { str, UserError } = require('../lib/util');
+const { str, escapeRegex, UserError } = require('../lib/util');
 
 const router = express.Router();
 router.use('/forum', requireLogin);
@@ -63,11 +63,19 @@ const EMPTY = { threads: 0, posts: 0, last: null, unread: 0 };
 
 // ---------- Übersicht ----------
 router.get('/forum', async (req, res) => {
-  const [cats, stats, reports] = await Promise.all([
+  const q = str(req.query.q).trim().slice(0, 80);
+  const pick = 'category title authorName createdAt replyCount lastPostAt lastPostByName pinned locked';
+  const [cats, stats, reports, reads, latest, found] = await Promise.all([
     ForumCategory.find().sort({ order: 1, createdAt: 1 }).lean(),
     categoryStats(req.user),
     req.user.canModerate ? forum.openReportCount() : 0,
+    forum.readMap(req.user._id),
+    ForumThread.find({ deleted: false }).sort({ createdAt: -1 }).limit(6).select(pick).lean(),
+    // Suche: nur in Thementiteln
+    q ? ForumThread.find({ deleted: false, title: new RegExp(escapeRegex(q), 'i') }).sort({ lastPostAt: -1 }).limit(40).select(pick).lean() : null,
   ]);
+  const catTitle = new Map(cats.map((c) => [String(c._id), c.title]));
+  const withRead = (t) => ({ ...t, unread: forum.isUnread(reads, t), catTitle: catTitle.get(String(t.category)) || '' });
   const withStats = (c) => ({ ...c, stats: stats.get(String(c._id)) || EMPTY });
   const roots = cats
     .filter((c) => !c.parent)
@@ -80,6 +88,11 @@ router.get('/forum', async (req, res) => {
     title: 'Forum',
     roots,
     reports,
+    q,
+    results: found ? found.map(withRead) : null,
+    latest: latest.map(withRead),
+    // Bereiche, in denen dieses Mitglied Themen eröffnen darf (Auswahl bei „+ Neues Thema“)
+    newChoices: cats.filter((c) => forum.can.createThread(req.user, c)),
     canManage: forum.can.manage(req.user),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
     // Hauptbereiche, unter denen dieses Mitglied Unterbereiche anlegen darf

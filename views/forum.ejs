@@ -1,56 +1,108 @@
 <%- include('partials/head') %>
 
-<div class="page-head">
+<div class="forum-page">
+<div class="forum-head">
   <h1>Forum</h1>
-  <% if (currentUser.canModerate) { %>
-    <a class="btn btn-ghost btn-sm nav-badge-link" href="/forum/meldungen">Meldungen<% if (reports) { %><span class="nav-badges"><span class="nav-badge" aria-label="<%= reports %> offene Meldungen"><%= reports > 99 ? '99+' : reports %></span></span><% } %></a>
-  <% } else { %>
-    <span class="muted">Weiß = Neues für dich, grau = schon gelesen</span>
-  <% } %>
+  <div class="forum-head-actions">
+    <% if (currentUser.canModerate) { %>
+      <a class="btn btn-secondary" href="/forum/meldungen">Meldungen<% if (reports) { %><span class="forum-report-count" aria-label="<%= reports %> offene Meldungen"><%= reports > 99 ? '99+' : reports %></span><% } %></a>
+    <% } %>
+    <% if (newChoices.length) { %><button type="button" class="btn btn-primary" data-dialog-open="neues-thema">+ Neues Thema</button><% } %>
+  </div>
 </div>
 
-<% roots.forEach((root) => { %>
-  <section class="card forum-section <%= root.staffOnly ? 'forum-staff' : '' %>">
-    <div class="forum-section-head">
-      <h2 class="<%= root.unread ? '' : 'is-read' %>"><a href="/forum/k/<%= root._id %>"><%= root.title %></a><% if (root.staffOnly) { %> <span class="tag">Team</span><% } %></h2>
-      <% if (root.description) { %><p class="muted small"><%= root.description %></p><% } %>
-    </div>
-    <ul class="forum-list">
-      <% [root, ...root.subs].forEach((c, i) => { const s = c.stats; if (i === 0 && !s.threads && root.subs.length) return; %>
-        <li class="forum-row <%= s.unread ? 'is-unread' : 'is-read' %>">
-          <div class="forum-row-main">
-            <a class="forum-row-title" href="/forum/k/<%= c._id %>"><%= i === 0 ? 'Themen direkt in „' + c.title + '“' : c.title %></a>
-            <% if (i > 0 && c.description) { %><span class="muted small"><%= c.description %></span><% } %>
-          </div>
-          <div class="forum-row-count muted small"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></div>
-          <div class="forum-row-last muted small">
-            <% if (s.last) { %><a href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a><br><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %><% } else { %>noch keine Themen<% } %>
-          </div>
-        </li>
-      <% }) %>
-    </ul>
-  </section>
-<% }) %>
+<form class="forum-search" method="get" action="/forum" role="search">
+  <span class="forum-search-icon"><%- include('partials/forum-icon', { name: 'search', size: 16 }) %></span>
+  <input class="input" type="search" name="q" value="<%= q %>" maxlength="80" placeholder="Themen durchsuchen …" aria-label="Themen durchsuchen">
+</form>
 
-<% if (canManage) { %>
-  <details class="card fold" id="bereiche">
-    <summary><h2>Neuen Bereich anlegen</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
-    <form method="post" action="/forum/bereiche" class="form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
-      <label class="field"><span>Beschreibung (optional)</span><input type="text" name="description" maxlength="200"></label>
-      <label class="field">
-        <span>Gehört zu</span>
-        <select name="parent">
-          <option value="">– eigener Hauptbereich –</option>
-          <% parentChoices.forEach((c) => { %><option value="<%= c._id %>">Unterbereich von „<%= c.title %>“</option><% }) %>
-        </select>
-      </label>
-      <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="10"></label>
-      <% if (canSetStaffOnly) { %><label class="check"><input type="checkbox" name="staffOnly" value="1"><span>Team-Bereich: Nur Admin und Devs eröffnen hier Themen (antworten dürfen alle).</span></label><% } %>
-      <button class="btn btn-primary" type="submit">Bereich anlegen</button>
-    </form>
-  </details>
+<div class="forum-layout">
+  <div class="forum-main">
+    <% if (results) { %>
+      <section class="forum-group">
+        <div class="forum-group-head forum-label"><%= results.length %><%= results.length === 40 ? '+' : '' %> Treffer für „<%= q %>“ · <a href="/forum">Suche aufheben</a></div>
+        <% if (results.length) { %>
+          <ul class="forum-rows"><% results.forEach((t) => { %><%- include('partials/forum-thread-row', { t, sub: t.catTitle + ' · von ' + t.authorName }) %><% }) %></ul>
+        <% } else { %>
+          <p class="forum-empty">Kein Thema gefunden.</p>
+        <% } %>
+      </section>
+    <% } else { %>
+      <% roots.forEach((root) => { %>
+        <section class="forum-group">
+          <div class="forum-group-head">
+            <h2><a href="/forum/k/<%= root._id %>"><%= root.title %></a></h2>
+            <% if (root.staffOnly) { %><span class="forum-team">Team</span><% } %>
+            <% if (root.description) { %><span class="forum-group-desc"><%= root.description %></span><% } %>
+          </div>
+          <ul class="forum-rows">
+            <% [root, ...root.subs].forEach((c, i) => { const s = c.stats; if (i === 0 && !s.threads && root.subs.length) return; %>
+              <li class="forum-crow <%= s.unread ? 'is-unread' : 'is-read' %>">
+                <span class="forum-trow-main">
+                  <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= i === 0 && root.subs.length ? 'Themen direkt in „' + c.title + '“' : c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
+                  <% if (i > 0 && c.description) { %><span class="forum-sub"><%= c.description %></span><% } %>
+                </span>
+                <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
+                <span class="forum-crow-last">
+                  <% if (s.last) { %>
+                    <a class="forum-last" href="/forum/t/<%= s.last._id %>?seite=letzte"><%= s.last.title %></a>
+                    <span class="forum-sub"><%= s.last.lastPostByName %> · <%= relTime(s.last.lastPostAt) %></span>
+                  <% } else { %><span class="forum-sub">noch keine Themen</span><% } %>
+                </span>
+              </li>
+            <% }) %>
+          </ul>
+        </section>
+      <% }) %>
+    <% } %>
+
+    <% if (canManage) { %>
+      <details class="card fold" id="bereiche">
+        <summary><h2>Neuen Bereich anlegen</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+        <form method="post" action="/forum/bereiche" class="form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
+          <label class="field"><span>Beschreibung (optional)</span><input type="text" name="description" maxlength="200"></label>
+          <label class="field">
+            <span>Gehört zu</span>
+            <select name="parent">
+              <option value="">– eigener Hauptbereich –</option>
+              <% parentChoices.forEach((c) => { %><option value="<%= c._id %>">Unterbereich von „<%= c.title %>“</option><% }) %>
+            </select>
+          </label>
+          <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="10"></label>
+          <% if (canSetStaffOnly) { %><label class="check"><input type="checkbox" name="staffOnly" value="1"><span>Team-Bereich: Nur Admin und Devs eröffnen hier Themen (antworten dürfen alle).</span></label><% } %>
+          <button class="btn btn-primary" type="submit">Bereich anlegen</button>
+        </form>
+      </details>
+    <% } %>
+  </div>
+
+  <aside class="forum-side">
+    <p class="forum-label">Neueste Themen</p>
+    <% if (!latest.length) { %><p class="forum-empty">Noch keine Themen.</p><% } %>
+    <% latest.forEach((t) => { %>
+      <a class="forum-latest <%= t.unread ? 'is-unread' : '' %>" href="/forum/t/<%= t._id %>">
+        <span class="forum-latest-title"><span class="forum-ellipsis"><%= t.title %></span><% if (t.unread) { %><span class="forum-dot"></span><% } %></span>
+        <span class="forum-sub"><%= t.catTitle %> · <%= relTime(t.createdAt) %></span>
+      </a>
+    <% }) %>
+  </aside>
+</div>
+</div>
+
+<% if (newChoices.length) { %>
+<dialog class="dialog" id="neues-thema" aria-labelledby="neues-thema-title">
+  <div class="dialog-head">
+    <h2 id="neues-thema-title">Neues Thema – in welchem Bereich?</h2>
+    <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+  </div>
+  <div class="forum-choose">
+    <% newChoices.forEach((c) => { %>
+      <a href="/forum/k/<%= c._id %>/neu"><b><%= c.title %></b><% if (c.description) { %><span class="forum-sub"><%= c.description %></span><% } %></a>
+    <% }) %>
+  </div>
+</dialog>
 <% } %>
 
 <%- include('partials/foot') %>
