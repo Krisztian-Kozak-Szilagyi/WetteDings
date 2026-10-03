@@ -297,42 +297,52 @@
     renumber();
   }
 
-  // Einsatz-Formular: Schnellbeträge + Gewinnschätzung
+  // Einsatz-Formular: Schnellbeträge, möglicher Gewinn, Bestätigung in zwei Schritten
   var euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   document.querySelectorAll('.stake-form').forEach(function (form) {
     var input = form.querySelector('input[name="amount"]');
     var out = form.querySelector('.estimate');
+    var winEl = form.querySelector('[data-win]');
+    var quoteEl = form.querySelector('[data-win-quote]');
+    var stepForm = form.querySelector('[data-stake-step="form"]');
+    var stepConfirm = form.querySelector('[data-stake-step="confirm"]');
     var max = Number(input.max) || Infinity;
+    var last = null; // letzte Berechnung für die Bestätigung
+
+    function setWin(text, quote) {
+      if (winEl) winEl.textContent = text;
+      if (quoteEl) quoteEl.textContent = quote || '';
+    }
 
     function update() {
       // Werte bei jedem Aufruf frisch lesen – sie werden durch die Live-Aktualisierung erneuert
       var totals = {};
       try { totals = JSON.parse(form.dataset.totals || '{}'); } catch (e) { totals = {}; }
-      var pot = Object.keys(totals).reduce(function (s, k) { return s + Number(totals[k] || 0); }, 0);
+      var pot = Object.keys(totals).reduce(function (sum, k) { return sum + Number(totals[k] || 0); }, 0);
       var feePct = (Number(form.dataset.fee) || 0) / 100;
       var mySide = form.dataset.mySide || '';
       var myAmount = Number(form.dataset.myAmount) || 0;
       var r = form.querySelector('input[name="side"]:checked');
       var cents = Math.round((parseFloat(String(input.value).replace(',', '.')) || 0) * 100);
-      if (!r || cents <= 0) { out.textContent = ''; return; }
-      var s = r.value;
-      var label = r.dataset.label || s;
-      var mine = Number(totals[s] || 0) + cents;
-      var other = pot - Number(totals[s] || 0);
-      var stake = cents + (s === mySide ? myAmount : 0);
       out.textContent = '';
+      last = null;
+      if (!r || cents <= 0) { setWin('–', ''); return; }
+      var side = r.value;
+      var label = r.dataset.label || side;
+      var mine = Number(totals[side] || 0) + cents;
+      var other = pot - Number(totals[side] || 0);
+      var stake = cents + (side === mySide ? myAmount : 0);
+      last = { label: label, cents: cents, payout: null };
       if (other === 0) {
+        setWin(euro.format(0), '');
         out.textContent = 'Noch hat niemand anders gesetzt – ohne Gegenseite gibt es nur den Einsatz zurück.';
         return;
       }
       // Provision höchstens so hoch wie die Einsätze der Gegenseite -> Gewinner bekommen nie weniger als ihren Einsatz
       var fee = Math.min((mine + other) * feePct, other);
       var payout = Math.floor(stake * (mine + other - fee) / mine);
-      out.append('Wenn ');
-      var b1 = document.createElement('strong'); b1.textContent = '„' + label + '“'; out.append(b1);
-      out.append(' eintritt, bekommst du nach aktuellem Stand ca. ');
-      var b2 = document.createElement('strong'); b2.textContent = euro.format(payout / 100); out.append(b2);
-      out.append(' (Gewinn ' + euro.format((payout - stake) / 100) + ').');
+      last.payout = payout;
+      setWin(euro.format((payout - stake) / 100), 'Quote ' + (payout / stake).toFixed(2).replace('.', ',') + '× · Auszahlung ' + euro.format(payout / 100));
     }
 
     form.querySelectorAll('[data-add]').forEach(function (b) {
@@ -352,6 +362,32 @@
     form.querySelectorAll('input[name="side"]').forEach(function (r) { r.addEventListener('change', update); });
     document.addEventListener('live:updated', update);
     update();
+
+    // Schritt 1 „Weiter“ zeigt die Zusammenfassung, Schritt 2 „Bestätigen“ sendet ab
+    if (stepForm && stepConfirm) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.confirmed === '1') return;
+        if (!form.checkValidity()) return;
+        e.preventDefault();
+        update();
+        if (!last) return;
+        form.querySelector('[data-confirm-amount]').textContent = euro.format(last.cents / 100);
+        form.querySelector('[data-confirm-label]').textContent = last.label;
+        form.querySelector('[data-confirm-win]').textContent = last.payout !== null
+          ? 'Möglicher Gewinn nach aktuellem Stand: ' + (winEl ? winEl.textContent : '') + '. Die Quote kann sich noch ändern.'
+          : 'Noch keine Gegenseite – ohne Gegenseite gibt es nur den Einsatz zurück.';
+        stepForm.hidden = true;
+        stepConfirm.hidden = false;
+        stepConfirm.querySelector('[data-stake-confirm]').focus();
+      });
+      stepConfirm.querySelector('[data-stake-confirm]').addEventListener('click', function () {
+        form.dataset.confirmed = '1';
+      });
+      stepConfirm.querySelector('[data-stake-back]').addEventListener('click', function () {
+        stepConfirm.hidden = true;
+        stepForm.hidden = false;
+      });
+    }
   });
 
   // Lotterie: Anzahl-Schnellwahl und Kostenanzeige

@@ -48,42 +48,24 @@
 
 <div class="bet-layout">
   <section class="bet-main">
-    <div class="card">
+    <div class="bet-head-wrap">
       <div data-live="bet-head">
-      <div class="bet-card-top">
+      <div class="bet-meta">
         <span class="badge badge-<%= st.key %>"><%= st.label %></span>
-        <span class="muted small">von <strong><%- userLink(bet.creatorName) %></strong> · <%= date(bet.createdAt) %></span>
+        <span aria-hidden="true">·</span>
+        <span>von <strong><%- userLink(bet.creatorName) %></strong></span>
+        <span aria-hidden="true">·</span>
+        <span><%= date(bet.createdAt) %></span>
+        <% if (bet.groupName) { %><span class="tag tag-group" title="Diese Wette sehen nur die Mitglieder der Gruppe.">Gruppe: <%= bet.groupName %></span><% } %>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
-      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole, canTip, myTip }) %><% } %>
-      <% if (bet.groupName) { %><p class="bet-group-note"><span class="tag tag-group">Gruppe: <%= bet.groupName %></span> <span class="muted small">Diese Wette sehen nur die Mitglieder der Gruppe.</span></p><% } %>
       <% if (bet.description) { %>
         <p class="bet-desc"><%= bet.description %></p>
         <% if (descEdited) { %><p class="muted small edited-hint">Beschreibung nachträglich bearbeitet – siehe Änderungsverlauf.</p><% } %>
       <% } %>
+      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole, canTip, myTip }) %><% } %>
 
-      <% if (!bet.duel) { %>
-      <p class="muted small">
-        <% if (isJaNein) { %>Ja/Nein-Wette.<% } else { %>Wette mit <%= bet.options.length %> Optionen.<% } %>
-        <% if (legacyCreatorBet) { %>
-          <%= bet.creatorName %> setzt auf <strong class="opt-text <%= optClass(bet, bet.creatorSide) %>"><%= optionLabel(bet, bet.creatorSide) %></strong>.
-        <% } else if (bet.referee) { %>
-          Wettersteller <%= bet.creatorName %> und Schiedsrichter <%= bet.refereeName %> setzen nicht mit<% if (feePct) { %> und teilen sich <%= feePct %> % vom Topf als Provision<% } %>.
-        <% } else { %>
-          Wettersteller <%= bet.creatorName %> setzt nicht mit<% if (feePct) { %> und erhält <%= feePct %> % vom Topf als Provision<% } %>.
-        <% } %>
-      </p>
-
-      <% if (bet.referee) { %>
-        <p class="muted small referee-line">
-          Schiedsrichter: <strong><%- userLink(bet.refereeName) %></strong> – bestätigt das Ergebnis gemeinsam mit <%= bet.creatorName %>.
-          Nur wenn beide dasselbe eintragen, wird ausgezahlt; sonst entscheidet ein Dev.
-        </p>
-      <% } else { %>
-        <p class="muted small referee-line">Wette ohne Schiedsrichter (vor Einführung des Verfahrens aufgestellt) – hier entscheidet der Wettersteller allein.</p>
-      <% } %>
-      <% } %>
-
+      <div class="bet-facts">
       <div class="dates">
         <% if (!bet.duel) { %>
         <div class="date-box <%= st.key === 'offen' ? 'is-next' : 'is-past' %>">
@@ -113,14 +95,17 @@
       </div>
 
       <% if (!bet.duel) { %>
-      <div class="stats stats-2">
+      <div class="bet-stats">
         <div class="stat"><span class="stat-label">Topf</span><span class="stat-value"><%= euro(total) %></span></div>
         <div class="stat"><span class="stat-label">Teilnehmende</span><span class="stat-value"><%= bet.participants %></span></div>
       </div>
+      <% } %>
+      </div>
 
+      <% if (!bet.duel) { %>
       <div class="pool">
         <% bet.options.forEach((o) => { %>
-          <div class="pool-side <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'winner' : '' %>">
+          <div class="pool-side <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'winner' : '' %> <%= myPosition && myPosition.side === o.key ? 'is-mine' : '' %>">
             <span class="pool-label"><%= o.label %><% if (bet.outcome === o.key) { %> ✓<% } %></span>
             <span class="pool-amount"><%= euro(o.total) %></span>
             <span class="pool-quote"><%= share(bet, o) %> % · Quote <%= quote(bet, o) %></span>
@@ -129,6 +114,25 @@
       </div>
       <%- include('partials/bar', { bet, big: true }) %>
       <% if (!total && !settled) { %><p class="muted small">Noch keine Einsätze – sei die erste Person, die setzt!</p><% } %>
+
+      <details class="bet-rules">
+        <summary>Regeln &amp; Provision</summary>
+        <p>
+          <% if (isJaNein) { %>Ja/Nein-Wette.<% } else { %>Wette mit <%= bet.options.length %> Optionen.<% } %>
+          <% if (legacyCreatorBet) { %>
+            <%= bet.creatorName %> setzt auf <strong class="opt-text <%= optClass(bet, bet.creatorSide) %>"><%= optionLabel(bet, bet.creatorSide) %></strong>.
+          <% } else if (bet.referee) { %>
+            Wettersteller <%= bet.creatorName %> und Schiedsrichter <%= bet.refereeName %> setzen nicht mit<% if (feePct) { %> und teilen sich <%= feePct %> % vom Topf als Provision<% } %>.
+          <% } else { %>
+            Wettersteller <%= bet.creatorName %> setzt nicht mit<% if (feePct) { %> und erhält <%= feePct %> % vom Topf als Provision<% } %>.
+          <% } %>
+        </p>
+        <% if (bet.referee) { %>
+          <p>Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong> bestätigt das Ergebnis gemeinsam mit <%= bet.creatorName %>. Nur wenn beide dasselbe eintragen, wird ausgezahlt – sonst entscheidet ein Dev.</p>
+        <% } else { %>
+          <p>Wette ohne Schiedsrichter (vor Einführung des Verfahrens aufgestellt) – hier entscheidet der Wettersteller allein.</p>
+        <% } %>
+      </details>
       <% } %>
 
       <%
@@ -206,40 +210,32 @@
     </div>
 
     <% if (!bet.duel) { %>
-    <div class="card" data-live="participants">
+    <div class="bet-section-box" data-live="participants">
       <h2>Teilnehmende</h2>
       <% if (!positions.length) { %>
         <p class="muted">Noch hat niemand gesetzt.</p>
       <% } else { %>
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr><th>Name</th><th>Option</th><th class="num">Einsatz</th><th class="num"><%= settled ? 'Auszahlung' : 'Anteil' %></th></tr>
-          </thead>
-          <tbody>
-            <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; %>
-              <tr class="<%= myPosition && String(p._id) === String(myPosition._id) ? 'me' : '' %>">
-                <td><%- userLink(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></td>
-                <td><span class="pill <%= optClass(bet, p.side) %>"><%= optionLabel(bet, p.side) %></span></td>
-                <td class="num"><%= euro(p.amount) %></td>
-                <td class="num">
-                  <% if (settled) { %>
-                    <span class="<%= p.payout > p.amount ? 'pos' : (p.payout === 0 ? 'neg' : '') %>"><%= euro(p.payout) %></span>
-                  <% } else { %>
-                    <%= optTotal ? Math.round(p.amount / optTotal * 100) : 0 %> %
-                  <% } %>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+      <ul class="bet-people">
+        <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; const me = myPosition && String(p._id) === String(myPosition._id); %>
+          <li class="<%= me ? 'me' : '' %>">
+            <span class="bet-people-name"><%- userLink(p.username) %><% if (me) { %> <span class="tag tag-me">Du</span><% } %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></span>
+            <span class="bet-people-opt <%= optClass(bet, p.side) %>"><span class="opt-dot"></span><%= optionLabel(bet, p.side) %></span>
+            <span class="bet-people-amt"><%= euro(p.amount) %>
+              <% if (settled) { %>
+                <small class="<%= p.payout > p.amount ? 'pos' : (p.payout === 0 ? 'neg' : '') %>">→ <%= euro(p.payout) %></small>
+              <% } else { %>
+                <small><%= optTotal ? Math.round(p.amount / optTotal * 100) : 0 %> %</small>
+              <% } %>
+            </span>
+          </li>
+        <% }) %>
+      </ul>
       <% } %>
     </div>
     <% } %>
 
-    <div class="card" id="kommentare">
-      <h2>Kommentare <span class="muted" data-live="comment-count">(<%= bet.commentCount || 0 %>)</span></h2>
+    <div class="bet-section-box" id="kommentare">
+      <h2>Kommentare <span class="muted" data-live="comment-count"><%= bet.commentCount || 0 %></span></h2>
       <div data-live="comments">
       <% if (!comments.length) { %>
         <p class="muted">Noch keine Kommentare. Schreib den ersten!</p>
@@ -291,33 +287,36 @@
 
   <aside class="bet-side">
     <% if (isOwner && !legacyCreatorBet && !bet.duel) { %>
-      <div class="card card-accent" data-live="owner-card">
+      <div class="card card-accent role-card" data-live="owner-card">
+        <span class="kicker">Deine Rolle</span>
         <h2>Deine Wette</h2>
         <% if (settled) { %>
-          <p>Deine Provision: <strong class="<%= bet.creatorFee ? 'pos' : '' %>"><%= euro(bet.creatorFee || 0) %></strong></p>
+          <div class="role-fee"><span>Deine Provision</span><strong class="<%= bet.creatorFee ? 'pos' : '' %>"><%= euro(bet.creatorFee || 0) %></strong></div>
         <% } else { %>
-          <p>Du bist Wettersteller und kannst nicht selbst mitsetzen.</p>
-          <% if (bet.referee) { %>
-            <p class="muted">Das Ergebnis trägst du gemeinsam mit <strong><%- userLink(bet.refereeName) %></strong> ein – ausgezahlt wird nur, wenn ihr dasselbe eintragt.</p>
-          <% } %>
+          <p class="role-text">Du setzt nicht mit<% if (bet.referee) { %> und bestätigst das Ergebnis mit <strong><%- userLink(bet.refereeName) %></strong><% } %>.</p>
           <% if (feePct) { %>
-            <p class="muted">Dein Provisionsanteil nach aktuellem Stand: bis zu <strong><%= euro(fees.creator) %></strong><% if (bet.referee) { %> (die Hälfte von <%= feePct %> % des Topfes, die andere Hälfte geht an <%= bet.refereeName %>)<% } else { %> (<%= feePct %> % vom Topf)<% } %>, höchstens die Einsätze der Verlierer. Ausgezahlt wird sie, wenn das Ergebnis feststeht – nicht bei Annullierung oder wenn es keine Gegenseite gibt.</p>
+            <div class="role-fee" title="<%= bet.referee ? 'Die Hälfte von ' + feePct + ' % des Topfes, die andere Hälfte geht an ' + bet.refereeName : feePct + ' % vom Topf' %>, höchstens die Einsätze der Verlierer. Ausgezahlt, wenn das Ergebnis feststeht – nicht bei Annullierung oder ohne Gegenseite.">
+              <span>Provision bis zu</span><strong><%= euro(fees.creator) %></strong>
+            </div>
           <% } %>
         <% } %>
       </div>
     <% } %>
 
     <% if (isReferee) { %>
-      <div class="card card-accent" data-live="referee-card">
+      <div class="card card-accent role-card" data-live="referee-card">
+        <span class="kicker">Deine Rolle</span>
         <h2>Du bist Schiedsrichter</h2>
         <% if (settled) { %>
-          <p>Deine Provision: <strong class="<%= bet.refereeFee ? 'pos' : '' %>"><%= euro(bet.refereeFee || 0) %></strong></p>
+          <div class="role-fee"><span>Deine Provision</span><strong class="<%= bet.refereeFee ? 'pos' : '' %>"><%= euro(bet.refereeFee || 0) %></strong></div>
         <% } else if (bet.duel) { %>
-          <p>Du entscheidest dieses Duell allein: Hat <strong><%= bet.creatorName %></strong> recht oder <strong><%= bet.duel.opponentName %></strong>?</p>
-          <p class="muted">Dafür bekommst du <%= feePct %> % vom Topf (<strong><%= euro(fees.referee) %></strong>) – nicht bei Annullierung.</p>
+          <p class="role-text">Du entscheidest dieses Duell allein: Hat <strong><%= bet.creatorName %></strong> recht oder <strong><%= bet.duel.opponentName %></strong>?</p>
+          <div class="role-fee" title="<%= feePct %> % vom Topf – nicht bei Annullierung."><span>Provision</span><strong><%= euro(fees.referee) %></strong></div>
         <% } else { %>
-          <p>Du bestätigst gemeinsam mit <strong><%- userLink(bet.creatorName) %></strong>, was eingetreten ist.</p>
-          <p class="muted">Du kannst hier nicht mitsetzen<% if (feePct) { %>, bekommst aber nach aktuellem Stand bis zu <strong><%= euro(fees.referee) %></strong> Provision (die Hälfte von <%= feePct %> % des Topfes)<% } %>. Ausgezahlt wird nur, wenn ihr beide dasselbe Ergebnis eintragt – sonst entscheidet ein Dev.</p>
+          <p class="role-text">Du bestätigst mit <strong><%- userLink(bet.creatorName) %></strong> das Ergebnis und setzt nicht mit.</p>
+          <% if (feePct) { %>
+            <div class="role-fee" title="Die Hälfte von <%= feePct %> % des Topfes. Ausgezahlt nur, wenn ihr beide dasselbe Ergebnis eintragt – sonst entscheidet ein Dev."><span>Provision bis zu</span><strong><%= euro(fees.referee) %></strong></div>
+          <% } %>
         <% } %>
       </div>
     <% } %>
@@ -342,42 +341,54 @@
     <% } %>
 
     <% if (perms.stake) { %>
-      <div class="card">
-        <h2><%= myPosition ? 'Einsatz erhöhen' : 'Jetzt setzen' %></h2>
+      <div class="card stake-card">
+        <div class="stake-head"><span class="kicker"><%= myPosition ? 'Einsatz erhöhen' : 'Einsatz setzen' %></span><span>Schluss <%= relTime(bet.deadline) %></span></div>
         <form method="post" action="/wetten/<%= bet._id %>/setzen" class="stake-form" data-live-attrs="stake-form"
               data-totals="<%= JSON.stringify(totals) %>" data-fee="<%= feePct %>"
               data-my-side="<%= myPosition ? myPosition.side : '' %>" data-my-amount="<%= myPosition ? myPosition.amount : 0 %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <fieldset class="side-picker <%= bet.options.length > 2 ? 'side-picker-many' : '' %>">
-            <legend class="sr-only">Option wählen</legend>
-            <% bet.options.forEach((o) => {
-                 const locked = myPosition && myPosition.side !== o.key;
-                 const checked = myPosition ? myPosition.side === o.key : (legacyCreatorBet && isJaNein && o.key !== bet.creatorSide);
-                 let sub = '';
-                 if (legacyCreatorBet) sub = o.key === bet.creatorSide ? (isJaNein ? 'Mitgehen' : 'Tipp von ' + bet.creatorName) : (isJaNein ? 'Dagegenhalten' : ''); %>
-              <label class="side-option <%= optClass(bet, o.key) %> <%= locked ? 'locked' : '' %>">
-                <input type="radio" name="side" value="<%= o.key %>" data-label="<%= o.label %>" <%= checked ? 'checked' : '' %> <%= locked ? 'disabled' : '' %> required>
-                <span class="side-option-title"><%= o.label %></span>
-                <% if (sub) { %><span class="side-option-sub"><%= sub %></span><% } %>
-                <span class="side-option-quote" data-live="quote-<%= o.key %>"><%= quote(bet, o) %></span>
-              </label>
-            <% }) %>
-          </fieldset>
+          <div data-stake-step="form">
+            <fieldset class="side-picker stake-options">
+              <legend class="sr-only">Option wählen</legend>
+              <% bet.options.forEach((o) => {
+                   const locked = myPosition && myPosition.side !== o.key;
+                   const checked = myPosition ? myPosition.side === o.key : (legacyCreatorBet && isJaNein && o.key !== bet.creatorSide);
+                   let sub = '';
+                   if (legacyCreatorBet) sub = o.key === bet.creatorSide ? (isJaNein ? 'Mitgehen' : 'Tipp von ' + bet.creatorName) : (isJaNein ? 'Dagegenhalten' : ''); %>
+                <label class="side-option <%= optClass(bet, o.key) %> <%= locked ? 'locked' : '' %>">
+                  <input type="radio" name="side" value="<%= o.key %>" data-label="<%= o.label %>" <%= checked ? 'checked' : '' %> <%= locked ? 'disabled' : '' %> required>
+                  <span class="side-option-ring" aria-hidden="true"></span>
+                  <span class="side-option-title"><%= o.label %><% if (sub) { %> <span class="side-option-sub"><%= sub %></span><% } %></span>
+                  <span class="side-option-quote" data-live="quote-<%= o.key %>"><%= quote(bet, o) %></span>
+                </label>
+              <% }) %>
+            </fieldset>
 
-          <label class="field">
-            <span>Einsatz in €</span>
-            <input type="number" name="amount" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= Math.min(10, currentUser.balance / 100) %>" required>
-          </label>
-          <div class="quick-amounts">
-            <button type="button" class="chip" data-add="5">+5</button>
-            <button type="button" class="chip" data-add="10">+10</button>
-            <button type="button" class="chip" data-add="50">+50</button>
-            <button type="button" class="chip" data-add="100">+100</button>
-            <button type="button" class="chip" data-set="<%= currentUser.balance / 100 %>">Alles</button>
+            <label class="field">
+              <span>Betrag in €</span>
+              <input type="number" name="amount" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= Math.min(10, currentUser.balance / 100) %>" required>
+            </label>
+            <div class="quick-amounts">
+              <button type="button" class="btn btn-ghost btn-sm" data-add="10">+10 €</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-add="50">+50 €</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-add="100">+100 €</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-set="<%= currentUser.balance / 100 %>">Alles</button>
+            </div>
+            <div class="stake-win">
+              <div class="stake-win-main"><span>Möglicher Gewinn</span><strong data-win>–</strong></div>
+              <div class="stake-win-sub"><span data-win-quote></span><span><% if (feePct) { %>nach <%= feePct %> % Provision<% } %></span></div>
+              <p class="estimate" aria-live="polite"></p>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" data-stake-next <%= currentUser.balance < minStake ? 'disabled' : '' %>>Weiter</button>
           </div>
-          <p class="estimate" aria-live="polite"></p>
-          <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < minStake ? 'disabled' : '' %>>Einsatz platzieren</button>
-          <p class="muted small">Verfügbar: <span data-live="stake-balance"><%= euro(currentUser.balance) %></span>. Die Quote kann sich bis zum Einsatzschluss noch ändern.<% if (feePct) { %> <%= feePct %> % des Topfes gehen als Provision an <%= bet.referee ? 'Wettersteller und Schiedsrichter' : 'den Wettersteller' %>.<% } %></p>
+          <div class="stake-confirm" data-stake-step="confirm" hidden>
+            <span class="kicker">Einsatz bestätigen</span>
+            <p class="stake-confirm-sum"><strong data-confirm-amount></strong> auf <b data-confirm-label></b></p>
+            <p class="muted small" data-confirm-win></p>
+            <button class="btn btn-primary btn-block btn-glow" type="submit" data-stake-confirm>Bestätigen</button>
+            <button class="btn btn-ghost btn-block" type="button" data-stake-back>Ändern</button>
+          </div>
+          <p class="muted small">Verfügbar: <span data-live="stake-balance"><%= euro(currentUser.balance) %></span>. Die Quote kann sich bis zum Einsatzschluss noch ändern.</p>
         </form>
       </div>
     <% } else if (!currentUser && accepting) { %>

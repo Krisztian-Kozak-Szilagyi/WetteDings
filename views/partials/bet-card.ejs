@@ -7,42 +7,29 @@
 %>
 <a class="bet-card <%= pick ? 'has-pick ' + optClass(bet, pick.side) : '' %>" href="/wetten/<%= bet._id %>">
   <div class="bet-card-top">
-    <span class="badge badge-<%= st.key %>"><%= st.label %></span>
-    <% if (bet.groupName) { %><span class="tag tag-group" title="Nur für Mitglieder dieser Gruppe sichtbar">Gruppe: <%= bet.groupName %></span><% } %>
-    <% if (bet.duel) { %><span class="tag tag-duel" title="Duell: nur die beiden setzen, der Schiedsrichter entscheidet">Duell</span><% } %>
-    <span class="muted small"><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %><% if (bet.commentCount) { %> · <%= bet.commentCount %> <%= bet.commentCount === 1 ? 'Kommentar' : 'Kommentare' %><% } %></span>
-  </div>
-  <h3 class="bet-card-title"><%= bet.title %></h3>
-  <% if (bet.duel) { %>
-  <p class="muted small"><%- userLink(bet.creatorName, { nested: true }) %> vs. <%- userLink(bet.duel.opponentName, { nested: true }) %> · <%= euro(bet.duel.stake) %> pro Person · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %></p>
-  <% } else { %>
-  <p class="muted small">von <%- userLink(bet.creatorName, { nested: true }) %><% if (bet.refereeName) { %> · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %><% } %><%= bet.type === 'optionen' ? ' · ' + bet.options.length + ' Optionen' : '' %></p>
-  <% } %>
-  <% if (bet.duel) { %><%- include('duel-tips', { bet }) %><% } else { %><%- include('bar', { bet }) %><% } %>
-  <ul class="opt-list">
-    <% shown.forEach((o) => { %>
-      <li class="opt-row <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'is-winner' : '' %> <%= pick && pick.side === o.key ? 'is-mine' : '' %>">
-        <span class="opt-dot"></span>
-        <span class="opt-label"><%= o.label %></span>
-        <span class="opt-meta"><%= share(bet, o) %> % · <%= quote(bet, o) %></span>
-      </li>
-    <% }) %>
-    <% if (bet.options.length > shown.length) { %>
-      <li class="muted small">+ <%= bet.options.length - shown.length %> weitere Optionen</li>
-    <% } %>
-  </ul>
-  <% if (pick) { %>
-    <p class="my-pick">Dein Tipp: <strong><%= optionLabel(bet, pick.side) %></strong> · <%= euro(pick.amount) %></p>
-  <% } %>
-  <% if (bet.resultAt && bet.status === 'offen') { %>
-    <p class="muted small card-result-date">Auswertung: <%= date(bet.resultAt) %></p>
-  <% } %>
-  <div class="bet-card-foot">
-    <span>Topf <strong><%= euro(pool(bet)) %></strong></span>
-    <span class="muted small">
+    <span class="bet-card-tags">
+      <span class="badge badge-<%= st.key %>"><%= st.label %></span>
+      <% if (bet.duel) { %><span class="tag tag-duel" title="Duell: nur die beiden setzen, der Schiedsrichter entscheidet">Duell</span><% } %>
+      <% if (bet.groupName) { %><span class="tag tag-group" title="Nur für Mitglieder dieser Gruppe sichtbar"><%= bet.groupName %></span><% } %>
+    </span>
+    <span class="bet-card-when">
       <% if (st.key === 'offen') { %>endet <%= relTime(bet.deadline) %>
       <% } else if (st.key === 'wartend') { %>Schluss <%= relTime(bet.deadline) %>
       <% } else { %><%= relTime(bet.resolvedAt) %><% } %>
     </span>
+  </div>
+  <h3 class="bet-card-title"><%= bet.title %></h3>
+  <% if (bet.duel) { %>
+    <p class="bet-card-sub"><%- userLink(bet.creatorName, { nested: true }) %> vs. <%- userLink(bet.duel.opponentName, { nested: true }) %> · <%= euro(bet.duel.stake) %> pro Person</p>
+  <% } %>
+  <div class="bet-chips">
+    <% shown.forEach((o) => { %>
+      <span class="bet-chip <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'is-winner' : '' %> <%= pick && pick.side === o.key ? 'is-mine' : '' %>"<%- pick && pick.side === o.key ? ' title="Dein Tipp: ' + euro(pick.amount) + '"' : '' %>><%= o.label %><span><%= share(bet, o) %> %</span></span>
+    <% }) %>
+    <% if (bet.options.length > shown.length) { %><span class="bet-chip-more">+<%= bet.options.length - shown.length %></span><% } %>
+  </div>
+  <div class="bet-card-foot">
+    <span class="bet-card-pot">Topf <strong><%= euro(pool(bet)) %></strong></span>
+    <span><% if (pick) { %><span class="bet-card-mine">Dein Einsatz <%= euro(pick.amount) %></span> · <% } %><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %></span>
   </div>
 </a>
