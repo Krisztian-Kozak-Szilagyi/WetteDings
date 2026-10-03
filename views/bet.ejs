@@ -104,6 +104,12 @@
             <span class="muted small"><%= settled ? 'Ausgewertet am ' + date(bet.resolvedAt) : 'Kein Termin angegeben' %></span>
           <% } %>
         </div>
+        <% if (bet.duel && st.key === 'wartend') { %>
+          <div class="result result-wait date-side">
+            <strong>Das Duell läuft.</strong>
+            <span>Wartet darauf, dass Schiedsrichter <%= bet.refereeName %> das Ergebnis einträgt.</span>
+          </div>
+        <% } %>
       </div>
 
       <% if (!bet.duel) { %>
@@ -163,10 +169,10 @@
           <strong><%= pendingVote.byName %> hat für „<%= voteLabel(bet, pendingVote.outcome) %>“ gestimmt.</strong>
           <span>Es fehlt die Bestätigung von <%= waitingFor %>. Erst wenn beide dasselbe eintragen, wird ausgezahlt. Einsätze sind nicht mehr möglich.</span>
         </div>
-      <% } else if (st.key === 'wartend') { %>
+      <% } else if (st.key === 'wartend' && !bet.duel) { %>
         <div class="result result-wait">
-          <strong><%= bet.duel ? 'Das Duell läuft.' : 'Einsatzschluss erreicht.' %></strong>
-          <span>Wartet darauf, dass <%= bet.duel ? 'Schiedsrichter ' + bet.refereeName + ' das Ergebnis einträgt' : bet.referee ? bet.creatorName + ' und ' + bet.refereeName + ' das Ergebnis eintragen' : bet.creatorName + ' das Ergebnis einträgt' %><% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
+          <strong>Einsatzschluss erreicht.</strong>
+          <span>Wartet darauf, dass <%= bet.referee ? bet.creatorName + ' und ' + bet.refereeName + ' das Ergebnis eintragen' : bet.creatorName + ' das Ergebnis einträgt' %><% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
         </div>
       <% } %>
 

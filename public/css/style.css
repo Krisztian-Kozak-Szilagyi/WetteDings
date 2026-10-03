@@ -517,7 +517,9 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .duel-tips-pct { display: flex; justify-content: space-between; margin-top: 3px; font-size: .72rem; font-weight: 700; line-height: 1; }
 .duel-tip-area { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, .3); }
 .duel-tip-head { margin: 0 0 6px; font-weight: 700; font-size: .9rem; }
-.duel-tip-form { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.duel-tip-form { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 20px; }
+/* Duell: Hinweis "Das Duell läuft" als zweite Kachel neben der Auswertung */
+.dates .date-side { margin-top: 0; justify-content: center; }
 .duel-tip-form .btn-opt.is-picked { opacity: 1; box-shadow: 0 0 0 2px var(--opt); }
 /* Profil: Knopf "Herausfordern" neben "Moderation" */
 .profil-head-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
