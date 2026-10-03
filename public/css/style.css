@@ -1363,6 +1363,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .tcg-hero-pack .tcg-pack-btn { position: relative; width: min(300px, 70%); animation: floaty 6s ease-in-out infinite; }
 .tcg-hero-pack .tcg-pack-btn img { box-shadow: none; filter: drop-shadow(0 30px 40px rgba(0, 0, 0, .6)); }
 .tcg-hero-pack .tcg-pack-btn:not(:disabled):hover { transform: none; filter: brightness(1.08); }
+.tcg-hero-pack .tcg-pack-btn:disabled { filter: none; }
 @keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-10px) rotate(-3deg); } }
 @media (prefers-reduced-motion: reduce) { .tcg-hero-pack .tcg-pack-btn { animation: none; transform: rotate(-4deg); } }
 .tcg-hero-info { display: flex; flex-direction: column; gap: 20px; max-width: 440px; }
@@ -3656,8 +3657,8 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .foil-face img { display: block; width: 100%; height: auto; border-radius: 5px; }
 .foil-front { position: relative; }
 .foil-back { transform: rotateY(180deg); display: grid; place-items: center; }
-.foil-back-art { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 5px; text-align: center; font-weight: 800; letter-spacing: .08em; font-size: 13px; color: var(--rar, var(--color-accent-300));
-  background: repeating-linear-gradient(45deg, var(--color-accent-900) 0 6px, var(--color-bg) 6px 12px); box-shadow: inset 0 0 0 2px var(--rar, var(--color-accent-700)); }
+.foil-back-art { display: block; width: 100%; height: 100%; border-radius: 5px; background: var(--gr-back);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
 .foil-sheen { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; mix-blend-mode: screen; opacity: .55;
   background: linear-gradient(115deg, transparent 20%, #ffffff55 32%, #a8d8ff40 38%, transparent 46%, transparent 60%, #f0abfc33 68%, transparent 76%); background-size: 250% 250%; animation: foil-sheen 6s ease-in-out infinite; }
 @keyframes foil-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 100%; } }
@@ -3708,14 +3709,35 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .inv-tile-foil, .inv-tile-arrow { transition: none; } }
 
 /* Folierte Karte groß */
-.foil-modal { border: 0; padding: 0; background: transparent; color: #fff; overflow: visible; max-width: calc(100vw - 24px); }
+/* Großansicht: ganzer Bildschirm, Schließen oben rechts in der Ecke */
+.foil-modal { border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; background: transparent; color: #fff; overflow: hidden; }
 .foil-modal::backdrop { background: color-mix(in srgb, var(--color-bg) 78%, transparent); backdrop-filter: blur(8px); }
-.foil-modal[open] { animation: tcg-pop .25s ease; }
-.foil-modal .tcg-close { position: absolute; top: -6px; right: -6px; z-index: 2; }
-.foil-modal-stage { display: grid; place-items: center; padding: 8px; }
-.foil-modal-hint { text-align: center; margin: 6px 0 0; }
-.foil-card-big { width: min(340px, 80vw); }
+.foil-modal .tcg-close { position: absolute; top: 16px; right: 16px; z-index: 2; }
+.foil-modal-stage { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; perspective: 1100px; animation: tcg-pop .25s ease; }
+.foil-card-big { width: min(340px, 78vw, 52dvh); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.foil-card-big:active { cursor: grabbing; }
+.foil-card-big .foil-inner { transition: none; will-change: transform; }
+.foil-card-big .foil-sheen { animation: none; opacity: .7; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), #ffffff70, transparent 45%), linear-gradient(115deg, transparent 25%, #a8d8ff40 40%, #f0abfc33 60%, transparent 75%); }
 .foil-card-big .foil-face { padding: 56px 12px 12px; border-radius: 18px; }
 .foil-card-big .foil-face img, .foil-card-big .foil-back-art { border-radius: 10px; }
 .foil-card-big .foil-ticket { top: 10px; left: 12px; right: 12px; height: 38px; padding: 0 14px; border-radius: 6px; font-size: 16px; box-shadow: inset 0 -3px 0 var(--rar, #94a3b8); }
-.foil-card-big .foil-back-art { font-size: 30px; }
+/* Folieren: die Folie gleitet über die Karte, das Etikett fällt auf, ein Glanz läuft darüber */
+.foil-card-big.is-foiling .foil-front::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(180deg, #ffffffcc, #e0f2fe99 30%, #e9d5ff88 70%, #fbcfe8aa); box-shadow: 0 6px 0 #ffffffaa;
+  animation: foil-wrap 1.2s .25s cubic-bezier(.3, .7, .2, 1) both;
+}
+.foil-card-big.is-foiling .foil-ticket { z-index: 2; animation: foil-ticket-drop .55s 1.35s cubic-bezier(.3, 1.6, .5, 1) both; }
+.foil-card-big.is-foiling .foil-front::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, #ffffffcc 50%, transparent 65%); background-size: 300% 100%;
+  animation: foil-shine .9s 1.9s ease-in-out both;
+}
+.foil-card-big.is-foiling .foil-face { animation: foil-press .35s 1.3s ease-out both; }
+@keyframes foil-wrap { 0% { transform: translateY(-110%); opacity: 1; } 75% { transform: translateY(0); opacity: .95; } 100% { transform: translateY(0); opacity: 0; } }
+@keyframes foil-ticket-drop { from { transform: translateY(-40px) scale(1.25); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes foil-shine { from { background-position: 130% 0; } to { background-position: -40% 0; } }
+@keyframes foil-press { 50% { box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 1px var(--rar, #ffffff30), 0 0 50px var(--rar, #c4b5fd); } }
+@media (prefers-reduced-motion: reduce) { .foil-card-big.is-foiling .foil-front::before, .foil-card-big.is-foiling .foil-front::after, .foil-card-big.is-foiling .foil-ticket, .foil-card-big.is-foiling .foil-face { animation: none; } }
+.tcg-slot.is-foiled { position: relative; }
+.tcg-slot.is-foiled .foil-sheen { border-radius: 12px; }

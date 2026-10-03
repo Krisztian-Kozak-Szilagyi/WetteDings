@@ -28,7 +28,7 @@
     <% const lk = locks[c.id]; const lockLabel = lk ? ({ handel: 'Im Handel', folie: 'Foliert' })[lk.reason] || 'Auf Quest' : ''; %>
     <% const freeN = n - (lk ? lk.n : 0); %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
-    <% if (n && freeN <= 0) { %>
+    <% if (n && freeN <= 0 && !(isAlbum && lk && lk.reason === 'folie')) { %>
       <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
@@ -56,7 +56,7 @@
         <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
           data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
           data-image="<%= c.image %>" data-count="<%= freeN %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"
-          data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>"
+          data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>"
           aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">
           <% inner() %>
         </button>

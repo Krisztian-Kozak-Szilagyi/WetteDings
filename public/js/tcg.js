@@ -114,8 +114,9 @@
       $('[data-tcg-modal-name]', modal).textContent = d.name;
       $('[data-tcg-modal-dot]', modal).className = 'tcg-dot r-' + d.rarity;
       $('[data-tcg-modal-rarity]', modal).textContent = d.rarityLabel + (d.no ? ' · #' + d.no : '');
+      var foiled = parseInt(d.foiled, 10) || 0;
       $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
-        : (count === 1 ? '1× im Besitz' : count + '× im Besitz') + (d.protected === '1' ? ' · geschützt' : '');
+        : (count ? (count === 1 ? '1× im Besitz' : count + '× im Besitz') : '') + (foiled ? (count ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '');
       $('[data-tcg-owned-actions]', modal).hidden = former;
       $('[data-tcg-former-action]', modal).hidden = !former;
       if (former) {
@@ -124,6 +125,7 @@
         return;
       }
 
+      sellOne.hidden = count < 1; // nur folierte Exemplare: die Bank kauft sie nicht
       sellOne.querySelector('input[name="card"]').value = d.tcgCard;
       $('[data-tcg-sell-text]', sellOne).textContent = d.sellText;
       if (rank >= RARE_RANK) {

@@ -119,7 +119,7 @@
                 <span class="foil-ticket"><b><%= f.card.name %></b><span><%= f.rarity.label %></span></span>
               </span>
               <span class="foil-face foil-back" aria-hidden="true">
-                <span class="foil-back-art">BfW<br>Holdings</span>
+                <span class="foil-back-art"></span>
                 <span class="foil-sheen"></span>
                 <span class="foil-ticket foil-ticket-back"><span>Foliert am</span><b><%= dayDate(f.foiledAt) %></b></span>
               </span>
@@ -165,11 +165,10 @@
   </section>
 </div>
 
-<!-- Folierte Karte groß (public/js/inventar.js): Klick dreht sie um -->
+<!-- Folierte Karte groß (public/js/inventar.js): ziehen dreht sie in 3D, antippen dreht sie um -->
 <dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
   <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
   <div class="foil-modal-stage" data-foil-stage></div>
-  <p class="muted small foil-modal-hint">Antippen zum Umdrehen</p>
 </dialog>
 
 <!-- Pack-Öffnung (public/js/tcg.js) -->

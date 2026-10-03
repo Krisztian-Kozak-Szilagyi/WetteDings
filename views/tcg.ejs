@@ -69,8 +69,9 @@
       <% } %>
       <div class="tcg-grid tcg-favs">
         <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
-          <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
+          <a class="tcg-slot r-<%= c.rarity %><%= foiledByCard[c.id] ? ' is-foiled' : '' %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %><%= foiledByCard[c.id] ? ', foliert' : '' %> – zum Album">
             <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            <% if (foiledByCard[c.id]) { %><span class="foil-sheen" aria-hidden="true"></span><% } %>
           </a>
         <% }) %>
         <% for (let i = favorites.length; i < maxFavorites; i++) { %>
