@@ -860,6 +860,9 @@ const LOADERS = {
   mitglied: (p, now, opts) => require('./memberStats').member(p, now, opts),
 };
 
+// Feste Liste [Schlüssel, Funktion]: der Reiter aus der Adresse wird nur verglichen, nie als Name nachgeschlagen
+const LOADER_LIST = Object.entries(LOADERS);
+
 /** Zeitreihen eines Diagramms auf die Abschnitte (Tag/Woche/Monat) bündeln */
 function bucketChart(chart, p, list) {
   const series = chart.series.map((s) => ({ name: s.name, values: aggregate(s.values, p.days, list, chart.agg) }));
@@ -872,7 +875,9 @@ function bucketChart(chart, p, list) {
  * opts: { user } für "mitglied", { raw: true } lässt die Verläufe tagesgenau (für den Export).
  */
 async function section(key, rangeDays, now = new Date(), opts = {}) {
-  const load = LOADERS[key] || LOADERS.uebersicht;
+  // Ein Schlüssel wie "constructor" aus der Adresse trifft so keine fremde Funktion
+  const found = LOADER_LIST.find(([k]) => k === key);
+  const load = found ? found[1] : LOADERS.uebersicht;
   const p = period(rangeDays, now);
   const prev = period(rangeDays, now, 1);
   const [blocks, prevBlocks, marks] = await Promise.all([load(p, now, opts), load(prev, now, opts), markers(p)]);

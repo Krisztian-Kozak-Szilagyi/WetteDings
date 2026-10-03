@@ -9,7 +9,7 @@
   const link = (bereich, tage, block) => '/admin/statistik?' + new URLSearchParams({ bereich, tage: String(tage), ...(bereich === 'mitglied' && member ? { spieler: member.username } : {}) }) + (block ? '#' + block : '');
   // Export des aktuellen Reiters (oder eines Blocks) mit denselben Einstellungen
   const exportLink = (teil, format) => '/admin/statistik/export?' + new URLSearchParams({ bereich: active, tage: String(curRange), ...(member ? { spieler: member.username } : {}), ...(teil ? { teil } : {}), ...(format ? { format } : {}) });
-  const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
+  const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', grading: 'Grading', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
   const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   const BUCKET = { tag: 'je Tag', woche: 'je Woche', monat: 'je Monat' };
   const VERDICT = { 'im-rahmen': ['Im Rahmen', 'ok'], 'zu-oft': ['Auffällig oft', 'warn'], 'zu-selten': ['Auffällig selten', 'warn'], 'wenig-daten': ['Zu wenig Daten', 'muted'] };
