@@ -3556,15 +3556,14 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .ihk-pick-stats { grid-template-columns: 1fr 1fr; }
 }
 
-/* IHK: Spielfläche und innere Kästen ohne Rahmen, Hintergrund und Schatten (Krisztian) */
-.ihk-stage, .ihk-quest, .ihk-offer:hover, .ihk-timer, .ihk-fight, .ihk-result,
+/* IHK: Spielfläche und innere Kästen (außer den Quest-Karten) ohne Rahmen, Hintergrund und Schatten (Krisztian) */
+.ihk-stage, .ihk-timer, .ihk-fight, .ihk-result,
 .ihk-slot, .ihk-player .ihk-slot-card, .ihk-slot-enemy { border: 0; background: none; box-shadow: none; }
 .ihk-stage { padding: 0; }
 /* leere Felder bleiben als gestrichelter Umriss erkennbar (sonst sieht man nicht, wohin die Karte soll) */
 .ihk-slot:not(:has(img)) { outline: 1px dashed var(--color-neutral-700); outline-offset: -1px; }
 .ihk-slot.is-drop-hint { outline-color: var(--color-accent-300); }
 .ihk-slot img { border-radius: 14px; }
-.ihk-offer.is-selected { box-shadow: none; outline: 1px solid var(--color-accent-300); outline-offset: 2px; }
 .ihk-pick-head { padding-top: 10px; border-top: 2px solid var(--color-divider); }
 
 /* Start-Knopf im Stil der Album-Kachel */
