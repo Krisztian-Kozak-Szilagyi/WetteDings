@@ -1,0 +1,148 @@
+<%- include('partials/head') %>
+<%
+  const p = data.period;
+  const dayLabel = (d) => d.split('-').reverse().join('.');
+  const link = (bereich, tage) => '/admin/statistik?' + new URLSearchParams({ bereich, tage: String(tage) });
+  const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
+  const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const cellText = (c) => fmt(c);
+  const cellHint = (c) => (c && typeof c === 'object' && c.hint ? c.hint : '');
+%>
+
+<div class="page-head">
+  <h1>Statistik</h1>
+  <span class="muted"><%= dayLabel(p.from) %> – <%= dayLabel(p.to) %> (<%= p.range %> Tage)</span>
+</div>
+
+<div class="stats-filters">
+  <nav class="tabs" aria-label="Bereich">
+    <% sections.forEach((s) => { %>
+      <a class="tab <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, p.range) %>"><%= s.label %></a>
+    <% }) %>
+  </nav>
+  <nav class="tabs stats-ranges" aria-label="Zeitraum">
+    <% ranges.forEach((r) => { %>
+      <a class="tab <%= r === p.range ? 'active' : '' %>" href="<%= link(active, r) %>"><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
+    <% }) %>
+  </nav>
+</div>
+
+<% if (data.markers.length) { %>
+  <details class="card stats-markers">
+    <summary><strong>Änderungen im Zeitraum (<%= data.markers.length %>)</strong> <span class="muted small">– als gestrichelte Linien in den Verläufen</span></summary>
+    <ul class="stats-marker-list">
+      <% data.markers.slice().reverse().forEach((m) => { %>
+        <li>
+          <span class="stats-marker-kind stats-marker-<%= m.kind %>"><%= m.kind === 'patch' ? 'Patch' : 'Einstellung' %></span>
+          <span><strong><%= m.label %></strong> <span class="muted small"><%= date(m.at) %><%= m.by ? ' · ' + m.by : '' %></span>
+            <% if (m.detail.length) { %><br><code class="small"><%= m.detail.join(' · ') %></code><% } %>
+          </span>
+        </li>
+      <% }) %>
+    </ul>
+  </details>
+<% } %>
+
+<div class="stats stats-auto">
+  <% data.kpis.forEach((k) => { %>
+    <div class="stat card" <% if (k.hint) { %>title="<%= k.hint %>"<% } %>>
+      <span class="stat-label"><%= k.label %></span>
+      <span class="stat-value"><%= k.unit === 'text' ? k.value : fmt({ value: k.value, unit: k.unit, signed: k.signed }) %></span>
+      <% if (k.hint) { %><span class="muted small"><%= k.hint %></span><% } %>
+    </div>
+  <% }) %>
+</div>
+
+<% if (active === 'spieler' && !data.since) { %>
+  <p class="card muted">Aktivitätsdaten werden erst seit dem Statistik-Update gesammelt – die Verläufe füllen sich ab jetzt Tag für Tag.</p>
+<% } %>
+
+<div class="stats-charts">
+  <% (data.charts || []).forEach((c) => { %>
+    <section class="card stats-chart-card">
+      <h2><%= c.title %></h2>
+      <% if (c.note) { %><p class="muted small"><%= c.note %></p><% } %>
+      <% if (c.diff) { %><p class="small stats-warn">Abgleich: Die Kontostände weichen um <%= fmt({ value: c.diff, unit: 'euro', signed: true }) %> von der Summe aller Buchungen ab (z. B. Konten ohne Startguthaben-Buchung).</p><% } %>
+      <div class="stats-chart" data-stats-chart="<%= c.id %>"><p class="muted small">Diagramm wird geladen …</p></div>
+    </section>
+  <% }) %>
+</div>
+
+<% if (active === 'spieler') { %>
+  <div class="stats-charts">
+    <section class="card">
+      <h2>Retention</h2>
+      <p class="muted small">Anteil der im Zeitraum Neuregistrierten, die genau 1, 7 bzw. 30 Tage später wieder aktiv waren. Mitglieder, deren Stichtag noch nicht erreicht ist, zählen nicht mit.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Tag</th><th class="num">Wieder aktiv</th><th class="num">Von</th><th class="num">Quote</th></tr></thead>
+          <tbody>
+            <% data.retention.forEach((r) => { %>
+              <tr><td>Tag <%= r.offset %></td><td class="num"><%= r.retained %></td><td class="num"><%= r.eligible %></td><td class="num"><%= fmt({ value: r.rate, unit: 'percent' }) %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bereichsnutzung</h2>
+      <p class="muted small">Seitenaufrufe und Aktionen je Bereich im Zeitraum.</p>
+      <% if (!data.areas.length) { %><p class="muted">Noch keine Daten.</p><% } %>
+      <ul class="stats-hbars">
+        <% data.areas.forEach((a) => { %>
+          <li>
+            <span class="stats-hbar-label"><%= AREA_NAMES[a.key] || a.key %></span>
+            <span class="stats-hbar-track"><span class="stats-hbar" style="width: <%= Math.max(1, Math.round(a.share * 100)) %>%"></span></span>
+            <span class="stats-hbar-value"><%= fmt({ value: a.n, unit: 'count' }) %> · <%= fmt({ value: a.share, unit: 'percent' }) %></span>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Aktivität nach Wochentag und Uhrzeit</h2>
+    <p class="muted small">Wie oft Mitglieder in der jeweiligen Stunde aktiv waren (deutsche Zeit). Dunkler = mehr.</p>
+    <div class="table-wrap">
+      <table class="stats-heat">
+        <thead><tr><th></th><% for (let h = 0; h < 24; h++) { %><th><%= h % 3 === 0 ? h : '' %></th><% } %></tr></thead>
+        <tbody>
+          <% data.heat.forEach((row, wd) => { %>
+            <tr>
+              <th><%= WEEKDAYS[wd] %></th>
+              <% row.forEach((n, h) => { %>
+                <td style="--heat: <%= (n / data.heatMax).toFixed(3) %>" title="<%= WEEKDAYS[wd] %> <%= h %>–<%= h + 1 %> Uhr: <%= n %>"><span class="sr-only"><%= n %></span></td>
+              <% }) %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<% (data.tables || []).forEach((t) => { %>
+  <section class="card">
+    <h2><%= t.title %></h2>
+    <% if (t.note) { %><p class="muted small"><%= t.note %></p><% } %>
+    <% if (!t.rows.length) { %>
+      <p class="muted">Keine Daten im Zeitraum.</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><% t.head.forEach((h) => { %><th class="<%= h.num ? 'num' : '' %>"><%= h.label || h %></th><% }) %></tr></thead>
+          <tbody>
+            <% t.rows.forEach((row) => { %>
+              <tr><% row.forEach((c, i) => { %><td class="<%= t.head[i] && t.head[i].num ? 'num' : '' %>" <% if (cellHint(c)) { %>title="<%= cellHint(c) %>"<% } %>><%= cellText(c) %></td><% }) %></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% }) %>
+
+<script type="application/json" id="stats-data"><%- JSON.stringify(chartData).replace(/</g, '\\u003c') %></script>
+<script src="/js/stats.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>
