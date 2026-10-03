@@ -16,36 +16,40 @@
   const swapState = (t, role) => { const turn = canAccept(t, role); %><span class="own-tag<%= turn ? ' own-new' : '' %>"><%= turn ? 'Du bist am Zug' : 'Wartet auf ' + (role === 'seller' ? t.toName : t.sellerName) %></span><% if (isUnread(t, role)) { %> <span class="nav-badge nav-badge-inline" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } };
 %>
 
+<div class="handel-page">
 <div class="page-head">
   <h1>Handel</h1>
-  <span class="muted">Handelssteuer: <strong><%= taxText %> %</strong> – wird dem vom Erlös abgezogen, der das Geld bekommt</span>
+  <span class="muted">Handelssteuer <strong><%= taxText %> %</strong><% if (taxPercent > 0) { %> · vom Erlös abgezogen<% } %></span>
 </div>
 
-<% { const bm = blackMarket; const left = bm.offers.filter((o) => !o.buyer).length; %>
-<details class="card fold black-market<%= bm.open ? ' is-open' : '' %>" id="blackmarket">
-  <summary>
-    <h2>Black Market
-      <% if (bm.open) { %><span class="bm-state bm-state-open">Geöffnet bis <%= bm.closeTime %> Uhr · noch <%= left %> von <%= bm.offers.length %></span>
-      <% } else { %><span class="bm-state">Geschlossen</span><% } %>
-    </h2>
-    <span class="fold-arrow" aria-hidden="true"></span>
-  </summary>
-  <% if (!bm.open) { %>
-    <p class="muted">Täglich von <strong><%= bm.openTime %></strong> bis <strong><%= bm.closeTime %> Uhr</strong>: vier seltene Karten (Gold bis Glitch), jede gibt es nur einmal – wer zuerst kauft, bekommt sie.</p>
-    <p>Öffnet in <strong data-countdown="<%= bm.opensAt.getTime() %>">–</strong></p>
-  <% } else { %>
-    <p class="muted">Vier Karten, jede nur einmal zu haben – wer zuerst kauft, bekommt sie. Preis: <%= bm.percent %> % des Verkaufswerts. Schließt in <strong data-countdown="<%= bm.closesAt.getTime() %>">–</strong>.</p>
+<% { const bm = blackMarket; const left = bm.offers.filter((o) => !o.buyer).length; const cdAt = (bm.open ? bm.closesAt : bm.opensAt).getTime(); %>
+<section class="bm<%= bm.open ? ' is-open' : '' %>" id="blackmarket">
+  <div class="bm-head">
+    <div class="bm-title">
+      <div class="bm-title-row">
+        <h2>Black Market</h2>
+        <% if (bm.open) { %><span class="bm-state bm-state-open"><span class="bm-dot"></span>Geöffnet · noch <%= left %> von <%= bm.offers.length %></span>
+        <% } else { %><span class="bm-state">Geschlossen</span><% } %>
+      </div>
+      <span class="bm-sub">Täglich <%= bm.openTime %>–<%= bm.closeTime %> Uhr · seltene Karten (Gold bis Glitch), jede nur einmal<% if (bm.open) { %> · Preis <%= bm.percent %> % des Kartenwerts<% } %>.</span>
+    </div>
+    <div class="bm-cd">
+      <span><%= bm.open ? 'Schließt in' : 'Öffnet in' %></span>
+      <strong data-countdown-parts="<%= cdAt %>"><span data-cd="h">–</span>:<span data-cd="m">–</span>:<span data-cd="s">–</span></strong>
+    </div>
+  </div>
+  <% if (bm.open) { %>
     <div class="bm-grid">
       <% bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; %>
         <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
-          <button type="button" class="tcg-slot r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
+          <button type="button" class="bm-card r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
             data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= coll.counts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
             <img src="<%= c.image %>" alt="" width="720" height="1008">
-            <% if (sold) { %><span class="tcg-exam-badge">Verkauft</span><% } %>
-            <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+            <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
           </button>
           <div class="bm-info">
-            <strong><%= c.name %></strong>
+            <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><%= r.label %> · <%= c.name %></span>
+            <span class="bm-price"><strong><%= euro(o.price) %></strong><span>Wert <%= euro(r.sell || 0) %></span></span>
             <% ownTag(c.id) %>
             <% if (sold) { %>
               <span class="muted small">an <%- userLink(o.buyerName) %></span>
@@ -53,25 +57,30 @@
               <form method="post" action="/handel/black-market" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(o.price) %> kaufen?">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="index" value="<%= i %>">
-                <button class="btn btn-primary btn-sm btn-block" type="submit" <%= bal < o.price ? 'disabled title="Guthaben reicht nicht"' : '' %>>Kaufen · <%= euro(o.price) %></button>
+                <button class="bm-buy" type="submit" <%= bal < o.price ? 'disabled title="Guthaben reicht nicht"' : '' %>>Kaufen</button>
               </form>
             <% } %>
           </div>
         </div>
       <% }) %>
     </div>
+  <% } else { %>
+    <div class="bm-backs" aria-hidden="true">
+      <% [0, 1, 2, 3].forEach(() => { %><div class="bm-back"><span>?</span></div><% }) %>
+    </div>
   <% } %>
-</details>
+</section>
 <% } %>
 
 <div class="trade-layout">
   <section class="trade-main">
     <% if (newDeals.length) { %>
-      <div class="card card-accent" id="neu">
-        <h2>Neu für dich <span class="nav-badge nav-badge-inline"><%= newDeals.length %></span></h2>
+      <div class="handel-block" id="neu">
+        <h4>Neu für dich <span class="nav-badge nav-badge-inline"><%= newDeals.length %></span></h4>
         <ul class="trade-news">
           <% newDeals.forEach((t) => { const c = line(t.card).c; const iSold = String(t.seller) === me; const partner = iSold ? t.buyerName : t.sellerName; %>
             <li class="<%= t.isNew ? 'is-new' : '' %>">
+              <span class="trade-news-dot"></span>
               <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; %>
                 <span><%- userLink(partner) %> hat deinen Tausch angenommen: <strong><%= iSold ? c.name : w.name %></strong> gegen <strong><%= iSold ? w.name : c.name %></strong>.</span>
               <% } else { %>
@@ -83,24 +92,27 @@
         </ul>
       </div>
     <% } %>
-    <div class="card" id="eingang">
-      <h2>Angebote an dich <% if (incoming.length) { %><span class="nav-badge nav-badge-inline"><%= incoming.length %></span><% } %></h2>
-      <% if (!incoming.length) { %>
-        <p class="muted">Gerade hat dir niemand etwas angeboten.</p>
-      <% } else { %>
-        <ul class="trade-list">
+
+    <% if (incoming.length) { %>
+    <div class="handel-block" id="eingang">
+      <h4>Angebote an dich <span class="nav-badge nav-badge-inline"><%= incoming.length %></span></h4>
+        <ul class="trade-list trade-incoming">
           <% incoming.forEach((t) => { const { c, r } = line(t.card); %>
             <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
               <li class="trade-item trade-swap">
                 <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
                 <div class="trade-info">
-                  <span class="trade-title"><strong>Tausch von <%= t.sellerName %></strong> <% swapState(t, 'to') %></span>
-                  <span class="small trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
-                  <span class="small">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
-                  <span class="muted small"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %></span>
+                  <span class="trade-kind">Tausch · von <%= t.sellerName %></span>
+                  <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
+                  <span class="trade-title">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
+                  <span class="trade-meta"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %> · <% swapState(t, 'to') %></span>
                   <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest oder Handel).</span><% } %>
                 </div>
                 <div class="trade-actions">
+                  <form method="post" action="/handel/<%= t._id %>/ablehnen">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-ghost btn-sm" type="submit">Ablehnen</button>
+                  </form>
                   <a class="btn btn-ghost btn-sm" href="/handel/verhandlung/<%= t._id %>">Verhandeln</a>
                   <% if (myTurn) { %>
                     <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= w.c.name %> gegen <%= c.name %> tauschen<%= t.price ? ' (' + x.text + ')' : '' %>?">
@@ -109,40 +121,37 @@
                       <button class="btn btn-primary btn-sm" type="submit" <%= blocked ? 'disabled' : '' %>>Annehmen</button>
                     </form>
                   <% } %>
-                  <form method="post" action="/handel/<%= t._id %>/ablehnen">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="btn btn-ghost btn-sm" type="submit">Ablehnen</button>
-                  </form>
                 </div>
               </li>
             <% } else { const lacks = t.price - bal; %>
               <li class="trade-item r-<%= c.rarity %>">
                 <%- include('partials/trade-thumbs', { a: c }) %>
                 <div class="trade-info">
+                  <span class="trade-kind">Privat · von <%= t.sellerName %></span>
                   <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
-                  <span class="muted small">von <%= t.sellerName %> · läuft ab <%= relTime(t.expiresAt) %></span>
+                  <span class="trade-meta">läuft ab <%= relTime(t.expiresAt) %></span>
                 </div>
                 <div class="trade-actions">
                   <span class="trade-price"><%= euro(t.price) %></span>
-                  <form method="post" action="/handel/<%= t._id %>/kaufen" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(t.price) %> kaufen?">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button class="btn btn-primary btn-sm" type="submit" <%= lacks > 0 ? 'disabled' : '' %>>Annehmen</button>
-                  </form>
                   <form method="post" action="/handel/<%= t._id %>/ablehnen">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button class="btn btn-ghost btn-sm" type="submit">Ablehnen</button>
+                  </form>
+                  <form method="post" action="/handel/<%= t._id %>/kaufen" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(t.price) %> kaufen?">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-primary btn-sm" type="submit" <%= lacks > 0 ? 'disabled' : '' %>>Annehmen</button>
                   </form>
                 </div>
               </li>
             <% } %>
           <% }) %>
         </ul>
-      <% } %>
     </div>
+    <% } %>
 
-    <div class="card" id="markt" data-market>
-      <div class="tcg-coll-head">
-        <h2>Markt</h2>
+    <div class="handel-block" id="markt" data-market>
+      <div class="handel-block-head">
+        <h4>Markt</h4>
         <% if (market.length) { %>
           <input type="search" class="market-search" data-market-search maxlength="40" placeholder="Karte suchen …" aria-label="Markt nach Kartenname durchsuchen">
         <% } %>
@@ -151,19 +160,19 @@
         <p class="muted">Auf dem Markt ist gerade nichts im Angebot.</p>
       <% } else { %>
         <div class="tcg-filter market-filter" role="tablist" aria-label="Markt nach Seltenheit filtern">
-          <button type="button" class="chip active" data-market-rarity="all" role="tab" aria-selected="true">Alle</button>
+          <button type="button" class="chip active" data-market-rarity="all" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle</button>
           <% rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).forEach((r) => { %>
-            <button type="button" class="chip" data-market-rarity="<%= r.key %>" role="tab" aria-selected="false"><%= r.label %></button>
+            <button type="button" class="chip r-<%= r.key %>" data-market-rarity="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %></button>
           <% }) %>
         </div>
         <p class="muted" data-market-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
-        <ul class="trade-list">
+        <ul class="trade-list trade-market">
           <% market.forEach((t) => { const { c, r } = line(t.card); const lacks = t.price - bal; %>
             <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
               <%- include('partials/trade-thumbs', { a: c }) %>
               <div class="trade-info">
-                <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
-                <span class="muted small">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Kartenwert <%= euro(r.sell || 0) %></span>
+                <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %></span>
+                <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(r.sell || 0) %></span>
               </div>
               <div class="trade-actions">
                 <span class="trade-price"><%= euro(t.price) %></span>
@@ -178,94 +187,82 @@
       <% } %>
     </div>
 
-    <div class="card" id="sammlung">
-      <div class="tcg-coll-head">
-        <h2>Deine Sammlung</h2>
-        <%- include('partials/tcg-filter', { counts: coll.counts }) %>
+    <div class="handel-block" id="sammlung" data-filter-scope>
+      <div class="handel-block-head">
+        <h4>Deine Sammlung</h4>
+        <% if (coll.cardCount) { %><span class="muted small">Karte antippen zum Anbieten · gesperrte Karten (Quest oder Handel) sind ausgegraut</span><% } %>
       </div>
       <% if (!coll.cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>
       <% } else { %>
-        <p class="muted small">Tippe eine Karte an, um sie auf den Markt zu stellen, privat zu verkaufen oder zu tauschen. Gesperrte Karten (Quest oder Handel) sind ausgegraut.</p>
+        <%- include('partials/tcg-filter', { counts: coll.counts }) %>
         <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard }) %>
       <% } %>
     </div>
   </section>
 
   <aside class="trade-side">
-    <div class="card card-accent">
-      <h2>So geht's</h2>
-      <ul class="trade-help small">
-        <li><strong>Markt:</strong> jeder kann kaufen, <%= marketDays %> Tage gültig.</li>
-        <li><strong>Privat:</strong> Verkauf an ein Mitglied, <%= privateHours %> Std. gültig.</li>
-        <li><strong>Tausch:</strong> deine Karte gegen eine aus der Sammlung eines Mitglieds, optional mit Aufpreis, <%= privateHours %> Std. gültig.</li>
-        <li>Angebotene Karten sind bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf Geld fallen <%= taxText %> % Steuer an.<% } else { %>Aktuell fällt keine Steuer an.<% } %></li>
-      </ul>
-      <a class="btn btn-ghost btn-block" href="#sammlung">Karte anbieten</a>
+    <div class="trade-help-box">
+      <a class="btn btn-primary btn-block" href="#sammlung">Karte anbieten</a>
+      <details class="trade-how">
+        <summary>So geht's</summary>
+        <ul>
+          <li><strong>Markt:</strong> jeder kann kaufen, <%= marketDays %> Tage gültig.</li>
+          <li><strong>Privat:</strong> Verkauf an ein Mitglied, <%= privateHours %> Std. gültig.</li>
+          <li><strong>Tausch:</strong> deine Karte gegen eine aus der Sammlung eines Mitglieds, optional mit Aufpreis, <%= privateHours %> Std. gültig.</li>
+          <li>Angebotene Karten sind bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf Geld fallen <%= taxText %> % Steuer an.<% } else { %>Aktuell fällt keine Steuer an.<% } %></li>
+        </ul>
+      </details>
     </div>
 
-    <div class="card">
-      <h2>Deine Angebote</h2>
+    <div class="side-list">
+      <span class="side-label">Deine Angebote</span>
       <% if (!mine.length) { %>
-        <p class="muted">Du hast keine offenen Angebote.</p>
+        <span class="muted small">Keine offenen Angebote.</span>
       <% } else { %>
-        <ul class="trade-offers">
+        <ul class="my-offers">
           <% mine.forEach((t) => { const { c, r } = line(t.card); const w = t.kind === 'tausch' ? line(t.wantCard) : null; %>
-            <li class="trade-offer">
-              <div class="trade-offer-head">
-                <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
-                <div class="trade-offer-title">
-                  <span class="trade-offer-kind"><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %></span>
-                  <% if (w) { %>
-                    <strong><%= c.name %> gegen <%= w.c.name %></strong>
-                    <span class="trade-title"><% swapState(t, 'seller') %></span>
-                  <% } else { %>
-                    <strong><%= c.name %></strong>
-                    <span><span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span></span>
-                  <% } %>
-                </div>
-              </div>
-              <dl class="trade-offer-facts">
+            <li class="my-offer">
+              <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
+              <div class="my-offer-info">
+                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong>
+                <span><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %> · läuft ab <%= relTime(t.expiresAt) %></span>
                 <% if (w) { %>
-                  <div><dt>Du gibst</dt><dd><%= c.name %> <span class="muted">(<%= r.label %>)</span></dd></div>
-                  <div><dt>Du bekommst</dt><dd><%= w.c.name %> <span class="muted">(<%= w.r.label %>)</span></dd></div>
-                  <div><dt>Aufpreis</dt><dd><%= extra(t).text %></dd></div>
-                <% } else { %>
-                  <div><dt>Preis</dt><dd><%= euro(t.price) %></dd></div>
-                  <% if (taxFor(t.price)) { %><div><dt>Erlös nach Steuer</dt><dd><%= euro(t.price - taxFor(t.price)) %></dd></div><% } %>
+                  <span><%= extra(t).text %></span>
+                  <span class="trade-title"><% swapState(t, 'seller') %></span>
+                  <a class="small" href="/handel/verhandlung/<%= t._id %>"><%= canAccept(t, 'seller') ? 'Gegenvorschlag ansehen' : 'Verhandeln' %> →</a>
+                <% } else if (taxFor(t.price)) { %>
+                  <span>Erlös nach Steuer <%= euro(t.price - taxFor(t.price)) %></span>
                 <% } %>
-                <div><dt>Läuft ab</dt><dd><%= relTime(t.expiresAt) %></dd></div>
-              </dl>
-              <div class="trade-offer-actions">
-                <% if (w) { %><a class="btn btn-<%= canAccept(t, 'seller') ? 'primary' : 'ghost' %> btn-sm" href="/handel/verhandlung/<%= t._id %>"><%= canAccept(t, 'seller') ? 'Gegenvorschlag ansehen' : 'Verhandeln' %></a><% } %>
-                <form method="post" action="/handel/<%= t._id %>/zurueckziehen">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button class="btn btn-ghost btn-sm btn-block" type="submit">Zurückziehen</button>
-                </form>
               </div>
+              <% if (!w) { %><span class="my-offer-price"><%= euro(t.price) %></span><% } %>
+              <form method="post" action="/handel/<%= t._id %>/zurueckziehen" data-confirm="Angebot für <%= c.name %> zurückziehen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="my-offer-x" type="submit" title="Zurückziehen" aria-label="Angebot zurückziehen">×</button>
+              </form>
             </li>
           <% }) %>
         </ul>
       <% } %>
     </div>
 
-    <div class="card">
-      <h2>Letzte Geschäfte</h2>
+    <div class="side-list">
+      <span class="side-label">Letzte Geschäfte</span>
       <% if (!history.length) { %>
-        <p class="muted">Noch keine Geschäfte.</p>
+        <span class="muted small">Noch keine Geschäfte.</span>
       <% } else { %>
-        <ul class="trade-history">
-          <% history.forEach((t) => { const { c } = line(t.card); const sold = String(t.seller) === me; %>
+        <ul class="deal-log">
+          <% history.forEach((t) => { const { c } = line(t.card); const sold = String(t.seller) === me; const partner = sold ? t.buyerName : t.sellerName; %>
             <li>
               <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; const x = extra(t); const got = sold ? w : c; const gave = sold ? c : w; %>
-                <span>Getauscht mit <%- userLink(sold ? t.buyerName : t.sellerName) %>: <strong><%= gave.name %></strong> gegen <strong><%= got.name %></strong><br><span class="muted small"><%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></span>
+                <div><span>Getauscht: <strong><%= gave.name %></strong> ⇄ <strong><%= got.name %></strong></span><span class="deal-sub">mit <%- userLink(partner) %> · <%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></div>
                 <% if (t.price) { %>
                   <span class="<%= x.iPay ? 'neg' : 'pos' %> nowrap"><%= x.iPay ? '−' + euro(t.price) : '+' + euro(t.price - t.tax) %></span>
                 <% } else { %>
                   <span class="muted nowrap">±0</span>
                 <% } %>
               <% } else { %>
-                <span><%= sold ? 'Verkauft an ' : 'Gekauft von ' %><%- userLink(sold ? t.buyerName : t.sellerName) %>: <strong><%= c.name %></strong><br><span class="muted small"><%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></span>
+                <div><span><%= sold ? 'Verkauft' : 'Gekauft' %>: <strong><%= c.name %></strong></span><span class="deal-sub"><%= sold ? 'an' : 'von' %> <%- userLink(partner) %> · <%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></div>
                 <span class="<%= sold ? 'pos' : 'neg' %> nowrap"><%= sold ? '+' + euro(t.price - t.tax) : '−' + euro(t.price) %></span>
               <% } %>
             </li>
@@ -274,6 +271,7 @@
       <% } %>
     </div>
   </aside>
+</div>
 </div>
 
 <!-- Karte aus einem Angebot groß ansehen -->

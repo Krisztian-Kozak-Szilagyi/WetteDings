@@ -27,11 +27,11 @@
   }
 
   // ---------- Filter der Sammlung ----------
-  // Jeder Filter wirkt nur auf das Raster in seiner .card (die Tauschseite hat zwei Raster)
+  // Jeder Filter wirkt nur auf das Raster in seiner .card bzw. [data-filter-scope] (die Tauschseite hat zwei Raster)
   $all('[data-tcg-filter]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var key = btn.getAttribute('data-tcg-filter');
-      var scope = btn.closest('.card') || document;
+      var scope = btn.closest('.card, [data-filter-scope]') || document;
       $all('[data-tcg-filter]', scope).forEach(function (b) {
         b.classList.toggle('active', b === btn);
         b.setAttribute('aria-selected', b === btn ? 'true' : 'false');

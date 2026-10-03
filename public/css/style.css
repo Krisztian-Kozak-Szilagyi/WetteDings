@@ -2907,3 +2907,126 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .lotto-stats span { font-size: 10px; letter-spacing: .06em; }
   .lotto-entry { gap: 10px; }
 }
+
+/* Handel (Redesign) */
+.handel-page { display: flex; flex-direction: column; gap: 28px; }
+.handel-page .page-head { margin: 0; }
+.handel-page .page-head strong { font-weight: 500; color: var(--text); }
+.bm {
+  position: relative; overflow: hidden; border-radius: var(--radius-lg);
+  background: radial-gradient(80% 120% at 0% 0%, color-mix(in srgb, #7e22ce 32%, transparent), transparent 60%), radial-gradient(60% 100% at 100% 100%, color-mix(in srgb, #a855f7 16%, transparent), transparent 60%), linear-gradient(180deg, #120c1f, var(--color-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #a855f7 30%, transparent), 0 0 40px color-mix(in srgb, #a855f7 8%, transparent);
+}
+.bm.is-open { box-shadow: 0 0 0 1px color-mix(in srgb, #c084fc 60%, transparent), 0 0 60px color-mix(in srgb, #a855f7 22%, transparent); }
+.bm::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .6; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px); }
+.bm-head { position: relative; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 20px 22px; }
+.bm-title { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 220px; }
+.bm-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bm-title h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: .02em; color: #e9d5ff; text-shadow: 0 0 18px color-mix(in srgb, #a855f7 70%, transparent); }
+.bm-sub { font-size: 13px; color: var(--color-neutral-400); }
+.bm .bm-state { display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px; border: 0; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--color-neutral-400); background: color-mix(in srgb, var(--color-bg) 60%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.bm .bm-state-open { color: #e9d5ff; background: color-mix(in srgb, #a855f7 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #c084fc 60%, transparent); }
+.bm-dot { width: 7px; height: 7px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #a855f7; }
+.bm-cd { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.bm-cd > span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #c084fc; }
+.bm-cd strong { font-size: 28px; font-weight: 500; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+.bm .bm-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 32px clamp(20px, 3.5vw, 48px); padding: 16px clamp(22px, 3vw, 40px) 32px; }
+.bm .bm-offer { display: flex; flex-direction: column; gap: 10px; }
+.bm-card { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: none; cursor: var(--cur-zoom-in); transition: transform .25s ease; box-shadow: 0 0 0 1px var(--rar, transparent), 0 10px 30px rgba(0, 0, 0, .5); }
+.bm-offer:nth-child(odd) .bm-card { transform: rotate(-2deg); }
+.bm-offer:nth-child(even) .bm-card { transform: rotate(1.5deg); }
+.bm-offer .bm-card:hover, .bm-offer .bm-card:focus-visible { transform: translateY(-6px) scale(1.03); }
+.bm-card img { display: block; width: 100%; height: auto; }
+.bm-offer.is-sold .bm-card img { filter: grayscale(1) brightness(.55); }
+.bm-stamp { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); padding: 4px 12px; font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #f87171; border: 2px solid #f87171; border-radius: 4px; background: rgba(10, 8, 18, .6); }
+.bm .bm-info { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.bm-rarity { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-neutral-400); min-width: 0; }
+.bm-price { display: flex; align-items: baseline; gap: 8px; }
+.bm-price strong { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.bm-price span { font-size: 12px; color: var(--color-neutral-500); }
+.bm .bm-info form { width: 100%; margin: 6px 0 0; }
+.bm-buy { width: 100%; height: 34px; border-radius: var(--radius-md); border: 1px solid #c084fc; background: color-mix(in srgb, #a855f7 12%, transparent); color: #e9d5ff; font: inherit; font-size: 13px; font-weight: 500; cursor: var(--cur-pointer); }
+.bm-buy:hover:not(:disabled) { background: color-mix(in srgb, #a855f7 24%, transparent); box-shadow: 0 0 18px color-mix(in srgb, #a855f7 40%, transparent); }
+.bm-buy:disabled { opacity: .45; cursor: not-allowed; }
+.bm-backs { position: relative; display: flex; gap: clamp(14px, 3.5vw, 48px); padding: 16px clamp(22px, 3vw, 40px) 32px; }
+.bm-back {
+  flex: 1 1 0; min-width: 0; max-width: 200px; aspect-ratio: 720 / 1008; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, #a855f7 7%, transparent) 0 8px, transparent 8px 16px), linear-gradient(160deg, #1d1330, var(--color-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #a855f7 30%, transparent);
+}
+.bm-back:nth-child(odd) { transform: rotate(-2deg); }
+.bm-back:nth-child(even) { transform: rotate(1.5deg); }
+.bm-back span { font-size: 34px; font-weight: 600; color: color-mix(in srgb, #c084fc 45%, transparent); }
+
+.handel-page .trade-layout { gap: 24px; }
+.handel-page .trade-main { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
+.handel-block { display: flex; flex-direction: column; gap: 14px; }
+.handel-block h4 { margin: 0; display: flex; align-items: center; gap: 4px; }
+.handel-block > p { margin: 0; font-size: 14px; }
+.handel-block-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.handel-block .market-filter, .handel-block .tcg-filter { margin: 0; }
+.handel-page .market-search[type="search"] { width: min(240px, 60vw); height: 38px; }
+.handel-page .trade-news li { align-items: center; padding: 12px 14px; border-radius: var(--radius-md); font-size: 14px; box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.handel-page .trade-news li > span:nth-child(2) { flex: 1; min-width: 200px; }
+.trade-news-dot { width: 7px; height: 7px; border-radius: 50%; background: oklch(0.8 0.14 155); flex: none; }
+.handel-page .trade-list { gap: 8px; }
+.handel-page .trade-item { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 14px; padding: 10px 12px 10px 10px; border: 0; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); transition: box-shadow .15s ease; }
+.handel-page .trade-item:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600); }
+.handel-page .trade-item.trade-swap { grid-template-columns: 140px minmax(0, 1fr) auto; }
+.handel-page .trade-item .trade-thumb img { width: 52px; border-radius: 5px; box-shadow: 0 0 0 1px var(--rar, transparent); }
+.handel-page .trade-swap .trade-thumbs { gap: 10px; }
+.handel-page .trade-swap .trade-thumb img { width: 62px; }
+.handel-page .trade-incoming .trade-item { padding: 16px; border-radius: var(--radius-lg); background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-surface)), var(--color-surface)); box-shadow: 0 0 0 1px var(--color-accent-700); }
+.handel-page .trade-info { gap: 4px; font-size: 14px; }
+.handel-page .trade-title strong { font-weight: 500; }
+.trade-kind { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-300); }
+.trade-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font-size: 12px; color: var(--color-neutral-500); }
+.trade-meta a { color: var(--color-neutral-300); }
+.trade-rarity { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-neutral-400); }
+.handel-page .trade-actions { gap: 8px; }
+.handel-page .trade-actions .btn { height: 34px; min-height: 0; }
+.handel-page .trade-price { margin: 0 4px 0 0; font-size: 16px; font-weight: 500; }
+.handel-page .own-tag { font-size: 11px; font-weight: 400; padding: 1px 8px; border: 0; color: var(--color-neutral-400); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.handel-page .own-tag.own-new { color: oklch(0.8 0.14 155); box-shadow: inset 0 0 0 1px color-mix(in srgb, oklch(0.8 0.14 155) 50%, transparent); }
+
+.handel-page .trade-side { display: flex; flex-direction: column; gap: 28px; }
+@media (min-width: 960px) { .handel-page .trade-side { position: sticky; top: 84px; } }
+.trade-help-box {
+  display: flex; flex-direction: column; gap: 14px; padding: 22px; border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 40px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.trade-help-box .btn-primary { height: 44px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.trade-how summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: var(--cur-pointer); font-size: 13px; font-weight: 500; color: var(--color-neutral-300); }
+.trade-how summary::-webkit-details-marker { display: none; }
+.trade-how summary::after { content: '▾'; color: var(--color-neutral-500); transition: transform .15s; }
+.trade-how[open] summary::after { transform: rotate(180deg); }
+.trade-how summary:hover { color: var(--text); }
+.trade-how ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--color-neutral-400); }
+.trade-how strong { font-weight: 500; color: var(--text); }
+.side-list { display: flex; flex-direction: column; gap: 10px; padding: 0 6px; }
+.side-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.my-offers, .deal-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.my-offer { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--color-divider); }
+.my-offer .trade-thumb img { width: 34px; border-radius: 4px; }
+.my-offer .trade-thumbs .trade-thumb img { width: 30px; }
+.my-offer .trade-swap-icon { width: 12px; height: 12px; }
+.my-offer-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--color-neutral-500); }
+.my-offer-info strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+.my-offer-price { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.my-offer form { margin: 0; }
+.my-offer-x { width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-md); background: none; font-size: 16px; line-height: 1; color: var(--color-neutral-500); cursor: var(--cur-pointer); }
+.my-offer-x:hover { color: var(--text); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.deal-log { gap: 12px; }
+.deal-log li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.deal-log li > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.deal-log strong { font-weight: 500; }
+.deal-log .nowrap { font-weight: 500; font-variant-numeric: tabular-nums; }
+.deal-sub { font-size: 11px; color: var(--color-neutral-500); }
+@media (max-width: 560px) {
+  .handel-page .trade-item, .handel-page .trade-item.trade-swap { grid-template-columns: auto minmax(0, 1fr); }
+  .handel-page .trade-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .handel-page .trade-swap .trade-thumb img { width: 46px; }
+  .bm-cd { align-items: flex-start; }
+  .bm .bm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
+}
