@@ -1,6 +1,8 @@
 <%- include('partials/head') %>
 <% const canOffer = mine.cardCount > 0 && theirs.cardCount > 0; %>
 
+<p><a class="btn btn-ghost btn-sm" href="<%= backUrl %>">← <%= pickCard ? 'Anderes Mitglied wählen' : 'Zurück zum Profil' %></a></p>
+
 <div class="page-head">
   <div class="ihk-title">
     <h1>Tausch mit <%= partner.username %></h1>
