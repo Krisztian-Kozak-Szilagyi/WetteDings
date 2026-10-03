@@ -29,7 +29,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const [owned, mine, statsAgg] = await Promise.all([
     inventory(profile._id),
@@ -46,8 +46,13 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     isMe: profile._id.equals(req.user._id),
     // Ban-Vermerk unter dem Namen (bleibt dauerhaft, auch nach Ablauf oder Unban) und Moderations-Menü für den Admin
     ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), by: profile.bannedByName, reason: profile.banReason } : null,
-    canBan: req.user.isAdmin && !config.adminUsernames.includes(profile.usernameLower),
-    maxBanHours: deviceLogic.MAX_BAN_HOURS,
+    canBan:
+      req.user.isStaff &&
+      !profile._id.equals(req.user._id) &&
+      !config.adminUsernames.includes(profile.usernameLower) &&
+      (req.user.isAdmin || profile.role !== 'dev'),
+    canUnban: req.user.isAdmin || (profile.bannedBy && profile.bannedBy.equals(req.user._id)),
+    maxBanHours: req.user.isAdmin ? deviceLogic.MAX_BAN_HOURS : deviceLogic.DEV_MAX_BAN_HOURS,
     // Zeit auf Platz 1 der Rangliste als Text; leer, wenn das Mitglied nie Erster war
     top1: rankService.top1Text(profile.top1Seconds),
     cardCount: owned.reduce((s, o) => s + o.n, 0),

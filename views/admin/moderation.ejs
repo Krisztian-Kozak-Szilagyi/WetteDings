@@ -1,0 +1,167 @@
+<%
+  const openAlerts = deviceMatches.filter((a) => !a.doneAt);
+  const doneAlerts = deviceMatches.filter((a) => a.doneAt);
+  const urgent = openAlerts.filter((a) => a.level >= 2).length;
+  const count = (n) => (n ? ` <span class="panel-badge panel-badge-inline">${n > 99 ? '99+' : n}</span>` : '');
+%>
+
+<nav class="stats-subnav" aria-label="Abschnitte">
+  <span class="muted small">Springe zu:</span>
+  <a href="#streitfaelle">Streitfälle</a><a href="#meldungen">Meldungen</a><a href="#ban">Bannen</a><a href="#banliste">Ban-Liste</a><a href="#geraete">Mehrfach-Konten</a>
+</nav>
+
+<section class="stats-block" id="streitfaelle">
+  <%- blockHead('Streitfälle' + count(counts.disputes), 'Wetten, bei denen Wettersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben. Dort wird nichts ausgezahlt, bis ein Dev mit seiner Stimme entscheidet.') %>
+  <div class="card panel-row">
+    <% if (counts.disputes) { %>
+      <span><strong><%= counts.disputes %> <%= counts.disputes === 1 ? 'Wette wartet' : 'Wetten warten' %></strong> auf eine Entscheidung.</span>
+      <a class="btn btn-primary btn-sm" href="/admin/streitfaelle">Streitfälle entscheiden</a>
+    <% } else { %>
+      <span class="muted">Aktuell gibt es keine Streitfälle.</span>
+      <a class="btn btn-ghost btn-sm" href="/admin/streitfaelle">Ansehen</a>
+    <% } %>
+  </div>
+</section>
+
+<section class="stats-block" id="meldungen">
+  <%- blockHead('Gemeldete Beiträge' + count(reports.length), 'Forenbeiträge, die Mitglieder der Moderation gemeldet haben. Prüfe den Beitrag im Forum, greife dort ein (bearbeiten, löschen, Thema schließen) und markiere die Meldung dann als erledigt.') %>
+  <div class="card">
+    <% if (!reports.length) { %>
+      <p class="muted">Keine offenen Meldungen.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% reports.forEach((r) => { %>
+          <li class="code-item">
+            <div class="code-main">
+              <span>Gemeldet von <%- userLink(r.byName, { realName: false }) %> · <%= dateSec(r.createdAt) %></span>
+            </div>
+            <div class="code-meta small">
+              <% if (r.reason) { %><div><strong>Grund:</strong> <%= r.reason %></div><% } %>
+              <div class="muted">
+                <% if (r.postDoc) { %>
+                  Beitrag von <%= r.postDoc.authorName %>: <%= r.postDoc.deleted ? '(inzwischen gelöscht)' : r.postDoc.body.slice(0, 220) + (r.postDoc.body.length > 220 ? ' …' : '') %>
+                <% } else { %>Beitrag nicht mehr vorhanden<% } %>
+              </div>
+            </div>
+            <div class="code-actions">
+              <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
+              <form method="post" action="/forum/meldungen/<%= r._id %>/erledigt">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="zurueck" value="panel">
+                <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+
+<section class="stats-block" id="ban">
+  <%- blockHead('Bannen', 'Ein gebanntes Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden. Der Ban gilt auch für alle Geräte, mit denen das Konto benutzt wurde: von dort aus ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.') %>
+  <div class="card">
+    <% if (!currentUser.isAdmin) { %>
+      <p class="panel-note small">Als Dev bannst du für <strong>1 bis <%= maxBanHours %> Stunden</strong> (7 Tage). Den Admin und andere Devs kannst du nicht bannen, und einen laufenden Ban eines anderen nicht ändern. Dauerhafte Bans vergibt der Admin.</p>
+    <% } %>
+    <form method="post" action="/admin/sperren" class="form panel-ban-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich bannen?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Mitglied</span>
+        <select name="user" required>
+          <option value="">– auswählen –</option>
+          <% bannable.forEach((u) => { %><option value="<%= u._id %>" <%= String(u._id) === banPreselect ? 'selected' : '' %>><%= u.username %><%= u.role ? ' (' + u.role + ')' : '' %></option><% }) %>
+        </select>
+      </label>
+      <label class="field">
+        <span>Dauer in Stunden <em><%= currentUser.isAdmin ? '(0 = dauerhaft)' : '(1–' + maxBanHours + ')' %></em></span>
+        <input type="number" name="hours" min="<%= currentUser.isAdmin ? 0 : 1 %>" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
+      </label>
+      <label class="field panel-ban-reason">
+        <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
+        <input type="text" name="reason" maxlength="200">
+      </label>
+      <button class="btn btn-danger" type="submit">Bannen</button>
+    </form>
+  </div>
+</section>
+
+<section class="stats-block" id="banliste">
+  <%- blockHead('Ban-Liste' + count(bans.length), currentUser.isAdmin ? '' : 'Aufheben kannst du die Bans, die du selbst vergeben hast.') %>
+  <div class="card">
+    <% if (!bans.length) { %>
+      <p class="muted">Aktuell ist niemand gebannt.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% bans.forEach((b) => { %>
+          <li class="code-item">
+            <div class="code-main"><strong><%- userLink(b.username, { realName: false }) %></strong> <span class="badge badge-entschieden"><%= b.forever ? 'dauerhaft' : 'bis ' + date(b.bannedUntil) %></span></div>
+            <div class="code-meta muted small">
+              <%= b.banReason ? 'Grund: ' + b.banReason + ' · ' : '' %>gebannt von <%= b.bannedByName || '–' %> · <%= date(b.bannedAt) %> · <%= b.devices %> <%= b.devices === 1 ? 'Gerät' : 'Geräte' %> mitgebannt
+            </div>
+            <div class="code-actions">
+              <% if (b.canUnban) { %>
+                <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-ghost btn-sm" type="submit">Ban aufheben</button>
+                </form>
+              <% } else { %>
+                <span class="muted small" title="Aufheben kann nur der Admin oder wer den Ban vergeben hat">nur Admin oder <%= b.bannedByName || 'Vergeber' %></span>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+
+<section class="stats-block" id="geraete">
+  <%- blockHead('Mehrfach-Konten' + count(urgent), 'Konten, die vom selben Gerät aus benutzt wurden. <strong>Sicher</strong> = derselbe Browser (Geräte-Kennung). <strong>Wahrscheinlich</strong> = gleiche Geräte-Merkmale und gleiche IP-Adresse (z. B. anderer Browser oder privates Fenster). <strong>Möglich</strong> = nur gleiche Geräte-Merkmale – das kommt auch bei baugleichen Geräten vor (Schulrechner, gleiches Handymodell) und zählt nicht fürs Abzeichen.') %>
+  <div class="card">
+    <% if (!openAlerts.length) { %>
+      <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
+    <% } %>
+    <% const alertList = (list) => { %>
+      <ul class="code-list">
+        <% list.forEach((a) => { %>
+          <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
+            <div class="code-main">
+              <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
+              <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
+            </div>
+            <div class="code-meta small">
+              <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
+              <% a.shared.forEach((s) => { %>
+                <div class="device-shared">
+                  <div class="muted"><%= s.label %> · <%= s.ua || 'Gerät' %></div>
+                  <% a.users.forEach((u, i) => { %>
+                    <div><strong><%= u.username %>:</strong> <%= s.logins[i].times.length ? 'Anmeldungen ' + s.logins[i].times.map((t) => date(t)).join(' · ') : 'zuletzt gesehen ' + date(s.logins[i].lastAt) %></div>
+                  <% }) %>
+                </div>
+              <% }) %>
+              <div class="muted">Konten erstellt: <%= a.users.map((u) => u.username + ' ' + date(u.createdAt)).join(' · ') %></div>
+            </div>
+            <div class="code-actions">
+              <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
+                <a class="btn btn-danger btn-sm" href="<%= panelUrl('moderation', 'ban', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
+              <% }) %>
+              <form method="post" action="/admin/geraete/<%= a._id %>">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
+                <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+    <% if (openAlerts.length) alertList(openAlerts); %>
+    <% if (doneAlerts.length) { %>
+      <details class="history device-done">
+        <summary>Erledigte Hinweise (<%= doneAlerts.length %>)</summary>
+        <% alertList(doneAlerts); %>
+      </details>
+    <% } %>
+  </div>
+</section>

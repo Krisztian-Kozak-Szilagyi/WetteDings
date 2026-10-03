@@ -243,7 +243,7 @@ router.get('/forum/meldungen', async (req, res, next) => {
 router.post('/forum/meldungen/:id/erledigt', async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
   if (valid(req.params.id)) await ForumReport.updateOne({ _id: req.params.id }, { $set: { done: true } });
-  res.redirect('/forum/meldungen');
+  res.redirect(req.body.zurueck === 'panel' && req.user.isStaff ? '/admin?bereich=moderation#meldungen' : '/forum/meldungen');
 });
 
 // ---------- Bereiche verwalten (Admin/Dev) ----------

@@ -80,4 +80,32 @@ function banUntil(hours, now = Date.now()) {
 const isForever = (date) => !!date && new Date(date).getTime() >= FOREVER.getTime();
 const isBanned = (user, now = Date.now()) => !!(user && user.bannedUntil && new Date(user.bannedUntil).getTime() > now);
 
-module.exports = { COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };
+// Devs dürfen befristet bannen (höchstens 7 Tage); dauerhafte Bans vergibt nur der Admin
+const DEV_MAX_BAN_HOURS = 168;
+
+/**
+ * Darf actor das Mitglied target für hours Stunden bannen? Gibt die Fehlermeldung zurück oder null.
+ * actor: { _id, isAdmin }, target: { _id, username, isAdmin, role, bannedUntil, bannedBy, bannedByName }
+ * Der Admin bannt jeden außer Admins. Devs bannen höchstens DEV_MAX_BAN_HOURS, keine Devs und keinen Admin,
+ * und überschreiben keinen laufenden Ban, den jemand anderes vergeben hat.
+ */
+function banError(actor, target, hours, now = Date.now()) {
+  if (target.isAdmin) return 'Der Admin kann nicht gebannt werden.';
+  if (String(target._id) === String(actor._id)) return 'Du kannst dich nicht selbst bannen.';
+  if (actor.isAdmin) return null;
+  if (target.role === 'dev') return 'Devs können keine anderen Devs bannen – das kann nur der Admin.';
+  const h = Number(String(hours).trim());
+  if (!Number.isInteger(h) || h < 1 || h > DEV_MAX_BAN_HOURS) return `Devs können für 1 bis ${DEV_MAX_BAN_HOURS} Stunden (7 Tage) bannen. Dauerhafte Bans vergibt der Admin.`;
+  if (isBanned(target, now) && String(target.bannedBy) !== String(actor._id)) {
+    return `${target.username} ist bereits von ${target.bannedByName || 'jemand anderem'} gebannt – das kann nur der Admin ändern.`;
+  }
+  return null;
+}
+
+/** Darf actor den Ban von target aufheben? Admin immer, Devs nur ihre eigenen Bans. Fehlermeldung oder null. */
+function unbanError(actor, target) {
+  if (actor.isAdmin || String(target.bannedBy) === String(actor._id)) return null;
+  return `Diesen Ban hat ${target.bannedByName || 'jemand anderes'} vergeben – aufheben kann ihn nur der Admin oder wer ihn vergeben hat.`;
+}
+
+module.exports = { COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };

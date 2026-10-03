@@ -15,8 +15,8 @@
             <input type="hidden" name="user" value="<%= profile._id %>">
             <input type="hidden" name="zurueck" value="profil">
             <label class="field admin-tcg-pack">
-              <span>Dauer in Stunden <em>(0 = dauerhaft)</em></span>
-              <input type="number" name="hours" min="0" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
+              <span>Dauer in Stunden <em><%= currentUser.isAdmin ? '(0 = dauerhaft)' : '(1–' + maxBanHours + ', höchstens 7 Tage)' %></em></span>
+              <input type="number" name="hours" min="<%= currentUser.isAdmin ? 0 : 1 %>" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
             </label>
             <label class="field">
               <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
@@ -24,7 +24,7 @@
             </label>
             <button class="btn btn-danger" type="submit">Ban</button>
           </form>
-          <% if (ban && ban.active) { %>
+          <% if (ban && ban.active && canUnban) { %>
             <form method="post" action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= profile.username %> wirklich entbannen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="zurueck" value="profil">
