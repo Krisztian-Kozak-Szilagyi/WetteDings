@@ -855,7 +855,10 @@ function bucketChart(chart, p, list) {
   return { ...chart, series, empty };
 }
 
-/** Daten eines Reiters: Blöcke mit Vergleichswerten, gebündelten Verläufen und Markierungen. opts: { user } für "mitglied" */
+/**
+ * Daten eines Reiters: Blöcke mit Vergleichswerten, gebündelten Verläufen und Markierungen.
+ * opts: { user } für "mitglied", { raw: true } lässt die Verläufe tagesgenau (für den Export).
+ */
 async function section(key, rangeDays, now = new Date(), opts = {}) {
   const load = LOADERS[key] || LOADERS.uebersicht;
   const p = period(rangeDays, now);
@@ -867,8 +870,12 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
   const bucketOf = Object.fromEntries(list.flatMap((b, i) => b.days.map((d) => [d, i])));
 
   for (const b of blocks) {
-    for (const k of b.kpis || []) if (k.compare) k.delta = delta(k.value, prevKpis.get(k.id), k);
-    b.charts = (b.charts || []).map((c) => bucketChart(c, p, list));
+    for (const k of b.kpis || []) {
+      if (!k.compare) continue;
+      k.prev = prevKpis.has(k.id) ? prevKpis.get(k.id) : null;
+      k.delta = delta(k.value, k.prev, k);
+    }
+    b.charts = (b.charts || []).map((c) => (opts.raw ? { ...c, empty: !c.series.some((x) => x.values.some((v) => v !== null && v !== 0)) } : bucketChart(c, p, list)));
   }
   return {
     period: p,
