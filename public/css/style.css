@@ -1850,6 +1850,7 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
     repeating-linear-gradient(45deg, rgba(255, 255, 255, .045) 0 6px, transparent 6px 12px),
     radial-gradient(circle at 50% 38%, #17605a, #042f2e 72%);
 }
+.admin-gr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; margin-bottom: 14px; }
 .gr-kicker { margin: 0 0 4px; font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--primary); }
 .gr-ok { color: var(--ja); font-weight: 600; }
 .gr-bad { color: var(--nein); font-weight: 600; }
@@ -1890,8 +1891,8 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 
 /* Die Bühne: Schneidematte unter einer Lampe */
 .gr-stage {
-  position: relative; height: clamp(440px, 64vh, 600px); border-radius: 12px; overflow: hidden;
-  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; outline: none;
+  position: relative; height: clamp(440px, 64vh, 600px); border-radius: 12px; overflow: hidden; isolation: isolate;
+  touch-action: none; user-select: none; -webkit-user-select: none; outline: none;
   background-color: #0f3a33;
   background-image:
     radial-gradient(ellipse 60% 55% at 50% 30%, rgba(255, 243, 214, .24), transparent 70%),
@@ -1902,29 +1903,43 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
   background-position: center, center, center, center;
 }
 .gr-stage:focus-visible { box-shadow: 0 0 0 3px var(--primary); }
-.gr-stage.is-dragging { cursor: grabbing; }
-.gr-stage.is-rubbing { cursor: crosshair; }
+/* Maus-Werkzeug: Drehen = Hand, Putzen = Schwamm (Kreis zeigt die Reichweite) */
+.gr-stage.mode-rotate { cursor: var(--cur-grab, grab); }
+.gr-stage.mode-rotate.is-pressed { cursor: var(--cur-grabbing, grabbing); }
+.gr-stage.mode-clean {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='17' fill='rgba(255,255,255,.18)' stroke='white' stroke-width='2' stroke-dasharray='4 3'/%3E%3Ccircle cx='20' cy='20' r='2' fill='white'/%3E%3C/svg%3E") 20 20, crosshair;
+}
+.gr-modes { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 8px; }
+.gr-mode {
+  display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px 6px 10px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .25); background: rgba(0, 0, 0, .55); color: #fff; font: 600 .9rem var(--font);
+  cursor: var(--cur-pointer, pointer);
+}
+.gr-mode:hover { background: rgba(0, 0, 0, .7); }
+.gr-mode.is-on { background: var(--primary); border-color: #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, .25); }
+.gr-mode span { font-size: 1.1rem; }
 .gr-lamp {
   position: absolute; top: -30px; left: 50%; width: 220px; height: 54px; transform: translateX(-50%); pointer-events: none;
   background: radial-gradient(ellipse, rgba(255, 250, 230, .95), rgba(255, 240, 200, .25) 45%, transparent 70%); filter: blur(5px);
 }
+/* Lupe: --z vergrößert die echte Kartengröße (bleibt scharf), verschoben wird per translate (grading.js) */
 .gr-zoom {
-  position: absolute; inset: 0; display: grid; place-items: center; perspective: 1300px;
-  transform: scale(var(--z, 1)); transition: transform .35s ease;
+  position: absolute; inset: 0; display: grid; place-items: center; perspective: calc(1300px * var(--z, 1));
+  transition: transform .2s ease-out;
 }
 .gr-shadow {
   position: absolute; left: 50%; bottom: 6%; width: 240px; height: 34px; pointer-events: none;
   background: radial-gradient(ellipse, rgba(0, 0, 0, .55), transparent 70%); filter: blur(4px);
 }
 .gr-obj {
-  --cw: min(290px, 60vw);
-  position: relative; width: var(--cw); aspect-ratio: 720 / 1008; transform-style: preserve-3d; will-change: transform;
-  animation: gr-float 5s ease-in-out infinite;
+  --cw: calc(min(290px, 60vw) * var(--z, 1));
+  position: relative; width: var(--cw); aspect-ratio: 720 / 1008; transform-style: preserve-3d;
+  animation: gr-float 5s ease-in-out infinite; transition: width .2s ease-out;
 }
 @keyframes gr-float { 50% { translate: 0 -7px; } }
 .gr-card { position: absolute; inset: 0; transform-style: preserve-3d; }
 .gr-face {
-  position: absolute; inset: 0; overflow: hidden; border-radius: 4.6% / 3.3%; background: #111;
+  position: absolute; inset: 0; overflow: hidden; border-radius: 4.6% / 3.3%; background: #111; isolation: isolate;
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .3), 0 18px 40px rgba(0, 0, 0, .35);
 }
@@ -1975,7 +1990,7 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 /* Flecken */
 .gr-spot {
   position: absolute; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
-  opacity: var(--hp, 1); cursor: crosshair; transition: opacity .15s;
+  opacity: var(--hp, 1); transition: opacity .15s;
 }
 .gr-spot-fleck { border-radius: 46% 54% 40% 60% / 55% 45% 55% 45%; background: radial-gradient(circle at 45% 40%, rgba(86, 56, 20, .9), rgba(86, 56, 20, .65) 45%, rgba(86, 56, 20, 0) 70%); }
 .gr-spot-kaffee { background: radial-gradient(circle, rgba(120, 72, 30, .12) 0 44%, rgba(120, 72, 30, .8) 52%, rgba(120, 72, 30, .35) 60%, rgba(120, 72, 30, 0) 68%); }
@@ -1989,13 +2004,6 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
   -webkit-mask-image: radial-gradient(ellipse 46% 56% at 50% 55%, #000 55%, transparent 76%); mask-image: radial-gradient(ellipse 46% 56% at 50% 55%, #000 55%, transparent 76%);
 }
 .gr-spot.is-clean { opacity: 0; pointer-events: none; transition: opacity .4s; }
-.gr-sparkle {
-  position: absolute; width: 18%; aspect-ratio: 1; translate: -50% -50%; pointer-events: none;
-  background: conic-gradient(from 0deg, transparent 0 10%, #fff 12%, transparent 14% 35%, #fff 37%, transparent 39% 60%, #fff 62%, transparent 64% 85%, #fff 87%, transparent 89%);
-  -webkit-mask-image: radial-gradient(circle, #000 8%, transparent 62%); mask-image: radial-gradient(circle, #000 8%, transparent 62%);
-  animation: gr-sparkle .9s ease-out forwards;
-}
-@keyframes gr-sparkle { from { transform: scale(.2) rotate(0); opacity: 1; } to { transform: scale(1.6) rotate(90deg); opacity: 0; } }
 .gr-foam {
   position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle at 35% 35%, #fff, rgba(255, 255, 255, .5) 60%, transparent 70%);
@@ -2019,13 +2027,13 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .gr-slab-label {
   position: absolute; left: 5%; right: 5%; top: 3%; height: 14%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
   padding: 0 6%; border-radius: 6px; background: linear-gradient(#ffffff, #e5e9ee); color: #0f172a;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .35); font: 700 .62rem/1.2 var(--font);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35); font: 700 calc(var(--cw) * .034)/1.2 var(--font);
 }
 .gr-slab-info { display: grid; min-width: 0; }
 .gr-slab-info strong { color: #0f766e; letter-spacing: .1em; }
 .gr-slab-info span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .gr-slab-word { color: #b45309; }
-.gr-slab-grade { font-size: 1.9rem; font-weight: 900; line-height: 1; color: #0f766e; }
+.gr-slab-grade { font-size: calc(var(--cw) * .11); font-weight: 900; line-height: 1; color: #0f766e; }
 .gr-obj.is-sent {
   transform: translateY(-170%) rotateZ(-24deg) rotateY(520deg) scale(.35) !important; opacity: 0;
   transition: transform .85s cubic-bezier(.55, -0.25, .8, .45), opacity .85s ease-in;
@@ -2035,7 +2043,7 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .gr-tools { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; }
 .gr-tool {
   width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .25); color: #fff; font-size: 1.15rem; cursor: var(--cur-pointer, pointer);
-  background: rgba(0, 0, 0, .42); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, .55);
 }
 .gr-tool:hover { background: rgba(0, 0, 0, .6); }
 .gr-tool.is-on { background: var(--primary); border-color: var(--primary); }
@@ -2056,8 +2064,6 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .gr-steps li.is-done { color: var(--ja); }
 .gr-steps li.is-done::before { content: "✓ "; }
 .gr-panel > p:first-child { margin-top: 0; }
-.gr-progress { height: 10px; overflow: hidden; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); }
-.gr-progress span { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--primary), #5eead4); transition: width .25s; }
 .gr-guide { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; list-style: none; }
 .gr-guide li { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); font-size: .85rem; }
 .gr-grades { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin: 10px 0 6px; }
@@ -2076,6 +2082,16 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .gr-meter-zone { position: absolute; top: 0; bottom: 0; left: 42%; width: 16%; background: color-mix(in srgb, var(--ja) 45%, transparent); }
 .gr-meter-needle { position: absolute; top: -2px; bottom: -2px; left: 0; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--text); }
 .gr-seal-result { min-height: 1.4em; margin: 10px 0 0; }
+.gr-grade.is-right { box-shadow: 0 0 0 3px var(--ja); }
+.gr-verdict { margin: 12px 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); }
+.gr-verdict.is-right { border-color: var(--ja); background: var(--ja-soft); }
+.gr-verdict.is-close { border-color: var(--warn); background: var(--warn-soft); }
+.gr-verdict.is-wrong { border-color: var(--nein); background: var(--nein-soft); }
+/* Auflösung nach dem Benoten: alle Mängel rot markiert, Kratzer voll sichtbar */
+.gr-card.is-revealed .gr-scratch { opacity: 1; background: #ef4444; box-shadow: 0 0 6px #ef4444; mix-blend-mode: normal; }
+.gr-card.is-revealed .gr-corner, .gr-card.is-revealed .gr-nick { outline: 2px solid #ef4444; outline-offset: 1px; border-radius: 50%; animation: gr-pulse 1s ease-in-out infinite; }
+.gr-card.is-revealed .gr-crease { background: #ef4444; opacity: .9; }
+@keyframes gr-pulse { 50% { outline-color: rgba(239, 68, 68, .2); } }
 
 /* Leerer Tisch, Tagesliste, Shop */
 .gr-empty { padding: 40px 20px; text-align: center; }

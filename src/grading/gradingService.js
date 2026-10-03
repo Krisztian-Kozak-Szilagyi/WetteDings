@@ -12,28 +12,46 @@ const catalog = require('../tcg/catalog');
 const CONTRACT_DAYS = 10; // so lange kann man nach der Annahme nicht kündigen
 const MS_PER_SPOT = 800; // Mindestzeit pro Fleck (gegen automatisches "Fertig"-Senden)
 
-// Arbeitsschritte: clean = Flecken entfernen, grade = Note bestimmen, slab = einschweißen
-// pay = Lohn in Cent pro Schritt: clean fest, grade bei exakter Note (±1 = halb), slab mal Qualität (0–100 %)
+// Arbeitsschritte: clean = Flecken entfernen, grade = Note bestimmen, slab = einschweißen.
+// Kosten, Lohn und Aufträge pro Tag stehen in den Einstellungen (Admin-Panel).
 const LEVELS = [
-  { level: 1, name: 'Putzstube', steps: ['clean'], jobs: 8, cost: 0, factor: 1, perk: 'Karten reinigen und zurückschicken' },
-  { level: 2, name: 'Grading-Labor', steps: ['clean', 'grade'], jobs: 10, cost: 150000, factor: 1, perk: 'Karten benoten (1–10) – richtige Noten bringen Extra-Lohn' },
-  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'grade', 'slab'], jobs: 12, cost: 500000, factor: 1, perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
-  { level: 4, name: 'Premium-Labor', steps: ['clean', 'grade', 'slab'], jobs: 14, cost: 1200000, factor: 1.3, perk: 'Sammler bringen nur noch seltene Karten (ab Gold) – 30 % mehr Lohn' },
+  { level: 1, name: 'Putzstube', steps: ['clean'], perk: 'Karten reinigen und zurückschicken' },
+  { level: 2, name: 'Grading-Labor', steps: ['clean', 'grade'], perk: 'Karten benoten (1–10) – richtige Noten bringen Extra-Lohn' },
+  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'grade', 'slab'], perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
+  { level: 4, name: 'Premium-Labor', steps: ['clean', 'grade', 'slab'], premium: true, perk: 'Sammler bringen nur noch seltene Karten (ab Gold) – mehr Lohn' },
 ];
-const PAY = { clean: 1500, grade: 2000, slab: 1500 };
-const levelInfo = (level) => LEVELS[Math.min(LEVELS.length, Math.max(1, level)) - 1];
 
 const CUSTOMERS = ['Sammler Günther', 'Frau Hildebrandt', 'Kevin (12)', 'Onkel Horst', 'Auktionshaus Lemke', 'Dr. Brösel', 'Tante Uschi', 'Herr Kowalski', 'Jacqueline', 'Investor Maximilian', 'Oma Erna', 'Der Typ vom Flohmarkt'];
 
 // ---------- Einstellungen (Admin) ----------
-const settings = { open: false };
-async function loadSettings() {
-  const doc = await GradingSettings.findById('grading').lean();
-  if (doc && typeof doc.open === 'boolean') settings.open = doc.open;
+// jobs = Aufträge pro Tag (alle Stufen), pay = Lohn in Cent pro Schritt (clean: ganz sauber; grade: exakte Note,
+// ±1 = halb; slab: perfekt versiegelt), costs = Ausbaukosten in Cent für Stufe 2, 3, 4, premium = Lohn-Aufschlag
+// in % auf Stufe 4
+const DEFAULTS = { open: false, jobs: 10, pay: { clean: 2500, grade: 2000, slab: 1500 }, costs: [150000, 500000, 1200000], premium: 30 };
+const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs] };
+const PAY = settings.pay; // gleiches Objekt – Änderungen im Admin-Panel gelten sofort
+const validCents = (v) => Number.isInteger(v) && v >= 0 && v <= 100000000;
+
+/** Ergänzt die Stufe um die aktuellen Einstellungen (Kosten, Aufträge, Lohnfaktor) */
+function levelInfo(level) {
+  const l = LEVELS[Math.min(LEVELS.length, Math.max(1, level)) - 1];
+  return { ...l, cost: l.level > 1 ? settings.costs[l.level - 2] : 0, jobs: settings.jobs, factor: l.premium ? 1 + settings.premium / 100 : 1 };
 }
-async function saveSettings({ open, admin }) {
-  await GradingSettings.updateOne({ _id: 'grading' }, { $set: { open, updatedByName: admin.username } }, { upsert: true });
-  settings.open = open;
+
+function apply(doc) {
+  if (!doc) return;
+  if (typeof doc.open === 'boolean') settings.open = doc.open;
+  if (Number.isInteger(doc.jobs) && doc.jobs >= 0 && doc.jobs <= 100) settings.jobs = doc.jobs;
+  if (doc.pay) for (const k of Object.keys(PAY)) if (validCents(doc.pay[k])) PAY[k] = doc.pay[k];
+  if (Array.isArray(doc.costs) && doc.costs.length === 3 && doc.costs.every(validCents)) settings.costs = [...doc.costs];
+  if (Number.isFinite(doc.premium) && doc.premium >= 0 && doc.premium <= 500) settings.premium = doc.premium;
+}
+async function loadSettings() {
+  apply(await GradingSettings.findById('grading').lean());
+}
+async function saveSettings({ admin, ...values }) {
+  await GradingSettings.updateOne({ _id: 'grading' }, { $set: { ...values, updatedByName: admin.username } }, { upsert: true });
+  apply(values);
 }
 
 // ---------- Auftrag auswürfeln ----------
@@ -93,10 +111,10 @@ function gradeFor(defects) {
   return Math.max(1, 10 - minus);
 }
 
-/** Lohn eines Auftrags in Cent */
-function payFor({ level, grade, guess, seal }) {
+/** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %) */
+function payFor({ level, clean = 100, grade, guess, seal }) {
   const info = levelInfo(level);
-  let pay = PAY.clean;
+  let pay = Math.round((PAY.clean * Math.max(0, Math.min(100, clean))) / 100);
   if (info.steps.includes('grade')) {
     const diff = Math.abs(grade - guess);
     if (diff === 0) pay += PAY.grade;
@@ -117,7 +135,7 @@ async function getState(userId) {
     GradingJob.find({ user: userId, day, status: 'fertig' }).sort({ doneAt: -1 }).lean(),
   ]);
   const info = levelInfo(shop ? shop.level : 1);
-  return { shop, info, next: LEVELS[info.level] || null, open, done, limit: info.jobs, used: done.length + (open && open.day === day ? 1 : 0) };
+  return { shop, info, next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null, open, done, limit: info.jobs, used: done.length + (open && open.day === day ? 1 : 0) };
 }
 
 /** Job annehmen: Vertrag über CONTRACT_DAYS Tage, ab jetzt kein Tagesbonus */
@@ -148,7 +166,7 @@ async function upgrade({ user }) {
   return inTransaction(async (session) => {
     const shop = await GradingShop.findById(user._id).session(session);
     if (!shop || !shop.active) throw new UserError('Du arbeitest nicht im Grading-Shop.');
-    const next = LEVELS[shop.level];
+    const next = shop.level < LEVELS.length ? levelInfo(shop.level + 1) : null;
     if (!next) throw new UserError('Dein Shop ist schon voll ausgebaut.');
     const paid = await User.updateOne({ _id: user._id, balance: { $gte: next.cost } }, { $inc: { balance: -next.cost } }, { session });
     if (!paid.modifiedCount) throw new UserError(`Dafür fehlt dir Spielgeld (${euro(next.cost)} nötig).`);
@@ -183,17 +201,33 @@ async function takeJob({ user }) {
   }
 }
 
-/** Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben */
-async function finishJob({ user, guess, seal }) {
+/**
+ * Note festlegen (nur einmal pro Auftrag, ab Stufe 2). Gibt die echte Note zurück – die Mängel sieht der
+ * Spieler danach markiert. Ändern lässt sich die Note nicht mehr.
+ */
+async function setGuess({ user, guess }) {
+  if (!(Number.isInteger(guess) && guess >= 1 && guess <= 10)) throw new UserError('Bitte gib eine Note von 1 bis 10.');
+  const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
+  if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
+  if (!levelInfo(job.level).steps.includes('grade')) throw new UserError('Benoten kannst du erst ab Stufe 2.');
+  const updated = await GradingJob.findOneAndUpdate({ _id: job._id, status: 'offen', guess: null }, { $set: { guess } }, { new: true }).lean();
+  const final = updated || job; // schon benotet: die erste Note bleibt
+  return { guess: final.guess, grade: final.grade };
+}
+
+/** Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben. clean = Sauberkeit 0–100 % */
+async function finishJob({ user, clean, seal }) {
   return inTransaction(async (session) => {
     const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session);
     if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
     const info = levelInfo(job.level);
-    if (Date.now() - job.createdAt.getTime() < job.spots.length * MS_PER_SPOT) throw new UserError('Die Karte ist noch nicht sauber.');
-    if (info.steps.includes('grade') && !(Number.isInteger(guess) && guess >= 1 && guess <= 10)) throw new UserError('Bitte gib eine Note von 1 bis 10.');
+    const cleanQ = Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
+    // Putzen braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
+    if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
+    if (info.steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
     const sealQ = info.steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
-    const pay = payFor({ level: job.level, grade: job.grade, guess, seal: sealQ });
-    Object.assign(job, { status: 'fertig', guess: info.steps.includes('grade') ? guess : null, seal: sealQ, pay, doneAt: new Date() });
+    const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ });
+    Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, doneAt: new Date() });
     await job.save({ session });
     await User.updateOne({ _id: user._id }, { $inc: { balance: pay } }, { session });
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay } }, { session });
@@ -206,4 +240,4 @@ async function finishJob({ user, guess, seal }) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, finishJob, isWorking };
+module.exports = { CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

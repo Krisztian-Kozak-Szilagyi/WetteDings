@@ -47,10 +47,15 @@
             <div class="gr-zoom" data-gr-zoom>
               <div class="gr-obj" data-gr-obj></div>
             </div>
-            <div class="gr-hint" data-gr-hint>Ziehen zum Drehen · über Flecken reiben zum Putzen</div>
+            <div class="gr-hint" data-gr-hint></div>
+            <%# Maus-Werkzeug: Drehen oder Putzen (Tasten D und P) %>
+            <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
+              <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
+              <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
+            </div>
             <div class="gr-tools">
               <button type="button" class="gr-tool" data-gr-flip title="Umdrehen">⟲</button>
-              <button type="button" class="gr-tool" data-gr-loupe title="Lupe">🔍</button>
+              <button type="button" class="gr-tool" data-gr-loupe title="Lupe (oder Mausrad)">🔍</button>
               <button type="button" class="gr-tool" data-gr-reset title="Gerade ausrichten">⌖</button>
             </div>
           </div>
@@ -63,14 +68,14 @@
           </ol>
 
           <div class="gr-panel" data-gr-panel="clean">
-            <p><strong>Flecken entfernen:</strong> Halte die Maus über einem Fleck gedrückt und reibe. Dreh die Karte um – auch hinten ist Schmutz!</p>
-            <div class="gr-progress"><span data-gr-clean-bar></span></div>
-            <p class="muted small" data-gr-clean-text></p>
+            <p><strong>Flecken entfernen:</strong> Nimm das Werkzeug <strong>Putzen</strong> und reibe mit gedrückter Maustaste über die Flecken. Mit <strong>Drehen</strong> wendest du die Karte – auch hinten kann Schmutz sein. Ob sie wirklich sauber ist, musst du selbst entscheiden.</p>
+            <p class="muted small">Ganz sauber: <%= euro(pay.clean) %> – jeder Rest Schmutz kostet Lohn.</p>
+            <button type="button" class="btn btn-primary" data-gr-clean-ok>Fertig geputzt</button>
           </div>
 
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
-            <p><strong>Note bestimmen:</strong> Untersuche die Vorderseite. Kratzer siehst du nur, wenn du die Karte schräg ins Licht drehst – die Lupe hilft bei Ecken und Kanten.</p>
+            <p><strong>Note bestimmen:</strong> Untersuche die Vorderseite. Kratzer siehst du nur, wenn du die Karte schräg ins Licht drehst – die Lupe (oder das Mausrad) hilft bei Ecken und Kanten.</p>
             <ul class="gr-guide">
               <li>Start: <strong>10</strong></li>
               <li>Kratzer <strong>−1</strong></li>
@@ -83,6 +88,8 @@
             </div>
             <p class="muted small">Exakt: +<%= euro(pay.grade) %> · um 1 daneben: +<%= euro(pay.grade / 2) %></p>
             <button type="button" class="btn btn-primary" data-gr-grade-ok disabled>Note festlegen</button>
+            <div class="gr-verdict" data-gr-verdict hidden></div>
+            <button type="button" class="btn btn-primary" data-gr-grade-next hidden>Weiter</button>
           </div>
           <% } %>
 
@@ -97,7 +104,7 @@
 
           <form method="post" action="/grading/zuruecksenden" class="gr-panel" data-gr-panel="send" data-gr-send hidden>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="grade" value="">
+            <input type="hidden" name="clean" value="">
             <input type="hidden" name="seal" value="">
             <p><strong>Fertig!</strong> Die Karte ist bereit für <%= jobData.customer %>.</p>
             <button class="btn btn-primary btn-lg" type="submit">An <%= jobData.customer %> zurückschicken</button>
@@ -127,8 +134,11 @@
               <li>
                 <% if (j.cardInfo) { %><img src="<%= j.cardInfo.image %>" alt="" width="40" height="56" loading="lazy"><% } %>
                 <span><strong><%= j.cardInfo ? j.cardInfo.name : j.card %></strong> <span class="muted">für <%= j.customer %></span>
-                  <% if (j.guess !== null) { %><br><span class="small <%= j.guess === j.grade ? 'gr-ok' : 'muted' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
-                  <% if (j.seal !== null) { %><span class="small muted"> · Versiegelung <%= j.seal %> %</span><% } %>
+                  <br><span class="small">
+                    <% if (j.clean !== null && j.clean !== undefined) { %><span class="<%= j.clean === 100 ? 'gr-ok' : 'muted' %>">Sauberkeit <%= j.clean %> %</span><% } %>
+                    <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : 'muted' %>"> · Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
+                    <% if (j.seal !== null) { %><span class="muted"> · Versiegelung <%= j.seal %> %</span><% } %>
+                  </span>
                 </span>
                 <strong class="gr-pay">+<%= euro(j.pay) %></strong>
               </li>
@@ -162,7 +172,7 @@
           <% levels.forEach((l) => { %>
             <li class="<%= l.level <= info.level ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>">
               <strong><%= l.name %></strong><%= l.cost ? ' · ' + euro(l.cost) : '' %>
-              <span class="small muted"><%= l.perk %> · <%= l.jobs %> Aufträge/Tag</span>
+              <span class="small muted"><%= l.perk %></span>
             </li>
           <% }) %>
         </ol>

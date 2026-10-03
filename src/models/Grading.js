@@ -35,6 +35,7 @@ const jobSchema = new Schema(
     grade: { type: Number, required: true }, // echte Note 1–10
     status: { type: String, enum: ['offen', 'fertig'], default: 'offen' },
     guess: { type: Number, default: null }, // Note des Spielers
+    clean: { type: Number, default: null }, // Sauberkeit beim Zurückschicken 0–100 %
     seal: { type: Number, default: null }, // Qualität der Versiegelung 0–100
     pay: { type: Number, default: 0 }, // Lohn in Cent
     doneAt: { type: Date, default: null },
@@ -46,7 +47,10 @@ jobSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { status: 
 jobSchema.index({ user: 1, day: 1 });
 
 // Admin-Einstellungen (ein Dokument, _id "grading")
-const settingsSchema = new Schema({ _id: { type: String, default: 'grading' }, open: Boolean, updatedByName: String }, { timestamps: true });
+const settingsSchema = new Schema(
+  { _id: { type: String, default: 'grading' }, open: Boolean, jobs: Number, pay: { clean: Number, grade: Number, slab: Number }, costs: [Number], premium: Number, updatedByName: String },
+  { timestamps: true }
+);
 
 module.exports = {
   GradingShop: model('GradingShop', shopSchema),

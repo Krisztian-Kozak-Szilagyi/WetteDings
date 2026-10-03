@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { LEVELS, PAY, levelInfo, rollSpots, rollDefects, gradeFor, payFor } = require('../src/grading/gradingService');
+const { LEVELS, PAY, settings, levelInfo, rollSpots, rollDefects, gradeFor, payFor } = require('../src/grading/gradingService');
 
 test('Note: 10 minus Mängel, Knick −3, mindestens 1', () => {
   const none = { scratches: [], corners: [], edges: [], crease: false };
@@ -26,8 +26,16 @@ test('Ausgewürfelte Aufträge: Flecken vorne und hinten, Mängel im gültigen B
   }
 });
 
-test('Lohn je Stufe: Reinigen fest, Note exakt/±1, Versiegeln nach Qualität', () => {
+test('Standardwerte: 10 Aufträge, Stufe 1 bis 25 € pro Auftrag', () => {
+  assert.equal(settings.jobs, 10);
+  assert.equal(PAY.clean, 2500);
+  assert.ok(LEVELS.every((l) => levelInfo(l.level).jobs === 10));
+});
+
+test('Lohn je Stufe: Putzen nach Sauberkeit, Note exakt/±1, Versiegeln nach Qualität', () => {
   assert.equal(payFor({ level: 1, grade: 8, guess: NaN, seal: null }), PAY.clean);
+  assert.equal(payFor({ level: 1, clean: 60 }), Math.round(PAY.clean * 0.6));
+  assert.equal(payFor({ level: 1, clean: 0 }), 0);
   assert.equal(payFor({ level: 2, grade: 8, guess: 8 }), PAY.clean + PAY.grade);
   assert.equal(payFor({ level: 2, grade: 8, guess: 7 }), PAY.clean + PAY.grade / 2);
   assert.equal(payFor({ level: 2, grade: 8, guess: 5 }), PAY.clean);
@@ -37,11 +45,11 @@ test('Lohn je Stufe: Reinigen fest, Note exakt/±1, Versiegeln nach Qualität', 
 });
 
 test('Stufen: aufsteigende Kosten, jede Stufe mindestens so viele Schritte wie die vorige', () => {
-  LEVELS.forEach((l, i) => {
+  LEVELS.map((x) => levelInfo(x.level)).forEach((l, i, all) => {
     assert.equal(l.level, i + 1);
     if (i) {
-      assert.ok(l.cost > LEVELS[i - 1].cost);
-      assert.ok(l.steps.length >= LEVELS[i - 1].steps.length);
+      assert.ok(l.cost > all[i - 1].cost);
+      assert.ok(l.steps.length >= all[i - 1].steps.length);
     }
   });
   assert.equal(levelInfo(99).level, LEVELS.length);

@@ -25,7 +25,7 @@ router.get('/grading', async (req, res) => {
   res.render('grading', {
     title: 'Grading-Shop',
     ...state,
-    levels: grading.LEVELS,
+    levels: grading.LEVELS.map((l) => grading.levelInfo(l.level)),
     pay: grading.PAY,
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
@@ -39,6 +39,9 @@ router.get('/grading', async (req, res) => {
           defects: job.defects,
           minMs: job.spots.length * grading.MS_PER_SPOT,
           startedAt: new Date(job.createdAt).getTime(),
+          // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen
+          guess: job.guess,
+          grade: job.guess !== null ? job.grade : null,
         }
       : null,
     // Schaukarte für die Vorstellung (eine Holo-Karte, falls vorhanden)
@@ -87,13 +90,23 @@ router.post('/grading/auftrag', (req, res) =>
   })
 );
 
+// Note festlegen (vom Arbeitstisch per fetch) – Antwort: echte Note für die Auflösung
+router.post('/grading/benoten', async (req, res) => {
+  try {
+    res.json(await grading.setGuess({ user: req.user, guess: Number.parseInt(str(req.body.grade), 10) }));
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.post('/grading/zuruecksenden', (req, res) =>
   handle(req, res, async () => {
-    const guess = Number.parseInt(str(req.body.grade), 10);
+    const clean = Number(str(req.body.clean));
     const seal = Number(str(req.body.seal));
-    const job = await grading.finishJob({ user: req.user, guess, seal });
+    const job = await grading.finishJob({ user: req.user, clean, seal });
     let msg = `Zurück an ${job.customer} – ${euro(job.pay)} Lohn.`;
-    if (job.guess !== null) msg += job.guess === job.grade ? ` Note ${job.grade} – exakt getroffen!` : ` Deine Note: ${job.guess}, richtig wäre ${job.grade} gewesen.`;
+    if (job.clean < 100) msg += ` Die Karte war erst zu ${job.clean} % sauber – das hat Lohn gekostet.`;
     return msg;
   })
 );

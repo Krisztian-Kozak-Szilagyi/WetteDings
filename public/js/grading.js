@@ -10,7 +10,9 @@
   var obj = bench.querySelector('[data-gr-obj]');
   var hint = bench.querySelector('[data-gr-hint]');
   var form = bench.querySelector('[data-gr-send]');
+  var csrf = form.elements._csrf.value;
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var BRUSH = 16; // Radius des Putzlappens in Pixeln (zusätzlich zur Fleckgröße)
 
   function el(tag, cls, parent) {
     var e = document.createElement(tag);
@@ -51,22 +53,20 @@
   el('div', 'gr-back-logo', back);
   el('div', 'gr-glare', back);
 
-  // Flecken: hp 1 → 0 durch Reiben
+  // Flecken: hp 1 → 0 durch Reiben. Ob alles weg ist, muss der Spieler selbst sehen – es gibt keine Anzeige.
   var spots = (job.spots || []).map(function (s) {
     var e = el('span', 'gr-spot gr-spot-' + s.kind, s.side === 'f' ? front : back);
     e.style.left = s.x + '%';
     e.style.top = s.y + '%';
     e.style.width = s.r * 1.6 + '%';
-    var spot = { el: e, side: s.side, hp: 1, need: 140 + s.r * 14 };
-    e._spot = spot;
-    return spot;
+    return { el: e, side: s.side, hp: 1, need: 90 + s.r * 8 };
   });
 
   // Slab (Schutzhülle) – erscheint beim Versiegeln
   var slabFront = el('div', 'gr-slab gr-slab-front', obj);
   var label = el('div', 'gr-slab-label', slabFront);
   el('div', 'gr-slab-back gr-slab', obj);
-  var shadow = el('div', 'gr-shadow', zoomEl);
+  var shadow = el('div', 'gr-shadow');
   zoomEl.insertBefore(shadow, zoomEl.firstChild);
 
   // ---------- Drehen ----------
@@ -76,8 +76,7 @@
   var vy = 0;
   var tween = null;
   var drag = null;
-  var zoom = 1;
-  var baseZoom = 1;
+  var facingFront = true;
   var sent = false;
 
   function normY() { return ((ry % 360) + 540) % 360 - 180; } // -180 … 180, 0 = Vorderseite zur Kamera
@@ -85,7 +84,7 @@
   function render() {
     obj.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg)';
     var ny = normY();
-    var facingFront = Math.abs(ny) < 90;
+    facingFront = Math.abs(ny) < 90;
     var fy = facingFront ? ny : (ny > 0 ? ny - 180 : ny + 180); // Neigung der gerade sichtbaren Seite
     // Der Browser trifft beim Klicken sonst auch die abgewandte Seite – sie bekommt keine Mausereignisse
     card.classList.toggle('show-back', !facingFront);
@@ -116,12 +115,71 @@
       // Schwung nach dem Loslassen
       ry += vy;
       rx = clamp(rx + vx, -65, 65);
-      vx *= 0.93;
-      vy *= 0.93;
+      vx *= 0.9;
+      vy *= 0.9;
     }
     render();
     requestAnimationFrame(loop);
   }
+
+  // ---------- Lupe ----------
+  // Vergrößert wird über die echte Kartengröße (nicht per scale) – so bleibt das Bild scharf.
+  // Der Punkt unter der Maus bleibt beim Zoomen stehen; bloßes Bewegen der Maus verschiebt nichts.
+  var zoom = 1;
+  var baseZoom = 1;
+  var ox = 0;
+  var oy = 0;
+  var loupeBtn = bench.querySelector('[data-gr-loupe]');
+  function applyZoom() {
+    zoomEl.style.setProperty('--z', (zoom * baseZoom).toFixed(3));
+    var w = obj.offsetWidth;
+    var h = obj.offsetHeight;
+    // Karte darf nicht ganz aus dem Bild rutschen
+    ox = clamp(ox, -w / 2, w / 2);
+    oy = clamp(oy, -h / 2, h / 2);
+    zoomEl.style.transform = 'translate(' + ox.toFixed(1) + 'px, ' + oy.toFixed(1) + 'px)';
+    loupeBtn.classList.toggle('is-on', zoom > 1);
+  }
+  function setZoom(z, px, py) {
+    z = clamp(z, 1, 2.6);
+    var f = z / zoom;
+    var r = stage.getBoundingClientRect();
+    var cx = r.left + r.width / 2;
+    var cy = r.top + r.height / 2;
+    if (px === undefined) {
+      px = cx + ox;
+      py = cy + oy;
+    }
+    // Punkt (px, py) relativ zur Kartenmitte bleibt an seiner Stelle
+    ox = px - cx - (px - cx - ox) * f;
+    oy = py - cy - (py - cy - oy) * f;
+    zoom = z;
+    if (zoom === 1) ox = oy = 0;
+    applyZoom();
+  }
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
+  }, { passive: false });
+  loupeBtn.addEventListener('click', function () { setZoom(zoom > 1 ? 1 : 2.2); });
+
+  // ---------- Maus-Werkzeug: Drehen oder Putzen ----------
+  var mode = 'rotate';
+  var modeBtns = bench.querySelectorAll('[data-gr-mode]');
+  function setMode(m) {
+    mode = m;
+    modeBtns.forEach(function (b) {
+      var on = b.getAttribute('data-gr-mode') === m;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    stage.classList.toggle('mode-clean', m === 'clean');
+    stage.classList.toggle('mode-rotate', m === 'rotate');
+    showHint();
+  }
+  modeBtns.forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.getAttribute('data-gr-mode')); });
+  });
 
   // ---------- Putzen ----------
   var lastFoam = 0;
@@ -137,65 +195,53 @@
     setTimeout(function () { f.remove(); }, 700);
   }
 
-  function rub(spot, dist) {
-    if (!spot || spot.hp <= 0) return;
-    spot.hp = Math.max(0, spot.hp - dist / spot.need);
-    spot.el.style.setProperty('--hp', (0.15 + spot.hp * 0.85).toFixed(3));
-    if (spot.hp <= 0) {
-      spot.el.classList.add('is-clean');
-      var sp = el('span', 'gr-sparkle', spot.el.parentNode);
-      sp.style.left = spot.el.style.left;
-      sp.style.top = spot.el.style.top;
-      setTimeout(function () { sp.remove(); }, 900);
-      updateClean();
-    }
+  /** Reibt alle Flecken der sichtbaren Seite, die der Lappen an (x, y) berührt */
+  function rubAt(x, y, dist) {
+    var hit = false;
+    spots.forEach(function (s) {
+      if (s.hp <= 0 || (s.side === 'f') !== facingFront) return;
+      var r = s.el.getBoundingClientRect();
+      var dx = x - (r.left + r.width / 2);
+      var dy = y - (r.top + r.height / 2);
+      if (Math.sqrt(dx * dx + dy * dy) > Math.max(r.width, r.height) / 2 + BRUSH) return;
+      hit = true;
+      s.hp = Math.max(0, s.hp - dist / s.need);
+      if (s.hp < 0.04) s.hp = 0;
+      // Reste bleiben lange sichtbar: erst ganz am Ende verschwindet ein Fleck
+      s.el.style.setProperty('--hp', Math.pow(s.hp, 0.6).toFixed(3));
+      if (!s.hp) s.el.classList.add('is-clean');
+    });
+    if (hit) foam(x, y);
   }
 
-  var cleanBar = bench.querySelector('[data-gr-clean-bar]');
-  var cleanText = bench.querySelector('[data-gr-clean-text]');
-  function updateClean() {
-    var left = spots.filter(function (s) { return s.hp > 0; });
-    var f = left.filter(function (s) { return s.side === 'f'; }).length;
-    cleanBar.style.width = Math.round(((spots.length - left.length) / spots.length) * 100) + '%';
-    cleanText.textContent = left.length ? 'Noch ' + left.length + (left.length === 1 ? ' Fleck' : ' Flecken') + ' – vorne ' + f + ', hinten ' + (left.length - f) + '.' : 'Blitzblank!';
-    if (!left.length && step === 'clean') {
-      card.classList.add('is-shiny');
-      // Der Server verlangt eine Mindestzeit pro Fleck – notfalls kurz warten
-      var wait = Math.max(600, job.startedAt + job.minMs + 300 - Date.now());
-      setTimeout(nextStep, wait);
-    }
+  /** Sauberkeit in Prozent (wird beim Zurückschicken mitgeschickt) */
+  function cleanliness() {
+    if (!spots.length) return 100;
+    var sum = spots.reduce(function (a, s) { return a + (1 - s.hp); }, 0);
+    return Math.round((sum / spots.length) * 100);
   }
 
-  // ---------- Zeiger: Drehen oder Reiben ----------
-  function spotAt(x, y) {
-    var t = document.elementFromPoint(x, y);
-    var e = t && t.closest ? t.closest('.gr-spot') : null;
-    return e && !e.classList.contains('is-clean') ? e._spot : null;
-  }
-
+  // ---------- Zeiger ----------
   stage.addEventListener('pointerdown', function (e) {
-    if (sent || e.button > 0 || e.target.closest('.gr-tools')) return;
-    var spot = step === 'clean' ? spotAt(e.clientX, e.clientY) : null;
-    drag = { mode: spot ? 'rub' : 'rotate', x: e.clientX, y: e.clientY };
+    if (sent || e.button > 0 || e.target.closest('.gr-tools, .gr-modes')) return;
+    e.preventDefault(); // keine Textauswahl beim Ziehen (die färbte die ganze Seite dunkel)
+    drag = { x: e.clientX, y: e.clientY };
     tween = null;
     vx = 0;
     vy = 0;
-    stage.setPointerCapture(e.pointerId);
-    stage.classList.add(spot ? 'is-rubbing' : 'is-dragging');
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* synthetische Ereignisse */ }
+    stage.classList.add('is-pressed');
     hint.classList.add('is-gone');
+    if (mode === 'clean') rubAt(e.clientX, e.clientY, 6);
   });
 
   stage.addEventListener('pointermove', function (e) {
-    if (zoom > 1) {
-      var r = stage.getBoundingClientRect();
-      zoomEl.style.transformOrigin = e.clientX - r.left + 'px ' + (e.clientY - r.top) + 'px';
-    }
     if (!drag) return;
     var dx = e.clientX - drag.x;
     var dy = e.clientY - drag.y;
     drag.x = e.clientX;
     drag.y = e.clientY;
-    if (drag.mode === 'rotate') {
+    if (mode === 'rotate') {
       var k = 0.45 / zoom;
       ry += dx * k;
       rx = clamp(rx - dy * k, -65, 65);
@@ -203,39 +249,23 @@
       vy = clamp(dx * k, -6, 6);
       vx = clamp(-dy * k, -6, 6);
     } else {
-      var spot = spotAt(e.clientX, e.clientY);
-      if (spot) {
-        rub(spot, Math.sqrt(dx * dx + dy * dy));
-        foam(e.clientX, e.clientY);
-      }
+      rubAt(e.clientX, e.clientY, Math.sqrt(dx * dx + dy * dy));
     }
   });
 
   function endDrag() {
     drag = null;
-    stage.classList.remove('is-dragging', 'is-rubbing');
+    stage.classList.remove('is-pressed');
   }
   stage.addEventListener('pointerup', endDrag);
   stage.addEventListener('pointercancel', endDrag);
+  stage.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-  // Mausrad: Lupe stufenlos
-  stage.addEventListener('wheel', function (e) {
-    e.preventDefault();
-    var r = stage.getBoundingClientRect();
-    zoomEl.style.transformOrigin = e.clientX - r.left + 'px ' + (e.clientY - r.top) + 'px';
-    setZoom(clamp(zoom - e.deltaY * 0.0015, 1, 2.6));
-  }, { passive: false });
-
-  function setZoom(z) {
-    zoom = z;
-    zoomEl.style.setProperty('--z', (zoom * baseZoom).toFixed(3));
-    loupeBtn.classList.toggle('is-on', zoom > 1);
-    if (zoom === 1) zoomEl.style.transformOrigin = '';
-  }
-
-  // Tastatur: Pfeiltasten drehen
+  // Tastatur: Pfeiltasten drehen, D/P wechseln das Werkzeug
   stage.tabIndex = 0;
   stage.addEventListener('keydown', function (e) {
+    if (e.key === 'd' || e.key === 'D') return setMode('rotate');
+    if (e.key === 'p' || e.key === 'P') return setMode('clean');
     var map = { ArrowLeft: [0, -12], ArrowRight: [0, 12], ArrowUp: [12, 0], ArrowDown: [-12, 0] };
     if (!map[e.key]) return;
     e.preventDefault();
@@ -246,8 +276,6 @@
   bench.querySelector('[data-gr-flip]').addEventListener('click', function () {
     tweenTo(0, Math.round((ry + 180) / 180) * 180, 700);
   });
-  var loupeBtn = bench.querySelector('[data-gr-loupe]');
-  loupeBtn.addEventListener('click', function () { setZoom(zoom > 1 ? 1 : 2.2); });
   bench.querySelector('[data-gr-reset]').addEventListener('click', function () {
     setZoom(1);
     tweenTo(0, Math.round(ry / 360) * 360, 600);
@@ -257,11 +285,16 @@
   var steps = (job.steps || ['clean']).concat(['send']);
   var step = null;
   var HINTS = {
-    clean: 'Ziehen zum Drehen · über Flecken reiben zum Putzen',
-    grade: 'Schräg ins Licht drehen – Kratzer blitzen auf · 🔍 für Ecken und Kanten',
-    slab: 'Stoppe den Zeiger im grünen Bereich',
-    send: 'Fertig – ab zum Kunden!',
+    clean: { clean: 'Putzen: mit gedrückter Maustaste über die Flecken reiben', rotate: 'Drehen: ziehen, um die Karte zu wenden · Mausrad = Lupe' },
+    grade: { clean: 'Putzen: mit gedrückter Maustaste reiben', rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Lupe' },
+    slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
+    send: { clean: 'Fertig – ab zum Kunden!', rotate: 'Fertig – ab zum Kunden!' },
   };
+  function showHint() {
+    if (!step) return;
+    hint.textContent = HINTS[step][mode];
+    hint.classList.remove('is-gone');
+  }
   function setStep(name) {
     step = name;
     bench.querySelectorAll('[data-gr-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-gr-panel') !== name; });
@@ -270,33 +303,78 @@
       li.classList.toggle('is-done', i < idx);
       li.classList.toggle('is-active', i === idx);
     });
-    stage.classList.toggle('is-clean-step', name === 'clean');
-    hint.textContent = HINTS[name] || '';
-    hint.classList.remove('is-gone');
+    setMode(name === 'clean' ? 'clean' : 'rotate');
     if (name === 'slab') startMeter();
   }
   function nextStep() {
     var i = steps.indexOf(step);
     if (i < steps.length - 1) setStep(steps[i + 1]);
   }
+  bench.querySelector('[data-gr-clean-ok]').addEventListener('click', nextStep);
 
-  // Benoten
+  // Benoten: Die Note geht sofort an den Server (nur einmal möglich), danach zeigt der Tisch die Auflösung
   var chosen = null;
   var gradeOk = bench.querySelector('[data-gr-grade-ok]');
-  bench.querySelectorAll('[data-grade]').forEach(function (b) {
+  var gradeNext = bench.querySelector('[data-gr-grade-next]');
+  var verdict = bench.querySelector('[data-gr-verdict]');
+  var gradeBtns = bench.querySelectorAll('[data-grade]');
+  gradeBtns.forEach(function (b) {
     b.addEventListener('click', function () {
-      if (step !== 'grade') return;
+      if (step !== 'grade' || job.guess) return;
       chosen = Number(b.getAttribute('data-grade'));
-      bench.querySelectorAll('[data-grade]').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      gradeBtns.forEach(function (x) { x.classList.toggle('is-on', x === b); });
       gradeOk.disabled = false;
     });
   });
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  function showVerdict(guess, grade) {
+    job.guess = guess;
+    job.grade = grade;
+    gradeBtns.forEach(function (x) {
+      var g = Number(x.getAttribute('data-grade'));
+      x.disabled = true;
+      x.classList.toggle('is-on', g === guess);
+      x.classList.toggle('is-right', g === grade);
+    });
+    gradeOk.hidden = true;
+    var diff = Math.abs(guess - grade);
+    var found = [];
+    if ((d.scratches || []).length) found.push(plural(d.scratches.length, 'Kratzer', 'Kratzer'));
+    if ((d.corners || []).length) found.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
+    if ((d.edges || []).length) found.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
+    if (d.crease) found.push('ein Knick');
+    verdict.className = 'gr-verdict ' + (diff === 0 ? 'is-right' : diff === 1 ? 'is-close' : 'is-wrong');
+    verdict.innerHTML = '';
+    el('strong', '', verdict).textContent = diff === 0 ? 'Exakt! Note ' + grade + '.' : diff === 1 ? 'Knapp daneben – richtig ist ' + grade + ' (halber Bonus).' : 'Daneben – richtig ist ' + grade + '.';
+    el('span', '', verdict).textContent = found.length ? ' Mängel: ' + found.join(', ') + ' – jetzt rot markiert.' : ' Die Karte war makellos.';
+    verdict.hidden = false;
+    gradeNext.hidden = false;
+    card.classList.add('is-revealed');
+  }
   if (gradeOk) {
     gradeOk.addEventListener('click', function () {
       if (!chosen) return;
-      form.elements.grade.value = String(chosen);
-      bench.querySelectorAll('[data-grade]').forEach(function (x) { x.disabled = true; });
       gradeOk.disabled = true;
+      fetch('/grading/benoten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ _csrf: csrf, grade: String(chosen) }),
+        credentials: 'same-origin',
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) throw new Error(res.error);
+          showVerdict(res.guess, res.grade);
+        })
+        .catch(function (err) {
+          gradeOk.disabled = false;
+          verdict.className = 'gr-verdict is-wrong';
+          verdict.textContent = err.message || 'Das hat nicht geklappt – bitte noch einmal.';
+          verdict.hidden = false;
+        });
+    });
+    gradeNext.addEventListener('click', function () {
+      card.classList.remove('is-revealed');
       nextStep();
     });
   }
@@ -331,11 +409,11 @@
       var res = bench.querySelector('[data-gr-seal-result]');
       res.textContent = q >= 90 ? 'Perfekt versiegelt! (' + q + ' %)' : q >= 60 ? 'Sauber versiegelt. (' + q + ' %)' : q > 0 ? 'Eine kleine Luftblase … (' + q + ' %)' : 'Schief eingeschweißt! (0 %)';
       res.className = 'gr-seal-result ' + (q >= 60 ? 'gr-ok' : 'gr-bad');
-      var g = Number(form.elements.grade.value) || 0;
+      var g = job.guess || 0;
       label.innerHTML = '';
       var info = el('div', 'gr-slab-info', label);
       el('strong', '', info).textContent = 'BfW GRADING';
-      el('span', '', info).textContent = (job.card ? job.card.name + ' · ' + job.card.rarityLabel : '');
+      el('span', '', info).textContent = job.card ? job.card.name + ' · ' + job.card.rarityLabel : '';
       el('span', 'gr-slab-word', info).textContent = GRADE_NAMES[g] || '';
       el('div', 'gr-slab-grade', label).textContent = g || '–';
       baseZoom = 0.82;
@@ -351,13 +429,19 @@
     if (sent) return;
     e.preventDefault();
     sent = true;
+    form.elements.clean.value = String(cleanliness());
     form.querySelector('button[type="submit"]').disabled = true;
     obj.classList.add('is-sent');
     setTimeout(function () { form.submit(); }, reduceMotion ? 0 : 850);
   });
 
   setStep(steps[0]);
-  updateClean();
+  // Schon benotet (Seite neu geladen): Auflösung zeigen, weiter beim Benoten-Schritt
+  if (job.guess && gradeOk) {
+    setStep('grade');
+    showVerdict(job.guess, job.grade);
+  }
+  applyZoom();
   render();
   requestAnimationFrame(loop);
 })();
