@@ -859,6 +859,8 @@ const LOADERS = {
   mitglied: (p, now, opts) => require('./memberStats').member(p, now, opts),
 };
 
+const LOADER_MAP = new Map(Object.entries(LOADERS));
+
 /** Zeitreihen eines Diagramms auf die Abschnitte (Tag/Woche/Monat) bündeln */
 function bucketChart(chart, p, list) {
   const series = chart.series.map((s) => ({ name: s.name, values: aggregate(s.values, p.days, list, chart.agg) }));
@@ -871,9 +873,8 @@ function bucketChart(chart, p, list) {
  * opts: { user } für "mitglied", { raw: true } lässt die Verläufe tagesgenau (für den Export).
  */
 async function section(key, rangeDays, now = new Date(), opts = {}) {
-  // Nur eigene Einträge: ein Schlüssel wie "constructor" aus der Adresse darf keine fremde Funktion aufrufen
-  const own = Object.prototype.hasOwnProperty.call(LOADERS, key) ? LOADERS[key] : null;
-  const load = typeof own === 'function' ? own : LOADERS.uebersicht;
+  // Über eine Map nachschlagen: ein Schlüssel wie "constructor" aus der Adresse kann so keine fremde Funktion treffen
+  const load = LOADER_MAP.get(key) || LOADERS.uebersicht;
   const p = period(rangeDays, now);
   const prev = period(rangeDays, now, 1);
   const [blocks, prevBlocks, marks] = await Promise.all([load(p, now, opts), load(prev, now, opts), markers(p)]);
