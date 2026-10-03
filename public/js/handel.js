@@ -164,9 +164,7 @@
     t.addEventListener('click', function () { showTab(t.getAttribute('data-trade-tab')); });
   });
 
-  document.addEventListener('click', function (e) {
-    var slot = e.target.closest('[data-trade-card]');
-    if (!slot) return;
+  function openFor(slot, tab) {
     var d = slot.dataset;
     var img = $('[data-trade-img]', modal);
     img.src = d.image;
@@ -182,8 +180,36 @@
 
     if (typeof modal.showModal === 'function') modal.showModal();
     else modal.setAttribute('open', '');
-    showTab('markt');
+    showTab(tab || 'markt');
+  }
+
+  document.addEventListener('click', function (e) {
+    var slot = e.target.closest('[data-trade-card]');
+    if (slot) openFor(slot);
   });
+
+  // Weiter zur Tausch-Auswahl: diese Seite so im Verlauf ablegen, dass "Zurück" wieder im Dialog landet
+  var swapForm = $('[data-trade-pane="tausch"]', modal);
+  swapForm.addEventListener('submit', function () {
+    var params = new URLSearchParams({ karte: swapForm.elements.karte.value, reiter: 'tausch', an: swapForm.elements.an.value.trim() });
+    history.replaceState(null, '', '/handel?' + params + '#sammlung');
+  });
+
+  // Rückweg von der Tausch-Auswahl (?karte=…&reiter=tausch&an=…): Dialog derselben Karte wieder öffnen
+  var query = new URLSearchParams(window.location.search);
+  var backCard = query.get('karte');
+  if (backCard) {
+    var backSlot = $all('[data-trade-card]').filter(function (s) { return s.dataset.tradeCard === backCard; })[0];
+    if (backSlot) {
+      openFor(backSlot, query.get('reiter') || 'markt');
+      if (query.get('an')) {
+        swapForm.elements.an.value = query.get('an');
+        swapForm.elements.an.select();
+      }
+    }
+    // Parameter entfernen, damit ein Neuladen den Dialog nicht erneut öffnet
+    history.replaceState(null, '', '/handel' + window.location.hash);
+  }
 
   function closeModal() {
     if (typeof modal.close === 'function') modal.close();

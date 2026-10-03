@@ -12,6 +12,8 @@ const router = express.Router();
 router.use('/handel', requireLogin);
 
 const cardInfo = (id) => catalog.cardById[id] || { id, name: id, rarity: 'crumpled', image: '' };
+/** Zurück in den Handel-Dialog derselben Karte, Reiter "Tauschen" (Partner vorausgefüllt) */
+const swapDialogUrl = (cardId, name) => '/handel?' + new URLSearchParams({ karte: cardId, reiter: 'tausch', an: name || '' }) + '#sammlung';
 
 router.get('/handel', async (req, res) => {
   const [data, market] = await Promise.all([
@@ -57,10 +59,11 @@ router.post('/handel/black-market', async (req, res) => {
 /** Tauschangebot zusammenstellen: links die eigenen freien Karten, rechts die Sammlung des Mitspielers */
 router.get('/handel/tausch', async (req, res) => {
   const name = str(req.query.an).trim();
+  const pickCard = str(req.query.karte);
   const partner = name && (await User.findOne({ usernameLower: name.toLowerCase(), deletedAt: null }).select('username').lean());
   if (!partner || partner._id.equals(req.user._id)) {
     req.flash('error', name ? 'Mit diesem Mitglied kannst du nicht tauschen.' : 'Bitte wähle aus, mit wem du tauschen möchtest.');
-    return res.redirect('/handel');
+    return res.redirect(pickCard ? swapDialogUrl(pickCard, name) : '/handel');
   }
   const [mine, theirs] = await Promise.all([collection(req.user), collection(partner)]);
   res.render('handel-tausch', {
@@ -71,7 +74,9 @@ router.get('/handel/tausch', async (req, res) => {
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
-    pickCard: str(req.query.karte),
+    pickCard,
+    // Ein Schritt zurück: aus dem Handel-Dialog gekommen -> dorthin, sonst (Profil) zum Profil
+    backUrl: pickCard ? swapDialogUrl(pickCard, partner.username) : `/profil/${encodeURIComponent(partner.username)}`,
     pickWant: str(req.query.will),
     pickPrice: str(req.query.preis),
     pickFrom: str(req.query.zahlt),
