@@ -58,6 +58,25 @@ async function grantPacks({ userId, type, count = 1, source, session }) {
   return t;
 }
 
+/** Booster Packs an viele Mitglieder auf einmal verschenken ("Bless everyone"): count Packs je Mitglied */
+async function grantPacksToMany({ userIds, type, count = 1, source = 'admin' }) {
+  const t = packType(type);
+  await TcgPack.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, type: t.key, source, cost: 0 }))));
+  return t;
+}
+
+/**
+ * Eine bestimmte Karte verschenken (Admin/Dev, z. B. nach einem Fehler oder für eine Aktion): count Exemplare je
+ * Mitglied. Die Karte gilt danach als "schon besessen" (Album).
+ */
+async function grantCards({ userIds, cardId, count = 1 }) {
+  const card = catalog.cardById[cardId];
+  if (!card) throw new UserError('Diese Karte gibt es nicht.');
+  await TcgCard.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, card: card.id, rarity: card.rarity }))));
+  await User.updateMany({ _id: { $in: userIds } }, { $addToSet: { tcgSeen: card.id } });
+  return card;
+}
+
 /** Ein Booster Pack aus dem Inventar öffnen (das älteste dieser Art). Gibt die gezogenen Karten zurück. */
 async function openPack({ user, type }) {
   const t = packType(type);
@@ -232,4 +251,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { soldMeta, MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { soldMeta, MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

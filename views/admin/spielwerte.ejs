@@ -1,35 +1,75 @@
-<% if (currentUser.isAdmin) { %>
-  <nav class="stats-subnav" aria-label="Abschnitte">
-    <span class="muted small">Springe zu:</span>
-    <a href="#packs">Packs vergeben</a><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#ihk">IHK</a>
-  </nav>
-<% } %>
+<nav class="stats-subnav" aria-label="Abschnitte">
+  <span class="muted small">Springe zu:</span>
+  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#ihk">IHK</a><% } %>
+</nav>
 
-<section class="stats-block" id="packs">
-  <%- blockHead('Booster Packs vergeben', 'Schenkt einem Mitglied ungeöffnete Booster Packs. Sie landen in seinem Inventar auf der TCG-Seite („Meine Packs“). Jede Vergabe wird im Pack-Log festgehalten (wer, wem, wann).') %>
-  <div class="card">
-    <form method="post" action="/admin/tcg/packs" class="form panel-inline-form" data-confirm="Booster Packs wirklich vergeben?">
+<div class="panel-warning" role="note">
+  <span class="panel-warning-icon" aria-hidden="true">!</span>
+  <div>
+    <strong>Nur für Bugfixes, Tests und Aktionen.</strong>
+    Vergaben von Packs und Karten greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe wird mit deinem Namen im <a href="<%= panelUrl('protokolle', 'packlog') %>">Vergabe-Log</a> festgehalten, und jede Aktion auf dieser Seite muss mit deinem Passwort bestätigt werden.
+  </div>
+</div>
+
+<section class="stats-block" id="vergeben">
+  <%- blockHead('Packs &amp; Karten vergeben', '') %>
+  <div class="panel-grants">
+    <form method="post" data-reauth action="/admin/tcg/packs" class="card panel-grant" data-confirm="Booster Packs an dieses Mitglied vergeben?">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label class="field">
-        <span>Mitglied</span>
+      <h3><%- icon('gift') %> Packs an ein Mitglied</h3>
+      <p class="muted small">Ungeöffnete Packs landen im Inventar („Meine Packs“).</p>
+      <label class="field"><span>Mitglied</span>
         <select name="user" required>
           <option value="">– auswählen –</option>
           <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
         </select>
       </label>
-      <label class="field">
-        <span>Booster Pack</span>
-        <select name="type" required>
-          <% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %>
-        </select>
-      </label>
-      <label class="field panel-field-sm">
-        <span>Anzahl (1–50)</span>
-        <input type="number" name="count" min="1" max="50" step="1" value="1" required>
-      </label>
+      <div class="panel-grant-row">
+        <label class="field"><span>Booster Pack</span>
+          <select name="type" required><% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
+        </label>
+        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      </div>
       <button class="btn btn-primary" type="submit">Packs vergeben</button>
     </form>
-    <p class="small"><a href="<%= panelUrl('protokolle', 'packlog') %>">Zum Pack-Log</a></p>
+
+    <form method="post" data-reauth action="/admin/tcg/bless" class="card panel-grant panel-grant-bless" data-confirm="Bless everyone: wirklich JEDES Mitglied (<%= users.length %>) beschenken?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <h3><%- icon('sparkle') %> Bless everyone</h3>
+      <p class="muted small">Jedes Mitglied (<strong><%= users.length %></strong>) bekommt dieselbe Anzahl Packs.</p>
+      <label class="field"><span>Booster Pack</span>
+        <select name="type" required><% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
+      </label>
+      <label class="field panel-count"><span>Packs je Mitglied (1–10)</span><input type="number" name="count" min="1" max="10" step="1" value="1" required></label>
+      <button class="btn btn-primary" type="submit">Alle beschenken</button>
+    </form>
+
+    <form method="post" data-reauth action="/admin/tcg/karte" class="card panel-grant" data-confirm="Diese Karte wirklich vergeben?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <h3><%- icon('cards') %> Bestimmte Karte vergeben</h3>
+      <p class="muted small">An ein Mitglied oder an alle – die Karte landet direkt in der Sammlung.</p>
+      <label class="field"><span>Karte</span>
+        <select name="card" required>
+          <option value="">– auswählen –</option>
+          <% grantCards.forEach((g) => { %>
+            <optgroup label="<%= g.rarity.label %><%= g.rarity.hidden ? ' (geheim)' : '' %>">
+              <% g.cards.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+            </optgroup>
+          <% }) %>
+        </select>
+      </label>
+      <div class="panel-grant-row">
+        <label class="field"><span>Empfänger</span>
+          <select name="user" required>
+            <option value="">– auswählen –</option>
+            <option value="alle">Alle Mitglieder (<%= users.length %>)</option>
+            <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+          </select>
+        </label>
+        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="5" step="1" value="1" required></label>
+      </div>
+      <button class="btn btn-primary" type="submit">Karte vergeben</button>
+    </form>
   </div>
 </section>
 
@@ -43,7 +83,7 @@
   <section class="stats-block" id="tcg">
     <%- blockHead('TCG: Chancen &amp; Preise', 'Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.') %>
     <div class="card">
-      <form method="post" action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin>
+      <form method="post" data-reauth action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="field admin-tcg-pack">
           <span>Packpreis (3 Karten)</span>
@@ -81,7 +121,7 @@
   <section class="stats-block" id="handel">
     <%- blockHead('Handelssteuer', 'Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.') %>
     <div class="card">
-      <form method="post" action="/admin/handel" class="form panel-inline-form">
+      <form method="post" data-reauth action="/admin/handel" class="form panel-inline-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="field panel-field-sm">
           <span>Handelssteuer in % (0–50)</span>
@@ -95,7 +135,7 @@
   <section class="stats-block" id="ihk">
     <%- blockHead('IHK: Limit &amp; Lohn', 'Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.') %>
     <div class="card">
-      <form method="post" action="/admin/ihk" class="form admin-tcg-form">
+      <form method="post" data-reauth action="/admin/ihk" class="form admin-tcg-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="check admin-ihk-open">
           <input type="checkbox" name="open" value="1" <%= ihk.settings.open ? 'checked' : '' %>>

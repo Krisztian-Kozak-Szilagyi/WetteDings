@@ -2071,7 +2071,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 
 /* Formulare und Zeilen */
 .panel-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.panel-inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.panel-inline-form { display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 12px; } /* .form ist sonst eine Spalte */
 .panel-inline-form .field { flex: 1 1 200px; max-width: 320px; }
 .panel-inline-form .panel-field-sm { flex: 0 1 160px; }
 .panel-ban-form { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 12px; align-items: end; }
@@ -2080,3 +2080,44 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 @media (max-width: 640px) { .panel-ban-form { grid-template-columns: 1fr; } }
 .panel-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--text); }
 .panel-hint { margin: -16px 0 24px; padding-left: 16px; }
+
+/* Vergaben (Packs & Karten) */
+.panel-warning {
+  display: flex; gap: 12px; align-items: flex-start; margin: 0 0 20px; padding: 14px 16px; border-radius: var(--radius);
+  background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); line-height: 1.5;
+}
+.panel-warning a { color: inherit; text-decoration: underline; }
+.panel-warning-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--warn); color: var(--surface); font-weight: 800;
+}
+.panel-grants { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+@media (max-width: 1000px) { .panel-grants { grid-template-columns: 1fr; } }
+.panel-grant { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.panel-grant h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1rem; }
+.panel-grant h3 .stats-icon { color: var(--primary); }
+.panel-grant > p { margin: -4px 0 2px; }
+.panel-grant .field > span { margin-bottom: 0; font-size: .85rem; }
+.panel-grant select, .panel-grant input { min-height: 40px; padding: 8px 10px; }
+.panel-grant .btn { margin-top: auto; align-self: flex-start; }
+.panel-grant-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+.panel-grant-bless { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 35%, var(--surface)); }
+.panel-grant-bless h3 .stats-icon { color: var(--warn); }
+
+/* Passwortabfrage */
+.reauth-dialog {
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px; background: var(--surface); color: var(--text);
+  width: min(420px, 100vw - 24px); box-shadow: var(--shadow);
+}
+.reauth-dialog::backdrop { background: rgba(3, 6, 15, .7); backdrop-filter: blur(3px); }
+.reauth-form { gap: 14px; }
+.reauth-head { display: flex; gap: 12px; align-items: center; }
+.reauth-head h2 { margin: 0; font-size: 1.15rem; }
+.reauth-head p { margin: 2px 0 0; }
+.reauth-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px;
+  background: var(--primary-soft); color: var(--primary);
+}
+.reauth-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.reauth-text { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 600; }
+.reauth-actions { display: flex; justify-content: flex-end; gap: 8px; }

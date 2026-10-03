@@ -5,7 +5,7 @@
     { n: counts.reports, title: 'Gemeldete Beiträge', text: 'Mitglieder haben Forenbeiträge gemeldet, die noch niemand geprüft hat.', href: panelUrl('moderation', 'meldungen'), action: 'Prüfen' },
     { n: counts.deviceAlerts, title: 'Mehrfach-Konten', text: 'Konten, die sich sicher oder wahrscheinlich ein Gerät teilen.', href: panelUrl('moderation', 'geraete'), action: 'Ansehen' },
     { n: counts.suspicious, title: 'Handel zwischen Mehrfach-Konten', text: 'Neue Geschäfte zwischen Konten, die dasselbe Gerät benutzen.', href: panelUrl('protokolle', 'handellog', { verdacht: '1' }), action: 'Im Handel-Log' },
-    ...(currentUser.isAdmin ? [{ n: counts.packLogNew, title: 'Neue Pack-Vergaben', text: 'Booster Packs, die Devs seit deinem letzten Blick vergeben haben.', href: '/admin/pack-log', action: 'Pack-Log' }] : []),
+    ...(currentUser.isAdmin ? [{ n: counts.packLogNew, title: 'Neue Vergaben', text: 'Packs und Karten, die Devs seit deinem letzten Blick vergeben haben.', href: '/admin/pack-log', action: 'Vergabe-Log' }] : []),
   ];
   const open = tasks.filter((t) => t.n);
 %>
@@ -53,8 +53,9 @@
         <li><strong>Streitfälle entscheiden</strong> – außer bei Wetten, an denen du selbst als Ersteller oder Schiedsrichter beteiligt bist.</li>
         <li><strong>Bannen</strong> – für 1 bis 168 Stunden (7 Tage), nicht den Admin und keine anderen Devs. Aufheben kannst du nur Bans, die du selbst vergeben hast; dauerhafte Bans vergibt der Admin.</li>
         <li><strong>Moderieren</strong> – gemeldete Beiträge prüfen, Hinweise auf Mehrfach-Konten abhaken, im Forum und bei Kommentaren eingreifen.</li>
-        <li><strong>Booster Packs vergeben</strong> – jede Vergabe steht im Pack-Log.</li>
-        <li><strong>Einsehen</strong> – Handel-Log, Pack-Log und die Statistik.</li>
+        <li><strong>Packs und Karten vergeben</strong> – nur für Bugfixes, Tests und Aktionen; jede Vergabe steht im Vergabe-Log.</li>
+        <li><strong>Passwort</strong> – jede Aktion in Moderation und Spielwerten bestätigst du mit deinem Passwort.</li>
+        <li><strong>Einsehen</strong> – Handel-Log, Vergabe-Log und die Statistik.</li>
       </ul>
       <p class="muted small">Preise, Chancen, Steuer, Tagesbonus, IHK, Rollen und Registrierungscodes stellt der Admin ein.</p>
     </div>

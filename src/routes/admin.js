@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const { requireAdmin, requireStaff } = require('../middleware');
+const { requireReauth } = require('../middleware/reauth');
 const { PackGrant } = require('../models/Tcg');
 const { Trade } = require('../models/Trade');
 const roles = require('../services/roles');
@@ -31,9 +32,9 @@ const router = express.Router();
 const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen auf einen Blick.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Booster Packs vergeben und – als Admin – Preise, Chancen, Steuer, Tagesbonus, Grading und IHK einstellen.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer und IHK einstellen.' },
   { key: 'team', label: 'Team & Zugang', icon: 'users', description: 'Devs und Mods ernennen und Registrierungscodes erzeugen.', adminOnly: true },
-  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Pack-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
+  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Vergabe-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
 
@@ -164,6 +165,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     maxBanHours: isAdmin ? MAX_BAN_HOURS : DEV_MAX_BAN_HOURS,
     users,
     packTypes: tcgCatalog.PACK_TYPES,
+    // Karten für "Karte vergeben", nach Seltenheit gruppiert
+    grantCards: tcgCatalog.RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
@@ -208,7 +211,7 @@ router.get('/admin/streitfaelle', requireStaff, async (req, res) => {
   });
 });
 
-router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res) => {
+router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth('/admin/streitfaelle'), async (req, res) => {
   const outcome = str(req.body.outcome);
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw new UserError('Wette nicht gefunden.');
@@ -236,7 +239,7 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, async (req, res
 });
 
 // ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
-router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
+router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
   res.redirect(panelUrl('moderation', 'geraete'));
 });
@@ -245,7 +248,7 @@ router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
 // Admin und Devs; was ein Dev darf (höchstens 7 Tage, keine Devs, nur eigene Bans aufheben), prüft deviceService
 const profilePath = (username) => `/profil/${encodeURIComponent(username)}`;
 
-router.post('/admin/sperren', requireStaff, async (req, res) => {
+router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   let back = panelUrl('moderation', 'ban');
   try {
@@ -260,7 +263,7 @@ router.post('/admin/sperren', requireStaff, async (req, res) => {
   res.redirect(back);
 });
 
-router.post('/admin/sperren/:id/aufheben', requireStaff, async (req, res) => {
+router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   let user = null;
   try {
     user = mongoose.isValidObjectId(req.params.id) ? await deviceService.unban(req.params.id, req.user) : null;
@@ -273,7 +276,7 @@ router.post('/admin/sperren/:id/aufheben', requireStaff, async (req, res) => {
 });
 
 // ---------- Handel: Steuer ----------
-router.post('/admin/handel', requireAdmin, async (req, res) => {
+router.post('/admin/handel', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const tax = Number(String(typeof req.body.tax === 'string' ? req.body.tax : '').replace(',', '.'));
   if (!Number.isFinite(tax) || tax < 0 || tax > 50) {
     req.flash('error', 'Die Steuer muss zwischen 0 und 50 % liegen.');
@@ -286,7 +289,7 @@ router.post('/admin/handel', requireAdmin, async (req, res) => {
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
-router.post('/admin/ihk', requireAdmin, async (req, res) => {
+router.post('/admin/ihk', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const dailyLimit = Number.parseInt(typeof req.body.dailyLimit === 'string' ? req.body.dailyLimit : '', 10);
   const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
   // Wertetabelle aus dem Formular: prefix '' = normale Quests, 'hybrid_' = Hybrid-Quests
@@ -332,7 +335,7 @@ function weightOrNull(value) {
 
 const percentText = (w) => `${(w / 100).toFixed(2).replace('.', ',')} %`;
 
-router.post('/admin/tcg', requireAdmin, async (req, res) => {
+router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const packCents = centsOrNull(req.body.pack);
   const sell = {};
   const weight = {};
@@ -366,8 +369,10 @@ router.post('/admin/tcg', requireAdmin, async (req, res) => {
   res.redirect(panelUrl('spielwerte', 'tcg'));
 });
 
-// ---------- TCG: Booster Packs an Mitglieder vergeben ----------
-router.post('/admin/tcg/packs', requireStaff, async (req, res) => {
+// ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
+const GRANT_URL = panelUrl('spielwerte', 'vergeben');
+
+router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
@@ -384,10 +389,64 @@ router.post('/admin/tcg/packs', requireStaff, async (req, res) => {
     await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count });
     req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
   }
-  res.redirect(panelUrl('spielwerte', 'packs'));
+  res.redirect(GRANT_URL);
 });
 
-// ---------- Pack-Log: eigene Seite, 50 Einträge pro Seite, mit Suche ----------
+/** Alle Mitglieder, die bei einer Vergabe "an alle" etwas bekommen (gelöschte Konten nicht) */
+const allMemberIds = async () => (await User.find({ deletedAt: null }).select('_id').lean()).map((u) => u._id);
+
+// "Bless everyone": jedes Mitglied bekommt count Booster Packs
+router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const type = tcgCatalog.packTypeByKey[req.body.type];
+  const count = Number.parseInt(str(req.body.count), 10);
+  if (!type) {
+    req.flash('error', 'Bitte ein Booster Pack auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 10) {
+    req.flash('error', 'Pro Mitglied können 1 bis 10 Packs vergeben werden.');
+  } else {
+    const ids = await allMemberIds();
+    await tcgService.grantPacksToMany({ userIds: ids, type: type.key, count });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: null, toName: `Alle Mitglieder (${ids.length})`, all: true, recipients: ids.length, kind: 'pack', type: type.key, typeLabel: type.label, count });
+    req.flash('success', `Bless everyone: ${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.`);
+  }
+  res.redirect(GRANT_URL);
+});
+
+// Bestimmte Karte an ein Mitglied oder an alle vergeben
+router.post('/admin/tcg/karte', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const card = tcgCatalog.cardById[str(req.body.card)];
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const toAll = target === 'alle';
+  const user = !toAll && mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!card) {
+    req.flash('error', 'Bitte eine Karte auswählen.');
+  } else if (!toAll && !user) {
+    req.flash('error', 'Bitte ein Mitglied oder „Alle Mitglieder“ auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > 5) {
+    req.flash('error', 'Pro Mitglied können 1 bis 5 Exemplare vergeben werden.');
+  } else {
+    const ids = toAll ? await allMemberIds() : [user._id];
+    await tcgService.grantCards({ userIds: ids, cardId: card.id, count });
+    const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
+    await PackGrant.create({
+      by: req.user._id,
+      byName: req.user.username,
+      to: toAll ? null : user._id,
+      toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username,
+      all: toAll,
+      recipients: ids.length,
+      kind: 'karte',
+      type: card.id,
+      typeLabel: label,
+      count,
+    });
+    req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${label} bekommen.` : `${count}× ${label} an ${user.username} vergeben.`);
+  }
+  res.redirect(GRANT_URL);
+});
+
+// ---------- Vergabe-Log (Packs und Karten): eigene Seite, 50 Einträge pro Seite, mit Suche ----------
 const LOG_PAGE = 50;
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -409,7 +468,7 @@ router.get('/admin/pack-log', requireStaff, async (req, res) => {
     res.locals.packLogNew = 0;
   }
   res.render('pack-log', {
-    title: 'Pack-Log',
+    title: 'Vergabe-Log',
     q,
     total,
     page,
