@@ -118,6 +118,7 @@ function createApp() {
   app.use(device);
   app.use(dailyBonus);
   app.use(csrf);
+  app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
   // Abzeichen im Menü. Alle Zähler laufen gleichzeitig – so kostet das pro Seitenaufruf nur die Dauer der
   // langsamsten Abfrage statt der Summe aller (die Datenbank liegt nicht auf diesem Server).
   app.use(async (req, res, next) => {
@@ -163,6 +164,7 @@ function createApp() {
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
   app.use(require('./routes/admin'));
+  app.use(require('./routes/stats'));
   app.use(require('./routes/coin'));
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));

@@ -111,7 +111,7 @@ async function buy({ user, index, now = Date.now() }) {
     );
     if (sold.modifiedCount !== 1) throw new UserError('Zu spät – jemand anderes war schneller.');
     await TcgCard.create([{ user: user._id, card: card.id, rarity: card.rarity }], { session });
-    await Ledger.create([{ user: user._id, type: 'black_market', amount: -offer.price, betTitle: `${card.name} (${catalog.rarityByKey[card.rarity].label})` }], { session });
+    await Ledger.create([{ user: user._id, type: 'black_market', amount: -offer.price, betTitle: `${card.name} (${catalog.rarityByKey[card.rarity].label})`, meta: { card: card.id, rarity: card.rarity } }], { session });
     await markSeen(user._id, [card.id], session);
     return { card, price: offer.price, balance: paid.balance };
   });

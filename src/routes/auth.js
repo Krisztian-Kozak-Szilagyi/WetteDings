@@ -9,6 +9,7 @@ const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../servi
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
 const deviceService = require('../device/deviceService');
+const activity = require('../stats/activity');
 const { date } = require('../lib/viewHelpers');
 
 const router = express.Router();
@@ -32,6 +33,7 @@ function startSession(req, userId) {
     req.session.regenerate((err) => {
       if (err) return reject(err);
       req.session.userId = String(userId);
+      activity.record(userId, 'login'); // Anmeldungen für die Statistik
       resolve();
     });
   });
