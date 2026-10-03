@@ -63,9 +63,10 @@
   });
 
   // Slab (Schutzhülle) – erscheint beim Versiegeln
-  var slabFront = el('div', 'gr-slab gr-slab-front', obj);
-  var label = el('div', 'gr-slab-label', slabFront);
-  el('div', 'gr-slab-back gr-slab', obj);
+  var slabBox = el('div', 'gr-slabbox', obj);
+  var label = el('div', 'gr-slab-label', el('div', 'gr-slab gr-slab-front', slabBox));
+  var labelBack = el('div', 'gr-slab-label gr-slab-label-back', el('div', 'gr-slab gr-slab-back', slabBox));
+  ['l', 'r', 't', 'b'].forEach(function (side) { el('div', 'gr-slab-edge gr-slab-edge-' + side, slabBox); });
   var shadow = el('div', 'gr-shadow');
   zoomEl.insertBefore(shadow, zoomEl.firstChild);
 
@@ -416,6 +417,13 @@
       el('span', '', info).textContent = job.card ? job.card.name + ' · ' + job.card.rarityLabel : '';
       el('span', 'gr-slab-word', info).textContent = GRADE_NAMES[g] || '';
       el('div', 'gr-slab-grade', label).textContent = g || '–';
+      // Rückseite: Zertifikat mit Nummer und Strichcode
+      labelBack.innerHTML = '';
+      var cert = el('div', 'gr-slab-cert', labelBack);
+      el('strong', '', cert).textContent = 'BfW GRADING';
+      el('span', '', cert).textContent = 'Zertifikat Nr. ' + (job.cert || '');
+      el('span', '', cert).textContent = 'Note ' + (g || '–') + ' · ' + (GRADE_NAMES[g] || '');
+      el('div', 'gr-slab-barcode', labelBack);
       baseZoom = 0.82;
       setZoom(1);
       tweenTo(-6, Math.round(ry / 360) * 360 + 14, 700);

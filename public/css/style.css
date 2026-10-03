@@ -2011,19 +2011,33 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 }
 @keyframes gr-foam { to { transform: translateY(-26px); opacity: 0; } }
 
-/* Slab (Schutzhülle) */
+/* Slab (Schutzhülle): ein Block aus Vorder- und Rückplatte plus vier Seitenwänden. Alles hängt an .gr-slabbox,
+   damit sich die Hülle als Ganzes mit der Karte dreht; die Karte liegt genau in der Mitte (z = 0). */
+.gr-slabbox {
+  --st: calc(var(--cw) * .045); /* Dicke der Hülle */
+  --sr: calc(var(--cw) * .035); /* Eckenradius */
+  position: absolute; left: -7%; right: -7%; top: -26%; bottom: -6%; pointer-events: none; opacity: 0;
+  transform-style: preserve-3d; transform: translateY(-150%);
+  transition: transform .9s cubic-bezier(.2, 1.25, .4, 1), opacity .3s;
+}
+.gr-obj.is-slabbed .gr-slabbox { opacity: 1; transform: none; }
 .gr-slab {
-  position: absolute; left: -7%; right: -7%; top: -26%; bottom: -6%; border-radius: 14px; pointer-events: none; opacity: 0;
+  position: absolute; inset: 0; border-radius: var(--sr);
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
   background: linear-gradient(135deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .05) 40%, rgba(255, 255, 255, .16) 70%, rgba(255, 255, 255, .04));
   border: 2px solid rgba(255, 255, 255, .6);
-  box-shadow: inset 0 0 0 7px rgba(255, 255, 255, .08), inset 0 0 22px rgba(255, 255, 255, .18), 0 14px 34px rgba(0, 0, 0, .35);
-  transform: translateZ(9px) translateY(-150%);
-  transition: transform .9s cubic-bezier(.2, 1.25, .4, 1), opacity .3s;
+  box-shadow: inset 0 0 0 7px rgba(255, 255, 255, .08), inset 0 0 22px rgba(255, 255, 255, .18);
+  transform: translateZ(calc(var(--st) / 2));
 }
-.gr-slab-back { transform: rotateY(180deg) translateZ(9px) translateY(-150%); }
-.gr-obj.is-slabbed .gr-slab-front { opacity: 1; transform: translateZ(9px); }
-.gr-obj.is-slabbed .gr-slab-back { opacity: 1; transform: rotateY(180deg) translateZ(9px); }
+.gr-slab-back { transform: rotateY(180deg) translateZ(calc(var(--st) / 2)); }
+/* Seitenwände: von beiden Seiten sichtbar, so wirkt die Hülle auch hochkant wie ein fester Block */
+.gr-slab-edge { position: absolute; background: linear-gradient(90deg, rgba(255, 255, 255, .55), rgba(220, 235, 245, .3), rgba(255, 255, 255, .55)); }
+.gr-slab-edge-l, .gr-slab-edge-r { top: var(--sr); bottom: var(--sr); width: var(--st); margin-left: calc(var(--st) / -2); }
+.gr-slab-edge-l { left: 0; transform: rotateY(90deg); }
+.gr-slab-edge-r { left: 100%; transform: rotateY(90deg); }
+.gr-slab-edge-t, .gr-slab-edge-b { left: var(--sr); right: var(--sr); height: var(--st); margin-top: calc(var(--st) / -2); background: linear-gradient(rgba(255, 255, 255, .55), rgba(220, 235, 245, .3), rgba(255, 255, 255, .55)); }
+.gr-slab-edge-t { top: 0; transform: rotateX(90deg); }
+.gr-slab-edge-b { top: 100%; transform: rotateX(90deg); }
 .gr-slab-label {
   position: absolute; left: 5%; right: 5%; top: 3%; height: 14%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
   padding: 0 6%; border-radius: 6px; background: linear-gradient(#ffffff, #e5e9ee); color: #0f172a;
@@ -2034,6 +2048,14 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .gr-slab-info span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .gr-slab-word { color: #b45309; }
 .gr-slab-grade { font-size: calc(var(--cw) * .11); font-weight: 900; line-height: 1; color: #0f766e; }
+.gr-slab-label-back { justify-content: space-between; }
+.gr-slab-cert { display: grid; }
+.gr-slab-cert strong { color: #0f766e; letter-spacing: .1em; }
+.gr-slab-cert span { color: #475569; font-variant-numeric: tabular-nums; }
+.gr-slab-barcode {
+  align-self: stretch; width: 38%; margin: 14% 0;
+  background: repeating-linear-gradient(90deg, #0f172a 0 2px, transparent 2px 3px, #0f172a 3px 4px, transparent 4px 7px, #0f172a 7px 10px, transparent 10px 11px);
+}
 .gr-obj.is-sent {
   transform: translateY(-170%) rotateZ(-24deg) rotateY(520deg) scale(.35) !important; opacity: 0;
   transition: transform .85s cubic-bezier(.55, -0.25, .8, .45), opacity .85s ease-in;
