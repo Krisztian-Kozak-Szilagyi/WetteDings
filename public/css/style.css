@@ -1895,7 +1895,10 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 /* Themenblock */
 .stats-block { margin: 8px 0 36px; scroll-margin-top: 120px; }
 .stats-block > .card, .stats-block > details.card { margin: 0 0 12px; }
-.stats-block-head { border-left: 4px solid var(--primary); padding: 2px 0 2px 12px; margin-bottom: 14px; }
+.stats-block-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-left: 4px solid var(--primary); padding: 2px 0 2px 12px; margin-bottom: 14px; }
+.stats-block-export { flex: none; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: .82rem; font-weight: 600; white-space: nowrap; }
+.stats-block-export:hover { text-decoration: none; color: var(--text); }
+.stats-export { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; }
 .stats-block-head h2 { margin: 0 0 2px; font-size: 1.3rem; }
 .stats-block-head p { margin: 0; }
 .stats-block h3 { margin: 0 0 6px; font-size: 1rem; }

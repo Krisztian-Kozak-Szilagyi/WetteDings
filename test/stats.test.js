@@ -8,6 +8,7 @@ const { soldMeta } = require('../src/tcg/tcgService');
 const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
 const { quantile, distribution } = require('../src/stats/snapshot');
 const { packLuck } = require('../src/stats/memberStats');
+const exportCsv = require('../src/stats/exportCsv');
 const { addDays, dayList, weekday, isoWeek, period, buckets, aggregate, delta, retention, effectiveChances, pullVerdict } = require('../src/stats/statsService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
@@ -201,4 +202,44 @@ test('Mitglied: Pack-Glück im Verhältnis zum Erwartungswert', () => {
   assert.equal(packLuck([], rarities), null);
   assert.equal(packLuck([{ rarity: 'a' }, { rarity: 'a' }], rarities), 200 / 380);
   assert.equal(packLuck([{ rarity: 'b' }, { rarity: 'a' }], rarities), 1100 / 380);
+});
+
+test('Export: Felder und Zahlen im deutschen Excel-Format', () => {
+  assert.equal(exportCsv.field('a;b'), '"a;b"');
+  assert.equal(exportCsv.field('sagt "hallo"'), '"sagt ""hallo"""');
+  assert.equal(exportCsv.field(null), '');
+  assert.equal(exportCsv.value(123456, 'euro'), '1234,56');
+  assert.equal(exportCsv.value(0.125, 'percent'), '12,5');
+  assert.equal(exportCsv.value(-500, 'euro'), '-5');
+  assert.equal(exportCsv.value(3, 'count'), '3');
+  assert.equal(exportCsv.value(null, 'euro'), '');
+});
+
+test('Export: ganze Datei mit Kopf, Abschnitten und tagesgenauen Verläufen', () => {
+  const data = {
+    period: { from: '2026-10-01', to: '2026-10-02', days: ['2026-10-01', '2026-10-02'] },
+    previous: { from: '2026-09-29', to: '2026-09-30' },
+    markers: [{ day: '2026-10-02', kind: 'einstellung', label: 'TCG: 1 Wert geändert', by: 'admin', detail: ['packPrice: 8000 → 9000'] }],
+    blocks: [
+      {
+        id: 'packs',
+        title: 'Booster Packs',
+        kpis: [{ label: 'Pack-Umsatz', value: 16000, unit: 'euro', compare: true, prev: 8000 }],
+        charts: [{ title: 'Geöffnete Packs', unit: 'count', series: [{ name: 'Packs', values: [2, 0] }] }],
+        tables: [{ title: 'Je Seltenheit', head: ['Seltenheit', { label: 'Bankwert', num: true }], rows: [['Gold', { value: 4000, unit: 'euro' }]] }],
+      },
+    ],
+  };
+  const csv = exportCsv.toCsv(data, { title: 'Statistik – TCG' });
+  assert.ok(csv.startsWith('﻿Statistik – TCG\r\n'));
+  const lines = csv.split('\r\n');
+  assert.ok(lines.includes('Zeitraum;01.10.2026 – 02.10.2026'));
+  assert.ok(lines.includes('Pack-Umsatz;€;160;80;'));
+  assert.ok(lines.includes('Tag;Packs (Anzahl)'));
+  assert.ok(lines.includes('01.10.2026;2') && lines.includes('02.10.2026;0'));
+  assert.ok(lines.includes('Seltenheit;Bankwert (€)') && lines.includes('Gold;40'));
+  assert.ok(lines.includes('02.10.2026;Einstellung;TCG: 1 Wert geändert;admin;packPrice: 8000 → 9000'));
+  // nur ein Block: keine Änderungsliste
+  assert.ok(!exportCsv.toCsv(data, { title: 'x', blockId: 'packs' }).includes('Änderungen im Zeitraum'));
+  assert.equal(exportCsv.fileName(['mitglied', 'Jörg Ü', 'packs'], data.period, 'csv'), 'statistik-mitglied-joerg-ue-packs-2026-10-01_2026-10-02.csv');
 });
