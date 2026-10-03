@@ -45,7 +45,7 @@
             </div>
             <div class="code-actions">
               <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
-              <form method="post" action="/forum/meldungen/<%= r._id %>/erledigt">
+              <form method="post" data-reauth action="/forum/meldungen/<%= r._id %>/erledigt" data-confirm="Meldung von <%= r.byName %> als erledigt markieren?">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="zurueck" value="panel">
                 <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
@@ -64,7 +64,7 @@
     <% if (!currentUser.isAdmin) { %>
       <p class="panel-note small">Als Dev bannst du für <strong>1 bis <%= maxBanHours %> Stunden</strong> (7 Tage). Den Admin und andere Devs kannst du nicht bannen, und einen laufenden Ban eines anderen nicht ändern. Dauerhafte Bans vergibt der Admin.</p>
     <% } %>
-    <form method="post" action="/admin/sperren" class="form panel-ban-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich bannen?">
+    <form method="post" data-reauth action="/admin/sperren" class="form panel-ban-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich bannen?">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label class="field">
         <span>Mitglied</span>
@@ -101,7 +101,7 @@
             </div>
             <div class="code-actions">
               <% if (b.canUnban) { %>
-                <form method="post" action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen?">
+                <form method="post" data-reauth action="/admin/sperren/<%= b._id %>/aufheben" data-confirm="<%= b.username %> wirklich entbannen?">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <button class="btn btn-ghost btn-sm" type="submit">Ban aufheben</button>
                 </form>
@@ -146,7 +146,7 @@
               <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
                 <a class="btn btn-danger btn-sm" href="<%= panelUrl('moderation', 'ban', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
               <% }) %>
-              <form method="post" action="/admin/geraete/<%= a._id %>">
+              <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
                 <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>

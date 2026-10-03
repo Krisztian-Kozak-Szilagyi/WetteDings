@@ -1,5 +1,6 @@
   </main>
   <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
+  <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>

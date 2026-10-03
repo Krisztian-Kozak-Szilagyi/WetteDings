@@ -54,7 +54,7 @@
             <span>Du darfst entscheiden, hast aber ein eigenes Interesse am Ausgang – überlasse den Fall besser einem Dev ohne Einsatz.</span>
           </p>
         <% } %>
-        <form method="post" action="/admin/streitfaelle/<%= bet._id %>/entscheiden" class="form dispute-form"
+        <form method="post" data-reauth action="/admin/streitfaelle/<%= bet._id %>/entscheiden" class="form dispute-form"
               data-confirm-resolve="Als Dev „%s“ festlegen und abrechnen? Das kann nicht rückgängig gemacht werden.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <fieldset class="side-picker side-picker-many">

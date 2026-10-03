@@ -24,7 +24,7 @@
           </div>
           <div class="code-actions">
             <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
-            <form method="post" action="/forum/meldungen/<%= r._id %>/erledigt">
+            <form method="post" <%= currentUser.isStaff ? "data-reauth" : "" %> action="/forum/meldungen/<%= r._id %>/erledigt">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
             </form>

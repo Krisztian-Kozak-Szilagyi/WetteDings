@@ -3,7 +3,7 @@
 %>
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#handellog">Handel-Log</a><a href="#packlog">Pack-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
+  <a href="#handellog">Handel-Log</a><a href="#packlog">Vergabe-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
 </nav>
 
 <section class="stats-block" id="handellog">
@@ -50,10 +50,10 @@
 </section>
 
 <section class="stats-block" id="packlog">
-  <%- blockHead('Pack-Log' + (packLogNew ? ` <span class="panel-badge panel-badge-inline">${packLogNew} neu</span>` : ''), 'Jede Vergabe von Booster Packs durch Admin oder Devs: wer, wem, welches Pack, wie viele und wann – mit Suche.') %>
+  <%- blockHead('Vergabe-Log' + (packLogNew ? ` <span class="panel-badge panel-badge-inline">${packLogNew} neu</span>` : ''), 'Jede Vergabe von Booster Packs und Karten durch Admin oder Devs – auch „Bless everyone“: wer, wem, was, wie viele und wann, mit Suche.') %>
   <a class="card panel-link-card" href="/admin/pack-log">
     <%- icon('list') %>
-    <div><strong>Pack-Log öffnen</strong><span class="muted small"><%= packLogNew ? packLogNew + ' neue Vergaben seit deinem letzten Blick' : 'Alle Vergaben, neueste zuerst' %></span></div>
+    <div><strong>Vergabe-Log öffnen</strong><span class="muted small"><%= packLogNew ? packLogNew + ' neue Vergaben seit deinem letzten Blick' : 'Alle Vergaben, neueste zuerst' %></span></div>
     <span aria-hidden="true">→</span>
   </a>
 </section>
