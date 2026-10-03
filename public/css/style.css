@@ -1451,7 +1451,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   border-radius: 50%; border: 1px solid var(--color-accent); color: var(--color-accent); font-size: 18px; transition: transform .25s ease;
 }
 .tcg-album-tile:hover .tcg-album-arrow { transform: translateX(4px); }
-.tcg-rare { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.tcg-rare { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+.tcg-rare-feed { flex: 2 1 520px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tcg-rare-feed > * { max-width: 520px; }
+.tcg-rare .inv-tile { flex: 1 1 280px; }
 .tcg-rare .tcg-feed li { font-size: 14px; }
 .tcg-rare .tcg-feed strong { font-weight: 500; }
 @media (max-width: 640px) {
@@ -3676,9 +3679,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .inv-item-actions form { margin: 0; }
 .trade-foil-head { margin: 18px 0 8px; font-size: 15px; }
 
-/* TCG-Seite: rechts Album-Kachel und darunter die Inventar-Kachel */
-.tcg-side { flex: 1 1 280px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.tcg-side .tcg-album-tile { flex: 1 1 auto; }
 /* Inventar-Kachel im Stil des IHK-Start-Knopfs, aber holografisch (Folie) */
 .inv-tile {
   position: relative; display: flex; align-items: center; gap: 18px; min-height: 104px; padding: 16px 20px;

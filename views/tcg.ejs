@@ -79,7 +79,6 @@
       </div>
     </div>
 
-    <div class="tcg-side">
     <a class="tcg-album-tile" href="/tcg/album">
       <span class="tcg-fan" aria-hidden="true">
         <% fan.forEach((c) => { %><img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= counts[c.id] ? '' : 'is-sample' %>"><% }) %>
@@ -96,25 +95,10 @@
         <span class="tcg-album-arrow" aria-hidden="true">→</span>
       </span>
     </a>
-
-    <%# Kachel im Stil des IHK-Start-Knopfs: Pack und Folie, beim Darüberfahren rutscht die Folie über das Pack %>
-    <a class="inv-tile" href="/inventar" id="packs">
-      <span class="inv-tile-art" aria-hidden="true">
-        <img class="inv-tile-pack" src="<%= packImage %>" alt="" width="800" height="1280" loading="lazy">
-        <span class="inv-tile-foil"></span>
-      </span>
-      <span class="inv-tile-text">
-        <span class="kicker">Packs &amp; Gegenstände</span>
-        <span class="inv-tile-title">Zum Inventar<% if (newItems) { %><span class="nav-live" title="Neuer Gegenstand im Inventar" aria-label="Neuer Gegenstand im Inventar"></span><% } %></span>
-        <span class="inv-tile-hint"><%= packTotal %> <%= packTotal === 1 ? 'Pack' : 'Packs' %> · <%= itemTotal %> <%= itemTotal === 1 ? 'Gegenstand' : 'Gegenstände' %></span>
-      </span>
-      <% if (newPacks) { %><span class="nav-badge inv-tile-badge" title="Neue Booster Packs" aria-label="<%= newPacks %> neue Booster Packs"><%= newPacks > 99 ? '99+' : newPacks %></span><% } %>
-      <span class="inv-tile-arrow" aria-hidden="true">→</span>
-    </a>
-    </div>
   </section>
 
   <section class="tcg-rare">
+    <div class="tcg-rare-feed">
     <span class="kicker kicker-muted">Seltene Ziehungen</span>
     <% if (!rarePulls.length) { %>
       <p class="muted small">Noch hat niemand eine Holo oder seltener gezogen.</p>
@@ -131,6 +115,22 @@
         <% }) %>
       </ul>
     <% } %>
+    </div>
+
+    <%# Kachel im Stil des IHK-Start-Knopfs: Pack und Folie, beim Darüberfahren rutscht die Folie über das Pack %>
+    <a class="inv-tile" href="/inventar" id="packs">
+      <span class="inv-tile-art" aria-hidden="true">
+        <img class="inv-tile-pack" src="<%= packImage %>" alt="" width="800" height="1280" loading="lazy">
+        <span class="inv-tile-foil"></span>
+      </span>
+      <span class="inv-tile-text">
+        <span class="kicker">Packs &amp; Gegenstände</span>
+        <span class="inv-tile-title">Zum Inventar<% if (newItems) { %><span class="nav-live" title="Neuer Gegenstand im Inventar" aria-label="Neuer Gegenstand im Inventar"></span><% } %></span>
+        <span class="inv-tile-hint"><%= packTotal %> <%= packTotal === 1 ? 'Pack' : 'Packs' %> · <%= itemTotal %> <%= itemTotal === 1 ? 'Gegenstand' : 'Gegenstände' %></span>
+      </span>
+      <% if (newPacks) { %><span class="nav-badge inv-tile-badge" title="Neue Booster Packs" aria-label="<%= newPacks %> neue Booster Packs"><%= newPacks > 99 ? '99+' : newPacks %></span><% } %>
+      <span class="inv-tile-arrow" aria-hidden="true">→</span>
+    </a>
   </section>
 </div>
 
