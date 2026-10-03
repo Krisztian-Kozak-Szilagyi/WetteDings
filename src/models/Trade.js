@@ -22,6 +22,7 @@ const tradeSchema = new Schema(
     toName: { type: String, default: null },
     card: { type: String, required: true }, // Karten-ID
     cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // gesperrtes Exemplar
+    foiledAt: { type: Date, default: null }, // angebotenes Exemplar ist foliert (seit)
     wantCard: { type: String, default: null }, // nur bei tausch: gewünschte Karte des Empfängers
     wantCardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // erst beim Annehmen gesetzt
     extraFrom: { type: String, enum: ['seller', 'to', null], default: null }, // nur bei tausch: wer den Aufpreis zahlt

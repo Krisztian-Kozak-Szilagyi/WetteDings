@@ -1,0 +1,161 @@
+<%- include('partials/head') %>
+<%
+  const pct = (p) => (Math.round(p * 10) / 10).toFixed(1).replace('.0', '').replace('.', ',');
+  const packTotal = packs.reduce((s, p) => s + p.count, 0);
+  // Folierbare Karten nach Seltenheit gruppiert (selten zuerst)
+  const groups = [];
+  foilable.forEach((f) => {
+    let g = groups.find((x) => x.rarity.key === f.rarity.key);
+    if (!g) groups.push((g = { rarity: f.rarity, list: [] }));
+    g.list.push(f);
+  });
+  const foilIcon = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M6 2.8h12a1.2 1.2 0 0 1 1.2 1.2v16a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 20V4A1.2 1.2 0 0 1 6 2.8Z"/><path fill="currentColor" opacity=".55" d="M7.5 6.5 13 6.5 8.5 17.5H7.5Z"/><path fill="currentColor" opacity=".3" d="M14.5 6.5h2l-4.5 11h-2Z"/></svg>';
+%>
+
+<div class="inv-page">
+  <header class="inv-head">
+    <h1>Inventar</h1>
+    <p class="muted">Deine ungeöffneten Booster Packs, Gegenstände und folierten Karten.</p>
+  </header>
+
+  <section class="inv-block" id="packs">
+    <h2>Booster Packs <span class="inv-count"><%= packTotal %></span></h2>
+    <% if (!packs.length) { %>
+      <p class="muted small">Keine ungeöffneten Packs. Neue gibt es im <a href="/tcg">TCG-Shop</a>.</p>
+    <% } %>
+    <div class="tcg-mypacks">
+      <% packs.forEach((p) => { %>
+        <div class="tcg-mypack">
+          <span class="tcg-mypack-img" aria-hidden="true">
+            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
+            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
+          </span>
+          <div class="tcg-mypack-text">
+            <strong><span data-tcg-pack-count="<%= p.key %>"><%= p.count %></span> ungeöffnete<%= p.count === 1 ? 's Pack' : ' Packs' %></strong>
+            <span><%= p.label %></span>
+          </div>
+          <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= p.image %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="type" value="<%= p.key %>">
+            <button class="btn btn-primary" type="submit">Öffnen</button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="inv-block" id="gegenstaende">
+    <h2>Gegenstände</h2>
+    <div class="inv-items">
+      <% itemList.forEach((it) => { %>
+        <div class="inv-item<%= it.count ? '' : ' is-empty' %>">
+          <span class="inv-item-icon"><%- foilIcon %></span>
+          <div class="inv-item-text">
+            <strong><%= it.label %> <span class="inv-count"><%= it.count %></span></strong>
+            <span class="muted small"><%= it.text %></span>
+            <% if (it.key === 'folie') { %>
+              <span class="muted small">Wert einer folierten Karte: sofort +<%= pct(foilSettings.bonusPercent) %> %, danach jeden Tag +<%= pct(foilSettings.dailyPercent) %> % vom Verkaufswert. Die Folie lässt sich jederzeit abziehen – dann ist sie aber kaputt.</span>
+            <% } %>
+          </div>
+        </div>
+        <% if (it.key === 'folie') { %>
+          <% if (!it.count) { %>
+            <p class="muted small inv-hint">Du hast gerade keine Folie. Mit etwas Glück bleibt beim Versiegeln im Grading-Shop eine übrig.</p>
+          <% } else if (!foilable.length) { %>
+            <p class="muted small inv-hint">Du hast keine freie, unfolierte Karte zum Folieren.</p>
+          <% } else { %>
+            <form method="post" action="/inventar/folieren" class="inv-foil-form" data-confirm="Karte folieren? Eine Folie wird verbraucht. Die Karte kann danach nicht mehr an die Bank verkauft und nicht auf Quests geschickt werden.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <label class="field"><span>Karte folieren</span>
+                <select name="card" required>
+                  <option value="">– Karte auswählen –</option>
+                  <% groups.forEach((g) => { %>
+                    <optgroup label="<%= g.rarity.label %>">
+                      <% g.list.forEach((f) => { %><option value="<%= f.card.id %>"><%= f.card.name %><%= f.free > 1 ? ' (' + f.free + '×)' : '' %> · <%= euro(f.rarity.sell) %></option><% }) %>
+                    </optgroup>
+                  <% }) %>
+                </select>
+              </label>
+              <button class="btn btn-primary" type="submit">Folieren</button>
+            </form>
+          <% } %>
+        <% } %>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="inv-block" id="folierte">
+    <h2>Folierte Karten <span class="inv-count"><%= foiled.length %></span></h2>
+    <% if (!foiled.length) { %>
+      <p class="muted small">Noch keine. Folierte Karten erscheinen hier – mit Datum und aktuellem Wert. Tippe eine Karte an, um sie umzudrehen.</p>
+    <% } else { %>
+      <p class="muted small">Tippe eine Karte an, um die Rückseite mit dem Foliendatum zu sehen.</p>
+    <% } %>
+    <div class="foil-grid">
+      <% foiled.forEach((f) => { %>
+        <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
+          <button type="button" class="foil-card" data-foil-flip aria-pressed="false" aria-label="<%= f.card.name %> umdrehen">
+            <span class="foil-inner">
+              <span class="foil-face foil-front">
+                <img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008">
+                <span class="foil-sheen" aria-hidden="true"></span>
+                <span class="foil-ticket"><b><%= f.card.name %></b><span><%= f.rarity.label %></span></span>
+              </span>
+              <span class="foil-face foil-back" aria-hidden="true">
+                <span class="foil-back-art">BfW<br>Holdings</span>
+                <span class="foil-sheen"></span>
+                <span class="foil-ticket foil-ticket-back"><span>Foliert am</span><b><%= dayDate(f.foiledAt) %></b></span>
+              </span>
+            </span>
+          </button>
+          <div class="foil-info">
+            <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
+            <strong><%= f.card.name %> <span class="tcg-badge r-<%= f.card.rarity %>"><%= f.rarity.label %></span></strong>
+            <span>Wert <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
+            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · Bankwert ohne Folie <%= euro(f.sell) %></span>
+            <% if (f.lock === 'handel') { %>
+              <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
+            <% } else { %>
+              <details class="foil-trade">
+                <summary>Im Handel anbieten</summary>
+                <form method="post" action="/handel/angebot" class="form">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="card" value="<%= f.card.id %>">
+                  <input type="hidden" name="copy" value="<%= f.id %>">
+                  <label class="field"><span>Preis in €</span><input type="text" name="price" inputmode="decimal" value="<%= (f.value / 100).toFixed(2).replace('.', ',') %>" required></label>
+                  <label class="field"><span>An (leer = für alle auf dem Markt)</span><input type="text" name="to" autocomplete="off" maxlength="30"></label>
+                  <button class="btn btn-primary btn-sm" type="submit">Anbieten</button>
+                </form>
+              </details>
+              <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt, die Wertsteigerung ist weg. Die Karte ist danach wieder eine normale Karte.">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="copy" value="<%= f.id %>">
+                <button class="btn btn-ghost btn-sm" type="submit">Folie abziehen</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+</div>
+
+<!-- Pack-Öffnung (public/js/tcg.js) -->
+<div class="tcg-reveal" data-tcg-reveal hidden>
+  <div class="tcg-reveal-stage">
+    <p class="tcg-reveal-hint" data-tcg-hint></p>
+    <button type="button" class="tcg-reveal-pack" data-tcg-pack aria-label="Pack aufreißen">
+      <img src="<%= packImage %>" alt="" width="800" height="1280">
+    </button>
+    <div class="tcg-reveal-cards" data-tcg-cards></div>
+    <div class="tcg-reveal-actions" data-tcg-actions hidden>
+      <button type="button" class="btn btn-ghost" data-tcg-flip-all>Alle aufdecken</button>
+      <button type="button" class="btn btn-primary" data-tcg-again>Nächstes Pack öffnen</button>
+      <button type="button" class="btn btn-ghost" data-tcg-done>Zur Sammlung</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/inventar.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

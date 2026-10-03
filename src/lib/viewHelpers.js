@@ -12,6 +12,9 @@ const rtf = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
 const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
+/** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
+const dayDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: config.timezone });
+const dayDate = (d) => (d ? dayDateFmt.format(new Date(d)) : '–');
 // sekundengenau, z. B. für Protokolle
 const dateSecFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'medium', timeZone: config.timezone });
 const dateSec = (d) => (d ? `${dateSecFmt.format(new Date(d))} Uhr` : '–');
@@ -127,6 +130,7 @@ const editFieldLabels = { title: 'Titel', description: 'Beschreibung' };
 module.exports = {
   euro,
   date,
+  dayDate,
   dateSec,
   relTime,
   pool,

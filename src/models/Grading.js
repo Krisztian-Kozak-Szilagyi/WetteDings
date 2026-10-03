@@ -38,6 +38,7 @@ const jobSchema = new Schema(
     clean: { type: Number, default: null }, // Sauberkeit beim Zurückschicken 0–100 %
     seal: { type: Number, default: null }, // Qualität der Versiegelung 0–100
     pay: { type: Number, default: 0 }, // Lohn in Cent
+    foilFound: { type: Boolean, default: false }, // beim Versiegeln eine Folie gefunden
     doneAt: { type: Date, default: null },
   },
   { timestamps: true }

@@ -5,6 +5,7 @@ const catalog = require('../tcg/catalog');
 const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const blackMarket = require('../tcg/blackMarket');
+const foil = require('../items/foil');
 const { str, parseEuro, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -38,6 +39,7 @@ router.get('/handel', async (req, res) => {
     canAccept: trade.canAccept,
     isUnread: trade.isUnread,
     termsText: trade.termsText,
+    foil,
     privateHours: trade.PRIVATE_HOURS,
     marketDays: trade.MARKET_DAYS,
     blackMarket: { ...market, openTime: blackMarket.OPEN, closeTime: blackMarket.CLOSE, percent: blackMarket.PRICE_PERCENT },
@@ -98,14 +100,23 @@ async function handle(req, res, fn, back = '/handel', next = '/handel') {
   }
 }
 
-router.post('/handel/angebot', (req, res) =>
-  handle(req, res, async () => {
-    const toName = str(req.body.to).trim() || null;
-    const t = await trade.create({ user: req.user, kind: toName ? 'privat' : 'markt', cardId: str(req.body.card), price: parseEuro(str(req.body.price)), toName });
-    const name = cardInfo(t.card).name;
-    return t.kind === 'privat' ? `Angebot an ${t.toName} gesendet: ${name} für ${euro(t.price)}.` : `${name} steht jetzt für ${euro(t.price)} auf dem Markt.`;
-  })
-);
+// copy = ein foliertes Exemplar aus dem Inventar anbieten (dann geht es auch dorthin zurück)
+router.post('/handel/angebot', (req, res) => {
+  const copyId = str(req.body.copy) || null;
+  const back = copyId ? '/inventar#folierte' : '/handel';
+  return handle(
+    req,
+    res,
+    async () => {
+      const toName = str(req.body.to).trim() || null;
+      const t = await trade.create({ user: req.user, kind: toName ? 'privat' : 'markt', cardId: str(req.body.card), price: parseEuro(str(req.body.price)), toName, copyId });
+      const name = cardInfo(t.card).name;
+      return t.kind === 'privat' ? `Angebot an ${t.toName} gesendet: ${name} für ${euro(t.price)}.` : `${name} steht jetzt für ${euro(t.price)} auf dem Markt.`;
+    },
+    back,
+    back
+  );
+});
 
 router.post('/handel/tausch', (req, res) => {
   const toName = str(req.body.to).trim();

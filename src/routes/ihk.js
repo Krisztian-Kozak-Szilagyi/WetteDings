@@ -35,7 +35,8 @@ router.get('/ihk', async (req, res) => {
 
   const offers = running ? [] : (await ihk.getOffers(req.user._id)).map((o) => questView(o.quest, o.difficulty));
   const canReroll = !running && used < limit && (await ihk.canReroll(req.user._id));
-  const owned = await TcgCard.distinct('card', { user: req.user._id });
+  // folierte Exemplare können nicht auf Quests
+  const owned = await TcgCard.distinct('card', { user: req.user._id, foiledAt: null });
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = owned.map((id) => catalog.cardById[id]).filter(Boolean);
   const cards = all.filter((c) => c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));

@@ -1,6 +1,5 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
-const User = require('../models/User');
 const { TcgOpening } = require('../models/Tcg');
 const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
@@ -25,11 +24,8 @@ router.get('/tcg', async (req, res) => {
     collection(req.user),
     TcgOpening.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: null, packs: { $sum: 1 }, spent: { $sum: '$cost' }, best: { $max: '$best' } } }]),
     TcgOpening.find({ best: { $gte: catalog.rarityByKey.holo.rank } }).sort({ createdAt: -1 }).limit(10).lean(),
-    tcg.packInventory(req.user._id),
-    // Besuch merken: neue Packs (Quest, Geschenk) gelten ab jetzt als gesehen
-    User.updateOne({ _id: req.user._id }, { $set: { packsSeenAt: new Date() } }),
+    tcg.packInventory(req.user._id), // ungeöffnete Packs liegen im Inventar – hier nur der Hinweis darauf
   ]);
-  res.locals.newPacks = 0;
 
   res.render('tcg', {
     title: 'TCG',
@@ -81,7 +77,7 @@ router.post('/tcg/kaufen', async (req, res) => {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/tcg'); // oben bleiben – so lassen sich bequem weitere Packs kaufen
+  res.redirect('/tcg'); // oben bleiben – so lassen sich bequem weitere Packs kaufen (der Inventar-Hinweis zählt mit)
 });
 
 router.post('/tcg/oeffnen', async (req, res) => {
@@ -94,7 +90,7 @@ router.post('/tcg/oeffnen', async (req, res) => {
     if (wantsJson(req)) return res.status(400).json({ error: err.message });
     req.flash('error', err.message);
   }
-  res.redirect('/tcg');
+  res.redirect('/inventar#packs');
 });
 
 /** Aktion ausführen, Meldung setzen, zurück ins Album */

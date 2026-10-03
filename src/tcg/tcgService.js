@@ -7,6 +7,7 @@ const { UserError } = require('../lib/util');
 const { notify } = require('../services/notifyService');
 const catalog = require('./catalog');
 const settings = require('./settings');
+const foil = require('../items/foil');
 
 const packType = (type) => {
   const t = catalog.packTypeByKey[type || catalog.DEFAULT_PACK];
@@ -59,7 +60,7 @@ async function grantPacks({ userId, type, count = 1, source, session }) {
   const t = packType(type);
   await TcgPack.insertMany(Array.from({ length: count }, () => ({ user: userId, type: t.key, source, cost: 0 })), { session });
   // Quest-Funde sieht man beim Abholen selbst; Geschenke vom Team kommen in die Glocke
-  if (source === 'admin') await notify(userId, { area: 'TCG', href: '/tcg', text: packGiftText(t, count) });
+  if (source === 'admin') await notify(userId, { area: 'Inventar', href: '/inventar', text: packGiftText(t, count) });
   return t;
 }
 
@@ -67,7 +68,7 @@ async function grantPacks({ userId, type, count = 1, source, session }) {
 async function grantPacksToMany({ userIds, type, count = 1, source = 'admin' }) {
   const t = packType(type);
   await TcgPack.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, type: t.key, source, cost: 0 }))));
-  await notify(userIds, { area: 'TCG', href: '/tcg', text: packGiftText(t, count) });
+  await notify(userIds, { area: 'Inventar', href: '/inventar', text: packGiftText(t, count) });
   return t;
 }
 
@@ -99,7 +100,7 @@ async function revokeCards({ userId, cardId, count = 1 }) {
     const free = owned.filter((d) => !isLocked(locked, d));
     if (free.length < count) {
       const lockedN = owned.length - free.length;
-      throw new UserError(`Das Mitglied hat nur ${free.length} freie${lockedN ? ` (dazu ${lockedN} gesperrte: Quest oder Handelsangebot)` : ''} Exemplar(e) dieser Karte.`);
+      throw new UserError(`Das Mitglied hat nur ${free.length} freie${lockedN ? ` (dazu ${lockedN} gesperrte: Quest, Handelsangebot oder foliert)` : ''} Exemplar(e) dieser Karte.`);
     }
     const ids = free.slice(0, count).map((d) => d._id);
     const res = await TcgCard.deleteMany({ _id: { $in: ids }, user: userId }, { session });
@@ -159,8 +160,11 @@ async function packInventory(userId) {
 async function sellCards({ user, cardId, count = 1, keepOne = false }) {
   if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu verkaufen.');
   return inTransaction(async (session) => {
-    const owned = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity').session(session).lean();
-    if (!owned.length) throw new UserError('Du besitzt diese Karte nicht.');
+    const all = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity foiledAt').session(session).lean();
+    if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
+    // Folierte Exemplare kauft die Bank nicht (nur Handel); sie zählen auch nicht als Duplikate
+    const owned = all.filter((c) => !c.foiledAt);
+    if (!owned.length) throw new UserError('Folierte Karten kauft die Bank nicht. Biete sie im Handel an oder zieh vorher die Folie ab.');
     // Exemplare auf einer IHK-Quest oder in einem Handelsangebot sind gesperrt
     const locked = await lockedDocs(user._id, session);
     const sellable = owned.filter((c) => !isLocked(locked, c));
@@ -179,7 +183,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
     const proceeds = rarity.sell * n;
     const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { balance: proceeds } }, { new: true, session });
     await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta(toSell.map((c) => ({ card: cardId, rarity: c.rarity }))) }], { session });
-    return { count: n, proceeds, remaining: owned.length - n, balance: updated.balance };
+    return { count: n, proceeds, remaining: all.length - n, balance: updated.balance };
   });
 }
 
@@ -190,7 +194,8 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
  */
 async function sellAllDuplicates({ user }) {
   return inTransaction(async (session) => {
-    const owned = await TcgCard.find({ user: user._id }).sort({ createdAt: 1, _id: 1 }).select('_id card rarity').session(session).lean();
+    // folierte Exemplare bleiben immer (die Bank kauft sie nicht)
+    const owned = await TcgCard.find({ user: user._id, foiledAt: null }).sort({ createdAt: 1, _id: 1 }).select('_id card rarity').session(session).lean();
     const byCard = new Map();
     for (const c of owned) {
       if (!byCard.has(c.card)) byCard.set(c.card, []);
@@ -261,23 +266,30 @@ async function toggleFavorite({ user, cardId }) {
 /** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch der TCG-Seite – für das Abzeichen im Menü */
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
-/** Sammlung eines Nutzers: { cardId: Anzahl } */
+/** Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, v: Wert in Cent (mit Folie) }] */
 async function inventory(userId) {
-  const agg = await TcgCard.aggregate([{ $match: { user: userId } }, { $group: { _id: '$card', n: { $sum: 1 }, rarity: { $first: '$rarity' } } }]);
+  const agg = await TcgCard.aggregate([
+    { $match: { user: userId } },
+    { $group: { _id: '$card', n: { $sum: 1 }, rarity: { $first: '$rarity' }, foiled: { $sum: { $cond: [{ $eq: [{ $type: '$foiledAt' }, 'date'] }, 1, 0] } }, v: { $sum: sellValueExpr() } } },
+  ]);
   return agg;
 }
 
-/** MongoDB-Ausdruck: Verkaufswert (Cent) einer Karte anhand von $rarity – für Ranglisten-Aggregationen */
+/**
+ * MongoDB-Ausdruck: Wert (Cent) einer Karte – Verkaufswert anhand von $rarity, foliert plus Wertsteigerung
+ * (src/items/foil.js). Für Ranglisten-Aggregationen.
+ */
 function sellValueExpr(field = '$rarity') {
-  return {
+  const sell = {
     $switch: {
       branches: catalog.RARITIES.map((r) => ({ case: { $eq: [field, r.key] }, then: r.sell })),
       default: 0,
     },
   };
+  return { $floor: { $add: [{ $multiply: [sell, foil.factorExpr()] }, 1e-9] } };
 }
 
-/** Wert aller Karten eines Nutzers in Cent: Verkaufswert der Karten + ungeöffnete Packs zum aktuellen Packpreis */
+/** Wert aller Karten eines Nutzers in Cent: Wert der Karten (foliert mit Steigerung) + ungeöffnete Packs zum aktuellen Packpreis */
 async function cardValueCents(userId) {
   const [agg, packs] = await Promise.all([
     TcgCard.aggregate([{ $match: { user: userId } }, { $group: { _id: null, s: { $sum: sellValueExpr() } } }]),

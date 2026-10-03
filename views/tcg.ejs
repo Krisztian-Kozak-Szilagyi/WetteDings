@@ -59,23 +59,17 @@
 
   <% if (packs.length) { %>
     <section id="packs" class="tcg-mypacks">
-      <% packs.forEach((p) => { %>
-        <div class="tcg-mypack">
-          <span class="tcg-mypack-img" aria-hidden="true">
-            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
-            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
-          </span>
-          <div class="tcg-mypack-text">
-            <strong><span data-tcg-pack-count="<%= p.key %>"><%= p.count %></span> ungeöffnete<%= p.count === 1 ? 's Pack' : ' Packs' %></strong>
-            <span><%= packs.length > 1 ? p.label : 'Meine Packs' %></span>
-          </div>
-          <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= p.image %>">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="type" value="<%= p.key %>">
-            <button class="btn btn-primary" type="submit">Öffnen</button>
-          </form>
-        </div>
-      <% }) %>
+      <a class="tcg-mypack" href="/inventar#packs">
+        <span class="tcg-mypack-img" aria-hidden="true">
+          <img src="<%= packs[0].image %>" alt="" width="800" height="1280" loading="lazy">
+          <img src="<%= packs[0].image %>" alt="" width="800" height="1280" loading="lazy">
+        </span>
+        <span class="tcg-mypack-text">
+          <strong><%= packTotal %> ungeöffnete<%= packTotal === 1 ? 's Pack' : ' Packs' %></strong>
+          <span>liegen in deinem Inventar</span>
+        </span>
+        <span class="btn btn-primary">Zum Inventar</span>
+      </a>
     </section>
   <% } %>
 
@@ -83,7 +77,7 @@
     <div class="tcg-favs-box" id="favoriten">
       <div>
         <h2>Meine Favoriten</h2>
-        <p class="tcg-sub"><%= cardCount %> <%= cardCount === 1 ? 'Karte' : 'Karten' %> · Verkaufswert <%= euro(collectionValue) %></p>
+        <p class="tcg-sub"><%= cardCount %> <%= cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(collectionValue) %></p>
       </div>
       <% if (!cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p>

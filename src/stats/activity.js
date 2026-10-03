@@ -12,6 +12,7 @@ const AREAS = {
   duell: 'wetten',
   gruppen: 'wetten',
   tcg: 'tcg',
+  inventar: 'tcg',
   handel: 'handel',
   ihk: 'ihk',
   grading: 'grading',

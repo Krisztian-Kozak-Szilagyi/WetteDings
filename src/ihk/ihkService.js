@@ -252,11 +252,11 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex }) {
       const locked = await lockedDocs(user._id, session);
       const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
       const doc = await freeDoc(cardId);
-      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel).');
+      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
       const boostDocs = [];
       for (const b of boosts) {
         const d = await freeDoc(b.id);
-        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
+        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
         boostDocs.push(d);
       }
       await claim([doc, ...boostDocs], user._id, session);

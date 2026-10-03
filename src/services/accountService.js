@@ -10,6 +10,7 @@ const { ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Fo
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
+const { Item } = require('../models/Item');
 const Group = require('../models/Group');
 const roles = require('./roles');
 const { CoinHolding } = require('../models/Coin');
@@ -133,6 +134,7 @@ async function deleteAccount({ user, password }) {
     await Promise.all([
       TcgCard.deleteMany({ user: id }, opt),
       TcgPack.deleteMany({ user: id }, opt),
+      Item.deleteMany({ user: id }, opt),
       CoinHolding.deleteMany({ user: id }, opt),
       // laufende Quest abbrechen (ihre Karte gibt es nicht mehr); abgeschlossene bleiben für die Statistik
       IhkRun.deleteMany({ user: id, status: 'laeuft' }, opt),

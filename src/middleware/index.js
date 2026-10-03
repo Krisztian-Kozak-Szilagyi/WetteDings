@@ -8,12 +8,17 @@ const deviceService = require('../device/deviceService');
 
 const DEVICE_COOKIE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
+// Erfolgsmeldungen (grün) gibt es nur noch bei Admin-/Moderationsaktionen. Bei allem anderen soll die Seite
+// selbst zeigen, dass es geklappt hat (Krisztians Wunsch) – Fehler und Hinweise kommen weiter.
+const STAFF_SUCCESS = /^\/(admin(\/|$)|forum\/bereiche(\/|$)|forum\/t\/[^/]+\/verschieben$)/;
+const keepsFlash = (type, path) => type !== 'success' || STAFF_SUCCESS.test(path);
+
 /** Einmalige Hinweise über eine Weiterleitung hinweg */
 function flash(req, res, next) {
   res.locals.flash = req.session.flash || null;
   if (req.session.flash) delete req.session.flash;
   req.flash = (type, message) => {
-    req.session.flash = { type, message };
+    if (keepsFlash(type, String(req.originalUrl || '').split('?')[0])) req.session.flash = { type, message };
   };
   next();
 }
@@ -141,4 +146,4 @@ function requireStaff(req, res, next) {
   next();
 }
 
-module.exports = { flash, loadUser, device, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };
+module.exports = { flash, keepsFlash, loadUser, device, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };

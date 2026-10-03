@@ -3616,3 +3616,56 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   20%, 22%, 56% { opacity: .55; text-shadow: none; }
 }
 @media (prefers-reduced-motion: reduce) { .bm.is-open .bm-title h2 { animation: none; } }
+
+/* ---------- Inventar & Folie ---------- */
+.inv-page { display: flex; flex-direction: column; gap: 40px; }
+.inv-head h1 { margin: 0 0 4px; }
+.inv-block h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.inv-count { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--color-accent-900); color: var(--color-accent-200); font-size: 12px; font-weight: 600; box-shadow: 0 0 0 1px var(--color-accent-800); }
+.inv-items { display: flex; flex-direction: column; gap: 12px; }
+.inv-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); }
+.inv-item.is-empty { opacity: .75; }
+.inv-item-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 10px; color: #dff3ff; background: linear-gradient(135deg, #7dd3fc33, #c4b5fd44, #f0abfc33); box-shadow: inset 0 0 0 1px #c4b5fd55; }
+.inv-item-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.inv-item-text strong { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.inv-hint { margin: 0; }
+.inv-foil-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.inv-foil-form .field { flex: 1 1 260px; margin: 0; }
+.inv-foil-form select { width: 100%; }
+
+.foil-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 18px; }
+.foil-item { display: flex; gap: 14px; padding: 12px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); scroll-margin-top: 90px; }
+.foil-item.is-new { animation: foil-new 2.4s ease-out 1; box-shadow: 0 0 0 2px var(--rar, var(--color-accent)); }
+@keyframes foil-new { 0% { transform: scale(.96); box-shadow: 0 0 0 2px var(--rar), 0 0 40px var(--rar); } 100% { transform: none; } }
+.foil-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.foil-info > strong { font-weight: 600; }
+.foil-info form { margin: 0; }
+.foil-trade summary { cursor: var(--cur-pointer, pointer); color: var(--color-accent-300); font-size: 14px; }
+.foil-trade .form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.foil-trade .field { margin: 0; }
+
+/* Die Karte im Folien-Slab: vorne Karte + Etikett oben, hinten das Etikett mit dem Datum */
+.foil-card { flex: none; width: 120px; padding: 0; border: 0; background: none; perspective: 700px; cursor: var(--cur-pointer, pointer); }
+.foil-inner { position: relative; display: block; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.3, .7, .3, 1); }
+.foil-card[aria-pressed="true"] .foil-inner { transform: rotateY(180deg); }
+.foil-face { position: absolute; inset: 0; display: block; overflow: hidden; border-radius: 9px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  padding: 26px 5px 5px; background: linear-gradient(160deg, #e9f6ff26, #ffffff0d 40%, #c4b5fd26); box-shadow: inset 0 0 0 1px #ffffff40, 0 0 0 1px var(--rar, #ffffff30), 0 6px 18px rgba(0, 0, 0, .35); }
+.foil-face img { display: block; width: 100%; height: auto; border-radius: 5px; }
+.foil-front { position: relative; }
+.foil-back { transform: rotateY(180deg); display: grid; place-items: center; }
+.foil-back-art { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 5px; text-align: center; font-weight: 800; letter-spacing: .08em; font-size: 13px; color: var(--rar, var(--color-accent-300));
+  background: repeating-linear-gradient(45deg, var(--color-accent-900) 0 6px, var(--color-bg) 6px 12px); box-shadow: inset 0 0 0 2px var(--rar, var(--color-accent-700)); }
+.foil-sheen { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; mix-blend-mode: screen; opacity: .55;
+  background: linear-gradient(115deg, transparent 20%, #ffffff55 32%, #a8d8ff40 38%, transparent 46%, transparent 60%, #f0abfc33 68%, transparent 76%); background-size: 250% 250%; animation: foil-sheen 6s ease-in-out infinite; }
+@keyframes foil-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 100%; } }
+.foil-ticket { position: absolute; top: 4px; left: 5px; right: 5px; height: 19px; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 6px; border-radius: 3px;
+  background: linear-gradient(90deg, #f8fafc, #e2e8f0); color: #0f172a; font-size: 9px; line-height: 1; box-shadow: inset 0 -2px 0 var(--rar, #94a3b8); }
+.foil-ticket b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.foil-ticket span { flex: none; color: #475569; }
+.foil-ticket-back { justify-content: center; gap: 5px; }
+.foil-tag { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: 600; color: #0f172a; background: linear-gradient(90deg, #a8d8ff, #e9d5ff, #fbcfe8); }
+.tcg-mark-foil { font-size: 11px; font-weight: 800; color: #0f172a; background: linear-gradient(135deg, #a8d8ff, #e9d5ff, #fbcfe8); }
+@media (max-width: 420px) { .foil-card { width: 96px; } }
+@media (prefers-reduced-motion: reduce) { .foil-sheen, .foil-item.is-new { animation: none; } .foil-inner { transition: none; } }
+
+a.tcg-mypack { color: inherit; text-decoration: none; }

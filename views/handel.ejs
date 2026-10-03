@@ -2,6 +2,8 @@
 <%
   const bal = currentUser.balance;
   const me = String(currentUser._id);
+  // Folierte Karte: Hinweis mit Datum (die Folie geht mit der Karte an den Käufer)
+  const foilTag = (t) => { if (t.foiledAt) { %> <span class="foil-tag" title="Foliert am <%= dayDate(t.foiledAt) %> – steigt täglich im Wert, kann nicht an die Bank verkauft oder auf Quests geschickt werden">Foliert · <%= dayDate(t.foiledAt) %></span><% } };
   const line = (id) => { const c = cardInfo(id); return { c, r: rarityByKey[c.rarity] || { label: '' } }; };
   const taxText = String(taxPercent).replace('.', ',');
   // Aufpreis eines Tauschs aus meiner Sicht: { iPay, text }
@@ -100,10 +102,10 @@
                 <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Tausch · von <%= t.sellerName %></span>
-                  <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
+                  <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
                   <span class="trade-title">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span></span>
                   <span class="trade-meta"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %> · <% swapState(t, 'to') %></span>
-                  <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest oder Handel).</span><% } %>
+                  <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest, Handel oder foliert).</span><% } %>
                 </div>
                 <div class="trade-actions">
                   <form method="post" action="/handel/<%= t._id %>/ablehnen">
@@ -125,7 +127,7 @@
                 <%- include('partials/trade-thumbs', { a: c }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Privat · von <%= t.sellerName %></span>
-                  <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %></span>
+                  <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
                   <span class="trade-meta">läuft ab <%= relTime(t.expiresAt) %></span>
                 </div>
                 <div class="trade-actions">
@@ -168,8 +170,8 @@
             <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
               <%- include('partials/trade-thumbs', { a: c }) %>
               <div class="trade-info">
-                <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %></span>
-                <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(r.sell || 0) %></span>
+                <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t) %></span>
+                <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(foil.cardValue(r.sell || 0, t.foiledAt)) %></span>
               </div>
               <div class="trade-actions">
                 <span class="trade-price"><%= euro(t.price) %></span>
@@ -187,7 +189,7 @@
     <div class="handel-block" id="sammlung" data-filter-scope>
       <div class="handel-block-head">
         <h4>Deine Sammlung</h4>
-        <% if (coll.cardCount) { %><span class="muted small">Karte antippen zum Anbieten · gesperrte Karten (Quest oder Handel) sind ausgegraut</span><% } %>
+        <% if (coll.cardCount) { %><span class="muted small">Karte antippen zum Anbieten · gesperrte Karten (Quest, Handel oder foliert) sind ausgegraut · folierte Karten bietest du im <a href="/inventar#folierte">Inventar</a> an</span><% } %>
       </div>
       <% if (!coll.cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>
@@ -222,7 +224,7 @@
             <li class="my-offer">
               <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
               <div class="my-offer-info">
-                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong>
+                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong><% foilTag(t) %>
                 <span><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %> · läuft ab <%= relTime(t.expiresAt) %></span>
                 <% if (w) { %>
                   <span><%= extra(t).text %></span>

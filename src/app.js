@@ -177,6 +177,7 @@ function createApp() {
   app.use(require('./routes/coin'));
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));
+  app.use(require('./routes/inventar'));
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
   app.use(require('./routes/trade'));

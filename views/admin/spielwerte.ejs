@@ -1,6 +1,6 @@
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#ihk">IHK</a><% } %>
+  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#folie">Folie</a><a href="#ihk">IHK</a><% } %>
 </nav>
 
 <div class="panel-warning" role="note">
@@ -96,6 +96,26 @@
       </div>
       <button class="btn btn-danger" type="submit">Karte entfernen</button>
     </form>
+
+    <form method="post" data-reauth action="/admin/items" class="card panel-grant" data-confirm="Diesen Gegenstand wirklich vergeben?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <h3><%- icon('gift') %> Gegenstand vergeben</h3>
+      <p class="muted small">Landet im Inventar des Mitglieds (z. B. eine Folie zum Testen).</p>
+      <label class="field"><span>Gegenstand</span>
+        <select name="type" required><% itemTypes.forEach((t) => { %><option value="<%= t.key %>"><%= t.label %></option><% }) %></select>
+      </label>
+      <div class="panel-grant-row">
+        <label class="field"><span>Empfänger</span>
+          <select name="user" required>
+            <option value="">– auswählen –</option>
+            <option value="alle">Alle Mitglieder (<%= users.length %>)</option>
+            <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+          </select>
+        </label>
+        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      </div>
+      <button class="btn btn-primary" type="submit">Gegenstand vergeben</button>
+    </form>
   </div>
 </section>
 
@@ -183,6 +203,22 @@
           <% }) %>
           <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
         </div>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="stats-block" id="folie">
+    <%- blockHead('Folie', 'Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit dieser Chance eine Folie. Folierte Karten steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel, die Bank zahlt aber nur ohne Folie.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/folie" class="form admin-tcg-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="admin-gr-grid">
+          <label class="field"><span>Fundchance pro versiegelter Karte in %</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung beim Folieren in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+        </div>
+        <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

@@ -17,6 +17,8 @@ const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
 const bonusService = require('../services/bonusService');
 const grading = require('../grading/gradingService');
+const itemService = require('../items/itemService');
+const foil = require('../items/foil');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
@@ -167,6 +169,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     maxBanHours: isAdmin ? MAX_BAN_HOURS : DEV_MAX_BAN_HOURS,
     users,
     packTypes: tcgCatalog.PACK_TYPES,
+    itemTypes: itemService.ITEM_TYPES,
+    foilSettings: foil.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     grantCards: tcgCatalog.RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     packLogNew: counts.packLogNew,
@@ -402,8 +406,52 @@ router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte
   res.redirect(panelUrl('spielwerte', 'tcg'));
 });
 
+// ---------- Folie: Fundchance im Grading-Shop und Wertsteigerung ----------
+router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  // Prozent mit Komma oder Punkt, z. B. "0,9"
+  const percent = (v) => {
+    const raw = str(v).trim().replace(',', '.');
+    return /^\d{1,4}(\.\d{1,2})?$/.test(raw) ? Number(raw) : NaN;
+  };
+  const chance = percent(req.body.chance);
+  const bonusPercent = percent(req.body.bonus);
+  const dailyPercent = percent(req.body.daily);
+  if (!(chance >= 0 && chance <= 100)) {
+    req.flash('error', 'Fundchance: 0 bis 100 % (höchstens zwei Nachkommastellen).');
+  } else if (!(bonusPercent >= 0 && bonusPercent <= 1000) || !(dailyPercent >= 0 && dailyPercent <= 1000)) {
+    req.flash('error', 'Wertsteigerung: 0 bis 1000 % (höchstens zwei Nachkommastellen).');
+  } else {
+    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent });
+    req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
+  }
+  res.redirect(panelUrl('spielwerte', 'folie'));
+});
+
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
 const GRANT_URL = panelUrl('spielwerte', 'vergeben');
+
+// Gegenstände (Folie) an ein Mitglied oder an alle
+router.post('/admin/items', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const type = itemService.ITEM_TYPES.find((t) => t.key === str(req.body.type));
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const toAll = target === 'alle';
+  const user = !toAll && mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!type) {
+    req.flash('error', 'Bitte einen Gegenstand auswählen.');
+  } else if (!toAll && !user) {
+    req.flash('error', 'Bitte ein Mitglied oder „Alle Mitglieder“ auswählen.');
+  } else if (!Number.isInteger(count) || count < 1 || count > (toAll ? 5 : itemService.MAX_GRANT)) {
+    req.flash('error', `Die Anzahl muss zwischen 1 und ${toAll ? 5 : itemService.MAX_GRANT} liegen.`);
+  } else {
+    const ids = toAll ? await allMemberIds() : [user._id];
+    await itemService.grantItems({ userIds: ids, type: type.key, count, source: 'admin' });
+    await itemService.notifyGift(ids, type, count);
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'item', type: type.key, typeLabel: type.label, count });
+    req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.` : `${count}× ${type.label} an ${user.username} vergeben.`);
+  }
+  res.redirect(GRANT_URL);
+});
 
 router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';

@@ -1,0 +1,127 @@
+// Inventar: Gegenstände (vorerst nur die Folie) und folierte Karten.
+// Eine folierte Karte gewinnt mit der Zeit an Wert, kann aber weder an die Bank verkauft noch auf Quests
+// (oder künftige Dungeons) geschickt werden – nur behalten oder im Handel weitergeben (siehe tcg/locks).
+const crypto = require('crypto');
+const { Item } = require('../models/Item');
+const { TcgCard } = require('../models/Tcg');
+const { lockedDocs, claim } = require('../tcg/locks');
+const { inTransaction } = require('../services/betService');
+const { notify } = require('../services/notifyService');
+const { UserError } = require('../lib/util');
+const catalog = require('../tcg/catalog');
+const foil = require('./foil');
+
+// Gegenstands-Arten. Später kommen weitere dazu (eigener Schlüssel, Name, Beschreibung).
+const ITEM_TYPES = [
+  {
+    key: 'folie',
+    label: 'Folie',
+    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden – nur behalten oder handeln.',
+  },
+];
+const itemTypeByKey = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
+
+const MAX_GRANT = 50;
+
+/** Gegenstände eines Nutzers: [{ ...Art, count }] (alle Arten, auch mit 0) */
+async function itemInventory(userId) {
+  const agg = await Item.aggregate([{ $match: { user: userId } }, { $group: { _id: '$type', n: { $sum: 1 } } }]);
+  const counts = Object.fromEntries(agg.map((a) => [a._id, a.n]));
+  return ITEM_TYPES.map((t) => ({ ...t, count: counts[t.key] || 0 }));
+}
+
+/** Gegenstände verschenken (Admin/Dev oder Fund). Optional in einer laufenden Transaktion. */
+async function grantItems({ userIds, type, count = 1, source, session }) {
+  const t = itemTypeByKey[type];
+  if (!t) throw new UserError('Diesen Gegenstand gibt es nicht.');
+  if (!Number.isInteger(count) || count < 1 || count > MAX_GRANT) throw new UserError(`Die Anzahl muss zwischen 1 und ${MAX_GRANT} liegen.`);
+  await Item.insertMany(userIds.flatMap((user) => Array.from({ length: count }, () => ({ user, type: t.key, source }))), { session });
+  return t;
+}
+
+/** Folierte Karten eines Nutzers, neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
+async function foiledCards(userId, now = Date.now()) {
+  const [docs, locked] = await Promise.all([
+    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).sort({ foiledAt: -1 }).lean(),
+    lockedDocs(userId),
+  ]);
+  return docs
+    .filter((d) => catalog.cardById[d.card])
+    .map((d) => {
+      const card = catalog.cardById[d.card];
+      const r = catalog.rarityByKey[d.rarity] || { sell: 0, label: d.rarity };
+      const reason = locked.reasons.get(String(d._id));
+      return {
+        id: String(d._id),
+        card,
+        rarity: r,
+        foiledAt: d.foiledAt,
+        days: foil.foilDays(d.foiledAt, now),
+        percent: foil.foilPercent(d.foiledAt, now),
+        sell: r.sell,
+        value: foil.cardValue(r.sell, d.foiledAt, now),
+        lock: reason && reason !== 'folie' ? reason : null, // 'handel' | 'quest'
+      };
+    });
+}
+
+/**
+ * Karten, die sich folieren lassen: mindestens ein freies, unfoliertes Exemplar.
+ * [{ card, rarity, free }] nach Seltenheit (selten zuerst) und Name.
+ */
+async function foilableCards(userId) {
+  const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
+  const free = {};
+  for (const d of docs) if (!locked.reasons.has(String(d._id))) free[d.card] = (free[d.card] || 0) + 1;
+  return Object.keys(free)
+    .map((id) => catalog.cardById[id])
+    .filter(Boolean)
+    .map((card) => ({ card, rarity: catalog.rarityByKey[card.rarity], free: free[card.id] }))
+    .sort((a, b) => b.rarity.rank - a.rarity.rank || a.card.name.localeCompare(b.card.name, 'de'));
+}
+
+/** Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar. Gibt die Exemplar-ID zurück. */
+async function foilCard({ user, cardId }) {
+  const card = catalog.cardById[cardId];
+  if (!card) throw new UserError('Bitte wähle eine Karte aus.');
+  return inTransaction(async (session) => {
+    const locked = await lockedDocs(user._id, session);
+    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id').session(session).lean();
+    const doc = docs.find((d) => !locked.reasons.has(String(d._id)));
+    if (!doc) throw new UserError(docs.length ? 'Alle unfolierten Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Du hast kein unfoliertes Exemplar dieser Karte.');
+    const used = await Item.findOneAndDelete({ user: user._id, type: 'folie' }, { sort: { createdAt: 1 }, session });
+    if (!used) throw new UserError('Du hast keine Folie mehr.');
+    await claim([doc], user._id, session);
+    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: new Date() } }, { session });
+    return String(doc._id);
+  });
+}
+
+/** Folie abziehen: Die Karte ist danach wieder normal (Bankwert, Quests), die Folie ist kaputt. */
+async function unfoilCard({ user, copyId }) {
+  return inTransaction(async (session) => {
+    const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card').session(session).lean();
+    if (!doc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
+    const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
+    if (reason === 'handel') throw new UserError('Die Karte ist gerade im Handel. Zieh zuerst das Angebot zurück.');
+    await claim([doc], user._id, session);
+    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null } }, { session });
+    return catalog.cardById[doc.card] || null;
+  });
+}
+
+/**
+ * Grading-Shop: Wer eine Karte versiegelt, findet mit kleiner Chance eine Folie (Einstellung gradingChance).
+ * Läuft in der Transaktion des Auftrags; gibt true zurück, wenn eine Folie gefunden wurde.
+ */
+async function rollGradingFoil({ userId, session, roll = () => crypto.randomInt(10000) }) {
+  if (roll() >= foil.settings.gradingChance) return false;
+  await grantItems({ userIds: [userId], type: 'folie', source: 'grading', session });
+  return true;
+}
+
+/** Glocke: geschenkte Gegenstände (nach der Transaktion aufrufen) */
+const notifyGift = (userIds, t, count) =>
+  notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
+
+module.exports = { ITEM_TYPES, itemTypeByKey, MAX_GRANT, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

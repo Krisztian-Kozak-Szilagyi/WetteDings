@@ -53,7 +53,7 @@
       </div>
 
       <% if (isOpen) { %>
-        <% if (role === 'to' && !wantFree) { %><p class="neg small">Du hast <%= give.name %> gerade nicht frei (Quest oder Handel). Annehmen geht erst, wenn die Karte wieder frei ist.</p><% } %>
+        <% if (role === 'to' && !wantFree) { %><p class="neg small">Du hast <%= give.name %> gerade nicht frei (Quest, Handel oder foliert). Annehmen geht erst, wenn die Karte wieder frei ist.</p><% } %>
         <div class="nego-actions">
           <% if (canAccept) { %>
             <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= give.name %> gegen <%= get.name %> tauschen (<%= termsText(t) %>)?">

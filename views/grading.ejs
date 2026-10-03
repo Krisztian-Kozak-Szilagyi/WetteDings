@@ -150,6 +150,7 @@
                     <% if (j.clean !== null && j.clean !== undefined) { %><span class="<%= j.clean === 100 ? 'gr-ok' : '' %>">Sauberkeit <%= j.clean %> %</span><% } %>
                     <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>"> · Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
                     <% if (j.seal !== null) { %><span> · Versiegelung <%= j.seal %> %</span><% } %>
+                    <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
                   </span>
                 </span>
                 <b class="gr-pay">+<%= euro(j.pay) %></b>

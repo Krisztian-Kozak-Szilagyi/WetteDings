@@ -8,6 +8,8 @@ const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const { logSettingsChange } = require('../stats/settingsLog');
 const catalog = require('../tcg/catalog');
+const { rollGradingFoil } = require('../items/itemService');
+const { notify } = require('../services/notifyService');
 
 // ---------- Spielregeln (Demo-Werte) ----------
 const CONTRACT_DAYS = 10; // so lange kann man nach der Annahme nicht kündigen
@@ -221,9 +223,12 @@ async function setGuess({ user, guess }) {
   return { guess: final.guess, grade: final.grade };
 }
 
-/** Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben. clean = Sauberkeit 0–100 % */
+/**
+ * Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben. clean = Sauberkeit 0–100 %.
+ * Wer versiegelt (ab Stufe 3), findet mit kleiner Chance eine Folie fürs Inventar.
+ */
 async function finishJob({ user, clean, seal }) {
-  return inTransaction(async (session) => {
+  const done = await inTransaction(async (session) => {
     const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session);
     if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
     const info = levelInfo(job.level);
@@ -233,7 +238,8 @@ async function finishJob({ user, clean, seal }) {
     if (info.steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
     const sealQ = info.steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
     const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ });
-    Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, doneAt: new Date() });
+    const foilFound = sealQ > 0 && (await rollGradingFoil({ userId: user._id, session }));
+    Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, foilFound, doneAt: new Date() });
     await job.save({ session });
     await User.updateOne({ _id: user._id }, { $inc: { balance: pay } }, { session });
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay } }, { session });
@@ -241,6 +247,8 @@ async function finishJob({ user, clean, seal }) {
     await Ledger.create([{ user: user._id, type: 'grading_lohn', amount: pay, betTitle: card ? `${card.name} für ${job.customer}` : job.customer }], { session });
     return job.toObject();
   });
+  if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });
+  return done;
 }
 
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */

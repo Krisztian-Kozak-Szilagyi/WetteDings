@@ -6,7 +6,7 @@
     <h1>Album</h1>
     <div class="tcg-progress">
       <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
-      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Verkaufswert <%= euro(collectionValue) %></span>
+      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Wert <%= euro(collectionValue) %></span>
     </div>
   </div>
   <form class="album-dupes" method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett."

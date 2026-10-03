@@ -5,7 +5,7 @@
   <div class="ihk-title">
     <h1>Sammlung von <%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
   </div>
-  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Verkaufswert <%= euro(collectionValue) %></span>
+  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Wert <%= euro(collectionValue) %></span>
 </div>
 
 <div class="card" id="sammlung">
