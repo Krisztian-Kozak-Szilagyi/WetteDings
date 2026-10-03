@@ -364,6 +364,9 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
   const duelActive = !!bet.duel && bet.duel.state === 'aktiv';
   const canDecide = bet.duel ? (duelRole === 'referee' && duelActive) || (!duelRole && role === 'dev' && duelActive) : !!role;
   const decidesAlone = role === 'dev' || (role === 'creator' && !bet.referee) || (!!bet.duel && canDecide);
+  // Zuschauer-Tipp (ohne Einsatz): nur Unbeteiligte, solange das Duell läuft und die Auswertung noch aussteht
+  const canTip = !!bet.duel && duelActive && isOpen && !duelRole && (!bet.resultAt || bet.resultAt > now);
+  const myTip = bet.duel && !duelRole ? await duels.myTip(bet._id, me._id) : null;
   const myVote = (bet.votes || []).find((v) => v.role === role) || null;
 
   res.render('bet', {
@@ -384,6 +387,8 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
     noteMin: svc.NOTE_MIN,
     noteMax: svc.NOTE_MAX,
     duelRole,
+    canTip,
+    myTip,
     duelFeePercent: duels.DUEL_FEE_PERCENT,
     perms: {
       // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen; im Duell setzt niemand nach
@@ -522,6 +527,18 @@ router.post('/wetten/:id/duell/annehmen', validId, requireLogin, (req, res) =>
       ? `Herausforderung angenommen – dein Einsatz von ${euro(r.bet.duel.stake)} ist gesetzt. Jetzt fehlt noch die Zusage des Schiedsrichters.`
       : 'Du hast als Schiedsrichter zugesagt. Jetzt fehlt noch die Zusage des Herausgeforderten.';
   })
+);
+
+router.post('/wetten/:id/duell/tipp', validId, requireLogin, (req, res) =>
+  action(
+    req,
+    res,
+    async () => {
+      const r = await duels.tip({ user: req.user, betId: req.params.id, side: str(req.body.side) });
+      return r.changed ? (r.switched ? 'Dein Tipp wurde geändert.' : 'Dein Tipp ist gespeichert – ganz ohne Einsatz.') : null;
+    },
+    '#duell'
+  )
 );
 
 router.post('/wetten/:id/duell/absagen', validId, requireLogin, (req, res) =>

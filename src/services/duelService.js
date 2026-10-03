@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
+const DuelTip = require('../models/DuelTip');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const betService = require('./betService');
@@ -133,7 +134,40 @@ async function expirePending(now = new Date()) {
   return stale.length;
 }
 
+/**
+ * Zuschauer-Tipp (ohne Einsatz): wer gewinnt das Duell? Nur für Unbeteiligte, solange das Duell läuft und der
+ * Termin der Auswertung noch nicht erreicht ist. Ein Tipp lässt sich bis dahin ändern.
+ */
+async function tip({ user, betId, side }) {
+  if (!['o1', 'o2'].includes(side)) throw new UserError('Bitte wähle eine Seite.');
+  return betService.inTransaction(async (session) => {
+    const bet = await Bet.findById(betId).session(session);
+    if (!bet || !bet.duel) throw new UserError('Duell nicht gefunden.');
+    if (duelRole(bet, user)) throw new UserError('Als Beteiligter kannst du nicht tippen.');
+    if (bet.status !== 'offen' || bet.duel.state !== 'aktiv') throw new UserError('Tippen geht nur, solange das Duell läuft.');
+    if (bet.resultAt && bet.resultAt <= new Date()) throw new UserError('Der Termin der Auswertung ist erreicht – Tipps sind nicht mehr möglich.');
+    const old = await DuelTip.findOne({ bet: bet._id, user: user._id }).session(session);
+    if (old && old.side === side) return { changed: false, side };
+    const inc = { [`duel.tips${side === 'o1' ? 'O1' : 'O2'}`]: 1 };
+    if (old) {
+      inc[`duel.tips${old.side === 'o1' ? 'O1' : 'O2'}`] = -1;
+      old.side = side;
+      await old.save({ session });
+    } else {
+      await DuelTip.create([{ bet: bet._id, user: user._id, side }], { session });
+    }
+    await Bet.updateOne({ _id: bet._id }, { $inc: inc }, { session, timestamps: false });
+    return { changed: true, side, switched: !!old };
+  });
+}
+
+/** Mein Tipp in diesem Duell ('o1' | 'o2' | null) */
+async function myTip(betId, userId) {
+  const t = await DuelTip.findOne({ bet: betId, user: userId }).select('side').lean();
+  return t ? t.side : null;
+}
+
 /** Anfragen, auf die ich antworten muss (für den Kasten auf der Wett-Übersicht) */
 const invitesFor = (userId) => Bet.find(betService.duelInviteFilter(userId)).sort({ createdAt: -1 }).limit(20).lean();
 
-module.exports = { DUEL_FEE_PERCENT, INVITE_HOURS, create, duelRole, accept, decline, expirePending, invitesFor };
+module.exports = { DUEL_FEE_PERCENT, INVITE_HOURS, create, duelRole, accept, decline, tip, myTip, expirePending, invitesFor };

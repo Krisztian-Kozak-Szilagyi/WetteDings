@@ -42,6 +42,9 @@ const duelSchema = new Schema(
     opponentAcceptedAt: { type: Date, default: null },
     refereeAcceptedAt: { type: Date, default: null },
     expiresAt: { type: Date, required: true }, // bis dahin muss angenommen sein, sonst Erstattung
+    // Tipps der Zuschauer ohne Einsatz (Anzahl je Seite; die einzelnen Tipps stehen in DuelTip)
+    tipsO1: { type: Number, default: 0 },
+    tipsO2: { type: Number, default: 0 },
   },
   { _id: false }
 );

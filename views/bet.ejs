@@ -55,7 +55,7 @@
         <span class="muted small">von <strong><%- userLink(bet.creatorName) %></strong> · <%= date(bet.createdAt) %></span>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
-      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole }) %><% } %>
+      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole, canTip, myTip }) %><% } %>
       <% if (bet.groupName) { %><p class="bet-group-note"><span class="tag tag-group">Gruppe: <%= bet.groupName %></span> <span class="muted small">Diese Wette sehen nur die Mitglieder der Gruppe.</span></p><% } %>
       <% if (bet.description) { %>
         <p class="bet-desc"><%= bet.description %></p>
@@ -163,8 +163,8 @@
         </div>
       <% } else if (st.key === 'wartend') { %>
         <div class="result result-wait">
-          <strong>Einsatzschluss erreicht.</strong>
-          <span>Wartet darauf, dass <%= bet.referee ? bet.creatorName + ' und ' + bet.refereeName + ' das Ergebnis eintragen' : bet.creatorName + ' das Ergebnis einträgt' %><% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
+          <strong><%= bet.duel ? 'Das Duell läuft.' : 'Einsatzschluss erreicht.' %></strong>
+          <span>Wartet darauf, dass <%= bet.duel ? 'Schiedsrichter ' + bet.refereeName + ' das Ergebnis einträgt' : bet.referee ? bet.creatorName + ' und ' + bet.refereeName + ' das Ergebnis eintragen' : bet.creatorName + ' das Ergebnis einträgt' %><% if (bet.resultAt) { %> – geplant für <%= date(bet.resultAt) %><% } %>.</span>
         </div>
       <% } %>
 

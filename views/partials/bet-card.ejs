@@ -18,7 +18,7 @@
   <% } else { %>
   <p class="muted small">von <%- userLink(bet.creatorName, { nested: true }) %><% if (bet.refereeName) { %> · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %><% } %><%= bet.type === 'optionen' ? ' · ' + bet.options.length + ' Optionen' : '' %></p>
   <% } %>
-  <%- include('bar', { bet }) %>
+  <% if (bet.duel) { %><%- include('duel-tips', { bet }) %><% } else { %><%- include('bar', { bet }) %><% } %>
   <ul class="opt-list">
     <% shown.forEach((o) => { %>
       <li class="opt-row <%= optClass(bet, o.key) %> <%= bet.outcome === o.key ? 'is-winner' : '' %> <%= pick && pick.side === o.key ? 'is-mine' : '' %>">

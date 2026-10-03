@@ -1,0 +1,16 @@
+<%
+  // Zuschauer-Tipps im Duell (ohne Einsatz): Balken, darunter links/rechts der Anteil je Seite, z. B. "52%"
+  const t1 = (bet.duel && bet.duel.tipsO1) || 0;
+  const t2 = (bet.duel && bet.duel.tipsO2) || 0;
+  const sum = t1 + t2;
+  const p1 = sum ? Math.round((t1 / sum) * 100) : 0;
+%>
+<div class="duel-tips" title="Tipps der Zuschauer (ohne Einsatz): <%= sum %> <%= sum === 1 ? 'Tipp' : 'Tipps' %>">
+  <div class="bar <%= locals.big ? 'bar-lg' : '' %><%= sum ? '' : ' bar-empty' %>" aria-hidden="true">
+    <% if (t1) { %><span class="bar-seg <%= optClass(bet, 'o1') %>" style="flex-grow: <%= t1 %>"></span><% } %>
+    <% if (t2) { %><span class="bar-seg <%= optClass(bet, 'o2') %>" style="flex-grow: <%= t2 %>"></span><% } %>
+  </div>
+  <% if (sum) { %>
+    <div class="duel-tips-pct"><span class="opt-text <%= optClass(bet, 'o1') %>"><%= p1 %>%</span><span class="opt-text <%= optClass(bet, 'o2') %>"><%= 100 - p1 %>%</span></div>
+  <% } %>
+</div>

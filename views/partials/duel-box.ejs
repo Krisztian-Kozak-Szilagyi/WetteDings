@@ -37,4 +37,20 @@
   <% } else if (d.state === 'aktiv' && bet.status === 'offen') { %>
     <p class="muted small">Das Duell läuft. Zum Termin der Auswertung trägt <%= bet.refereeName %> ein, wer gewonnen hat – mitwetten können andere nicht.</p>
   <% } %>
+  <% if (d.state === 'aktiv') { %>
+    <div class="duel-tip-area">
+      <p class="duel-tip-head">Tipps der Zuschauer <span class="muted small">(ohne Einsatz)</span></p>
+      <%- include('duel-tips', { bet, big: true }) %>
+      <% if (locals.canTip) { %>
+        <form method="post" action="/wetten/<%= bet._id %>/duell/tipp" class="duel-tip-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <% [['o1', bet.creatorName], ['o2', d.opponentName]].forEach(([k, name]) => { %>
+            <button class="btn btn-sm btn-opt <%= optClass(bet, k) %><%= locals.myTip === k ? ' is-picked' : '' %>" type="submit" name="side" value="<%= k %>" <%= locals.myTip === k ? 'disabled' : '' %>><%= locals.myTip === k ? 'Dein Tipp: ' : 'Ich tippe auf ' %><%= name %></button>
+          <% }) %>
+        </form>
+      <% } else if (locals.myTip) { %>
+        <p class="muted small">Dein Tipp: <%= locals.myTip === 'o1' ? bet.creatorName : d.opponentName %></p>
+      <% } %>
+    </div>
+  <% } %>
 </div>
