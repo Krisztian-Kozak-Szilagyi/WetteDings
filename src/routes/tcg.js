@@ -5,6 +5,7 @@ const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
+const { itemInventory } = require('../items/itemService');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -20,11 +21,12 @@ function cardView(card) {
 }
 
 router.get('/tcg', async (req, res) => {
-  const [coll, stats, rarePulls, packs] = await Promise.all([
+  const [coll, stats, rarePulls, packs, invItems] = await Promise.all([
     collection(req.user),
     TcgOpening.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: null, packs: { $sum: 1 }, spent: { $sum: '$cost' }, best: { $max: '$best' } } }]),
     TcgOpening.find({ best: { $gte: catalog.rarityByKey.holo.rank } }).sort({ createdAt: -1 }).limit(10).lean(),
-    tcg.packInventory(req.user._id), // ungeöffnete Packs liegen im Inventar – hier nur der Hinweis darauf
+    tcg.packInventory(req.user._id), // ungeöffnete Packs liegen im Inventar – hier nur die Kachel dorthin
+    itemInventory(req.user._id),
   ]);
 
   res.render('tcg', {
@@ -44,6 +46,7 @@ router.get('/tcg', async (req, res) => {
     maxPacksPerPurchase: tcg.MAX_PACKS_PER_PURCHASE,
     packImage: catalog.PACK_IMAGE,
     packs,
+    itemTotal: invItems.reduce((s, i) => s + i.count, 0),
     packType: catalog.DEFAULT_PACK,
     cardsPerPack: catalog.CARDS_PER_PACK,
   });

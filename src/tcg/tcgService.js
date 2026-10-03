@@ -263,7 +263,7 @@ async function toggleFavorite({ user, cardId }) {
   });
 }
 
-/** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch der TCG-Seite – für das Abzeichen im Menü */
+/** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch des Inventars – für das Abzeichen im Menü */
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
 /** Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, v: Wert in Cent (mit Folie) }] */

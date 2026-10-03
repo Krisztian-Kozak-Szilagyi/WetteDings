@@ -22,7 +22,7 @@ const ITEM_TYPES = [
     label: 'Folie',
     sell: 1000,
     image: '/img/items/folie.svg',
-    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden – nur behalten, verkaufen im Handel oder tauschen. Die Folie selbst kannst du auch handeln oder der Bank verkaufen.',
+    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.',
   },
 ];
 const itemTypeByKey = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
@@ -186,8 +186,11 @@ async function rollGradingFoil({ userId, session, roll = () => crypto.randomInt(
   return true;
 }
 
+/** Neue Gegenstände seit dem letzten Besuch des Inventars (gleiche Marke wie bei den Packs) – für das Leuchten an „TCG“ */
+const newItemCount = (user) => Item.countDocuments({ user: user._id, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
+
 /** Glocke: geschenkte Gegenstände (nach der Transaktion aufrufen) */
 const notifyGift = (userIds, t, count) =>
   notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
 
-module.exports = { ITEM_TYPES, itemTypeByKey, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };
+module.exports = { newItemCount, ITEM_TYPES, itemTypeByKey, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

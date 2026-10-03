@@ -11,6 +11,7 @@ const viewHelpers = require('./lib/viewHelpers');
 const { settings: ihkSettings } = require('./ihk/ihkService');
 const tradeService = require('./trade/tradeService');
 const tcgService = require('./tcg/tcgService');
+const itemService = require('./items/itemService');
 const forumRoutes = require('./routes/forum');
 const forumService = require('./forum/forumService');
 const groupService = require('./services/groupService');
@@ -86,6 +87,7 @@ function createApp() {
     betNewPublic: 0,
     betNewGroup: 0,
     newPacks: 0,
+    newItems: 0,
     patchNew: 0,
     packLogNew: 0,
     forumMine: 0,
@@ -129,11 +131,12 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
-        tcgService.newPackCount(u), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
+        tcgService.newPackCount(u), // geschenkte Packs seit dem letzten Besuch des Inventars
+        itemService.newItemCount(u), // neue Gegenstände (z. B. Folie) seit dem letzten Besuch des Inventars – leuchtender Punkt an TCG
         forumService.patchNewCount(u), // Patchnotes seit dem letzten Lesen
         betService.pendingVoteCount(u._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
         // neue öffentliche Wetten und neue Wetten in den eigenen Gruppen seit dem letzten Besuch der Übersicht
@@ -149,6 +152,7 @@ function createApp() {
         tradeIncoming: incoming + deals,
         tradeMarketNew: marketNew,
         newPacks,
+        newItems,
         patchNew,
         betVotePending: votePending,
         betNewPublic: betNew.pub,

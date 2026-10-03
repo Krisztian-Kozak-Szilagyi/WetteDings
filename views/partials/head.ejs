@@ -28,8 +28,7 @@
       navItems.push({ href: '/rangliste', label: 'Rangliste', active: currentPath === '/rangliste', badges: [] });
       navItems.push({ href: '/coin-exchange', label: 'Coin Exchange', active: currentPath === '/coin-exchange', badges: [] });
       navItems.push({ href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie', badges: [] });
-      navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg'), badges: [] });
-      navItems.push({ href: '/inventar', label: 'Inventar', active: currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [] });
+      navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });
       const tradeBadges = [];
       if (tradeMarketNew) tradeBadges.push({ n: tradeMarketNew, cls: 'nav-badge-market', title: 'Neu auf dem Markt', aria: tradeMarketNew + ' neue Markt-Angebote' });
       if (tradeIncoming) tradeBadges.push({ n: tradeIncoming, cls: '', title: 'Angebote, Verhandlungen und abgeschlossene Geschäfte für dich', aria: tradeIncoming + ' Angebote und Verhandlungen für dich' });
@@ -131,6 +130,7 @@
                 <% navItems.forEach((it) => { %><%- navLink(it) %><% }) %>
               </div>
               <a role="menuitem" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Profil ansehen</a>
+              <a role="menuitem" href="/inventar">Inventar</a>
               <a role="menuitem" href="/konto">Statistiken</a>
               <a role="menuitem" href="/konto/wetten">Meine Wetten</a>
               <a role="menuitem" href="/konto/auszug">Kontoauszug</a>

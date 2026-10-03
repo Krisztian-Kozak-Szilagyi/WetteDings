@@ -52,10 +52,7 @@
           <span class="inv-item-icon"><%- foilIcon %></span>
           <div class="inv-item-text">
             <strong><%= it.label %> <span class="inv-count"><%= it.count %></span><% if (it.inTrade) { %> <span class="muted small">davon <%= it.inTrade %> im Handel</span><% } %></strong>
-            <span class="muted small"><%= it.text %></span>
-            <% if (it.key === 'folie') { %>
-              <span class="muted small">Wert einer folierten Karte: sofort +<%= pct(foilSettings.bonusPercent) %> %, danach jeden Tag +<%= pct(foilSettings.dailyPercent) %> % vom Verkaufswert. Die Folie lässt sich jederzeit abziehen – dann ist sie aber kaputt.</span>
-            <% } %>
+            <span class="muted small"><%= it.key === 'folie' ? 'Schweißt eine deiner Karten ein. Folierte Karten steigen sofort um ' + pct(foilSettings.bonusPercent) + ' % und danach jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.' : it.text %></span>
           </div>
         </div>
         <% const free = it.count - it.inTrade; %>
@@ -81,7 +78,6 @@
         <% } %>
         <% if (it.key === 'folie') { %>
           <% if (!free) { %>
-            <p class="muted small inv-hint">Du hast gerade keine Folie. Mit etwas Glück bleibt beim Versiegeln im Grading-Shop eine übrig.</p>
           <% } else if (!foilable.length) { %>
             <p class="muted small inv-hint">Du hast keine freie, unfolierte Karte zum Folieren.</p>
           <% } else { %>
@@ -108,14 +104,14 @@
   <section class="inv-block" id="folierte">
     <h2>Folierte Karten <span class="inv-count"><%= foiled.length %></span></h2>
     <% if (!foiled.length) { %>
-      <p class="muted small">Noch keine. Folierte Karten erscheinen hier – mit Datum und aktuellem Wert. Tippe eine Karte an, um sie umzudrehen.</p>
+      <p class="muted small">Noch keine.</p>
     <% } else { %>
-      <p class="muted small">Tippe eine Karte an, um die Rückseite mit dem Foliendatum zu sehen.</p>
+      <p class="muted small">Tippe eine Karte an, um sie groß anzusehen und umzudrehen.</p>
     <% } %>
     <div class="foil-grid">
       <% foiled.forEach((f) => { %>
         <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
-          <button type="button" class="foil-card" data-foil-flip aria-pressed="false" aria-label="<%= f.card.name %> umdrehen">
+          <button type="button" class="foil-card" data-foil-zoom aria-label="<%= f.card.name %> groß ansehen">
             <span class="foil-inner">
               <span class="foil-face foil-front">
                 <img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008">
@@ -168,6 +164,13 @@
     </div>
   </section>
 </div>
+
+<!-- Folierte Karte groß (public/js/inventar.js): Klick dreht sie um -->
+<dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
+  <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
+  <div class="foil-modal-stage" data-foil-stage></div>
+  <p class="muted small foil-modal-hint">Antippen zum Umdrehen</p>
+</dialog>
 
 <!-- Pack-Öffnung (public/js/tcg.js) -->
 <div class="tcg-reveal" data-tcg-reveal hidden>
