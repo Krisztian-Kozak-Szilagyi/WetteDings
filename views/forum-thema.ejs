@@ -36,6 +36,17 @@
       <input type="hidden" name="action" value="entfernen">
       <button class="btn btn-ghost btn-sm forum-danger" type="submit">Thema entfernen</button>
     </form>
+    <% if (moveTargets.length) { %>
+      <form method="post" action="/forum/t/<%= thread._id %>/verschieben" class="forum-move">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="sr-only" for="verschieben-ziel">Verschieben nach</label>
+        <select id="verschieben-ziel" name="category" required>
+          <option value="">Verschieben nach …</option>
+          <% moveTargets.forEach((c) => { %><option value="<%= c._id %>"><%= c.label %></option><% }) %>
+        </select>
+        <button class="btn btn-ghost btn-sm" type="submit">Verschieben</button>
+      </form>
+    <% } %>
   </div>
 <% } %>
 

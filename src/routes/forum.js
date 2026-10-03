@@ -130,6 +130,7 @@ router.get('/forum/k/:id', async (req, res) => {
     total,
     canCreate: forum.can.createThread(req.user, cat),
     canManage: forum.can.manageCategory(req.user, cat, parent),
+    canAddSub: !cat.parent && forum.can.manage(req.user) && forum.can.manageCategory(req.user, cat, null),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
   });
 });
@@ -159,6 +160,14 @@ router.get('/forum/t/:id', async (req, res) => {
   if (!thread) return notFound(res, 'Dieses Thema gibt es nicht (mehr).');
   const [cat, total, reads] = await Promise.all([ForumCategory.findById(thread.category).lean(), ForumPost.countDocuments({ thread: thread._id }), forum.readMap(req.user._id)]);
   const parent = cat && cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
+  const allCats = req.user.canModerate && cat ? await ForumCategory.find().sort({ order: 1, createdAt: 1 }).lean() : [];
+  const moveTargets = [];
+  for (const root of allCats.filter((c) => !c.parent)) {
+    for (const c of [root, ...allCats.filter((s) => String(s.parent) === String(root._id))]) {
+      const p = c === root ? null : root;
+      if (forum.can.moveThread(req.user, cat, parent, c, p)) moveTargets.push({ _id: c._id, label: p ? `${root.title} › ${c.title}` : c.title });
+    }
+  }
   const { page, pages } = pageOf(req, total, forum.POSTS_PER_PAGE);
   const posts = await ForumPost.find({ thread: thread._id }).sort({ createdAt: 1, _id: 1 }).skip((page - 1) * forum.POSTS_PER_PAGE).limit(forum.POSTS_PER_PAGE).lean();
   const lastRead = reads.get(String(thread._id)) || null;
@@ -182,6 +191,7 @@ router.get('/forum/t/:id', async (req, res) => {
       canDelete: forum.can.deletePost(req.user, p),
     })),
     upvoted: thread.upvotes.some((id) => id.equals(req.user._id)),
+    moveTargets,
     canReply: forum.can.reply(req.user, thread),
     myTags: tagsFor(forum.roleOfUser(req.user)),
     bodyMax: forum.BODY_MAX,
@@ -196,6 +206,14 @@ router.post('/forum/t/:id/antwort', (req, res) =>
 );
 
 router.post('/forum/t/:id/upvote', (req, res) => act(req, res, `/forum/t/${req.params.id}`, () => forum.toggleUpvote({ user: req.user, threadId: req.params.id }).then(() => null)));
+
+router.post('/forum/t/:id/verschieben', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}`, async () => {
+    const { to } = await forum.moveThread({ user: req.user, threadId: req.params.id, categoryId: str(req.body.category) });
+    req.flash('success', `Thema nach „${to.title}“ verschoben.`);
+    return null;
+  })
+);
 
 router.post('/forum/t/:id/moderation', (req, res) =>
   act(req, res, `/forum/t/${req.params.id}`, async () => {
@@ -289,8 +307,8 @@ router.post('/forum/bereiche', (req, res, next) => {
       if (!forum.can.manageCategory(req.user, parent, null)) throw new UserError('In Team-Bereichen legen nur Admin und Devs Unterbereiche an.');
     }
     await ForumCategory.create({ ...data, parent: parent ? parent._id : null });
-    req.flash('success', `Bereich „${data.title}“ angelegt.`);
-    return '/forum';
+    req.flash('success', `${parent ? 'Unterbereich' : 'Bereich'} „${data.title}“ angelegt.`);
+    return parent ? `/forum/k/${parent._id}` : '/forum';
   });
 });
 

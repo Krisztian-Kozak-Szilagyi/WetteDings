@@ -92,6 +92,12 @@ const can = {
    * Team-Bereiche ("Admin & Dev" samt Unterbereichen) sind geschützt: dort nur Admin/Dev.
    */
   manageCategory: (user, cat, parent) => !!user.isStaff || (!!user.isMod && !cat.staffOnly && !(parent && parent.staffOnly)),
+  /**
+   * Thema in einen anderen Bereich verschieben: die Moderation, aber Team-Bereiche (Quelle oder Ziel)
+   * nur Admin/Dev – wie beim Bearbeiten von Bereichen.
+   */
+  moveThread: (user, from, fromParent, to, toParent) =>
+    !!user.canModerate && String(from._id) !== String(to._id) && can.manageCategory(user, from, fromParent) && can.manageCategory(user, to, toParent),
   /** Einen Bereich zum Team-Bereich machen (oder das zurücknehmen): nur Admin/Dev */
   setStaffOnly: (user) => !!user.isStaff,
   editPost(user, post, thread) {
@@ -208,6 +214,24 @@ async function moderateThread({ user, threadId, action }) {
   return thread;
 }
 
+/** Thema in einen anderen Bereich verschieben (Moderation) */
+async function moveThread({ user, threadId, categoryId }) {
+  if (!mongoose.isValidObjectId(threadId) || !mongoose.isValidObjectId(categoryId)) throw new UserError('Bitte einen Bereich wählen.');
+  const thread = await ForumThread.findOne({ _id: threadId, deleted: false });
+  if (!thread) throw new UserError('Dieses Thema gibt es nicht.');
+  const [from, to] = await Promise.all([ForumCategory.findById(thread.category).lean(), ForumCategory.findById(categoryId).lean()]);
+  if (!from || !to) throw new UserError('Diesen Bereich gibt es nicht.');
+  if (String(from._id) === String(to._id)) throw new UserError('Das Thema ist schon in diesem Bereich.');
+  const [fromParent, toParent] = await Promise.all([
+    from.parent ? ForumCategory.findById(from.parent).lean() : null,
+    to.parent ? ForumCategory.findById(to.parent).lean() : null,
+  ]);
+  if (!can.moveThread(user, from, fromParent, to, toParent)) throw new UserError('Themen in oder aus Team-Bereichen verschieben nur Admin und Devs.');
+  thread.category = to._id;
+  await thread.save();
+  return { thread, to };
+}
+
 async function toggleUpvote({ user, threadId }) {
   if (!mongoose.isValidObjectId(threadId)) throw new UserError('Dieses Thema gibt es nicht.');
   const added = await ForumThread.updateOne({ _id: threadId, deleted: false, upvotes: { $ne: user._id } }, { $addToSet: { upvotes: user._id } });
@@ -276,6 +300,7 @@ module.exports = {
   editPost,
   deletePost,
   moderateThread,
+  moveThread,
   toggleUpvote,
   report,
   markRead,

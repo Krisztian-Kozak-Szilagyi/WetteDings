@@ -10,18 +10,21 @@
 
 <div class="forum-head">
   <div class="forum-head-text">
+    <% if (parent) { %><span class="forum-sub-of"><%- include('partials/forum-icon', { name: 'folder', size: 13 }) %>Unterbereich von <a href="/forum/k/<%= parent._id %>"><%= parent.title %></a></span><% } %>
     <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="forum-team">Team</span><% } %></h1>
     <% if (cat.description) { %><span class="forum-head-desc"><%= cat.description %></span><% } %>
   </div>
   <% if (canCreate) { %><a class="btn btn-primary" href="/forum/k/<%= cat._id %>/neu">+ Neues Thema</a><% } %>
 </div>
 
-<% if (subs.length) { %>
-  <section class="forum-group">
-    <div class="forum-group-head forum-label">Unterbereiche</div>
+<% if (subs.length || canAddSub) { %>
+  <section class="forum-group forum-box">
+    <div class="forum-group-head"><span class="forum-label">Unterbereiche</span><% if (canAddSub) { %><button type="button" class="forum-add-sub" data-dialog-open="sub-<%= cat._id %>">+ Unterbereich</button><% } %></div>
+    <% if (!subs.length) { %><p class="forum-empty">Noch keine Unterbereiche.</p><% } %>
     <ul class="forum-rows">
       <% subs.forEach((c) => { const s = c.stats; %>
-        <li class="forum-crow <%= s.unread ? 'is-unread' : 'is-read' %>">
+        <li class="forum-crow is-sub <%= s.unread ? 'is-unread' : 'is-read' %>">
+          <span class="forum-crow-icon"><%- include('partials/forum-icon', { name: 'folder', size: 18 }) %></span>
           <span class="forum-trow-main">
             <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
             <% if (c.description) { %><span class="forum-sub"><%= c.description %></span><% } %>
@@ -40,6 +43,7 @@
 <% } %>
 
 <section class="forum-group">
+  <% if (subs.length || canAddSub) { %><h2 class="forum-threads-title">Themen in „<%= cat.title %>“</h2><% } %>
   <div class="forum-thead"><span>Thema</span><span>Antworten</span><span>Letzter Beitrag</span></div>
   <% if (!threads.length) { %>
     <p class="forum-empty"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Noch keine Themen.' %><%= canCreate ? ' Mach den Anfang!' : '' %></p>
@@ -81,5 +85,7 @@
 <% } %>
 
 </div>
+
+<% if (canAddSub) { %><%- include('partials/forum-sub-dialog', { root: cat }) %><% } %>
 
 <%- include('partials/foot') %>
