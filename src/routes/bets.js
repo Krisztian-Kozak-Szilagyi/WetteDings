@@ -7,7 +7,7 @@ const Comment = require('../models/Comment');
 const User = require('../models/User');
 const rateLimit = require('express-rate-limit');
 const { requireLogin } = require('../middleware');
-const { verdictRole } = require('../lib/verdict');
+const { verdictRole, devMayDecide } = require('../lib/verdict');
 const { str, escapeRegex, parseEuro, UserError } = require('../lib/util');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const { euro } = require('../lib/viewHelpers');
@@ -393,8 +393,9 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
     perms: {
       // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen; im Duell setzt niemand nach
       stake: !!me && accepting && !isOwner && !isReferee && !bet.duel,
-      // Ersteller, Schiedsrichter und Devs dürfen jederzeit eine Stimme abgeben (Duell: siehe canDecide)
-      resolve: isOpen && canDecide,
+      // Ersteller und Schiedsrichter dürfen jederzeit eine Stimme abgeben (Duell: siehe canDecide);
+      // ein unbeteiligter Dev legt ein Ergebnis nur im Streitfall oder nach dem Auswertungstermin fest
+      resolve: isOpen && canDecide && (role !== 'dev' || devMayDecide(bet, null, now)),
       void: isOpen && canDecide,
       close: accepting && !bet.duel && (isOwner || isReferee || isStaff),
       edit: (isOwner && isOpen) || isAdmin,

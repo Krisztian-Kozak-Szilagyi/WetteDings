@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { verdictRole, evaluateVotes } = require('../src/lib/verdict');
+const { verdictRole, devMayDecide, evaluateVotes } = require('../src/lib/verdict');
 const { pendingVoteFilter, disputedFilter } = require('../src/services/betService');
 
 const bet = { creator: 'u1', referee: 'u2' };
@@ -27,6 +27,23 @@ test('Eigene Beteiligung wiegt schwerer als die Dev-Rolle', () => {
   assert.equal(verdictRole(bet, { ...referee, isAdmin: true }), 'referee');
   // Bei einer Wette ohne Schiedsrichter bleibt ein unbeteiligter Dev Dev
   assert.equal(verdictRole({ creator: 'u1', referee: null }, dev), 'dev');
+});
+
+test('Dev: annullieren immer, Ergebnis nur im Streitfall oder nach dem Auswertungstermin', () => {
+  const now = new Date('2026-10-03T12:00:00Z');
+  const before = new Date('2026-10-03T11:00:00Z');
+  const after = new Date('2026-10-03T13:00:00Z');
+  const running = { deadline: after, resultAt: after, disputed: false };
+  assert.equal(devMayDecide(running, 'annulliert', now), true);
+  assert.equal(devMayDecide(running, 'ja', now), false);
+  assert.equal(devMayDecide(running, null, now), false);
+  assert.equal(devMayDecide({ ...running, disputed: true }, 'ja', now), true);
+  // Einsatzschluss vorbei reicht nicht, solange die Auswertung noch aussteht
+  assert.equal(devMayDecide({ ...running, deadline: before }, 'ja', now), false);
+  assert.equal(devMayDecide({ ...running, deadline: before, resultAt: before }, 'ja', now), true);
+  // Ohne Auswertungstermin zählt der Einsatzschluss
+  assert.equal(devMayDecide({ deadline: before, resultAt: null }, 'ja', now), true);
+  assert.equal(devMayDecide({ deadline: after, resultAt: null }, 'ja', now), false);
 });
 
 test('Eine Stimme allein entscheidet nicht', () => {

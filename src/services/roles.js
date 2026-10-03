@@ -1,5 +1,5 @@
 // Rollen: Admin (eine Person, über ADMIN_USERNAMES), Devs und Mods (vom Admin im Panel ernannt, Feld "role").
-//  Dev: schreibt im Team-Bereich des Forums, entscheidet/annulliert alle Wetten, vergibt Booster Packs, moderiert.
+//  Dev: schreibt im Team-Bereich des Forums, annulliert alle Wetten jederzeit, entscheidet sie im Streitfall oder nach dem Auswertungstermin, vergibt Booster Packs, moderiert.
 //  Mod: moderiert das Forum und Kommentare (löschen, bearbeiten, anpinnen, schließen) – sonst nichts.
 // Für die Zusätze neben Namen (echter Name in Klammern, Abzeichen) gibt es ein kleines Verzeichnis im
 // Speicher (Name → Rolle / echter Name), damit Listen mit gespeicherten Namen (Kommentare, Wetten, …)

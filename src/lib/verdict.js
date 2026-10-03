@@ -29,6 +29,18 @@ function verdictRole(bet, actor) {
 }
 
 /**
+ * Darf ein unbeteiligter Dev hier eingreifen? Annullieren geht immer (z. B. bei Regelverstößen),
+ * ein Ergebnis festlegen nur im Streitfall oder wenn der Auswertungstermin vorbei ist
+ * (ohne Termin: der Einsatzschluss) – vorher entscheiden Wettersteller und Schiedsrichter.
+ * outcome: 'annulliert' oder ein Options-key; null fragt, ob ein Ergebnis festgelegt werden darf.
+ */
+function devMayDecide(bet, outcome, now = new Date()) {
+  if (outcome === 'annulliert' || bet.disputed) return true;
+  const due = bet.resultAt || bet.deadline;
+  return !!due && new Date(due) <= now;
+}
+
+/**
  * Wertet die abgegebenen Stimmen aus. votes: [{ role, outcome }] – je Rolle zählt eine Stimme.
  * Alte Wetten ohne Schiedsrichter (hasReferee = false): der Wettersteller entscheidet allein.
  * -> { decided, disputed, outcome, missing }
@@ -47,4 +59,4 @@ function evaluateVotes(votes, { hasReferee = true } = {}) {
   return { decided: agreed, disputed: !agreed, outcome: agreed ? outcomes[0] : null, missing: [] };
 }
 
-module.exports = { VOTER_ROLES, ROLE_LABELS, verdictRole, evaluateVotes };
+module.exports = { VOTER_ROLES, ROLE_LABELS, verdictRole, devMayDecide, evaluateVotes };

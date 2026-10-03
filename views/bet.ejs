@@ -483,7 +483,8 @@
             </form>
           </details>
         <% } %>
-        <% if (role === 'dev') { %><p class="muted small">Du siehst diese Optionen als <%= myRoleLabel %> – deine Stimme entscheidet auch Streitfälle.</p><% } %>
+        <% if (role === 'dev' && perms.resolve) { %><p class="muted small">Du siehst diese Optionen als <%= myRoleLabel %> – deine Stimme entscheidet auch Streitfälle.</p><% } %>
+        <% if (role === 'dev' && !perms.resolve && perms.void) { %><p class="muted small">Als <%= myRoleLabel %> kannst du diese Wette jederzeit annullieren. Ein Ergebnis legst du erst fest, wenn sie strittig ist oder der Auswertungstermin vorbei ist.</p><% } %>
       </div>
     <% } %>
   </aside>
