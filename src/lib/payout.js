@@ -80,8 +80,10 @@ function feeFor(pot, loseTotal, feePercent = 0) {
  * und bekommen je die Hälfte; ein ungerader Cent geht an den Wettersteller.
  * Wetten ohne Schiedsrichter (Altbestand): alles an den Wettersteller.
  */
-function splitFee(fee, hasReferee) {
+function splitFee(fee, hasReferee, { duel = false } = {}) {
   const total = Math.max(0, Math.floor(fee || 0));
+  // Duell: der Herausforderer setzt selbst mit – die Provision gehört allein dem Schiedsrichter
+  if (duel) return { creator: 0, referee: total };
   const referee = hasReferee ? Math.floor(total / 2) : 0;
   return { creator: total - referee, referee };
 }

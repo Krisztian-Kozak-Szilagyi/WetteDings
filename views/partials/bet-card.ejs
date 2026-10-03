@@ -9,10 +9,15 @@
   <div class="bet-card-top">
     <span class="badge badge-<%= st.key %>"><%= st.label %></span>
     <% if (bet.groupName) { %><span class="tag tag-group" title="Nur für Mitglieder dieser Gruppe sichtbar">Gruppe: <%= bet.groupName %></span><% } %>
+    <% if (bet.duel) { %><span class="tag tag-duel" title="Duell: nur die beiden setzen, der Schiedsrichter entscheidet">Duell</span><% } %>
     <span class="muted small"><%= bet.participants %> <%= bet.participants === 1 ? 'Teilnehmer' : 'Teilnehmende' %><% if (bet.commentCount) { %> · <%= bet.commentCount %> <%= bet.commentCount === 1 ? 'Kommentar' : 'Kommentare' %><% } %></span>
   </div>
   <h3 class="bet-card-title"><%= bet.title %></h3>
+  <% if (bet.duel) { %>
+  <p class="muted small"><%- userLink(bet.creatorName, { nested: true }) %> vs. <%- userLink(bet.duel.opponentName, { nested: true }) %> · <%= euro(bet.duel.stake) %> pro Person · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %></p>
+  <% } else { %>
   <p class="muted small">von <%- userLink(bet.creatorName, { nested: true }) %><% if (bet.refereeName) { %> · Schiedsrichter <%- userLink(bet.refereeName, { nested: true }) %><% } %><%= bet.type === 'optionen' ? ' · ' + bet.options.length + ' Optionen' : '' %></p>
+  <% } %>
   <%- include('bar', { bet }) %>
   <ul class="opt-list">
     <% shown.forEach((o) => { %>

@@ -13,6 +13,7 @@ const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const { euro } = require('../lib/viewHelpers');
 const svc = require('../services/betService');
 const groups = require('../services/groupService');
+const duels = require('../services/duelService');
 
 const router = express.Router();
 const PER_PAGE = 24;
@@ -51,8 +52,10 @@ function validId(req, res, next) {
 // entscheiden). Gilt für alle Routen unter /wetten/:id – ansehen, setzen, kommentieren, Live-Stand.
 router.use('/wetten/:id', async (req, res, next) => {
   if (!req.user || !mongoose.isValidObjectId(req.params.id)) return next();
-  const bet = await Bet.findById(req.params.id).select('group').lean();
+  const bet = await Bet.findById(req.params.id).select('group creator referee duel').lean();
   if (bet && bet.group && !groups.canSee(bet, req.user, await groups.groupIdsOf(req.user._id))) return next('router'); // wie "nicht gefunden"
+  // Duell-Anfrage: nur die drei Beteiligten (und Admin/Devs)
+  if (bet && bet.duel && bet.duel.state === 'angefragt' && !duels.duelRole(bet, req.user) && !req.user.isStaff) return next('router');
   next();
 });
 
@@ -76,12 +79,15 @@ router.get('/', async (req, res) => {
     offen: { filter: { status: 'offen', deadline: { $gt: now } }, sort: { deadline: 1 } },
     wartend: { filter: { status: 'offen', deadline: { $lte: now } }, sort: { deadline: -1 } },
     abgeschlossen: { filter: { status: { $in: ['entschieden', 'annulliert'] } }, sort: { resolvedAt: -1 } },
-    // gesetzt ODER selbst erstellt ODER Schiedsrichter (Ersteller und Schiedsrichter setzen nicht mit)
+    // gesetzt ODER selbst erstellt ODER Schiedsrichter (Ersteller und Schiedsrichter setzen nicht mit) ODER herausgefordert
     meine: {
-      filter: { $or: [{ _id: { $in: myBetIds } }, { creator: req.user._id }, { referee: req.user._id }] },
+      filter: { $or: [{ _id: { $in: myBetIds } }, { creator: req.user._id }, { referee: req.user._id }, { 'duel.opponent': req.user._id }] },
       sort: { createdAt: -1 },
     },
   };
+  // Duell-Anfragen sehen nur die Beteiligten
+  const hidden = svc.hiddenDuelFilter(req.user._id);
+  for (const k of Object.keys(TAB_QUERIES)) TAB_QUERIES[k].filter = { $and: [TAB_QUERIES[k].filter, hidden] };
   const { filter, sort } = TAB_QUERIES[tab];
 
   // Sichtbar: öffentliche Wetten und die der eigenen Gruppen
@@ -116,7 +122,10 @@ router.get('/', async (req, res) => {
   res.locals.betNewPublic = 0;
   res.locals.betNewGroup = 0;
 
-  res.render('index', { title: 'Wetten', bets, groupBets, tab, tabs: TABS, counts, myPicks, page, hasMore, q, liveVersion });
+  // Duell-Anfragen, auf die ich antworten muss (Kasten oben)
+  const duelInvites = await duels.invitesFor(req.user._id);
+
+  res.render('index', { title: 'Wetten', bets, groupBets, tab, tabs: TABS, counts, myPicks, page, hasMore, q, liveVersion, duelInvites });
 });
 
 // ---------- Live-Stand (für die automatische Aktualisierung alle 5 Sekunden) ----------
@@ -350,7 +359,11 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
   // Rolle bei der Ergebnisfindung – die eigene Beteiligung wiegt schwerer als die Dev-Rolle
   const role = me ? verdictRole(bet, me) : null;
   // Ohne Schiedsrichter (alte Wetten) entscheidet der Ersteller allein; ein unbeteiligter Dev immer
-  const decidesAlone = role === 'dev' || (role === 'creator' && !bet.referee);
+  // Duell: allein der Schiedsrichter entscheidet; die beiden Beteiligten nie (auch nicht als Dev)
+  const duelRole = bet.duel ? duels.duelRole(bet, me) : null;
+  const duelActive = !!bet.duel && bet.duel.state === 'aktiv';
+  const canDecide = bet.duel ? (duelRole === 'referee' && duelActive) || (!duelRole && role === 'dev' && duelActive) : !!role;
+  const decidesAlone = role === 'dev' || (role === 'creator' && !bet.referee) || (!!bet.duel && canDecide);
   const myVote = (bet.votes || []).find((v) => v.role === role) || null;
 
   res.render('bet', {
@@ -370,13 +383,15 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
     accepting,
     noteMin: svc.NOTE_MIN,
     noteMax: svc.NOTE_MAX,
+    duelRole,
+    duelFeePercent: duels.DUEL_FEE_PERCENT,
     perms: {
-      // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen
-      stake: !!me && accepting && !isOwner && !isReferee,
-      // Ersteller, Schiedsrichter und Devs dürfen jederzeit eine Stimme abgeben
-      resolve: isOpen && !!role,
-      void: isOpen && !!role,
-      close: accepting && (isOwner || isReferee || isStaff),
+      // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen; im Duell setzt niemand nach
+      stake: !!me && accepting && !isOwner && !isReferee && !bet.duel,
+      // Ersteller, Schiedsrichter und Devs dürfen jederzeit eine Stimme abgeben (Duell: siehe canDecide)
+      resolve: isOpen && canDecide,
+      void: isOpen && canDecide,
+      close: accepting && !bet.duel && (isOwner || isReferee || isStaff),
       edit: (isOwner && isOpen) || isAdmin,
       remove: isStaff, // vollständig löschen: Admin und Devs
     },
@@ -408,6 +423,7 @@ router.post('/wetten/:id/schliessen', validId, requireLogin, (req, res) =>
 function feeText(r) {
   if (!r.fee) return '';
   if (!r.refereeFee) return ` Provision für den Wettersteller: ${euro(r.creatorFee)}.`;
+  if (!r.creatorFee) return ` Provision für den Schiedsrichter: ${euro(r.refereeFee)}.`; // Duell
   return ` Provision: ${euro(r.creatorFee)} für den Wettersteller und ${euro(r.refereeFee)} für den Schiedsrichter.`;
 }
 
@@ -437,6 +453,81 @@ router.post('/wetten/:id/annullieren', validId, requireLogin, (req, res) =>
   action(req, res, async () => {
     const r = await svc.resolveBet({ actor: req.user, betId: req.params.id, outcome: 'annulliert', note: str(req.body.note) });
     return voteMessage(r, 'eine Annullierung');
+  })
+);
+
+// ---------- Duelle (Head-to-Head) ----------
+
+/** Formular "Herausfordern": Gegner aus dem Profil, Schiedsrichter frei wählbar (nicht die beiden Beteiligten) */
+async function duelForm(req, res, { errors = [], values = {} } = {}, status = 200) {
+  const name = values.opponent || str(req.query.gegen).trim();
+  const opponent = name ? await User.findOne({ usernameLower: name.toLowerCase(), deletedAt: null }).select('username').lean() : null;
+  if (!opponent || opponent._id.equals(req.user._id)) {
+    req.flash('error', opponent ? 'Du kannst dich nicht selbst herausfordern.' : 'Dieses Mitglied gibt es nicht.');
+    return res.redirect('/rangliste');
+  }
+  const candidates = (await refereeCandidates(req.user._id)).filter((u) => !u._id.equals(opponent._id));
+  res.status(status).render('duell-neu', {
+    title: `${opponent.username} herausfordern`,
+    opponent,
+    candidates,
+    errors,
+    values: { title: '', description: '', stake: '', referee: '', resultAt: '', ...values },
+    feePercent: duels.DUEL_FEE_PERCENT,
+    inviteHours: duels.INVITE_HOURS,
+    minDeadline: toZonedLocalInput(new Date(Date.now() + 10 * 60 * 1000), config.timezone),
+  });
+}
+
+router.get('/duell/neu', requireLogin, (req, res) => duelForm(req, res));
+
+router.post('/duell', requireLogin, async (req, res) => {
+  const values = {
+    opponent: str(req.body.opponent).trim(),
+    title: str(req.body.title).trim().replace(/\s+/g, ' '),
+    description: str(req.body.description).trim().replace(/\r\n/g, '\n'),
+    stake: str(req.body.stake).trim(),
+    referee: str(req.body.referee),
+    resultAt: str(req.body.resultAt),
+  };
+  const errors = [];
+  if (values.title.length < 5 || values.title.length > 140) errors.push('Die Behauptung muss 5–140 Zeichen lang sein.');
+  if (values.description.length > 2000) errors.push('Die Beschreibung darf höchstens 2000 Zeichen lang sein.');
+  const stake = parseEuro(values.stake);
+  if (stake === null || stake < config.minStake) errors.push(`Der Einsatz muss mindestens ${euro(config.minStake)} betragen.`);
+  else if (stake > req.user.balance) errors.push('Dein Guthaben reicht für diesen Einsatz nicht aus.');
+  const resultAt = parseZonedLocal(values.resultAt, config.timezone);
+  if (!resultAt) errors.push('Bitte gib den Termin der Auswertung an (Datum und Uhrzeit).');
+  const opponent = await User.findOne({ usernameLower: values.opponent.toLowerCase(), deletedAt: null }).select('username').lean();
+  const referee = mongoose.isValidObjectId(values.referee) ? await User.findOne({ _id: values.referee, deletedAt: null }).select('username').lean() : null;
+  if (!referee) errors.push('Bitte wähle einen Schiedsrichter aus.');
+  if (!errors.length) {
+    try {
+      const bet = await duels.create({ user: req.user, opponent, referee, title: values.title, description: values.description, stake, resultAt });
+      req.flash('success', `Herausforderung verschickt! Sobald ${opponent.username} und Schiedsrichter ${referee.username} angenommen haben, gilt das Duell. Bis dahin ist dein Einsatz von ${euro(stake)} reserviert.`);
+      return res.redirect(`/wetten/${bet._id}`);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      errors.push(err.message);
+    }
+  }
+  duelForm(req, res, { errors, values }, 400);
+});
+
+router.post('/wetten/:id/duell/annehmen', validId, requireLogin, (req, res) =>
+  action(req, res, async () => {
+    const r = await duels.accept({ user: req.user, betId: req.params.id });
+    if (r.started) return 'Das Duell läuft! Der Schiedsrichter entscheidet zum Termin der Auswertung.';
+    return r.role === 'opponent'
+      ? `Herausforderung angenommen – dein Einsatz von ${euro(r.bet.duel.stake)} ist gesetzt. Jetzt fehlt noch die Zusage des Schiedsrichters.`
+      : 'Du hast als Schiedsrichter zugesagt. Jetzt fehlt noch die Zusage des Herausgeforderten.';
+  })
+);
+
+router.post('/wetten/:id/duell/absagen', validId, requireLogin, (req, res) =>
+  action(req, res, async () => {
+    const r = await duels.decline({ user: req.user, betId: req.params.id });
+    return r.role === 'challenger' ? 'Herausforderung zurückgezogen – dein Einsatz wurde erstattet.' : 'Abgelehnt. Der Herausforderer bekommt seinen Einsatz zurück.';
   })
 );
 

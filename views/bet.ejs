@@ -29,7 +29,6 @@
      data-live-signature="<%= bet.status %>|<%= accepting ? 1 : 0 %>|<%= myPosition ? myPosition.side : '-' %>|<%= edits.length %>|<%= perms.resolve ? 1 : 0 %>|<%= perms.edit ? 1 : 0 %>|<%= votes.length %>|<%= bet.disputed ? 1 : 0 %>"></div>
 
 <div class="bet-toolbar">
-  <a class="breadcrumb" href="/">← Alle Wetten</a>
   <div class="toolbar-actions">
     <% if (perms.edit) { %>
       <a class="btn btn-ghost btn-sm" href="/wetten/<%= bet._id %>/bearbeiten">Bearbeiten</a>
@@ -56,12 +55,14 @@
         <span class="muted small">von <strong><%- userLink(bet.creatorName) %></strong> · <%= date(bet.createdAt) %></span>
       </div>
       <h1 class="bet-title"><%= bet.title %></h1>
+      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole }) %><% } %>
       <% if (bet.groupName) { %><p class="bet-group-note"><span class="tag tag-group">Gruppe: <%= bet.groupName %></span> <span class="muted small">Diese Wette sehen nur die Mitglieder der Gruppe.</span></p><% } %>
       <% if (bet.description) { %>
         <p class="bet-desc"><%= bet.description %></p>
         <% if (descEdited) { %><p class="muted small edited-hint">Beschreibung nachträglich bearbeitet – siehe Änderungsverlauf.</p><% } %>
       <% } %>
 
+      <% if (!bet.duel) { %>
       <p class="muted small">
         <% if (isJaNein) { %>Ja/Nein-Wette.<% } else { %>Wette mit <%= bet.options.length %> Optionen.<% } %>
         <% if (legacyCreatorBet) { %>
@@ -81,13 +82,16 @@
       <% } else { %>
         <p class="muted small referee-line">Wette ohne Schiedsrichter (vor Einführung des Verfahrens aufgestellt) – hier entscheidet der Wettersteller allein.</p>
       <% } %>
+      <% } %>
 
       <div class="dates">
+        <% if (!bet.duel) { %>
         <div class="date-box <%= st.key === 'offen' ? 'is-next' : 'is-past' %>">
           <span class="date-label">Einsatzschluss</span>
           <span class="date-value"><%= date(bet.deadline) %></span>
           <span class="muted small"><%= st.key === 'offen' ? 'Setzen möglich bis ' + relTime(bet.deadline) : 'Keine Einsätze mehr möglich' %></span>
         </div>
+        <% } %>
         <div class="date-box <%= !settled && st.key !== 'offen' ? 'is-next' : '' %> <%= settled ? 'is-past' : '' %>">
           <span class="date-label">Auswertung</span>
           <% if (bet.resultAt) { %>
@@ -126,6 +130,7 @@
           dev: 'entschieden von einem Dev, weil Wettersteller und Schiedsrichter sich nicht einig waren',
           system: 'automatisch eingetragen, weil kein Ergebnis gemeldet wurde',
           ersteller: 'eingetragen vom Wettersteller',
+          schiedsrichter: 'entschieden vom Schiedsrichter',
         }[bet.resolvedVia] || 'eingetragen';
       %>
       <% if (bet.status === 'entschieden') { %>
@@ -135,7 +140,8 @@
           <% if (bet.resolutionNote) { %><span class="result-note"><b>Begründung:</b> <%= bet.resolutionNote %></span><% } %>
           <% if (bet.refunded) { %><span>Da es keine Gegenseite gab, wurden alle Einsätze erstattet.</span><% } %>
           <% if (bet.creatorFee || bet.refereeFee) { %>
-            <span>Provision (<%= feePct %> % vom Topf): <%= euro(bet.creatorFee) %> an <%= bet.creatorName %><% if (bet.refereeFee) { %>, <%= euro(bet.refereeFee) %> an <%= bet.refereeName %><% } %></span>
+            <% if (bet.duel) { %><span>Provision (<%= feePct %> % vom Topf): <%= euro(bet.refereeFee) %> an <%= bet.refereeName %></span>
+            <% } else { %><span>Provision (<%= feePct %> % vom Topf): <%= euro(bet.creatorFee) %> an <%= bet.creatorName %><% if (bet.refereeFee) { %>, <%= euro(bet.refereeFee) %> an <%= bet.refereeName %><% } %></span><% } %>
           <% } %>
         </div>
       <% } else if (bet.status === 'annulliert') { %>
@@ -274,7 +280,7 @@
   </section>
 
   <aside class="bet-side">
-    <% if (isOwner && !legacyCreatorBet) { %>
+    <% if (isOwner && !legacyCreatorBet && !bet.duel) { %>
       <div class="card card-accent" data-live="owner-card">
         <h2>Deine Wette</h2>
         <% if (settled) { %>
@@ -296,6 +302,9 @@
         <h2>Du bist Schiedsrichter</h2>
         <% if (settled) { %>
           <p>Deine Provision: <strong class="<%= bet.refereeFee ? 'pos' : '' %>"><%= euro(bet.refereeFee || 0) %></strong></p>
+        <% } else if (bet.duel) { %>
+          <p>Du entscheidest dieses Duell allein: Hat <strong><%= bet.creatorName %></strong> recht oder <strong><%= bet.duel.opponentName %></strong>?</p>
+          <p class="muted">Dafür bekommst du <%= feePct %> % vom Topf (<strong><%= euro(fees.referee) %></strong>) – nicht bei Annullierung.</p>
         <% } else { %>
           <p>Du bestätigst gemeinsam mit <strong><%- userLink(bet.creatorName) %></strong>, was eingetreten ist.</p>
           <p class="muted">Du kannst hier nicht mitsetzen<% if (feePct) { %>, bekommst aber nach aktuellem Stand bis zu <strong><%= euro(fees.referee) %></strong> Provision (die Hälfte von <%= feePct %> % des Topfes)<% } %>. Ausgezahlt wird nur, wenn ihr beide dasselbe Ergebnis eintragt – sonst entscheidet ein Dev.</p>
@@ -381,7 +390,9 @@
                 data-confirm-resolve="<%= decidesAlone ? 'Ergebnis „%s“ festlegen und auszahlen? Das kann nicht rückgängig gemacht werden.' : 'Stimme für „%s“ abgeben? Ausgezahlt wird, sobald die andere Seite dasselbe einträgt.' %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <p><strong><%= decidesAlone ? 'Ergebnis eintragen' : 'Deine Stimme zum Ergebnis' %></strong></p>
-            <% if (decidesAlone && role === 'dev') { %>
+            <% if (bet.duel && duelRole === 'referee') { %>
+              <p class="muted small">Als Schiedsrichter entscheidest du dieses Duell allein. Das Ergebnis wird sofort ausgezahlt und kann nicht rückgängig gemacht werden.</p>
+            <% } else if (decidesAlone && role === 'dev') { %>
               <p class="muted small">Als <%= myRoleLabel %> gibst du die entscheidende Stimme ab – auch dann, wenn Wettersteller und Schiedsrichter sich nicht einig sind. Die Wette wird sofort geschlossen und ausgezahlt.</p>
             <% } else if (decidesAlone) { %>
               <p class="muted small">Diese Wette hat keinen Schiedsrichter. Du kannst jederzeit festlegen, was eingetreten ist – die Wette wird dann sofort geschlossen und ausgezahlt.</p>

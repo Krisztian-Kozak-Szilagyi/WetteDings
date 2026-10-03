@@ -18,7 +18,6 @@
 <div class="page-head">
   <div class="ihk-title">
     <h1>Tausch mit <a href="/profil/<%= encodeURIComponent(other) %>"><%= other %></a></h1>
-    <a class="btn btn-ghost btn-sm" href="/handel">← Zurück zum Handel</a>
   </div>
   <% if (isOpen) { %>
     <span class="nego-turn <%= canAccept ? 'nego-turn-me' : '' %>"><%= canAccept ? 'Du bist am Zug' : 'Warte auf ' + other %> · läuft ab <%= relTime(t.expiresAt) %></span>

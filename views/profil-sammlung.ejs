@@ -4,7 +4,6 @@
 <div class="page-head">
   <div class="ihk-title">
     <h1>Sammlung von <%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
-    <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>">← Zum Profil</a>
   </div>
   <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Verkaufswert <%= euro(collectionValue) %></span>
 </div>

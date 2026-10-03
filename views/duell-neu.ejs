@@ -1,0 +1,62 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <div class="card">
+    <h1><%= opponent.username %> herausfordern</h1>
+    <p class="muted">Ein Duell ist eine Wette nur zwischen euch beiden: Du stellst eine Behauptung auf, <strong><%= opponent.username %></strong> hält dagegen. Ihr setzt beide denselben Betrag, wer recht hat, bekommt den Topf.</p>
+
+    <div class="info-box">
+      <strong>Ein Schiedsrichter entscheidet.</strong>
+      <span>Du wählst ein drittes Mitglied als Schiedsrichter. Es trägt zum Termin der Auswertung ein, wer gewonnen hat, und bekommt dafür <strong><%= feePercent %> % vom Topf</strong>. Ihr beiden stimmt nicht mit ab.</span>
+    </div>
+
+    <div class="info-box">
+      <strong>Es gilt erst, wenn beide zusagen.</strong>
+      <span>Dein Einsatz wird sofort reserviert. <%= opponent.username %> und der Schiedsrichter haben <strong><%= inviteHours %> Stunden</strong> Zeit zum Annehmen. Lehnt einer ab oder läuft die Frist ab, bekommst du deinen Einsatz zurück. Bis dahin sehen nur ihr drei das Duell, danach alle – mitwetten können andere aber nicht.</span>
+    </div>
+
+    <% if (errors.length) { %>
+      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+    <% } %>
+
+    <form method="post" action="/duell" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="opponent" value="<%= opponent.username %>">
+
+      <label class="field">
+        <span>Deine Behauptung</span>
+        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Ich laufe am Samstag die 5 km unter 25 Minuten">
+        <small class="muted">Du gewinnst, wenn sie eintritt – sonst gewinnt <%= opponent.username %>.</small>
+      </label>
+
+      <label class="field">
+        <span>Details &amp; Regeln <em class="muted">(optional)</em></span>
+        <textarea name="description" rows="3" maxlength="2000" placeholder="Wie wird entschieden? Was gilt, wenn …?"><%= values.description %></textarea>
+      </label>
+
+      <label class="field">
+        <span>Einsatz pro Person in €</span>
+        <input type="number" name="stake" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= values.stake %>" required>
+        <small class="muted">Beide setzen genau diesen Betrag. Verfügbar: <%= euro(currentUser.balance) %>.</small>
+      </label>
+
+      <label class="field">
+        <span>Schiedsrichter</span>
+        <select name="referee" required>
+          <option value="">– auswählen –</option>
+          <% candidates.forEach((u) => { %><option value="<%= u._id %>" <%= values.referee === String(u._id) ? 'selected' : '' %>><%= u.username %></option><% }) %>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Termin der Auswertung</span>
+        <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required>
+        <small class="muted">Ab dann trägt der Schiedsrichter das Ergebnis ein.</small>
+      </label>
+
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Herausforderung senden</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

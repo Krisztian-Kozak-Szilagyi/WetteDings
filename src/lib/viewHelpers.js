@@ -52,7 +52,7 @@ function share(bet, opt) {
 const feeEstimate = (bet) => Math.floor((pool(bet) * (bet.creatorFeePercent || 0)) / 100);
 
 /** Voraussichtliche Provision je Seite: { creator, referee } */
-const feeSplit = (bet) => splitFee(feeEstimate(bet), !!bet.referee);
+const feeSplit = (bet) => splitFee(feeEstimate(bet), !!bet.referee, { duel: !!bet.duel });
 
 const findOption = (bet, key) => bet.options.find((o) => o.key === key) || null;
 const optionLabel = (bet, key) => (findOption(bet, key) || { label: '–' }).label;
@@ -74,6 +74,7 @@ function statusInfo(bet) {
   if (bet.status === 'annulliert') return { key: 'annulliert', label: 'Annulliert' };
   if (bet.status === 'entschieden') return { key: 'entschieden', label: `Ergebnis: ${optionLabel(bet, bet.outcome)}` };
   if (bet.disputed) return { key: 'streitig', label: 'Strittig – Dev entscheidet' };
+  if (bet.duel && bet.duel.state === 'angefragt') return { key: 'duell', label: 'Duell angefragt' };
   if (voteOf(bet, 'creator') || voteOf(bet, 'referee')) return { key: 'bestaetigung', label: 'Warte auf Bestätigung' };
   if (new Date(bet.deadline) > new Date()) return { key: 'offen', label: 'Offen' };
   return { key: 'wartend', label: 'Wartet auf Ergebnis' };

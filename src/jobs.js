@@ -3,6 +3,7 @@ const Bet = require('./models/Bet');
 const { resolveBet, SYSTEM_ACTOR } = require('./services/betService');
 const { runLottery } = require('./services/lotteryService');
 const rankService = require('./services/rankService');
+const duelService = require('./services/duelService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -42,6 +43,11 @@ function startJobs() {
   const lottery = () => runLottery().catch((err) => console.error('Lotterie-Fehler:', err));
   lottery();
   setInterval(lottery, 15 * 1000).unref();
+
+  // Duell-Anfragen, die niemand rechtzeitig angenommen hat: Einsatz zurück (alle 5 Minuten)
+  const duels = () => duelService.expirePending().catch((err) => console.error('Duell-Fehler:', err));
+  setTimeout(duels, 20 * 1000).unref();
+  setInterval(duels, 5 * 60 * 1000).unref();
 
   // Rangliste: jede Minute festhalten, wer gerade auf Platz 1 steht (Anzeige im Profil)
   const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));

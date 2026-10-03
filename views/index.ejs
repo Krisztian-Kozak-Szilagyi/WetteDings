@@ -19,6 +19,20 @@
   <button class="btn btn-ghost" type="submit">Suchen</button>
 </form>
 
+<% if (locals.duelInvites && duelInvites.length) { %>
+  <div class="card card-accent duel-invites">
+    <h2>Herausforderungen an dich <span class="nav-badge nav-badge-inline"><%= duelInvites.length %></span></h2>
+    <ul class="duel-invite-list">
+      <% duelInvites.forEach((b) => { const asRef = String(b.referee) === String(currentUser._id); %>
+        <li>
+          <a href="/wetten/<%= b._id %>#duell"><strong><%= b.title %></strong></a>
+          <span class="muted small"><%= asRef ? b.creatorName + ' vs. ' + b.duel.opponentName + ' – du sollst Schiedsrichter sein' : b.creatorName + ' fordert dich heraus · ' + euro(b.duel.stake) + ' Einsatz' %> · bis <%= date(b.duel.expiresAt) %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
 <div hidden data-live-root data-live-url="/wetten-stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= tab %>|<%= page %>|<%= q %>"></div>
 
 <div data-live="bet-list">

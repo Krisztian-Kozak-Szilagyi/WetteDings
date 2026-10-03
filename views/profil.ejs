@@ -4,7 +4,7 @@
 <div class="page-head">
   <div class="ihk-title">
     <h1><%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
-    <a class="btn btn-ghost btn-sm" href="/rangliste">← Zur Rangliste</a>
+    <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/duell/neu?gegen=<%= encodeURIComponent(profile.username) %>">Herausfordern</a><% } %>
     <% if (canBan) { %>
       <details class="mod-menu" data-dropdown>
         <summary class="btn btn-ghost btn-sm">Moderation</summary>

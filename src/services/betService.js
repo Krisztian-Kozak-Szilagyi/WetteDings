@@ -106,6 +106,8 @@ async function placeStake({ user, betId, side, amount }) {
   return inTransaction(async (session) => {
     const current = await Bet.findById(betId).session(session);
     if (!current) throw new UserError('Wette nicht gefunden.');
+    // Duell: nur die beiden Herausforderer setzen – und zwar beim Herausfordern bzw. Annehmen
+    if (current.duel) throw new UserError('Bei einem Duell setzen nur die beiden Beteiligten – mitwetten ist nicht möglich.');
     // Neue Regel: Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen
     if (isOwnerOf(current, user)) {
       throw new UserError('Als Wettersteller kannst du nicht auf deine eigene Wette setzen – du erhältst dafür eine Provision vom Topf.');
@@ -206,7 +208,7 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
   );
 
   // Provision tragen Wettersteller und Schiedsrichter gemeinsam – je die Hälfte
-  const feeShare = splitFee(fee, !!bet.referee);
+  const feeShare = splitFee(fee, !!bet.referee, { duel: !!bet.duel });
 
   const updated = await Bet.updateOne(
     { _id: bet._id, status: 'offen' },
@@ -311,6 +313,12 @@ async function resolveBet({ actor, betId, outcome, note }) {
     if (bet.status !== 'offen') throw new UserError('Diese Wette ist bereits abgeschlossen.');
 
     const role = verdictRole(bet, actor);
+    if (bet.duel && role !== 'system') {
+      // Duell: die beiden Beteiligten entscheiden nie mit – auch nicht als Dev
+      const id = String(actor._id);
+      if (id === String(bet.creator) || id === String(bet.duel.opponent)) throw new UserError('Im Duell entscheidet allein der Schiedsrichter.');
+      if (bet.duel.state !== 'aktiv') throw new UserError('Das Duell hat noch nicht begonnen – es fehlt noch eine Zusage.');
+    }
     if (!role) throw new UserError('Nur der Wettersteller, der Schiedsrichter oder ein Dev kann diese Wette abschließen.');
     const winner = bet.options.find((o) => o.key === outcome) || null;
     if (outcome !== 'annulliert' && !winner) throw new UserError('Ungültiges Ergebnis.');
@@ -324,6 +332,8 @@ async function resolveBet({ actor, betId, outcome, note }) {
     if (role === 'system' || role === 'dev') {
       return payOut({ session, bet, outcome, note: text, actor, votes, via: role, now });
     }
+    // Duell: der Schiedsrichter entscheidet allein
+    if (bet.duel) return payOut({ session, bet, outcome, note: text, actor, votes, via: 'schiedsrichter', now });
 
     const verdict = evaluateVotes(votes, { hasReferee });
     if (verdict.decided) {
@@ -387,16 +397,43 @@ const disputedCount = () => Bet.countDocuments(disputedFilter());
  */
 function pendingVoteFilter(userId) {
   return {
-    status: 'offen',
-    disputed: false,
-    'votes.0': { $exists: true }, // mindestens eine Stimme liegt vor
     $or: [
-      { creator: userId, votes: { $not: { $elemMatch: { role: 'creator' } } } },
-      { referee: userId, votes: { $not: { $elemMatch: { role: 'referee' } } } },
+      {
+        status: 'offen',
+        disputed: false,
+        duel: null,
+        'votes.0': { $exists: true }, // mindestens eine Stimme liegt vor
+        $or: [
+          { creator: userId, votes: { $not: { $elemMatch: { role: 'creator' } } } },
+          { referee: userId, votes: { $not: { $elemMatch: { role: 'referee' } } } },
+        ],
+      },
+      // Duell: der Schiedsrichter ist am Zug, sobald der Termin der Auswertung erreicht ist
+      { status: 'offen', 'duel.state': 'aktiv', referee: userId, resultAt: { $lte: new Date() } },
     ],
   };
 }
-const pendingVoteCount = (userId) => Bet.countDocuments(pendingVoteFilter(userId));
+
+/** Duell-Anfragen, auf die ich noch antworten muss (als Herausgeforderter oder Schiedsrichter) */
+function duelInviteFilter(userId) {
+  return {
+    status: 'offen',
+    'duel.state': 'angefragt',
+    $or: [
+      { 'duel.opponent': userId, 'duel.opponentAcceptedAt': null },
+      { referee: userId, 'duel.refereeAcceptedAt': null },
+    ],
+  };
+}
+
+/** Abzeichen am Menüpunkt "Wetten": fehlende Stimmen und offene Duell-Anfragen */
+const pendingVoteCount = async (userId) => {
+  const [votes, invites] = await Promise.all([Bet.countDocuments(pendingVoteFilter(userId)), Bet.countDocuments(duelInviteFilter(userId))]);
+  return votes + invites;
+};
+
+/** Sichtbarkeit: Duell-Anfragen sehen nur die drei Beteiligten (Admin/Devs über canSeeBet) */
+const hiddenDuelFilter = (userId) => ({ $or: [{ 'duel.state': { $ne: 'angefragt' } }, { creator: userId }, { referee: userId }, { 'duel.opponent': userId }] });
 
 module.exports = {
   SYSTEM_ACTOR,
@@ -414,4 +451,6 @@ module.exports = {
   disputedCount,
   pendingVoteFilter,
   pendingVoteCount,
+  duelInviteFilter,
+  hiddenDuelFilter,
 };

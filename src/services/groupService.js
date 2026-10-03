@@ -129,7 +129,8 @@ async function overview(userId) {
  * öffentliche und die aus den eigenen Gruppen (Abzeichen am Menüpunkt „Wetten“).
  */
 async function newBetCounts(user, groupIds) {
-  const base = { status: 'offen', creator: { $ne: user._id }, createdAt: { $gt: user.betsSeenAt || user.createdAt } };
+  // Duell-Anfragen zählen nicht (sie sehen nur die Beteiligten, siehe betService.hiddenDuelFilter)
+  const base = { status: 'offen', creator: { $ne: user._id }, createdAt: { $gt: user.betsSeenAt || user.createdAt }, 'duel.state': { $ne: 'angefragt' } };
   const [pub, group] = await Promise.all([
     Bet.countDocuments({ ...base, group: null }),
     groupIds.length ? Bet.countDocuments({ ...base, group: { $in: groupIds } }) : 0,

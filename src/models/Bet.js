@@ -30,6 +30,22 @@ const voteSchema = new Schema(
   { _id: false }
 );
 
+// Duell (Head-to-Head): ein Mitglied fordert ein anderes heraus. Beide setzen denselben Betrag, nur sie dürfen
+// setzen, und allein der Schiedsrichter entscheidet (er bekommt die Provision). Gilt erst, wenn der Herausgeforderte
+// UND der Schiedsrichter angenommen haben – bis dahin ist die Wette nur für die drei sichtbar (state 'angefragt').
+const duelSchema = new Schema(
+  {
+    opponent: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    opponentName: { type: String, required: true },
+    stake: { type: Number, required: true }, // Cent, für beide gleich
+    state: { type: String, enum: ['angefragt', 'aktiv'], default: 'angefragt' },
+    opponentAcceptedAt: { type: Date, default: null },
+    refereeAcceptedAt: { type: Date, default: null },
+    expiresAt: { type: Date, required: true }, // bis dahin muss angenommen sein, sonst Erstattung
+  },
+  { _id: false }
+);
+
 const betSchema = new Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 140 },
@@ -55,7 +71,9 @@ const betSchema = new Schema(
     // true, solange Ersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben
     disputed: { type: Boolean, default: false },
     // Wie das Ergebnis zustande kam
-    resolvedVia: { type: String, enum: ['ersteller', 'einstimmig', 'dev', 'system', null], default: null },
+    resolvedVia: { type: String, enum: ['ersteller', 'einstimmig', 'dev', 'system', 'schiedsrichter', null], default: null },
+    // nur bei Duellen gesetzt (siehe duelSchema)
+    duel: { type: duelSchema, default: undefined },
     // Gesamtprovision in % vom Topf – beim Erstellen festgeschrieben (alte Wetten: 0).
     // Ersteller und Schiedsrichter teilen sie sich (siehe lib/payout → splitFee).
     creatorFeePercent: { type: Number, default: 0, min: 0, max: 100 },
@@ -103,6 +121,7 @@ betSchema.index({ referee: 1, status: 1 });
 betSchema.index({ group: 1, status: 1 });
 betSchema.index({ status: 1, resolvedAt: -1 });
 betSchema.index({ createdAt: -1 });
+betSchema.index({ 'duel.state': 1, 'duel.expiresAt': 1 }); // offene Duell-Anfragen
 betSchema.index({ updatedAt: -1 }); // für die Live-Aktualisierung der Übersicht
 
 module.exports = model('Bet', betSchema);

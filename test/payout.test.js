@@ -153,3 +153,14 @@ test('Euro-Eingaben', () => {
   assert.equal(parseEuro('abc'), null);
   assert.equal(parseEuro('1,234'), null);
 });
+
+test('Duell: die ganze Provision (3 %) geht an den Schiedsrichter', () => {
+  const { computePayouts, splitFee } = require('../src/lib/payout');
+  // beide setzen 50 €; der Herausforderer gewinnt
+  const { payouts, fee } = computePayouts([{ id: 'a', side: 'o1', amount: 5000 }, { id: 'b', side: 'o2', amount: 5000 }], 'o1', 3);
+  assert.equal(fee, 300);
+  assert.equal(payouts.get('a'), 9700);
+  assert.equal(payouts.get('b'), 0);
+  assert.deepEqual(splitFee(fee, true, { duel: true }), { creator: 0, referee: 300 });
+  assert.deepEqual(splitFee(fee, true), { creator: 150, referee: 150 });
+});

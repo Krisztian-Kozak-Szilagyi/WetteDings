@@ -81,7 +81,13 @@ test('Streitfälle: nur offene Wetten mit Uneinigkeit', () => {
 });
 
 test('Abzeichen: Wetten, in denen meine Stimme noch fehlt', () => {
-  const f = pendingVoteFilter('u1');
+  const [normal, duel] = pendingVoteFilter('u1').$or;
+  // Duell: der Schiedsrichter ist ab dem Termin der Auswertung am Zug
+  assert.equal(duel['duel.state'], 'aktiv');
+  assert.equal(duel.referee, 'u1');
+  assert.ok(duel.resultAt.$lte instanceof Date);
+  const f = normal;
+  assert.equal(f.duel, null); // Duelle laufen über die eigene Regel
   assert.equal(f.status, 'offen');
   assert.equal(f.disputed, false); // Streitfälle liegen beim Dev, nicht mehr bei mir
   assert.deepEqual(f['votes.0'], { $exists: true }); // die andere Seite hat schon abgestimmt
