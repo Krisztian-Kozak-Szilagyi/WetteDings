@@ -35,15 +35,16 @@
       </div>
     </div>
 
-    <div class="stats stats-4 coin-stats">
-      <div class="stat card"><span class="stat-label">24 h Hoch</span><span class="stat-value stat-value-sm" data-live-high><%= coinPrice(snap.high24h) %></span></div>
-      <div class="stat card"><span class="stat-label">24 h Tief</span><span class="stat-value stat-value-sm" data-live-low><%= coinPrice(snap.low24h) %></span></div>
-      <div class="stat card"><span class="stat-label">Allzeithoch</span><span class="stat-value stat-value-sm" data-live-ath><%= coinPrice(snap.ath) %></span></div>
-      <div class="stat card"><span class="stat-label">Dein Bestand</span><span class="stat-value stat-value-sm"><%= coinAmount(holding.units) %></span></div>
+    <div class="coin-stats">
+      <div class="stat"><span class="stat-label">24 h Hoch</span><span class="stat-value stat-value-sm" data-live-high><%= coinPrice(snap.high24h) %></span></div>
+      <div class="stat"><span class="stat-label">24 h Tief</span><span class="stat-value stat-value-sm" data-live-low><%= coinPrice(snap.low24h) %></span></div>
+      <div class="stat"><span class="stat-label">Allzeithoch</span><span class="stat-value stat-value-sm" data-live-ath><%= coinPrice(snap.ath) %></span></div>
+      <div class="stat"><span class="stat-label">Dein Bestand</span><span class="stat-value stat-value-sm"><%= coinAmount(holding.units) %></span></div>
     </div>
 
-    <div class="card">
-      <h2>Marktereignisse</h2>
+    <div class="coin-lists">
+    <div class="coin-list">
+      <h4>Marktereignisse</h4>
       <% if (!events.length) { %>
         <p class="muted">Bisher keine großen Kursbewegungen.</p>
       <% } else { %>
@@ -59,43 +60,27 @@
       <% } %>
     </div>
 
-    <div class="card">
-      <h2>Deine letzten Trades</h2>
+    <div class="coin-list">
+      <div class="coin-list-head"><h4>Deine letzten Trades</h4><span>letzte 10</span></div>
       <% if (!trades.length) { %>
         <p class="muted">Du hast noch nicht gehandelt.</p>
       <% } else { %>
-        <div class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Zeit</th><th>Art</th><th class="num">Menge</th><th class="num">Kurs</th><th class="num">Betrag</th></tr></thead>
-            <tbody>
-              <% trades.forEach((t) => { %>
-                <tr>
-                  <td class="nowrap"><%= date(t.createdAt) %></td>
-                  <td><span class="pill <%= t.side === 'kauf' ? 'c-ja' : 'c-nein' %>"><%= t.side === 'kauf' ? 'Kauf' : 'Verkauf' %></span></td>
-                  <td class="num"><%= coinAmount(t.units) %></td>
-                  <td class="num"><%= coinPrice(t.price) %></td>
-                  <td class="num"><%= euro(t.cents) %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="trade-rows">
+          <% trades.slice(0, 10).forEach((t) => { %>
+            <div class="trade-row">
+              <span class="trade-side <%= t.side === 'kauf' ? 'pos' : 'neg' %>"><%= t.side === 'kauf' ? 'Kauf' : 'Verkauf' %></span>
+              <span class="trade-what"><span><%= coinAmount(t.units) %> <span class="muted">à <%= coinPrice(t.price) %></span></span><span class="trade-when"><%= date(t.createdAt) %></span></span>
+              <span class="trade-sum"><%= euro(t.cents) %></span>
+            </div>
+          <% }) %>
         </div>
       <% } %>
+      <a class="coin-ledger-link" href="/konto/auszug">Vollständiger Kontoauszug im Profil →</a>
+    </div>
     </div>
   </section>
 
   <aside class="coin-side">
-    <div class="card card-accent">
-      <h2>Dein Depot</h2>
-      <p class="big"><%= coinAmount(holding.units) %></p>
-      <dl class="depot">
-        <div><dt>Aktueller Wert</dt><dd data-live-value><%= euro(value) %></dd></div>
-        <div><dt>Einstand</dt><dd><%= euro(holding.costCents) %><% if (avgPrice) { %> <span class="muted small">(Ø <%= coinPrice(avgPrice) %>)</span><% } %></dd></div>
-        <div><dt>Gewinn / Verlust</dt><dd class="<%= pl > 0 ? 'pos' : pl < 0 ? 'neg' : '' %>" data-live-pl><%= holding.units ? (pl > 0 ? '+' : '') + euro(pl) : '–' %></dd></div>
-        <div><dt>Verfügbares Guthaben</dt><dd><%= euro(currentUser.balance) %></dd></div>
-      </dl>
-    </div>
-
     <div class="card trade-card"
          data-price="<%= snap.price %>" data-units="<%= holding.units %>" data-cost="<%= holding.costCents %>" data-balance="<%= currentUser.balance %>">
       <div class="trade-tabs" role="tablist">
@@ -115,9 +100,9 @@
           <button type="button" class="chip" data-set-amount="100">100 €</button>
           <button type="button" class="chip" data-set-amount="<%= currentUser.balance / 100 %>">Alles</button>
         </div>
-        <p class="muted small">Mindestens 10 % des aktuellen Kurses: <strong data-min-buy-text><%= euro(minBuy) %></strong></p>
+        <p class="trade-min">Mindestens 10 % des Kurses: <strong data-min-buy-text><%= euro(minBuy) %></strong></p>
         <p class="estimate" data-trade-preview></p>
-        <button class="btn btn-ja btn-block" type="submit" <%= currentUser.balance < minBuy ? 'disabled' : '' %>>Samantha Coin kaufen</button>
+        <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < minBuy ? 'disabled' : '' %>>Samantha Coin kaufen</button>
       </form>
 
       <form method="post" action="/coin-exchange/verkaufen" class="trade-form" data-trade-form="verkaufen" data-confirm-trade="verkaufen" hidden>
@@ -133,10 +118,21 @@
           <button type="button" class="chip" data-sell-fraction="1">Alles</button>
         </div>
         <p class="estimate" data-trade-preview></p>
-        <button class="btn btn-nein btn-block" type="submit" <%= holding.units <= 0 ? 'disabled' : '' %>>Samantha Coin verkaufen</button>
+        <button class="btn btn-primary btn-block" type="submit" <%= holding.units <= 0 ? 'disabled' : '' %>>Samantha Coin verkaufen</button>
       </form>
-      <p class="muted small">Ausgeführt wird zum Kurs im Moment des Absendens – er kann sich bis dahin noch bewegen.</p>
+      <p class="trade-note">Ausgeführt zum Kurs im Moment des Absendens.</p>
     </div>
+
+    <div class="coin-depot">
+      <div class="coin-depot-head"><span>Dein Depot</span><strong><%= coinAmount(holding.units) %></strong></div>
+      <dl class="depot">
+        <div><dt>Aktueller Wert</dt><dd data-live-value><%= euro(value) %></dd></div>
+        <div><dt>Einstand</dt><dd><%= euro(holding.costCents) %><% if (avgPrice) { %> <span class="muted small">(Ø <%= coinPrice(avgPrice) %>)</span><% } %></dd></div>
+        <div><dt>Gewinn / Verlust</dt><dd class="<%= pl > 0 ? 'pos' : pl < 0 ? 'neg' : '' %>" data-live-pl><%= holding.units ? (pl > 0 ? '+' : '') + euro(pl) : '–' %></dd></div>
+        <div><dt>Verfügbares Guthaben</dt><dd><%= euro(currentUser.balance) %></dd></div>
+      </dl>
+    </div>
+
   </aside>
 </div>
 

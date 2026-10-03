@@ -2763,3 +2763,68 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .podium-1 .podium-total { font-size: 16px; }
   .rang-table .leaderboard td, .rang-table .leaderboard th { padding-left: 10px; padding-right: 10px; }
 }
+
+/* Coin Exchange (Redesign) */
+.coin-head { align-items: flex-end; gap: 20px; margin-bottom: 28px; }
+.coin-id { gap: 16px; }
+.coin-id svg, .coin-id img { width: 56px; height: 56px; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--color-accent) 40%, transparent)); }
+.coin-id h1 { font-size: clamp(28px, 1.3rem + 1.4vw, 36px); }
+.coin-symbol { font-size: 18px; font-weight: 400; color: var(--color-neutral-500); }
+.coin-id .live { font-size: 12px; color: var(--color-neutral-400); }
+.live-dot { width: 6px; height: 6px; background: oklch(0.8 0.14 155); box-shadow: 0 0 8px oklch(0.8 0.14 155); animation: none; }
+.coin-price { font-size: clamp(32px, 1.6rem + 2vw, 44px); font-weight: 500; letter-spacing: -.03em; line-height: 1; padding: 0; }
+.coin-change { font-size: 13px; font-weight: 500; }
+.coin-change .muted { font-weight: 400; color: var(--color-neutral-500); }
+.coin-layout { gap: 24px; }
+@media (min-width: 960px) { .coin-layout { grid-template-columns: minmax(0, 1fr) 340px; } .coin-main { display: flex; flex-direction: column; gap: 24px; } }
+.coin-main > .chart-card { padding: 22px; border: 0; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); }
+.range-tabs { justify-content: space-between; margin-bottom: 16px; }
+.range-tabs .chip { height: 28px; min-height: 0; padding: 0 10px; border: 0; border-radius: 6px; font-size: 12px; font-weight: 500; background: transparent; color: var(--color-neutral-400); }
+.range-tabs .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-neutral-700); border: 0; }
+.range-tabs .chart-range-change { margin-left: auto; font-size: 13px; font-weight: 500; }
+.chart, .chart.chart-up, .chart.chart-down { --chart: #9184d9; }
+.chart-svg .line { filter: drop-shadow(0 0 6px rgba(145, 132, 217, .6)); }
+.chart-svg .fill-top { stop-opacity: .35; }
+.chart-svg .grid { stroke: #e9e9ed; stroke-opacity: .06; stroke-dasharray: none; }
+.chart-svg .axis { fill: var(--color-neutral-500); }
+.chart-svg .cursor { stroke: var(--color-neutral-500); }
+.chart-svg .live-point, .chart-svg .cursor-dot { fill: var(--color-accent-300); stroke: var(--color-surface); filter: drop-shadow(0 0 6px var(--color-accent)); }
+.chart-tip { border-radius: var(--radius-md); background: var(--color-neutral-100); color: var(--color-bg); font-variant-numeric: tabular-nums; }
+.coin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 24px; padding: 0 4px; margin: 0; }
+.coin-stats .stat { display: flex; flex-direction: column; gap: 4px; padding: 0; background: none; border: 0; box-shadow: none; }
+.coin-stats .stat-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.coin-stats .stat-value { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.coin-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 24px; }
+.coin-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.coin-list h4 { margin: 0; }
+.coin-list-head { display: flex; justify-content: space-between; align-items: baseline; }
+.coin-list-head span { font-size: 12px; color: var(--color-neutral-500); }
+.coin-list .event { padding: 12px 14px; border-radius: var(--radius-md); font-size: 13px; background: none; box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.coin-list .event-type { font-weight: 500; }
+.coin-list .event .pos, .coin-list .event .neg { font-weight: 500; }
+.trade-rows { display: flex; flex-direction: column; }
+.trade-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 2px; font-size: 13px; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; }
+.trade-side { font-size: 12px; font-weight: 500; }
+.trade-what { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.trade-when { font-size: 11px; color: var(--color-neutral-500); }
+.trade-sum { text-align: right; font-weight: 500; }
+.coin-ledger-link { font-size: 13px; font-weight: 500; }
+.coin-side { display: flex; flex-direction: column; gap: 16px; }
+.coin-side .trade-card { padding: 22px; border: 0; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 40px color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.trade-tabs { gap: 4px; margin-bottom: 18px; border-radius: var(--radius-md); background: var(--color-bg); }
+.trade-tab { height: 34px; padding: 0; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--color-neutral-400); }
+.trade-tab.active { background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-700); }
+.trade-card input[type="number"] { min-height: 46px; font-size: 18px; }
+.trade-card .quick-amounts .chip { height: 32px; min-height: 0; padding: 0 12px; font-size: 13px; border-radius: var(--radius-md); }
+.trade-min, .trade-note { margin: 0 0 12px; font-size: 12px; color: var(--color-neutral-500); }
+.trade-min strong { font-weight: 500; color: var(--color-neutral-300); }
+.trade-note { margin: 12px 0 0; font-size: 11px; }
+.trade-card .btn-primary { min-height: 44px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.coin-depot { display: flex; flex-direction: column; gap: 10px; padding: 4px 6px; }
+.coin-depot-head { display: flex; justify-content: space-between; align-items: baseline; }
+.coin-depot-head span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.coin-depot-head strong { font-size: 16px; font-weight: 500; }
+.coin-depot .depot { gap: 10px; }
+.coin-depot .depot div { border: 0; padding: 0; font-size: 13px; }
+.coin-depot .depot dt { color: var(--color-neutral-400); }
+.coin-depot .depot dd { font-weight: 400; }
