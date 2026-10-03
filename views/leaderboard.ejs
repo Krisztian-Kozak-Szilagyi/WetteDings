@@ -1,16 +1,30 @@
 <%- include('partials/head') %>
 
+<div class="rang-page">
 <div class="page-head">
   <h1>Rangliste</h1>
   <form method="get" action="/rangliste" class="leader-search" role="search">
     <label class="sr-only" for="rang-suche">Mitglied suchen</label>
     <input type="search" id="rang-suche" name="suche" value="<%= q %>" maxlength="30" placeholder="Mitglied suchen …">
-    <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
     <% if (q) { %><a class="btn btn-ghost btn-sm" href="/rangliste">Alle</a><% } %>
   </form>
 </div>
 
-<div class="card">
+<% if (!q && leaders.length >= 3) { %>
+  <div class="podium">
+    <% [1, 0, 2].forEach((i) => { const u = leaders[i]; const me = currentUser && String(currentUser._id) === String(u._id); %>
+      <a class="podium-place podium-<%= u.rank %><%= me ? ' is-me' : '' %>" href="/profil/<%= encodeURIComponent(u.username) %>">
+        <span class="podium-rank"><%= u.rank %></span>
+        <img class="podium-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="">
+        <span class="podium-name"><%= u.username %><%- roleBadge(u.username) %></span>
+        <span class="podium-total"><%= euro(u.total) %></span>
+        <% if (me) { %><span class="podium-me">Du</span><% } %>
+      </a>
+    <% }) %>
+  </div>
+<% } %>
+
+<div class="rang-table">
   <% if (!leaders.length) { %>
     <p class="muted"><%= q ? 'Kein Mitglied gefunden.' : 'Noch niemand dabei.' %></p>
   <% } else { %>
@@ -33,6 +47,8 @@
       </table>
     </div>
   <% } %>
+</div>
+
 </div>
 
 <%- include('partials/foot') %>

@@ -2713,3 +2713,53 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .new-bet-submit p { margin: 0; font-size: 12px; color: var(--color-neutral-500); max-width: 360px; }
 .new-bet-submit .btn { min-height: 46px; padding: 0 26px; font-size: 15px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 25%, transparent); }
 @media (max-width: 480px) { .new-bet-form .type-picker { grid-template-columns: 1fr; } .new-bet-submit .btn { width: 100%; } }
+
+/* Rangliste (Redesign) */
+.rang-page { display: flex; flex-direction: column; gap: 40px; }
+.rang-page .page-head { margin: 0; }
+.rang-page .leader-search input[type="search"] { width: min(260px, 70vw); height: 40px; }
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: end; width: 100%; max-width: 900px; margin: 0 auto; }
+.podium-place {
+  --rk: #cfd3e5; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 16px 22px;
+  border-radius: var(--radius-lg); text-align: center; overflow: hidden; color: var(--text); text-decoration: none;
+  background: linear-gradient(180deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800);
+}
+.podium-place:hover { color: var(--text); text-decoration: none; }
+.podium-1 { --rk: #f2c14e; padding: 40px 16px 28px;
+  background: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--rk) 18%, transparent), transparent 70%), linear-gradient(180deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rk) 45%, transparent), 0 0 50px color-mix(in srgb, var(--rk) 12%, transparent); }
+.podium-3 { --rk: #c99067; }
+.podium-place.is-me:not(.podium-1) { box-shadow: 0 0 0 1px var(--color-accent-700); }
+.podium-rank { position: absolute; top: 10px; left: 14px; font-size: 44px; font-weight: 600; line-height: 1; letter-spacing: -.04em; color: color-mix(in srgb, var(--rk) 35%, transparent); }
+.podium-avatar { width: 56px; height: 56px; border-radius: 8px; }
+.podium-1 .podium-avatar { width: 72px; height: 72px; }
+.podium-name { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.podium-total { font-size: 19px; font-weight: 500; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.podium-1 .podium-total { font-size: 24px; }
+.podium-me { font-size: 11px; color: var(--color-accent-300); }
+.rang-table .leaderboard { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.rang-table .leaderboard th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 400; color: var(--color-neutral-500); border: 0; padding: 0 16px 10px; background: none; }
+.rang-table .leaderboard td { padding: 14px 16px; font-size: 14px; border: 0; box-shadow: inset 0 -1px 0 var(--color-divider); }
+.rang-table .leaderboard td.num:not(:nth-child(3)) { color: var(--color-neutral-300); }
+.rang-table .leaderboard td.num:nth-child(5), .rang-table .leaderboard td.num:nth-child(6) { color: var(--color-neutral-500); }
+.rang-table .leaderboard td strong { font-weight: 500; }
+.rang-table .leaderboard .rank { font-weight: 500; color: var(--color-neutral-400); }
+.rang-table .leaderboard .rank-1 { color: #f2c14e; }
+.rang-table .leaderboard .rank-2 { color: #cfd3e5; }
+.rang-table .leaderboard .rank-3 { color: #c99067; }
+.rang-table .leaderboard td a { font-weight: 500; }
+.rang-table .leaderboard tr.me td { background: color-mix(in srgb, var(--color-accent) 8%, transparent); box-shadow: inset 0 1px 0 var(--color-accent-700), inset 0 -1px 0 var(--color-accent-700); }
+.rang-table .leaderboard tr.me td:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); box-shadow: inset 1px 1px 0 var(--color-accent-700), inset 0 -1px 0 var(--color-accent-700); }
+.rang-table .leaderboard tr.me td:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; box-shadow: inset -1px 1px 0 var(--color-accent-700), inset 0 -1px 0 var(--color-accent-700); }
+@media (max-width: 640px) {
+  .podium { gap: 8px; }
+  .podium-place { padding: 22px 8px 16px; }
+  .podium-1 { padding: 30px 8px 20px; }
+  .podium-rank { font-size: 30px; top: 8px; left: 10px; }
+  .podium-avatar { width: 40px; height: 40px; }
+  .podium-1 .podium-avatar { width: 52px; height: 52px; }
+  .podium-name { font-size: 13px; }
+  .podium-total { font-size: 14px; }
+  .podium-1 .podium-total { font-size: 16px; }
+  .rang-table .leaderboard td, .rang-table .leaderboard th { padding-left: 10px; padding-right: 10px; }
+}
