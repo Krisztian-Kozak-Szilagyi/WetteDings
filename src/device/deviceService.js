@@ -2,6 +2,7 @@
 // die sich ein Gerät teilen, und setzt Sperren durch (Konto und alle seine Geräte).
 const User = require('../models/User');
 const { Device, DeviceAlert } = require('../models/Device');
+const { Trade } = require('../models/Trade');
 const { UserError } = require('../lib/util');
 const logic = require('./deviceLogic');
 
@@ -59,6 +60,40 @@ async function checkMatches(dev) {
       await alert.save();
     }
   }
+}
+
+// ---------- Handel zwischen Mehrfach-Konten ----------
+const SUSPICIOUS_DAYS = 30; // so weit zurück zählen Geschäfte fürs Abzeichen
+
+/** Konten-Paare mit Hinweis "sicher" oder "wahrscheinlich" (auch erledigte) als Set von pairKey */
+async function flaggedPairs() {
+  const alerts = await DeviceAlert.find({ level: { $gte: logic.LEVEL.wahrscheinlich } }).select('key').lean();
+  return new Set(alerts.map((a) => a.key));
+}
+
+/** Die beiden Seiten eines abgeschlossenen Geschäfts: Anbieter und Käufer bzw. Tauschpartner */
+const tradePartner = (t) => (t.kind === 'tausch' ? t.to : t.buyer);
+const tradePairKey = (t) => logic.pairKey(t.seller, tradePartner(t));
+
+/** Mongo-Filter: Geschäfte zwischen den Konten eines der Paare */
+function tradeFilterForPairs(pairs) {
+  const or = [];
+  for (const key of pairs) {
+    const [a, b] = key.split(':');
+    for (const [x, y] of [[a, b], [b, a]]) {
+      or.push({ seller: x, kind: { $ne: 'tausch' }, buyer: y }, { seller: x, kind: 'tausch', to: y });
+    }
+  }
+  return or.length ? { $or: or } : { _id: null }; // ohne Paare: nichts
+}
+
+/** Neue Geschäfte zwischen Mehrfach-Konten seit dem letzten Blick (Abzeichen für Admin und Devs) */
+async function suspiciousTradeCount(user) {
+  const since = Math.max(user.suspiciousSeenAt ? new Date(user.suspiciousSeenAt).getTime() : 0, Date.now() - SUSPICIOUS_DAYS * 24 * 60 * 60 * 1000);
+  const trades = await Trade.find({ status: 'verkauft', closedAt: { $gt: new Date(since) } }).select('kind seller buyer to').lean();
+  if (!trades.length) return 0;
+  const pairs = await flaggedPairs();
+  return trades.filter((t) => pairs.has(tradePairKey(t))).length;
 }
 
 /** Offene Hinweise (sicher oder wahrscheinlich) – für das Abzeichen am Admin-Menüpunkt */
@@ -193,4 +228,4 @@ async function forgetUser(userId) {
   await Promise.all([Device.deleteMany({ user: userId }), DeviceAlert.deleteMany({ users: userId })]);
 }
 
-module.exports = { record, alertCount, listAlerts, setAlertDone, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };
+module.exports = { flaggedPairs, tradePairKey, tradeFilterForPairs, suspiciousTradeCount, record, alertCount, listAlerts, setAlertDone, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };

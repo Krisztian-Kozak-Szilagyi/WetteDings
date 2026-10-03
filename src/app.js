@@ -90,6 +90,7 @@ function createApp() {
     betVotePending: 0, // Wetten, in denen meine Stimme zum Ergebnis fehlt
     betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
+    tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
     deviceProbe: false,
     roleBadge: roles.roleBadge,
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
@@ -122,7 +123,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -135,6 +136,7 @@ function createApp() {
         u.isStaff ? betService.disputedCount() : 0, // nur Devs/Admins: strittige Wetten
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
         u.isAdmin ? deviceService.alertCount() : 0, // nur Admin: Konten, die sich ein Gerät teilen
+        u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
@@ -149,6 +151,7 @@ function createApp() {
         betDisputes: disputes,
         packLogNew,
         deviceAlerts,
+        tradeAlerts,
       });
     }
     next();

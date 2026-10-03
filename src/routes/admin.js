@@ -29,10 +29,17 @@ const router = express.Router();
 const TRADE_LOG_PAGE = 50;
 const KIND_LABEL = { markt: 'Markt', privat: 'Privatverkauf', tausch: 'Tausch' };
 
-/** Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte */
-async function tradeLog(query) {
+/**
+ * Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte.
+ * Geschäfte zwischen Mehrfach-Konten (Hinweis "sicher"/"wahrscheinlich") sind markiert, neue seit seenAt zusätzlich "Neu";
+ * mit ?verdacht=1 nur diese.
+ */
+async function tradeLog(query, seenAt) {
   const q = (typeof query.handelsuche === 'string' ? query.handelsuche : '').trim().slice(0, 40);
+  const onlySuspicious = query.verdacht === '1';
+  const pairs = await deviceService.flaggedPairs();
   const filter = { status: 'verkauft' };
+  if (onlySuspicious) filter.$and = [deviceService.tradeFilterForPairs(pairs)];
   if (q) {
     const rx = new RegExp(escapeRegex(q), 'i');
     // Karten über ihren angezeigten Namen finden (z. B. "St. Ivan") – gespeichert ist nur die Karten-ID
@@ -43,7 +50,7 @@ async function tradeLog(query) {
   const pages = Math.max(1, Math.ceil(total / TRADE_LOG_PAGE));
   const page = Math.min(pages, Math.max(1, Number.parseInt(query.handelseite, 10) || 1));
   const rows = await Trade.find(filter)
-    .select('kind sellerName buyerName toName card wantCard price extraFrom tax closedAt')
+    .select('kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt')
     .sort({ closedAt: -1, _id: -1 })
     .skip((page - 1) * TRADE_LOG_PAGE)
     .limit(TRADE_LOG_PAGE)
@@ -52,8 +59,10 @@ async function tradeLog(query) {
     const c = tcgCatalog.cardById[id];
     return c ? `${c.name} (${tcgCatalog.rarityByKey[c.rarity].label})` : id;
   };
+  const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
+    onlySuspicious,
     total,
     page,
     pages,
@@ -65,7 +74,9 @@ async function tradeLog(query) {
         back = card(t.wantCard);
         if (t.price > 0) back += ` + ${euro(t.price)} von ${t.extraFrom === 'to' ? to : t.sellerName}`;
       }
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: card(t.card), back, tax: t.tax };
+      const flagged = pairs.has(deviceService.tradePairKey(t));
+      const isNew = flagged && new Date(t.closedAt).getTime() > seen;
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: card(t.card), back, tax: t.tax, flagged, isNew };
     }),
   };
 }
@@ -80,8 +91,14 @@ router.get('/admin', requireStaff, async (req, res) => {
     User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean(),
     isAdmin ? deviceService.listAlerts() : [], // Konten mit gemeinsamem Gerät
     isAdmin ? deviceService.listBans() : [],
-    tradeLog(req.query), // Handel-Log (Admin und Devs): abgeschlossene Verkäufe und Tausche
+    tradeLog(req.query, req.user.suspiciousSeenAt), // Handel-Log (Admin und Devs): abgeschlossene Verkäufe und Tausche
   ]);
+  // Besuch merken: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
+  const newSuspicious = res.locals.tradeAlerts || 0;
+  if (newSuspicious) {
+    await User.updateOne({ _id: req.user._id }, { $set: { suspiciousSeenAt: new Date() } });
+    res.locals.tradeAlerts = 0;
+  }
   res.render('admin', {
     title: req.user.isAdmin ? 'Admin' : 'Dev',
     packLogNew: res.locals.packLogNew || 0,
@@ -107,6 +124,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     bans,
     maxBanHours: MAX_BAN_HOURS,
     trades,
+    newSuspicious,
     // Mitglieder, die gesperrt werden können (der Admin selbst nicht)
     bannable: users.filter((u) => !config.adminUsernames.includes(u.usernameLower)),
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',

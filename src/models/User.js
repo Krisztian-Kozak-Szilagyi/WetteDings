@@ -35,6 +35,8 @@ const userSchema = new Schema(
     role: { type: String, enum: ['dev', 'mod', null], default: null },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
     forumSeenAt: { type: Date, default: null },
+    // Admin/Dev: bis wann Geschäfte zwischen Mehrfach-Konten gesehen wurden (Abzeichen am Menüpunkt)
+    suspiciousSeenAt: { type: Date, default: null },
     // Admin: wann das Pack-Log zuletzt angesehen wurde (für das Abzeichen am Menüpunkt)
     packLogSeenAt: { type: Date, default: null },
     // Sperre durch den Admin: gesperrt, solange bannedUntil in der Zukunft liegt (dauerhaft = Jahr 9999).

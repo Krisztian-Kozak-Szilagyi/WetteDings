@@ -276,16 +276,17 @@
 </details>
 <% } %>
 
-<details class="card fold" id="handellog" <%= trades.q || trades.page > 1 ? 'open' : '' %>>
-  <summary><h2>Handel-Log</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
-  <p class="muted">Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen.</p>
+<details class="card fold" id="handellog" <%= trades.q || trades.page > 1 || trades.onlySuspicious || newSuspicious ? 'open' : '' %>>
+  <summary><h2>Handel-Log<% if (newSuspicious) { %> <span class="nav-badge nav-badge-inline nav-badge-suspicious" title="Neue Geschäfte zwischen Mehrfach-Konten"><%= newSuspicious %></span><% } %></h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert – neue lösen ein Abzeichen am Menüpunkt aus.</p>
   <form method="get" action="/admin#handellog" class="leader-search" role="search">
     <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
     <input type="search" id="handel-suche" name="handelsuche" value="<%= trades.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
+    <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= trades.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
     <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
-    <% if (trades.q) { %><a class="btn btn-ghost btn-sm" href="/admin#handellog">Alle</a><% } %>
+    <% if (trades.q || trades.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="/admin#handellog">Alle</a><% } %>
   </form>
-  <p class="muted small"><%= trades.total %> <%= trades.total === 1 ? 'Geschäft' : 'Geschäfte' %><%= trades.q ? ' für „' + trades.q + '“' : '' %> · Seite <%= trades.page %> von <%= trades.pages %></p>
+  <p class="muted small"><%= trades.total %> <%= trades.total === 1 ? 'Geschäft' : 'Geschäfte' %><%= trades.onlySuspicious ? ' zwischen Mehrfach-Konten' : '' %><%= trades.q ? ' für „' + trades.q + '“' : '' %> · Seite <%= trades.page %> von <%= trades.pages %></p>
   <% if (!trades.rows.length) { %>
     <p class="muted"><%= trades.q ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
   <% } else { %>
@@ -294,8 +295,8 @@
         <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Karte</th><th>Gegenleistung</th><th>Art</th></tr></thead>
         <tbody>
           <% trades.rows.forEach((t) => { %>
-            <tr>
-              <td class="nowrap"><%= dateSec(t.at) %></td>
+            <tr class="<%= t.flagged ? 'trade-flagged' : '' %>">
+              <td class="nowrap"><%= dateSec(t.at) %><% if (t.flagged) { %><br><span class="badge trade-flag" title="Beide Konten werden vom selben Gerät aus benutzt">Mehrfach-Konto</span><% } %><% if (t.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
               <td><%- userLink(t.from, { realName: false }) %></td>
               <td><%- userLink(t.to, { realName: false }) %></td>
               <td><%= t.card %></td>
@@ -307,7 +308,7 @@
       </table>
     </div>
   <% } %>
-  <% if (trades.pages > 1) { const link = (p) => '/admin?' + new URLSearchParams({ ...(trades.q ? { handelsuche: trades.q } : {}), handelseite: p }) + '#handellog'; %>
+  <% if (trades.pages > 1) { const link = (p) => '/admin?' + new URLSearchParams({ ...(trades.q ? { handelsuche: trades.q } : {}), ...(trades.onlySuspicious ? { verdacht: '1' } : {}), handelseite: p }) + '#handellog'; %>
     <div class="log-pager">
       <% if (trades.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(trades.page - 1) %>">← Neuere</a><% } %>
       <span class="muted small">Seite <%= trades.page %> / <%= trades.pages %></span>

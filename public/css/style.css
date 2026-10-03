@@ -503,6 +503,12 @@ nav.tabs { padding-top: 9px; padding-right: 10px; gap: 14px; }
 .trade-log td { vertical-align: top; }
 .device-done > .code-list { margin-top: 12px; }
 .nav-badge.nav-badge-device { background: #f59e0b; }
+.nav-badge.nav-badge-suspicious { background: #dc2626; }
+/* Handel-Log: Geschäft zwischen Mehrfach-Konten */
+.trade-log tr.trade-flagged td { background: rgba(220, 38, 38, .08); }
+.trade-flag { background: rgba(220, 38, 38, .18); color: #f87171; margin-top: 4px; }
+.bm-filter { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; white-space: nowrap; }
+.leader-search .bm-filter input { width: auto; flex: none; margin: 0; }
 .code-input { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 560px) {
   .code-item { grid-template-columns: 1fr; }
