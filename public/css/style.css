@@ -3448,3 +3448,110 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .forum-report-post p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--color-neutral-200); overflow-wrap: anywhere; }
 .forum-report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .forum-report-actions form { margin: 0; }
+
+/* IHK (Redesign) – im Stil der TCG-Seite: Hero oben, Spielfläche mit lila Licht, Quests als Karten mit Seltenheitsfarbe */
+.ihk-page { display: flex; flex-direction: column; gap: 32px; }
+.ihk-hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px 32px; }
+.ihk-hero-text { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+.ihk-hero-text h1 { margin: 0; font-size: clamp(32px, 1.6rem + 2vw, 44px); }
+.ihk-hero-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; text-wrap: pretty; }
+.ihk-hero-side { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.ihk-day { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.ihk-day-pips { display: flex; gap: 6px; }
+.ihk-pip { width: 22px; height: 6px; border-radius: 999px; background: var(--color-neutral-800); }
+.ihk-pip.is-done { background: var(--color-accent-300); box-shadow: 0 0 10px var(--color-accent); }
+.ihk-day-text { font-size: 13px; color: var(--color-neutral-400); }
+.ihk-day-text strong { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* Spielfläche */
+.ihk-stage {
+  margin-bottom: 0; padding: 32px 28px; gap: 28px; border-radius: var(--radius-lg); color: var(--text); overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 110%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 0%, color-mix(in srgb, var(--text) 5%, transparent), transparent 70%),
+    var(--color-surface);
+  border: 1px solid var(--color-neutral-800); box-shadow: var(--shadow-lg);
+}
+.ihk-col-label { align-self: stretch; text-align: center; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-accent-300); }
+.ihk-col-label.is-enemy { color: #f0857a; }
+.ihk-slot { border: 1px solid var(--color-neutral-700); border-radius: 14px; background: color-mix(in srgb, var(--color-bg) 70%, transparent); box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }
+.ihk-player .ihk-slot-card { border-color: var(--color-accent-700); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 25%, transparent), 0 0 40px color-mix(in srgb, var(--color-accent) 25%, transparent), 0 18px 40px rgba(0, 0, 0, .45); }
+.ihk-slot-enemy { border-color: color-mix(in srgb, #e5483a 55%, transparent); box-shadow: 0 0 40px color-mix(in srgb, #e5483a 18%, transparent), 0 18px 40px rgba(0, 0, 0, .45); }
+.ihk-slot-item { border-style: dashed; border-color: var(--color-neutral-600); border-radius: 10px; }
+.ihk-slot-empty { color: var(--color-neutral-500); font-weight: 500; font-size: 13px; }
+.ihk-slot-empty small { color: var(--color-neutral-600); }
+.ihk-slot.is-drop-hint { border-color: var(--color-accent-300); }
+.ihk-slot.is-target { box-shadow: 0 0 0 3px var(--color-accent-300), 0 0 40px var(--color-accent); }
+.ihk-vs {
+  align-self: center; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--text);
+  background: var(--color-bg); border: 1px solid var(--color-neutral-700);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 10%, transparent), 0 0 30px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+/* Quests: Karte mit Seltenheitsfarbe am Rand */
+.ihk-quest {
+  padding: 16px 18px 14px 20px; border-radius: var(--radius-md); color: var(--text);
+  background: color-mix(in srgb, var(--color-bg) 65%, transparent); border: 1px solid var(--color-neutral-800); box-shadow: none;
+}
+.ihk-quest::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--rar, var(--color-accent)); box-shadow: 0 0 12px var(--rar, var(--color-accent)); }
+.ihk-quest.r-holo::before { background: linear-gradient(180deg, #ffd1f0, #a8e6ff, #d9b8ff); }
+.ihk-quest h2 { color: var(--text); font-size: 16px; font-weight: 600; }
+.ihk-quest p { color: var(--color-neutral-400); font-size: 13px; }
+.ihk-quest-dur { font-weight: 500; font-size: 12px; color: var(--color-neutral-500); }
+.ihk-quest-meta { font-size: 12px; color: var(--color-neutral-400); border-top-color: var(--color-divider); }
+.ihk-quest-meta strong { color: var(--text); font-weight: 500; }
+.ihk-level { font-weight: 600; }
+.ihk-hybrid { border-color: color-mix(in srgb, var(--color-accent-300) 60%, transparent); color: var(--color-accent-300); font-weight: 500; font-size: 11px; letter-spacing: .04em; }
+.ihk-offers { gap: 12px; }
+.ihk-offer { grid-template-columns: 64px 1fr; }
+.ihk-offer:hover { transform: translateY(-2px); border-color: var(--color-neutral-600); background: color-mix(in srgb, var(--color-bg) 45%, transparent); }
+.ihk-offer h2 { font-size: 15px; }
+.ihk-offer p { font-size: 12.5px; }
+.ihk-offer-thumb { width: 64px; border-radius: 6px; box-shadow: 0 6px 14px rgba(0, 0, 0, .4); }
+.ihk-offer.is-selected { border-color: var(--color-accent-300); box-shadow: 0 0 0 1px var(--color-accent-300), 0 0 30px color-mix(in srgb, var(--color-accent) 35%, transparent); }
+.ihk-offer:focus-visible, .ihk-pick-card:focus-visible { outline: 2px solid var(--color-accent-300); outline-offset: 2px; }
+.ihk-info { font-size: 13px; color: var(--color-neutral-400); }
+.ihk-info a { color: var(--color-accent-300); }
+
+/* Laufende Quest und Auswertung */
+.ihk-timer { padding: 14px 18px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-bg) 65%, transparent); border: 1px solid var(--color-neutral-800); font-size: 14px; color: var(--color-neutral-400); }
+.ihk-timer strong { display: block; margin-top: 4px; color: var(--color-accent-300); font-size: 28px; font-weight: 600; text-shadow: 0 0 20px var(--color-accent); }
+.ihk-fight { padding: 16px 18px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-bg) 65%, transparent); border: 1px solid var(--color-neutral-800); }
+.ihk-bar-label { font-size: 12px; font-weight: 500; color: var(--color-neutral-400); }
+.ihk-bar { height: 10px; background: var(--color-neutral-900, rgba(0, 0, 0, .5)); border-color: var(--color-neutral-800); }
+.ihk-bar-progress { background: linear-gradient(90deg, var(--color-accent-700), var(--color-accent-300)); box-shadow: 0 0 14px var(--color-accent); }
+.ihk-bar-progress2 { background: linear-gradient(90deg, #0e7490, #67e8f9); box-shadow: 0 0 14px rgba(34, 211, 238, .55); }
+.ihk-bar-time { background: linear-gradient(90deg, #b42318, #f59e0b); }
+.ihk-skip { background: none; color: var(--color-neutral-400); border-color: var(--color-neutral-700); }
+.ihk-result { border: 1px solid var(--color-neutral-800); background: var(--color-surface); }
+.ihk-result.is-win { border-color: color-mix(in srgb, #22c55e 45%, transparent); box-shadow: 0 0 40px color-mix(in srgb, #22c55e 18%, transparent); }
+.ihk-result.is-fail { border-color: color-mix(in srgb, #e5483a 45%, transparent); box-shadow: 0 0 40px color-mix(in srgb, #e5483a 15%, transparent); }
+.ihk-result strong { font-size: 24px; font-weight: 600; }
+.ihk-result p { color: var(--color-neutral-400); font-size: 14px; }
+.ihk-abilities, .ihk-ability-banner { border-color: color-mix(in srgb, var(--color-accent-300) 40%, transparent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-neutral-300); }
+.ihk-abilities strong, .ihk-ability-banner strong { color: var(--color-accent-200); }
+
+/* Karten wählen */
+.ihk-pick-head { margin-bottom: 18px; align-items: flex-end; }
+.ihk-pick-head h2 { margin: 6px 0 0; }
+.ihk-pick-head .btn { min-height: 44px; padding: 0 22px; font-size: 15px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.ihk-pick-head .btn:disabled { box-shadow: none; }
+.ihk-pick-grid { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(30%, 120px), 1fr)); }
+.ihk-pick-card img { border-radius: 10px; box-shadow: 0 10px 24px rgba(0, 0, 0, .4); }
+.ihk-pick-card:hover img { transform: translateY(-4px); box-shadow: 0 0 0 1px var(--rar, var(--color-neutral-600)), 0 14px 30px rgba(0, 0, 0, .5); }
+.ihk-pick-card.is-selected img { box-shadow: 0 0 0 2px var(--color-accent-300), 0 0 30px var(--color-accent); }
+.ihk-pick-card.is-boost img { box-shadow: 0 0 0 2px #67e8f9, 0 0 26px rgba(34, 211, 238, .55); }
+.ihk-pick-stats { grid-template-columns: repeat(4, auto); justify-content: center; gap: 2px 8px; margin-top: 8px; font-size: 11px; font-weight: 500; color: var(--color-neutral-500); }
+.ihk-pick-sub { margin: 28px 0 14px; font-size: 11px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.ihk-zoom-info h2 { color: var(--text); }
+.ihk-zoom-info p { color: var(--color-neutral-400); }
+
+@media (max-width: 760px) {
+  .ihk-page { gap: 24px; }
+  .ihk-hero { align-items: flex-start; }
+  .ihk-day { align-items: flex-start; }
+  .ihk-stage { padding: 18px 14px; gap: 14px; }
+  .ihk-vs { display: none; }
+  .ihk-pick-stats { grid-template-columns: 1fr 1fr; }
+}
