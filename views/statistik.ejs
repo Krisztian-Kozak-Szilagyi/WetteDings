@@ -20,87 +20,141 @@
   const info = (hint) => hint ? `<span class="stats-info" tabindex="0" title="${hint.replace(/"/g, '&quot;')}" aria-label="${hint.replace(/"/g, '&quot;')}">i</span>` : '';
 %>
 
-<div class="page-head stats-head">
-  <h1>Statistik</h1>
-  <% if (data) { %><span class="muted"><%= span(p) %> <span class="small">· verglichen mit <%= span(prev) %></span></span><% } %>
-</div>
+<%
+  const current = sections.find((s) => s.key === active);
+  // Symbole der Bereiche (Linien-Icons, Farbe über currentColor)
+  const ICONS = {
+    grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+    trend: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14.8c1.9.7 3.1 2.5 3.5 5.2"/>',
+    cards: '<rect x="3" y="5" width="11" height="15" rx="2"/><path d="M17 4.5l3.4 1a1.5 1.5 0 0 1 1 1.9l-3.6 12.3"/>',
+    dice: '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.4 4.2-6.5 8-6.5s7 2.1 8 6.5"/>',
+    download: '<path d="M12 4v11"/><path d="M7 10.5l5 5 5-5"/><path d="M4.5 20h15"/>',
+    flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  };
+  const icon = (name) => `<svg class="stats-icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+  const showChanges = data && data.markers.length && active !== 'uebersicht';
+%>
 
-<div class="stats-filters">
-  <nav class="tabs" aria-label="Bereich">
+<header class="stats-hero">
+  <div>
+    <h1>Statistik</h1>
+    <p class="muted"><%= current.description %></p>
+  </div>
+  <% if (data) { %>
+    <div class="stats-period">
+      <span class="stats-period-main"><%- icon('calendar') %> <%= span(p) %></span>
+      <span class="muted small">Vergleich mit <%= span(prev) %></span>
+    </div>
+  <% } %>
+</header>
+
+<div class="stats-toolbar">
+  <nav class="stats-sections" aria-label="Bereich der Statistik">
     <% sections.forEach((s) => { %>
-      <a class="tab <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, curRange) %>"><%= s.label %></a>
+      <a class="stats-section <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, curRange) %>" title="<%= s.description %>" <% if (s.key === active) { %>aria-current="page"<% } %>>
+        <%- icon(s.icon) %><span><%= s.label %></span>
+      </a>
     <% }) %>
   </nav>
-  <nav class="stats-range" aria-label="Zeitraum">
-    <% ranges.forEach((r) => { %>
-      <a class="<%= r === curRange ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === curRange) { %>aria-current="true"<% } %>><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
-    <% }) %>
-  </nav>
+
+  <div class="stats-toolbar-row">
+    <div class="stats-toolbar-group">
+      <span class="stats-toolbar-label">Zeitraum</span>
+      <nav class="stats-range" aria-label="Zeitraum">
+        <% ranges.forEach((r) => { %>
+          <a class="<%= r === curRange ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === curRange) { %>aria-current="true"<% } %>><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
+        <% }) %>
+      </nav>
+    </div>
+
+    <% if (active === 'mitglied') { %>
+      <form method="get" action="/admin/statistik" class="stats-member-pick" role="search">
+        <input type="hidden" name="bereich" value="mitglied">
+        <input type="hidden" name="tage" value="<%= curRange %>">
+        <label class="sr-only" for="stats-member">Mitglied</label>
+        <input id="stats-member" type="search" name="spieler" list="stats-members" autocomplete="off" placeholder="Mitglied suchen …" value="<%= member ? member.username : '' %>" required>
+        <button class="btn btn-primary btn-sm" type="submit">Anzeigen</button>
+        <% if (member) { %><a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(member.username) %>">Profil</a><% } %>
+      </form>
+      <datalist id="stats-members"><% members.forEach((m) => { %><option value="<%= m.username %>"><% }) %></datalist>
+    <% } %>
+
+    <% if (data) { %>
+      <div class="stats-toolbar-group stats-toolbar-actions">
+        <% if (showChanges) { %>
+          <details class="stats-menu" data-dropdown>
+            <summary class="btn btn-ghost btn-sm"><%- icon('flag') %> Änderungen <span class="stats-count"><%= data.markers.length %></span></summary>
+            <div class="stats-menu-panel stats-menu-wide">
+              <p class="muted small">Einstellungsänderungen und Patchnotes im Zeitraum – in den Verläufen als gestrichelte Linie.</p>
+              <ol class="stats-timeline">
+                <% data.markers.slice().reverse().forEach((m) => { %>
+                  <li>
+                    <span class="stats-badge stats-badge-<%= m.kind === 'patch' ? 'muted' : 'setting' %>"><%= m.kind === 'patch' ? 'Patch' : m.short %></span>
+                    <div>
+                      <strong><%= m.label %></strong> <span class="muted small"><%= date(m.at) %><%= m.by ? ' · ' + m.by : '' %></span>
+                      <% if (m.detail.length) { %><ul class="small"><% m.detail.forEach((x) => { %><li><code><%= x %></code></li><% }) %></ul><% } %>
+                    </div>
+                  </li>
+                <% }) %>
+              </ol>
+            </div>
+          </details>
+        <% } %>
+        <details class="stats-menu" data-dropdown>
+          <summary class="btn btn-ghost btn-sm"><%- icon('download') %> Export</summary>
+          <div class="stats-menu-panel">
+            <a class="stats-menu-item" href="<%= exportLink(null, null) %>" download>
+              <strong>CSV für Excel</strong>
+              <span class="muted small">Ganzer Bereich „<%= current.label %>“, Verläufe tagesgenau</span>
+            </a>
+            <a class="stats-menu-item" href="<%= exportLink(null, 'json') %>" download>
+              <strong>JSON</strong>
+              <span class="muted small">Rohwerte für eigene Auswertungen (Cent, Anteile 0–1)</span>
+            </a>
+            <span class="muted small stats-menu-hint">Einzelne Themen: „CSV“ rechts an jedem Abschnitt.</span>
+          </div>
+        </details>
+      </div>
+    <% } %>
+  </div>
 </div>
 
-<% if (active === 'mitglied') { %>
-  <form method="get" action="/admin/statistik" class="stats-member-pick">
-    <input type="hidden" name="bereich" value="mitglied">
-    <input type="hidden" name="tage" value="<%= curRange %>">
-    <label class="field">
-      <span>Mitglied</span>
-      <input type="text" name="spieler" list="stats-members" autocomplete="off" placeholder="Benutzername" value="<%= member ? member.username : '' %>" required>
-    </label>
-    <button class="btn btn-primary" type="submit">Anzeigen</button>
-    <% if (member) { %><a class="btn btn-ghost" href="/profil/<%= encodeURIComponent(member.username) %>">Profil öffnen</a><% } %>
-  </form>
-  <% if (!member) { %>
-    <section class="stats-block">
-      <header class="stats-block-head">
+<% if (active === 'mitglied' && !member) { %>
+  <section class="stats-block">
+    <header class="stats-block-head">
+      <div>
         <h2>Mitglied auswählen</h2>
         <p class="muted">Suche oben nach einem Namen oder wähle ein Mitglied aus der Rangliste.</p>
-      </header>
-      <div class="card">
-        <div class="table-wrap">
-          <table class="table">
-            <thead><tr><th class="num">#</th><th>Mitglied</th><th class="num">Gesamtvermögen</th><th class="num hide-sm">Guthaben</th><th class="num hide-sm">Karten & Packs</th></tr></thead>
-            <tbody>
-              <% members.forEach((m, i) => { %>
-                <tr>
-                  <td class="num"><%= i + 1 %></td>
-                  <td><a href="/admin/statistik?<%= new URLSearchParams({ bereich: 'mitglied', tage: String(curRange), spieler: m.username }) %>"><%= m.username %></a></td>
-                  <td class="num"><%= fmt({ value: m.total, unit: 'euro' }) %></td>
-                  <td class="num hide-sm"><%= fmt({ value: m.balance, unit: 'euro' }) %></td>
-                  <td class="num hide-sm"><%= fmt({ value: m.cardValue, unit: 'euro' }) %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
       </div>
-    </section>
-  <% } %>
-  <datalist id="stats-members"><% members.forEach((m) => { %><option value="<%= m.username %>"><% }) %></datalist>
+    </header>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th class="num">#</th><th>Mitglied</th><th class="num">Gesamtvermögen</th><th class="num hide-sm">Guthaben</th><th class="num hide-sm">Karten & Packs</th></tr></thead>
+          <tbody>
+            <% members.forEach((m, i) => { %>
+              <tr>
+                <td class="num"><%= i + 1 %></td>
+                <td><a href="/admin/statistik?<%= new URLSearchParams({ bereich: 'mitglied', tage: String(curRange), spieler: m.username }) %>"><%= m.username %></a></td>
+                <td class="num"><%= fmt({ value: m.total, unit: 'euro' }) %></td>
+                <td class="num hide-sm"><%= fmt({ value: m.balance, unit: 'euro' }) %></td>
+                <td class="num hide-sm"><%= fmt({ value: m.cardValue, unit: 'euro' }) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 <% } %>
 
 <% if (data) { %>
-<div class="stats-export">
-  <span class="muted small">Exportieren (Verläufe tagesgenau):</span>
-  <a class="btn btn-ghost btn-sm" href="<%= exportLink(null, null) %>" download>Alles als CSV (Excel)</a>
-  <a class="btn btn-ghost btn-sm" href="<%= exportLink(null, 'json') %>" download>JSON</a>
-</div>
-<% if (data.markers.length && active !== 'uebersicht') { %>
-  <div class="stats-strip" aria-label="Änderungen im Zeitraum">
-    <span class="stats-strip-label">Änderungen:</span>
-    <% data.markers.forEach((m) => { %>
-      <details class="stats-chip stats-chip-<%= m.kind %>">
-        <summary><span aria-hidden="true">◆</span> <%= dd(m.day).slice(0, 6) %> <%= m.kind === 'patch' ? 'Patch: ' : '' %><%= m.label %></summary>
-        <div class="stats-chip-body">
-          <span class="muted small"><%= date(m.at) %><%= m.by ? ' · ' + m.by : '' %></span>
-          <% if (m.detail.length) { %><ul><% m.detail.forEach((x) => { %><li><code><%= x %></code></li><% }) %></ul><% } %>
-        </div>
-      </details>
-    <% }) %>
-  </div>
-<% } %>
-
 <% if (data.blocks.length > 2) { %>
-  <nav class="stats-subnav" aria-label="Themen">
+  <nav class="stats-subnav" aria-label="Abschnitte">
+    <span class="muted small">Springe zu:</span>
     <% data.blocks.forEach((b) => { %><a href="#<%= b.id %>"><%= b.title %></a><% }) %>
   </nav>
 <% } %>

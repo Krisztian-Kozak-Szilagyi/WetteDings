@@ -132,7 +132,7 @@ async function member(p, now, { user }) {
         { id: 'm-rang', label: 'Rang', value: index >= 0 ? `${index + 1}. von ${rank.length}` : '–', unit: 'text', hint: 'nach Gesamtvermögen (jetzt)' },
         { id: 'm-vermoegen', label: 'Gesamtvermögen', value: row.total, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
         { id: 'm-guthaben', label: 'Guthaben', value: row.balance, unit: 'euro', hint: 'jetzt' },
-        { id: 'm-zufluss', label: 'Netto-Zufluss', value: Object.values(dayNet).reduce((a, v) => a + v, 0), unit: 'euro', signed: true, compare: true, hint: 'Veränderung des Guthabens im Zeitraum' },
+        { id: 'm-zufluss', label: 'Guthaben-Veränderung', value: Object.values(dayNet).reduce((a, v) => a + v, 0), unit: 'euro', signed: true, compare: true, hint: 'Veränderung des Guthabens im Zeitraum' },
         { id: 'm-einsaetze-offen', label: 'Offene Einsätze', value: row.inPlay, unit: 'euro', hint: 'jetzt' },
         { id: 'm-coins', label: 'Coins (Wert)', value: row.coinValue, unit: 'euro', hint: 'zum aktuellen Kurs (jetzt)' },
         { id: 'm-karten', label: 'Karten & Packs (Wert)', value: row.cardValue, unit: 'euro', hint: 'Bankwert (jetzt)' },
@@ -186,7 +186,7 @@ async function member(p, now, { user }) {
         { id: 'm-einsaetze', label: 'Einsätze', value: staked[0] ? staked[0].s : 0, unit: 'euro', compare: true, hint: `${staked[0] ? staked[0].n : 0} Einsätze` },
         { id: 'm-wett-ergebnis', label: 'Ergebnis abgerechneter Wetten', value: settledPayout - settledStake, unit: 'euro', signed: true, compare: true, hint: 'Auszahlungen − Einsätze der im Zeitraum abgerechneten Positionen' },
         { id: 'm-rendite', label: 'Rendite', value: settledStake ? (settledPayout - settledStake) / settledStake : null, unit: 'percent', compare: true, hint: 'Ergebnis ÷ Einsätze' },
-        { id: 'm-trefferquote', label: 'Gewonnen', value: s.pct(won, won + lost), unit: 'percent', compare: true, hint: `${won} gewonnen, ${lost} verloren` },
+        { id: 'm-trefferquote', label: 'Trefferquote', value: s.pct(won, won + lost), unit: 'percent', compare: true, hint: `${won} gewonnen, ${lost} verloren` },
         { id: 'm-wetten-erstellt', label: 'Wetten aufgestellt', value: created, unit: 'count', compare: true },
         { id: 'm-schiri', label: 'Als Schiedsrichter', value: refereed, unit: 'count', compare: true },
         { id: 'm-provision', label: 'Provisionen', value: sumType('provision', 'provision_schiri'), unit: 'euro', compare: true },
@@ -231,7 +231,7 @@ async function member(p, now, { user }) {
         { id: 'm-ihk', label: 'Abgeschlossene Läufe', value: runs.length, unit: 'count', compare: true },
         { id: 'm-ihk-erfolg', label: 'Erfolgsquote', value: s.pct(ihkOk, runs.length), unit: 'percent', compare: true },
         { id: 'm-ihk-lohn', label: 'Löhne', value: s.sumBy(runs, 'reward'), unit: 'euro', compare: true },
-        { id: 'm-ihk-packs', label: 'Gefundene Packs', value: runs.filter((r) => r.pack).length, unit: 'count', compare: true },
+        { id: 'm-ihk-packs', label: 'Packs als Quest-Fund', value: runs.filter((r) => r.pack).length, unit: 'count', compare: true },
       ],
       tables: [
         {
@@ -250,7 +250,7 @@ async function member(p, now, { user }) {
       title: 'Coin & Lotterie',
       question: 'Gewinnt oder verliert das Mitglied mit Coins und Losen?',
       kpis: [
-        { id: 'm-coin-netto', label: 'Coin: Netto', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum (ohne den aktuellen Bestand)' },
+        { id: 'm-coin-netto', label: 'Coin: Gewinn/Verlust', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum (ohne den aktuellen Bestand)' },
         { id: 'm-coin-trades', label: 'Coin-Trades', value: (coin.kauf ? coin.kauf.n : 0) + (coin.verkauf ? coin.verkauf.n : 0), unit: 'count', compare: true },
         { id: 'm-coin-bestand', label: 'Coin-Bestand', value: holding ? holding.units / 1e8 : 0, unit: 'number', hint: 'SAM (jetzt)' },
         { id: 'm-lose', label: 'Lose gekauft', value: tickets, unit: 'count', compare: true, hint: `für ${(-sumType('lotto_los') / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` },

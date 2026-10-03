@@ -31,13 +31,14 @@ const { compareGini } = require('./giniReference');
 const TZ = config.timezone;
 const RANGES = [7, 30, 90, 365];
 const DEFAULT_RANGE = 30;
+// Reiter der Statistik-Seite (key = URL-Parameter "bereich", bleibt stabil, damit Links weiter funktionieren)
 const SECTIONS = [
-  { key: 'uebersicht', label: 'Übersicht' },
-  { key: 'wirtschaft', label: 'Wirtschaft' },
-  { key: 'spieler', label: 'Spieler' },
-  { key: 'tcg', label: 'TCG & Handel' },
-  { key: 'spiele', label: 'Spiele' },
-  { key: 'mitglied', label: 'Mitglied' },
+  { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Die wichtigsten Kennzahlen und alle Änderungen auf einen Blick.' },
+  { key: 'wirtschaft', label: 'Wirtschaft', icon: 'trend', description: 'Geldmenge, woher das Geld kommt und wohin es verschwindet – und wie das Vermögen verteilt ist.' },
+  { key: 'spieler', label: 'Aktivität', icon: 'users', description: 'Wie viele Mitglieder spielen, wann sie spielen, ob neue bleiben und welche Bereiche sie nutzen.' },
+  { key: 'tcg', label: 'TCG & Handel', icon: 'cards', description: 'Booster Packs, Drop-Raten, Karten im Umlauf, Handel zwischen Mitgliedern und Black Market.' },
+  { key: 'spiele', label: 'Wetten & Spiele', icon: 'dice', description: 'Wetten und Duelle, IHK-Quests, Samantha Coin und Lotterie.' },
+  { key: 'mitglied', label: 'Einzelspieler', icon: 'user', description: 'Alle Kennzahlen zu einem einzelnen Mitglied – Vermögen, Aktivität, Wetten, Karten und mehr.' },
 ];
 
 // Buchungsarten nach Bereich. Die Summe je Bereich zeigt, wie viel Geld dort entsteht (+) oder verschwindet (−);
@@ -289,7 +290,7 @@ async function economy(p) {
   return [
     {
       id: 'geldmenge',
-      title: 'Geldmenge',
+      title: 'Geldmenge & Geldfluss',
       question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es?',
       kpis: [
         { id: 'guthaben', label: 'Guthaben gesamt', value: balanceSum, unit: 'euro', hint: 'Summe aller Kontostände (jetzt)' },
@@ -297,7 +298,7 @@ async function economy(p) {
         { id: 'zufluss-tag', label: 'Zufluss je Tag', value: Math.round(periodNet / p.range), unit: 'euro', signed: true, compare: true },
         {
           id: 'zufluss-spieler',
-          label: 'Zufluss je Spielertag',
+          label: 'Zufluss je aktivem Spieler und Tag',
           value: activeDays ? Math.round(periodNet / activeDays) : null,
           unit: 'euro',
           signed: true,
@@ -356,7 +357,7 @@ async function economy(p) {
           hint: `0 = alle gleich reich, 1 = einer besitzt alles (jetzt).${giniCompare ? ` Im Ländervergleich: ${giniCompare.text}.` : ''}`,
         },
         { id: 'top10', label: 'Anteil reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'am Gesamtvermögen (jetzt)' },
-        { id: 'bonus', label: 'Bonusberechtigt', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
+        { id: 'bonus', label: 'Erhalten Tagesbonus', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
       ],
       charts: [
         { id: 'gini', title: 'Gini-Koeffizient', type: 'line', unit: 'ratio', agg: 'last', series: [{ name: 'Gini', values: fromSnap((s) => s.wealth.total && s.wealth.total.gini) }] },
@@ -437,11 +438,11 @@ async function playersSection(p, now = new Date()) {
   return [
     {
       id: 'aktivitaet',
-      title: 'Aktivität',
+      title: 'Aktive Mitglieder',
       question: 'Wie viele spielen – und wann?',
       kpis: [
         { id: 'mitglieder', label: 'Mitglieder', value: members, unit: 'count', hint: banned ? `davon ${banned} gesperrt (jetzt)` : 'jetzt' },
-        { id: 'aktiv-tag', label: 'Ø aktiv je Tag', value: playerDays / p.range, unit: 'number', compare: true },
+        { id: 'aktiv-tag', label: 'Aktive Mitglieder pro Tag (Ø)', value: playerDays / p.range, unit: 'number', compare: true },
         { id: 'aktiv-7', label: 'Aktiv letzte 7 Tage', value: wau.size, unit: 'count', hint: members ? `${Math.round((wau.size / members) * 100)} % der Mitglieder` : null },
         { id: 'aktiv-30', label: 'Aktiv letzte 30 Tage', value: mau.size, unit: 'count', hint: members ? `${Math.round((mau.size / members) * 100)} % der Mitglieder` : null },
         { id: 'aufrufe', label: 'Seitenaufrufe', value: views, unit: 'count', compare: true },
@@ -453,7 +454,7 @@ async function playersSection(p, now = new Date()) {
     },
     {
       id: 'wachstum',
-      title: 'Neue Mitglieder & Bindung',
+      title: 'Neuzugänge & Bindung',
       question: 'Kommen neue Mitglieder dazu – und bleiben sie?',
       kpis: [{ id: 'neu', label: 'Neue Mitglieder', value: cohortUsers.length, unit: 'count', compare: true }, retKpi(d1, 'ret1'), retKpi(d7, 'ret7'), retKpi(d30, 'ret30')],
       charts: [{ id: 'neu', title: 'Registrierungen', type: 'bars', unit: 'count', agg: 'sum', wide: true, series: [{ name: 'Registrierungen', values: byDays(p.days, toMap(signups)) }] }],
@@ -581,11 +582,11 @@ async function tcg(p, now = new Date()) {
     },
     {
       id: 'handel',
-      title: 'Handel zwischen Mitgliedern',
+      title: 'Handel',
       question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank?',
       kpis: [
         { id: 'angebote', label: 'Neue Angebote', value: created, unit: 'count', compare: true },
-        { id: 'abschluesse', label: 'Abgeschlossene Geschäfte', value: closed, unit: 'count', compare: true },
+        { id: 'abschluesse', label: 'Abgeschlossene Handelsgeschäfte', value: closed, unit: 'count', compare: true },
         { id: 'abschlussquote', label: 'Abschlussquote', value: pct(closed, created), unit: 'percent', compare: true },
         { id: 'handelsumsatz', label: 'Handelsumsatz', value: sumBy(trades, 'volume'), unit: 'euro', compare: true, hint: 'Kaufpreise und Aufpreise' },
         { id: 'steuer', label: 'Steuer', value: sumBy(trades, 'tax'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
@@ -617,7 +618,7 @@ async function tcg(p, now = new Date()) {
       question: 'Wird der Black Market angenommen?',
       kpis: [
         { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
-        { id: 'bm-quote', label: 'Verkaufte Karten', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
+        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
         { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
       ],
     },
@@ -721,7 +722,7 @@ async function games(p) {
         { id: 'wetten-neu', label: 'Neue Wetten', value: bs.bets, unit: 'count', compare: true },
         { id: 'einsaetze', label: 'Einsätze', value: sumBy(stakes, 's'), unit: 'euro', compare: true },
         { id: 'teilnehmer', label: 'Ø Teilnehmer je Wette', value: avg(bs.players, bs.bets), unit: 'number', compare: true },
-        { id: 'streitfaelle', label: 'Streitfälle (Dev)', value: devDisputes, unit: 'count', compare: true, hint: 'Ersteller und Schiedsrichter uneinig, ein Dev hat entschieden' },
+        { id: 'streitfaelle', label: 'Streitfälle (von Devs entschieden)', value: devDisputes, unit: 'count', compare: true, hint: 'Ersteller und Schiedsrichter uneinig, ein Dev hat entschieden' },
         { id: 'duelle', label: 'Duelle angefragt', value: sumBy(duels, 'n'), unit: 'count', compare: true, hint: `${duelCount('aktiv', 'entschieden')} entschieden, ${duelCount('angefragt', 'annulliert')} abgelehnt oder verfallen` },
         { id: 'tipps', label: 'Zuschauer-Tipps', value: tips, unit: 'count', compare: true },
       ],
@@ -749,7 +750,7 @@ async function games(p) {
         { id: 'ihk-laeufe', label: 'Abgeschlossene Läufe', value: runTotal, unit: 'count', compare: true },
         { id: 'ihk-erfolg', label: 'IHK-Erfolgsquote', value: pct(okTotal, runTotal), unit: 'percent', compare: true },
         { id: 'ihk-loehne', label: 'Ausgezahlte Löhne', value: sumBy(runs, 'reward'), unit: 'euro', compare: true, hint: 'Geldquelle' },
-        { id: 'ihk-packs', label: 'Gefundene Packs', value: sumBy(runs, 'packs'), unit: 'count', compare: true },
+        { id: 'ihk-packs', label: 'Packs als Quest-Fund', value: sumBy(runs, 'packs'), unit: 'count', compare: true },
       ],
       tables: [
         {
@@ -767,11 +768,11 @@ async function games(p) {
       title: 'Samantha Coin',
       question: 'Wie entwickelt sich der Kurs – und gewinnen oder verlieren die Spieler?',
       kpis: [
-        { id: 'kurs', label: 'Kurs am Ende', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
-        { id: 'coin-netto', label: 'Coin: Netto der Spieler', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum. Positiv: Coins bringen Geld ins Spiel.' },
+        { id: 'kurs', label: 'Kurs am Ende des Zeitraums', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
+        { id: 'coin-netto', label: 'Coin: Gewinn/Verlust der Spieler', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum. Positiv: Coins bringen Geld ins Spiel.' },
         { id: 'coin-kaeufe', label: 'Käufe', value: buys, unit: 'euro', compare: true },
         { id: 'coin-verkaeufe', label: 'Verkäufe', value: sells, unit: 'euro', compare: true },
-        { id: 'coin-haendler', label: 'Händler', value: traders.size, unit: 'count', compare: true },
+        { id: 'coin-haendler', label: 'Aktive Coin-Händler', value: traders.size, unit: 'count', compare: true },
       ],
       charts: [
         { id: 'kurs', title: 'Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
@@ -836,7 +837,7 @@ async function overview(p, now) {
   return [
     {
       id: 'auf-einen-blick',
-      title: 'Auf einen Blick',
+      title: 'Kennzahlen auf einen Blick',
       question: 'Die wichtigsten Werte im Vergleich zum Zeitraum davor. Ein Klick auf eine Kachel führt zum Bereich.',
       kpis: OVERVIEW_KPIS.map(([s, id]) => find(s, id)).filter(Boolean),
       charts: [
