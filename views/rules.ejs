@@ -18,13 +18,7 @@
     <h3>1. Spielgeld bekommen</h3>
     <p>Jedes neue Mitglied erhält <strong><%= euro(startBalance) %></strong> Spielgeld. Das ist <strong>kein echtes Geld</strong> – es kann weder eingezahlt noch ausgezahlt werden. Es geht nur um den Spaß und die Rangliste.</p>
     <h4>Tagesbonus</h4>
-    <p>Wer wenig Spielgeld hat, bekommt einmal pro Tag automatisch Nachschub – maßgeblich ist das Gesamtvermögen (verfügbar + Einsätze in offenen Wetten + Wert deiner Samantha Coins + Verkaufswert deiner TCG-Karten + ungeöffnete Booster Packs zum Packpreis):</p>
-    <ul>
-      <% bonusTiers.forEach((t, i) => { %>
-        <li><%= i === 0 ? 'unter' : 'ab ' + euro(bonusTiers[i - 1].below) + ', unter' %> <%= euro(t.below) %>: <strong>+<%= euro(t.amount) %> pro Tag</strong></li>
-      <% }) %>
-      <li>ab <%= euro(bonusTiers[bonusTiers.length - 1].below) %>: kein Bonus</li>
-    </ul>
+    <p>Jedes Mitglied bekommt einmal pro Tag automatisch <strong>+<%= euro(dailyBonus()) %></strong> – egal, wie viel Spielgeld es schon hat. Ausnahme: Wer gerade im Grading-Shop arbeitet, bekommt stattdessen seinen Lohn und keinen Tagesbonus.</p>
     <p class="muted small">Den Bonus gibt es täglich ab <%= bonusTime %> Uhr (deutsche Zeit) – er wird beim ersten Besuch danach gutgeschrieben.</p>
   </div>
 
@@ -106,7 +100,7 @@
     <ul>
       <li>Der Kurs ist <strong>simuliert</strong> und ändert sich alle paar Sekunden – rund um die Uhr, auch wenn niemand online ist.</li>
       <li>Beim Kauf musst du mindestens <strong>10 % des aktuellen Kurses</strong> investieren (mindestens 1 €).</li>
-      <li>Der Wert deiner Coins zählt zu deinem Gesamtvermögen (Rangliste, Tagesbonus).</li>
+      <li>Der Wert deiner Coins zählt zu deinem Gesamtvermögen (Rangliste).</li>
     </ul>
   </div>
 
@@ -125,7 +119,7 @@
       <li>Ein Booster Pack kostet <strong><%= euro(tcgPackPrice) %></strong> und enthält 3 zufällige Karten.</li>
       <li>Seltenheiten von häufig nach selten: <strong>Crumpled, BFWler, Gold, Holo, Bockhaber, Glitch, Icon</strong>. Jede Karte wird unabhängig gezogen – die genauen Drop-Raten stehen im TCG-Bereich.</li>
       <li>Jede Karte kann jederzeit zu einem festen Preis (je nach Seltenheit) verkauft werden. Im Schnitt ist ein Pack weniger wert als sein Preis – es geht ums Sammeln.</li>
-      <li>Der Verkaufswert deiner Karten zählt zum Gesamtvermögen (Rangliste, Tagesbonus).</li>
+      <li>Der Verkaufswert deiner Karten zählt zum Gesamtvermögen (Rangliste).</li>
       <li>Im <strong>Handel</strong> kannst du Karten auf den Markt stellen, privat an ein Mitglied verkaufen oder <strong>tauschen</strong>: deine Karte gegen eine aus der Sammlung eines anderen Mitglieds, optional mit Aufpreis. Über den Aufpreis könnt ihr im Chat der Verhandlung reden und ihn per Gegenvorschlag anpassen, bis eine Seite annimmt. Angebotene Karten sind bis zum Abschluss gesperrt. Eine eventuelle Handelssteuer fällt nur auf Geld an und trägt, wer es bekommt.</li>
     </ul>
   </div>

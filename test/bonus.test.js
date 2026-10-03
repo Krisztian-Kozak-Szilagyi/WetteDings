@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { today, bonusFor } = require('../src/services/bonusService');
+const { today, settings } = require('../src/services/bonusService');
 
 test('Bonustag beginnt um 07:45 deutscher Zeit', () => {
   // Sommerzeit (UTC+2): 07:44 Berlin = 05:44 UTC -> noch Vortag
@@ -17,10 +17,6 @@ test('Bonustag beginnt um 07:45 deutscher Zeit', () => {
   assert.equal(today(new Date('2026-03-01T05:00:00Z')), '2026-02-28');
 });
 
-test('Bonusstufen', () => {
-  assert.equal(bonusFor(0), 15000);
-  assert.equal(bonusFor(49999), 15000);
-  assert.equal(bonusFor(50000), 10000);
-  assert.equal(bonusFor(99999), 10000);
-  assert.equal(bonusFor(100000), 0);
+test('Tagesbonus: 100 € für alle als Standard', () => {
+  assert.equal(settings.amount, 10000);
 });

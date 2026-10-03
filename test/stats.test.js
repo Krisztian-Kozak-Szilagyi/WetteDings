@@ -29,7 +29,7 @@ test('Einstellungs-Verlauf: neue und weggefallene Werte', () => {
 
 test('Einstellungs-Verlauf: .env-Werte beim Start', () => {
   const v = configValues();
-  assert.ok(Number.isInteger(v.startBalance) && Number.isInteger(v.duelFeePercent) && Array.isArray(v.bonusTiers));
+  assert.ok(Number.isInteger(v.startBalance) && Number.isInteger(v.duelFeePercent) && typeof v.bonusTime === 'string');
 });
 
 test('Kartenverkauf: Exemplare je Karte zusammengefasst', () => {

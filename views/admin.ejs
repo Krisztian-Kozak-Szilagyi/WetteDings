@@ -337,6 +337,35 @@
   </form>
 </div>
 
+<details class="card fold" id="bonus">
+  <summary><h2>Tagesbonus &amp; Grading</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
+  <p class="muted">Der Tagesbonus gilt für alle Mitglieder gleich (unabhängig vom Vermögen) – außer für die, die gerade im Grading-Shop arbeiten. Gilt ab dem nächsten Bonustag (<%= bonusTime %> Uhr).</p>
+  <form method="post" action="/admin/bonus" class="form admin-tcg-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field admin-tcg-pack">
+      <span>Tagesbonus in € (0 = keiner)</span>
+      <input type="text" name="amount" inputmode="decimal" value="<%= (dailyBonus() / 100).toFixed(2).replace('.', ',') %>" required>
+    </label>
+    <label class="check admin-ihk-open">
+      <input type="checkbox" name="gradingOpen" value="1" <%= gradingOpen() ? 'checked' : '' %>>
+      <span><strong>Grading-Shop für alle Mitglieder verfügbar</strong> – sonst sehen nur Admins den Menüpunkt „Grading“.</span>
+    </label>
+    <h3 class="admin-ihk-sub">Grading-Shop: Lohn &amp; Preise</h3>
+    <p class="muted small">Lohn pro Auftrag: Putzen (bei 100 % sauber, sonst anteilig) + Benoten (exakte Note, ±1 = halb, ab Stufe 2) + Versiegeln (bei 100 %, ab Stufe 3). Stufe 4 bekommt den Premium-Aufschlag auf alles.</p>
+    <div class="admin-gr-grid">
+      <label class="field"><span>Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+      <label class="field"><span>Lohn Putzen in €</span><input type="text" name="gr_pay_clean" inputmode="decimal" value="<%= (gradingSettings.pay.clean / 100).toFixed(2).replace('.', ',') %>" required></label>
+      <label class="field"><span>Lohn Benoten in €</span><input type="text" name="gr_pay_grade" inputmode="decimal" value="<%= (gradingSettings.pay.grade / 100).toFixed(2).replace('.', ',') %>" required></label>
+      <label class="field"><span>Lohn Versiegeln in €</span><input type="text" name="gr_pay_slab" inputmode="decimal" value="<%= (gradingSettings.pay.slab / 100).toFixed(2).replace('.', ',') %>" required></label>
+      <% gradingLevels.slice(1).forEach((l, i) => { %>
+        <label class="field"><span>Ausbau auf Stufe <%= l.level %> („<%= l.name %>“) in €</span><input type="text" name="gr_cost_<%= l.level %>" inputmode="decimal" value="<%= (gradingSettings.costs[i] / 100).toFixed(2).replace('.', ',') %>" required></label>
+      <% }) %>
+      <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
+    </div>
+    <button class="btn btn-primary" type="submit">Speichern</button>
+  </form>
+</details>
+
 <details class="card fold" id="ihk">
   <summary><h2>IHK: Limit &amp; Lohn</h2><span class="fold-arrow" aria-hidden="true"></span></summary>
   <p class="muted">Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.</p>

@@ -17,6 +17,8 @@ async function main() {
   await tcgSettings.load(); // im Admin-Panel geänderte TCG-Preise
   await require('./src/ihk/ihkService').loadSettings(); // IHK: Tageslimit und Belohnungen
   await require('./src/trade/tradeService').loadSettings(); // Handel: Steuer
+  await require('./src/services/bonusService').loadSettings(); // Tagesbonus
+  await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?
   await require('./src/stats/settingsLog').logConfigOnStart(); // geänderte .env-Werte im Einstellungs-Verlauf vermerken
   await require('./src/forum/forumService').seed(); // Forum: Bereiche beim ersten Start
   await require('./src/forum/forumService').migratePatchnotes(); // alte Patchnotes ins Forum

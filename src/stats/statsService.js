@@ -21,7 +21,7 @@ const tcgSettings = require('../tcg/settings');
 const ihk = require('../ihk/ihkService');
 const { DIFFICULTIES, questById } = require('../ihk/quests');
 const { ranking } = require('../services/rankService');
-const { bonusFor } = require('../services/bonusService');
+const bonusService = require('../services/bonusService');
 const { parseZonedLocal } = require('../lib/time');
 const { ledgerLabels } = require('../lib/viewHelpers');
 const { dayAndHour } = require('./activity');
@@ -47,6 +47,7 @@ const LEDGER_GROUPS = [
   { key: 'start', label: 'Startguthaben', types: ['startguthaben'], hint: 'neue Mitglieder' },
   { key: 'bonus', label: 'Tagesbonus', types: ['bonus'], hint: 'für Mitglieder unter der Bonus-Grenze' },
   { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'], hint: 'geschaffte Quests' },
+  { key: 'grading', label: 'Grading-Shop', types: ['grading_lohn', 'grading_ausbau'], hint: 'Löhne für Aufträge − Ausbau des Shops' },
   { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'black_market'], hint: 'Verkäufe an die Bank − Packs und Black Market' },
   { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'], hint: 'Verkäufe − Käufe (Kursgewinne/-verluste)' },
   { key: 'wetten', label: 'Wetten', types: ['einsatz', 'auszahlung', 'erstattung', 'provision', 'provision_schiri'], hint: 'noch offene Einsätze und verfallene Gewinne' },
@@ -229,7 +230,7 @@ function pullVerdict(count, total, chance) {
 
 // ---------- Markierungen ----------
 
-const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', config: '.env' };
+const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', bonus: 'Bonus', grading: 'Grading', config: '.env' };
 
 /** Einstellungsänderungen und Patchnotes im Zeitraum – Markierungen in allen Verläufen */
 async function markers(p) {
@@ -344,7 +345,7 @@ async function economy(p) {
     {
       id: 'verteilung',
       title: 'Vermögensverteilung',
-      question: 'Wie ungleich ist das Vermögen verteilt – im Vergleich zu echten Ländern – und wer bekommt den Tagesbonus?',
+      question: 'Wie ungleich ist das Vermögen verteilt – auch im Vergleich zu echten Ländern?',
       giniCompare,
       kpis: [
         { id: 'vermoegen', label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
@@ -357,7 +358,7 @@ async function economy(p) {
           hint: `0 = alle gleich reich, 1 = einer besitzt alles (jetzt).${giniCompare ? ` Im Ländervergleich: ${giniCompare.text}.` : ''}`,
         },
         { id: 'top10', label: 'Anteil reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'am Gesamtvermögen (jetzt)' },
-        { id: 'bonus', label: 'Erhalten Tagesbonus', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
+        { id: 'bonus', label: 'Tagesbonus', value: bonusService.settings.amount, unit: 'euro', hint: 'je Mitglied und Tag, für alle gleich (aktuell eingestellt). Wer im Grading-Shop arbeitet, bekommt keinen.' },
       ],
       charts: [
         { id: 'gini', title: 'Gini-Koeffizient', type: 'line', unit: 'ratio', agg: 'last', series: [{ name: 'Gini', values: fromSnap((s) => s.wealth.total && s.wealth.total.gini) }] },

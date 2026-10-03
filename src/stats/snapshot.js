@@ -8,7 +8,8 @@ const { Trade, openFilter } = require('../models/Trade');
 const coinEngine = require('../coin/engine');
 const tcgSettings = require('../tcg/settings');
 const { ranking } = require('../services/rankService');
-const { bonusFor } = require('../services/bonusService');
+const bonusService = require('../services/bonusService');
+const { GradingShop } = require('../models/Grading');
 const { disputedFilter } = require('../services/betService');
 const { dayAndHour } = require('./activity');
 
@@ -54,7 +55,7 @@ const countBy = (rows) => Object.fromEntries(rows.map((r) => [r._id, r.n]));
 
 /** Aktuellen Stand erfassen (ohne zu speichern) */
 async function collect(now = new Date()) {
-  const [players, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed] = await Promise.all([
+  const [players, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed, grading] = await Promise.all([
     ranking(),
     User.countDocuments({ deletedAt: null }),
     User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
@@ -64,6 +65,7 @@ async function collect(now = new Date()) {
     Trade.aggregate([{ $match: openFilter() }, { $group: { _id: '$kind', n: { $sum: 1 } } }]),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(disputedFilter()),
+    GradingShop.countDocuments({ active: true }),
   ]);
   const byRarity = countBy(cardsByRarity);
   return {
@@ -74,7 +76,9 @@ async function collect(now = new Date()) {
       inPlay: sumOf(players, 'inPlay'),
       coinValue: sumOf(players, 'coinValue'),
       cardValue: sumOf(players, 'cardValue'),
-      bonusEligible: players.filter((p) => bonusFor(p.total) > 0).length,
+      // Tagesbonus ist für alle gleich; wer im Grading-Shop arbeitet, bekommt keinen
+      bonusAmount: bonusService.settings.amount,
+      gradingActive: grading,
       total: distribution(players.map((p) => p.total)),
     },
     coin: { price: coinEngine.isRunning() ? coinEngine.getPrice() : null, units: coins[0] ? coins[0].units : 0, holders: coins[0] ? coins[0].holders : 0 },

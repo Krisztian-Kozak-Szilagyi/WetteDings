@@ -14,6 +14,8 @@ const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
+const bonusService = require('../services/bonusService');
+const grading = require('../grading/gradingService');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
@@ -119,6 +121,8 @@ router.get('/admin', requireStaff, async (req, res) => {
       lastUpdate: await tcgSettings.lastUpdate(),
     },
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
+    gradingSettings: grading.settings,
+    gradingLevels: grading.LEVELS,
     tradeTax: tradeService.settings.taxPercent,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     bans,
@@ -220,6 +224,35 @@ router.post('/admin/handel', requireAdmin, async (req, res) => {
     req.flash('success', `Handelssteuer auf ${String(taxPercent).replace('.', ',')} % gesetzt.`);
   }
   res.redirect('/admin#handel');
+});
+
+// ---------- Tagesbonus und Grading-Shop ----------
+router.post('/admin/bonus', requireAdmin, async (req, res) => {
+  // "0" / "0,00" ist erlaubt (parseEuro allein lässt 0 auch zu, aber sicher ist sicher)
+  const money = (v) => {
+    const raw = typeof v === 'string' ? v.trim() : '';
+    return /^0+([.,]0*)?$/.test(raw) ? 0 : centsOrNull(raw);
+  };
+  const amount = money(req.body.amount);
+  const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
+  const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
+  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab) };
+  const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
+  const tooBig = (c) => c === null || c > 10000000;
+  if (tooBig(amount)) {
+    req.flash('error', 'Bitte einen gültigen Tagesbonus angeben (0 bis 100.000 €).');
+  } else if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
+    req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
+  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
+    req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
+  } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
+    req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
+  } else {
+    await bonusService.saveSettings({ amount, admin: req.user });
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, pay, costs, premium, admin: req.user });
+    req.flash('success', `Gespeichert: Tagesbonus ${euro(amount)}, Grading-Shop ${jobs} Aufträge pro Tag.`);
+  }
+  res.redirect('/admin#bonus');
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------

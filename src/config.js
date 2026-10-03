@@ -42,12 +42,8 @@ module.exports = {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
   autoVoidDays: Number(process.env.AUTO_VOID_DAYS) || 14,
-  // Tagesbonus nach Gesamtvermögen (Kontostand + offene Einsätze), in Cent.
-  // Erste passende Stufe gilt; ab 1000 € gibt es keinen Bonus mehr.
-  bonusTiers: [
-    { below: 50000, amount: 15000 }, // unter 500 €: 150 € pro Tag
-    { below: 100000, amount: 10000 }, // unter 1000 €: 100 € pro Tag
-  ],
+  // Tagesbonus für alle (unabhängig vom Vermögen), in Cent. Standardwert – im Admin-Panel änderbar.
+  dailyBonus: eurosToCents(process.env.DAILY_BONUS_EUR, 100),
   // Ab dieser Uhrzeit (deutsche Zeit, "HH:MM") gibt es den Tagesbonus des neuen Tages
   bonusTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.BONUS_TIME || '') ? process.env.BONUS_TIME : '07:45',
   // Lotterie: Lospreis und Startzeit der täglichen Lotterie (deutsche Zeit, "HH:MM").
