@@ -2791,7 +2791,11 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .trade-min strong { font-weight: 500; color: var(--color-neutral-300); }
 .trade-note { margin: 12px 0 0; font-size: 11px; }
 .trade-card .btn-primary { min-height: 44px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
-.coin-depot { display: flex; flex-direction: column; gap: 10px; padding: 4px 6px; }
+.coin-depot {
+  display: flex; flex-direction: column; gap: 10px; padding: 22px; border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 40px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
 .coin-depot-head { display: flex; justify-content: space-between; align-items: baseline; }
 .coin-depot-head span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
 .coin-depot-head strong { font-size: 16px; font-weight: 500; }
