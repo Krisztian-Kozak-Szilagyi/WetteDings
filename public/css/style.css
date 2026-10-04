@@ -199,7 +199,7 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
   position: absolute; left: 50%; top: calc(100% + 6px); z-index: 60; min-width: 190px; padding: 6px;
   display: flex; flex-direction: column; gap: 2px;
   border-radius: var(--radius-lg); background: var(--color-surface);
-  box-shadow: var(--shadow-lg), 0 18px 40px -18px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .65), 0 18px 40px -18px color-mix(in srgb, var(--color-accent) 45%, transparent);
   transform-origin: 50% 0; transform: translateX(-50%);
 }
 .nav-group[open] .nav-group-panel { animation: navDrop .38s cubic-bezier(.2, .9, .25, 1.15) both; }
@@ -219,8 +219,8 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 .nav-group[open] .nav-group-panel > a:nth-child(3) { animation-delay: .1s; }
 .nav-group[open] .nav-group-panel > a:nth-child(4) { animation-delay: .15s; }
 @keyframes navDrop {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scaleY(.6); clip-path: inset(0 0 100% 0 round 12px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scaleY(1); clip-path: inset(0 0 0 0 round 12px); }
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scaleY(.6); clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scaleY(1); clip-path: inset(-60px -60px -90px -60px); }
 }
 @keyframes navLift { to { opacity: 0; transform: translateX(-50%) translateY(-6px) scaleY(.85); } }
 @keyframes navItemIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
