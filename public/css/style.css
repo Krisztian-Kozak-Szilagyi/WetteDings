@@ -4345,3 +4345,10 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-depot-box { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; min-height: 38px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
 .bx-depot-box small { font-size: 11px; }
 @media (max-width: 1100px) { .bx-row .bx-col-depot { display: none; } }
+/* Spaltenköpfe nie umbrechen; Kurs und Dein Depot: Kopf, Feld und Inhalt mittig */
+.bx-sort { white-space: nowrap; }
+.bx-col-price, .bx-row .bx-col-depot { justify-content: center; align-items: center; text-align: center; }
+.bx-price { text-align: center; }
+.bx-depot-box { align-items: center; }
+.bx-row-head .bx-sort.bx-col-price, .bx-row-head .bx-sort.bx-col-depot { justify-content: center; padding-right: 0; }
+.bx-row-head .bx-sort.bx-col-price::after, .bx-row-head .bx-sort.bx-col-depot::after { content: ''; flex: none; width: 1.2em; } /* Gegengewicht zum Pfeil: Text bleibt mittig */
