@@ -82,7 +82,7 @@
   </div>
 
   <%# ---------- Favoriten | Heute ---------- %>
-  <div class="dx-row">
+  <div class="dx-row dx-row-favs" data-dash-favrow>
     <section class="dx-col-wide dx-favs" aria-labelledby="dx-favs-h">
       <div class="dx-head">
         <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(d.cardValue) %></div><% } %></div>

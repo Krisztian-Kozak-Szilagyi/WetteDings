@@ -121,6 +121,9 @@
 /* Favoriten + Album: nutzt die TCG-Klassen; nur Platz anpassen */
 .dx-fav-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .dx-album { min-height: 300px; }
+/* Favoriten so groß, dass sie bis zum Boden von „Heute“ reichen: Kartenbreite --fav-w setzt dashboard.js */
+.dx-row-favs.is-fit { grid-template-columns: max-content minmax(0, 1fr); }
+.dx-row-favs.is-fit .dx-fav-grid { grid-template-columns: repeat(var(--fav-n, 4), var(--fav-w)); }
 
 /* Forum | Benachrichtigungen */
 .dx-pair { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); }

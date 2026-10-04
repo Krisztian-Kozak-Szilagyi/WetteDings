@@ -45,3 +45,35 @@
   }
   setInterval(poll, 5000);
 })();
+
+// Favoriten: Karten so groß, dass ihr Boden mit dem der „Heute“-Liste abschließt (nur in der breiten Ansicht).
+// Die Spalte wird dafür breiter, „Heute“ behält mindestens 300 px. Ohne JS bleibt das normale Raster.
+(function () {
+  var row = document.querySelector('[data-dash-favrow]');
+  if (!row) return;
+  var grid = row.querySelector('.dx-fav-grid');
+  var tasks = row.querySelector('.dx-tasks');
+  if (!grid || !tasks) return;
+  var narrow = window.matchMedia('(max-width: 900px)');
+  function fit() {
+    row.classList.remove('is-fit');
+    var n = grid.children.length;
+    if (narrow.matches || !n) return;
+    var gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+    var colGap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    var maxW = (row.clientWidth - colGap - 300 - (n - 1) * gap) / n;
+    row.style.setProperty('--fav-n', n);
+    // „Heute“ wird schmaler und damit evtl. höher – darum ein paar Runden, bis es passt
+    for (var k = 0; k < 4; k++) {
+      var h = tasks.getBoundingClientRect().bottom - grid.getBoundingClientRect().top;
+      var w = Math.max(0, Math.min((h * 720) / 1008, maxW));
+      row.style.setProperty('--fav-w', Math.floor(w) + 'px');
+      row.classList.add('is-fit');
+    }
+  }
+  var timer;
+  window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(fit, 100); });
+  window.addEventListener('load', fit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  fit();
+})();
