@@ -156,13 +156,17 @@ function botBoost(rand = random, weights = settings.botWeights) {
 // Boost-Fähigkeiten, die im Dungeon der ganzen Gruppe helfen: Ömer (FIS für die befreundeten Karten), Hundekarten
 // (alle freundlichen Charaktere), Mauch (schickt die Gruppe zum Gruschteln) und Matzes Hundekarte-Bonus, sobald
 // irgendwer einen Hund mitbringt. Bloodlust und Reality Check treffen den Gegner – also die Deadline aller.
-const TEAM_KEYS = new Set(['osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
+// Fähigkeiten von Hauptkarten, die für die ganze Gruppe wirken
+const TEAM_MAIN_KEYS = new Set(['forkbomb']);
+const TEAM_KEYS = new Set(['forkbomb', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
 
 /** Fähigkeiten eines Spielers: eigene Karte + eigener Boost, dazu die Gruppen-Fähigkeiten der Boosts der anderen */
 function teamEffects(members, m) {
   const mem = members[m];
   const out = resolveAll(mem.card, mem.boost ? [mem.boost] : []).map((e) => ({ ...e, from: m }));
   members.forEach((other, o) => {
+    // Forkbomb einer Hauptkarte trifft die Aufgabe – also wirkt sie für die ganze Gruppe
+    if (o !== m) for (const e of resolve(other.card, null)) if (TEAM_MAIN_KEYS.has(e.key) && !out.some((x) => x.key === e.key)) out.push({ ...e, from: o });
     if (o === m || !other.boost) return;
     for (const e of resolve(mem.card, other.boost)) {
       if (TEAM_KEYS.has(e.key) && !out.some((x) => x.key === e.key && x.label === e.label)) out.push({ ...e, from: o });
@@ -186,7 +190,7 @@ function fight(members, stat, required, rand = random) {
     const effects = teamEffects(members, m);
     const r = simulate(mem.card.stats, stat, required, rand, effects);
     if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text }));
-    limit = Math.max(limit, WORK_TIME + r.freeze);
+    limit = Math.max(limit, WORK_TIME + r.freeze + (r.extend || 0));
     r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
   });
   events.sort((a, b) => a.t - b.t || a.m - b.m);

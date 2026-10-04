@@ -251,7 +251,13 @@
   var DURATION = 15000;
   var half = data.workTime / 2;
   var freeze = data.freeze || 0;
-  var span = data.workTime + freeze; // Spielzeit inkl. Stillstand
+  var slow = data.slow || []; // Forkbomb: [von, bis, Prozent] – Deadline läuft langsamer
+  function overlap(a, b, c, d) { return Math.max(0, Math.min(b, d) - Math.max(a, c)); }
+  // durch Forkbomb gewonnene Deadline-Sekunden bis Spielzeit t (wie ihkService.slowGain)
+  function slowGain(t) {
+    return slow.reduce(function (sum, x) { return sum + ((overlap(x[0], x[1], 0, t) - overlap(x[0], x[1], half, Math.min(half + freeze, t))) * x[2]) / 100; }, 0);
+  }
+  var span = data.workTime + freeze + slowGain(Infinity); // Spielzeit inkl. Stillstand und Verlangsamung
   var progress = fight.querySelector('[data-ihk-progress]');
   var timebar = fight.querySelector('[data-ihk-timebar]');
   var points = fight.querySelector('[data-ihk-points]');
@@ -315,10 +321,9 @@
   var last = ticks.length ? ticks[ticks.length - 1].t : 0;
   var endT = data.success ? last : Math.max(span, last);
 
-  // Verstrichene Deadline-Zeit: während Bloodlust steht die Uhr
+  // Verstrichene Deadline-Zeit: während Bloodlust steht die Uhr, bei Forkbomb läuft sie langsamer
   function elapsed(t) {
-    if (!freeze || t < half) return t;
-    return t < half + freeze ? half : t - freeze;
+    return t - overlap(half, half + freeze, 0, t) - slowGain(t);
   }
   function render(t) {
     progress.style.width = (Math.min(1, total / data.required) * 100).toFixed(1) + '%';

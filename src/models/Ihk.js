@@ -18,6 +18,8 @@ const runSchema = new Schema(
       default: [],
     },
     freeze: { type: Number, default: 0 }, // Sekunden Stillstand der Deadline (Bloodlust)
+    slow: { type: [[Number]], default: undefined }, // Forkbomb: [von, bis, Prozent] – Deadline läuft langsamer
+    extend: { type: Number, default: 0 }, // Forkbomb: dadurch gewonnene Sekunden
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
