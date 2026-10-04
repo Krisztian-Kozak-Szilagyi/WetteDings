@@ -30,6 +30,7 @@ const threadSchema = new Schema(
     lastPostBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     lastPostByName: { type: String, default: null },
     participants: { type: [Schema.Types.ObjectId], default: [] }, // wer das Thema eröffnet oder darin geschrieben hat
+    starterKey: { type: String, default: null }, // von der Seite angelegtes Startthema (siehe forum/starters.js) – nur einmal
   },
   { timestamps: true }
 );
@@ -78,10 +79,26 @@ const reportSchema = new Schema(
 reportSchema.index({ done: 1, createdAt: -1 });
 reportSchema.index({ post: 1, by: 1 }, { unique: true });
 
+// Mod-Log: was die Moderation im Forum getan hat (Themen, Beiträge anderer, Meldungen)
+const modLogSchema = new Schema(
+  {
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    byName: { type: String, required: true },
+    action: { type: String, required: true }, // siehe MODLOG_LABELS in forum/forumService.js
+    thread: { type: Schema.Types.ObjectId, ref: 'ForumThread', default: null },
+    threadTitle: { type: String, default: null },
+    post: { type: Schema.Types.ObjectId, ref: 'ForumPost', default: null },
+    detail: { type: String, default: '' },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+modLogSchema.index({ createdAt: -1 });
+
 module.exports = {
   ForumCategory: model('ForumCategory', categorySchema),
   ForumThread: model('ForumThread', threadSchema),
   ForumPost: model('ForumPost', postSchema),
   ForumRead: model('ForumRead', readSchema),
   ForumReport: model('ForumReport', reportSchema),
+  ForumModLog: model('ForumModLog', modLogSchema),
 };

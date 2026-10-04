@@ -6,6 +6,9 @@ const { requireLogin } = require('../middleware');
 const { requireReauth } = require('../middleware/reauth');
 const forum = require('../forum/forumService');
 const { render, tagsFor } = require('../forum/render');
+const { loadEmbeds } = require('../forum/embeds');
+const hallOfFame = require('../forum/hallOfFame');
+const { HALL_OF_FAME_KEY } = require('../forum/starters');
 const { str, escapeRegex, UserError } = require('../lib/util');
 
 const router = express.Router();
@@ -122,6 +125,7 @@ router.get('/forum/k/:id', async (req, res) => {
   res.render('forum-kategorie', {
     title: cat.title,
     cat,
+    hof: cat.key === HALL_OF_FAME_KEY ? await hallOfFame.load() : null, // Bestenlisten als Kopf über den Themen
     parent,
     subs: subsRaw.map((s) => ({ ...s, stats: stats.get(String(s._id)) || EMPTY })),
     threads: threads.map((t) => ({ ...t, unread: forum.isUnread(reads, t) })),
@@ -173,6 +177,9 @@ router.get('/forum/t/:id', async (req, res) => {
   const lastRead = reads.get(String(thread._id)) || null;
   await forum.markRead(req.user._id, thread._id); // jetzt gilt alles als gelesen
   const mine = (p) => String(p.author) === String(req.user._id);
+  const showOriginal = (p) => p.deleted && forum.can.seeOriginal(req.user) && p.original;
+  // Einbettungen (Wetten, Namen) für alle Beiträge der Seite auf einmal laden
+  const embeds = await loadEmbeds(posts.map((p) => (p.deleted ? (showOriginal(p) ? p.original : null) : p.body)));
   res.render('forum-thema', {
     title: thread.title,
     thread,
@@ -183,8 +190,8 @@ router.get('/forum/t/:id', async (req, res) => {
     total,
     posts: posts.map((p) => ({
       ...p,
-      html: p.deleted ? '' : render(p.body),
-      originalHtml: p.deleted && forum.can.seeOriginal(req.user) && p.original ? render(p.original) : null,
+      html: p.deleted ? '' : render(p.body, embeds),
+      originalHtml: showOriginal(p) ? render(p.original, embeds) : null,
       isNew: !mine(p) && (!lastRead || p.createdAt > lastRead), // seit dem letzten Besuch dazugekommen
       mine: mine(p),
       canEdit: forum.can.editPost(req.user, p, thread),
@@ -195,6 +202,7 @@ router.get('/forum/t/:id', async (req, res) => {
     canReply: forum.can.reply(req.user, thread),
     myTags: tagsFor(forum.roleOfUser(req.user)),
     bodyMax: forum.BODY_MAX,
+    reasonMax: forum.REASON_MAX,
   });
 });
 
@@ -256,20 +264,29 @@ router.post('/forum/b/:id/loeschen', (req, res) =>
 );
 
 router.post('/forum/b/:id/melden', (req, res) =>
-  act(req, res, '/forum', async () => {
+  act(req, res, valid(req.params.id) ? `/forum/b/${req.params.id}/zum-beitrag` : '/forum', async () => {
     const thread = await forum.report({ user: req.user, postId: req.params.id, reason: str(req.body.reason) });
     req.flash('success', 'Danke – der Beitrag wurde der Moderation gemeldet.');
     return `/forum/t/${thread._id}#b-${req.params.id}`;
   })
 );
 
-// ---------- Meldungen (Moderation) ----------
+// Zurück zu einem Beitrag (z. B. nach einem Fehler beim Melden)
+router.get('/forum/b/:id/zum-beitrag', async (req, res) => {
+  const post = valid(req.params.id) ? await ForumPost.findById(req.params.id).select('thread').lean() : null;
+  res.redirect(post ? `/forum/t/${post.thread}#b-${post._id}` : '/forum');
+});
+
+// ---------- Meldungen und Mod-Log (Moderation) ----------
 router.get('/forum/meldungen', async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
   const reports = await ForumReport.find({ done: false }).sort({ createdAt: -1 }).limit(100).lean();
-  const posts = await ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted thread').lean();
+  const [posts, log] = await Promise.all([
+    ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted thread').lean(),
+    forum.modLogPage(Number.parseInt(req.query.seite, 10) || 1),
+  ]);
   const byId = new Map(posts.map((p) => [String(p._id), p]));
-  res.render('forum-meldungen', { title: 'Meldungen', reports: reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null })) });
+  res.render('forum-meldungen', { title: 'Meldungen', reports: reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null })), log });
 });
 
 // Admin und Devs bestätigen Moderationsaktionen mit ihrem Passwort (wie im Panel); Mods nicht
@@ -278,7 +295,7 @@ const reauthForStaff = (req, res, next) => (req.user && req.user.isStaff ? staff
 
 router.post('/forum/meldungen/:id/erledigt', reauthForStaff, async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
-  if (valid(req.params.id)) await ForumReport.updateOne({ _id: req.params.id }, { $set: { done: true } });
+  await forum.resolveReport({ user: req.user, reportId: req.params.id });
   res.redirect(req.body.zurueck === 'panel' && req.user.isStaff ? '/admin?bereich=moderation#meldungen' : '/forum/meldungen');
 });
 

@@ -3603,6 +3603,42 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .forum-report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .forum-report-actions form { margin: 0; }
 
+/* Forum: Melden mit Grund, Mod-Log */
+.forum-post-actions { flex-wrap: wrap; }
+.forum-report-fold summary { list-style: none; }
+.forum-report-fold summary::-webkit-details-marker { display: none; }
+.forum-report-fold[open] { flex-basis: 100%; }
+.forum-report-form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.forum-report-form .input { flex: 1 1 240px; height: 32px; font-size: 13px; }
+.forum-modlog { font-size: 13px; }
+.forum-modlog-detail { color: var(--color-neutral-400); overflow-wrap: anywhere; }
+
+/* Forum: Einbettungen (Karte, Wette, Profil) und @Erwähnungen */
+.forum-embed {
+  display: inline-flex; align-items: center; gap: 10px; max-width: 100%; margin: 2px 0; padding: 6px 12px 6px 6px; vertical-align: middle;
+  border-radius: var(--radius-md); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: inherit; text-decoration: none; line-height: 1.3;
+}
+a.forum-embed:hover { box-shadow: inset 0 0 0 1px var(--color-accent-700); }
+.forum-embed img { flex: none; border-radius: 4px; }
+.forum-embed-card { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar, var(--color-neutral-700)) 45%, transparent); }
+.forum-embed-bet { padding-left: 12px; }
+.forum-embed-avatar { border-radius: 50%; }
+.forum-embed-text { display: flex; flex-direction: column; min-width: 0; }
+.forum-embed-kicker { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.forum-embed-title { font-size: 14px; font-weight: 500; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forum-embed-sub { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-neutral-400); }
+.forum-mention { font-weight: 500; }
+
+/* Forum: Hall of Fame */
+.forum-hof-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px 32px; padding: 16px 6px 4px; }
+.forum-hof-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.forum-hof-list h2 { margin: 0; font-size: 16px; }
+.forum-hof-list .forum-empty { padding: 0; font-size: 13px; }
+.forum-hof-rows li { font-size: 14px; }
+.forum-hof-rows strong { font-weight: 500; }
+.forum-hof-rank { width: 20px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-neutral-500); text-align: right; }
+.forum-hof-value { font-variant-numeric: tabular-nums; color: var(--color-accent-300); }
+
 /* IHK (Redesign) – im Stil der TCG-Seite: Hero oben, Spielfläche mit lila Licht, Quests als Karten mit Seltenheitsfarbe */
 .ihk-page { display: flex; flex-direction: column; gap: 32px; }
 .ihk-hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px 32px; }

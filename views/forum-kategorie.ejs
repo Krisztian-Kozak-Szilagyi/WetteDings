@@ -42,8 +42,59 @@
   </section>
 <% } %>
 
+<% if (hof) { %>
+  <%# Hall of Fame: Bestenlisten aus den Daten der Seite (forum/hallOfFame.js), alle paar Minuten neu %>
+  <section class="forum-group forum-box forum-hof" aria-label="Hall of Fame">
+    <div class="forum-group-head"><span class="forum-label">Bestenlisten</span><span class="forum-sub">je die Top 10 · alle paar Minuten aktualisiert</span></div>
+    <div class="forum-hof-grid">
+      <div class="forum-hof-list">
+        <h2>Größte Wettgewinne</h2>
+        <% if (!hof.wins.length) { %><p class="forum-empty">Noch keine abgerechneten Gewinne.</p><% } else { %>
+          <ol class="tcg-feed forum-hof-rows">
+            <% hof.wins.forEach((w, i) => { %>
+              <li>
+                <span class="forum-hof-rank"><%= i + 1 %></span>
+                <span class="forum-ellipsis"><strong><%- userLink(w.name) %></strong> <span class="muted">·</span> <% if (w.href) { %><a href="<%= w.href %>"><%= w.title %></a><% } else { %><span class="muted"><%= w.title %></span><% } %></span>
+                <span class="nowrap forum-hof-value">+<%= euro(w.profit) %></span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+      <div class="forum-hof-list">
+        <h2>Seltenste Pulls</h2>
+        <% if (!hof.pulls.length) { %><p class="forum-empty">Noch hat niemand eine Glitch oder seltener gezogen.</p><% } else { %>
+          <ol class="tcg-feed forum-hof-rows">
+            <% hof.pulls.forEach((p, i) => { %>
+              <li class="r-<%= p.rarity %>">
+                <span class="forum-hof-rank"><%= i + 1 %></span>
+                <span class="forum-ellipsis"><strong><%- userLink(p.name) %></strong> zog <%= p.card %> <span class="muted">(<span class="tcg-dot"></span> <%= p.rarityLabel %>)</span></span>
+                <span class="muted small nowrap"><%= dayDate(p.at) %></span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+      <div class="forum-hof-list">
+        <h2>Größte Lottogewinne</h2>
+        <% if (!hof.lotto.length) { %><p class="forum-empty">Noch kein Lottogewinn.</p><% } else { %>
+          <ol class="tcg-feed forum-hof-rows">
+            <% hof.lotto.forEach((l, i) => { %>
+              <li>
+                <span class="forum-hof-rank"><%= i + 1 %></span>
+                <span class="forum-ellipsis"><strong><%- userLink(l.name) %></strong> <span class="muted small"><%= dayDate(l.at) %></span></span>
+                <span class="nowrap forum-hof-value">+<%= euro(l.amount) %></span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+    </div>
+  </section>
+<% } %>
+
 <section class="forum-group">
-  <% if (subs.length || canAddSub) { %><h2 class="forum-threads-title">Themen in „<%= cat.title %>“</h2><% } %>
+  <% if (subs.length || canAddSub || hof) { %><h2 class="forum-threads-title">Themen in „<%= cat.title %>“</h2><% } %>
   <div class="forum-thead"><span>Thema</span><span>Antworten</span><span>Letzter Beitrag</span></div>
   <% if (!threads.length) { %>
     <p class="forum-empty"><%= subs.length ? 'Direkt in diesem Bereich gibt es noch keine Themen.' : 'Noch keine Themen.' %><%= canCreate ? ' Mach den Anfang!' : '' %></p>

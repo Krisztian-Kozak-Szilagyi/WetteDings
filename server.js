@@ -24,6 +24,7 @@ async function main() {
   await require('./src/services/lotteryService').loadSettings(); // Wochen-/Monats-Lotterie: Lospreis und Bank-Gewinn
   await require('./src/stats/settingsLog').logConfigOnStart(); // geänderte .env-Werte im Einstellungs-Verlauf vermerken
   await require('./src/forum/forumService').seed(); // Forum: Bereiche beim ersten Start
+  await require('./src/forum/forumService').ensureDefaults(); // Forum: feste Bereiche (z. B. Hall of Fame) und Startthemen, je nur einmal
   await require('./src/forum/forumService').migratePatchnotes(); // alte Patchnotes ins Forum
   await require('./src/services/roles').load(); // Devs für die Abzeichen neben Namen
   await markets.start(); // Broker: SAM, COW, BTCG
