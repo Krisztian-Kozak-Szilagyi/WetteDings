@@ -58,7 +58,7 @@
               <form method="post" action="/handel/black-market" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(o.price) %> kaufen?">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="index" value="<%= i %>">
-                <button class="bm-buy" type="submit" <%= bal < o.price ? 'disabled title="Guthaben reicht nicht"' : '' %>>Kaufen</button>
+                <button class="bm-buy" type="submit" <%= bal < o.price ? 'disabled' : '' %>>Kaufen</button>
               </form>
             <% } %>
           </div>

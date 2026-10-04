@@ -21,7 +21,7 @@
       <div class="duel-actions">
         <form method="post" action="/wetten/<%= bet._id %>/duell/annehmen" data-confirm="<%= duelRole === 'opponent' ? 'Herausforderung annehmen? Dein Einsatz von ' + euro(d.stake) + ' wird sofort abgebucht.' : 'Als Schiedsrichter zusagen? Du entscheidest dann allein, wer gewinnt.' %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button class="btn btn-primary" type="submit" <%= duelRole === 'opponent' && currentUser.balance < d.stake ? 'disabled title="Guthaben reicht nicht"' : '' %>><%= duelRole === 'opponent' ? 'Annehmen (' + euro(d.stake) + ')' : 'Als Schiedsrichter zusagen' %></button>
+          <button class="btn btn-primary" type="submit" <%= duelRole === 'opponent' && currentUser.balance < d.stake ? 'disabled' : '' %>><%= duelRole === 'opponent' ? 'Annehmen (' + euro(d.stake) + ')' : 'Als Schiedsrichter zusagen' %></button>
         </form>
         <form method="post" action="/wetten/<%= bet._id %>/duell/absagen" data-confirm="Wirklich ablehnen? Das Duell findet dann nicht statt.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
