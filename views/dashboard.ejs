@@ -38,21 +38,6 @@
       <span class="dx-kicker"><%= todayText %></span>
       <h1><%= d.greeting %>,<br><span class="dx-name"><%= currentUser.username %></span></h1>
       <% if (t.items.length) { %><p class="dx-sub"><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %></p><% } %>
-      <% if (d.countdowns.length) { %>
-        <div class="dx-timers" aria-label="Countdowns">
-          <% d.countdowns.forEach((c) => { %>
-            <a class="dx-timer dx-timer-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
-              <span class="dx-timer-head">
-                <svg class="dx-timer-ico" viewBox="0 0 24 24" aria-hidden="true"><%- TIMER_ICONS[c.key] || TIMER_ICONS.woche %></svg>
-                <span class="dx-timer-label"><%= c.label %></span>
-              </span>
-              <span class="dx-clock" data-dash-cd="<%= c.at.getTime() %>" data-dash-clock>
-                <% clockParts(c.at).forEach(([n, u]) => { %><span class="dx-seg"><b><%= n %></b><small><%= u %></small></span><% }) %>
-              </span>
-            </a>
-          <% }) %>
-        </div>
-      <% } %>
     </div>
 
     <section class="dx-wealth" aria-labelledby="dx-wealth-h">
@@ -98,6 +83,23 @@
       </div>
     </section>
   </div>
+
+  <%# ---------- Countdowns (eigene Reihe unter dem Hero) ---------- %>
+    <% if (d.countdowns.length) { %>
+      <div class="dx-timers" aria-label="Countdowns">
+        <% d.countdowns.forEach((c) => { %>
+          <a class="dx-timer dx-timer-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
+            <span class="dx-timer-head">
+              <svg class="dx-timer-ico" viewBox="0 0 24 24" aria-hidden="true"><%- TIMER_ICONS[c.key] || TIMER_ICONS.woche %></svg>
+              <span class="dx-timer-label"><%= c.label %></span>
+            </span>
+            <span class="dx-clock" data-dash-cd="<%= c.at.getTime() %>" data-dash-clock>
+              <% clockParts(c.at).forEach(([n, u]) => { %><span class="dx-seg"><b><%= n %></b><small><%= u %></small></span><% }) %>
+            </span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
 
   <%# ---------- Favoriten | Heute ---------- %>
   <div class="dx-row">
