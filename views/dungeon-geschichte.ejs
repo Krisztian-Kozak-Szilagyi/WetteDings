@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+
+<%# Ganze Geschichte eines Dungeons im Original (Englisch), oben dasselbe Banner wie auf der Dungeon-Seite %>
+<div class="dg-story-page">
+  <section class="dg-hero dg-story-hero">
+    <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1983" height="793">
+    <div class="dg-hero-shade"></div>
+    <div class="dg-hero-text">
+      <span class="kicker">Dungeon · Geschichte</span>
+      <h1><%= dg.title %></h1>
+    </div>
+  </section>
+
+  <div class="card dg-story" lang="en">
+    <% dg.story.forEach((p) => { %><p><%= p %></p><% }) %>
+  </div>
+
+  <p><a class="btn btn-ghost" href="/dungeon">← Zurück zum Dungeon</a></p>
+</div>
+
+<%- include('partials/foot') %>

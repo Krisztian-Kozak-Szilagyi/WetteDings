@@ -17,7 +17,7 @@
     <div class="dg-hero-shade"></div>
     <div class="dg-hero-text">
       <span class="kicker">Dungeon<%= phase === 'laeuft' ? ' · läuft' : '' %></span>
-      <h1><%= dg.title %></h1>
+      <h1><% if (dg.story) { %><a class="dg-hero-title" href="/dungeon/geschichte/<%= dg.key %>" title="Ganze Geschichte lesen"><%= dg.title %></a><% } else { %><%= dg.title %><% } %></h1>
       <% if (phase === 'laeuft') { %>
         <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>

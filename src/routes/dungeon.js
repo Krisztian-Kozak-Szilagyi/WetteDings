@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const { requireLogin } = require('../middleware');
 const catalog = require('../tcg/catalog');
 const dungeon = require('../dungeon/dungeonService');
-const { dungeonByKey, dungeonForSlot } = require('../dungeon/dungeons');
+const { DUNGEONS, dungeonByKey, dungeonForSlot } = require('../dungeon/dungeons');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
@@ -148,6 +148,13 @@ router.post('/dungeon/anmelden', (req, res) =>
 );
 
 router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS }));
+
+// Ganze Geschichte eines Dungeons (Englisch, Original) – der Titel im Banner verlinkt hierher
+router.get('/dungeon/geschichte/:key', (req, res, next) => {
+  const dg = DUNGEONS.find((d) => d.key === req.params.key && d.story);
+  if (!dg) return next();
+  res.render('dungeon-geschichte', { title: `Dungeon – ${dg.title}`, dg });
+});
 
 router.post('/dungeon/karten', (req, res) =>
   handle(req, res, () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null }).then(() => null))

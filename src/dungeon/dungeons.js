@@ -1,6 +1,7 @@
 // Dungeons: Geschichte, zwei Trash-Kämpfe und ein Boss. Wie bei der IHK sehen die Spieler nicht, welche
 // Fähigkeit (stat: 'fia' | 'fis' | 'bwl') ein Kampf braucht – sie müssen es aus dem Text erraten.
-// image ist das Querformat-Bild über den Spieler-Plätzen (vorerst dasselbe Banner für alle).
+// image ist das Querformat-Bild über den Spieler-Plätzen. story (optional): ganze Geschichte im Original (Englisch),
+// zu lesen unter /dungeon/geschichte/<key> – der Titel im Banner verlinkt dorthin.
 // Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – so kann man sich vorher darauf einstellen.
 
 const PLACEHOLDER = '/img/dungeon/placeholder.svg';
@@ -8,10 +9,19 @@ const BANNER = '/img/dungeon/st-ivan-dungeon-banner.webp'; // vorerst für alle 
 
 const DUNGEONS = [
   {
-    key: 'serverraum',
-    title: 'Der Serverraum im Keller',
+    key: 'serverraum', // Schlüssel bleibt (steht in gespeicherten Läufen)
+    title: 'The Fall of St. Ivan',
     image: BANNER,
-    intro: 'Seit Tagen dringt aus dem Keller ein seltsames Brummen. Niemand traut sich mehr hinunter – bis heute. Drei mutige Azubis nehmen die Taschenlampe und steigen die Treppe hinab.',
+    intro: 'Sein Gott Claude verstummte, das verbotene Buch „A Stack O’Floe“ verdarb seinen Geist – nun reißt St. Ivan Tempel nieder. Die Miliz sucht mutige Abenteurer, die ihn aufhalten.',
+    story: [
+      'St. Ivan was once a promising acolyte, blessed with the undivided attention of his god, Claude, who answered his every question and guided his path.',
+      'But one day, the divine voice fell silent. No guidance, no answers, only an unbearable emptiness.',
+      'Desperate for answers, St. Ivan discovered an ancient tome, A Stack O’Floe, filled with long-forgotten, forbidden knowledge. The book corrupted his mind, dragging him to the dark side.',
+      'He abandoned reason, branded all who opposed him as heretics, and soon began using his newfound power to tear down temples.',
+      'This cannot continue!',
+      'The local militia is seeking young, daring adventurers to put an end to St. Ivan’s rampage.',
+      'Will you answer the call, or will you flee?!',
+    ],
     fights: [
       {
         key: 'inventur-kobolde',
