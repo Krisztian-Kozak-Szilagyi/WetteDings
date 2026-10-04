@@ -32,7 +32,7 @@
         <thead><tr><th>#</th><th>Name</th><th class="num">Gesamt</th><th class="num hide-sm">Verfügbar</th><th class="num hide-sm">In Wetten</th><th class="num hide-sm">In Coins</th><th class="num hide-sm" title="Verkaufswert der Karten (folierte mit Wertsteigerung) plus ungeöffnete Packs zum Packpreis">In Karten</th></tr></thead>
         <tbody>
           <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
-            <tr class="<%= me ? 'me' : '' %>">
+            <tr class="<%= [me ? 'me' : '', u.rank <= 3 ? 'top-' + u.rank : ''].join(' ').trim() %>">
               <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
               <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><%- roleBadge(u.username) %></td>
               <td class="num"><strong><%= euro(u.total) %></strong></td>
