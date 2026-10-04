@@ -274,3 +274,16 @@ test('Gini: Einordnung im Ländervergleich', () => {
   assert.equal(rows[self - 1].name, 'Deutschland');
   assert.equal(rows[self + 1].name, 'USA');
 });
+
+test('Statistik: Kernzahlen und Bewertung der Veränderung', () => {
+  const { rate, PRIMARY } = require('../src/stats/statsService');
+  const up = (id) => ({ id, delta: { dir: 'up' } });
+  assert.deepStrictEqual([rate(up('aktiv-tag'), 'spieler').primary, rate(up('aktiv-tag'), 'spieler').tone], [true, 'good']);
+  assert.equal(rate(up('gini'), 'wirtschaft').tone, 'bad'); // höhere Ungleichheit ist schlecht
+  assert.equal(rate({ id: 'm-rang', delta: { dir: 'down' } }, 'mitglied').tone, 'good'); // kleinerer Rang ist besser
+  assert.equal(rate(up('guthaben'), 'wirtschaft').tone, null); // Geldmenge: neutral
+  assert.equal(rate({ id: 'einsaetze', delta: { dir: 'flat' } }, 'spiele').tone, null);
+  assert.equal(rate(up('aufrufe'), 'spieler').primary, false);
+  // höchstens 4 Kernzahlen je Reiter (außer Übersicht), damit oben eine Reihe bleibt
+  for (const [key, ids] of Object.entries(PRIMARY)) if (key !== 'uebersicht') assert.ok(ids.length <= 4, key);
+});

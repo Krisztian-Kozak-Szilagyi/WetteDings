@@ -735,5 +735,20 @@ router.post('/admin/codes/:id/loeschen', requireStaff, async (req, res) => {
   res.redirect(panelUrl('team', 'codes'));
 });
 
+/** Reiterleiste des Panels für andere Seiten im Panel-Rahmen (Statistik): sichtbare Reiter und Zähler */
+async function panelNav(user, locals) {
+  const reports = await ForumReport.countDocuments({ done: false });
+  return {
+    panelSections: sectionsFor(user),
+    panelBadges: {
+      moderation: (locals.betDisputes || 0) + reports + (locals.deviceAlerts || 0),
+      vergaben: locals.packLogNew || 0,
+      protokolle: locals.tradeAlerts || 0,
+    },
+    panelUrl,
+  };
+}
+
 module.exports = router;
+module.exports.panelNav = panelNav;
 module.exports.packLogNewCount = packLogNewCount;

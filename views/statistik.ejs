@@ -19,7 +19,19 @@
   // Tabellenzeilen ohne Daten ausblenden (zeroCols: Spalten, die über "hat Daten" entscheiden)
   const visibleRows = (t) => (t.zeroCols ? t.rows.filter((r) => t.zeroCols.some((i) => !isZero(r[i]))) : t.rows);
   const cellHint = (c) => (c && typeof c === 'object' && c.hint ? c.hint : '');
-  const info = (hint) => hint ? `<span class="stats-info" tabindex="0" title="${hint.replace(/"/g, '&quot;')}" aria-label="${hint.replace(/"/g, '&quot;')}">i</span>` : '';
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Erklärung hinter einem ?-Knopf (Klick öffnet, auch am Handy); html: Text ist schon HTML
+  const help = (text, html = false) => (text ? `<details class="help-tip"><summary aria-label="Erklärung" title="Erklärung">?</summary><div class="help-tip-body">${html ? text : esc(text)}</div></details>` : '');
+  const info = (hint) => help(hint);
+  // Kennzahl als Kachel; Veränderung grün/rot, wenn klar ist, ob mehr gut oder schlecht ist (k.tone)
+  const kpiTile = (k, core) => {
+    const d = fmtDelta(k);
+    const value = k.unit === 'text' ? k.value : fmt({ value: k.value, unit: k.unit, signed: k.signed });
+    const label = k.href ? `<a href="${link(k.href.bereich, curRange, k.href.block)}">${esc(k.label)}</a>` : esc(k.label);
+    const arrow = k.delta && k.delta.dir === 'up' ? '▲' : k.delta && k.delta.dir === 'down' ? '▼' : '●';
+    const delta = d ? `<span class="stats-delta stats-delta-${k.delta.dir}${k.tone ? ' is-' + k.tone : ''}"><span aria-hidden="true">${arrow}</span> ${esc(d)}</span>` : '';
+    return `<div class="stats-kpi card${core ? ' is-core' : ''}"><span class="stat-label">${label} ${info(k.hint)}</span><span class="stat-value">${esc(value)}</span>${delta}</div>`;
+  };
 %>
 
 <%
@@ -40,28 +52,22 @@
   const showChanges = data && data.markers.length && active !== 'uebersicht';
 %>
 
-<header class="stats-hero">
-  <div>
-    <h1>Statistik</h1>
-    <p class="muted"><%= current.description %></p>
-  </div>
+<header class="panel-hero">
+  <h1><%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</h1>
   <% if (data) { %>
-    <div class="stats-period">
-      <span class="stats-period-main"><%- icon('calendar') %> <%= isToday ? 'Heute, ' + span(p) : span(p) %></span>
-      <span class="muted small">Vergleich mit <%= isToday ? 'gestern' : span(prev) %><%= isToday ? ' · Verläufe ab 7 Tagen' : '' %></span>
-    </div>
+    <span class="muted small"><%- icon('calendar') %> <%= isToday ? 'Heute, ' + span(p) : span(p) %> · Veränderung ggü. <%= isToday ? 'gestern' : span(prev) %></span>
   <% } %>
 </header>
 
-<div class="stats-toolbar">
-  <nav class="stats-sections" aria-label="Bereich der Statistik">
-    <% sections.forEach((s) => { %>
-      <a class="stats-section <%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, curRange) %>" title="<%= s.description %>" <% if (s.key === active) { %>aria-current="page"<% } %>>
-        <%- icon(s.icon) %><span><%= s.label %></span>
-      </a>
-    <% }) %>
-  </nav>
-
+<div class="stats-toolbar panel-toolbar">
+  <%- include('partials/panel-tabs', { panelTab: 'statistik' }) %>
+  <div class="stats-toolbar-row">
+    <nav class="stats-range panel-subnav" aria-label="Bereich der Statistik">
+      <% sections.forEach((s) => { %>
+        <a class="<%= s.key === active ? 'active' : '' %>" href="<%= link(s.key, curRange) %>" title="<%= s.description %>" <% if (s.key === active) { %>aria-current="page"<% } %>><%= s.label %></a>
+      <% }) %>
+    </nav>
+  </div>
   <div class="stats-toolbar-row">
     <div class="stats-toolbar-group">
       <span class="stats-toolbar-label">Zeitraum</span>
@@ -83,15 +89,13 @@
       </form>
       <datalist id="stats-members"><% members.forEach((m) => { %><option value="<%= m.username %>"><% }) %></datalist>
     <% } %>
-
     <% if (data) { %>
       <div class="stats-toolbar-group stats-toolbar-actions">
         <% if (showChanges) { %>
           <details class="stats-menu" data-dropdown>
             <summary class="btn btn-ghost btn-sm"><%- icon('flag') %> Änderungen <span class="stats-count"><%= data.markers.length %></span></summary>
             <div class="stats-menu-panel stats-menu-wide">
-              <p class="muted small">Einstellungsänderungen und Patchnotes im Zeitraum – in den Verläufen als gestrichelte Linie.</p>
-              <ol class="stats-timeline">
+                            <ol class="stats-timeline">
                 <% data.markers.slice().reverse().forEach((m) => { %>
                   <li>
                     <span class="stats-badge stats-badge-<%= m.kind === 'patch' ? 'muted' : 'setting' %>"><%= m.kind === 'patch' ? 'Patch' : m.short %></span>
@@ -116,7 +120,7 @@
               <strong>JSON</strong>
               <span class="muted small">Rohwerte für eigene Auswertungen (Cent, Anteile 0–1)</span>
             </a>
-            <span class="muted small stats-menu-hint">Einzelne Themen: „CSV“ rechts an jedem Abschnitt.</span>
+            <span class="muted small stats-menu-hint">Einzelne Abschnitte: Menü ⋯ am Abschnitt.</span>
           </div>
         </details>
       </div>
@@ -126,12 +130,7 @@
 
 <% if (active === 'mitglied' && !member) { %>
   <section class="stats-block">
-    <header class="stats-block-head">
-      <div>
-        <h2>Mitglied auswählen</h2>
-        <p class="muted">Suche oben nach einem Namen oder wähle ein Mitglied aus der Rangliste.</p>
-      </div>
-    </header>
+    <header class="stats-block-head"><div><h2>Mitglied auswählen</h2></div></header>
     <div class="card">
       <div class="table-wrap">
         <table class="table">
@@ -154,37 +153,33 @@
 <% } %>
 
 <% if (data) { %>
-<% if (data.blocks.length > 2) { %>
-  <nav class="stats-subnav" aria-label="Abschnitte">
-    <span class="muted small">Springe zu:</span>
-    <% data.blocks.forEach((b) => { %><a href="#<%= b.id %>"><%= b.title %></a><% }) %>
-  </nav>
+<% const core = data.blocks.flatMap((b) => (b.kpis || []).filter((k) => k.primary)); %>
+<% if (core.length) { %>
+  <section class="stats-core" aria-label="Kernzahlen">
+    <div class="stats-kpis stats-kpis-core"><% core.forEach((k) => { %><%- kpiTile(k, true) %><% }) %></div>
+  </section>
 <% } %>
 
 <% data.blocks.forEach((b) => { %>
   <section class="stats-block" id="<%= b.id %>">
     <header class="stats-block-head">
-      <div>
-        <h2><%= b.title %></h2>
-        <p class="muted"><%= b.question %></p>
+      <div><h2><%= b.title %></h2></div>
+      <div class="stats-block-tools">
+        <%- help(b.question) %>
+        <% if (!b.timeline) { %>
+          <details class="stats-menu" data-dropdown>
+            <summary class="stats-more" aria-label="Mehr zu <%= b.title %>" title="Mehr">⋯</summary>
+            <div class="stats-menu-panel">
+              <a class="stats-menu-item" href="<%= exportLink(b.id, null) %>" download><strong>CSV für Excel</strong><span class="muted small">Nur „<%= b.title %>“</span></a>
+            </div>
+          </details>
+        <% } %>
       </div>
-      <% if (!b.timeline) { %><a class="stats-block-export" href="<%= exportLink(b.id, null) %>" download title="<%= b.title %> als CSV für Excel herunterladen">CSV <span aria-hidden="true">↓</span></a><% } %>
     </header>
 
-    <% if (b.kpis && b.kpis.length) { %>
-      <div class="stats-kpis stats-kpis-<%= b.kpis.length %>">
-        <% b.kpis.forEach((k) => { const d = fmtDelta(k); const tag = k.href ? 'a' : 'div'; %>
-          <<%= tag %> class="stats-kpi card" <% if (k.href) { %>href="<%= link(k.href.bereich, curRange, k.href.block) %>"<% } %>>
-            <span class="stat-label"><%= k.label %> <%- info(k.hint) %></span>
-            <span class="stat-value"><%= k.unit === 'text' ? k.value : fmt({ value: k.value, unit: k.unit, signed: k.signed }) %></span>
-            <% if (d) { %>
-              <span class="stats-delta stats-delta-<%= k.delta.dir %>"><span aria-hidden="true"><%= k.delta.dir === 'up' ? '▲' : k.delta.dir === 'down' ? '▼' : '●' %></span> <%= d %> <span class="muted"><%= isToday ? 'ggü. gestern' : 'ggü. Vorzeitraum' %></span></span>
-            <% } else if (k.compare) { %>
-              <span class="stats-delta stats-delta-none">kein Vergleich möglich</span>
-            <% } %>
-          </<%= tag %>>
-        <% }) %>
-      </div>
+    <% const rest = (b.kpis || []).filter((k) => !k.primary); %>
+    <% if (rest.length) { %>
+      <div class="stats-kpis stats-kpis-compact"><% rest.forEach((k) => { %><%- kpiTile(k, false) %><% }) %></div>
     <% } %>
 
     <% if (b.warning) { %>
@@ -216,7 +211,7 @@
 
     <% if (b.giniCompare) { const gc = b.giniCompare; %>
       <div class="card">
-        <h3>Ländervergleich</h3>
+        <h3 class="stats-card-title">Ländervergleich <%- help('Vermögens-Gini, nicht Einkommens-Gini – Vermögen ist überall deutlich ungleicher verteilt als Einkommen. Quelle: ' + gc.source + '. Bei wenigen Mitgliedern schwankt der Wert der Plattform stark.') %></h3>
         <p>Das Vermögen auf der Plattform ist <strong><%= gc.text %></strong>.</p>
         <ul class="stats-hbars stats-gini">
           <% gc.rows.forEach((r) => { %>
@@ -227,13 +222,12 @@
             </li>
           <% }) %>
         </ul>
-        <p class="muted small">Vermögens-Gini, nicht Einkommens-Gini – Vermögen ist überall deutlich ungleicher verteilt als Einkommen. Quelle: <%= gc.source %>. Bei wenigen Mitgliedern schwankt der Wert der Plattform stark.</p>
       </div>
     <% } %>
 
     <% if (b.pulls) { %>
       <div class="card">
-        <p class="muted small"><%= b.pulls.total %> gezogene Karten im Zeitraum. Der Balken zeigt die tatsächliche Häufigkeit im Verhältnis zur eingestellten Chance – die Linie in der Mitte ist genau „wie eingestellt“. Erst ab etwa 5 erwarteten Karten ist eine Aussage möglich.</p>
+        <p class="muted small stats-card-title"><%= b.pulls.total %> gezogene Karten im Zeitraum <%- help('Der Balken zeigt die tatsächliche Häufigkeit im Verhältnis zur eingestellten Chance – die Linie in der Mitte ist genau „wie eingestellt“. Erst ab etwa 5 erwarteten Karten ist eine Aussage möglich.') %></p>
         <div class="table-wrap">
           <table class="table stats-pulls">
             <thead><tr><th>Seltenheit</th><th class="num">Chance</th><th class="num">Erwartet</th><th class="num">Gezogen</th><th class="hide-sm">Ist ÷ Soll</th><th>Bewertung</th></tr></thead>
@@ -291,8 +285,7 @@
 
     <% if (b.heat) { %>
       <div class="card">
-        <h3>Wann wird gespielt?</h3>
-        <p class="muted small">Wie oft in der jeweiligen Stunde gespielt wurde (Tage mit Aktivität, deutsche Zeit). Dunkler = mehr.</p>
+        <h3 class="stats-card-title">Wann wird gespielt? <%- help('Wie oft in der jeweiligen Stunde gespielt wurde (Tage mit Aktivität, deutsche Zeit). Dunkler = mehr.') %></h3>
         <div class="table-wrap">
           <table class="stats-heat">
             <thead><tr><th></th><% for (let h = 0; h < 24; h++) { %><th><%= h % 3 === 0 ? h : '' %></th><% } %></tr></thead>
@@ -311,7 +304,7 @@
 
     <% (b.tables || []).forEach((t) => { const rows = visibleRows(t); if (!rows.length) return; %>
       <% if (t.collapsed) { %><details class="card stats-collapsed"><summary><strong><%= t.title %></strong></summary><% } else { %><div class="card"><h3><%= t.title %></h3><% } %>
-        <% if (t.note) { %><p class="muted small"><%= t.note %></p><% } %>
+        <% if (t.note) { %><p class="muted small stats-card-title">Hinweis <%- help(t.note) %></p><% } %>
         <div class="table-wrap">
           <table class="table">
             <thead><tr><% t.head.forEach((h) => { %><th class="<%= h.num ? 'num' : '' %>"><%= h.label || h %></th><% }) %></tr></thead>

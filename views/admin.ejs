@@ -29,14 +29,7 @@
 </header>
 
 <div class="stats-toolbar panel-toolbar">
-  <nav class="stats-sections panel-sections" aria-label="Bereich des Panels">
-    <% sections.forEach((s) => { %>
-      <a class="stats-section <%= s.key === tab ? 'active' : '' %>" href="<%= panelUrl(s.key) %>" title="<%= s.description %>" <% if (s.key === tab) { %>aria-current="page"<% } %>>
-        <%- icon(s.icon) %><span><%= s.label %></span><%- badge(badgeOf[s.key]) %>
-      </a>
-    <% }) %>
-    <a class="stats-section panel-section-link" href="/admin/statistik" title="Kennzahlen und Verläufe für das Balancing"><%- icon('trend') %><span>Statistik</span></a>
-  </nav>
+  <%- include('partials/panel-tabs', { panelSections: sections, panelTab: tab, panelBadges: badgeOf, panelUrl }) %>
   <% if (subs) { %>
     <div class="stats-toolbar-row">
       <nav class="stats-range panel-subnav" aria-label="Unterbereich">

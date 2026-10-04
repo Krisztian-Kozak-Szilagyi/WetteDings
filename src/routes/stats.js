@@ -7,6 +7,7 @@ const { euro, date } = require('../lib/viewHelpers');
 const stats = require('../stats/statsService');
 const { ranking } = require('../services/rankService');
 const exportCsv = require('../stats/exportCsv');
+const { panelNav } = require('./admin');
 
 const router = express.Router();
 
@@ -95,11 +96,14 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
     members = await ranking(); // Auswahl und Namensvorschläge
     if (name && !member) res.locals.flash = { type: 'error', message: `Das Mitglied „${name}“ gibt es nicht.` };
   }
+  // Reiterleiste des Panels (die Statistik ist ein Reiter im Panel)
+  const nav = await panelNav(req.user, res.locals);
   if (key === 'mitglied' && !member) {
-    return res.render('statistik', { title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
+    return res.render('statistik', { ...nav, title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
   }
   const data = await stats.section(key, range, new Date(), { user: member });
   res.render('statistik', {
+    ...nav,
     title: 'Statistik',
     sections: stats.SECTIONS,
     ranges: stats.RANGES,
