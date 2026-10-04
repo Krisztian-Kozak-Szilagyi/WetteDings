@@ -4274,7 +4274,7 @@ a.dg-start-tile:hover { color: var(--text); }
 .bx-filters .chip { height: 32px; min-height: 0; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
 .bx-filters .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-accent-700); }
 .bx-table { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
-.bx-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(100px, .8fr) minmax(110px, 1fr) 130px 110px minmax(150px, 1.1fr) minmax(150px, 1.1fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
+.bx-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(100px, .8fr) minmax(110px, 1fr) 130px 130px minmax(150px, 1.1fr) minmax(150px, 1.1fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
 .bx-row:last-of-type { border-bottom: 0; }
 a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); text-decoration: none; }
 .bx-row[hidden] { display: none; }
@@ -4340,3 +4340,8 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 /* Sentiment und 52-Wochen-Spanne: Kopf und Beschriftung rechtsbündig */
 .bx-row-head .bx-col-range, .bx-row-head .bx-sort.bx-col-sent { justify-content: flex-end; text-align: right; }
 .bx-sent-label { text-align: right; }
+/* Dein Depot im gleichen Feld wie der Kurs (Wert und Gewinn/Verlust untereinander, gleiche Höhe) */
+.bx-price { line-height: 22px; }
+.bx-depot-box { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; min-height: 38px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
+.bx-depot-box small { font-size: 11px; }
+@media (max-width: 1100px) { .bx-row .bx-col-depot { display: none; } }

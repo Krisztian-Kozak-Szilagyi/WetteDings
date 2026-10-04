@@ -48,10 +48,12 @@
       </span>
       <span class="bx-col-price"><span class="bx-price" data-bx-price><%= coinPrice(r.price) %></span></span>
       <span class="num bx-col-depot">
-        <% if (r.value > 0) { %>
-          <span class="bx-depot"><%= euro(r.value) %></span>
-          <small class="<%= r.pl > 0 ? 'pos' : r.pl < 0 ? 'neg' : 'muted' %>"><%= (r.pl > 0 ? '+' : '') + euro(r.pl) %></small>
-        <% } else { %><span class="muted">–</span><% } %>
+        <span class="bx-price bx-depot-box">
+          <% if (r.value > 0) { %>
+            <span class="bx-depot"><%= euro(r.value) %></span>
+            <small class="<%= r.pl > 0 ? 'pos' : r.pl < 0 ? 'neg' : 'muted' %>"><%= (r.pl > 0 ? '+' : '') + euro(r.pl) %></small>
+          <% } else { %><span class="muted">–</span><% } %>
+        </span>
       </span>
       <span class="bx-col-range">
         <span class="bx-range-nums"><span><%= coinPrice(r.lo) %></span><span><%= coinPrice(r.hi) %></span></span>
