@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const PatchNote = require('../models/PatchNote');
-const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog } = require('../models/Forum');
+const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReaction, ForumPoll, ForumPollVote } = require('../models/Forum');
 const { tagsFor, tagsIn, sanitizeTags, parseMentions } = require('./render');
 const { mentionedUsers } = require('./embeds');
 const { CATEGORIES, STARTERS } = require('./starters');
+const reactions = require('./reactions');
+const polls = require('./polls');
 const config = require('../config');
 const { UserError, escapeRegex } = require('../lib/util');
 const { notify, short } = require('../services/notifyService');
@@ -159,6 +161,10 @@ const can = {
   deletePost: (user, post) => !post.deleted && (user.canModerate || String(post.author) === String(user._id)),
   /** Original eines gelöschten Beitrags ansehen */
   seeOriginal: (user) => user.isStaff,
+  /** Reagieren (auch auf eigene Beiträge): nicht auf gelöschte Beiträge und nicht in geschlossenen Themen – auch nicht zurücknehmen */
+  react: (user, post, thread) => !post.deleted && !thread.locked && !thread.deleted,
+  /** Umfrage entfernen: die Moderation */
+  removePoll: (user) => !!user.canModerate,
 };
 
 // ---------- Schreiben ----------
@@ -214,6 +220,7 @@ const MODLOG_LABELS = {
   bearbeiten: 'Beitrag bearbeitet',
   loeschen: 'Beitrag gelöscht',
   meldung: 'Meldung erledigt',
+  umfrage: 'Umfrage entfernt',
 };
 
 /** Eintrag ins Mod-Log. Wirft nie: Die eigentliche Aktion ist dann schon geschehen. */
@@ -242,16 +249,19 @@ async function modLogPage(page = 1) {
   return { entries: entries.map((e) => ({ ...e, label: MODLOG_LABELS[e.action] || e.action })), page: p, pages, total };
 }
 
-async function createThread({ user, categoryId, title, body }) {
+/** poll (optional): { question, options (eine Antwort pro Zeile), endsAt } aus dem Formular – siehe forum/polls.js */
+async function createThread({ user, categoryId, title, body, poll = null }) {
   const cat = mongoose.isValidObjectId(categoryId) ? await ForumCategory.findById(categoryId).lean() : null;
   if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
   if (!can.createThread(user, cat)) throw new UserError('In diesem Bereich eröffnen nur Admin und Devs Themen.');
   const t = cleanTitle(title);
   const b = cleanBody(body, tagsFor(roleOfUser(user)));
+  const p = poll ? polls.parsePollInput(poll, { timeZone: config.timezone }) : null; // vor dem Anlegen prüfen
   throttle(user);
   const now = new Date();
   const thread = await ForumThread.create({ category: cat._id, title: t, author: user._id, authorName: user.username, lastPostAt: now, lastPostBy: user._id, lastPostByName: user.username, participants: [user._id] });
   await ForumPost.create({ thread: thread._id, author: user._id, authorName: user.username, body: b, isFirst: true });
+  if (p) await ForumPoll.create({ thread: thread._id, ...p });
   await markRead(user._id, thread._id, now);
   await notifyMentions({ user, thread, body: b, href: `/forum/t/${thread._id}` });
   return thread;
@@ -358,6 +368,81 @@ async function moveThread({ user, threadId, categoryId }) {
   return { thread, to };
 }
 
+// ---------- Reaktionen ----------
+/** Reaktion setzen oder (beim zweiten Klick) zurücknehmen. Gibt { post, thread, on } zurück. */
+async function toggleReaction({ user, postId, reaction }) {
+  if (!reactions.reactionByKey[reaction]) throw new UserError('Diese Reaktion gibt es nicht.');
+  const { post, thread } = await loadPost(postId);
+  if (!can.react(user, post, thread)) throw new UserError(thread.locked ? 'Dieses Thema ist geschlossen.' : 'Auf diesen Beitrag kann man nicht mehr reagieren.');
+  const key = { post: post._id, user: user._id, reaction };
+  const removed = await ForumReaction.deleteOne(key);
+  if (removed.deletedCount) return { post, thread, on: false };
+  try {
+    await ForumReaction.create({ ...key, thread: thread._id, userName: user.username });
+  } catch (err) {
+    if (err.code !== 11000) throw err; // Doppelklick: schon gesetzt
+  }
+  return { post, thread, on: true };
+}
+
+/** Reaktionen aller Beiträge einer Seite – eine Abfrage. Map postId → Liste (siehe reactions.summarize) */
+async function reactionsFor(postIds, userId) {
+  if (!postIds.length) return new Map();
+  const docs = await ForumReaction.find({ post: { $in: postIds } }).sort({ createdAt: 1 }).select('post user userName reaction').lean();
+  return reactions.summarize(docs, userId);
+}
+
+// ---------- Umfragen ----------
+/** Umfrage eines Themas für die Anzeige: Frage, eigene Stimme, Ergebnis (nur nach der Stimme oder wenn vorbei) */
+async function pollView(thread, user) {
+  const poll = await ForumPoll.findOne({ thread: thread._id }).lean();
+  if (!poll) return null;
+  const [mine, counted] = await Promise.all([
+    ForumPollVote.findOne({ poll: poll._id, user: user._id }).select('option').lean(),
+    ForumPollVote.aggregate([{ $match: { poll: poll._id } }, { $group: { _id: '$option', n: { $sum: 1 } } }]),
+  ]);
+  const closed = polls.isClosed(poll, thread);
+  const result = polls.results(poll.options, Object.fromEntries(counted.map((c) => [c._id, c.n])));
+  return {
+    ...poll,
+    closed,
+    myVote: mine ? mine.option : null,
+    total: result.total,
+    rows: mine || closed ? result.rows : null, // vorher kein Zwischenstand
+    canVote: !mine && !closed,
+    canRemove: can.removePoll(user),
+  };
+}
+
+async function vote({ user, threadId, option }) {
+  const thread = mongoose.isValidObjectId(threadId) ? await ForumThread.findOne({ _id: threadId, deleted: false }).lean() : null;
+  const poll = thread ? await ForumPoll.findOne({ thread: thread._id }).lean() : null;
+  if (!poll) throw new UserError('Diese Umfrage gibt es nicht (mehr).');
+  const voted = !!(await ForumPollVote.exists({ poll: poll._id, user: user._id }));
+  const error = polls.voteError(poll, thread, { option, voted });
+  if (error) throw new UserError(error);
+  try {
+    await ForumPollVote.create({ poll: poll._id, user: user._id, option });
+  } catch (err) {
+    if (err.code === 11000) throw new UserError('Du hast schon abgestimmt.');
+    throw err;
+  }
+  return thread;
+}
+
+/** Umfrage samt Stimmen entfernen (Moderation) – kommt ins Mod-Log */
+async function removePoll({ user, threadId }) {
+  if (!can.removePoll(user)) throw new UserError('Das darf nur die Moderation.');
+  const thread = mongoose.isValidObjectId(threadId) ? await ForumThread.findOne({ _id: threadId, deleted: false }).lean() : null;
+  const poll = thread ? await ForumPoll.findOne({ thread: thread._id }).lean() : null;
+  if (!poll) throw new UserError('Diese Umfrage gibt es nicht (mehr).');
+  const votes = await ForumPollVote.countDocuments({ poll: poll._id });
+  await ForumPollVote.deleteMany({ poll: poll._id });
+  await ForumPoll.deleteOne({ _id: poll._id });
+  await modLog(user, 'umfrage', { thread, detail: `„${poll.question}“ (${votes} ${votes === 1 ? 'Stimme' : 'Stimmen'})` });
+  return thread;
+}
+
 async function toggleUpvote({ user, threadId }) {
   if (!mongoose.isValidObjectId(threadId)) throw new UserError('Dieses Thema gibt es nicht.');
   const added = await ForumThread.updateOne({ _id: threadId, deleted: false, upvotes: { $ne: user._id } }, { $addToSet: { upvotes: user._id } });
@@ -443,6 +528,11 @@ module.exports = {
   moderateThread,
   moveThread,
   toggleUpvote,
+  toggleReaction,
+  reactionsFor,
+  pollView,
+  vote,
+  removePoll,
   report,
   resolveReport,
   modLogPage,
