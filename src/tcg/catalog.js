@@ -36,12 +36,12 @@ const packTypeByKey = Object.fromEntries(PACK_TYPES.map((p) => [p.key, p]));
  * hidden = geheime Seltenheit: taucht für Mitglieder weder in den Drop-Raten noch im Filter auf.
  */
 const RARITIES = [
-  { key: 'crumpled', label: 'Crumpled', weight: 5809, sell: 500 },
-  { key: 'bfwler', label: 'BFWler', weight: 2800, sell: 2000 },
-  { key: 'gold', label: 'Gold', weight: 1100, sell: 4000 },
-  { key: 'holo', label: 'Holo', weight: 250, sell: 15000 },
-  { key: 'bockhaber', label: 'Bockhaber', weight: 30, sell: 100000 },
-  { key: 'glitch', label: 'Glitch', weight: 8, sell: 300000 },
+  { key: 'crumpled', label: 'Crumpled', weight: 5809, sell: 300 },
+  { key: 'bfwler', label: 'BFWler', weight: 2800, sell: 1300 },
+  { key: 'gold', label: 'Gold', weight: 1100, sell: 2000 },
+  { key: 'holo', label: 'Holo', weight: 250, sell: 5000 },
+  { key: 'bockhaber', label: 'Bockhaber', weight: 30, sell: 50000 },
+  { key: 'glitch', label: 'Glitch', weight: 8, sell: 250000 },
   { key: 'icon', label: 'Icon', weight: 2, sell: 400000 },
   { key: 'sith', label: 'Sith', weight: 1, sell: 1000000, hidden: true },
 ];

@@ -27,7 +27,7 @@ test('Gewichte ergeben 100 % und werden seltener', () => {
 
 test('Erwartungswert eines Packs (5 Karten)', () => {
   const ev = catalog.expectedPackValue();
-  assert.equal(Math.round(ev), 11927);
+  assert.equal(Math.round(ev), 7066);
 });
 
 test('4× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {

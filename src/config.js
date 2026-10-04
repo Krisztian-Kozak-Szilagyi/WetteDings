@@ -52,7 +52,7 @@ module.exports = {
   lotteryTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.LOTTERY_TIME || '') ? process.env.LOTTERY_TIME : '20:00',
   lotteryMaxTicketsPerPurchase: 10,
   // TCG: Preis eines Booster Packs (5 Karten)
-  tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 80),
+  tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 90),
   // Support-Bot (Groq API). Ohne Schlüssel ist der Chat ausgeblendet.
   groqApiKey: process.env.GROQ_API_KEY || '',
   // Modelle der Reihe nach (bei Limit/Überlastung wird das nächste versucht), kommagetrennt
