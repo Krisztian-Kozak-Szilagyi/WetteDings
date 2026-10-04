@@ -30,9 +30,9 @@
       <input type="hidden" name="type" value="<%= packType %>">
       <div class="tcg-hero-pack">
         <span class="tcg-hero-glow" aria-hidden="true"></span>
-        <button class="tcg-pack-btn" type="submit" <%= canAfford ? '' : 'disabled' %> aria-label="Booster Pack für <%= euro(packPrice) %> kaufen">
-          <img src="<%= packImage %>" alt="" width="800" height="1280">
-        </button>
+        <span class="tcg-pack-btn tcg-pack-art" aria-hidden="true">
+          <img src="<%= packImage %>" alt="" width="800" height="1280" draggable="false">
+        </span>
       </div>
       <div class="tcg-hero-info">
         <span class="kicker">Trading Cards</span>

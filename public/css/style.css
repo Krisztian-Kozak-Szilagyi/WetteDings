@@ -3744,10 +3744,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 
 /* Folierte Exemplare als eigene Plätze (Album, Sammlung, Favoriten) und im Handel */
 .tcg-slot.foil-slot { position: relative; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-pointer, pointer); }
-.foil-card.foil-card-slot { display: block; width: 100%; perspective: none; cursor: inherit; }
-.foil-card-slot .foil-face { border-radius: 8%/5.5%; padding: 15% 4% 4%; }
-.foil-card-slot .foil-ticket { top: 3%; left: 4%; right: 4%; height: 10%; font-size: clamp(7px, .75vw, 11px); }
-.tcg-slot.foil-slot:hover .foil-card-slot { transform: translateY(-4px); transition: transform .2s ease; }
 .tcg-slot.foil-slot .tcg-marks { position: absolute; top: 18%; right: 8px; z-index: 2; }
 .trade-thumb-foil { position: relative; overflow: hidden; }
 .trade-thumb-foil img { box-shadow: 0 0 0 2px #e9d5ff, 0 0 10px #c4b5fd88; }
@@ -3756,3 +3752,4 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .foil-modal[open] { display: flex; flex-direction: column; }
 .foil-modal .foil-modal-stage { flex: 1 1 auto; height: auto; min-height: 0; }
 .foil-modal-actions { display: flex; justify-content: center; margin: 0; padding: 0 16px 28px; }
+.tcg-hero-pack .tcg-pack-art:hover { filter: none !important; }
