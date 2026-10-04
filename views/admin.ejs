@@ -1,6 +1,5 @@
 <%- include('partials/head') %>
 <%
-  const current = sections.find((s) => s.key === tab);
   // Symbole der Reiter (Linien-Icons wie in der Statistik)
   const ICONS = {
     grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
@@ -16,34 +15,41 @@
   };
   const icon = (name) => `<svg class="stats-icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
   // Zähler offener Aufgaben am Reiter
-  const badgeOf = { moderation: counts.moderation, protokolle: counts.protokolle };
-  // Kopf eines Themenblocks
-  const blockHead = (title, text) => `<header class="stats-block-head"><div><h2>${title}</h2>${text ? `<p class="muted">${text}</p>` : ''}</div></header>`;
+  const badgeOf = { moderation: counts.moderation, vergaben: counts.vergaben, protokolle: counts.protokolle };
+  const badge = (n, cls = '') => (n ? `<span class="panel-badge ${cls}" aria-label="${n} offen">${n > 99 ? '99+' : n}</span>` : '');
+  // Erklärung hinter einem ?-Knopf (Klick öffnet, funktioniert auch am Handy); text darf HTML enthalten
+  const help = (text, label = 'Erklärung') => (text ? `<details class="help-tip"><summary aria-label="${label}" title="${label}">?</summary><div class="help-tip-body">${text}</div></details>` : '');
+  // Kopf eines Themenblocks: Titel, rechts optional Erklärung
+  const blockHead = (title, text) => `<header class="stats-block-head"><div><h2>${title}</h2></div>${help(text)}</header>`;
 %>
 
-<header class="stats-hero">
-  <div>
-    <h1><%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</h1>
-    <p class="muted"><%= current.description %></p>
-  </div>
-  <div class="stats-period">
-    <span class="stats-period-main"><%= currentUser.username %><%- roleBadge(currentUser.username, { realName: false }) %></span>
-    <span class="muted small">angemeldet als <%= currentUser.isAdmin ? 'Admin' : 'Dev' %></span>
-  </div>
+<header class="panel-hero">
+  <h1><%= currentUser.isAdmin ? 'Admin' : 'Dev' %>-Panel</h1>
+  <span class="muted small"><%= currentUser.username %><%- roleBadge(currentUser.username, { realName: false }) %></span>
 </header>
 
-<div class="stats-toolbar">
+<div class="stats-toolbar panel-toolbar">
   <nav class="stats-sections panel-sections" aria-label="Bereich des Panels">
     <% sections.forEach((s) => { %>
       <a class="stats-section <%= s.key === tab ? 'active' : '' %>" href="<%= panelUrl(s.key) %>" title="<%= s.description %>" <% if (s.key === tab) { %>aria-current="page"<% } %>>
-        <%- icon(s.icon) %><span><%= s.label %></span>
-        <% if (badgeOf[s.key]) { %><span class="panel-badge" aria-label="<%= badgeOf[s.key] %> offen"><%= badgeOf[s.key] > 99 ? '99+' : badgeOf[s.key] %></span><% } %>
+        <%- icon(s.icon) %><span><%= s.label %></span><%- badge(badgeOf[s.key]) %>
       </a>
     <% }) %>
-    <a class="stats-section panel-section-link" href="/admin/statistik" title="Kennzahlen und Verläufe für das Balancing"><%- icon('trend') %><span>Statistik</span><span aria-hidden="true">↗</span></a>
+    <a class="stats-section panel-section-link" href="/admin/statistik" title="Kennzahlen und Verläufe für das Balancing"><%- icon('trend') %><span>Statistik</span></a>
   </nav>
+  <% if (subs) { %>
+    <div class="stats-toolbar-row">
+      <nav class="stats-range panel-subnav" aria-label="Unterbereich">
+        <% subs.forEach((x) => { %>
+          <a class="<%= x.key === sub ? 'active' : '' %>" href="<%= subUrl(tab, x.key) %>" <% if (x.key === sub) { %>aria-current="page"<% } %>><%= x.label %><% if (tab === 'moderation' && x.key !== 'bans') { %><%- badge(subCounts[x.key], 'panel-badge-inline') %><% } %></a>
+        <% }) %>
+      </nav>
+    </div>
+  <% } %>
 </div>
 
-<%- include('admin/' + tab, { icon, blockHead }) %>
+<div data-panel-tab="<%= tab %>" data-panel-sub="<%= sub || '' %>">
+  <%- include('admin/' + tab, { icon, blockHead, help, badge }) %>
+</div>
 
 <%- include('partials/foot') %>

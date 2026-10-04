@@ -831,7 +831,80 @@
       set('[data-gc-payback="' + l.level + '"]', i && gain > 0 ? Math.ceil(cost / gain) + ' Tagen' : '–');
       prev = day;
     });
-    set('[data-gc-bonus]', fmt.format(val('amount')));
+    // Tagesbonus hat ein eigenes Formular – dann bleibt der vom Server gezeigte Wert stehen
+    if (form.querySelector('[name="amount"]')) set('[data-gc-bonus]', fmt.format(val('amount')));
   };
   form.addEventListener('input', recalc);
 })();
+
+// Admin-/Dev-Panel
+(function () {
+  // Alte Links mit Anker (z. B. /admin?bereich=spielwerte#folie) in den passenden Unterreiter umleiten
+  var panel = document.querySelector('[data-panel-tab]');
+  if (panel && window.location.hash && !/[?&]teil=/.test(window.location.search)) {
+    var tab = panel.getAttribute('data-panel-tab');
+    var hash = window.location.hash.slice(1);
+    var MAP = {
+      moderation: { streitfaelle: 'streit', meldungen: 'meldungen', ban: 'bans', banliste: 'bans', geraete: 'geraete' },
+      spielwerte: { tcg: 'tcg', steuer: 'steuer', bonus: 'bonus', folie: 'folie', lotterie: 'lotterie', ihk: 'ihk', dungeon: 'dungeon' },
+    };
+    if (tab === 'spielwerte' && hash === 'vergeben') window.location.replace('/admin?bereich=vergaben');
+    else if (MAP[tab] && MAP[tab][hash] && MAP[tab][hash] !== panel.getAttribute('data-panel-sub')) {
+      var params = new URLSearchParams(window.location.search);
+      params.set('teil', MAP[tab][hash]);
+      window.location.replace('/admin?' + params.toString());
+    }
+  }
+
+  // ?-Hilfe: immer nur eine offen; schließt bei Klick daneben oder Escape
+  var tips = function () { return document.querySelectorAll('.help-tip[open]'); };
+  document.addEventListener('click', function (e) {
+    var own = e.target.closest('.help-tip');
+    Array.prototype.forEach.call(tips(), function (t) { if (t !== own) t.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') Array.prototype.forEach.call(tips(), function (t) { t.open = false; });
+  });
+
+  // Protokolle: Auswahl wechseln lädt sofort neu
+  document.querySelectorAll('[data-log-form] [data-autosubmit]').forEach(function (el) {
+    el.addEventListener('change', function () {
+      var form = el.form;
+      // beim Wechsel des Protokolls die Filter des alten nicht mitnehmen
+      if (el.name === 'log') form.querySelectorAll('[name="handelsuche"], [name="verdacht"], [name="buchung"]').forEach(function (f) { f.disabled = true; });
+      form.submit();
+    });
+  });
+
+  // Vergaben: nur die Felder der gewählten Art zeigen, Höchstzahl und Knopf anpassen
+  var grant = document.querySelector('[data-grant-form]');
+  if (grant) {
+    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], entzug: [50, 50] }; // [ein Mitglied, alle]
+    var user = grant.querySelector('[name="user"]');
+    var count = grant.querySelector('[name="count"]');
+    var submit = grant.querySelector('[data-grant-submit]');
+    var update = function () {
+      var checked = grant.querySelector('[name="art"]:checked');
+      var art = checked ? checked.value : 'pack';
+      grant.querySelectorAll('[data-for]').forEach(function (f) {
+        var on = f.getAttribute('data-for').split(' ').indexOf(art) >= 0;
+        f.hidden = !on;
+        f.querySelectorAll('select, input').forEach(function (i) { i.disabled = !on; i.required = on; });
+      });
+      user.querySelectorAll('[data-not]').forEach(function (o) {
+        var off = o.getAttribute('data-not') === art;
+        o.hidden = off;
+        o.disabled = off;
+        if (off && user.value === o.value) user.value = '';
+      });
+      var max = MAX[art][user.value === 'alle' ? 1 : 0];
+      count.max = max;
+      if (Number(count.value) > max) count.value = max;
+      submit.textContent = checked ? checked.getAttribute('data-button') : 'Vergeben';
+      submit.className = 'btn ' + (art === 'entzug' ? 'btn-danger' : 'btn-primary');
+    };
+    grant.addEventListener('change', update);
+    update();
+  }
+})();
+

@@ -1,8 +1,3 @@
-<nav class="stats-subnav" aria-label="Abschnitte">
-  <span class="muted small">Springe zu:</span>
-  <a href="#codes">Mitglieder einladen</a><% if (currentUser.isAdmin) { %><a href="#devs">Devs</a><a href="#mods">Mods</a><% } %>
-</nav>
-
 <section class="stats-block" id="codes">
   <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt <strong>${ttlMinutes} Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
   <div class="card">

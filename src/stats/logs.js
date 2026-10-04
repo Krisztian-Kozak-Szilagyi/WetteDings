@@ -12,6 +12,8 @@ const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const { CoinTrade } = require('../models/Coin');
 const { GradingJob } = require('../models/Grading');
+const { PackGrant } = require('../models/Tcg');
+const SettingsChange = require('../models/SettingsChange');
 const coinMarkets = require('../coin/markets');
 const { LEVELS: GRADING_LEVELS } = require('../grading/gradingService');
 const tcgCatalog = require('../tcg/catalog');
@@ -30,6 +32,7 @@ const EXPORT_MAX = 20000; // Obergrenze für den Export (alle Seiten auf einmal)
 const LOG_GROUPS = [
   { key: 'spiel', label: 'Spiel' },
   { key: 'tcg', label: 'TCG' },
+  { key: 'team', label: 'Team' },
 ];
 const LOGS = [
   { key: 'wetten', label: 'Wetten', page: 'wettenseite', group: 'spiel' },
@@ -43,6 +46,8 @@ const LOGS = [
   { key: 'ihk', label: 'IHK-Quests', page: 'ihkseite', group: 'tcg' },
   { key: 'dungeon', label: 'Dungeons', page: 'dungeonseite', group: 'tcg' },
   { key: 'grading', label: 'Grading', page: 'gradingseite', group: 'tcg' },
+  { key: 'vergaben', label: 'Vergaben', page: 'vergabeseite', group: 'team' },
+  { key: 'einstellungen', label: 'Einstellungen', page: 'einstellungsseite', group: 'team' },
 ];
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
@@ -427,6 +432,35 @@ async function ledgerLog(query, { player = null, all = false } = {}) {
   return { ...pg, type, types: LEDGER_TYPES.map((k) => ({ key: k, label: ledgerLabels[k] })), rows: docs.map((l) => ledgerRow(l, names.get(String(l.user)))) };
 }
 
+// ---------- Vergaben durch Admin und Devs (Packs, Karten, Gegenstände, entfernte Karten) ----------
+
+const GRANT_KIND = { pack: 'Pack', karte: 'Karte', item: 'Gegenstand', entzug: 'Entfernt' };
+
+function grantRow(g) {
+  return { at: g.createdAt, by: g.byName, to: g.toName, all: !!g.all, kind: g.kind || 'pack', kindLabel: GRANT_KIND[g.kind || 'pack'] || g.kind, what: g.typeLabel, count: g.count, recipients: g.recipients || 1 };
+}
+
+async function grantLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { $or: [{ by: player._id }, { to: player._id }] } : {};
+  const { docs, ...pg } = await paged(PackGrant, filter, { createdAt: -1, _id: -1 }, query.vergabeseite, null, all);
+  return { ...pg, rows: docs.map(grantRow) };
+}
+
+// ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
+
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', dungeon: 'Dungeon', lotterie: 'Lotterie', config: 'Serverstart (.env)' };
+const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+
+function settingsRow(c) {
+  return { at: c.createdAt, by: c.byName || 'Serverstart', area: SETTINGS_AREA[c.area] || c.area, changes: (c.changes || []).map((x) => ({ path: x.path, from: valueText(x.from), to: valueText(x.to) })) };
+}
+
+async function settingsLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { by: player._id } : {};
+  const { docs, ...pg } = await paged(SettingsChange, filter, { createdAt: -1, _id: -1 }, query.einstellungsseite, 'area changes byName createdAt', all);
+  return { ...pg, rows: docs.map(settingsRow) };
+}
+
 // ---------- Export: CSV für Excel (wie die Statistik: Semikolon, Dezimalkomma, UTF-8 mit BOM) ----------
 
 const csvDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: config.timezone });
@@ -441,6 +475,14 @@ const IHK_STATE = { laeuft: 'Läuft', geschafft: 'Geschafft', gescheitert: 'Gesc
 
 // Kopfzeile und Zeilen je Log (eine Zeile pro Eintrag; Dungeons: eine Zeile pro Teilnehmer, damit Excel filtern kann)
 const CSV = {
+  vergaben: {
+    head: ['Zeitpunkt', 'Von', 'An', 'Art', 'Was', 'Anzahl je Mitglied', 'Empfänger'],
+    rows: (g) => [[csvDate(g.at), g.by, g.to, g.kindLabel, g.what, g.count, g.recipients]],
+  },
+  einstellungen: {
+    head: ['Zeitpunkt', 'Von', 'Bereich', 'Wert', 'Vorher', 'Nachher'],
+    rows: (c) => (c.changes.length ? c.changes.map((x) => [csvDate(c.at), c.by, c.area, x.path, x.from, x.to]) : [[csvDate(c.at), c.by, c.area, '', '', '']]),
+  },
   wetten: {
     head: ['Erstellt', 'Wette', 'Duell', 'Gruppe', 'Ersteller', 'Schiedsrichter', 'Optionen', 'Einsatzschluss', 'Status', 'Ergebnis', 'Entschieden über', 'Entschieden von', 'Entschieden am', 'Begründung', 'Topf (€)', 'Teilnehmer', 'Provision (€)'],
     rows: (b) => [[csvDate(b.at), b.title, yesNo(b.duel), b.group || '', b.creator, b.referee || '', b.options.join(' / '), csvDate(b.deadline), BET_STATUS[b.status] || b.status, b.result === BET_STATUS[b.status] ? '' : b.result, b.via || '', b.resolvedBy || '', csvDate(b.resolvedAt), b.note || '', csvEuro(b.pot), b.participants, csvEuro(b.fees)]],
@@ -519,7 +561,7 @@ function exportFileName(key, playerName, ext, now = new Date()) {
   return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
-const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog };
+const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, einstellungen: settingsLog };
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
@@ -555,4 +597,6 @@ module.exports = {
   lottoRow,
   gradingRow,
   ledgerRow,
+  grantRow,
+  settingsRow,
 };
