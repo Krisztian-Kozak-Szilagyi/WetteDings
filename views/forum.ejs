@@ -34,7 +34,6 @@
           <div class="forum-group-head">
             <h2><a href="/forum/k/<%= root._id %>"><%= root.title %></a></h2>
             <% if (root.staffOnly) { %><span class="forum-team">Team</span><% } %>
-            <% if (root.description) { %><span class="forum-group-desc"><%= root.description %></span><% } %>
             <% if (addSub) { %><button type="button" class="forum-add-sub" data-dialog-open="sub-<%= root._id %>">+ Unterbereich</button><% } %>
           </div>
           <ul class="forum-rows">
@@ -43,7 +42,7 @@
                 <span class="forum-crow-icon"><%- include('partials/forum-icon', { name: i > 0 ? 'folder' : 'chat', size: 18 }) %></span>
                 <span class="forum-trow-main">
                   <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= i === 0 ? (root.subs.length ? 'Themen direkt in „' + c.title + '“' : 'Themen') : c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
-                  <% if (i > 0 && c.description) { %><span class="forum-sub"><%= c.description %></span><% } %>
+
                 </span>
                 <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
                 <span class="forum-crow-last">
@@ -65,7 +64,7 @@
         <form method="post" action="/forum/bereiche" class="form">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
-          <label class="field"><span>Beschreibung (optional)</span><input type="text" name="description" maxlength="200"></label>
+
           <label class="field">
             <span>Gehört zu</span>
             <select name="parent">
@@ -104,7 +103,7 @@
   </div>
   <div class="forum-choose">
     <% newChoices.forEach((c) => { %>
-      <a href="/forum/k/<%= c._id %>/neu"><b><%= c.title %></b><% if (c.description) { %><span class="forum-sub"><%= c.description %></span><% } %></a>
+      <a href="/forum/k/<%= c._id %>/neu"><b><%= c.title %></b></a>
     <% }) %>
   </div>
 </dialog>

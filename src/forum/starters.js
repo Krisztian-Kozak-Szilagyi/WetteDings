@@ -15,7 +15,7 @@ const CATEGORIES = [
   { key: 'coins', title: 'Broker', titles: ['Coin Exchange'], description: 'Broker, Coins und ETFs: Kurse, Strategien, Prognosen.', parent: 'allgemein', order: 2 },
   { key: 'ihk', title: 'IHK-Quests', titles: ['IHK'], description: 'Quests, Karten-Kombinationen, Tipps.', parent: 'allgemein', order: 3 },
   { key: 'feedback', title: 'Feedback & Bugs', description: 'Wünsche, Fehler und Verbesserungen.', parent: 'allgemein', order: 4 },
-  { key: 'halloffame', title: 'Hall of Fame', description: 'Die größten Gewinne und seltensten Pulls – automatisch aktuell.', parent: 'allgemein', order: 5 },
+  { key: 'halloffame', title: 'Hall of Fame', description: 'Die größten Gewinne und seltensten Pulls.', parent: 'allgemein', order: 5 },
   { key: 'ankuendigungen', title: 'Ankündigungen', description: 'Wichtiges und Geplantes.', parent: null, create: false },
 ];
 

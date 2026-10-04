@@ -8,7 +8,7 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="parent" value="<%= root._id %>">
     <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
-    <label class="field"><span>Beschreibung (optional)</span><input type="text" name="description" maxlength="200"></label>
+
     <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="10"></label>
     <button class="btn btn-primary" type="submit">Unterbereich anlegen</button>
   </form>

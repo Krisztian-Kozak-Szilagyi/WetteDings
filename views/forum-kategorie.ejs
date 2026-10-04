@@ -12,7 +12,6 @@
   <div class="forum-head-text">
     <% if (parent) { %><span class="forum-sub-of"><%- include('partials/forum-icon', { name: 'folder', size: 13 }) %>Unterbereich von <a href="/forum/k/<%= parent._id %>"><%= parent.title %></a></span><% } %>
     <h1><%= cat.title %><% if (cat.staffOnly) { %> <span class="forum-team">Team</span><% } %></h1>
-    <% if (cat.description) { %><span class="forum-head-desc"><%= cat.description %></span><% } %>
   </div>
   <% if (canCreate) { %><a class="btn btn-primary" href="/forum/k/<%= cat._id %>/neu">+ Neues Thema</a><% } %>
 </div>
@@ -27,7 +26,7 @@
           <span class="forum-crow-icon"><%- include('partials/forum-icon', { name: 'folder', size: 18 }) %></span>
           <span class="forum-trow-main">
             <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
-            <% if (c.description) { %><span class="forum-sub"><%= c.description %></span><% } %>
+
           </span>
           <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
           <span class="forum-crow-last">
@@ -45,7 +44,7 @@
 <% if (hof) { %>
   <%# Hall of Fame: Bestenlisten aus den Daten der Seite (forum/hallOfFame.js), alle paar Minuten neu %>
   <section class="forum-group forum-box forum-hof" aria-label="Hall of Fame">
-    <div class="forum-group-head"><span class="forum-label">Bestenlisten</span><span class="forum-sub">je die Top 10 · alle paar Minuten aktualisiert</span></div>
+    <div class="forum-group-head"><span class="forum-label">Bestenlisten</span></div>
     <div class="forum-hof-grid">
       <div class="forum-hof-list">
         <h2>Größte Wettgewinne</h2>
@@ -120,7 +119,7 @@
     <form method="post" action="/forum/bereiche/<%= cat._id %>" class="form">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" value="<%= cat.title %>" required></label>
-      <label class="field"><span>Beschreibung</span><input type="text" name="description" maxlength="200" value="<%= cat.description %>"></label>
+
       <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="<%= cat.order %>"></label>
       <% if (canSetStaffOnly) { %><label class="check"><input type="checkbox" name="staffOnly" value="1" <%= cat.staffOnly ? 'checked' : '' %>><span>Team-Bereich: Nur Admin und Devs eröffnen hier Themen.</span></label><% } %>
       <button class="btn btn-primary" type="submit">Speichern</button>
