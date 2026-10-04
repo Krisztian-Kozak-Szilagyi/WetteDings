@@ -4,7 +4,7 @@
 
 <section class="pf-hero">
   <div class="pf-id">
-    <div class="pf-avatar"><img src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152"></div>
+    <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
     <div class="pf-id-text">
       <h1 class="pf-name"><%= profile.username %><%- roleBadge(profile.username) %></h1>
       <% if (profile.realName) { %><p class="pf-realname"><%= profile.realName %></p><% } %>
@@ -169,18 +169,36 @@
         <% if (isMe && !pinnedChosen) { %><p class="muted small pf-hint">Mit der Nadel in der Liste wählst du selbst, welche zwei hier stehen.</p><% } %>
       <% } %>
 
-      <% if (ban || top1) { %>
+      <% if (bans.length || top1) { %>
         <div class="pf-badges">
           <% if (top1) { %>
-            <span class="pf-badge pf-badge-top1" tabindex="0" data-tip="<%= top1 %> lang auf Platz 1 der Rangliste.">
+            <span class="pf-badge pf-badge-top1" tabindex="0" aria-describedby="pf-tip-top1">
               <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><defs><linearGradient id="pf-g-top1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4"/><stop offset="1" stop-color="#c08a1e"/></linearGradient></defs><path d="M8 34 L6 14 L16 22 L24 9 L32 22 L42 14 L40 34Z" fill="url(#pf-g-top1)"/><rect x="8" y="36" width="32" height="5" rx="2" fill="url(#pf-g-top1)"/><text x="24" y="31" text-anchor="middle" font-size="11" font-weight="900" fill="#3a2a08">1</text></svg>
               <span class="pf-badge-label">Platz 1</span>
+              <span class="pf-tip" role="tooltip" id="pf-tip-top1">
+                <span class="pf-tip-title">Platz 1 der Rangliste</span>
+                <span class="pf-tip-row">Insgesamt <strong><%= top1 %></strong> ganz oben.</span>
+              </span>
             </span>
           <% } %>
-          <% if (ban) { %>
-            <span class="pf-badge pf-badge-ban" tabindex="0" data-tip="<%= ban.active ? 'Zurzeit gebannt' : 'War gebannt' %><%= ban.at ? ' (seit ' + dayDate(ban.at) + ')' : '' %>, gebannt von: <%= ban.by || '–' %>. Grund: <%= ban.reason || '–' %>">
+          <% if (bans.length) { const activeBan = bans[0].state === 'aktiv'; %>
+            <span class="pf-badge pf-badge-ban" tabindex="0" aria-describedby="pf-tip-ban">
               <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M24 4 L41 10 V23 C41 33 33 40 24 44 C15 40 7 33 7 23 V10Z" fill="#3a1418" stroke="#f87171" stroke-width="3"/><g transform="rotate(-40 24 24)" fill="#f87171"><rect x="15" y="13" width="18" height="9" rx="2"/><rect x="22.5" y="21" width="3" height="16" rx="1.5"/></g></svg>
-              <span class="pf-badge-label"><%= ban.active ? 'Gebannt' : 'War gebannt' %></span>
+              <span class="pf-badge-label"><%= activeBan ? 'Gebannt' : bans.length > 1 ? bans.length + '× gebannt' : 'War gebannt' %></span>
+              <span class="pf-tip pf-tip-ban" role="tooltip" id="pf-tip-ban">
+                <span class="pf-tip-title"><%= bans.length === 1 ? 'Ein Ban' : bans.length + ' Bans' %></span>
+                <% bans.forEach((b) => { %>
+                  <span class="pf-ban">
+                    <span class="pf-ban-head">
+                      <strong><%= dayDate(b.at) %></strong>
+                      <span class="pf-ban-state s-<%= b.state %>"><%= b.state === 'aktiv' ? 'läuft noch' : b.state === 'abgelaufen' ? 'abgelaufen' : 'vorzeitig aufgehoben' %></span>
+                    </span>
+                    <span class="pf-tip-row"><em>Dauer</em><%= b.duration || '–' %><% if (b.state === 'aktiv' && b.duration !== 'dauerhaft') { %> (bis <%= dayDate(b.until) %>)<% } %><% if (b.liftedAt) { %> · aufgehoben am <%= dayDate(b.liftedAt) %><% } %></span>
+                    <span class="pf-tip-row"><em>Von</em><%= b.byName || '–' %></span>
+                    <span class="pf-tip-row"><em>Grund</em><%= b.reason || 'kein Grund angegeben' %></span>
+                  </span>
+                <% }) %>
+              </span>
             </span>
           <% } %>
         </div>

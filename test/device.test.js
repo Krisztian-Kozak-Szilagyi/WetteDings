@@ -101,3 +101,31 @@ test('Ban-Rechte: aufheben – Admin alle, Devs nur eigene', () => {
   assert.match(unbanError({ _id: 'd2' }, target), /Dev1 vergeben/);
   assert.match(unbanError({ _id: 'd2' }, { username: 'Alt', bannedBy: null, bannedByName: 'Boss' }), /Boss vergeben/);
 });
+
+test('Ban-Verlauf: Altbestand aus den Einzelfeldern, laufende Bans schließen, Dauer als Text, neueste zuerst', () => {
+  const L = require('../src/device/deviceLogic');
+  const H = 3600000;
+  assert.deepEqual(L.banHistory(null), []);
+  assert.deepEqual(L.banHistory({ bannedAt: null }), []);
+  // alter Ban, aufgehoben (bannedUntil null) → ein Eintrag "aufgehoben"
+  const legacy = L.banTimeline({ bannedAt: new Date(0), bannedUntil: null, bannedByName: 'T', banReason: '' });
+  assert.equal(legacy.length, 1);
+  assert.equal(legacy[0].state, 'aufgehoben');
+  assert.equal(legacy[0].duration, null);
+  assert.equal(L.banDurationText(new Date(0), new Date(5 * H)), '5 Stunden');
+  assert.equal(L.banDurationText(new Date(0), new Date(H)), '1 Stunde');
+  assert.equal(L.banDurationText(new Date(0), new Date(48 * H)), '2 Tage');
+  assert.equal(L.banDurationText(new Date(0), new Date(25 * H)), '1 Tag 1 Stunde');
+  assert.equal(L.banDurationText(new Date(0), L.FOREVER), 'dauerhaft');
+  const now = new Date(100 * H);
+  const list = [
+    { at: new Date(10 * H), until: new Date(20 * H), byName: 'A', reason: 'x' },
+    { at: new Date(90 * H), until: new Date(200 * H), byName: 'B', reason: 'y' },
+  ];
+  const closed = L.closeOpenBans(list, now);
+  assert.equal(closed[0].liftedAt, undefined); // schon abgelaufen: bleibt
+  assert.equal(closed[1].liftedAt, now);
+  const tl = L.banTimeline({ banHistory: list }, now.getTime());
+  assert.deepEqual(tl.map((b) => [b.byName, b.state]), [['B', 'aktiv'], ['A', 'abgelaufen']]);
+  assert.equal(L.banTimeline({ banHistory: closed }, now.getTime())[0].state, 'aufgehoben');
+});

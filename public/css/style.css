@@ -4400,7 +4400,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 /* ========== Profil (Steam-artig: Kopf mit Bild und Text, links Inhalt, rechts Vitrine) ========== */
 .pf-hero {
   position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap;
-  margin-bottom: 24px; padding: 24px; border-radius: var(--radius-lg); overflow: hidden;
+  margin-bottom: 24px; padding: 24px; border-radius: var(--radius-lg);
   background:
     radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 55%),
     radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, #45d9ff 10%, transparent), transparent 60%),
@@ -4408,12 +4408,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
   box-shadow: 0 0 0 1px var(--color-neutral-800);
 }
 .pf-id { display: flex; gap: 22px; align-items: flex-start; min-width: 0; flex: 1 1 420px; }
-.pf-avatar {
-  flex: none; width: 152px; height: 152px; padding: 4px; border-radius: 22px;
-  background: linear-gradient(140deg, var(--color-accent-300), var(--color-accent-700) 55%, #45d9ff);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 26px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-.pf-avatar img { display: block; width: 100%; height: 100%; border-radius: 18px; background: var(--color-bg); }
+.pf-avatar { flex: none; display: block; width: 152px; height: 152px; border-radius: 8px; }
 .pf-id-text { min-width: 0; flex: 1; }
 .pf-name { margin: 4px 0 0; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; overflow-wrap: anywhere; }
 .pf-realname { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
@@ -4432,6 +4427,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-level-label { font-size: 22px; font-weight: 300; letter-spacing: .01em; }
 .pf-level:hover .ach-count { transform: translateY(-2px) scale(1.04); }
 .pf-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.pf-actions .mod-menu-panel { left: auto; right: 0; text-align: left; } /* rechts bündig, damit es nicht aus dem Kopf ragt */
 
 .pf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .pf-main, .pf-side { min-width: 0; }
@@ -4505,14 +4501,30 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-showcase-item.is-unique { box-shadow: 0 0 0 1px #b48cf2, 0 0 20px rgba(180, 140, 242, .22); }
 .pf-showcase-name { font-size: .88rem; font-weight: 700; line-height: 1.25; }
 .pf-hint { margin: 10px 0 0; }
-.pf-badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
+.pf-badges { position: relative; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
 .pf-badge {
-  position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 99px;
   background: var(--surface-2); box-shadow: 0 0 0 1px var(--color-neutral-800); font-size: .85rem; font-weight: 700; cursor: help;
 }
 .pf-badge svg { display: block; width: 34px; height: 34px; }
 .pf-badge-top1 { box-shadow: 0 0 0 1px #8c5f16; color: #ffd76a; }
 .pf-badge-ban { box-shadow: 0 0 0 1px #7f1d1d; color: var(--nein); }
+/* Details zum Abzeichen: so breit wie die Vitrine, über den Abzeichen (Hover und Fokus/Tippen) */
+.pf-tip {
+  position: absolute; left: 0; right: 0; bottom: calc(100% - 6px); z-index: 20; display: flex; flex-direction: column; gap: 8px;
+  max-height: 60vh; overflow-y: auto; padding: 12px; border-radius: var(--radius-md); background: var(--color-neutral-900);
+  box-shadow: var(--shadow-md); color: var(--text); font-size: .82rem; font-weight: 500; line-height: 1.45; cursor: default;
+  opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s ease, transform .15s ease, visibility .15s;
+}
+.pf-badge:hover .pf-tip, .pf-badge:focus .pf-tip, .pf-badge:focus-within .pf-tip { opacity: 1; visibility: visible; transform: none; }
+.pf-tip-title { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pf-tip-row { display: block; overflow-wrap: anywhere; }
+.pf-tip-row em { display: inline-block; min-width: 48px; margin-right: 6px; font-style: normal; color: var(--muted); }
+.pf-ban { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--nein) 7%, var(--surface-2)); box-shadow: inset 3px 0 0 #7f1d1d; }
+.pf-ban-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 2px; }
+.pf-ban-state { font-size: .7rem; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: var(--muted); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.pf-ban-state.s-aktiv { color: #fff; background: #b91c1c; }
+.pf-ban:has(.s-aktiv) { box-shadow: inset 3px 0 0 var(--nein); }
 
 /* Tooltip (Hover und Fokus, damit es auch per Tippen geht) */
 [data-tip] { position: relative; }
@@ -4539,10 +4551,10 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 @media (max-width: 640px) {
   .pf-hero { padding: 18px; }
   .pf-id { gap: 14px; flex-basis: 100%; }
-  .pf-avatar { width: 92px; height: 92px; border-radius: 16px; padding: 3px; }
-  .pf-avatar img { border-radius: 13px; }
+  .pf-avatar { width: 92px; height: 92px; }
   .pf-head-side { align-items: flex-start; margin-left: 0; width: 100%; }
   .pf-actions { justify-content: flex-start; }
+  .pf-actions .mod-menu-panel { left: 0; right: auto; }
   .ach-row { gap: 10px; padding: 10px; }
   .ach-icon { width: 46px; height: 46px; }
   [data-tip]::after { max-width: min(240px, 70vw); }

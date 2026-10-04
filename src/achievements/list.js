@@ -29,21 +29,21 @@ const ACHIEVEMENTS = [
   // ---- Einzelstücke (von Hand vergeben) ----
   {
     key: 'hermann',
-    name: 'Hermann',
+    name: 'Zu stark für diese Welt',
     text: 'Die Verkörperung der ersten gebannten Karte. Sie war schlicht zu stark für diese Welt – und musste deshalb gehen.',
     unique: true,
     icon: { glyph: 'hermann', tone: 'gold', frame: 'legend' },
   },
   {
     key: 'oemer',
-    name: 'Ömer',
+    name: 'König der 21 %',
     text: 'Der allererste Spieler auf Platz 1 der Rangliste – mit 21 % des gesamten Vermögens aller Mitglieder in der eigenen Tasche.',
     unique: true,
     icon: { glyph: 'oemer', tone: 'gold', frame: 'legend' },
   },
   {
     key: 'aleks',
-    name: 'Aleks',
+    name: 'Genosse Nummer eins',
     text: 'Der erste Russe bei BfW Holdings. Mehr muss man dazu nicht sagen.',
     unique: true,
     icon: { glyph: 'aleks', tone: 'gold', frame: 'legend' },

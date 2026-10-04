@@ -31,7 +31,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy bio pinnedAchievements').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const [owned, mine, statsAgg, earned, shares, playmates] = await Promise.all([
     inventory(profile._id),
@@ -55,7 +55,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     profile,
     isMe: profile._id.equals(req.user._id),
     // Ban-Vermerk unter dem Namen (bleibt dauerhaft, auch nach Ablauf oder Unban) und Moderations-Menü für den Admin
-    ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), at: profile.bannedAt, by: profile.bannedByName, reason: profile.banReason } : null,
+    ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile) } : null,
+    bans: deviceLogic.banTimeline(profile), // alle Bans, neueste zuerst (Abzeichen mit Details)
     canBan:
       req.user.isStaff &&
       !profile._id.equals(req.user._id) &&

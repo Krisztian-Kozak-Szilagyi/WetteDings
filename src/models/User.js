@@ -51,6 +51,12 @@ const userSchema = new Schema(
     bannedAt: { type: Date, default: null },
     bannedByName: { type: String, default: null },
     bannedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // wer gebannt hat (Devs dürfen nur eigene Bans aufheben)
+    // Alle Bans nacheinander (Profil zeigt jeden einzeln). liftedAt = vorzeitig aufgehoben oder durch einen neuen Ban ersetzt.
+    // Fehlt bei Bans von vor 2026-10-04 – dann gilt nur der letzte Ban aus den Feldern oben (deviceLogic.banHistory).
+    banHistory: {
+      type: [new Schema({ at: Date, until: Date, byName: String, reason: String, liftedAt: { type: Date, default: null } }, { _id: false })],
+      default: undefined,
+    },
     // Sekunden auf Platz 1 der Rangliste (wird minütlich hochgezählt, siehe services/rankService)
     top1Seconds: { type: Number, default: 0 },
     // Gelöschtes Konto: nur noch eine leere Hülle mit neutralem Namen (siehe services/accountService)

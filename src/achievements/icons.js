@@ -12,11 +12,36 @@ const TONES = {
   legend: ['#ffd6f6', '#b48cf2', '#45d9ff'],
 };
 
+/** Kette aus Gliedern von (x1,y1) nach (x2,y2): abwechselnd von oben und von der Seite gesehen */
+function chain(x1, y1, x2, y2, n = 9) {
+  const ang = ((Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI).toFixed(1);
+  let out = '';
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const x = +(x1 + (x2 - x1) * t).toFixed(1);
+    const y = +(y1 + (y2 - y1) * t).toFixed(1);
+    const rot = `transform="rotate(${ang} ${x} ${y})"`;
+    out +=
+      i % 2
+        ? `<rect x="${x - 6}" y="${y - 1.6}" width="12" height="3.2" rx="1.6" fill="#d7dde9" stroke="#3b4150" stroke-width="1" ${rot}/>`
+        : `<ellipse cx="${x}" cy="${y}" rx="6.5" ry="3.8" fill="none" stroke="#3b4150" stroke-width="4.6" ${rot}/>` +
+          `<ellipse cx="${x}" cy="${y}" rx="6.5" ry="3.8" fill="none" stroke="#d7dde9" stroke-width="2.6" ${rot}/>`;
+  }
+  return out;
+}
+
 const GLYPHS = {
+  // zu starke Karte: glüht vor Kraft, liegt aber in Ketten mit Schloss
   hermann:
-    '<rect x="45" y="30" width="38" height="56" rx="6" fill="F" transform="rotate(-8 64 58)"/>' +
-    '<path d="M69 38 L54 62 H64 L58 82 L77 54 H67 L73 38Z" fill="D"/>' +
-    '<circle cx="64" cy="60" r="33" fill="none" stroke="#ff5b5b" stroke-width="7"/><path d="M41 37 L87 83" stroke="#ff5b5b" stroke-width="7" stroke-linecap="round"/>',
+    '<g stroke="F" stroke-width="3" stroke-linecap="round" opacity=".9"><path d="M40 30 l-7 -7 M88 30 l7 -7 M34 58 h-9 M94 58 h9 M64 18 v-8"/></g>' +
+    '<rect x="44" y="24" width="40" height="60" rx="6" fill="F"/>' +
+    '<rect x="48" y="28" width="32" height="52" rx="4" fill="none" stroke="D" stroke-width="1.5" opacity=".35"/>' +
+    '<path d="M69 32 L55 56 H64 L58 76 L76 49 H67 L73 32Z" fill="D"/>' +
+    chain(30, 43, 98, 90) +
+    chain(98, 43, 30, 90) +
+    '<path d="M56 76 v-6 a8 8 0 0 1 16 0 v6" fill="none" stroke="#d7dde9" stroke-width="4"/>' +
+    '<rect x="51" y="75" width="26" height="21" rx="4" fill="#e04848" stroke="#5a1010" stroke-width="2"/>' +
+    '<circle cx="64" cy="84" r="3" fill="#3a0a0a"/><rect x="62.6" y="85" width="2.8" height="6" rx="1" fill="#3a0a0a"/>',
   oemer:
     '<path d="M32 80 L28 44 L46 60 L64 34 L82 60 L100 44 L96 80Z" fill="F"/><rect x="32" y="84" width="64" height="9" rx="3" fill="F"/>' +
     '<circle cx="28" cy="42" r="5" fill="F"/><circle cx="64" cy="32" r="5" fill="F"/><circle cx="100" cy="42" r="5" fill="F"/>' +
