@@ -115,10 +115,10 @@
 .dx-fav-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .dx-album { min-height: 300px; }
 
-/* Countdowns über den Favoriten: füllen den Platz neben „Heute“, die Favoriten sitzen unten bündig */
-.dx-favcol { justify-content: space-between; gap: 20px; }
-.dx-favs { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+/* Favoriten unten bündig mit „Heute“ (Platz bleibt oben) */
+.dx-favs { justify-content: flex-end; }
+/* Countdowns im Hero als Kacheln unter der Begrüßung */
+.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 6px; }
 .dx-timer { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 10px 14px; border-radius: var(--radius-lg, 8px);
   background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); color: var(--color-text); transition: box-shadow .2s; }
 .dx-timer:hover { box-shadow: 0 0 0 1px var(--color-accent-700); color: var(--color-text); }
