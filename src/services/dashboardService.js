@@ -13,7 +13,7 @@ const bonusService = require('./bonusService');
 const lottery = require('./lotteryService');
 const markets = require('../coin/markets');
 const blackMarket = require('../tcg/blackMarket');
-const { favoriteList, inventory } = require('../tcg/tcgService');
+const { favoriteList, inventory, MAX_FAVORITES } = require('../tcg/tcgService');
 const catalog = require('../tcg/catalog');
 const forumService = require('../forum/forumService');
 const ihk = require('../ihk/ihkService');
@@ -189,20 +189,38 @@ function albumFan(cards, counts, rarityByKey) {
   return fan.map((card) => ({ card, sample: !counts[card.id] }));
 }
 
-/** Sammlung: Album-Kachel (Fächer, Fortschritt) und Lieblingskarten (wie im Profil) */
+/**
+ * Ohne gewählte Favoriten: zufällige eigene Karten (ohne Folie, keine geheimen Seltenheiten), höchstens `max`.
+ * Gibt dieselbe Form wie favoriteList zurück: [{ key, card, foiledAt: null }]
+ */
+function randomFavorites(plain, cardById, rarityByKey, max, rnd = Math.random) {
+  const pool = Object.keys(plain).filter((id) => plain[id] > 0 && cardById[id] && !(rarityByKey[cardById[id].rarity] || {}).hidden);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, max).map((id) => ({ key: id, card: cardById[id], foiledAt: null }));
+}
+
+/** Sammlung: Album-Kachel (Fächer, Fortschritt) und Lieblingskarten (wie auf der TCG-Seite; ohne Auswahl zufällige eigene) */
 async function collectionInfo(user) {
   const owned = await inventory(user._id);
   const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
-  const favs = (user.tcgFavorites || []).length ? await favoriteList(user, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))) : [];
+  const plain = Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]));
+  let favs = (user.tcgFavorites || []).length ? await favoriteList(user, plain) : [];
+  if (!favs.length) favs = randomFavorites(plain, catalog.cardById, catalog.rarityByKey, MAX_FAVORITES);
   return {
     favorites: favs,
+    favMax: MAX_FAVORITES,
+    cardCount: owned.reduce((n, o) => n + o.n, 0),
+    cardValue: owned.reduce((n, o) => n + (o.v || 0), 0), // Cent, mit Wertsteigerung folierter Karten
     album: { fan: albumFan(catalog.CARDS, counts, catalog.rarityByKey), owned: catalog.CARDS.filter((c) => counts[c.id]).length, total: catalog.CARDS.length },
   };
 }
 
 async function load(user) {
   const [w, bets, today, cds, threads, tick, coll] = await Promise.all([wealth(user), openBets(user), todayStatus(user), countdowns(user), forumLatest(user), ticker(), collectionInfo(user)]);
-  return { greeting: greeting(), wealth: w, bets, today, countdowns: cds, threads, ticker: tick, favorites: coll.favorites, album: coll.album, notesMax: NOTES_MAX };
+  return { greeting: greeting(), wealth: w, bets, today, countdowns: cds, threads, ticker: tick, favorites: coll.favorites, favMax: coll.favMax, cardCount: coll.cardCount, cardValue: coll.cardValue, album: coll.album, notesMax: NOTES_MAX };
 }
 
-module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, albumFan, load };
+module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, albumFan, randomFavorites, load };

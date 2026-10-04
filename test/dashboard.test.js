@@ -56,3 +56,14 @@ test('Dashboard: Album-Fächer zeigt die seltensten eigenen Karten, sonst Beispi
   assert.deepEqual(empty.map((f) => [f.card.id, f.sample]), [['b', true], ['d', true], ['c', true]]);
   assert.deepEqual(dash.albumFan(cards, { s: 1, a: 1 }, rar).map((f) => f.card.id), ['a', 'b', 'd']);
 });
+
+test('zufällige Favoriten: nur eigene, nicht folierte, keine geheimen, höchstens max, ohne Doppelte', () => {
+  const byId = { a: { id: 'a', rarity: 'common' }, b: { id: 'b', rarity: 'holo' }, s: { id: 's', rarity: 'sith' }, c: { id: 'c', rarity: 'gold' } };
+  const rar = { common: {}, holo: {}, gold: {}, sith: { hidden: true } };
+  const plain = { a: 2, b: 1, s: 1, c: 0, x: 3 }; // c nur foliert, x gibt es nicht im Katalog
+  const ids = dash.randomFavorites(plain, byId, rar, 4).map((f) => f.card.id).sort();
+  assert.deepEqual(ids, ['a', 'b']);
+  assert.equal(dash.randomFavorites(plain, byId, rar, 1).length, 1);
+  assert.deepEqual(dash.randomFavorites({}, byId, rar, 4), []);
+  assert.ok(dash.randomFavorites(plain, byId, rar, 4).every((f) => f.foiledAt === null));
+});
