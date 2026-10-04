@@ -3,7 +3,8 @@
    --color-neutral-*, --color-divider, --radius-md/-lg, --r-gold, --r-holo, --warn, --ja. Fallbacks in Klammern. */
 .dx { --dx-pos: var(--ja, oklch(0.8 0.14 155)); --dx-neg: oklch(0.74 0.14 25); --dx-line: var(--color-divider, color-mix(in srgb, var(--color-text) 10%, transparent));
   --dx-cash: var(--color-accent); --dx-bets: var(--warn, oklch(0.85 0.13 85)); --dx-coins: var(--ja, oklch(0.8 0.14 155)); --dx-cards: var(--r-holo, #a8d8ff); --dx-gold: var(--r-gold, #e3b341);
-  display: flex; flex-direction: column; gap: 48px; }
+  --dx-cols: minmax(0, 3fr) minmax(0, 2fr); --dx-gap: 24px;
+  display: flex; flex-direction: column; gap: 36px; }
 .dx h1, .dx h2, .dx h3 { margin: 0; font-weight: 500; }
 .dx h3 { font-size: 18px; }
 .dx .pos { color: var(--dx-pos); } .dx .neg { color: var(--dx-neg); }
@@ -16,11 +17,10 @@
 .dx-head-center { align-items: center; }
 
 /* Hero */
-.dx-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 40px; align-items: center; }
-.dx-hero-text { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+/* Alle Reihen im selben Raster (3 : 2), damit die rechte Spalte überall auf einer Linie liegt */
+.dx-hero { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); align-items: center; }
+.dx-hero-text { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .dx-kicker { display: flex; align-items: center; gap: 8px; color: var(--color-accent-300); }
-.dx-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); animation: dxPulse 1.6s ease-in-out infinite; }
-@keyframes dxPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
 .dx-hero h1 { font-size: clamp(32px, 1.4rem + 2vw, 44px); line-height: 1.05; letter-spacing: -.025em; }
 .dx-name { color: var(--color-accent-300); }
 .dx-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
@@ -55,7 +55,7 @@
 .dx-split { display: flex; gap: 2px; height: 6px; border-radius: 6px; overflow: hidden; }
 .dx-split span { background: var(--dx-c); box-shadow: 0 0 8px var(--dx-c); }
 .dx-c-cash { --dx-c: var(--dx-cash); } .dx-c-bets { --dx-c: var(--dx-bets); } .dx-c-coins { --dx-c: var(--dx-coins); } .dx-c-cards { --dx-c: var(--dx-cards); }
-.dx-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 16px; margin: 0; }
+.dx-parts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; margin: 0; }
 .dx-parts dt { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-500); }
 .dx-parts dt i { width: 7px; height: 7px; transform: rotate(45deg); border-radius: 1px; background: var(--dx-c); }
 .dx-parts dd { margin: 2px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -63,7 +63,8 @@
 .dx-tick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 -6px -6px; border-radius: var(--radius-md, 8px); color: var(--color-text); background: color-mix(in srgb, var(--color-bg) 60%, transparent); }
 .dx-tick + .dx-tick { margin-top: -12px; }
 .dx-tick:hover { background: var(--color-bg); color: var(--color-text); }
-.dx-tick-logo, .dx-tick-mark { width: 26px; height: 26px; flex: none; }
+.dx-tick-logo, .dx-tick-mark { width: 28px; height: 28px; flex: none; }
+.dx-tick .asset-mark { font-size: 7px; letter-spacing: 0; border-radius: 8px; }
 .dx-tick-id, .dx-tick-price { display: flex; flex-direction: column; line-height: 1.2; }
 .dx-tick-id strong, .dx-tick-price strong { font-size: 13px; font-weight: 500; }
 .dx-tick-id small { font-size: 11px; color: var(--color-neutral-500); }
@@ -76,11 +77,10 @@
 @keyframes dxFlash { from { box-shadow: inset 0 0 0 1px var(--color-accent); } to { box-shadow: inset 0 0 0 1px transparent; } }
 
 /* Reihen */
-.dx-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
-.dx-row-stretch { align-items: stretch; }
-.dx-col-wide { flex: 2 1 520px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.dx-col-side { flex: 1 1 280px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.dx-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: var(--radius-lg, 8px); box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-400); font-size: 14px; }
+.dx-row { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); align-items: stretch; }
+.dx-col-wide, .dx-col-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* Leerer Zustand füllt die Höhe der Nachbarspalte (keine Lücke darunter) */
+.dx-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 18px; border-radius: var(--radius-lg, 8px); box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-400); font-size: 14px; }
 .dx-empty p { margin: 0; }
 
 /* Offene Wetten */
@@ -119,11 +119,11 @@
 
 /* Favoriten + Album: nutzt die TCG-Klassen; nur Platz anpassen */
 .dx-fav-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.dx-album { flex: 1 1 280px; min-height: 340px; }
+.dx-album { min-height: 300px; }
 
 /* Forum | Benachrichtigungen */
-.dx-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 40px; }
-.dx-pair > section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dx-pair { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); }
+.dx-pair > section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dx-list { display: flex; flex-direction: column; }
 .dx-item { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 4px; border-bottom: 1px solid var(--dx-line); color: var(--color-neutral-300); }
 .dx-item-top { align-items: start; }
@@ -138,8 +138,12 @@
 .dx-item-main small { font-size: 11px; color: var(--color-neutral-500); }
 .dx-note-text { font-size: 13px; line-height: 1.45; text-wrap: pretty; }
 
+@media (max-width: 900px) {
+  .dx { --dx-cols: minmax(0, 1fr); }
+}
 @media (max-width: 640px) {
-  .dx { gap: 36px; }
+  .dx { gap: 28px; }
+  .dx-parts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dx-fav-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dx-total-value { font-size: 32px; }
 }

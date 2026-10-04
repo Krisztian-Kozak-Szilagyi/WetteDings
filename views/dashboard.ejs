@@ -22,7 +22,7 @@
   <%# ---------- Hero: Gruß + Countdowns | Vermögen ---------- %>
   <div class="dx-hero">
     <div class="dx-hero-text">
-      <span class="dx-kicker"><span class="dx-pulse"></span><%= todayText %></span>
+      <span class="dx-kicker"><%= todayText %></span>
       <h1><%= d.greeting %>,<br><span class="dx-name"><%= currentUser.username %></span></h1>
       <% if (t.items.length) { %><p class="dx-sub"><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %></p><% } %>
       <% if (d.countdowns.length) { %>
