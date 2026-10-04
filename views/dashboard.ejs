@@ -21,7 +21,7 @@
 <div class="dash">
   <header class="dash-hero">
     <div class="dash-hero-text">
-      <p class="dash-kicker"><span class="live-dot"></span> <%= todayText %></p>
+      <p class="dash-kicker"><%= todayText %></p>
       <h1><%= d.greeting %>, <span class="dash-name"><%= currentUser.username %></span></h1>
       <p class="dash-sub"><% if (t.items.length) { %><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %><% } %></p>
     </div>
