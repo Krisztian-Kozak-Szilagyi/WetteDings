@@ -3790,7 +3790,9 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .foil-face { position: absolute; inset: 0; display: block; overflow: hidden; border-radius: 9px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   padding: 23cqw 4cqw 4cqw; background: linear-gradient(160deg, #e9f6ff26, #ffffff0d 40%, #c4b5fd26); box-shadow: inset 0 0 0 1px #ffffff40, 0 0 0 1px var(--rar, #ffffff30), 0 6px 18px rgba(0, 0, 0, .35); }
 .foil-face img { display: block; width: 100%; height: auto; border-radius: 5px; }
-.foil-front { position: relative; }
+.foil-front { position: relative; transform: rotateY(0deg); }
+/* Firefox: jede Seite eigene Ebene – sonst „plättet“ der Glanz (mix-blend-mode) die 3D-Karte: keine Rückseite, Vorderseite gespiegelt (#46) */
+.foil-face { isolation: isolate; }
 .foil-back { transform: rotateY(180deg); display: grid; place-items: center; }
 .foil-back-art { display: block; width: 100%; height: 100%; border-radius: 5px; background: var(--gr-back);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
@@ -3851,6 +3853,7 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .foil-modal-stage { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; perspective: 1100px; animation: tcg-pop .25s ease; }
 .foil-card-big { width: min(340px, 78vw, 52dvh); cursor: var(--cur-grab); touch-action: none; user-select: none; -webkit-user-select: none; }
 .foil-card-big:active { cursor: var(--cur-grabbing); }
+.foil-card-big:focus { outline: none; } /* Firefox zeigt sonst einen Rahmen um die ganze Fläche (#46) */
 .foil-card-big .foil-inner { transition: none; will-change: transform; }
 .foil-card-big .foil-sheen { animation: none; opacity: .7; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), #ffffff70, transparent 45%), linear-gradient(115deg, transparent 25%, #a8d8ff40 40%, #f0abfc33 60%, transparent 75%); }
 .foil-card-big .foil-face { padding: 23cqw 3.5cqw 3.5cqw; border-radius: 18px; }

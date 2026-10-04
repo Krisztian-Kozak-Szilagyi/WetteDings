@@ -38,8 +38,8 @@ const router = express.Router();
 const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen auf einen Blick.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer, Tagesbonus, Grading und IHK einstellen.' },
   { key: 'team', label: 'Team & Einladungen', icon: 'users', description: 'Neue Mitglieder per Code einladen und – als Admin – Devs und Mods ernennen.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer, Tagesbonus, Grading und IHK einstellen.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Vergabe-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
