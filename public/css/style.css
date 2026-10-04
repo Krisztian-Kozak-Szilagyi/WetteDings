@@ -4274,7 +4274,7 @@ a.dg-start-tile:hover { color: var(--text); }
 .bx-filters .chip { height: 32px; min-height: 0; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
 .bx-filters .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-accent-700); }
 .bx-table { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
-.bx-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) minmax(100px, .9fr) 130px minmax(100px, .9fr) minmax(110px, .9fr) minmax(150px, 1.2fr) minmax(150px, 1.2fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
+.bx-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(100px, .8fr) minmax(110px, 1fr) 130px 110px minmax(150px, 1.1fr) minmax(150px, 1.1fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
 .bx-row:last-of-type { border-bottom: 0; }
 a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); text-decoration: none; }
 .bx-row[hidden] { display: none; }
@@ -4311,7 +4311,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-empty { padding: 18px; margin: 0; }
 .bx-back { display: inline-block; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
 @media (max-width: 1100px) {
-  .bx-row { grid-template-columns: minmax(160px, 1.6fr) minmax(90px, .9fr) 100px minmax(100px, .9fr) minmax(140px, 1.2fr); }
+  .bx-row { grid-template-columns: minmax(160px, 1.5fr) minmax(90px, .8fr) minmax(90px, 1fr) 120px minmax(140px, 1.1fr); }
   .bx-col-depot, .bx-col-range { display: none; }
 }
 @media (max-width: 700px) {
@@ -4332,8 +4332,11 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-sort.bx-col-price { padding-right: 14px; }
 .bx-row-head .bx-sort.bx-col-depot { flex-direction: row; align-items: center; }
 /* Platz zwischen Mini-Chart und Kurs */
-.bx-col-spark { padding-right: 8px; }
+.bx-col-spark { padding: 0 22px 0 6px; }
 /* linksbündige Köpfe (Markt, Sentiment): Pfeil ragt in den Abstand, der Text steht bündig über den Werten */
-.bx-sort:not(.num):not(.bx-col-price) { margin-left: -1.2em; }
+.bx-sort.bx-sort-left { margin-left: -1.2em; }
 @media (max-width: 1100px) { .bx-row-head .bx-sort.bx-col-depot { display: none; } }
 @media (max-width: 700px) { .bx-row-head .bx-sort { display: none; } }
+/* Sentiment und 52-Wochen-Spanne: Kopf und Beschriftung rechtsbündig */
+.bx-row-head .bx-col-range, .bx-row-head .bx-sort.bx-col-sent { justify-content: flex-end; text-align: right; }
+.bx-sent-label { text-align: right; }
