@@ -25,10 +25,6 @@
       <h1><%= d.greeting %>, <span class="dash-name"><%= currentUser.username %></span></h1>
       <p class="dash-sub"><% if (t.items.length) { %><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %><% } %></p>
     </div>
-    <div class="dash-hero-actions">
-      <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
-      <a class="btn btn-ghost" href="/wetten">Alle Wetten</a>
-    </div>
   </header>
 
   <% if (d.countdowns.length) { %>
@@ -43,48 +39,65 @@
   <% } %>
 
   <div class="dash-grid">
-    <%# ---------- Vermögen ---------- %>
-    <section class="dash-card dash-wealth" aria-labelledby="dash-wealth-h">
-      <div class="dash-card-head">
-        <h2 id="dash-wealth-h">Vermögen</h2>
-        <% if (w.rank) { %><a class="dash-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %>
-      </div>
-      <div class="dash-wealth-main">
-        <div class="dash-total">
-          <span class="dash-total-value"><%= euro(w.total) %></span>
-          <% if (w.change) { const up = w.change.diff >= 0; %>
-            <span class="dash-delta <%= up ? 'pos' : 'neg' %>" title="Veränderung seit <%= dayDate(w.points[0].day + 'T12:00:00Z') %>">
-              <%= up ? '▲' : '▼' %> <%= (up ? '+' : '−') + euro(Math.abs(w.change.diff)) %><% if (w.change.pct !== null) { %> · <%= signedPercent(w.change.pct) %><% } %>
-              <small><%= w.points.length %> Tage</small>
-            </span>
+    <div class="dash-col-main">
+      <%# ---------- Vermögen (kompakt) ---------- %>
+      <section class="dash-card dash-wealth" aria-labelledby="dash-wealth-h">
+        <div class="dash-wealth-top<%= w.curve ? '' : ' no-chart' %>">
+          <div class="dash-total">
+            <div class="dash-total-head">
+              <h2 id="dash-wealth-h">Vermögen</h2>
+              <% if (w.rank) { %><a class="dash-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %>
+            </div>
+            <span class="dash-total-value"><%= euro(w.total) %></span>
+            <% if (w.change) { const up = w.change.diff >= 0; %>
+              <span class="dash-delta <%= up ? 'pos' : 'neg' %>" title="Veränderung seit <%= dayDate(w.points[0].day + 'T12:00:00Z') %>">
+                <%= up ? '▲' : '▼' %> <%= (up ? '+' : '−') + euro(Math.abs(w.change.diff)) %><% if (w.change.pct !== null) { %> · <%= signedPercent(w.change.pct) %><% } %>
+                <small><%= w.points.length %> Tage</small>
+              </span>
+            <% } %>
+          </div>
+          <dl class="dash-parts">
+            <% parts.forEach((p) => { %>
+              <div class="dash-part dash-part-<%= p.key %>"><dt><span class="dash-swatch"></span><%= p.label %></dt><dd><%= euro(p.value) %><small><%= Math.round((Math.max(0, p.value || 0) / partTotal) * 100) %> %</small></dd></div>
+            <% }) %>
+          </dl>
+          <% if (w.curve) { %>
+            <figure class="dash-chart" aria-label="Verlauf des Gesamtvermögens der letzten <%= w.points.length %> Tage">
+              <svg viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="dash-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".45"/>
+                    <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path class="dash-chart-area" d="<%= w.curve.area %>" fill="url(#dash-fill)"/>
+                <path class="dash-chart-line" d="<%= w.curve.line %>" vector-effect="non-scaling-stroke"/>
+              </svg>
+              <span class="dash-chart-dot" style="--x: <%= (w.curve.last[0] / 3).toFixed(2) %>%; --y: <%= (w.curve.last[1] / 0.8).toFixed(2) %>%"></span>
+              <figcaption class="dash-chart-days"><% w.points.forEach((p) => { %><span><%= dayLabel(p.day) %></span><% }) %></figcaption>
+            </figure>
           <% } %>
         </div>
-        <% if (w.curve) { %>
-          <figure class="dash-chart" aria-label="Verlauf des Gesamtvermögens der letzten <%= w.points.length %> Tage">
-            <svg viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="dash-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".45"/>
-                  <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path class="dash-chart-area" d="<%= w.curve.area %>" fill="url(#dash-fill)"/>
-              <path class="dash-chart-line" d="<%= w.curve.line %>" vector-effect="non-scaling-stroke"/>
-            </svg>
-            <span class="dash-chart-dot" style="--x: <%= (w.curve.last[0] / 3).toFixed(2) %>%; --y: <%= (w.curve.last[1] / 0.8).toFixed(2) %>%"></span>
-            <figcaption class="dash-chart-days"><% w.points.forEach((p) => { %><span><%= dayLabel(p.day) %></span><% }) %></figcaption>
-          </figure>
-        <% } %>
-      </div>
-      <div class="dash-split" role="img" aria-label="Aufteilung des Vermögens">
-        <% parts.forEach((p) => { if (p.value > 0) { %><span class="dash-split-<%= p.key %>" style="flex-grow: <%= (Math.max(0, p.value) / partTotal).toFixed(4) %>"></span><% } }) %>
-      </div>
-      <dl class="dash-parts">
-        <% parts.forEach((p) => { %>
-          <div class="dash-part dash-part-<%= p.key %>"><dt><span class="dash-swatch"></span><%= p.label %></dt><dd><%= euro(p.value) %></dd></div>
+        <div class="dash-split" role="img" aria-label="Aufteilung des Vermögens">
+          <% parts.forEach((p) => { if (p.value > 0) { %><span class="dash-split-<%= p.key %>" style="flex-grow: <%= (Math.max(0, p.value) / partTotal).toFixed(4) %>"></span><% } }) %>
+        </div>
+      </section>
+
+      <%# ---------- Broker-Ticker ---------- %>
+      <section class="dash-ticker" aria-label="Broker-Kurse">
+        <% d.ticker.forEach((a) => { const up = a.change24h >= 0; %>
+          <a class="dash-tick" href="<%= a.href %>" data-dash-tick="<%= a.symbol %>">
+            <%- include('partials/asset-mark', { sym: a.symbol, px: 36, imgClass: 'dash-tick-logo', markClass: 'dash-tick-mark' }) %>
+            <span class="dash-tick-id"><strong><%= a.symbol %></strong><small><%= a.name %></small></span>
+            <% if (a.spark) { %><svg class="dash-tick-spark <%= up ? 'up' : 'down' %>" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="<%= a.spark %>" vector-effect="non-scaling-stroke"/></svg><% } %>
+            <span class="dash-tick-price">
+              <strong data-dash-price><%= coinPrice(a.price) %></strong>
+              <small class="<%= up ? 'pos' : 'neg' %>" data-dash-change><%= signedPercent(a.change24h) %></small>
+            </span>
+          </a>
         <% }) %>
-      </dl>
-    </section>
+      </section>
+    </div>
 
     <%# ---------- Heute ---------- %>
     <section class="dash-card dash-today" aria-labelledby="dash-today-h">
@@ -119,20 +132,6 @@
       </ul>
     </section>
 
-    <%# ---------- Broker-Ticker ---------- %>
-    <section class="dash-ticker" aria-label="Broker-Kurse">
-      <% d.ticker.forEach((a) => { const up = a.change24h >= 0; %>
-        <a class="dash-tick" href="<%= a.href %>" data-dash-tick="<%= a.symbol %>">
-          <%- include('partials/asset-mark', { sym: a.symbol, px: 36, imgClass: 'dash-tick-logo', markClass: 'dash-tick-mark' }) %>
-          <span class="dash-tick-id"><strong><%= a.symbol %></strong><small><%= a.name %></small></span>
-          <% if (a.spark) { %><svg class="dash-tick-spark <%= up ? 'up' : 'down' %>" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="<%= a.spark %>" vector-effect="non-scaling-stroke"/></svg><% } %>
-          <span class="dash-tick-price">
-            <strong data-dash-price><%= coinPrice(a.price) %></strong>
-            <small class="<%= up ? 'pos' : 'neg' %>" data-dash-change><%= signedPercent(a.change24h) %></small>
-          </span>
-        </a>
-      <% }) %>
-    </section>
 
     <%# ---------- Offene Wetten ---------- %>
     <section class="dash-card dash-bets" aria-labelledby="dash-bets-h">
