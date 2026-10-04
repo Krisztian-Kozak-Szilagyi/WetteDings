@@ -78,7 +78,7 @@ function createApp() {
     dailyBonus: () => require('./services/bonusService').settings.amount, // Tagesbonus (Admin-Panel)
     gradingOpen: () => require('./grading/gradingService').settings.open, // Grading-Shop für alle freigegeben?
     bonusTime: config.bonusTime,
-    lotteryTicketPrice: config.lotteryTicketPrice,
+    lotteryTicketPrice: () => require('./services/lotteryService').ticketPrice('taeglich'), // Admin-Panel
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)

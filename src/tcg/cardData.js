@@ -14,7 +14,7 @@ module.exports = {
     frame: 'gilded',
     name: 'St. Ivan, the Forsaken',
     stats: [96, 95, 99, 90],
-    // Platzhalter – den endgültigen Text schreibt Krisztian
-    ability: 'Platzhalter – die Fähigkeit von St. Ivan folgt.',
+    // Forkbomb (Idee: Krisztian) – wirkt auf gegnerische Karten, also erst im kommenden Spielmodus
+    ability: '„Forkbomb“: Alle gegnerischen Karten werden 20 % langsamer, jede Runde lässt der Effekt um 2 % nach. Reinigende Karten (z. B. St. Ivans „Backup“) heben ihn auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.',
   },
 };

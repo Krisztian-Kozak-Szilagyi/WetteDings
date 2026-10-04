@@ -225,9 +225,9 @@
   </section>
 
   <section class="stats-block" id="lotterie">
-    <%- blockHead('Wochen- &amp; Monats-Lotterie', 'Lospreis und Gewinn aus der Bank. Der Gewinner bekommt alle Einsätze und zusätzlich diesen Bank-Gewinn (Geld, Booster Packs, Folien). Werden keine Lose verkauft, verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die gerade laufende Runde.') %>
+    <%- blockHead('Lotterien', 'Lospreis und Gewinn aus der Bank (Topf der Bank). Der Gewinner bekommt alle Einsätze und zusätzlich diesen Bank-Gewinn (Geld, Booster Packs, Folien). Werden keine Lose verkauft, verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die gerade laufende Runde.') %>
     <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
-    <% [['woche', 'Wochen-Lotterie (sonntags)'], ['monat', 'Monats-Lotterie (am 28.)']].forEach(([key, label]) => { const ls = lottoSettings[key]; %>
+    <% [['taeglich', 'Tages-Lotterie'], ['woche', 'Wochen-Lotterie (sonntags)'], ['monat', 'Monats-Lotterie (am 28.)']].forEach(([key, label]) => { const ls = lottoSettings[key]; %>
       <div class="card">
         <form method="post" data-reauth action="/admin/lotterie" class="form admin-tcg-form">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">

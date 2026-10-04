@@ -77,3 +77,10 @@ test('Einstellungen Wochen-/Monats-Lotterie prüfen', () => {
   assert.ok(settingsError({ ...ok, prizeFoils: -1 }));
   assert.ok(settingsError({ ...ok, prizeCash: 1.5 }));
 });
+
+test('Tages-Lotterie: Bank-Topf im Admin-Panel einstellbar, Standard 0', () => {
+  const lottery = require('../src/services/lotteryService');
+  const config = require('../src/config');
+  assert.deepStrictEqual(lottery.settings.taeglich, { ticketPrice: config.lotteryTicketPrice, prizeCash: 0, prizePacks: 0, prizeFoils: 0 });
+  assert.strictEqual(lottery.ticketPrice('taeglich'), config.lotteryTicketPrice);
+});

@@ -38,13 +38,14 @@ const kindByKey = (key) => KINDS.find((k) => k.key === key) || null;
 /** Art einer Runde (aus ihrem kind-Feld) */
 const kindOfRound = (round) => KINDS.find((k) => k.kind === (round.kind || undefined));
 
-// ---------- Einstellungen Wochen-/Monats-Lotterie (Admin-Panel) ----------
+// ---------- Einstellungen aller Lotterien (Admin-Panel): Lospreis und Bank-Gewinn ("Topf" der Bank) ----------
 const MAX = { ticketPrice: 100000000, prizeCash: 100000000000, prizePacks: 500, prizeFoils: 100 };
 const DEFAULTS = {
+  taeglich: { ticketPrice: config.lotteryTicketPrice, prizeCash: 0, prizePacks: 0, prizeFoils: 0 },
   woche: { ticketPrice: 10000, prizeCash: 0, prizePacks: 50, prizeFoils: 0 },
   monat: { ticketPrice: 10000, prizeCash: 1000000, prizePacks: 50, prizeFoils: 2 },
 };
-const settings = { woche: { ...DEFAULTS.woche }, monat: { ...DEFAULTS.monat } };
+const settings = { taeglich: { ...DEFAULTS.taeglich }, woche: { ...DEFAULTS.woche }, monat: { ...DEFAULTS.monat } };
 const validInt = (v, max, min = 0) => Number.isInteger(v) && v >= min && v <= max;
 
 /** Prüft die Werte; gibt eine Fehlermeldung zurück oder null */
@@ -80,7 +81,7 @@ async function saveSettings({ admin, key, values }) {
   await LotterySettings.updateOne({ _id: key }, { $set: { ...clean, updatedByName: admin.username } }, { upsert: true });
   const before = { ...settings[key] };
   apply(key, clean);
-  await LotteryRound.updateOne({ kind: key, status: 'offen' }, { $set: prizesOf(key) });
+  await LotteryRound.updateOne({ ...kindByKey(key).filter, status: 'offen' }, { $set: prizesOf(key) }); // tägliche Runden: ohne kind
   await logSettingsChange({ area: 'lotterie', before: { [key]: before }, after: { [key]: { ...settings[key] } }, by: admin });
 }
 

@@ -459,9 +459,9 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
   res.redirect(panelUrl('spielwerte', 'folie'));
 });
 
-// Wochen-/Monats-Lotterie: Lospreis und Gewinn aus der Bank (gilt sofort, auch für die offene Runde)
+// Lotterien (täglich, Woche, Monat): Lospreis und Gewinn aus der Bank (gilt sofort, auch für die offene Runde)
 router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
-  const k = lotteryService.KINDS.find((x) => x.key !== 'taeglich' && x.key === str(req.body.kind));
+  const k = lotteryService.KINDS.find((x) => x.key === str(req.body.kind));
   const count = (v) => (/^\d{1,6}$/.test(str(v).trim()) ? Number(str(v).trim()) : NaN);
   if (!k) {
     req.flash('error', 'Diese Lotterie gibt es nicht.');
