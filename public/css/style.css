@@ -4719,10 +4719,13 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 a.dash-meta:hover { color: var(--color-accent-400); }
 .dash-col-main { grid-column: span 8; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .dash-wealth { padding: 20px 22px; box-shadow: 0 0 0 1px var(--color-accent-800), 0 0 48px color-mix(in srgb, var(--color-accent) 8%, transparent); }
-.dash-today { grid-column: span 4; }
+.dash-col-side { grid-column: span 4; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* Das letzte Element jeder Spalte füllt die Höhe auf – so bleibt neben der längeren Spalte keine Lücke */
+.dash-col-main > .dash-bets, .dash-col-side > .dash-album { flex: 1 1 auto; }
+.dash-today .dash-task { padding-top: 7px; padding-bottom: 7px; }
+.dash-today .dash-tasks { gap: 2px; }
 .dash-ticker { grid-column: 1 / -1; }
-.dash-bets { grid-column: span 7; }
-.dash-album { grid-column: span 5; min-height: 300px; }
+.dash-album { min-height: 280px; }
 /* Countdowns: Leiste unter der Begrüßung */
 .dash-cds { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: -8px; }
 .dash-cds .dash-cd { margin: 0; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
@@ -4841,7 +4844,7 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .dash-fav-grid.tcg-favs { grid-template-columns: repeat(auto-fill, minmax(120px, 160px)); }
 
 @media (max-width: 1100px) {
-  .dash-col-main, .dash-today, .dash-bets, .dash-album, .dash-forum, .dash-notes { grid-column: 1 / -1; }
+  .dash-col-main, .dash-col-side, .dash-forum, .dash-notes { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
   .dash-hero { padding: 24px 18px 22px; }

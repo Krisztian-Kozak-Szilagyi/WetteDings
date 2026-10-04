@@ -97,88 +97,90 @@
           </a>
         <% }) %>
       </section>
+
+      <%# ---------- Offene Wetten ---------- %>
+      <section class="dash-card dash-bets" aria-labelledby="dash-bets-h">
+        <div class="dash-card-head">
+          <h2 id="dash-bets-h">Deine offenen Wetten</h2>
+          <% if (d.bets.count) { %><span class="dash-meta"><%= d.bets.count %> · <%= euro(d.bets.total) %> im Spiel</span><% } %>
+        </div>
+        <% if (!d.bets.list.length) { %>
+          <div class="dash-empty">
+            <p>Gerade läuft nichts. Zeit für einen Tipp?</p>
+            <a class="btn btn-ghost btn-sm" href="/wetten">Offene Wetten ansehen</a>
+          </div>
+        <% } else { %>
+          <ul class="dash-list">
+            <% d.bets.list.forEach((b) => { %>
+              <li>
+                <a class="dash-bet" href="/wetten/<%= b.id %>">
+                  <span class="dash-bet-main">
+                    <strong><% if (b.duel) { %><span class="dash-tag">Duell</span> <% } %><%= b.title %></strong>
+                    <small><% if (b.picked) { %>Dein Tipp: <span class="dash-pick"><%= b.picked %></span> · <% } %><%= b.open ? 'Einsatzschluss ' + relTime(b.at) : 'Wartet auf das Ergebnis' %></small>
+                  </span>
+                  <span class="dash-bet-money"><strong><%= euro(b.stake) %></strong><small>Topf <%= euro(b.pot) %></small></span>
+                </a>
+              </li>
+            <% }) %>
+          </ul>
+          <% if (d.bets.count > d.bets.list.length) { %><a class="dash-more" href="/wetten?tab=meine">Alle <%= d.bets.count %> ansehen →</a><% } %>
+        <% } %>
+      </section>
     </div>
 
-    <%# ---------- Heute ---------- %>
-    <section class="dash-card dash-today" aria-labelledby="dash-today-h">
-      <div class="dash-card-head">
-        <h2 id="dash-today-h">Heute</h2>
-        <span class="dash-ring" title="<%= t.done %> von <%= t.items.length %> erledigt">
-          <svg viewBox="0 0 52 52" aria-hidden="true">
-            <circle class="dash-ring-bg" cx="26" cy="26" r="22"/>
-            <circle class="dash-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.items.length ? t.done / t.items.length : 0))).toFixed(1) %>"/>
-          </svg>
-          <span><%= t.done %>/<%= t.items.length %></span>
-        </span>
-      </div>
-      <ul class="dash-tasks">
-        <% t.items.forEach((it) => { %>
-          <li>
-            <a class="dash-task<%= it.done ? ' is-done' : '' %>" href="<%= it.href %>">
-              <span class="dash-check" aria-hidden="true"><% if (it.done) { %><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg><% } %></span>
-              <span class="dash-task-text">
-                <strong><%= it.label %></strong>
-                <small><%= it.text %><% if (it.at && !it.done) { %> · <%= relTime(it.at) %><% } %></small>
-              </span>
-              <% if (it.progress) { %>
-                <span class="dash-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>">
-                  <span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span>
-                </span>
-              <% } %>
-              <span class="dash-arrow" aria-hidden="true">→</span>
-            </a>
-          </li>
-        <% }) %>
-      </ul>
-    </section>
-
-
-    <%# ---------- Offene Wetten ---------- %>
-    <section class="dash-card dash-bets" aria-labelledby="dash-bets-h">
-      <div class="dash-card-head">
-        <h2 id="dash-bets-h">Deine offenen Wetten</h2>
-        <% if (d.bets.count) { %><span class="dash-meta"><%= d.bets.count %> · <%= euro(d.bets.total) %> im Spiel</span><% } %>
-      </div>
-      <% if (!d.bets.list.length) { %>
-        <div class="dash-empty">
-          <p>Gerade läuft nichts. Zeit für einen Tipp?</p>
-          <a class="btn btn-ghost btn-sm" href="/wetten">Offene Wetten ansehen</a>
+    <div class="dash-col-side">
+      <%# ---------- Heute ---------- %>
+      <section class="dash-card dash-today" aria-labelledby="dash-today-h">
+        <div class="dash-card-head">
+          <h2 id="dash-today-h">Heute</h2>
+          <span class="dash-ring" title="<%= t.done %> von <%= t.items.length %> erledigt">
+            <svg viewBox="0 0 52 52" aria-hidden="true">
+              <circle class="dash-ring-bg" cx="26" cy="26" r="22"/>
+              <circle class="dash-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.items.length ? t.done / t.items.length : 0))).toFixed(1) %>"/>
+            </svg>
+            <span><%= t.done %>/<%= t.items.length %></span>
+          </span>
         </div>
-      <% } else { %>
-        <ul class="dash-list">
-          <% d.bets.list.forEach((b) => { %>
+        <ul class="dash-tasks">
+          <% t.items.forEach((it) => { %>
             <li>
-              <a class="dash-bet" href="/wetten/<%= b.id %>">
-                <span class="dash-bet-main">
-                  <strong><% if (b.duel) { %><span class="dash-tag">Duell</span> <% } %><%= b.title %></strong>
-                  <small><% if (b.picked) { %>Dein Tipp: <span class="dash-pick"><%= b.picked %></span> · <% } %><%= b.open ? 'Einsatzschluss ' + relTime(b.at) : 'Wartet auf das Ergebnis' %></small>
+              <a class="dash-task<%= it.done ? ' is-done' : '' %>" href="<%= it.href %>">
+                <span class="dash-check" aria-hidden="true"><% if (it.done) { %><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg><% } %></span>
+                <span class="dash-task-text">
+                  <strong><%= it.label %></strong>
+                  <small><%= it.text %><% if (it.at && !it.done) { %> · <%= relTime(it.at) %><% } %></small>
                 </span>
-                <span class="dash-bet-money"><strong><%= euro(b.stake) %></strong><small>Topf <%= euro(b.pot) %></small></span>
+                <% if (it.progress) { %>
+                  <span class="dash-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>">
+                    <span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span>
+                  </span>
+                <% } %>
+                <span class="dash-arrow" aria-hidden="true">→</span>
               </a>
             </li>
           <% }) %>
         </ul>
-        <% if (d.bets.count > d.bets.list.length) { %><a class="dash-more" href="/wetten?tab=meine">Alle <%= d.bets.count %> ansehen →</a><% } %>
-      <% } %>
-    </section>
+      </section>
 
-    <%# ---------- Album (wie auf der TCG-Seite) ---------- %>
-    <a class="tcg-album-tile dash-album" href="/tcg/album">
-      <span class="tcg-fan" aria-hidden="true">
-        <% d.album.fan.forEach((f) => { %><img src="<%= f.card.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= f.sample ? 'is-sample' : '' %>"><% }) %>
-      </span>
-      <span class="tcg-album-foot">
-        <span class="tcg-album-text">
-          <span class="kicker">Sammlung</span>
-          <span class="tcg-album-title">Zum Album</span>
-          <span class="tcg-progress">
-            <span class="progress"><span style="width: <%= d.album.total ? Math.round(d.album.owned / d.album.total * 100) : 0 %>%"></span></span>
-            <span class="tcg-progress-num"><%= d.album.owned %> / <%= d.album.total %></span>
-          </span>
+
+      <%# ---------- Album (wie auf der TCG-Seite) ---------- %>
+      <a class="tcg-album-tile dash-album" href="/tcg/album">
+        <span class="tcg-fan" aria-hidden="true">
+          <% d.album.fan.forEach((f) => { %><img src="<%= f.card.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= f.sample ? 'is-sample' : '' %>"><% }) %>
         </span>
-        <span class="tcg-album-arrow" aria-hidden="true">→</span>
-      </span>
-    </a>
+        <span class="tcg-album-foot">
+          <span class="tcg-album-text">
+            <span class="kicker">Sammlung</span>
+            <span class="tcg-album-title">Zum Album</span>
+            <span class="tcg-progress">
+              <span class="progress"><span style="width: <%= d.album.total ? Math.round(d.album.owned / d.album.total * 100) : 0 %>%"></span></span>
+              <span class="tcg-progress-num"><%= d.album.owned %> / <%= d.album.total %></span>
+            </span>
+          </span>
+          <span class="tcg-album-arrow" aria-hidden="true">→</span>
+        </span>
+      </a>
+    </div>
 
     <%# ---------- Forum ---------- %>
     <section class="dash-card dash-forum" aria-labelledby="dash-forum-h">
