@@ -565,8 +565,9 @@ const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
-  const key = logByKey[query.log] ? query.log : 'handel';
-  return { key, data: await LOADERS[key](query, opts) };
+  // Schlüssel mit fester Liste vergleichen (kein Zugriff über den Nutzerwert)
+  const [key, loader] = Object.entries(LOADERS).find(([k]) => k === query.log && logByKey[k]) || ['handel', LOADERS.handel];
+  return { key, data: await loader(query, opts) };
 }
 
 module.exports = {
