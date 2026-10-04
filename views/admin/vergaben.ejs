@@ -35,11 +35,11 @@
         <select name="item"><% itemTypes.forEach((t) => { %><option value="<%= t.key %>"><%= t.label %></option><% }) %></select>
       </label>
       <label class="field"><span>An</span>
-        <select name="user" required>
-          <option value="">– Mitglied auswählen –</option>
-          <option value="alle" data-not="entzug">Alle Mitglieder (<%= users.length %>)</option>
-          <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
-        </select>
+        <input type="text" name="user" list="grant-members" autocomplete="off" maxlength="40" placeholder="Name tippen oder auswählen" required>
+        <datalist id="grant-members">
+          <option value="Alle Mitglieder (<%= users.length %>)" data-not="entzug"></option>
+          <% users.forEach((u) => { %><option value="<%= u.username %>"></option><% }) %>
+        </datalist>
       </label>
       <label class="field grant-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
     </div>

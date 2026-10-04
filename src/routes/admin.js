@@ -655,9 +655,24 @@ router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL)
 
 // Ein Formular für alle Vergaben (Reiter "Vergaben"): art = pack | karte | item | entzug; user = Mitglied oder "alle".
 // Die Felder heißen je Art anders (pack, card, item) und werden für die einzelnen Vergaben umbenannt.
+// "alle" oder der Vorschlag "Alle Mitglieder (12)" – genau so, damit ein Name wie "Allessandro" nicht passt
+const ALL_MEMBERS = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i;
+
 router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
   const art = str(req.body.art);
-  const body = req.body;
+  // Empfänger kommt als Name (Eingabefeld mit Vorschlägen): in die ID umwandeln, "Alle Mitglieder" -> "alle"
+  const target = str(req.body.user).trim();
+  let user = target;
+  if (ALL_MEMBERS.test(target)) user = 'alle';
+  else if (target && !mongoose.isValidObjectId(target)) {
+    const found = await User.findOne({ usernameLower: target.toLowerCase(), deletedAt: null }).select('_id').lean();
+    if (!found) {
+      req.flash('error', `Es gibt kein Mitglied „${target.slice(0, 40)}“.`);
+      return res.redirect(GRANT_URL);
+    }
+    user = String(found._id);
+  }
+  const body = { ...req.body, user };
   if (art === 'pack') {
     req.body = { ...body, type: str(body.pack) };
     await (str(body.user) === 'alle' ? blessEveryone(req) : grantPacksTo(req));
@@ -669,7 +684,10 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
     await grantItemsTo(req);
   } else if (art === 'entzug') {
     if (str(body.user) === 'alle') req.flash('error', 'Karten lassen sich nur bei einem einzelnen Mitglied entfernen.');
-    else await revokeCardFrom(req);
+    else {
+      req.body = body;
+      await revokeCardFrom(req);
+    }
   } else {
     req.flash('error', 'Bitte auswählen, was vergeben werden soll.');
   }

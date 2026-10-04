@@ -4878,7 +4878,9 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 
 /* Vergaben: ein Formular */
 .grant-form { max-width: 760px; }
-.grant-arts { flex-wrap: wrap; }
+.grant-arts { flex-wrap: wrap; width: fit-content; max-width: 100%; }
+.grant-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.grant-form legend { padding: 0; margin-bottom: 6px; }
 .grant-art { position: relative; }
 .grant-art input { position: absolute; opacity: 0; pointer-events: none; }
 .grant-art span { display: block; padding: 5px 12px; border-radius: 8px; color: var(--muted); font-size: .88rem; font-weight: 600; cursor: var(--cur-pointer, pointer); white-space: nowrap; }

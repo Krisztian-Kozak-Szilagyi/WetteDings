@@ -881,6 +881,8 @@
   if (grant) {
     var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], entzug: [50, 50] }; // [ein Mitglied, alle]
     var user = grant.querySelector('[name="user"]');
+    var members = document.getElementById(user.getAttribute('list'));
+    var allOption = members ? members.querySelector('[data-not]') : null;
     var count = grant.querySelector('[name="count"]');
     var submit = grant.querySelector('[data-grant-submit]');
     var update = function () {
@@ -891,19 +893,21 @@
         f.hidden = !on;
         f.querySelectorAll('select, input').forEach(function (i) { i.disabled = !on; i.required = on; });
       });
-      user.querySelectorAll('[data-not]').forEach(function (o) {
-        var off = o.getAttribute('data-not') === art;
-        o.hidden = off;
-        o.disabled = off;
-        if (off && user.value === o.value) user.value = '';
-      });
-      var max = MAX[art][user.value === 'alle' ? 1 : 0];
+      // "Alle Mitglieder" nur, wo es erlaubt ist (Vorschlag aus der Liste nehmen bzw. wieder einsetzen)
+      var toAll = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i.test(user.value.trim()); // wie ALL_MEMBERS in routes/admin.js
+      if (allOption) {
+        if (art === 'entzug' && allOption.parentNode) allOption.remove();
+        if (art !== 'entzug' && !allOption.parentNode) members.insertBefore(allOption, members.firstChild);
+        if (art === 'entzug' && toAll) user.value = '';
+      }
+      var max = MAX[art][toAll && art !== 'entzug' ? 1 : 0];
       count.max = max;
       if (Number(count.value) > max) count.value = max;
       submit.textContent = checked ? checked.getAttribute('data-button') : 'Vergeben';
       submit.className = 'btn ' + (art === 'entzug' ? 'btn-danger' : 'btn-primary');
     };
     grant.addEventListener('change', update);
+    user.addEventListener('input', update);
     update();
   }
 })();
