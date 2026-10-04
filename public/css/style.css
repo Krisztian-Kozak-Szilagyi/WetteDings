@@ -4743,7 +4743,6 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .dash-chart-dot { position: absolute; left: var(--x); top: calc(var(--y) * 110px / 100); width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--color-accent-300); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 25%, transparent), 0 0 16px var(--color-accent); }
 .dash-chart-days { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--color-neutral-600); }
 .dash-chart-days span:last-child { color: var(--color-accent-400); font-weight: 600; }
-.dash-chart-empty { margin: 0; align-self: center; }
 .dash-split { display: flex; gap: 3px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--color-neutral-900); }
 .dash-split span { flex-basis: 0; min-width: 4px; }
 .dash-split-cash { background: var(--dash-cash); }

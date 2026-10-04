@@ -63,8 +63,6 @@
             <span class="dash-chart-dot" style="--x: <%= (w.curve.last[0] / 3).toFixed(2) %>%; --y: <%= (w.curve.last[1] / 0.8).toFixed(2) %>%"></span>
             <figcaption class="dash-chart-days"><% w.points.forEach((p) => { %><span><%= dayLabel(p.day) %></span><% }) %></figcaption>
           </figure>
-        <% } else { %>
-          <p class="dash-chart-empty muted small">Der Verlauf füllt sich ab morgen – jeden Tag kommt ein Punkt dazu.</p>
         <% } %>
       </div>
       <div class="dash-split" role="img" aria-label="Aufteilung des Vermögens">
