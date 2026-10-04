@@ -113,6 +113,8 @@ const ledgerLabels = {
   ihk_lohn: 'IHK-Quest geschafft',
   dungeon_lohn: 'Dungeon-Beute',
   erfolg: 'Erfolg freigeschaltet',
+  team_gutschrift: 'Gutschrift vom Team',
+  team_abzug: 'Abzug durch das Team',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',

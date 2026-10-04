@@ -93,6 +93,26 @@ async function sellItems({ user, type, count = 1 }) {
   });
 }
 
+/**
+ * Gegenstände aus dem Inventar entfernen (Admin/Dev, z. B. nach einer falschen Vergabe). Gegenstände in einem
+ * offenen Handelsangebot bleiben. Gibt { type, removed, remaining } zurück.
+ */
+async function revokeItems({ userId, type, count = 1 }) {
+  const t = itemTypeByKey[type];
+  if (!t) throw new UserError('Diesen Gegenstand gibt es nicht.');
+  const result = await inTransaction(async (session) => {
+    const free = await freeItems(userId, t.key, session);
+    if (free.length < count) throw new UserError(free.length ? `Das Mitglied hat nur ${free.length} freie ${t.label} (der Rest steht im Handel).` : `Das Mitglied hat keine freie ${t.label}.`);
+    const docs = free.slice(-count); // die neuesten
+    await claimItems(docs, userId, session);
+    const res = await Item.deleteMany({ _id: { $in: docs.map((d) => d._id) }, user: userId }, { session });
+    if (res.deletedCount !== docs.length) throw new UserError('Das Inventar hat sich geändert. Bitte versuche es erneut.');
+    return { type: t, removed: docs.length, remaining: free.length - docs.length };
+  });
+  await notify(userId, { area: 'Inventar', href: '/inventar', text: `Das Team hat ${result.removed > 1 ? result.removed + '× ' : 'eine '}${t.label} aus deinem Inventar entfernt.` });
+  return result;
+}
+
 /** Gegenstände verschenken (Admin/Dev oder Fund). Optional in einer laufenden Transaktion. */
 async function grantItems({ userIds, type, count = 1, source, session }) {
   const t = itemTypeByKey[type];
@@ -193,4 +213,4 @@ const newItemCount = (user) => Item.countDocuments({ user: user._id, createdAt: 
 const notifyGift = (userIds, t, count) =>
   notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
 
-module.exports = { newItemCount, ITEM_TYPES, itemTypeByKey, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };
+module.exports = { newItemCount, revokeItems, ITEM_TYPES, itemTypeByKey, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

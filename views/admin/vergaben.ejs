@@ -1,34 +1,47 @@
 <%
   // Ein Formular für alle Vergaben (POST /admin/vergeben). Ohne JS sind alle Felder sichtbar; mit JS nur die zur Art
-  // passenden (public/js/app.js, [data-grant-form]). data-for: bei welchen Arten ein Feld gebraucht wird.
-  const ARTS = [
-    { key: 'pack', label: 'Booster Pack', button: 'Packs vergeben' },
-    { key: 'karte', label: 'Karte', button: 'Karte vergeben' },
-    { key: 'item', label: 'Gegenstand', button: 'Gegenstand vergeben' },
-    { key: 'entzug', label: 'Karte entfernen', button: 'Karte entfernen' },
+  // passenden (public/js/app.js, [data-grant-form]). data-for: bei welchem "Was" ein Feld gebraucht wird.
+  // Zwei Schritte: Aktion (vergeben/entfernen) und was – der Server macht daraus die Art (routes/admin.js GRANT_ART)
+  const WHAT = [
+    { key: 'pack', label: 'Booster Pack' },
+    { key: 'karte', label: 'Karte' },
+    { key: 'item', label: 'Gegenstand' },
+    { key: 'geld', label: 'Geld' },
   ];
-  const KIND = { pack: ['Pack', 'badge-offen'], karte: ['Karte', 'badge-entschieden'], item: ['Gegenstand', 'badge-entschieden'], entzug: ['Entfernt', 'badge-streitig'] };
+  const KIND = {
+    pack: ['Pack', 'badge-offen'], karte: ['Karte', 'badge-entschieden'], item: ['Gegenstand', 'badge-entschieden'], geld: ['Geld', 'badge-entschieden'],
+    packentzug: ['Pack entfernt', 'badge-streitig'], entzug: ['Karte entfernt', 'badge-streitig'], itementzug: ['Gegenstand entfernt', 'badge-streitig'], geldabzug: ['Geld abgezogen', 'badge-streitig'],
+  };
   const cardOptions = () => grantCards.map((g) => `<optgroup label="${g.rarity.label}${g.rarity.hidden ? ' (geheim)' : ''}">${g.cards.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}</optgroup>`).join('');
 %>
 
 <section class="stats-block" id="vergeben">
-  <%- blockHead('Vergeben', 'Vergaben greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe steht mit deinem Namen im Protokoll und muss mit deinem Passwort bestätigt werden.<br><br><strong>An alle:</strong> Packs 1–10, Karten 1–5, Gegenstände 1–5 je Mitglied. Karten entfernen geht nur bei einem Mitglied; gesperrte Exemplare (Quest, Handelsangebot) bleiben.') %>
+  <%- blockHead('Vergeben', 'Vergaben greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe steht mit deinem Namen im Protokoll und muss mit deinem Passwort bestätigt werden.<br><br><strong>Vergeben an alle:</strong> Packs 1–10, Karten 1–5, Gegenstände 1–5 je Mitglied.<br><strong>Entfernen</strong> geht nur bei einem Mitglied: Packs (neueste zuerst), Karten und Gegenstände – gesperrte Exemplare (Quest, Handelsangebot) bleiben. Geld wird nie unter 0 € abgezogen und erscheint im Kontoauszug als „Gutschrift vom Team“ bzw. „Abzug durch das Team“.') %>
   <p class="panel-warning-line"><span aria-hidden="true">!</span> Nur für Bugfixes, Tests und Aktionen – alles steht im Protokoll.</p>
   <form method="post" data-reauth action="/admin/vergeben" class="card form grant-form" data-grant-form data-confirm="Diese Vergabe wirklich ausführen?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <fieldset class="field">
-      <legend>Was?</legend>
-      <div class="stats-range grant-arts" role="radiogroup">
-        <% ARTS.forEach((a, i) => { %>
-          <label class="grant-art"><input type="radio" name="art" value="<%= a.key %>" data-button="<%= a.button %>" <%= i === 0 ? 'checked' : '' %>><span><%= a.label %></span></label>
-        <% }) %>
-      </div>
-    </fieldset>
+    <div class="grant-steps">
+      <fieldset class="field">
+        <legend>Aktion</legend>
+        <div class="stats-range grant-arts" role="radiogroup">
+          <label class="grant-art"><input type="radio" name="aktion" value="vergeben" checked><span>Vergeben</span></label>
+          <label class="grant-art grant-art-danger"><input type="radio" name="aktion" value="entfernen"><span>Entfernen</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="field">
+        <legend>Was</legend>
+        <div class="stats-range grant-arts" role="radiogroup">
+          <% WHAT.forEach((w, i) => { %>
+            <label class="grant-art"><input type="radio" name="was" value="<%= w.key %>" <%= i === 0 ? 'checked' : '' %>><span><%= w.label %></span></label>
+          <% }) %>
+        </div>
+      </fieldset>
+    </div>
     <div class="grant-fields">
       <label class="field" data-for="pack"><span>Booster Pack</span>
         <select name="pack"><% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
       </label>
-      <label class="field" data-for="karte entzug"><span>Karte</span>
+      <label class="field" data-for="karte"><span>Karte</span>
         <select name="card"><option value="">– auswählen –</option><%- cardOptions() %></select>
       </label>
       <label class="field" data-for="item"><span>Gegenstand</span>
@@ -37,11 +50,12 @@
       <label class="field"><span>An</span>
         <input type="text" name="user" list="grant-members" autocomplete="off" maxlength="40" placeholder="Name tippen oder auswählen" required>
         <datalist id="grant-members">
-          <option value="Alle Mitglieder (<%= users.length %>)" data-not="entzug"></option>
+          <option value="Alle Mitglieder (<%= users.length %>)" data-not="entfernen"></option>
           <% users.forEach((u) => { %><option value="<%= u.username %>"></option><% }) %>
         </datalist>
       </label>
-      <label class="field grant-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      <label class="field grant-count" data-for="geld"><span>Betrag in €</span><input type="text" name="amount" inputmode="decimal" placeholder="z. B. 250,00"></label>
+      <label class="field grant-count" data-for="pack karte item"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
     </div>
     <div class="grant-submit"><button class="btn btn-primary" type="submit" data-grant-submit>Vergeben</button></div>
   </form>

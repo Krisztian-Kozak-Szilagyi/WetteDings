@@ -58,6 +58,7 @@ const LEDGER_GROUPS = [
   { key: 'lotterie', label: 'Lotterie', types: ['lotto_los', 'lotto_gewinn'], hint: 'noch nicht gezogene und verfallene Töpfe' },
   { key: 'handel', label: 'Handel', types: ['handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'], hint: 'Handelssteuer' },
   { key: 'loeschung', label: 'Gelöschte Konten', types: ['konto_geloescht'], hint: 'verfallenes Guthaben' },
+  { key: 'team', label: 'Vergaben (Team)', types: ['team_gutschrift', 'team_abzug'], hint: 'Spielgeld, das Admin oder Devs gutgeschrieben oder abgezogen haben' },
 ];
 const groupOfType = Object.fromEntries(LEDGER_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 
