@@ -20,6 +20,8 @@ async function migrate() {
     }
   }
   await LotteryRound.createIndexes();
+  // Erfolge: der eindeutige Index (Mitglied + Erfolg) muss stehen, bevor der erste Erfolg vergeben wird
+  await require('./models/Achievement').createIndexes();
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [

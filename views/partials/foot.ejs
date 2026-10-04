@@ -1,6 +1,24 @@
   </main>
   <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
+  <%# Neuer Erfolg: erscheint auf jeder Seite, bis er mit OK bestätigt ist (Esc schließt nicht, siehe app.js) %>
+  <% if (currentUser && typeof achPopup !== 'undefined' && achPopup) { %>
+    <dialog class="ach-pop<%= achPopup.unique ? ' is-unique' : '' %>" data-ach-pop aria-labelledby="ach-pop-title" aria-describedby="ach-pop-text">
+      <span class="ach-pop-rays" aria-hidden="true"></span>
+      <p class="ach-pop-kicker">Erfolg freigeschaltet</p>
+      <img class="ach-pop-icon" src="/img/erfolge/<%= achPopup.key %>.svg?v=<%= assetVersion %>" alt="" width="132" height="132">
+      <h2 id="ach-pop-title"><%= achPopup.name %></h2>
+      <p id="ach-pop-text" class="ach-pop-text"><%= achPopup.text %></p>
+      <% if (achPopup.reward) { %><p class="ach-pop-reward">+<%= euro(achPopup.reward) %></p><% } %>
+      <form method="post" action="/erfolge/gesehen">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" value="<%= achPopup.id %>">
+        <input type="hidden" name="zurueck" value="<%= achPopupBack %>">
+        <button class="btn btn-primary ach-pop-ok" type="submit" autofocus>OK</button>
+      </form>
+      <% if (achPopup.left > 1) { %><p class="muted small ach-pop-more">Noch <%= achPopup.left - 1 %> weitere<%= achPopup.left - 1 === 1 ? 'r Erfolg wartet' : ' Erfolge warten' %> auf dich.</p><% } %>
+    </dialog>
+  <% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>

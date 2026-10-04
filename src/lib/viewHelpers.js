@@ -110,6 +110,7 @@ const ledgerLabels = {
   item_verkauf: 'Gegenstand verkauft',
   ihk_lohn: 'IHK-Quest geschafft',
   dungeon_lohn: 'Dungeon-Beute',
+  erfolg: 'Erfolg freigeschaltet',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
@@ -137,6 +138,9 @@ function signedPercent(x) {
   return `${x > 0 ? '+' : ''}${v} %`;
 }
 
+/** Profilbild eines Mitglieds. Noch für alle der Platzhalter – später kann jeder sein eigenes Bild hochladen. */
+const avatarUrl = () => '/img/avatar-placeholder.svg';
+
 const editFieldLabels = { title: 'Titel', description: 'Beschreibung' };
 
 module.exports = {
@@ -162,4 +166,5 @@ module.exports = {
   coinPrice,
   coinAmount,
   signedPercent,
+  avatarUrl,
 };

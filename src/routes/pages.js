@@ -2,7 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
-const { str } = require('../lib/util');
+const { str, safeRedirect } = require('../lib/util');
 const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
@@ -10,6 +10,8 @@ const rankService = require('../services/rankService');
 const { inventory, favoriteList } = require('../tcg/tcgService');
 const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
+const achievementService = require('../achievements/achievementService');
+const achievementLogic = require('../achievements/logic');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -29,23 +31,31 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy bio pinnedAchievements').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
-  const [owned, mine, statsAgg] = await Promise.all([
+  const [owned, mine, statsAgg, earned, shares, playmates] = await Promise.all([
     inventory(profile._id),
     inventory(req.user._id), // eigene Karten: "du besitzt …" in der großen Ansicht
     Position.aggregate([
       { $match: { user: profile._id, payout: { $ne: null } } },
       { $group: { _id: null, won: { $sum: { $cond: [{ $gt: ['$payout', '$amount'] }, 1, 0] } }, lost: { $sum: { $cond: [{ $eq: ['$payout', 0] }, 1, 0] } } } },
     ]),
+    achievementService.earnedOf(profile._id),
+    achievementService.shares(),
+    achievementService.playmates(profile._id),
   ]);
+  // Erfolge: Liste (freigeschaltete zuerst), angeheftete oben rechts – ohne eigene Auswahl die zwei neuesten
+  const achievements = achievementLogic.profileList(achievementService.ACHIEVEMENTS, earned, shares.counts, shares.members);
+  const earnedRows = achievements.filter((a) => a.earned);
+  const pinnedKeys = (profile.pinnedAchievements || []).filter((k) => earnedRows.some((a) => a.key === k));
+  const pinned = pinnedKeys.length ? pinnedKeys.map((k) => earnedRows.find((a) => a.key === k)) : earnedRows.slice(0, achievementLogic.PIN_MAX);
   const has = new Set(owned.map((o) => o._id));
   res.render('profil', {
     title: profile.username,
     profile,
     isMe: profile._id.equals(req.user._id),
     // Ban-Vermerk unter dem Namen (bleibt dauerhaft, auch nach Ablauf oder Unban) und Moderations-Menü für den Admin
-    ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), by: profile.bannedByName, reason: profile.banReason } : null,
+    ban: profile.bannedAt ? { active: deviceLogic.isBanned(profile), at: profile.bannedAt, by: profile.bannedByName, reason: profile.banReason } : null,
     canBan:
       req.user.isStaff &&
       !profile._id.equals(req.user._id) &&
@@ -62,8 +72,41 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln
     rarityByKey: catalog.rarityByKey,
+    achievements,
+    achievementCount: earnedRows.length,
+    achievementTotal: achievements.filter((a) => !a.unique || a.earned).length,
+    pinnedAchievements: pinned,
+    pinnedChosen: pinnedKeys.length > 0,
+    pinnedKeys,
+    playmates,
+    countTier: achievementLogic.countTier,
+    shareText: achievementLogic.shareText,
+    bioMax: achievementLogic.BIO_MAX,
     ownedCounts: Object.fromEntries(mine.map((o) => [o._id, o.n])),
   });
+});
+
+// Eigener Profiltext (für alle Mitglieder sichtbar)
+router.post('/profil/text', requireLogin, async (req, res) => {
+  await User.updateOne({ _id: req.user._id }, { $set: { bio: achievementLogic.cleanBio(req.body.text) } });
+  res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
+});
+
+// Erfolg oben rechts im Profil an- oder abheften (höchstens zwei)
+router.post('/profil/anheften', requireLogin, async (req, res) => {
+  const a = achievementService.find(str(req.body.erfolg));
+  if (a) {
+    const [me, earned] = await Promise.all([User.findById(req.user._id).select('pinnedAchievements').lean(), achievementService.earnedOf(req.user._id)]);
+    const next = achievementLogic.togglePin(me ? me.pinnedAchievements : [], a.key, earned.map((e) => e.key));
+    await User.updateOne({ _id: req.user._id }, { $set: { pinnedAchievements: next } });
+  }
+  res.redirect(`/profil/${encodeURIComponent(req.user.username)}#erfolge`);
+});
+
+// Fenster "Erfolg freigeschaltet" mit OK bestätigt – zurück auf die Seite, auf der es erschien
+router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
+  await achievementService.markSeen(req.user._id, str(req.body.id));
+  res.redirect(safeRedirect(str(req.body.zurueck), '/'));
 });
 
 // Sammlung eines Mitglieds (nur ansehen); bei fremden Sammlungen führt ein Klick auf eine Karte zum Tauschangebot

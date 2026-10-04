@@ -33,6 +33,10 @@ const userSchema = new Schema(
     realName: { type: String, default: null },
     // Rolle: 'dev' oder 'mod' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
     role: { type: String, enum: ['dev', 'mod', null], default: null },
+    // Profil: selbst geschriebener Text (höchstens 300 Zeichen, siehe achievements/logic.cleanBio) und bis zu
+    // zwei angeheftete Erfolge (Schlüssel aus src/achievements/list.js)
+    bio: { type: String, default: '' },
+    pinnedAchievements: { type: [String], default: [] },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
     forumSeenAt: { type: Date, default: null },
     // Admin/Dev: bis wann Geschäfte zwischen Mehrfach-Konten gesehen wurden (Abzeichen am Menüpunkt)

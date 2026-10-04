@@ -579,4 +579,20 @@
     '</filter></svg>';
   var add = function () { document.body.insertAdjacentHTML('afterbegin', svg); };
   if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+  // Neuer Erfolg: Fenster sofort öffnen; Esc schließt es nicht – es muss mit OK bestätigt werden
+  var onReady = function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); };
+  onReady(function () {
+    var pop = document.querySelector('[data-ach-pop]');
+    if (!pop || !pop.showModal) return;
+    pop.addEventListener('cancel', function (e) { e.preventDefault(); });
+    pop.showModal();
+  });
+
+  // Zeichenzähler für Textfelder: data-count="<id des Zählers>" (Emojis zählen als ein Zeichen)
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!el.hasAttribute || !el.hasAttribute('data-count')) return;
+    var out = document.getElementById(el.getAttribute('data-count'));
+    if (out) out.textContent = String(Array.from(el.value).length);
+  });
 })();

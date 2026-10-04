@@ -19,6 +19,7 @@ const roles = require('./services/roles');
 const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
 const notifyService = require('./services/notifyService');
+const achievementService = require('./achievements/achievementService');
 const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -43,6 +44,7 @@ function createApp() {
   app.use(compression());
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
   app.use(require('./routes/cardImage')); // Rahmen-Karten als SVG, ebenfalls ohne Session
+  app.use(require('./routes/achievementImage')); // Symbole der Erfolge als SVG
   app.use(express.urlencoded({ extended: false, limit: '20kb' }));
 
   app.use(
@@ -134,7 +136,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell, achPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -150,6 +152,7 @@ function createApp() {
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
         notifyService.forBell(u._id), // Glocke
+        achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
@@ -168,6 +171,8 @@ function createApp() {
         tradeAlerts,
         bellNotes: bell.list,
         bellUnread: bell.unread,
+        achPopup,
+        achPopupBack: req.originalUrl,
       });
     }
     next();
