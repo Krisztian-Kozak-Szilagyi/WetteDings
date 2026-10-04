@@ -27,6 +27,7 @@
             <div class="code-actions">
               <% if (!used) { %>
                 <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= formatCode(c.code) %>">Kopieren</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-invite-image="<%= formatCode(c.code) %>" data-src="/img/einladung.webp?v=<%= assetVersion %>">Als Bild</button>
               <% } %>
               <% if (currentUser.isAdmin || String(c.createdBy) === String(currentUser._id)) { %>
                 <form method="post" action="/admin/codes/<%= c._id %>/loeschen" data-confirm="Diesen Code löschen?">

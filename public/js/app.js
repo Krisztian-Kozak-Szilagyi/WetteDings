@@ -963,3 +963,55 @@
     groups.forEach(function (g) { if (g.open) { close(g); g.querySelector('summary').focus(); } });
   });
 })();
+
+// Einladungscode als Bild: der Code wird im Browser auf die Einladungskarte (Linie unter "INVITE-CODE") geschrieben
+// und als PNG heruntergeladen. Maße beziehen sich auf das Originalbild (1429 × 2000).
+(function () {
+  var buttons = document.querySelectorAll('[data-invite-image]');
+  if (!buttons.length) return;
+  var LINE = { x1: 320, x2: 1117, y: 833 }; // Linie im Bild
+  function draw(img, code) {
+    var c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    var k = c.width / 1429; // falls das Bild einmal in anderer Größe vorliegt
+    var maxW = (LINE.x2 - LINE.x1) * k * 0.92;
+    var size = 76 * k;
+    var text = code.split('').join(' ');
+    ctx.font = '700 ' + size + 'px ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace';
+    var w = ctx.measureText(text).width;
+    if (w > maxW) { size = size * maxW / w; ctx.font = '700 ' + size + 'px ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace'; }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#53ec96';
+    ctx.shadowColor = 'rgba(83, 236, 150, .75)';
+    ctx.shadowBlur = 24 * k;
+    var x = ((LINE.x1 + LINE.x2) / 2) * k;
+    var y = (LINE.y - 26) * k;
+    ctx.fillText(text, x, y);
+    ctx.shadowBlur = 0;
+    ctx.fillText(text, x, y);
+    return c;
+  }
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.getAttribute('data-invite-image');
+      var img = new Image();
+      img.onload = function () {
+        draw(img, code).toBlob(function (blob) {
+          if (!blob) return;
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'einladung-' + code + '.png';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+        }, 'image/png');
+      };
+      img.src = btn.getAttribute('data-src');
+    });
+  });
+})();
