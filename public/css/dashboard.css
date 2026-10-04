@@ -19,6 +19,10 @@
 /* Hero */
 /* Alle Reihen im selben Raster (3 : 2), damit die rechte Spalte überall auf einer Linie liegt */
 .dx-hero { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); align-items: center; }
+/* Links: Gruß, darunter die Countdowns; rechts das Vermögen über beide Zeilen */
+.dx-hero > .dx-hero-text { grid-column: 1; align-self: end; }
+.dx-hero > .dx-timers { grid-column: 1; align-self: start; }
+.dx-hero > .dx-wealth { grid-column: 2; grid-row: 1 / span 2; }
 .dx-hero-text { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .dx-kicker { display: flex; align-items: center; gap: 8px; color: var(--color-accent-300); }
 .dx-hero h1 { font-size: clamp(32px, 1.4rem + 2vw, 44px); line-height: 1.05; letter-spacing: -.025em; }
@@ -118,8 +122,7 @@
 /* Favoriten unten bündig mit „Heute“ (Platz bleibt oben) */
 .dx-favs { justify-content: flex-end; }
 /* Countdowns im Hero als Kacheln unter der Begrüßung */
-/* Nur so breit wie die linke Spalte (3 von 5 Teilen des Rasters) */
-.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; max-width: calc((100% - var(--dx-gap)) * 3 / 5); }
+.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
 /* --tc = Farbe der Kachel je Art */
 .dx-timer { --tc: var(--color-accent); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 14px 14px 12px; border-radius: 10px; color: var(--color-text);
   background: radial-gradient(110% 90% at 100% 0%, color-mix(in srgb, var(--tc) 22%, transparent), transparent 65%), linear-gradient(180deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 40%, var(--color-bg)));
@@ -161,7 +164,7 @@
 
 @media (max-width: 900px) {
   .dx { --dx-cols: minmax(0, 1fr); }
-  .dx-timers { max-width: none; }
+  .dx-hero > .dx-hero-text, .dx-hero > .dx-timers, .dx-hero > .dx-wealth { grid-column: 1; grid-row: auto; }
 }
 @media (max-width: 640px) {
   .dx { gap: 28px; }
