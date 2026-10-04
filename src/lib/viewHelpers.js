@@ -16,10 +16,12 @@ const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace
 /**
  * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
+ * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
+  if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
   return h;
 }
 /** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
