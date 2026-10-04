@@ -136,3 +136,87 @@ test('Hall of Fame: Lottogewinne nur mit bekanntem (nicht gelöschtem) Namen', (
   );
   assert.deepEqual(rows.map((r) => [r.name, r.amount]), [['Max', 90000], ['Anna', 1000]]);
 });
+
+// ---------- Reaktionen und Umfragen (#56) ----------
+const reactions = require('../src/forum/reactions');
+const polls = require('../src/forum/polls');
+const { can } = require('../src/forum/forumService');
+const { UserError } = require('../src/lib/util');
+
+test('Reaktionen: Zähler je Reaktion, eigene markiert, Namen im Tooltip, feste Reihenfolge', () => {
+  const docs = [
+    { post: 'p1', user: 'u1', userName: 'Max', reaction: 'herz' },
+    { post: 'p1', user: 'u2', userName: 'Anna', reaction: 'herz' },
+    { post: 'p1', user: 'u2', userName: 'Anna', reaction: 'daumen' },
+    { post: 'p2', user: 'u1', userName: 'Max', reaction: 'lachen' },
+    { post: 'p2', user: 'u3', userName: 'Tom', reaction: 'gibtsnicht' },
+  ];
+  const map = reactions.summarize(docs, 'u1');
+  const p1 = map.get('p1');
+  assert.deepEqual(p1.map((r) => r.key), reactions.REACTIONS.map((r) => r.key));
+  const herz = p1.find((r) => r.key === 'herz');
+  assert.deepEqual([herz.count, herz.mine, herz.who], [2, true, 'Max, Anna']);
+  const daumen = p1.find((r) => r.key === 'daumen');
+  assert.deepEqual([daumen.count, daumen.mine], [1, false]);
+  assert.equal(map.get('p2').reduce((s, r) => s + r.count, 0), 1, 'unbekannte Reaktion zählt nicht');
+  assert.ok(reactions.empty().every((r) => r.count === 0 && !r.mine));
+  assert.ok(reactions.whoText(Array.from({ length: 17 }, (_, i) => `n${i}`)).endsWith('und 2 weitere'));
+  assert.equal(reactions.REACTIONS.length, 6);
+});
+
+test('Reaktionen: nicht auf gelöschte Beiträge und nicht in geschlossenen Themen', () => {
+  const user = { _id: 'u1' };
+  const mod = { _id: 'm', canModerate: true };
+  const post = { author: 'u2', deleted: false };
+  assert.ok(can.react(user, post, { locked: false }));
+  assert.ok(can.react(user, { ...post, author: 'u1' }, { locked: false }), 'auch auf eigene Beiträge');
+  assert.ok(!can.react(user, { ...post, deleted: true }, { locked: false }));
+  assert.ok(!can.react(user, post, { locked: true }) && !can.react(mod, post, { locked: true }));
+  assert.ok(can.removePoll(mod) && !can.removePoll(user));
+});
+
+test('Umfrage: Eingabe prüfen', () => {
+  const now = new Date('2026-10-04T10:00:00Z');
+  const opt = { now, timeZone: 'Europe/Berlin' };
+  assert.equal(polls.parsePollInput({ question: ' ', options: '\n \n', endsAt: '' }, opt), null, 'keine Umfrage');
+  const p = polls.parsePollInput({ question: '  Welche  Season? ', options: 'A\r\n\r\n  B  \nC', endsAt: '2026-10-05T12:00' }, opt);
+  assert.equal(p.question, 'Welche Season?');
+  assert.deepEqual(p.options, [{ key: 'o1', label: 'A' }, { key: 'o2', label: 'B' }, { key: 'o3', label: 'C' }]);
+  assert.equal(p.endsAt.toISOString(), '2026-10-05T10:00:00.000Z', 'Ortszeit (Sommerzeit) → UTC');
+  assert.equal(polls.parsePollInput({ question: 'Frage?', options: 'Ja\nNein' }, opt).endsAt, null);
+  const bad = (input, re) => assert.throws(() => polls.parsePollInput({ question: 'Frage?', options: 'Ja\nNein', ...input }, opt), (e) => e instanceof UserError && re.test(e.message));
+  bad({ question: '' }, /Frage/);
+  bad({ options: 'Nur eine' }, /2–10/);
+  bad({ options: Array.from({ length: 11 }, (_, i) => `A${i}`).join('\n') }, /2–10/);
+  bad({ options: 'Ja\nja' }, /nur einmal/);
+  bad({ options: `Ja\n${'x'.repeat(81)}` }, /80/);
+  bad({ endsAt: 'morgen' }, /gültiges/);
+  bad({ endsAt: '2026-10-04T12:02' }, /5 Minuten/); // = 10:02 UTC
+  bad({ endsAt: '2027-12-01T10:00' }, /ein Jahr/);
+});
+
+test('Umfrage: Prozente ganzzahlig, zusammen 100, ohne Stimmen 0', () => {
+  const options = [{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }, { key: 'c', label: 'C' }];
+  const r = polls.results(options, { a: 1, b: 1, c: 1 });
+  assert.equal(r.total, 3);
+  assert.deepEqual(r.rows.map((x) => x.percent), [34, 33, 33]);
+  const r2 = polls.results(options, { a: 2, b: 1, c: 0 });
+  assert.deepEqual(r2.rows.map((x) => [x.count, x.percent, x.leading]), [[2, 67, true], [1, 33, false], [0, 0, false]]);
+  const r3 = polls.results(options, { a: 1, b: 5, c: 1 }); // 14,29 / 71,43 / 14,29
+  assert.deepEqual(r3.rows.map((x) => x.percent), [14, 72, 14]);
+  const none = polls.results(options, {});
+  assert.deepEqual([none.total, none.rows.map((x) => x.percent), none.rows.some((x) => x.leading)], [0, [0, 0, 0], false]);
+});
+
+test('Umfrage: Abstimmen nach dem Ende, im geschlossenen Thema oder doppelt wird abgelehnt', () => {
+  const now = new Date('2026-10-04T10:00:00Z');
+  const poll = { options: [{ key: 'o1' }, { key: 'o2' }], endsAt: new Date('2026-10-04T12:00:00Z') };
+  const open = { locked: false };
+  assert.equal(polls.voteError(poll, open, { option: 'o1', now }), null);
+  assert.match(polls.voteError(poll, open, { option: 'o1', now: new Date('2026-10-04T12:00:00Z') }), /beendet/);
+  assert.match(polls.voteError(poll, { locked: true }, { option: 'o1', now }), /geschlossen/);
+  assert.match(polls.voteError(poll, open, { option: 'o1', voted: true, now }), /schon abgestimmt/);
+  assert.match(polls.voteError(poll, open, { option: 'o9', now }), /wähle/);
+  assert.equal(polls.voteError({ ...poll, endsAt: null }, open, { option: 'o2', now }), null, 'ohne Enddatum offen');
+  assert.ok(polls.isClosed(poll, open, new Date('2026-10-05T00:00:00Z')) && polls.isClosed({ endsAt: null }, { locked: true }) && !polls.isClosed({ endsAt: null }, open));
+});
