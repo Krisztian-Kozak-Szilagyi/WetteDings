@@ -173,7 +173,9 @@ test('Protokolle: Broker, Lotterie, Grading und Buchungen', () => {
   const buy = logs.coinRow({ coin: 'SAM', side: 'kauf', units: 150000000, price: 12.5, cents: 1875, createdAt: new Date() }, 'anna');
   assert.equal(buy.asset, 'Samantha Coin (SAM)');
   assert.equal(buy.cents, -1875); // Kauf = Abbuchung
-  assert.equal(logs.coinRow({ coin: 'SAM', side: 'verkauf', units: 1, price: 1, cents: 500, createdAt: new Date() }).cents, 500);
+  const sale = logs.coinRow({ coin: 'SAM', side: 'verkauf', units: 1, price: 1, cents: 500, tax: 25, createdAt: new Date() });
+  assert.deepStrictEqual([sale.cents, sale.tax], [500, 25]);
+  assert.equal(buy.tax, 0); // ältere Aufträge ohne Steuer
 
   const ticket = logs.lottoRow({ type: 'lotto_los', amount: -300, createdAt: new Date(), meta: { kind: 'woche', count: 3, round: 7 } }, 'anna');
   assert.deepStrictEqual([ticket.kind, ticket.lottery, ticket.count, ticket.round], ['Lose gekauft', 'Wochen-Lotterie', 3, 7]);

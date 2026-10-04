@@ -346,7 +346,8 @@ function coinRow(t, name) {
     units: t.units,
     unitsText: coinAmount(t.units, t.coin),
     price: t.price,
-    cents: t.side === 'kauf' ? -t.cents : t.cents,
+    cents: t.side === 'kauf' ? -t.cents : t.cents, // Verkauf: Erlös nach Steuer
+    tax: t.tax || 0, // Steuer auf den Gewinn (nur Verkauf)
   };
 }
 
@@ -449,8 +450,8 @@ const CSV = {
     rows: (p) => [[csvDate(p.at), p.player, p.bet, p.side, csvEuro(p.amount), p.payout === null ? '' : csvEuro(p.payout), p.net === null ? '' : csvEuro(p.net), STAKE_STATE[p.state], csvDate(p.settledAt)]],
   },
   broker: {
-    head: ['Zeitpunkt', 'Spieler', 'Wert', 'Art', 'Menge', 'Kurs (€)', 'Betrag (€)'],
-    rows: (t) => [[csvDate(t.at), t.player, t.asset, t.side, csvNum(t.units / 1e8, 8), csvNum(t.price, 6), csvEuro(t.cents)]],
+    head: ['Zeitpunkt', 'Spieler', 'Wert', 'Art', 'Menge', 'Kurs (€)', 'Betrag (€)', 'Steuer (€)'],
+    rows: (t) => [[csvDate(t.at), t.player, t.asset, t.side, csvNum(t.units / 1e8, 8), csvNum(t.price, 6), csvEuro(t.cents), csvEuro(t.tax)]],
   },
   lotterie: {
     head: ['Zeitpunkt', 'Spieler', 'Art', 'Lotterie', 'Lose', 'Runde', 'Gewinnlos', 'Betrag (€)'],

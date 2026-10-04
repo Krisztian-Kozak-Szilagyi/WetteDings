@@ -322,7 +322,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'broker') { %>
-      <p class="muted small">Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag.</p>
+      <p class="muted small">Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag – bei Verkäufen der Erlös nach Steuer auf den Gewinn.</p>
       <p class="muted small"><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Käufe oder Verkäufe.</p>
@@ -339,7 +339,7 @@
                   <td class="nowrap"><span class="badge <%= t.side === 'Kauf' ? 'badge-offen' : 'badge-entschieden' %>"><%= t.side %></span></td>
                   <td class="num nowrap"><%= t.unitsText %></td>
                   <td class="num nowrap"><%= coinPrice(t.price) %></td>
-                  <td class="num nowrap"><%- signedEuro(t.cents) %></td>
+                  <td class="num nowrap"><%- signedEuro(t.cents) %><% if (t.tax) { %><br><span class="muted small">Steuer <%= euro(t.tax) %></span><% } %></td>
                 </tr>
               <% }) %>
             </tbody>
