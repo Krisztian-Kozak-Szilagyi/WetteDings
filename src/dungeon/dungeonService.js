@@ -41,16 +41,13 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 const DEFAULTS = {
   open: false,
   intervalHours: 2,
-  // Simuliert mit EINEM Team für alle drei Kämpfe (Kampf 1 BWL, Kampf 2 FIA, Boss FIS), je 1500 Läufe:
-  // - nur Crumpled/BFWler: Kampf 1 nur perfekt kombiniert (~23 %), Kampf 2 praktisch nie
-  // - bis Gold: optimal kombiniert Kampf 1+2 sicher, Boss nie
-  // - Voll-Holo optimal kombiniert: Boss ~55 %; mit einer Bockhaber ~98 % (passende Werte ohne Kombos ~64 %)
-  // - Glitch im Team: sicher. Drei Bots (Standard-Gewichte) schaffen kaum Kampf 1.
-  required: [1950, 2550, 3200],
+  // Von Krisztian festgelegt (2026-10-04); die Simulation dazu steht in .claude/notes/funkciok.md
+  required: [1800, 1950, 2200],
   rewards: [5000, 5000, 15000],
   foilChance: 2,
   cardChance: 1,
-  botWeights: { crumpled: 40, bfwler: 35, gold: 20, holo: 5, bockhaber: 0, glitch: 0, icon: 0, sith: 0 },
+  // Bots bringen keine Crumpled-Karten; selten Bockhaber, ganz selten Glitch (Summe 100 = Prozent)
+  botWeights: { crumpled: 0, bfwler: 40, gold: 40, holo: 15, bockhaber: 4, glitch: 1, icon: 0, sith: 0 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
 
