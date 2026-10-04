@@ -109,6 +109,7 @@ const ledgerLabels = {
   tcg_verkauf: 'TCG-Karte verkauft',
   item_verkauf: 'Gegenstand verkauft',
   ihk_lohn: 'IHK-Quest geschafft',
+  dungeon_lohn: 'Dungeon-Beute',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',

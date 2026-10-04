@@ -47,6 +47,7 @@ const LEDGER_GROUPS = [
   { key: 'start', label: 'Startguthaben', types: ['startguthaben'], hint: 'neue Mitglieder' },
   { key: 'bonus', label: 'Tagesbonus', types: ['bonus'], hint: 'für Mitglieder unter der Bonus-Grenze' },
   { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'], hint: 'geschaffte Quests' },
+  { key: 'dungeon', label: 'Dungeon', types: ['dungeon_lohn'], hint: 'Lohn für gewonnene Kämpfe' },
   { key: 'grading', label: 'Grading-Shop', types: ['grading_lohn', 'grading_ausbau'], hint: 'Löhne für Aufträge − Ausbau des Shops' },
   { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'item_verkauf', 'black_market'], hint: 'Verkäufe an die Bank (Karten, Gegenstände) − Packs und Black Market' },
   { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'], hint: 'Verkäufe − Käufe (Kursgewinne/-verluste)' },

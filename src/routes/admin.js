@@ -15,6 +15,7 @@ const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
+const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
@@ -192,6 +193,7 @@ router.get('/admin', requireStaff, async (req, res) => {
         }
       : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
+    dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
     tradeTax: tradeService.settings.taxPercent,
@@ -325,6 +327,31 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
     req.flash('success', `Gespeichert: Tagesbonus ${euro(amount)}, Grading-Shop ${jobs} Aufträge pro Tag.`);
   }
   res.redirect(panelUrl('spielwerte', 'bonus'));
+});
+
+// ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
+router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
+  const pct = (v) => Number(String(typeof v === 'string' ? v : 'x').replace(',', '.') || 'x');
+  const fights = [0, 1, 2];
+  try {
+    await dungeonService.saveSettings({
+      open: req.body.open === '1',
+      intervalHours: num(req.body.intervalHours),
+      required: fights.map((i) => num(req.body[`required_${i}`])),
+      // "0" / "0,00" = kein Lohn für diesen Kampf
+      rewards: fights.map((i) => (/^\s*0+([.,]0*)?\s*$/.test(String(req.body[`reward_${i}`] || 'x')) ? 0 : centsOrNull(req.body[`reward_${i}`]))),
+      foilChance: pct(req.body.foilChance),
+      cardChance: pct(req.body.cardChance),
+      botWeights: Object.fromEntries(tcgCatalog.RARITIES.map((r) => [r.key, num(req.body[`bot_${r.key}`])])),
+      admin: req.user,
+    });
+    req.flash('success', 'Dungeon-Einstellungen gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(panelUrl('spielwerte', 'dungeon'));
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------

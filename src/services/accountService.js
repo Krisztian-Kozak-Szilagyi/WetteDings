@@ -17,6 +17,7 @@ const { CoinHolding } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
 const { GradingShop, GradingJob } = require('../models/Grading');
 const { Trade } = require('../models/Trade');
+const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const { inTransaction } = require('./betService');
 const { UserError } = require('../lib/util');
 const deviceService = require('../device/deviceService');
@@ -58,6 +59,12 @@ async function propagateName(userId, oldName, name, session) {
     PackGrant.updateMany({ by: userId }, { $set: { byName: name } }, opt),
     PackGrant.updateMany({ to: userId }, { $set: { toName: name } }, opt),
   ]);
+  // Dungeon: Plätze, Einladungen und Chat (nacheinander, weil es dieselben Dokumente sind)
+  for (const M of [DungeonParty, DungeonRun]) {
+    await M.updateMany({ 'members.user': userId }, { $set: { 'members.$[m].name': name } }, { ...opt, arrayFilters: [{ 'm.user': userId }] });
+    await M.updateMany({ 'chat.user': userId }, { $set: { 'chat.$[c].name': name } }, { ...opt, arrayFilters: [{ 'c.user': userId }] });
+  }
+  await DungeonParty.updateMany({ 'invites.user': userId }, { $set: { 'invites.$[i].name': name } }, { ...opt, arrayFilters: [{ 'i.user': userId }] });
 }
 
 /** Wann darf der Name frühestens wieder geändert werden? (null = sofort) */
@@ -159,6 +166,13 @@ async function deleteAccount({ user, password }) {
     // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
     await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
+    // Dungeon: Anmeldungen verlassen (leere verschwinden, die Leitung geht weiter), Chat-Nachrichten entfernen;
+    // im laufenden Durchlauf spielt der Platz ohne Lohn zu Ende (die Karte gibt es nicht mehr)
+    await DungeonParty.updateMany({ $or: [{ 'members.user': id }, { 'invites.user': id }, { 'chat.user': id }] }, { $pull: { members: { user: id }, invites: { user: id }, chat: { user: id } } }, opt);
+    await DungeonParty.deleteMany({ members: { $size: 0 } }, opt);
+    await DungeonParty.updateMany({ leader: id }, [{ $set: { leader: { $arrayElemAt: ['$members.user', 0] } } }], opt);
+    await DungeonRun.updateMany({ 'chat.user': id }, { $pull: { chat: { user: id } } }, opt);
+    await DungeonRun.updateMany({ 'members.user': id, status: 'laeuft' }, { $set: { 'members.$[m].user': null, 'members.$[m].reward': 0, 'members.$[m].foil': false, 'members.$[m].bossCard': false } }, { ...opt, arrayFilters: [{ 'm.user': id }] });
   });
   await roles.load();
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)

@@ -16,6 +16,7 @@ async function main() {
   await migrate();
   await tcgSettings.load(); // im Admin-Panel geänderte TCG-Preise
   await require('./src/ihk/ihkService').loadSettings(); // IHK: Tageslimit und Belohnungen
+  await require('./src/dungeon/dungeonService').loadSettings(); // Dungeon: Termine, Lohn, Beute, Bot-Karten
   await require('./src/trade/tradeService').loadSettings(); // Handel: Steuer
   await require('./src/services/bonusService').loadSettings(); // Tagesbonus
   await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?

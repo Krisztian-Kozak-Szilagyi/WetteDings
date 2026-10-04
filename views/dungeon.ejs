@@ -1,0 +1,210 @@
+<%- include('partials/head') %>
+<%
+  const statLine = (c) => c && c.stats ? `⚡${c.stats.speed} · FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
+  const canLeave = (phase === 'solo' || phase === 'gruppe') && !lockedIn;
+%>
+
+<div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
+<% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
+
+<%# Bild des Dungeons im Querformat – darüber Titel, Termin bzw. der laufende Kampf %>
+<section class="dg-hero">
+  <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1600" height="640">
+  <div class="dg-hero-shade"></div>
+  <div class="dg-hero-text">
+    <span class="kicker">Dungeon<%= phase === 'laeuft' ? ' · läuft' : '' %></span>
+    <h1><%= dg.title %></h1>
+    <% if (phase === 'laeuft') { %>
+      <div class="dg-stage" data-dg-stage>
+        <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
+        <p class="dg-stage-text" data-dg-fight-text></p>
+        <div class="dg-hp" data-dg-hp hidden><span class="dg-hp-bar" data-dg-hp-bar></span><span class="dg-hp-label" data-dg-hp-label></span></div>
+        <ol class="dg-steps" aria-label="Kämpfe">
+          <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
+        </ol>
+      </div>
+    <% } else { %>
+      <p class="dg-hero-sub"><%= dg.intro %></p>
+      <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
+    <% } %>
+  </div>
+</section>
+
+<%# Tisch: drei Plätze nebeneinander, rechts der Gruppen-Chat %>
+<section class="dg-table<%= hasChat ? '' : ' no-chat' %>">
+  <div class="dg-slots">
+    <% slots.forEach((s, i) => { %>
+      <% if (s.card) { %>
+        <div class="dg-slot r-<%= s.card.rarity %><%= s.me ? ' is-me' : '' %><%= s.bot ? ' is-bot' : '' %>" data-dg-slot="<%= i %>">
+          <% if (s.leader) { %><span class="dg-leader" title="Gruppenleiter" aria-label="Gruppenleiter">♛</span><% } %>
+          <div class="dg-slot-card">
+            <img src="<%= s.card.image %>" alt="<%= s.card.name %>" width="720" height="1008" loading="lazy">
+            <% if (s.boost) { %><img class="dg-slot-boost" src="<%= s.boost.image %>" alt="Boost: <%= s.boost.name %>" title="Boost: <%= s.boost.name %>" width="720" height="1008" loading="lazy"><% } %>
+            <span class="dg-pop-layer" data-dg-pops></span>
+          </div>
+          <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %></span>
+          <span class="dg-slot-stats"><%= statLine(s.card) %></span>
+        </div>
+      <% } else if (s.invited) { %>
+        <div class="dg-slot is-empty is-invited">
+          <div class="dg-slot-card dg-slot-placeholder"><span>Eingeladen</span></div>
+          <span class="dg-slot-name"><%= s.name %></span>
+          <% if (isLeader && !lockedIn) { %>
+            <form method="post" action="/dungeon/einladung-zurueck">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="user" value="<%= s.userId %>">
+              <button class="btn btn-ghost btn-sm" type="submit">Zurückziehen</button>
+            </form>
+          <% } %>
+        </div>
+      <% } else { %>
+        <div class="dg-slot is-empty">
+          <div class="dg-slot-card dg-slot-placeholder"><span><%= s.solo ? 'Wird beim Start zugelost' : 'Freier Platz' %></span></div>
+          <span class="dg-slot-name muted"><%= s.solo ? 'Mitspieler oder Bot' : '–' %></span>
+        </div>
+      <% } %>
+    <% }) %>
+  </div>
+
+  <% if (hasChat) { %>
+    <aside class="dg-chat" data-dg-chat>
+      <h2 class="dg-chat-head">Gruppen-Chat</h2>
+      <ol class="dg-chat-list" data-dg-chat-list aria-live="polite"></ol>
+      <form class="dg-chat-form" data-dg-chat-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="text" name="text" maxlength="<%= chatMax %>" placeholder="Nachricht …" autocomplete="off" aria-label="Nachricht an die Gruppe">
+        <button class="btn btn-primary btn-sm" type="submit">Senden</button>
+      </form>
+      <p class="dg-chat-note muted small">Der Chat wird gelöscht, sobald der Dungeon vorbei ist.</p>
+    </aside>
+  <% } %>
+</section>
+
+<%# ---------- Aktionen je nach Phase ---------- %>
+<% if (phase === 'laeuft') { %>
+  <section class="dg-log card" data-dg-log>
+    <h2>Kampfverlauf</h2>
+    <ol class="dg-log-list" data-dg-log-list></ol>
+  </section>
+  <script type="application/json" id="dg-playback"><%- JSON.stringify(playback).replace(/</g, '\\u003c') %></script>
+<% } %>
+
+<% if (phase === 'solo' || phase === 'gruppe') { %>
+  <section class="dg-actions card">
+    <% if (phase === 'solo') { %>
+      <p>Du bist allein angemeldet. Beim Start wirst du mit anderen Einzelspielern zusammengelost – fehlende Plätze übernehmen Bots.</p>
+    <% } else if (isLeader) { %>
+      <p>Du bist <strong>Gruppenleiter</strong>. Lade bis zu zwei Mitglieder ein – freie Plätze übernehmen beim Start Bots.</p>
+      <% if (!lockedIn && slots.some((s) => s.empty)) { %>
+        <form method="post" action="/dungeon/einladen" class="dg-invite">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="text" name="name" placeholder="Name des Mitglieds" required maxlength="40" autocomplete="off" aria-label="Name des Mitglieds">
+          <button class="btn btn-primary" type="submit">Einladen</button>
+        </form>
+      <% } %>
+    <% } else { %>
+      <p>Du bist in der Gruppe von <strong><%= (party.members.find((m) => String(m.user) === String(party.leader)) || {}).name %></strong>. Ihr startet gemeinsam.</p>
+    <% } %>
+    <form method="post" action="/dungeon/verlassen" data-dg-leave>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-ghost" type="submit" <%= canLeave ? '' : 'disabled' %>><%= phase === 'solo' ? 'Abmelden' : 'Gruppe verlassen' %></button>
+      <span class="muted small">Bis <%= lockSeconds %> Sekunden vor dem Start möglich – deine Karten bleiben bis zum Ende gesperrt.</span>
+    </form>
+  </section>
+<% } %>
+
+<% if (currentUser.isAdmin && phase !== 'laeuft') { %>
+  <form method="post" action="/dungeon/sofort-starten" class="dg-admin">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-ghost btn-sm" type="submit">Admin: alle Anmeldungen jetzt starten</button>
+  </form>
+<% } %>
+
+<%# Kartenauswahl (für Anmeldung und Beitritt) %>
+<% const picker = (prefix) => { %>
+  <% if (!cards.characters.length) { %>
+    <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest, im Handel oder foliert können nicht mit.</p>
+  <% } else { %>
+    <h3 class="dg-pick-sub">Charakter</h3>
+    <div class="dg-pick-grid">
+      <% cards.characters.forEach((c, i) => { %>
+        <label class="dg-pick r-<%= c.rarity %>">
+          <input type="radio" name="card" value="<%= c.id %>" required <%= i === 0 ? 'checked' : '' %>>
+          <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
+          <span class="dg-pick-name"><%= c.name %> <span class="muted">(<%= rarityByKey[c.rarity].label %>)</span></span>
+          <span class="dg-pick-stats"><%= statLine(c) %></span>
+        </label>
+      <% }) %>
+    </div>
+    <h3 class="dg-pick-sub">Boost (Booster-Karte)</h3>
+    <div class="dg-pick-grid">
+      <label class="dg-pick dg-pick-none">
+        <input type="radio" name="boost" value="" checked>
+        <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
+      </label>
+      <% cards.boosts.forEach((c) => { %>
+        <label class="dg-pick r-<%= c.rarity %>">
+          <input type="radio" name="boost" value="<%= c.id %>">
+          <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
+          <span class="dg-pick-name"><%= c.name %></span>
+        </label>
+      <% }) %>
+    </div>
+  <% } %>
+<% } %>
+
+<% if (phase === 'frei') { %>
+  <% invitations.forEach((inv) => { %>
+    <section class="dg-invitation card">
+      <h2>Einladung von <%= inv.leader %></h2>
+      <p class="muted">In der Gruppe: <%= inv.members.join(', ') %>. Wähle deine Karten und tritt bei.</p>
+      <form method="post" action="/dungeon/beitreten">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="party" value="<%= inv.id %>">
+        <% picker() %>
+        <div class="dg-buttons">
+          <button class="btn btn-primary" type="submit" <%= cards.characters.length ? '' : 'disabled' %>>Beitreten</button>
+          <button class="btn btn-ghost" type="submit" formaction="/dungeon/ablehnen" formnovalidate>Ablehnen</button>
+        </div>
+      </form>
+    </section>
+  <% }) %>
+
+  <% if (!invitations.length) { %>
+    <section class="dg-register card">
+      <h2>Für den nächsten Dungeon anmelden</h2>
+      <p class="muted">Zwei Kämpfe gegen Gegnerhorden, am Ende ein Boss. Welche Fachrichtung gebraucht wird, verrät nur die Geschichte. Gewonnene Kämpfe bringen Geld, der Boss mit etwas Glück eine Folie oder seine eigene Karte.</p>
+      <form method="post" action="/dungeon/anmelden">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% picker() %>
+        <div class="dg-buttons">
+          <button class="btn btn-primary" type="submit" name="mode" value="solo" <%= cards.characters.length ? '' : 'disabled' %>>Allein anmelden</button>
+          <button class="btn btn-ghost" type="submit" name="mode" value="gruppe" <%= cards.characters.length ? '' : 'disabled' %>>Gruppe gründen</button>
+        </div>
+      </form>
+    </section>
+  <% } %>
+<% } %>
+
+<%# Ergebnis des letzten Durchlaufs %>
+<% if (resultSlots) { %>
+  <section class="dg-result card<%= run.success ? ' is-win' : ' is-loss' %>">
+    <h2><%= runDungeon ? runDungeon.title : 'Dungeon' %>: <%= run.success ? 'Boss besiegt!' : 'Rückzug' %></h2>
+    <ol class="dg-result-fights">
+      <% (runDungeon ? runDungeon.fights : []).forEach((f, i) => { const r = run.fights[i]; %>
+        <li class="<%= !r ? 'is-skipped' : r.success ? 'is-win' : 'is-loss' %>">
+          <strong><%= f.title %></strong> – <%= !r ? 'nicht erreicht' : r.success ? f.success : f.fail %>
+        </li>
+      <% }) %>
+    </ol>
+    <ul class="dg-result-loot">
+      <% resultSlots.filter((s) => !s.bot).forEach((s) => { %>
+        <li<%- s.me ? ' class="is-me"' : '' %>><strong><%= s.name %></strong>: <%= s.reward ? euro(s.reward) : 'kein Geld' %><%= s.foil ? ' · Folie' : '' %><%= s.bossCard ? ' · Boss-Karte (wird nachgereicht)' : '' %></li>
+      <% }) %>
+    </ul>
+  </section>
+<% } %>
+</div>
+
+<script src="/js/dungeon.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

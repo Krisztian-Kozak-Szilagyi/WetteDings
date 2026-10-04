@@ -79,6 +79,7 @@ function createApp() {
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
+    dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
     blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
@@ -184,6 +185,7 @@ function createApp() {
   app.use(require('./routes/inventar'));
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
+  app.use(require('./routes/dungeon'));
   app.use(require('./routes/trade'));
   app.use(require('./routes/grading'));
 

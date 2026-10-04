@@ -5,6 +5,7 @@ const { runLottery } = require('./services/lotteryService');
 const rankService = require('./services/rankService');
 const duelService = require('./services/duelService');
 const { takeDailySnapshot } = require('./stats/snapshot');
+const dungeonService = require('./dungeon/dungeonService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -49,6 +50,11 @@ function startJobs() {
   const duels = () => duelService.expirePending().catch((err) => console.error('Duell-Fehler:', err));
   setTimeout(duels, 20 * 1000).unref();
   setInterval(duels, 5 * 60 * 1000).unref();
+
+  // Dungeon: fällige Starts und abgelaufene Durchläufe alle 5 Sekunden prüfen
+  const dungeon = () => dungeonService.tick().catch((err) => console.error('Dungeon-Fehler:', err));
+  setTimeout(dungeon, 10 * 1000).unref();
+  setInterval(dungeon, 5 * 1000).unref();
 
   // Rangliste: jede Minute festhalten, wer gerade auf Platz 1 steht (Anzeige im Profil)
   const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));

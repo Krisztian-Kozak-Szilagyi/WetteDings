@@ -123,7 +123,7 @@ async function foiledCards(userId, now = Date.now()) {
         percent: foil.foilPercent(d.foiledAt, now),
         sell: r.sell,
         value: foil.cardValue(r.sell, d.foiledAt, now),
-        lock: reason && reason !== 'folie' ? reason : null, // 'handel' | 'quest'
+        lock: reason && reason !== 'folie' ? reason : null, // 'handel' | 'quest' | 'dungeon'
       };
     });
 }

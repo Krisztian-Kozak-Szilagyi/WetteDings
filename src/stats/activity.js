@@ -15,6 +15,7 @@ const AREAS = {
   inventar: 'tcg',
   handel: 'handel',
   ihk: 'ihk',
+  dungeon: 'ihk',
   grading: 'grading',
   'coin-exchange': 'coin',
   lotterie: 'lotterie',

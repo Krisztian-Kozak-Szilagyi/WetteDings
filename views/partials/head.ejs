@@ -34,6 +34,7 @@
       if (tradeIncoming) tradeBadges.push({ n: tradeIncoming, cls: '', title: 'Angebote, Verhandlungen und abgeschlossene Geschäfte für dich', aria: tradeIncoming + ' Angebote und Verhandlungen für dich' });
       navItems.push({ href: '/handel', label: 'Handel', active: currentPath === '/handel', badges: tradeBadges, live: blackMarketOpen() ? 'Black Market geöffnet' : '' });
       if (ihkOpen() || currentUser.isAdmin) navItems.push({ href: '/ihk', label: 'IHK', active: currentPath === '/ihk', badges: [] });
+      if (dungeonOpen() || currentUser.isAdmin) navItems.push({ href: '/dungeon', label: 'Dungeon', active: currentPath === '/dungeon', badges: [] });
       if (gradingOpen() || currentUser.isAdmin) navItems.push({ href: '/grading', label: 'Grading', active: currentPath === '/grading', badges: [] });
       const forumBadges = [];
       if (forumOther) forumBadges.push({ n: forumOther, cls: 'nav-badge-market', title: 'Neues im Forum', aria: forumOther + ' Themen mit neuen Beiträgen' });
