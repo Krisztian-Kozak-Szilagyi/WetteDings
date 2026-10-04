@@ -32,7 +32,22 @@
       </form>
     </div>
     <div class="gr-hero-card" aria-hidden="true">
-      <div class="gr-spin"><div class="gr-spin-front" style="background-image: url('<%= heroCard %>')"></div><div class="gr-spin-back"></div></div>
+      <% if (heroCard) { %>
+        <%# Versiegelte Karte im Slab – wie nach einem Auftrag (Etikett oben, Note 10) %>
+        <div class="gr-hero-slab">
+          <div class="gr-hero-slab-label">
+            <div class="gr-slab-info"><strong>BfW GRADING</strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span><span class="gr-slab-word">GEM MINT</span></div>
+            <div class="gr-slab-grade">10</div>
+          </div>
+          <span class="tcg-slot gr-hero-slab-slot r-<%= heroCard.rarity %>">
+            <span class="tcg-art">
+              <img src="<%= heroCard.image %>" alt="" width="720" height="1008">
+              <% if (heroCard.rarity === 'glitch') { %><img class="tcg-glitch-a" src="<%= heroCard.image %>" alt="" width="720" height="1008"><img class="tcg-glitch-b" src="<%= heroCard.image %>" alt="" width="720" height="1008"><span class="tcg-fx tcg-fx-glitch"></span><% } %>
+            </span>
+          </span>
+          <span class="gr-hero-slab-shine"></span>
+        </div>
+      <% } %>
     </div>
   </section>
 <% } else { %>

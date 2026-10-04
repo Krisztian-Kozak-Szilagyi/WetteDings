@@ -45,8 +45,8 @@ router.get('/grading', async (req, res) => {
           grade: job.guess !== null ? job.grade : null,
         }
       : null,
-    // Schaukarte für die Vorstellung (eine Holo-Karte, falls vorhanden)
-    heroCard: (catalog.cardsByRarity.holo[0] || catalog.CARDS[0] || {}).image || '',
+    // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
+    heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
     doneCards: state.done.map((j) => ({ ...j, cardInfo: catalog.cardById[j.card] || null })),
   });
 });
