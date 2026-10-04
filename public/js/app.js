@@ -970,6 +970,13 @@
   var buttons = document.querySelectorAll('[data-invite-image]');
   if (!buttons.length) return;
   var LINE = { x1: 320, x2: 1117, y: 833 }; // Linie im Bild
+  // kleiner Zufallsgenerator mit dem Code als Startwert: derselbe Code ergibt immer dasselbe Bild
+  function seeded(text) {
+    var h = 2166136261;
+    for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return function () { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  }
+  var FONT = '"Inter", "Arial Black", "Segoe UI", sans-serif';
   function draw(img, code) {
     var c = document.createElement('canvas');
     c.width = img.naturalWidth;
@@ -977,22 +984,62 @@
     var ctx = c.getContext('2d');
     ctx.drawImage(img, 0, 0);
     var k = c.width / 1429; // falls das Bild einmal in anderer Größe vorliegt
-    var maxW = (LINE.x2 - LINE.x1) * k * 0.92;
-    var size = 76 * k;
-    var text = code.split('').join(' ');
-    ctx.font = '700 ' + size + 'px ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace';
-    var w = ctx.measureText(text).width;
-    if (w > maxW) { size = size * maxW / w; ctx.font = '700 ' + size + 'px ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace'; }
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#53ec96';
-    ctx.shadowColor = 'rgba(83, 236, 150, .75)';
-    ctx.shadowBlur = 24 * k;
-    var x = ((LINE.x1 + LINE.x2) / 2) * k;
-    var y = (LINE.y - 26) * k;
-    ctx.fillText(text, x, y);
-    ctx.shadowBlur = 0;
-    ctx.fillText(text, x, y);
+    var rnd = seeded(code);
+
+    // Schriftgröße: groß und fett, aber nie breiter als der Rahmen um die Linie
+    var maxW = 880 * k;
+    var size = 170 * k;
+    var font = function (s) { return '900 ' + s + 'px ' + FONT; };
+    var lx = c.getContext('2d');
+    lx.font = font(size);
+    var w = lx.measureText(code).width;
+    if (w > maxW) size = size * maxW / w;
+
+    // Text auf eigener Ebene: Farbversatz rot/türkis, darüber weiß
+    var pad = 40 * k;
+    var layer = document.createElement('canvas');
+    layer.width = Math.ceil(maxW + pad * 2);
+    layer.height = Math.ceil(size * 1.2 + pad * 2);
+    var t = layer.getContext('2d');
+    t.font = font(size);
+    t.textAlign = 'center';
+    t.textBaseline = 'alphabetic';
+    var cx = layer.width / 2;
+    var by = pad + size * 0.95;
+    var off = 6 * k;
+    t.globalAlpha = 0.9;
+    t.fillStyle = '#ff2d6f'; t.fillText(code, cx - off, by);
+    t.fillStyle = '#22e6ff'; t.fillText(code, cx + off, by + 1 * k);
+    t.globalAlpha = 1;
+    t.shadowColor = 'rgba(83, 236, 150, .55)';
+    t.shadowBlur = 18 * k;
+    t.fillStyle = '#f4fff9'; t.fillText(code, cx, by);
+    t.shadowBlur = 0;
+
+    // Scanlines: jede dritte/vierte Zeile ausdünnen
+    t.globalCompositeOperation = 'destination-out';
+    t.fillStyle = 'rgba(0, 0, 0, .38)';
+    for (var y = 0; y < layer.height; y += 4 * k) t.fillRect(0, y, layer.width, 1.6 * k);
+    t.globalCompositeOperation = 'source-over';
+
+    // Glitch-Streifen: einige waagerechte Bänder seitlich versetzt
+    var glitched = document.createElement('canvas');
+    glitched.width = layer.width;
+    glitched.height = layer.height;
+    var g = glitched.getContext('2d');
+    g.drawImage(layer, 0, 0);
+    var bands = 4 + Math.floor(rnd() * 3);
+    for (var b = 0; b < bands; b++) {
+      var bh = (4 + rnd() * 14) * k;
+      var bt = pad + rnd() * (size * 1.05 - bh);
+      var shift = (rnd() < 0.5 ? -1 : 1) * (6 + rnd() * 18) * k;
+      g.clearRect(0, bt, glitched.width, bh);
+      g.drawImage(layer, 0, bt, layer.width, bh, shift, bt, layer.width, bh);
+    }
+
+    // auf die Karte: Grundlinie knapp über der Linie
+    var lineCenter = ((LINE.x1 + LINE.x2) / 2) * k;
+    ctx.drawImage(glitched, lineCenter - cx, (LINE.y - 58) * k - by);
     return c;
   }
   buttons.forEach(function (btn) {
@@ -1000,18 +1047,22 @@
       var code = btn.getAttribute('data-invite-image');
       var img = new Image();
       img.onload = function () {
-        draw(img, code).toBlob(function (blob) {
-          if (!blob) return;
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'einladung-' + code + '.png';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-        }, 'image/png');
+        var ready = document.fonts && document.fonts.load ? document.fonts.load('900 100px Inter', code).catch(function () {}) : Promise.resolve();
+        ready.then(function () { save(draw(img, code), code); });
       };
       img.src = btn.getAttribute('data-src');
     });
   });
+  function save(canvas, code) {
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'einladung-' + code + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    }, 'image/png');
+  }
 })();
