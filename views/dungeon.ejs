@@ -31,10 +31,12 @@
   <% if (phase === 'laeuft') { %>
     <%# Unter dem Bild: links die Kampf-Stationen, darunter Fortschritt und Deadline %>
     <div class="dg-under">
+      <div class="dg-under-top">
       <ol class="dg-steps" aria-label="Kämpfe">
         <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
       </ol>
       <p class="dg-next" data-dg-next hidden></p>
+      </div>
       <div class="dg-bars" data-dg-bars hidden>
         <div class="dg-bar is-progress">
           <span class="dg-bar-label">Fortschritt</span>
@@ -249,7 +251,7 @@
   <% if (!invitations.length) { %>
     <section class="dg-register card">
       <h2>Für den nächsten Dungeon anmelden</h2>
-      <p class="muted">Klicke eine Charakterkarte an – sie wird markiert und ist ausgewählt. Genauso wählst du darunter eine Boost-Karte (oder „Ohne Boost“).</p>
+      <p class="muted">Klicke eine Charakterkarte an – sie wird markiert und ist ausgewählt. Genauso wählst du darunter eine Boost-Karte.</p>
       <form method="post" action="/dungeon/anmelden">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <% picker() %>
@@ -303,7 +305,7 @@
         <% if (p.bossCard) items.push({ cls: 'is-card', text: 'Boss-Karte' }); %>
         <% if (!items.length) items.push({ cls: 'is-none', text: 'keine Beute' }); %>
         <% items.forEach((it) => { %>
-          <li class="dg-loot-row<%= p.me ? ' is-me' : '' %>" data-dg-loot-row>
+          <li class="dg-loot-row <%= it.cls %><%= p.me ? ' is-me' : '' %>" data-dg-loot-row>
             <span class="dg-loot-name"><%= p.name %><% if (p.bot) { %> <span class="dg-bot-tag">Bot</span><% } %></span>
             <span class="dg-loot-chip <%= it.cls %>"><% if (it.img) { %><img src="<%= it.img %>" alt="" width="18" height="18"><% } %><%= it.text %></span>
           </li>

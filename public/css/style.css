@@ -4043,3 +4043,16 @@ button.dg-boost-card:hover, button.dg-boost-card:focus-visible { outline: 0; tra
 .dg-search svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .dg-search input[type="search"] { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; box-shadow: none; font-size: 13px; color: var(--text); outline: 0; }
 .dg-picklist .tcg-filter { margin-top: -2px; }
+
+/* Dungeon: Stationen links, Countdown in derselben Zeile mittig */
+.dg-under-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.dg-under-top .dg-steps { grid-column: 1; }
+.dg-under-top .dg-next { grid-column: 2; white-space: nowrap; }
+@media (max-width: 560px) {
+  .dg-under-top { grid-template-columns: 1fr; justify-items: center; }
+  .dg-under-top .dg-steps, .dg-under-top .dg-next { grid-column: 1; }
+}
+
+/* Beute-Zeilen: Folie leuchtet in den Farben der Folie, die Boss-Karte golden */
+.dg-loot-row.is-foil { box-shadow: 0 0 0 1px rgba(233, 213, 255, .6), 0 0 16px rgba(168, 216, 255, .35), 0 0 22px rgba(251, 207, 232, .25); }
+.dg-loot-row.is-card { background: linear-gradient(90deg, rgba(251, 191, 36, .22) 0%, var(--color-bg) 50%); box-shadow: 0 0 0 1px rgba(251, 191, 36, .6), 0 0 18px rgba(251, 191, 36, .35); }
