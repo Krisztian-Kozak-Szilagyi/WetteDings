@@ -1,9 +1,12 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const PatchNote = require('../models/PatchNote');
-const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Forum');
-const { tagsFor, tagsIn, sanitizeTags } = require('./render');
-const { UserError } = require('../lib/util');
+const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog } = require('../models/Forum');
+const { tagsFor, tagsIn, sanitizeTags, parseMentions } = require('./render');
+const { mentionedUsers } = require('./embeds');
+const { CATEGORIES, STARTERS } = require('./starters');
+const config = require('../config');
+const { UserError, escapeRegex } = require('../lib/util');
 const { notify, short } = require('../services/notifyService');
 
 const TITLE_MIN = 3;
@@ -13,6 +16,9 @@ const THREADS_PER_PAGE = 20;
 const POSTS_PER_PAGE = 20;
 const POSTS_PER_MINUTE = 5;
 const PATCHNOTES_KEY = 'patchnotes';
+const REASON_MAX = 300;
+const MENTIONS_MAX = 20; // so viele Erwähnte pro Beitrag werden benachrichtigt
+const MODLOG_PER_PAGE = 100;
 
 /** Rolle eines angemeldeten Nutzers im Forum: 'admin' | 'dev' | 'mod' | null */
 const roleOfUser = (user) => (user.isAdmin ? 'admin' : user.isDev ? 'dev' : user.isMod ? 'mod' : null);
@@ -30,6 +36,49 @@ async function seed() {
   await make('TCG & Handel', 'Karten, Packs, Tauschgesuche.', { parent: general._id, order: 2 });
   await make('IHK', 'Quests, Karten-Kombinationen, Tipps.', { parent: general._id, order: 3 });
   await make('Feedback & Bugs', 'Wünsche, Fehler und Verbesserungen.', { parent: general._id, order: 4 });
+}
+
+/**
+ * Feste Bereiche und Startthemen (forum/starters.js) – bei jedem Start, legt aber nichts doppelt an:
+ * Bereiche werden über ihren key gefunden, sonst über den (früheren) Titel übernommen; Startthemen gibt es je
+ * starterKey nur einmal (auch wenn die Moderation eines entfernt hat). Verfasser der Startthemen ist der erste
+ * Admin aus ADMIN_USERNAMES – gibt es ihn (noch) nicht, folgen sie bei einem späteren Start.
+ */
+async function ensureDefaults() {
+  const byKey = {};
+  for (const def of CATEGORIES) {
+    let cat = await ForumCategory.findOne({ key: def.key }).lean();
+    const parent = def.parent ? byKey[def.parent] : null;
+    if (!cat && (!def.parent || parent)) {
+      const titles = [def.title, ...(def.titles || [])].map((t) => new RegExp(`^${escapeRegex(t)}$`, 'i'));
+      const filter = { key: null, title: { $in: titles } };
+      if (def.create !== false) filter.parent = parent ? parent._id : null; // nur übernehmen: überall suchen
+      const found = await ForumCategory.findOne(filter).sort({ createdAt: 1 }).lean();
+      if (found) {
+        const set = { key: def.key };
+        if (found.title !== def.title) Object.assign(set, { title: def.title, description: def.description }); // z. B. "Wetten" → "Wetten & Duelle"
+        cat = await ForumCategory.findOneAndUpdate({ _id: found._id }, { $set: set }, { new: true }).lean();
+      } else if (def.create !== false) {
+        cat = (await ForumCategory.create({ key: def.key, title: def.title, description: def.description, parent: parent ? parent._id : null, order: def.order })).toObject();
+        console.log(`Forum: Bereich „${def.title}“ angelegt.`);
+      }
+    }
+    if (cat) byKey[def.key] = cat;
+  }
+
+  const adminName = config.adminUsernames[0];
+  const author = adminName ? await User.findOne({ usernameLower: adminName, deletedAt: null }).select('_id username').lean() : null;
+  if (!author) return byKey;
+  // rückwärts, damit das erste Startthema eines Bereichs oben steht (angepinnte nach dem letzten Beitrag sortiert)
+  for (const s of [...STARTERS].reverse()) {
+    const cat = byKey[s.category];
+    if (!cat || (await ForumThread.exists({ starterKey: s.key }))) continue;
+    const now = new Date();
+    const thread = await ForumThread.create({ category: cat._id, title: s.title, author: author._id, authorName: author.username, pinned: true, starterKey: s.key, lastPostAt: now, lastPostBy: author._id, lastPostByName: author.username, participants: [author._id] });
+    await ForumPost.create({ thread: thread._id, author: author._id, authorName: author.username, body: s.body, isFirst: true });
+    console.log(`Forum: Startthema „${s.title}“ angelegt.`);
+  }
+  return byKey;
 }
 
 // Der Bereich "Patchnotes" ändert sich praktisch nie – kurz im Speicher halten statt bei jedem Seitenaufruf nachzuschlagen
@@ -138,6 +187,61 @@ function cleanTitle(text) {
 
 const markRead = (userId, threadId, at = new Date()) => ForumRead.updateOne({ user: userId, thread: threadId }, { $set: { at } }, { upsert: true });
 
+/**
+ * @Erwähnungen benachrichtigen (nicht sich selbst, nicht wer ohnehin schon benachrichtigt wird – skip).
+ * Alle Bereiche sind für alle Mitglieder lesbar (staffOnly regelt nur, wer Themen eröffnet), deshalb ohne
+ * weitere Sichtbarkeitsprüfung. Wirft nie – wie notify.
+ */
+async function notifyMentions({ user, thread, body, href, skip = [] }) {
+  try {
+    const names = parseMentions(body).filter((n) => n !== user.username.toLowerCase());
+    const done = new Set(skip.map(String));
+    const users = (await mentionedUsers(names, MENTIONS_MAX)).filter((u) => !done.has(String(u._id)));
+    await notify(users, { area: 'Forum', href, except: user, text: `${user.username} hat dich im Thema „${short(thread.title)}“ erwähnt.` });
+  } catch (err) {
+    console.error('Erwähnungen fehlgeschlagen:', err.message);
+  }
+}
+
+// ---------- Mod-Log ----------
+const MODLOG_LABELS = {
+  anpinnen: 'Thema angepinnt',
+  loesen: 'Thema nicht mehr angepinnt',
+  schliessen: 'Thema geschlossen',
+  oeffnen: 'Thema wieder geöffnet',
+  entfernen: 'Thema entfernt',
+  verschieben: 'Thema verschoben',
+  bearbeiten: 'Beitrag bearbeitet',
+  loeschen: 'Beitrag gelöscht',
+  meldung: 'Meldung erledigt',
+};
+
+/** Eintrag ins Mod-Log. Wirft nie: Die eigentliche Aktion ist dann schon geschehen. */
+async function modLog(user, action, { thread = null, post = null, detail = '' } = {}) {
+  try {
+    await ForumModLog.create({
+      by: user._id,
+      byName: user.username,
+      action,
+      thread: thread ? thread._id : null,
+      threadTitle: thread ? thread.title || null : null,
+      post: post ? post._id : null,
+      detail: String(detail || '').slice(0, 400),
+    });
+  } catch (err) {
+    console.error('Mod-Log fehlgeschlagen:', err.message);
+  }
+}
+
+/** Eine Seite des Mod-Logs (neueste zuerst) */
+async function modLogPage(page = 1) {
+  const total = await ForumModLog.countDocuments();
+  const pages = Math.max(1, Math.ceil(total / MODLOG_PER_PAGE));
+  const p = Math.min(pages, Math.max(1, page));
+  const entries = await ForumModLog.find().sort({ createdAt: -1, _id: -1 }).skip((p - 1) * MODLOG_PER_PAGE).limit(MODLOG_PER_PAGE).lean();
+  return { entries: entries.map((e) => ({ ...e, label: MODLOG_LABELS[e.action] || e.action })), page: p, pages, total };
+}
+
 async function createThread({ user, categoryId, title, body }) {
   const cat = mongoose.isValidObjectId(categoryId) ? await ForumCategory.findById(categoryId).lean() : null;
   if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
@@ -149,6 +253,7 @@ async function createThread({ user, categoryId, title, body }) {
   const thread = await ForumThread.create({ category: cat._id, title: t, author: user._id, authorName: user.username, lastPostAt: now, lastPostBy: user._id, lastPostByName: user.username, participants: [user._id] });
   await ForumPost.create({ thread: thread._id, author: user._id, authorName: user.username, body: b, isFirst: true });
   await markRead(user._id, thread._id, now);
+  await notifyMentions({ user, thread, body: b, href: `/forum/t/${thread._id}` });
   return thread;
 }
 
@@ -163,14 +268,20 @@ async function reply({ user, threadId, body }) {
   await ForumThread.updateOne({ _id: thread._id }, { $inc: { replyCount: 1 }, $set: { lastPostAt: now, lastPostBy: user._id, lastPostByName: user.username }, $addToSet: { participants: user._id } });
   await markRead(user._id, thread._id, now);
   const title = short(thread.title);
+  const base = { area: 'Forum', href: `/forum/t/${thread._id}`, key: `forum:${thread._id}`, except: user };
   await notify(thread.author, {
-    area: 'Forum',
-    href: `/forum/t/${thread._id}`,
-    key: `forum:${thread._id}`,
-    except: user,
+    ...base,
     text: `${user.username} hat in deinem Thema „${title}“ geantwortet.`,
     many: (n) => `${n} neue Antworten in deinem Thema „${title}“.`,
   });
+  // alle anderen, die im Thema geschrieben haben
+  const others = thread.participants.filter((id) => String(id) !== String(thread.author));
+  await notify(others, {
+    ...base,
+    text: `${user.username} hat im Thema „${title}“ geantwortet.`,
+    many: (n) => `${n} neue Antworten im Thema „${title}“.`,
+  });
+  await notifyMentions({ user, thread, body: b, href: `/forum/t/${thread._id}?seite=letzte#b-${post._id}`, skip: [thread.author, ...thread.participants] });
   return { thread, post };
 }
 
@@ -195,10 +306,12 @@ async function editPost({ user, postId, body, title }) {
   }
   await post.save();
   // Titel des Themas: über den Eröffnungsbeitrag
+  const oldTitle = thread.title;
   if (post.isFirst && typeof title === 'string' && title.trim()) {
     thread.title = cleanTitle(title);
     await thread.save();
   }
+  if (!own) await modLog(user, 'bearbeiten', { thread, post, detail: `Beitrag von ${post.authorName}${thread.title !== oldTitle ? ` · Titel vorher: „${oldTitle}“` : ''}` });
   return { post, thread };
 }
 
@@ -211,6 +324,7 @@ async function deletePost({ user, postId }) {
   post.deleted = true;
   post.deletedByRole = own ? 'autor' : roleOfUser(user);
   await post.save();
+  if (!own) await modLog(user, 'loeschen', { thread, post, detail: `Beitrag von ${post.authorName}` });
   return { post, thread };
 }
 
@@ -221,6 +335,7 @@ async function moderateThread({ user, threadId, action }) {
   if (!set || !mongoose.isValidObjectId(threadId)) throw new UserError('Unbekannte Aktion.');
   const thread = await ForumThread.findOneAndUpdate({ _id: threadId, deleted: false }, { $set: set }, { new: true });
   if (!thread) throw new UserError('Dieses Thema gibt es nicht.');
+  await modLog(user, action, { thread });
   return thread;
 }
 
@@ -239,6 +354,7 @@ async function moveThread({ user, threadId, categoryId }) {
   if (!can.moveThread(user, from, fromParent, to, toParent)) throw new UserError('Themen in oder aus Team-Bereichen verschieben nur Admin und Devs.');
   thread.category = to._id;
   await thread.save();
+  await modLog(user, 'verschieben', { thread, detail: `${from.title} → ${to.title}` });
   return { thread, to };
 }
 
@@ -249,14 +365,26 @@ async function toggleUpvote({ user, threadId }) {
 }
 
 async function report({ user, postId, reason }) {
+  const why = String(reason || '').trim().replace(/\s+/g, ' ').slice(0, REASON_MAX);
+  if (!why) throw new UserError('Bitte gib einen Grund für die Meldung an.');
   const { post, thread } = await loadPost(postId);
   if (post.deleted) throw new UserError('Dieser Beitrag wurde schon gelöscht.');
   try {
-    await ForumReport.create({ post: post._id, thread: thread._id, by: user._id, byName: user.username, reason: String(reason || '').trim().slice(0, 300) });
+    await ForumReport.create({ post: post._id, thread: thread._id, by: user._id, byName: user.username, reason: why });
   } catch (err) {
     if (err.code !== 11000) throw err; // schon gemeldet – kein Fehler
   }
   return thread;
+}
+
+/** Meldung als erledigt markieren (Moderation) – mit Eintrag im Mod-Log */
+async function resolveReport({ user, reportId }) {
+  if (!user.canModerate || !mongoose.isValidObjectId(reportId)) return null;
+  const r = await ForumReport.findOneAndUpdate({ _id: reportId, done: false }, { $set: { done: true } }, { new: true }).lean();
+  if (!r) return null; // gibt es nicht oder schon erledigt
+  const thread = await ForumThread.findById(r.thread).select('title').lean();
+  await modLog(user, 'meldung', { thread: thread || { _id: r.thread }, post: { _id: r.post }, detail: `gemeldet von ${r.byName}${r.reason ? `: „${r.reason}“` : ''}` });
+  return r;
 }
 
 // ---------- Lesen: ungelesen, Abzeichen ----------
@@ -299,8 +427,11 @@ module.exports = {
   THREADS_PER_PAGE,
   POSTS_PER_PAGE,
   PATCHNOTES_KEY,
+  REASON_MAX,
+  MODLOG_LABELS,
   roleOfUser,
   seed,
+  ensureDefaults,
   migratePatchnotes,
   patchnotesCategory,
   can,
@@ -313,6 +444,8 @@ module.exports = {
   moveThread,
   toggleUpvote,
   report,
+  resolveReport,
+  modLogPage,
   markRead,
   readMap,
   isUnread,

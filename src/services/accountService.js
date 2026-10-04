@@ -6,7 +6,7 @@ const Bet = require('../models/Bet');
 const Comment = require('../models/Comment');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const { ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Forum');
+const { ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog } = require('../models/Forum');
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
@@ -87,6 +87,8 @@ async function rename({ user, username }) {
     await inTransaction(async (session) => {
       await User.updateOne({ _id: user._id }, { $set: { username: name, usernameLower: lower, usernameChangedAt: new Date() } }, { session });
       await propagateName(user._id, user.username, name, session);
+      // Mod-Log nur beim Umbenennen – nach einer Kontolöschung bleibt dort der Name stehen, unter dem gehandelt wurde
+      await ForumModLog.updateMany({ by: user._id }, { $set: { byName: name } }, { session });
     });
   } catch (err) {
     if (err && err.code === 11000) throw new UserError('Dieser Benutzername ist bereits vergeben.');

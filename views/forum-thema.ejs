@@ -82,10 +82,15 @@
                 </form>
               <% } %>
               <% if (!p.mine) { %>
-                <form method="post" action="/forum/b/<%= p._id %>/melden" data-confirm="Diesen Beitrag der Moderation melden?">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button class="link-btn link-btn-muted" type="submit">Melden</button>
-                </form>
+                <details class="forum-report-fold">
+                  <summary class="link-btn link-btn-muted">Melden</summary>
+                  <form method="post" action="/forum/b/<%= p._id %>/melden" class="forum-report-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <label class="sr-only" for="grund-<%= p._id %>">Grund der Meldung</label>
+                    <input class="input" type="text" id="grund-<%= p._id %>" name="reason" maxlength="<%= reasonMax %>" required placeholder="Grund (Pflicht), z. B. Beleidigung, Spam …">
+                    <button class="btn btn-ghost btn-sm" type="submit">An die Moderation melden</button>
+                  </form>
+                </details>
               <% } %>
             </span>
             <% if (p.modEdited) { %><span class="forum-edited role-mod-text">von einem Mod bearbeitet</span><% } else if (p.editedAt) { %><span class="forum-edited">bearbeitet <%= relTime(p.editedAt) %></span><% } %>
