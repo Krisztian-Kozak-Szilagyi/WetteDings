@@ -11,11 +11,20 @@
     </div>
   </section>
 
-  <div class="card dg-story" lang="en">
+  <div class="dg-story" lang="en">
     <% dg.story.forEach((p) => { %><p><%= p %></p><% }) %>
   </div>
 
-  <p><a class="btn btn-ghost" href="/dungeon">← Zurück zum Dungeon</a></p>
+  <a class="ihk-start-tile dg-start-tile" href="/dungeon">
+    <span class="dg-start-emblem" aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>
+    </span>
+    <span class="ihk-start-text">
+      <span class="kicker">Der Ruf ist ergangen</span>
+      <span class="ihk-start-title">Zurück zum Dungeon</span>
+    </span>
+    <span class="ihk-start-arrow" aria-hidden="true">→</span>
+  </a>
 </div>
 
 <%- include('partials/foot') %>
