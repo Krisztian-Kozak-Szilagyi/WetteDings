@@ -4593,3 +4593,8 @@ dialog.ach-pop[open] { animation: ach-pop-in .45s cubic-bezier(.2, 1.4, .4, 1); 
 @media (prefers-reduced-motion: reduce) {
   dialog.ach-pop[open], .ach-pop-rays, .ach-pop-icon { animation: none; }
 }
+
+/* Dungeon: Karte schon als Charakter gewählt, nur ein Exemplar → als Boost gesperrt */
+.dg-pick.is-blocked { cursor: var(--cur-no); }
+.dg-pick.is-blocked img { filter: grayscale(1) brightness(.55); }
+.dg-pick.is-blocked .dg-pick-name { color: var(--color-neutral-600); }

@@ -254,10 +254,15 @@ const makeTeams = (entries, rand = random) => {
 async function availableCards(userId, { ownDungeon = false } = {}) {
   const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
   const free = (d) => !isLocked(locked, d) || (ownDungeon && locked.reasons.get(String(d._id)) === 'dungeon');
-  const ids = [...new Set(docs.filter(free).map((d) => d.card))];
+  // counts: freie Exemplare je Karte – dieselbe Karte als Charakter UND Boost braucht zwei
+  const counts = {};
+  docs.filter(free).forEach((d) => {
+    counts[d.card] = (counts[d.card] || 0) + 1;
+  });
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
-  const all = ids.map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
-  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => !c.isCharacter && canBoost(c)) };
+  const all = Object.keys(counts).map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
+  // Boost: Items, Spells und Charaktere mit Boost-Fähigkeit (Ömer, Pascal, Lili)
+  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts };
 }
 
 /** Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag */
@@ -267,7 +272,7 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false 
   let boost = null;
   if (boostId) {
     boost = catalog.cardById[boostId];
-    if (!boost || boost.id === card.id || !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
+    if (!boost || !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
   }
   if (boost && needsCoffee(boost)) {
     const owned = await TcgCard.distinct('card', { user: user._id }).session(session);
@@ -276,11 +281,14 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false 
   const locked = await lockedDocs(user._id, session);
   // Karten tauschen: die bisher eingesetzten Exemplare sind wieder wählbar
   if (ownDungeon) [...locked.reasons].filter(([, r]) => r === 'dungeon').forEach(([id]) => locked.reasons.delete(id));
-  const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
+  // except: dieses Exemplar ist schon vergeben (dieselbe Karte als Charakter und Boost → zwei verschiedene Exemplare)
+  const freeDoc = async (id, except) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d) && !(except && d._id.equals(except._id)));
   const doc = await freeDoc(card.id);
   if (!doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
-  const boostDoc = boost ? await freeDoc(boost.id) : null;
-  if (boost && !boostDoc) throw new UserError('Die Boost-Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+  const boostDoc = boost ? await freeDoc(boost.id, boost.id === card.id ? doc : null) : null;
+  if (boost && !boostDoc) {
+    throw new UserError(boost.id === card.id ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie Exemplare.` : 'Die Boost-Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+  }
   await claim([doc, boostDoc], user._id, session);
   return { user: user._id, name: user.username, card: card.id, cardDoc: doc._id, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null };
 }

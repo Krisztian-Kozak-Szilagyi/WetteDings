@@ -160,7 +160,7 @@
           </label>
         <% } %>
         <% list.forEach((c, i) => { const checked = kind === 'card' ? (sel ? sel.card === c.id : i === 0) : !!sel && sel.boost === c.id; %>
-          <label class="dg-pick r-<%= c.rarity %>" data-dg-item data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>">
+          <label class="dg-pick r-<%= c.rarity %>" data-dg-item data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>">
             <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= kind === 'card' ? 'required' : '' %> <%= checked ? 'checked' : '' %>>
             <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
             <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>

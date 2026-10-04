@@ -147,6 +147,32 @@
     });
   }
 
+  // ---------- Dieselbe Karte als Charakter und Boost nur mit zwei freien Exemplaren ----------
+  page.querySelectorAll('form').forEach((form) => {
+    const boostInputs = [...form.querySelectorAll('input[name="boost"]')];
+    if (!boostInputs.length) return;
+    const sync = () => {
+      const main = form.querySelector('input[name="card"]:checked');
+      boostInputs.forEach((inp) => {
+        const item = inp.closest('[data-dg-item]');
+        if (!item) return;
+        const blocked = !!main && inp.value === main.value && Number(item.dataset.count) < 2;
+        inp.disabled = blocked;
+        item.classList.toggle('is-blocked', blocked);
+        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : '';
+        if (blocked && inp.checked) {
+          inp.checked = false;
+          const none = form.querySelector('input[name="boost"][value=""]');
+          if (none) none.checked = true;
+        }
+      });
+    };
+    form.addEventListener('change', (e) => {
+      if (e.target.name === 'card') sync();
+    });
+    sync();
+  });
+
   // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 20 Karten ----------
   const PER_PAGE = 20;
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
