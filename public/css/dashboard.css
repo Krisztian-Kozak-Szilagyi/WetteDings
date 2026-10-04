@@ -118,7 +118,8 @@
 /* Favoriten unten bündig mit „Heute“ (Platz bleibt oben) */
 .dx-favs { justify-content: flex-end; }
 /* Countdowns im Hero als Kacheln unter der Begrüßung */
-.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; }
+/* Nur so breit wie die linke Spalte (3 von 5 Teilen des Rasters) */
+.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; max-width: calc((100% - var(--dx-gap)) * 3 / 5); }
 /* --tc = Farbe der Kachel je Art */
 .dx-timer { --tc: var(--color-accent); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 14px 14px 12px; border-radius: 10px; color: var(--color-text);
   background: radial-gradient(110% 90% at 100% 0%, color-mix(in srgb, var(--tc) 22%, transparent), transparent 65%), linear-gradient(180deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 40%, var(--color-bg)));
@@ -160,6 +161,7 @@
 
 @media (max-width: 900px) {
   .dx { --dx-cols: minmax(0, 1fr); }
+  .dx-timers { max-width: none; }
 }
 @media (max-width: 640px) {
   .dx { gap: 28px; }
