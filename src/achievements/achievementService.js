@@ -47,7 +47,40 @@ async function grantSpecial() {
 }
 
 /** Alle automatischen Erfolge prüfen und an neue Inhaber vergeben (Job, alle paar Minuten) */
-async function checkAll() {
+let checking = null; // laufende Prüfung (nie zwei gleichzeitig)
+let again = false; // während einer Prüfung kam eine neue Aktion → danach noch einmal prüfen
+let soonTimer = null;
+
+function checkAll() {
+  if (checking) {
+    again = true;
+    return checking;
+  }
+  checking = runCheck().finally(() => {
+    checking = null;
+    if (again) {
+      again = false;
+      soon();
+    }
+  });
+  return checking;
+}
+
+/**
+ * Nach einer Aktion eines Mitglieds (POST): in 2 Sekunden prüfen – mehrere Aktionen kurz hintereinander lösen nur
+ * eine Prüfung aus. Das Fenster erscheint dann beim nächsten Seitenaufruf. Der 5-Minuten-Job bleibt als Rückfall
+ * (z. B. für Lotterie-Ziehung und Zeit auf Platz 1, die ohne Aktion entstehen).
+ */
+function soon(delay = 2000) {
+  if (soonTimer) return;
+  soonTimer = setTimeout(() => {
+    soonTimer = null;
+    checkAll().catch((err) => console.error('Erfolge-Fehler:', err));
+  }, delay);
+  if (soonTimer.unref) soonTimer.unref();
+}
+
+async function runCheck() {
   for (const a of ACHIEVEMENTS) {
     if (!a.holders) continue;
     try {
@@ -131,4 +164,4 @@ async function playmates(userId, limit = 5) {
     .map((e) => ({ username: names.get(String(e.id)), together: e.together, dungeons: e.dungeons, duels: e.duels, achievements: achievements.get(String(e.id)) || 0 }));
 }
 
-module.exports = { grant, grantSpecial, checkAll, nextUnseen, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };
+module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };
