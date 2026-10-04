@@ -3714,8 +3714,8 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .foil-modal::backdrop { background: color-mix(in srgb, var(--color-bg) 78%, transparent); backdrop-filter: blur(8px); }
 .foil-modal .tcg-close { position: absolute; top: 16px; right: 16px; z-index: 2; }
 .foil-modal-stage { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; perspective: 1100px; animation: tcg-pop .25s ease; }
-.foil-card-big { width: min(340px, 78vw, 52dvh); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-.foil-card-big:active { cursor: grabbing; }
+.foil-card-big { width: min(340px, 78vw, 52dvh); cursor: var(--cur-grab); touch-action: none; user-select: none; -webkit-user-select: none; }
+.foil-card-big:active { cursor: var(--cur-grabbing); }
 .foil-card-big .foil-inner { transition: none; will-change: transform; }
 .foil-card-big .foil-sheen { animation: none; opacity: .7; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), #ffffff70, transparent 45%), linear-gradient(115deg, transparent 25%, #a8d8ff40 40%, #f0abfc33 60%, transparent 75%); }
 .foil-card-big .foil-face { padding: 56px 12px 12px; border-radius: 18px; }
@@ -3753,3 +3753,18 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .foil-modal .foil-modal-stage { flex: 1 1 auto; height: auto; min-height: 0; }
 .foil-modal-actions { display: flex; justify-content: center; margin: 0; padding: 0 16px 28px; }
 .tcg-hero-pack .tcg-pack-art:hover { filter: none !important; }
+/* Folierter Platz: insgesamt genau so groß wie eine normale Karte; Karte, Folie und Etikett bewegen sich als ein Stück */
+.foil-card.foil-card-slot { display: block; width: 100%; perspective: none; cursor: inherit; container-type: inline-size; transition: transform .2s ease; }
+.foil-card-slot .foil-inner { transform: none; transition: none; }
+.foil-card-slot .foil-face { position: relative; aspect-ratio: 720 / 1008; padding: 0; border-radius: 10px; }
+.foil-card-slot .foil-face img {
+  position: absolute; top: 12.5%; left: 50%; width: auto; height: 84.5%; border-radius: 5px;
+  transform: translateX(-50%) !important; box-shadow: none !important; transition: none !important;
+}
+.foil-card-slot .foil-ticket { top: 3%; left: 4%; right: 4%; height: 7.5%; padding: 0 4cqw; font-size: 5.6cqw; border-radius: 3cqw; }
+.tcg-slot.foil-slot:hover .foil-card-slot, .tcg-slot.foil-slot:focus-visible .foil-card-slot { transform: translateY(-4px); }
+.tcg-favs .foil-card-slot .foil-face { border-radius: 12px; }
+.tcg-favs .tcg-slot.foil-slot:hover .foil-card-slot { transform: translateY(-6px) rotate(-1.5deg); }
+/* TCG-Seite: das Pack-Bild ist nur Deko – gekauft wird mit dem Knopf (normaler Mauszeiger, nicht ziehbar) */
+.tcg-pack-btn.tcg-pack-art { display: block; cursor: var(--cur-default); user-select: none; -webkit-user-select: none; }
+.tcg-pack-art img { pointer-events: none; -webkit-user-drag: none; }
