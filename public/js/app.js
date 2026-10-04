@@ -579,13 +579,67 @@
     '</filter></svg>';
   var add = function () { document.body.insertAdjacentHTML('afterbegin', svg); };
   if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
-  // Neuer Erfolg: Fenster sofort öffnen; Esc schließt es nicht – es muss mit OK bestätigt werden
+  // Neuer Erfolg: Fenster wie das Beute-Fenster. Ist beim Laden schon einer offen, sofort zeigen; sonst alle 10 Sekunden
+  // (und kurz nach jeder Aktion) nachfragen – so springt es auch ohne Neuladen auf, z. B. direkt nach dem Packöffnen.
+  // Esc schließt nicht; „Weiter“ bestätigt im Hintergrund und zeigt gleich den nächsten Erfolg, falls noch einer wartet.
   var onReady = function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn(); };
   onReady(function () {
     var pop = document.querySelector('[data-ach-pop]');
     if (!pop || !pop.showModal) return;
+    var form = pop.querySelector('[data-ach-form]');
+    var q = function (sel) { return pop.querySelector(sel); };
     pop.addEventListener('cancel', function (e) { e.preventDefault(); });
-    pop.showModal();
+
+    var fill = function (d) {
+      q('[data-ach-id]').value = d.id;
+      q('[data-ach-icon]').setAttribute('src', d.icon);
+      q('[data-ach-name]').textContent = d.name;
+      q('[data-ach-text]').textContent = d.text;
+      q('[data-ach-reward]').textContent = d.reward || '';
+      q('[data-ach-reward-row]').hidden = !d.reward;
+      var more = q('[data-ach-more]');
+      var left = (d.left || 1) - 1;
+      more.hidden = left < 1;
+      more.textContent = left === 1 ? 'Noch 1 weiterer Erfolg wartet.' : 'Noch ' + left + ' weitere Erfolge warten.';
+      pop.classList.toggle('is-unique', !!d.unique);
+      // Einblend-Animation für jeden Erfolg neu starten
+      pop.classList.remove('is-fresh');
+      void pop.offsetWidth;
+      pop.classList.add('is-fresh');
+    };
+    var open = function (d) {
+      if (d) fill(d);
+      if (!pop.open) pop.showModal();
+    };
+    if (pop.hasAttribute('data-open')) open(null);
+
+    var busy = false;
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: new URLSearchParams(new FormData(form)) })
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (res) { if (res.next) fill(res.next); else pop.close(); })
+        .catch(function () { form.submit(); })
+        .then(function () { busy = false; });
+    });
+
+    var poll = function () {
+      if (pop.open || document.hidden) return;
+      fetch('/erfolge/neu', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) { if (res && res.popup) open(res.popup); })
+        .catch(function () {});
+    };
+    setInterval(poll, 10000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+    // Nach einer Aktion (Formular, Klick auf einen Knopf) prüft der Server binnen ~2 Sekunden – kurz danach nachfragen
+    var later = null;
+    var soon = function () { clearTimeout(later); later = setTimeout(poll, 3500); };
+    document.addEventListener('submit', function (e) { if (e.target !== form) soon(); });
+    document.addEventListener('click', function (e) { if (e.target.closest('button') && !pop.contains(e.target)) soon(); });
   });
 
   // Zeichenzähler für Textfelder: data-count="<id des Zählers>" (Emojis zählen als ein Zeichen)

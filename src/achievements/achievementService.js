@@ -1,7 +1,7 @@
 // Erfolge vergeben, anzeigen und bestätigen.
 // Vergabe: Erfolg anlegen + 100 € gutschreiben + Buchung – alles in einer Transaktion. Der eindeutige Index
 // (user + key) verhindert doppelte Vergabe auch bei gleichzeitigen Läufen: Die zweite Transaktion scheitert,
-// es gibt kein Geld. Das Fenster mit OK erscheint danach auf jeder Seite, bis es bestätigt wurde.
+// es gibt kein Geld. Das Fenster erscheint danach (auch ohne Neuladen) auf jeder Seite, bis es bestätigt wurde.
 const mongoose = require('mongoose');
 const Achievement = require('../models/Achievement');
 const User = require('../models/User');
@@ -9,7 +9,6 @@ const Ledger = require('../models/Ledger');
 const { DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
 const { inTransaction } = require('../services/betService');
-const notifyService = require('../services/notifyService');
 const { ACHIEVEMENTS, SPECIAL, REWARD, byKey, find } = require('./list');
 
 const isDuplicate = (err) => err && (err.code === 11000 || /E11000/.test(err.message || ''));
@@ -32,9 +31,7 @@ async function grant(userId, key) {
     if (isDuplicate(err)) return false; // parallel schon vergeben – die Transaktion ist samt Gutschrift zurückgerollt
     throw err;
   }
-  if (granted) {
-    await notifyService.notify(id, { area: 'Erfolge', text: `Erfolg freigeschaltet: ${byKey[key].name} (+${REWARD / 100} €)`, href: `/profil/${encodeURIComponent(granted)}` });
-  }
+  // Keine Glocke: Der neue Erfolg erscheint als eigenes Fenster (partials/foot.ejs, app.js fragt regelmäßig nach)
   return !!granted;
 }
 
@@ -115,6 +112,13 @@ async function nextUnseen(userId) {
   return { id: String(d._id), key: d.key, name: a.name, text: a.text, unique: !!a.unique, reward: d.reward, left: known.length };
 }
 
+/** Daten für das Fenster als JSON (für app.js), Beträge schon formatiert */
+function popupJson(p, assetVersion = '') {
+  if (!p) return null;
+  const { euro } = require('../lib/viewHelpers');
+  return { id: p.id, name: p.name, text: p.text, unique: p.unique, reward: p.reward ? `+${euro(p.reward)}` : '', left: p.left, icon: `/img/erfolge/${p.key}.svg?v=${assetVersion}` };
+}
+
 /** Fenster bestätigt */
 async function markSeen(userId, id) {
   if (!mongoose.isValidObjectId(id)) return;
@@ -173,4 +177,4 @@ async function playmates(userId, limit = 5) {
     .map((e) => ({ username: names.get(String(e.id)), together: e.together, dungeons: e.dungeons, duels: e.duels, achievements: achievements.get(String(e.id)) || 0 }));
 }
 
-module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };
+module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, popupJson, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };

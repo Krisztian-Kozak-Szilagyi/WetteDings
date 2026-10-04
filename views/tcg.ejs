@@ -127,10 +127,10 @@
     <% } %>
     </div>
 
-    <%# Kachel im Stil des IHK-Start-Knopfs: Pack und Folie, beim Darüberfahren rutscht die Folie über das Pack %>
+    <%# Kachel im Stil des IHK-Start-Knopfs: Karte und Folie, beim Darüberfahren rutscht die Folie über die Karte %>
     <a class="inv-tile" href="/inventar" id="packs">
       <span class="inv-tile-art" aria-hidden="true">
-        <img class="inv-tile-pack" src="<%= packImage %>" alt="" width="800" height="1280" loading="lazy">
+        <img class="inv-tile-pack" src="<%= (cardById['st-ivan-boss'] || {}).image || packImage %>" alt="" width="720" height="1008" loading="lazy">
         <span class="inv-tile-foil"></span>
       </span>
       <span class="inv-tile-text">

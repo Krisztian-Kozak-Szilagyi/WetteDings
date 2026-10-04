@@ -1,22 +1,28 @@
   </main>
   <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
-  <%# Neuer Erfolg: erscheint auf jeder Seite, bis er mit OK bestätigt ist (Esc schließt nicht, siehe app.js) %>
-  <% if (currentUser && typeof achPopup !== 'undefined' && achPopup) { %>
-    <dialog class="ach-pop<%= achPopup.unique ? ' is-unique' : '' %>" data-ach-pop aria-labelledby="ach-pop-title" aria-describedby="ach-pop-text">
+  <%# Neuer Erfolg: Fenster wie das Beute-Fenster. Steht für jedes angemeldete Mitglied bereit; ist schon ein Erfolg offen,
+      öffnet app.js es sofort, sonst fragt app.js alle paar Sekunden nach (/erfolge/neu). Esc schließt nicht – erst „Weiter“. %>
+  <% if (currentUser) { const ap = typeof achPopup !== 'undefined' && achPopup ? achPopup : null; %>
+    <dialog class="dg-loot ach-pop<%= ap && ap.unique ? ' is-unique' : '' %>" data-ach-pop<%= ap ? ' data-open' : '' %> aria-labelledby="ach-pop-title" aria-describedby="ach-pop-text">
       <span class="ach-pop-rays" aria-hidden="true"></span>
-      <p class="ach-pop-kicker">Erfolg freigeschaltet</p>
-      <img class="ach-pop-icon" src="/img/erfolge/<%= achPopup.key %>.svg?v=<%= assetVersion %>" alt="" width="132" height="132">
-      <h2 id="ach-pop-title"><%= achPopup.name %></h2>
-      <p id="ach-pop-text" class="ach-pop-text"><%= achPopup.text %></p>
-      <% if (achPopup.reward) { %><p class="ach-pop-reward">+<%= euro(achPopup.reward) %></p><% } %>
-      <form method="post" action="/erfolge/gesehen">
+      <span class="kicker">Erfolg freigeschaltet</span>
+      <img class="ach-pop-icon" data-ach-icon<% if (ap) { %> src="/img/erfolge/<%= ap.key %>.svg?v=<%= assetVersion %>"<% } %> alt="" width="132" height="132">
+      <h2 id="ach-pop-title" data-ach-name><%= ap ? ap.name : '' %></h2>
+      <p id="ach-pop-text" class="ach-pop-text" data-ach-text><%= ap ? ap.text : '' %></p>
+      <ul class="dg-loot-list" data-ach-reward-row<%= ap && !ap.reward ? ' hidden' : '' %>>
+        <li class="dg-loot-row is-money is-shown is-me">
+          <span class="dg-loot-name">Belohnung gutgeschrieben</span>
+          <span class="dg-loot-chip is-money" data-ach-reward><%= ap && ap.reward ? '+' + euro(ap.reward) : '' %></span>
+        </li>
+      </ul>
+      <form method="post" action="/erfolge/gesehen" data-ach-form>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="id" value="<%= achPopup.id %>">
-        <input type="hidden" name="zurueck" value="<%= achPopupBack %>">
-        <button class="btn btn-primary ach-pop-ok" type="submit" autofocus>OK</button>
+        <input type="hidden" name="id" value="<%= ap ? ap.id : '' %>" data-ach-id>
+        <input type="hidden" name="zurueck" value="<%= typeof achPopupBack !== 'undefined' ? achPopupBack : '/' %>">
+        <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
       </form>
-      <% if (achPopup.left > 1) { %><p class="muted small ach-pop-more">Noch <%= achPopup.left - 1 %> weitere<%= achPopup.left - 1 === 1 ? 'r Erfolg wartet' : ' Erfolge warten' %> auf dich.</p><% } %>
+      <p class="muted small ach-pop-more" data-ach-more<%= ap && ap.left > 1 ? '' : ' hidden' %>><%= ap && ap.left > 1 ? 'Noch ' + (ap.left - 1) + (ap.left - 1 === 1 ? ' weiterer Erfolg wartet.' : ' weitere Erfolge warten.') : '' %></p>
     </dialog>
   <% } %>
   <footer class="footer">

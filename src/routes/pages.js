@@ -107,6 +107,10 @@ router.post('/profil/anheften', requireLogin, async (req, res) => {
 // Fenster "Erfolg freigeschaltet" mit OK bestätigt – zurück auf die Seite, auf der es erschien
 router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   await achievementService.markSeen(req.user._id, str(req.body.id));
+  // app.js schickt im Hintergrund und zeigt gleich den nächsten Erfolg; ohne JavaScript zurück auf die Seite
+  if (req.accepts(['html', 'json']) === 'json') {
+    return res.json({ next: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), req.app.locals.assetVersion) });
+  }
   res.redirect(safeRedirect(str(req.body.zurueck), '/'));
 });
 

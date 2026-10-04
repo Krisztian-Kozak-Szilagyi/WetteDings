@@ -4560,7 +4560,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
   [data-tip]::after { max-width: min(240px, 70vw); }
 }
 
-/* Fenster "Erfolg freigeschaltet" */
+/* Fenster "Erfolg freigeschaltet" (Grundform wie das Beute-Fenster .dg-loot) */
 dialog.ach-pop {
   width: min(100% - 32px, 420px); padding: 32px 28px 24px; border: 0; border-radius: 20px; text-align: center; overflow: hidden;
   color: var(--text); background: radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--color-accent) 30%, transparent), transparent 62%), var(--color-surface);
@@ -4568,7 +4568,7 @@ dialog.ach-pop {
 }
 dialog.ach-pop.is-unique { box-shadow: 0 0 0 1px #b48cf2, 0 24px 70px rgba(0, 0, 0, .7), 0 0 70px rgba(255, 122, 217, .25); }
 dialog.ach-pop::backdrop { background: color-mix(in srgb, var(--color-bg) 78%, transparent); backdrop-filter: blur(8px); }
-dialog.ach-pop[open] { animation: ach-pop-in .45s cubic-bezier(.2, 1.4, .4, 1); }
+dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic-bezier(.2, 1.4, .4, 1); }
 .ach-pop-rays {
   position: absolute; left: 50%; top: 118px; width: 560px; height: 560px; margin: -280px 0 0 -280px; pointer-events: none; opacity: .22;
   background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--color-accent-300) 60%, transparent) 0 6deg, transparent 6deg 18deg);
@@ -4576,14 +4576,13 @@ dialog.ach-pop[open] { animation: ach-pop-in .45s cubic-bezier(.2, 1.4, .4, 1); 
   animation: ach-spin 24s linear infinite;
 }
 .ach-pop > *:not(.ach-pop-rays) { position: relative; }
-.ach-pop-kicker { margin: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--color-accent-300); }
+.ach-pop .kicker { display: block; margin: 0 0 10px; color: var(--color-accent-300); }
+.ach-pop .dg-loot-list { margin: 0 0 18px; text-align: left; }
+.ach-pop [hidden] { display: none !important; }
+.ach-pop .dg-loot-row.is-money .dg-loot-chip { font-size: 15px; padding: 5px 14px; }
 .ach-pop-icon { display: block; width: 132px; height: 132px; margin: 0 auto 10px; filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .55)); animation: ach-float 3.2s ease-in-out infinite; }
 .ach-pop h2 { margin: 0 0 8px; font-size: 26px; }
 .ach-pop-text { margin: 0 auto 14px; max-width: 32ch; color: var(--color-neutral-300); line-height: 1.5; }
-.ach-pop-reward {
-  display: inline-block; margin: 0 0 18px; padding: 6px 16px; border-radius: 99px; font-weight: 800; font-size: 18px;
-  color: #ffd76a; background: var(--warn-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
-}
 .ach-pop form { margin: 0; }
 .ach-pop-ok { min-width: 160px; }
 .ach-pop-more { margin: 12px 0 0; }
@@ -4591,7 +4590,7 @@ dialog.ach-pop[open] { animation: ach-pop-in .45s cubic-bezier(.2, 1.4, .4, 1); 
 @keyframes ach-spin { to { transform: rotate(360deg); } }
 @keyframes ach-float { 50% { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) {
-  dialog.ach-pop[open], .ach-pop-rays, .ach-pop-icon { animation: none; }
+  dialog.ach-pop[open], dialog.ach-pop.is-fresh, .ach-pop-rays, .ach-pop-icon { animation: none; }
 }
 
 /* Dungeon: Karte schon als Charakter gewählt, nur ein Exemplar → als Boost gesperrt */

@@ -129,6 +129,12 @@ function createApp() {
   app.use(device);
   app.use(dailyBonus);
   app.use(csrf);
+  // Neuer Erfolg? app.js fragt alle paar Sekunden – deshalb vor Statistik und Menü-Abzeichen (nur eine kleine Abfrage)
+  app.get('/erfolge/neu', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return res.status(401).json({ popup: null });
+    res.json({ popup: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), app.locals.assetVersion) });
+  });
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
   app.use(require('./coin/etfTrend').trackPulse); // Aktionen der Mitglieder bewegen den BfW-TCG ETF
   // Nach jeder erfolgreichen Aktion (POST) kurz darauf prüfen, ob jemand einen neuen Erfolg erreicht hat
