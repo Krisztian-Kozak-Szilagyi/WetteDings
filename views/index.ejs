@@ -8,13 +8,13 @@
 <div class="bet-toolbar-row">
   <nav class="tabs" aria-label="Filter" data-live="tabs">
     <% Object.entries(tabs).forEach(([key, label]) => { if (key === 'meine' && !currentUser) return; %>
-      <a href="/?tab=<%= key %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="tab <%= tab === key ? 'active' : '' %>">
+      <a href="/wetten?tab=<%= key %><%= q ? '&q=' + encodeURIComponent(q) : '' %>" class="tab <%= tab === key ? 'active' : '' %>">
         <%= label %><span class="tab-count <%= counts[key] ? '' : 'is-zero' %>" aria-label="<%= counts[key] %> Wetten"><%= counts[key] > 99 ? '99+' : counts[key] %></span>
       </a>
     <% }) %>
   </nav>
 
-  <form class="search bet-search" method="get" action="/" role="search">
+  <form class="search bet-search" method="get" action="/wetten" role="search">
     <input type="hidden" name="tab" value="<%= tab %>">
     <input type="search" name="q" value="<%= q %>" placeholder="Wetten durchsuchen …" aria-label="Wetten durchsuchen (Enter)" maxlength="100">
   </form>
@@ -54,7 +54,7 @@
   <% } %>
   <% if (page > 1 || hasMore) { %>
     <nav class="pager" aria-label="Seiten">
-      <% const base = '/?tab=' + tab + (q ? '&q=' + encodeURIComponent(q) : ''); %>
+      <% const base = '/wetten?tab=' + tab + (q ? '&q=' + encodeURIComponent(q) : ''); %>
       <% if (page > 1) { %><a class="btn btn-ghost" href="<%= base %>&seite=<%= page - 1 %>">← Zurück</a><% } else { %><span></span><% } %>
       <span class="muted">Seite <%= page %></span>
       <% if (hasMore) { %><a class="btn btn-ghost" href="<%= base %>&seite=<%= page + 1 %>">Weiter →</a><% } else { %><span></span><% } %>

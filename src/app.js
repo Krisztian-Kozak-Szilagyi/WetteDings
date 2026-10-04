@@ -192,6 +192,7 @@ function createApp() {
   app.use(require('./routes/pages'));
   app.use(forumRoutes);
   app.use(require('./routes/auth'));
+  app.use(require('./routes/dashboard'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
   app.use(require('./routes/notify'));

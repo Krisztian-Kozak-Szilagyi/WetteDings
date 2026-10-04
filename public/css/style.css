@@ -4657,3 +4657,162 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 .pf-asset-value { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pf-asset-form { display: flex; gap: 8px; margin: 12px 0 0; }
 .pf-asset-form select { flex: 1; min-width: 0; margin: 0; }
+
+/* ========== Dashboard (Startseite nach der Anmeldung) ========== */
+.dash { --dash-cash: var(--color-accent); --dash-bets: var(--warn); --dash-coins: var(--ja); --dash-cards: var(--r-holo); display: flex; flex-direction: column; gap: 28px; }
+.dash-hero {
+  position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 32px;
+  padding: 34px 32px 30px; border-radius: var(--radius-lg); overflow: hidden; isolation: isolate;
+  background: radial-gradient(70% 140% at 0% 0%, color-mix(in srgb, var(--color-accent) 26%, transparent), transparent 62%),
+    radial-gradient(50% 120% at 100% 100%, color-mix(in srgb, var(--color-accent-700) 30%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-800), 0 0 60px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.dash-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; background: repeating-linear-gradient(115deg, transparent 0 22px, color-mix(in srgb, var(--color-accent) 4%, transparent) 22px 23px); mask-image: linear-gradient(90deg, transparent, #000 70%); }
+.dash-hero-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dash-kicker { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-accent-400); }
+.dash-hero h1 { margin: 0; font-size: clamp(28px, 1.3rem + 2vw, 42px); line-height: 1.1; letter-spacing: -.02em; }
+.dash-name { background: linear-gradient(90deg, var(--color-accent-300), var(--color-accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dash-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
+.dash-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.dash-hero-actions .btn-primary { box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 28%, transparent); }
+
+.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 20px; }
+.dash-card {
+  display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 22px 22px 20px; border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 40%, var(--color-bg)));
+  box-shadow: var(--shadow-sm);
+}
+.dash-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dash-card-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; color: var(--color-neutral-200); }
+.dash-meta { font-size: 12px; font-weight: 500; color: var(--color-neutral-500); white-space: nowrap; }
+a.dash-meta:hover { color: var(--color-accent-400); }
+.dash-wealth { grid-column: span 8; box-shadow: 0 0 0 1px var(--color-accent-800), 0 0 48px color-mix(in srgb, var(--color-accent) 8%, transparent); }
+.dash-today { grid-column: span 4; }
+.dash-ticker { grid-column: 1 / -1; }
+.dash-bets { grid-column: span 7; }
+.dash-cds { grid-column: span 5; }
+.dash-forum, .dash-notes { grid-column: span 6; }
+.dash-favs { grid-column: 1 / -1; }
+
+/* Vermögen */
+.dash-rank { display: inline-flex; align-items: baseline; gap: 5px; padding: 5px 12px; border-radius: 999px; font-size: 12px; color: var(--color-neutral-300); background: color-mix(in srgb, var(--color-accent) 12%, transparent); box-shadow: inset 0 0 0 1px var(--color-accent-800); }
+.dash-rank strong { font-size: 14px; color: var(--color-accent-300); }
+.dash-rank.is-top { background: color-mix(in srgb, var(--r-gold) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--r-gold) 45%, transparent); }
+.dash-rank.is-top strong { color: var(--r-gold); }
+.dash-wealth-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: end; gap: 18px 28px; }
+.dash-total { display: flex; flex-direction: column; gap: 10px; }
+.dash-total-value { font-size: clamp(32px, 1.4rem + 2vw, 46px); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.dash-delta { display: inline-flex; align-items: baseline; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-variant-numeric: tabular-nums; background: color-mix(in srgb, currentColor 12%, transparent); }
+.dash-delta small { font-size: 11px; font-weight: 400; color: var(--color-neutral-500); }
+.dash-chart { position: relative; margin: 0; }
+.dash-chart svg { display: block; width: 100%; height: 110px; overflow: visible; }
+.dash-chart-line { fill: none; stroke: var(--color-accent-400); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 60%, transparent)); }
+.dash-chart-dot { position: absolute; left: var(--x); top: calc(var(--y) * 110px / 100); width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--color-accent-300); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 25%, transparent), 0 0 16px var(--color-accent); }
+.dash-chart-days { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--color-neutral-600); }
+.dash-chart-days span:last-child { color: var(--color-accent-400); font-weight: 600; }
+.dash-chart-empty { margin: 0; align-self: center; }
+.dash-split { display: flex; gap: 3px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--color-neutral-900); }
+.dash-split span { flex-basis: 0; min-width: 4px; }
+.dash-split-cash { background: var(--dash-cash); }
+.dash-split-bets { background: var(--dash-bets); }
+.dash-split-coins { background: var(--dash-coins); }
+.dash-split-cards { background: var(--dash-cards); }
+.dash-parts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.dash-part dt { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--color-neutral-500); }
+.dash-part dd { margin: 4px 0 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dash-swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--sw); box-shadow: 0 0 8px var(--sw); }
+.dash-part-cash { --sw: var(--dash-cash); }
+.dash-part-bets { --sw: var(--dash-bets); }
+.dash-part-coins { --sw: var(--dash-coins); }
+.dash-part-cards { --sw: var(--dash-cards); }
+
+/* Heute */
+.dash-ring { position: relative; display: grid; place-items: center; width: 52px; height: 52px; flex: none; }
+.dash-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.dash-ring circle { fill: none; stroke-width: 5; }
+.dash-ring-bg { stroke: var(--color-neutral-800); }
+.dash-ring-fg { stroke: var(--color-accent); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--color-accent)); transition: stroke-dashoffset .6s ease; }
+.dash-ring span { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dash-tasks, .dash-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.dash-task, .dash-bet, .dash-cd, .dash-thread, .dash-note {
+  display: flex; align-items: center; gap: 12px; padding: 10px 10px; margin: 0 -10px; border-radius: var(--radius-md); color: inherit; text-decoration: none; transition: background .15s ease;
+}
+.dash-task:hover, .dash-bet:hover, .dash-cd:hover, .dash-thread:hover, .dash-note:hover { color: inherit; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.dash-check { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--color-neutral-700); }
+.dash-check svg { width: 14px; height: 14px; fill: none; stroke: var(--color-bg); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dash-task.is-done .dash-check { background: var(--color-accent); box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 50%, transparent); }
+.dash-task-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dash-task-text strong { font-size: 14px; font-weight: 600; }
+.dash-task-text small, .dash-bet small, .dash-cd small, .dash-thread small { font-size: 12px; color: var(--color-neutral-500); }
+.dash-task.is-done .dash-task-text strong { color: var(--color-neutral-400); }
+.dash-task-progress { width: 48px; height: 5px; flex: none; border-radius: 999px; background: var(--color-neutral-800); overflow: hidden; }
+.dash-task-progress span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
+.dash-arrow { flex: none; color: var(--color-neutral-700); transition: transform .15s ease, color .15s ease; }
+.dash-task:hover .dash-arrow { transform: translateX(3px); color: var(--color-accent-400); }
+
+/* Broker-Ticker */
+.dash-ticker { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.dash-tick {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: center; gap: 4px 12px;
+  padding: 14px 16px; border-radius: var(--radius-lg); color: inherit; text-decoration: none; background: var(--color-surface); box-shadow: var(--shadow-sm); transition: box-shadow .2s ease, transform .2s ease;
+}
+.dash-tick:hover { color: inherit; transform: translateY(-2px); box-shadow: 0 0 0 1px var(--color-accent-700), 0 10px 30px rgba(0, 0, 0, .4); }
+.dash-tick-logo, .dash-tick .asset-mark { grid-row: 1 / 3; width: 36px; height: 36px; }
+.dash-tick .asset-mark { font-size: 9px; border-radius: 10px; }
+.dash-tick-id { display: flex; flex-direction: column; min-width: 0; }
+.dash-tick-id strong { font-size: 14px; }
+.dash-tick-id small { overflow: hidden; font-size: 11px; color: var(--color-neutral-500); white-space: nowrap; text-overflow: ellipsis; }
+.dash-tick-spark { grid-column: 2; grid-row: 2; width: 100%; height: 22px; }
+.dash-tick-spark path { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+.dash-tick-spark.up path { stroke: var(--ja); }
+.dash-tick-spark.down path { stroke: var(--nein); }
+.dash-tick-price { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+.dash-tick-price strong { font-size: 16px; }
+.dash-tick-price small { font-size: 12px; }
+.dash-tick.is-flash .dash-tick-price strong { animation: dash-flash .9s ease; }
+@keyframes dash-flash { 0% { color: var(--color-accent-300); text-shadow: 0 0 12px var(--color-accent); } 100% { color: inherit; text-shadow: none; } }
+
+/* Listen: Wetten, Countdowns, Forum, Benachrichtigungen */
+.dash-bet-main, .dash-thread-main, .dash-note-main, .dash-cd-label { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.dash-bet-main strong, .dash-thread-main strong { overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.dash-tag { display: inline-block; padding: 1px 6px; margin-right: 2px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; color: var(--warn); background: var(--warn-soft); }
+.dash-pick { color: var(--color-accent-300); font-weight: 500; }
+.dash-bet-money { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; font-variant-numeric: tabular-nums; }
+.dash-bet-money strong { font-size: 15px; }
+.dash-more { align-self: flex-start; font-size: 13px; font-weight: 500; }
+.dash-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-bg) 60%, transparent); border: 1px dashed var(--color-neutral-800); }
+.dash-empty p { margin: 0; color: var(--color-neutral-400); font-size: 14px; }
+.dash-cd-label strong { font-size: 14px; font-weight: 600; }
+.dash-cd-time { flex: none; padding: 6px 10px; border-radius: var(--radius-md); font-family: ui-monospace, Consolas, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-neutral-200); background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.dash-cd-time.is-soon { color: var(--warn); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent); }
+.dash-cd-bm .dash-cd-time { color: #c4a6f7; box-shadow: inset 0 0 0 1px color-mix(in srgb, #a855f7 40%, transparent), 0 0 14px color-mix(in srgb, #a855f7 18%, transparent); }
+.dash-cd.is-live .dash-cd-label strong::after { content: "OFFEN"; margin-left: 8px; padding: 1px 6px; border-radius: 4px; font-size: 10px; letter-spacing: .08em; color: #e9d5ff; background: color-mix(in srgb, #a855f7 35%, transparent); vertical-align: 2px; }
+.dash-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--color-neutral-800); }
+.is-unread > .dash-dot { background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); }
+.dash-note { align-items: flex-start; }
+.dash-note .dash-dot { margin-top: 6px; }
+.dash-note-main span { font-size: 14px; line-height: 1.4; color: var(--color-neutral-300); }
+.dash-note.is-unread .dash-note-main span { color: var(--text); }
+.dash-note-area { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-500); }
+.dash-thread.is-unread strong { color: var(--text); }
+.dash-thread:not(.is-unread) strong { color: var(--color-neutral-300); font-weight: 500; }
+
+/* Favoriten */
+.dash-fav-grid.tcg-favs { grid-template-columns: repeat(auto-fill, minmax(120px, 160px)); }
+
+@media (max-width: 1100px) {
+  .dash-wealth, .dash-today, .dash-bets, .dash-cds, .dash-forum, .dash-notes { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .dash-hero { padding: 24px 18px 22px; }
+  .dash-hero-actions { width: 100%; }
+  .dash-hero-actions .btn { flex: 1; }
+  .dash-grid { gap: 14px; }
+  .dash-card { padding: 18px 16px 16px; }
+  .dash-wealth-main { grid-template-columns: 1fr; }
+  .dash-parts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-chart svg { height: 90px; }
+  .dash-chart-dot { top: calc(var(--y) * 90px / 100); }
+  .dash-fav-grid.tcg-favs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

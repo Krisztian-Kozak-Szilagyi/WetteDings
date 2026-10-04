@@ -1,0 +1,256 @@
+<%- include('partials/head') %>
+<%
+  const d = dash;
+  const w = d.wealth;
+  const wd = new Intl.DateTimeFormat('de-DE', { weekday: 'short', timeZone: 'UTC' });
+  const dayLabel = (day) => wd.format(new Date(day + 'T12:00:00Z')).replace('.', '');
+  const todayText = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' }).format(new Date());
+  // Anteile am Vermögen (gestapelter Balken)
+  const parts = [
+    { key: 'cash', label: 'Verfügbar', value: w.balance },
+    { key: 'bets', label: 'In Wetten', value: w.inPlay },
+    { key: 'coins', label: 'In Coins', value: w.coinValue },
+    { key: 'cards', label: 'In Karten', value: w.cardValue },
+  ];
+  const partTotal = parts.reduce((s, p) => s + Math.max(0, p.value || 0), 0) || 1;
+  const t = d.today;
+  const ring = 2 * Math.PI * 22; // Umfang des Fortschrittsrings (r = 22)
+  const notes = (locals.bellNotes || []).slice(0, d.notesMax);
+%>
+
+<div class="dash">
+  <header class="dash-hero">
+    <div class="dash-hero-text">
+      <p class="dash-kicker"><span class="live-dot"></span> <%= todayText %></p>
+      <h1><%= d.greeting %>, <span class="dash-name"><%= currentUser.username %></span></h1>
+      <p class="dash-sub"><% if (t.items.length) { %><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %><% } %></p>
+    </div>
+    <div class="dash-hero-actions">
+      <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
+      <a class="btn btn-ghost" href="/wetten">Alle Wetten</a>
+    </div>
+  </header>
+
+  <div class="dash-grid">
+    <%# ---------- Vermögen ---------- %>
+    <section class="dash-card dash-wealth" aria-labelledby="dash-wealth-h">
+      <div class="dash-card-head">
+        <h2 id="dash-wealth-h">Vermögen</h2>
+        <% if (w.rank) { %><a class="dash-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %>
+      </div>
+      <div class="dash-wealth-main">
+        <div class="dash-total">
+          <span class="dash-total-value"><%= euro(w.total) %></span>
+          <% if (w.change) { const up = w.change.diff >= 0; %>
+            <span class="dash-delta <%= up ? 'pos' : 'neg' %>" title="Veränderung seit <%= dayDate(w.points[0].day + 'T12:00:00Z') %>">
+              <%= up ? '▲' : '▼' %> <%= (up ? '+' : '−') + euro(Math.abs(w.change.diff)) %><% if (w.change.pct !== null) { %> · <%= signedPercent(w.change.pct) %><% } %>
+              <small><%= w.points.length %> Tage</small>
+            </span>
+          <% } %>
+        </div>
+        <% if (w.curve) { %>
+          <figure class="dash-chart" aria-label="Verlauf des Gesamtvermögens der letzten <%= w.points.length %> Tage">
+            <svg viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="dash-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".45"/>
+                  <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path class="dash-chart-area" d="<%= w.curve.area %>" fill="url(#dash-fill)"/>
+              <path class="dash-chart-line" d="<%= w.curve.line %>" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <span class="dash-chart-dot" style="--x: <%= (w.curve.last[0] / 3).toFixed(2) %>%; --y: <%= (w.curve.last[1] / 0.8).toFixed(2) %>%"></span>
+            <figcaption class="dash-chart-days"><% w.points.forEach((p) => { %><span><%= dayLabel(p.day) %></span><% }) %></figcaption>
+          </figure>
+        <% } else { %>
+          <p class="dash-chart-empty muted small">Der Verlauf füllt sich ab morgen – jeden Tag kommt ein Punkt dazu.</p>
+        <% } %>
+      </div>
+      <div class="dash-split" role="img" aria-label="Aufteilung des Vermögens">
+        <% parts.forEach((p) => { if (p.value > 0) { %><span class="dash-split-<%= p.key %>" style="flex-grow: <%= (Math.max(0, p.value) / partTotal).toFixed(4) %>"></span><% } }) %>
+      </div>
+      <dl class="dash-parts">
+        <% parts.forEach((p) => { %>
+          <div class="dash-part dash-part-<%= p.key %>"><dt><span class="dash-swatch"></span><%= p.label %></dt><dd><%= euro(p.value) %></dd></div>
+        <% }) %>
+      </dl>
+    </section>
+
+    <%# ---------- Heute ---------- %>
+    <section class="dash-card dash-today" aria-labelledby="dash-today-h">
+      <div class="dash-card-head">
+        <h2 id="dash-today-h">Heute</h2>
+        <span class="dash-ring" title="<%= t.done %> von <%= t.items.length %> erledigt">
+          <svg viewBox="0 0 52 52" aria-hidden="true">
+            <circle class="dash-ring-bg" cx="26" cy="26" r="22"/>
+            <circle class="dash-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.items.length ? t.done / t.items.length : 0))).toFixed(1) %>"/>
+          </svg>
+          <span><%= t.done %>/<%= t.items.length %></span>
+        </span>
+      </div>
+      <ul class="dash-tasks">
+        <% t.items.forEach((it) => { %>
+          <li>
+            <a class="dash-task<%= it.done ? ' is-done' : '' %>" href="<%= it.href %>">
+              <span class="dash-check" aria-hidden="true"><% if (it.done) { %><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg><% } %></span>
+              <span class="dash-task-text">
+                <strong><%= it.label %></strong>
+                <small><%= it.text %><% if (it.at && !it.done) { %> · <%= relTime(it.at) %><% } %></small>
+              </span>
+              <% if (it.progress) { %>
+                <span class="dash-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>">
+                  <span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span>
+                </span>
+              <% } %>
+              <span class="dash-arrow" aria-hidden="true">→</span>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+
+    <%# ---------- Broker-Ticker ---------- %>
+    <section class="dash-ticker" aria-label="Broker-Kurse">
+      <% d.ticker.forEach((a) => { const up = a.change24h >= 0; %>
+        <a class="dash-tick" href="<%= a.href %>" data-dash-tick="<%= a.symbol %>">
+          <%- include('partials/asset-mark', { sym: a.symbol, px: 36, imgClass: 'dash-tick-logo', markClass: 'dash-tick-mark' }) %>
+          <span class="dash-tick-id"><strong><%= a.symbol %></strong><small><%= a.name %></small></span>
+          <% if (a.spark) { %><svg class="dash-tick-spark <%= up ? 'up' : 'down' %>" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="<%= a.spark %>" vector-effect="non-scaling-stroke"/></svg><% } %>
+          <span class="dash-tick-price">
+            <strong data-dash-price><%= coinPrice(a.price) %></strong>
+            <small class="<%= up ? 'pos' : 'neg' %>" data-dash-change><%= signedPercent(a.change24h) %></small>
+          </span>
+        </a>
+      <% }) %>
+    </section>
+
+    <%# ---------- Offene Wetten ---------- %>
+    <section class="dash-card dash-bets" aria-labelledby="dash-bets-h">
+      <div class="dash-card-head">
+        <h2 id="dash-bets-h">Deine offenen Wetten</h2>
+        <% if (d.bets.count) { %><span class="dash-meta"><%= d.bets.count %> · <%= euro(d.bets.total) %> im Spiel</span><% } %>
+      </div>
+      <% if (!d.bets.list.length) { %>
+        <div class="dash-empty">
+          <p>Gerade läuft nichts. Zeit für einen Tipp?</p>
+          <a class="btn btn-ghost btn-sm" href="/wetten">Offene Wetten ansehen</a>
+        </div>
+      <% } else { %>
+        <ul class="dash-list">
+          <% d.bets.list.forEach((b) => { %>
+            <li>
+              <a class="dash-bet" href="/wetten/<%= b.id %>">
+                <span class="dash-bet-main">
+                  <strong><% if (b.duel) { %><span class="dash-tag">Duell</span> <% } %><%= b.title %></strong>
+                  <small><% if (b.picked) { %>Dein Tipp: <span class="dash-pick"><%= b.picked %></span> · <% } %><%= b.open ? 'Einsatzschluss ' + relTime(b.at) : 'Wartet auf das Ergebnis' %></small>
+                </span>
+                <span class="dash-bet-money"><strong><%= euro(b.stake) %></strong><small>Topf <%= euro(b.pot) %></small></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+        <% if (d.bets.count > d.bets.list.length) { %><a class="dash-more" href="/wetten?tab=meine">Alle <%= d.bets.count %> ansehen →</a><% } %>
+      <% } %>
+    </section>
+
+    <%# ---------- Countdowns ---------- %>
+    <section class="dash-card dash-cds" aria-labelledby="dash-cds-h">
+      <div class="dash-card-head"><h2 id="dash-cds-h">Countdowns</h2></div>
+      <ul class="dash-list">
+        <% d.countdowns.forEach((c) => { %>
+          <li>
+            <a class="dash-cd dash-cd-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>">
+              <span class="dash-cd-label"><strong><%= c.label %></strong><small><%= date(c.at) %></small></span>
+              <span class="dash-cd-time" data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></span>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+
+    <%# ---------- Forum ---------- %>
+    <section class="dash-card dash-forum" aria-labelledby="dash-forum-h">
+      <div class="dash-card-head">
+        <h2 id="dash-forum-h">Forum</h2>
+        <a class="dash-meta" href="/forum">Zum Forum →</a>
+      </div>
+      <% if (!d.threads.length) { %>
+        <p class="muted small">Noch keine Themen.</p>
+      <% } else { %>
+        <ul class="dash-list">
+          <% d.threads.forEach((th) => { %>
+            <li>
+              <a class="dash-thread<%= th.unread ? ' is-unread' : '' %>" href="/forum/t/<%= th._id %>?seite=letzte">
+                <span class="dash-dot" aria-hidden="true"></span>
+                <span class="dash-thread-main">
+                  <strong><%= th.title %></strong>
+                  <small><%= th.lastPostByName || '' %><%= th.lastPostByName ? ' · ' : '' %><%= relTime(th.lastPostAt) %> · <%= th.replyCount || 0 %> <%= th.replyCount === 1 ? 'Antwort' : 'Antworten' %></small>
+                </span>
+                <% if (th.unread) { %><span class="nav-badge nav-badge-inline">Neu</span><% } %>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <%# ---------- Benachrichtigungen ---------- %>
+    <section class="dash-card dash-notes" aria-labelledby="dash-notes-h">
+      <div class="dash-card-head">
+        <h2 id="dash-notes-h">Benachrichtigungen</h2>
+        <% if (locals.bellUnread) { %><span class="dash-meta"><%= bellUnread %> ungelesen</span><% } %>
+      </div>
+      <% if (!notes.length) { %>
+        <p class="muted small">Nichts Neues – hier erscheint, was dich betrifft.</p>
+      <% } else { %>
+        <ul class="dash-list">
+          <% notes.forEach((n) => { %>
+            <li>
+              <a class="dash-note<%= n.readAt ? '' : ' is-unread' %>" href="/benachrichtigungen/<%= n._id %>">
+                <span class="dash-dot" aria-hidden="true"></span>
+                <span class="dash-note-main">
+                  <small class="dash-note-area"><%= n.area %> · <%= relTime(n.at) %></small>
+                  <span><%= n.text %></span>
+                </span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <%# ---------- Lieblingskarten ---------- %>
+    <section class="dash-card dash-favs" aria-labelledby="dash-favs-h">
+      <div class="dash-card-head">
+        <h2 id="dash-favs-h">Deine Favoriten</h2>
+        <a class="dash-meta" href="/tcg/album">Zum Album →</a>
+      </div>
+      <% if (!d.favorites.length) { %>
+        <div class="dash-empty">
+          <p>Noch keine Lieblingskarten – markiere sie im Album mit dem Stern.</p>
+          <a class="btn btn-ghost btn-sm" href="/tcg/album">Album öffnen</a>
+        </div>
+      <% } else { %>
+        <div class="tcg-grid tcg-favs dash-fav-grid">
+          <% d.favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; %>
+            <% if (fv.foiledAt) { %>
+              <a class="tcg-slot foil-slot r-<%= c.rarity %>" href="/inventar" aria-label="<%= c.name %>, <%= r.label %>, foliert">
+                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+                <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(fv.foiledAt) %></span>
+              </a>
+            <% } else { %>
+              <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %>">
+                <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+                <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+              </a>
+            <% } %>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</div>
+
+<script src="/js/dashboard.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

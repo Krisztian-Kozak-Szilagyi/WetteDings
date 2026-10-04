@@ -61,10 +61,8 @@ router.use('/wetten/:id', async (req, res, next) => {
 
 // ---------- Übersicht ----------
 
-router.get('/', async (req, res) => {
-  // Gäste sehen keine Wetten – nur die Startseite mit Anmeldung/Registrierung
-  if (!req.user) return res.render('landing', { title: 'Willkommen' });
-
+// (Die Startseite "/" ist das Dashboard – routes/dashboard.js)
+router.get('/wetten', requireLogin, async (req, res) => {
   const tab = TABS[str(req.query.tab)] ? str(req.query.tab) : 'offen';
   const page = Math.min(500, Math.max(1, parseInt(str(req.query.seite), 10) || 1));
   const q = str(req.query.q).trim().slice(0, 100);
@@ -568,7 +566,7 @@ router.post('/wetten/:id/loeschen', validId, requireLogin, async (req, res) => {
   try {
     const r = await svc.deleteBet({ actor: req.user, betId: req.params.id });
     req.flash('success', `Wette „${r.title}“ gelöscht.${r.refunded ? ' Alle Einsätze wurden erstattet.' : ''}`);
-    return res.redirect('/');
+    return res.redirect('/wetten');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

@@ -94,6 +94,7 @@ async function dailyBonus(req, res, next) {
     if (granted) {
       // Kontostand oben sofort aktuell; keine Meldung (Krisztian: keine grünen Bestätigungen) – die Buchung steht im Kontoauszug
       req.user.balance = granted.balance;
+      req.user.lastBonusDay = require('../services/bonusService').today(); // Dashboard: „Tagesbonus gutgeschrieben“
     }
   } catch (err) {
     // Ein Fehler beim Bonus darf die Seite nicht blockieren
