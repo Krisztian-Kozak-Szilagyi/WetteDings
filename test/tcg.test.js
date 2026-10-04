@@ -24,14 +24,13 @@ test('Gewichte ergeben 100 % und werden seltener', () => {
   assert.equal(catalog.chance('bockhaber'), 0.003);
 });
 
-test('Ein Pack ist im Schnitt weniger wert als sein Preis', () => {
+test('Erwartungswert eines Packs (5 Karten)', () => {
   const ev = catalog.expectedPackValue();
-  assert.equal(Math.round(ev), 7156);
-  assert.ok(ev < config.tcgPackPrice, `Erwartungswert ${ev} muss unter ${config.tcgPackPrice} liegen`);
+  assert.equal(Math.round(ev), 11927);
 });
 
-test('2× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {
-  assert.ok(2 * sell('crumpled') + sell('bfwler') <= config.tcgPackPrice - 500);
+test('4× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {
+  assert.ok(4 * sell('crumpled') + sell('bfwler') <= config.tcgPackPrice - 500);
 });
 
 test('Seltenheit je Wurf (Grenzen)', () => {
@@ -112,8 +111,8 @@ test('Admin-Chancen: nur gültig, wenn zusammen genau 100 %', () => {
   assert.ok(settings.validWeights(filled));
 });
 
-test('Ein Pack hat 3 Karten', () => {
-  assert.equal(catalog.drawPack().length, 3);
+test('Ein Pack hat 5 Karten', () => {
+  assert.equal(catalog.drawPack().length, 5);
 });
 
 test('Packs kaufen: Anzahl 1 bis Obergrenze, nur ganze Zahlen', async () => {

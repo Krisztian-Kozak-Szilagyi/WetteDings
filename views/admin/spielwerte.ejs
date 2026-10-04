@@ -129,10 +129,10 @@
   <section class="stats-block" id="tcg">
     <%- blockHead('TCG: Chancen &amp; Preise', 'Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin>
+      <form method="post" data-reauth action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin data-cards-per-pack="<%= tcg.cardsPerPack %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="field admin-tcg-pack">
-          <span>Packpreis (3 Karten)</span>
+          <span>Packpreis (<%= tcg.cardsPerPack %> Karten)</span>
           <input type="text" name="pack" inputmode="decimal" value="<%= toInput(tcg.packPrice) %>" required>
         </label>
         <div class="table-wrap">

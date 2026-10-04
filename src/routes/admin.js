@@ -189,6 +189,7 @@ router.get('/admin', requireStaff, async (req, res) => {
           defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
           totalWeight: tcgCatalog.TOTAL_WEIGHT,
           expectedPack: Math.round(tcgCatalog.expectedPackValue()),
+          cardsPerPack: tcgCatalog.CARDS_PER_PACK,
           lastUpdate: await tcgSettings.lastUpdate(),
         }
       : null,

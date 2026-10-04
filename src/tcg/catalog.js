@@ -17,7 +17,7 @@ function imageUrl(file) {
 }
 
 const PACK_IMAGE = imageUrl('bfw-holdings-booster-pack.webp');
-const CARDS_PER_PACK = 3;
+const CARDS_PER_PACK = 5;
 
 // Booster-Pack-Arten. Später kommen weitere dazu (eigener Schlüssel, Name und Bild).
 const PACK_TYPES = [{ key: 'bfw-holdings', label: 'BfW Holdings Booster Pack', image: PACK_IMAGE }];
@@ -28,8 +28,7 @@ const packTypeByKey = Object.fromEntries(PACK_TYPES.map((p) => [p.key, p]));
  * Seltenheiten von häufig nach selten. weight = Chance pro Karte in 1/10.000 (Summe 10.000),
  * sell = Verkaufspreis in Cent.
  *
- * Erwartungswert pro Karte: 23,85 € -> pro Pack 71,56 € bei 80 € Packpreis (~89 % Rückfluss).
- * Ein schwaches Pack (2× Crumpled + 1× BFWler = 30 €) bleibt klar im Minus.
+ * Erwartungswert pro Karte: 23,85 € -> pro Pack (5 Karten) 119,27 €. Den Packpreis stellt das Admin-Panel ein.
  *
  * hidden = geheime Seltenheit: taucht für Mitglieder weder in den Drop-Raten noch im Filter auf.
  */

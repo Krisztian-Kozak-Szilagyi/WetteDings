@@ -253,10 +253,11 @@
     state.cards.forEach(function (c, i) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'tcg-flip r-' + c.rarity + (c.rank >= RARE_RANK ? ' tcg-rare-hint' : '');
+      btn.className = 'tcg-flip r-' + c.rarity;
       btn.style.animationDelay = i * 140 + 'ms';
       btn.setAttribute('aria-label', 'Karte ' + (i + 1) + ' aufdecken');
       btn.innerHTML =
+        '<span class="tcg-aura" aria-hidden="true"></span>' +
         '<span class="tcg-flip-inner">' +
           '<span class="tcg-face tcg-back"><span class="tcg-back-logo"><span>BfW</span></span></span>' +
           '<span class="tcg-face tcg-front"><img alt="" width="720" height="1008"><span class="tcg-shine"></span></span>' +

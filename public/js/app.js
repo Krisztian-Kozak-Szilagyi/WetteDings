@@ -445,6 +445,7 @@
       return isFinite(v) ? v : NaN;
     };
     var fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    var perPack = Number(tcgAdmin.getAttribute('data-cards-per-pack')) || 5;
     var recalc = function () {
       var sum = 0, ev = 0;
       tcgAdmin.querySelectorAll('input[name^="weight_"]').forEach(function (inp) {
@@ -452,7 +453,7 @@
         var w = num(inp.value);
         var sell = num(tcgAdmin.querySelector('input[name="sell_' + key + '"]').value);
         if (isFinite(w)) sum += w;
-        if (isFinite(w) && isFinite(sell)) ev += (w / 100) * sell * 3;
+        if (isFinite(w) && isFinite(sell)) ev += (w / 100) * sell * perPack;
       });
       var pack = num(tcgAdmin.querySelector('input[name="pack"]').value);
       var sumEl = tcgAdmin.querySelector('[data-tcg-sum]');

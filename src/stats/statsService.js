@@ -537,7 +537,7 @@ async function tcg(p, now = new Date()) {
       question: 'Lohnt sich ein Pack – und wie viele werden gekauft?',
       kpis: [
         { id: 'packpreis', label: 'Packpreis', value: packPrice, unit: 'euro', hint: 'aktuell eingestellt' },
-        { id: 'ev', label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: 'Bank-Verkaufswert der 3 Karten im Mittel (aktuelle Chancen und Preise)' },
+        { id: 'ev', label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: `Bank-Verkaufswert der ${catalog.CARDS_PER_PACK} Karten im Mittel (aktuelle Chancen und Preise)` },
         { id: 'rueckfluss', label: 'Pack-Rückfluss', value: pct(ev, packPrice), unit: 'percent', hint: 'Erwartungswert ÷ Packpreis. Unter 100 %: Packs ziehen im Mittel Geld aus dem Spiel.' },
         { id: 'pack-umsatz', label: 'Pack-Umsatz', value: packSales[0] ? packSales[0].s : 0, unit: 'euro', compare: true },
         { id: 'geoeffnet', label: 'Packs geöffnet', value: sumBy(openingsByDay, 'n'), unit: 'count', compare: true },
