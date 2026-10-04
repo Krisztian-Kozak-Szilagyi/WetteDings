@@ -10,4 +10,4 @@
   <% }) %>
 </div>
 <textarea id="<%= id %>" name="<%= locals.name || 'body' %>" rows="<%= locals.rows || 6 %>" maxlength="<%= max %>" required placeholder="<%= locals.placeholder || '' %>"><%= locals.value || '' %></textarea>
-<p class="muted small"><code># Überschrift</code> · <code>- Liste</code> · <code>**fett**</code> · <code>__unterstrichen__</code> · Leerzeile = neuer Absatz<% if ((locals.myTags || []).length) { %> · <% myTags.forEach((t, i) => { %><%= i ? ', ' : '' %><code>&lt;<%= t %>&gt;Text&lt;/<%= t %>&gt;</code><% }) %> hebt deinen Text als Team-Beitrag hervor<% } %></p>
+<p class="muted small"><code># Überschrift</code> · <code>- Liste</code> · <code>**fett**</code> · <code>__unterstrichen__</code> · Leerzeile = neuer Absatz · <code>@Name</code> erwähnt jemanden · <code>[karte:id]</code>, <code>[wette:id]</code>, <code>[profil:Name]</code> oder ein Link <code>/wetten/…</code> allein in einer Zeile zeigen eine Vorschau<% if ((locals.myTags || []).length) { %> · <% myTags.forEach((t, i) => { %><%= i ? ', ' : '' %><code>&lt;<%= t %>&gt;Text&lt;/<%= t %>&gt;</code><% }) %> hebt deinen Text als Team-Beitrag hervor<% } %></p>

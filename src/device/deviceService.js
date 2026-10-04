@@ -201,14 +201,20 @@ function banMessage(ban, date) {
 async function ban({ userId, hours, reason, admin, adminUsernames = [] }) {
   const until = logic.banUntil(hours);
   if (!until) throw new UserError(`Bitte die Dauer in ganzen Stunden angeben (0 = dauerhaft, höchstens ${logic.MAX_BAN_HOURS}).`);
-  const user = await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower role bannedUntil bannedBy bannedByName').lean();
+  const user = await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower role bannedUntil bannedBy bannedByName bannedAt banReason banHistory').lean();
   if (!user) throw new UserError('Bitte ein Mitglied auswählen.');
   // Wer wen wie lange bannen darf (Admin oder Dev), steht in deviceLogic.banError
   const error = logic.banError(admin, { ...user, isAdmin: adminUsernames.includes(user.usernameLower) }, hours);
   if (error) throw new UserError(error);
+  const now = new Date();
+  const text = String(reason || '').trim().slice(0, 200);
+  // Liste aller Bans: ein noch laufender wird durch den neuen ersetzt (als beendet vermerkt)
+  const history = logic.closeOpenBans(logic.banHistory(user), now);
   await User.updateOne(
     { _id: user._id },
-    { $set: { bannedUntil: until, banReason: String(reason || '').trim().slice(0, 200), bannedAt: new Date(), bannedByName: admin.username, bannedBy: admin._id } }
+    {
+      $set: { bannedUntil: until, banReason: text, bannedAt: now, bannedByName: admin.username, bannedBy: admin._id, banHistory: [...history, { at: now, until, byName: admin.username, reason: text, liftedAt: null }] },
+    }
   );
   await reload();
   return { username: user.username, until };
@@ -219,11 +225,12 @@ async function ban({ userId, hours, reason, admin, adminUsernames = [] }) {
  * das Profil zeigt den Vermerk weiterhin.
  */
 async function unban(userId, actor) {
-  const target = await User.findById(userId).select('username bannedBy bannedByName').lean();
+  const target = await User.findById(userId).select('username bannedBy bannedByName bannedAt bannedUntil banReason banHistory').lean();
   if (!target) return null;
   const error = logic.unbanError(actor, target);
   if (error) throw new UserError(error);
-  const user = await User.findOneAndUpdate({ _id: userId }, { $set: { bannedUntil: null } }).select('username').lean();
+  const history = logic.closeOpenBans(logic.banHistory(target), new Date()); // in der Liste als vorzeitig aufgehoben vermerken
+  const user = await User.findOneAndUpdate({ _id: userId }, { $set: { bannedUntil: null, banHistory: history } }).select('username').lean();
   await reload();
   return user;
 }

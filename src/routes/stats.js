@@ -7,6 +7,7 @@ const { euro, date } = require('../lib/viewHelpers');
 const stats = require('../stats/statsService');
 const { ranking } = require('../services/rankService');
 const exportCsv = require('../stats/exportCsv');
+const { panelNav } = require('./admin');
 
 const router = express.Router();
 
@@ -92,17 +93,21 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
   // Reiter "Mitglied": ohne (gültiges) Mitglied erst die Auswahl zeigen
   let members = [];
   if (key === 'mitglied') {
-    members = await ranking(); // Auswahl und Namensvorschläge
+    members = await ranking({ team: true }); // Auswahl und Namensvorschläge – auch das Team (ohne Platz)
     if (name && !member) res.locals.flash = { type: 'error', message: `Das Mitglied „${name}“ gibt es nicht.` };
   }
+  // Reiterleiste des Panels (die Statistik ist ein Reiter im Panel)
+  const nav = await panelNav(req.user, res.locals);
   if (key === 'mitglied' && !member) {
-    return res.render('statistik', { title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
+    return res.render('statistik', { ...nav, title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
   }
   const data = await stats.section(key, range, new Date(), { user: member });
   res.render('statistik', {
+    ...nav,
     title: 'Statistik',
     sections: stats.SECTIONS,
     ranges: stats.RANGES,
+    rangeLabel: stats.rangeLabel,
     active: key,
     range: data.period.range,
     member,
@@ -116,7 +121,8 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
       labels: data.labels,
       longLabels: data.longLabels,
       markers: data.markers.filter((m) => m.i !== undefined).map((m) => ({ i: m.i, short: m.short, label: m.label, kind: m.kind })),
-      charts: data.blocks.flatMap((b) => b.charts).filter((c) => !c.empty),
+      // Heute: keine Verläufe (je Diagramm nur ein Wert)
+      charts: data.period.range === 1 ? [] : data.blocks.flatMap((b) => b.charts).filter((c) => !c.empty),
     },
   });
 });

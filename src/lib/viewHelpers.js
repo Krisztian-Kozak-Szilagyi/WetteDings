@@ -12,6 +12,21 @@ const rtf = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
 const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
+const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/**
+ * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
+ * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
+ * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
+ */
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null } = {}) {
+  let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
+  if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
+  if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
+  return h;
+}
+/** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
+const dayDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: config.timezone });
+const dayDate = (d) => (d ? dayDateFmt.format(new Date(d)) : '–');
 // sekundengenau, z. B. für Protokolle
 const dateSecFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'medium', timeZone: config.timezone });
 const dateSec = (d) => (d ? `${dateSecFmt.format(new Date(d))} Uhr` : '–');
@@ -88,19 +103,26 @@ const ledgerLabels = {
   provision: 'Provision (Wettersteller)',
   provision_schiri: 'Provision (Schiedsrichter)',
   bonus: 'Tagesbonus',
-  coin_kauf: 'Samantha Coin gekauft',
-  coin_verkauf: 'Samantha Coin verkauft',
+  coin_kauf: 'Broker: Kauf',
+  coin_verkauf: 'Broker: Verkauf',
   lotto_los: 'Lotterielos gekauft',
   lotto_gewinn: 'Lotteriegewinn',
   tcg_pack: 'Booster Pack gekauft',
   tcg_verkauf: 'TCG-Karte verkauft',
+  item_verkauf: 'Gegenstand verkauft',
   ihk_lohn: 'IHK-Quest geschafft',
+  dungeon_lohn: 'Dungeon-Beute',
+  erfolg: 'Erfolg freigeschaltet',
+  team_gutschrift: 'Gutschrift vom Team',
+  team_abzug: 'Abzug durch das Team',
   handel_kauf: 'Karte gekauft (Handel)',
   handel_verkauf: 'Karte verkauft (Handel)',
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
   black_market: 'Karte gekauft (Black Market)',
   konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
+  grading_lohn: 'Grading-Auftrag erledigt',
+  grading_ausbau: 'Grading-Shop ausgebaut',
 };
 
 /** Coin-Kurs mit passender Genauigkeit, z. B. 12,34 € oder 0,004512 € */
@@ -109,9 +131,9 @@ function coinPrice(p) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
 }
 
-/** Coin-Menge aus Einheiten (1e-8), z. B. "12,3456 SAM" */
-function coinAmount(units) {
-  return `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format((units || 0) / 1e8)} SAM`;
+/** Menge eines Broker-Werts aus Einheiten (1e-8), z. B. "12,3456 SAM" */
+function coinAmount(units, symbol = 'SAM') {
+  return `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format((units || 0) / 1e8)} ${symbol}`;
 }
 
 /** Prozent mit Vorzeichen, z. B. "+4,21 %" */
@@ -120,11 +142,16 @@ function signedPercent(x) {
   return `${x > 0 ? '+' : ''}${v} %`;
 }
 
+/** Profilbild eines Mitglieds. Noch für alle der Platzhalter – später kann jeder sein eigenes Bild hochladen. */
+const avatarUrl = () => '/img/avatar-placeholder.svg';
+
 const editFieldLabels = { title: 'Titel', description: 'Beschreibung' };
 
 module.exports = {
   euro,
   date,
+  dayDate,
+  foilViewAttrs,
   dateSec,
   relTime,
   pool,
@@ -143,4 +170,5 @@ module.exports = {
   coinPrice,
   coinAmount,
   signedPercent,
+  avatarUrl,
 };

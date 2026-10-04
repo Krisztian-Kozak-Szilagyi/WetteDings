@@ -1,6 +1,30 @@
   </main>
   <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
+  <%# Neuer Erfolg: Fenster wie das Beute-Fenster. Steht für jedes angemeldete Mitglied bereit; ist schon ein Erfolg offen,
+      öffnet app.js es sofort, sonst fragt app.js alle paar Sekunden nach (/erfolge/neu). Esc schließt nicht – erst „Weiter“. %>
+  <% if (currentUser) { const ap = typeof achPopup !== 'undefined' && achPopup ? achPopup : null; %>
+    <dialog class="dg-loot ach-pop<%= ap && ap.unique ? ' is-unique' : '' %>" data-ach-pop<%= ap ? ' data-open' : '' %> aria-labelledby="ach-pop-title" aria-describedby="ach-pop-text">
+      <span class="ach-pop-rays" aria-hidden="true"></span>
+      <span class="kicker">Erfolg freigeschaltet</span>
+      <img class="ach-pop-icon" data-ach-icon<% if (ap) { %> src="/img/erfolge/<%= ap.key %>.svg?v=<%= assetVersion %>"<% } %> alt="" width="132" height="132">
+      <h2 id="ach-pop-title" data-ach-name><%= ap ? ap.name : '' %></h2>
+      <p id="ach-pop-text" class="ach-pop-text" data-ach-text><%= ap ? ap.text : '' %></p>
+      <ul class="dg-loot-list" data-ach-reward-row<%= ap && !ap.reward ? ' hidden' : '' %>>
+        <li class="dg-loot-row is-money is-shown is-me">
+          <span class="dg-loot-name">Belohnung gutgeschrieben</span>
+          <span class="dg-loot-chip is-money" data-ach-reward><%= ap && ap.reward ? '+' + euro(ap.reward) : '' %></span>
+        </li>
+      </ul>
+      <form method="post" action="/erfolge/gesehen" data-ach-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" value="<%= ap ? ap.id : '' %>" data-ach-id>
+        <input type="hidden" name="zurueck" value="<%= typeof achPopupBack !== 'undefined' ? achPopupBack : '/' %>">
+        <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
+      </form>
+      <p class="muted small ach-pop-more" data-ach-more<%= ap && ap.left > 1 ? '' : ' hidden' %>><%= ap && ap.left > 1 ? 'Noch ' + (ap.left - 1) + (ap.left - 1 === 1 ? ' weiterer Erfolg wartet.' : ' weitere Erfolge warten.') : '' %></p>
+    </dialog>
+  <% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>

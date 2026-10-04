@@ -5,6 +5,8 @@ const { runLottery } = require('./services/lotteryService');
 const rankService = require('./services/rankService');
 const duelService = require('./services/duelService');
 const { takeDailySnapshot } = require('./stats/snapshot');
+const dungeonService = require('./dungeon/dungeonService');
+const achievementService = require('./achievements/achievementService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -50,6 +52,11 @@ function startJobs() {
   setTimeout(duels, 20 * 1000).unref();
   setInterval(duels, 5 * 60 * 1000).unref();
 
+  // Dungeon: fällige Starts und abgelaufene Durchläufe alle 5 Sekunden prüfen
+  const dungeon = () => dungeonService.tick().catch((err) => console.error('Dungeon-Fehler:', err));
+  setTimeout(dungeon, 10 * 1000).unref();
+  setInterval(dungeon, 5 * 1000).unref();
+
   // Rangliste: jede Minute festhalten, wer gerade auf Platz 1 steht (Anzeige im Profil)
   const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));
   top1();
@@ -59,6 +66,11 @@ function startJobs() {
   const snapshot = () => takeDailySnapshot().catch((err) => console.error('Statistik-Fehler:', err));
   setTimeout(snapshot, 30 * 1000).unref();
   setInterval(snapshot, 60 * 60 * 1000).unref();
+
+  // Erfolge: beim Start die Einzelstücke vergeben, danach alle 5 Minuten prüfen, wer neue Erfolge erreicht hat
+  const achievements = () => achievementService.checkAll().catch((err) => console.error('Erfolge-Fehler:', err));
+  setTimeout(() => achievementService.grantSpecial().catch((err) => console.error('Erfolge-Fehler:', err)).then(achievements), 40 * 1000).unref();
+  setInterval(achievements, 5 * 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };

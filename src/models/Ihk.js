@@ -18,10 +18,12 @@ const runSchema = new Schema(
       default: [],
     },
     freeze: { type: Number, default: 0 }, // Sekunden Stillstand der Deadline (Bloodlust)
+    slow: { type: [[Number]], default: undefined }, // Forkbomb: [von, bis, Prozent] – Deadline läuft langsamer
+    extend: { type: Number, default: 0 }, // Forkbomb: dadurch gewonnene Sekunden
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean }, { _id: false })], default: [] },
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte
     total: { type: Number, required: true },
     total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },
@@ -35,6 +37,8 @@ const runSchema = new Schema(
 // Pro Nutzer höchstens eine laufende Quest
 runSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { status: 'laeuft' } });
 runSchema.index({ user: 1, day: 1 });
+runSchema.index({ createdAt: -1 }); // Protokolle: alle Quests, neueste zuerst
+runSchema.index({ user: 1, createdAt: -1 });
 
 // Die drei angebotenen Quests pro Nutzer (zufällig, jede Schwierigkeit höchstens einmal)
 const stateSchema = new Schema({

@@ -5,13 +5,21 @@ const catalog = require('../tcg/catalog');
 const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const blackMarket = require('../tcg/blackMarket');
+const foil = require('../items/foil');
+const items = require('../items/itemService');
 const { str, parseEuro, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
 const router = express.Router();
 router.use('/handel', requireLogin);
 
-const cardInfo = (id) => catalog.cardById[id] || { id, name: id, rarity: 'crumpled', image: '' };
+/** Karte – oder Gegenstand ("item:folie") – für die Anzeige */
+const cardInfo = (id) => {
+  const item = items.itemByCardId(id);
+  return item ? items.itemCard(item) : catalog.cardById[id] || { id, name: id, rarity: 'crumpled', image: '' };
+};
+/** Seltenheiten samt der Pseudo-Seltenheit "Gegenstand" */
+const tradeRarities = () => ({ ...catalog.rarityByKey, item: items.ITEM_RARITY });
 /** Zurück in den Handel-Dialog derselben Karte, Reiter "Tauschen" (Partner vorausgefüllt) */
 const swapDialogUrl = (cardId, name) => '/handel?' + new URLSearchParams({ karte: cardId, reiter: 'tausch', an: name || '' }) + '#sammlung';
 
@@ -32,12 +40,13 @@ router.get('/handel', async (req, res) => {
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),
     cardInfo,
-    rarityByKey: catalog.rarityByKey,
-    taxPercent: trade.settings.taxPercent,
-    taxFor: trade.taxFor,
+    rarityByKey: tradeRarities(),
+    taxRates: trade.taxRates(),
+    taxFor: trade.taxOf,
     canAccept: trade.canAccept,
     isUnread: trade.isUnread,
     termsText: trade.termsText,
+    foil,
     privateHours: trade.PRIVATE_HOURS,
     marketDays: trade.MARKET_DAYS,
     blackMarket: { ...market, openTime: blackMarket.OPEN, closeTime: blackMarket.CLOSE, percent: blackMarket.PRICE_PERCENT },
@@ -65,12 +74,15 @@ router.get('/handel/tausch', async (req, res) => {
     req.flash('error', name ? 'Mit diesem Mitglied kannst du nicht tauschen.' : 'Bitte wähle aus, mit wem du tauschen möchtest.');
     return res.redirect(pickCard ? swapDialogUrl(pickCard, name) : '/handel');
   }
-  const [mine, theirs] = await Promise.all([collection(req.user), collection(partner)]);
+  const [mine, theirs, myFoiled, theirFoiled] = await Promise.all([collection(req.user), collection(partner), items.foiledCards(req.user._id), items.foiledCards(partner._id)]);
   res.render('handel-tausch', {
     title: 'Tausch',
     partner,
     mine,
     theirs,
+    // folierte Karten werden einzeln gewählt (Wert "f:<Exemplar>"); eigene nur, wenn sie nicht schon im Handel stehen
+    myFoiled: myFoiled.filter((f) => !f.lock),
+    theirFoiled,
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
@@ -80,7 +92,7 @@ router.get('/handel/tausch', async (req, res) => {
     pickWant: str(req.query.will),
     pickPrice: str(req.query.preis),
     pickFrom: str(req.query.zahlt),
-    taxPercent: trade.settings.taxPercent,
+    taxPercent: trade.taxRates().tausch,
     privateHours: trade.PRIVATE_HOURS,
   });
 });
@@ -98,28 +110,44 @@ async function handle(req, res, fn, back = '/handel', next = '/handel') {
   }
 }
 
-router.post('/handel/angebot', (req, res) =>
-  handle(req, res, async () => {
-    const toName = str(req.body.to).trim() || null;
-    const t = await trade.create({ user: req.user, kind: toName ? 'privat' : 'markt', cardId: str(req.body.card), price: parseEuro(str(req.body.price)), toName });
-    const name = cardInfo(t.card).name;
-    return t.kind === 'privat' ? `Angebot an ${t.toName} gesendet: ${name} für ${euro(t.price)}.` : `${name} steht jetzt für ${euro(t.price)} auf dem Markt.`;
-  })
-);
-
-router.post('/handel/tausch', (req, res) => {
-  const toName = str(req.body.to).trim();
-  const cardId = str(req.body.card);
-  const wantCardId = str(req.body.want);
-  const rawPrice = str(req.body.price).trim();
-  const extraFrom = str(req.body.extra) || null;
-  // Bei einem Fehler zurück zur Auswahl, mit allem, was schon gewählt war
-  const back = '/handel/tausch?' + new URLSearchParams({ an: toName, karte: cardId, will: wantCardId, preis: rawPrice, zahlt: extraFrom || '' });
+// copy = ein foliertes Exemplar, item = ein Gegenstand aus dem Inventar anbieten (dann geht es auch dorthin zurück)
+router.post('/handel/angebot', (req, res) => {
+  const copyId = str(req.body.copy) || null;
+  const itemKey = str(req.body.item);
+  const back = itemKey ? '/inventar#gegenstaende' : '/handel';
   return handle(
     req,
     res,
     async () => {
-      const t = await trade.create({ user: req.user, kind: 'tausch', cardId, wantCardId, price: rawPrice ? parseEuro(rawPrice) : 0, extraFrom, toName, message: str(req.body.message) });
+      const toName = str(req.body.to).trim() || null;
+      const cardId = itemKey ? items.itemCardId(itemKey) : str(req.body.card);
+      const t = await trade.create({ user: req.user, kind: toName ? 'privat' : 'markt', cardId, price: parseEuro(str(req.body.price)), toName, copyId });
+      const name = cardInfo(t.card).name;
+      return t.kind === 'privat' ? `Angebot an ${t.toName} gesendet: ${name} für ${euro(t.price)}.` : `${name} steht jetzt für ${euro(t.price)} auf dem Markt.`;
+    },
+    back,
+    back
+  );
+});
+
+router.post('/handel/tausch', (req, res) => {
+  const toName = str(req.body.to).trim();
+  // "f:<Exemplar>" = ein bestimmtes foliertes Exemplar (eigenes bzw. des Partners)
+  const rawCard = str(req.body.card);
+  const rawWant = str(req.body.want);
+  const copyId = rawCard.startsWith('f:') ? rawCard.slice(2) : null;
+  const wantCopy = rawWant.startsWith('f:') ? rawWant.slice(2) : null;
+  const cardId = copyId ? null : rawCard;
+  const wantCardId = wantCopy ? null : rawWant;
+  const rawPrice = str(req.body.price).trim();
+  const extraFrom = str(req.body.extra) || null;
+  // Bei einem Fehler zurück zur Auswahl, mit allem, was schon gewählt war
+  const back = '/handel/tausch?' + new URLSearchParams({ an: toName, karte: rawCard, will: rawWant, preis: rawPrice, zahlt: extraFrom || '' });
+  return handle(
+    req,
+    res,
+    async () => {
+      const t = await trade.create({ user: req.user, kind: 'tausch', cardId, wantCardId, copyId, wantCopy, price: rawPrice ? parseEuro(rawPrice) : 0, extraFrom, toName, message: str(req.body.message) });
       return `Tauschangebot an ${t.toName} gesendet: ${cardInfo(t.card).name} gegen ${cardInfo(t.wantCard).name}.`;
     },
     back
@@ -143,14 +171,14 @@ router.get('/handel/verhandlung/:id', async (req, res) => {
     isOpen,
     canAccept: isOpen && trade.canAccept(t, n.role),
     // Hat der Empfänger die Wunschkarte gerade frei? (nur für den Hinweis; geprüft wird beim Annehmen)
-    wantFree: !coll || n.role !== 'to' || (coll.free[t.wantCard] || 0) > 0,
+    wantFree: !coll || n.role !== 'to' || !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0,
     ownedCounts: coll ? coll.counts : {},
     cardInfo,
-    rarityByKey: catalog.rarityByKey,
+    rarityByKey: tradeRarities(),
     termsText: trade.termsText,
     settlement: trade.settlement,
-    taxFor: trade.taxFor,
-    taxPercent: trade.settings.taxPercent,
+    taxFor: (price) => trade.taxOf(price, 'tausch'),
+    taxPercent: trade.taxRates().tausch,
     messageMax: trade.MESSAGE_MAX,
   });
 });

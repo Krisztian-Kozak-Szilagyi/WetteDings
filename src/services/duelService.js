@@ -11,6 +11,9 @@ const DuelTip = require('../models/DuelTip');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const betService = require('./betService');
+const notifyService = require('./notifyService');
+
+const duelHref = (bet) => `/wetten/${bet._id}`;
 
 const DUEL_FEE_PERCENT = 3;
 const INVITE_HOURS = 48; // so lange haben Herausgeforderter und Schiedsrichter Zeit zum Annehmen
@@ -29,7 +32,7 @@ async function create({ user, opponent, referee, title, description = '', stake,
   // Frist zum Annehmen: 48 Stunden, aber nicht nach der Auswertung
   const expiresAt = new Date(Math.min(now + INVITE_HOURS * 60 * 60 * 1000, resultAt.getTime()));
 
-  return betService.inTransaction(async (session) => {
+  const created = await betService.inTransaction(async (session) => {
     const [bet] = await Bet.create(
       [
         {
@@ -59,6 +62,10 @@ async function create({ user, opponent, referee, title, description = '', stake,
     await Ledger.create([{ user: user._id, type: 'einsatz', amount: -stake, bet: bet._id, betTitle: title }], { session });
     return bet;
   });
+  const t = notifyService.short(title);
+  await notifyService.notify(opponent._id, { area: 'Duell', href: duelHref(created), text: `${user.username} fordert dich zum Duell heraus: „${t}“ (Einsatz ${euro(stake)}).` });
+  await notifyService.notify(referee._id, { area: 'Duell', href: duelHref(created), text: `${user.username} möchte dich als Schiedsrichter für das Duell „${t}“ gegen ${opponent.username}.` });
+  return created;
 }
 
 /** Rolle im Duell: 'challenger' | 'opponent' | 'referee' | null */
@@ -73,7 +80,7 @@ function duelRole(bet, user) {
 
 /** Herausgeforderter oder Schiedsrichter nimmt an. Haben beide angenommen, beginnt das Duell. */
 async function accept({ user, betId }) {
-  return betService.inTransaction(async (session) => {
+  const result = await betService.inTransaction(async (session) => {
     const bet = await Bet.findById(betId).session(session);
     if (!bet || !bet.duel) throw new UserError('Duell nicht gefunden.');
     if (bet.status !== 'offen' || bet.duel.state !== 'angefragt') throw new UserError('Dieses Duell kann nicht mehr angenommen werden.');
@@ -104,6 +111,16 @@ async function accept({ user, betId }) {
     await bet.save({ session });
     return { bet, role, started };
   });
+  const { bet, role, started } = result;
+  const t = notifyService.short(bet.title);
+  const what = role === 'opponent' ? 'die Herausforderung' : 'das Schiedsrichteramt';
+  if (started) {
+    // Herausforderer und wer vorher schon zugesagt hatte
+    await notifyService.notify([bet.creator, bet.duel.opponent, bet.referee], { area: 'Duell', href: duelHref(bet), except: user, text: `Das Duell „${t}“ hat begonnen – ${user.username} hat ${what} angenommen.` });
+  } else {
+    await notifyService.notify(bet.creator, { area: 'Duell', href: duelHref(bet), text: `${user.username} hat ${what} im Duell „${t}“ angenommen. Es fehlt noch eine Zusage.` });
+  }
+  return result;
 }
 
 /** Ablehnen (Herausgeforderter/Schiedsrichter) oder zurückziehen (Herausforderer) – solange noch nicht begonnen */
@@ -117,7 +134,9 @@ async function decline({ user, betId }) {
     role === 'challenger'
       ? `${user.username} hat die Herausforderung zurückgezogen.`
       : `${user.username} hat ${role === 'referee' ? 'das Schiedsrichteramt' : 'die Herausforderung'} abgelehnt.`;
-  await betService.resolveBet({ actor: betService.SYSTEM_ACTOR, betId, outcome: 'annulliert', note });
+  await betService.resolveBet({ actor: betService.SYSTEM_ACTOR, betId, outcome: 'annulliert', note, quietFor: user._id });
+  // Der Herausgeforderte hat noch keinen Einsatz und bekäme sonst nichts mit
+  if (role !== 'opponent') await notifyService.notify(bet.duel.opponent, { area: 'Duell', href: duelHref(bet), text: `Duell „${notifyService.short(bet.title)}“: ${note}` });
   return { role };
 }
 

@@ -1,13 +1,23 @@
 <%- include('partials/head') %>
 <% const left = Math.max(0, limit - used); const canStart = phase === 'offer' && left && cards.length; %>
 
-<div class="page-head">
-  <div class="ihk-title">
-    <h1>IHK</h1>
+<div class="ihk-page">
+<section class="ihk-hero">
+  <div class="ihk-hero-text">
+    <span class="kicker">IHK · Auftragsbrett</span>
+    <h1>Quests</h1>
+    <p class="ihk-hero-sub">Drei Aufträge, eine Karte, ein Boost – und die Frage, ob die Fachrichtung passt.</p>
+  </div>
+  <div class="ihk-hero-side">
+    <div class="ihk-day">
+      <% if (limit <= 12) { %>
+        <span class="ihk-day-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="ihk-pip<%= i < used ? ' is-done' : '' %>"></span><% } %></span>
+      <% } %>
+      <span class="ihk-day-text">Heute <strong><%= used %> / <%= limit %></strong> Quests</span>
+    </div>
     <a class="btn btn-ghost btn-sm" href="/ihk/anleitung">So funktioniert's</a>
   </div>
-  <span class="muted">Heute: <strong><%= used %> / <%= limit %></strong> Quests</span>
-</div>
+</section>
 <% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <%# Eigenes Formular außerhalb des Start-Formulars (keine verschachtelten Forms) – der Button verweist per form-Attribut darauf %>
@@ -26,6 +36,7 @@
 
 <div class="ihk-stage">
   <div class="ihk-col ihk-player">
+    <span class="ihk-col-label">Deine Karte</span>
     <div class="ihk-slot ihk-slot-card" <%- canStart ? 'data-ihk-drop="card"' : '' %>
       <% if (runCard) { %>data-zoom="<%= runCard.image %>" data-zoom-title="<%= runCard.name %>"<% } %>>
       <% if (runCard) { %>
@@ -52,7 +63,8 @@
 
   <div class="ihk-col ihk-center">
     <% if (quest) { %>
-      <div class="ihk-quest">
+      <span class="ihk-vs" aria-hidden="true">VS</span>
+      <div class="ihk-quest r-<%= quest.level.toLowerCase() %>">
         <div class="ihk-quest-head"><h2><%= quest.title %></h2><span class="ihk-quest-dur"><%= quest.duration %> Min.</span></div>
         <p><%= quest.text %></p>
         <div class="ihk-quest-meta">
@@ -64,7 +76,7 @@
     <% } else { %>
       <div class="ihk-offers">
         <% offers.forEach((o, i) => { %>
-          <div class="ihk-quest ihk-offer" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"<%- o.hybrid ? ' data-hybrid="1"' : '' %>
+          <div class="ihk-quest ihk-offer r-<%= o.level.toLowerCase() %>" tabindex="0" data-drag="offer" data-value="<%= i %>" data-image="<%= o.image %>"<%- o.hybrid ? ' data-hybrid="1"' : '' %>
             data-zoom="<%= o.image %>" data-zoom-title="<%= o.title %>" data-zoom-text="<%= o.text %>" data-zoom-level="<%= o.level %>" data-zoom-level-key="<%= o.level.toLowerCase() %>"<%- o.hybrid ? ' data-zoom-hybrid="1"' : '' %>>
             <img class="ihk-offer-thumb" src="<%= o.image %>" alt="" width="720" height="1008" draggable="false">
             <div>
@@ -95,7 +107,7 @@
         <span>Quest läuft … noch <strong data-ihk-countdown="<%= new Date(run.endsAt).getTime() %>">–</strong></span>
       </div>
     <% } else if (phase === 'result') { %>
-      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [] }) %>'>
+      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, slow: run.slow || [], abilities: run.abilities || [], imgs: runImages, base: runCard && runCard.stats ? [runCard.stats.speed, runCard.stats.fia, runCard.stats.fis, runCard.stats.bwl] : null }) %>'>
         <% const twoBars = quest.hybrid && run.total2 != null; %>
         <div class="ihk-bar-label"><span>Fortschritt<%= twoBars ? ' 1' : '' %></span><span data-ihk-points>0 / <%= run.required %></span></div>
         <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress" data-ihk-progress></span></div>
@@ -120,12 +132,11 @@
       <p class="ihk-info">Für heute hast du alle Quests erledigt. Morgen gibt es neue Aufträge!</p>
     <% } else if (!cards.length) { %>
       <p class="ihk-info">Du brauchst mindestens eine Charakterkarte. Öffne ein Booster Pack im <a href="/tcg">TCG</a>!</p>
-    <% } else { %>
-      <p class="ihk-info">Tippe eine Quest und eine Karte an und wähle sie aus – oder zieh sie mit der Maus in die Felder.</p>
     <% } %>
   </div>
 
   <div class="ihk-col ihk-enemy">
+    <span class="ihk-col-label is-enemy">Quest</span>
     <div class="ihk-slot ihk-slot-card ihk-slot-enemy" <%- canStart ? 'data-ihk-drop="offer"' : '' %>
       <% if (quest) { %>data-zoom="<%= quest.image %>" data-zoom-title="<%= quest.title %>" data-zoom-text="<%= quest.text %>" data-zoom-level="<%= quest.level %>" data-zoom-level-key="<%= quest.level.toLowerCase() %>"<%- quest.hybrid ? ' data-zoom-hybrid="1"' : '' %><% } %>>
       <% if (quest) { %>
@@ -138,10 +149,25 @@
 </div>
 
 <% if (canStart) { %>
-  <div class="card ihk-pick">
+  <section class="ihk-pick">
     <div class="ihk-pick-head">
-      <h2>Deine Karten</h2>
-      <button class="btn btn-primary" type="submit" data-ihk-start disabled>Quest starten</button>
+      <div>
+        <span class="kicker kicker-muted">Team aufstellen</span>
+        <h2>Deine Karten</h2>
+      </div>
+      <%# Großer Start-Knopf im Stil der Album-Kachel (TCG): Auftragsmappe mit Stempel, der beim Darüberfahren aufsetzt %>
+      <button class="ihk-start-tile" type="submit" data-ihk-start disabled>
+        <span class="ihk-start-art" aria-hidden="true">
+          <svg class="ihk-start-doc" width="54" height="64" viewBox="0 0 54 64"><rect x="1" y="1" width="52" height="62" rx="6"/><path d="M11 16h32M11 25h32M11 34h20"/></svg>
+          <span class="ihk-start-stamp">IHK</span>
+        </span>
+        <span class="ihk-start-text">
+          <span class="kicker">Auftrag annehmen</span>
+          <span class="ihk-start-title">Quest starten</span>
+          <span class="ihk-start-hint">Wähle eine Quest und eine Karte</span>
+        </span>
+        <span class="ihk-start-arrow" aria-hidden="true">→</span>
+      </button>
     </div>
     <div class="ihk-pick-grid">
       <% cards.forEach((c) => { %>
@@ -165,9 +191,10 @@
         <% }) %>
       </div>
     <% } %>
-  </div>
+  </section>
 </form>
 <% } %>
+</div>
 
 <dialog class="tcg-modal ihk-zoom" data-ihk-zoom aria-label="Vergrößerte Ansicht">
   <button type="button" class="tcg-close" data-ihk-zoom-close aria-label="Schließen">×</button>

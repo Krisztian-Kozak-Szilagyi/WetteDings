@@ -9,7 +9,8 @@ const statDailySchema = new Schema(
     at: { type: Date, required: true }, // Zeitpunkt der Aufnahme
     users: { type: Schema.Types.Mixed, default: {} }, // { total, banned }
     wealth: { type: Schema.Types.Mixed, default: {} }, // Summen und Verteilung des Gesamtvermögens (Cent)
-    coin: { type: Schema.Types.Mixed, default: {} }, // { price, units, holders }
+    coin: { type: Schema.Types.Mixed, default: {} }, // Samantha Coin: { price, units, holders }
+    coins: { type: Schema.Types.Mixed, default: {} }, // alle Broker-Werte: { SAM: { price, units, holders }, COW: …, BTCG: … }
     cards: { type: Schema.Types.Mixed, default: {} }, // { total, byRarity, packsUnopened, packPrice }
     market: { type: Schema.Types.Mixed, default: {} }, // offene Handelsangebote je Art
     bets: { type: Schema.Types.Mixed, default: {} }, // { open, disputed }

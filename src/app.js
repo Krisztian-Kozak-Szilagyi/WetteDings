@@ -11,12 +11,15 @@ const viewHelpers = require('./lib/viewHelpers');
 const { settings: ihkSettings } = require('./ihk/ihkService');
 const tradeService = require('./trade/tradeService');
 const tcgService = require('./tcg/tcgService');
+const itemService = require('./items/itemService');
 const forumRoutes = require('./routes/forum');
 const forumService = require('./forum/forumService');
 const groupService = require('./services/groupService');
 const roles = require('./services/roles');
 const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
+const notifyService = require('./services/notifyService');
+const achievementService = require('./achievements/achievementService');
 const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -40,6 +43,8 @@ function createApp() {
   );
   app.use(compression());
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
+  app.use(require('./routes/cardImage')); // Rahmen-Karten als SVG, ebenfalls ohne Session
+  app.use(require('./routes/achievementImage')); // Symbole der Erfolge als SVG
   app.use(express.urlencoded({ extended: false, limit: '20kb' }));
 
   app.use(
@@ -70,12 +75,15 @@ function createApp() {
     startBalance: config.startBalance,
     autoVoidDays: config.autoVoidDays,
     creatorFeePercent: config.creatorFeePercent,
-    bonusTiers: config.bonusTiers,
+    dailyBonus: () => require('./services/bonusService').settings.amount, // Tagesbonus (Admin-Panel)
+    gradingOpen: () => require('./grading/gradingService').settings.open, // Grading-Shop für alle freigegeben?
     bonusTime: config.bonusTime,
-    lotteryTicketPrice: config.lotteryTicketPrice,
+    lotteryTicketPrice: () => require('./services/lotteryService').ticketPrice('taeglich'), // Admin-Panel
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
+    dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
+    blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     tradeIncoming: 0,
@@ -83,6 +91,7 @@ function createApp() {
     betNewPublic: 0,
     betNewGroup: 0,
     newPacks: 0,
+    newItems: 0,
     patchNew: 0,
     packLogNew: 0,
     forumMine: 0,
@@ -91,6 +100,8 @@ function createApp() {
     betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
     tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
+    bellNotes: [], // Glocke: Benachrichtigungen (ungelesene und die neuesten gelesenen)
+    bellUnread: 0,
     deviceProbe: false,
     roleBadge: roles.roleBadge,
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
@@ -118,17 +129,30 @@ function createApp() {
   app.use(device);
   app.use(dailyBonus);
   app.use(csrf);
+  // Neuer Erfolg? app.js fragt alle paar Sekunden – deshalb vor Statistik und Menü-Abzeichen (nur eine kleine Abfrage)
+  app.get('/erfolge/neu', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return res.status(401).json({ popup: null });
+    res.json({ popup: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), app.locals.assetVersion) });
+  });
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
+  app.use(require('./coin/etfTrend').trackPulse); // Aktionen der Mitglieder bewegen den BfW-TCG ETF
+  // Nach jeder erfolgreichen Aktion (POST) kurz darauf prüfen, ob jemand einen neuen Erfolg erreicht hat
+  app.use((req, res, next) => {
+    if (req.user && req.method === 'POST') res.on('finish', () => res.statusCode < 400 && achievementService.soon());
+    next();
+  });
   // Abzeichen im Menü. Alle Zähler laufen gleichzeitig – so kostet das pro Seitenaufruf nur die Dauer der
   // langsamsten Abfrage statt der Summe aller (die Datenbank liegt nicht auf diesem Server).
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell, achPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
-        tcgService.newPackCount(u), // geschenkte Packs seit dem letzten Besuch der TCG-Seite
+        tcgService.newPackCount(u), // geschenkte Packs seit dem letzten Besuch des Inventars
+        itemService.newItemCount(u), // neue Gegenstände (z. B. Folie) seit dem letzten Besuch des Inventars – leuchtender Punkt an TCG
         forumService.patchNewCount(u), // Patchnotes seit dem letzten Lesen
         betService.pendingVoteCount(u._id), // Wetten, in denen meine Stimme zum Ergebnis fehlt
         // neue öffentliche Wetten und neue Wetten in den eigenen Gruppen seit dem letzten Besuch der Übersicht
@@ -138,11 +162,14 @@ function createApp() {
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
+        notifyService.forBell(u._id), // Glocke
+        achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
         tradeMarketNew: marketNew,
         newPacks,
+        newItems,
         patchNew,
         betVotePending: votePending,
         betNewPublic: betNew.pub,
@@ -153,6 +180,10 @@ function createApp() {
         packLogNew,
         deviceAlerts,
         tradeAlerts,
+        bellNotes: bell.list,
+        bellUnread: bell.unread,
+        achPopup,
+        achPopupBack: req.originalUrl,
       });
     }
     next();
@@ -161,16 +192,21 @@ function createApp() {
   app.use(require('./routes/pages'));
   app.use(forumRoutes);
   app.use(require('./routes/auth'));
+  app.use(require('./routes/dashboard'));
   app.use(require('./routes/bets'));
   app.use(require('./routes/account'));
+  app.use(require('./routes/notify'));
   app.use(require('./routes/admin'));
   app.use(require('./routes/stats'));
   app.use(require('./routes/coin'));
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));
+  app.use(require('./routes/inventar'));
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
+  app.use(require('./routes/dungeon'));
   app.use(require('./routes/trade'));
+  app.use(require('./routes/grading'));
 
   app.use((req, res) => {
     res.status(404).render('error', {

@@ -121,6 +121,7 @@ const betSchema = new Schema(
 betSchema.index({ status: 1, deadline: 1 });
 betSchema.index({ status: 1, disputed: 1 }); // Streitfälle im Dev-Panel
 betSchema.index({ referee: 1, status: 1 });
+betSchema.index({ creator: 1, createdAt: -1 }); // Protokolle: Wetten eines Spielers
 betSchema.index({ group: 1, status: 1 });
 betSchema.index({ status: 1, resolvedAt: -1 });
 betSchema.index({ createdAt: -1 });

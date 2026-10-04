@@ -1,118 +1,28 @@
-<nav class="stats-subnav" aria-label="Abschnitte">
-  <span class="muted small">Springe zu:</span>
-  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#ihk">IHK</a><% } %>
-</nav>
 
-<div class="panel-warning" role="note">
-  <span class="panel-warning-icon" aria-hidden="true">!</span>
-  <div>
-    <strong>Nur für Bugfixes, Tests und Aktionen.</strong>
-    Vergaben von Packs und Karten greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe wird mit deinem Namen im <a href="<%= panelUrl('protokolle', 'packlog') %>">Vergabe-Log</a> festgehalten, und jede Aktion auf dieser Seite muss mit deinem Passwort bestätigt werden.
-  </div>
+<%
+  const toInput = (c) => (c / 100).toFixed(2).replace('.', ',');
+  const pctInput = (w) => (w / 100).toFixed(2).replace('.', ',');
+  // Schalter "für alle verfügbar" auf einen Blick; geändert werden sie im jeweiligen Unterreiter
+  const FEATURES = [
+    { key: 'ihk', label: 'IHK-Quests', on: ihk.settings.open },
+    { key: 'dungeon', label: 'Dungeon', on: dungeon.settings.open },
+    { key: 'grading', label: 'Grading-Shop', on: gradingOpen() },
+  ];
+%>
+<div class="panel-features" aria-label="Für alle Mitglieder verfügbar">
+  <span class="stats-toolbar-label">Für alle sichtbar</span>
+  <% FEATURES.forEach((f) => { %>
+    <a class="panel-feature <%= f.on ? 'is-on' : '' %>" href="<%= subUrl('spielwerte', f.key) %>"><span class="panel-feature-dot" aria-hidden="true"></span><%= f.label %> <span class="muted small"><%= f.on ? 'an' : 'aus' %></span></a>
+  <% }) %>
 </div>
-
-<section class="stats-block" id="vergeben">
-  <%- blockHead('Packs &amp; Karten vergeben', '') %>
-  <div class="panel-grants">
-    <form method="post" data-reauth action="/admin/tcg/packs" class="card panel-grant" data-confirm="Booster Packs an dieses Mitglied vergeben?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <h3><%- icon('gift') %> Packs an ein Mitglied</h3>
-      <p class="muted small">Ungeöffnete Packs landen im Inventar („Meine Packs“).</p>
-      <label class="field"><span>Mitglied</span>
-        <select name="user" required>
-          <option value="">– auswählen –</option>
-          <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
-        </select>
-      </label>
-      <div class="panel-grant-row">
-        <label class="field"><span>Booster Pack</span>
-          <select name="type" required><% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
-        </label>
-        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
-      </div>
-      <button class="btn btn-primary" type="submit">Packs vergeben</button>
-    </form>
-
-    <form method="post" data-reauth action="/admin/tcg/bless" class="card panel-grant panel-grant-bless" data-confirm="Bless everyone: wirklich JEDES Mitglied (<%= users.length %>) beschenken?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <h3><%- icon('sparkle') %> Bless everyone</h3>
-      <p class="muted small">Jedes Mitglied (<strong><%= users.length %></strong>) bekommt dieselbe Anzahl Packs.</p>
-      <label class="field"><span>Booster Pack</span>
-        <select name="type" required><% packTypes.forEach((p) => { %><option value="<%= p.key %>"><%= p.label %></option><% }) %></select>
-      </label>
-      <label class="field panel-count"><span>Packs je Mitglied (1–10)</span><input type="number" name="count" min="1" max="10" step="1" value="1" required></label>
-      <button class="btn btn-primary" type="submit">Alle beschenken</button>
-    </form>
-
-    <form method="post" data-reauth action="/admin/tcg/karte" class="card panel-grant" data-confirm="Diese Karte wirklich vergeben?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <h3><%- icon('cards') %> Bestimmte Karte vergeben</h3>
-      <p class="muted small">An ein Mitglied oder an alle – die Karte landet direkt in der Sammlung.</p>
-      <label class="field"><span>Karte</span>
-        <select name="card" required>
-          <option value="">– auswählen –</option>
-          <% grantCards.forEach((g) => { %>
-            <optgroup label="<%= g.rarity.label %><%= g.rarity.hidden ? ' (geheim)' : '' %>">
-              <% g.cards.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
-            </optgroup>
-          <% }) %>
-        </select>
-      </label>
-      <div class="panel-grant-row">
-        <label class="field"><span>Empfänger</span>
-          <select name="user" required>
-            <option value="">– auswählen –</option>
-            <option value="alle">Alle Mitglieder (<%= users.length %>)</option>
-            <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
-          </select>
-        </label>
-        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="5" step="1" value="1" required></label>
-      </div>
-      <button class="btn btn-primary" type="submit">Karte vergeben</button>
-    </form>
-
-    <form method="post" data-reauth action="/admin/tcg/karte-entziehen" class="card panel-grant" data-confirm="Diese Karte wirklich aus der Sammlung entfernen?">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <h3><%- icon('cards') %> Karte entfernen</h3>
-      <p class="muted small">Entfernt Exemplare aus der Sammlung eines Mitglieds, z. B. nach einer falschen Vergabe. Gesperrte Exemplare (Quest, Handelsangebot) bleiben. Es gibt kein Geld dafür.</p>
-      <label class="field"><span>Karte</span>
-        <select name="card" required>
-          <option value="">– auswählen –</option>
-          <% grantCards.forEach((g) => { %>
-            <optgroup label="<%= g.rarity.label %><%= g.rarity.hidden ? ' (geheim)' : '' %>">
-              <% g.cards.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
-            </optgroup>
-          <% }) %>
-        </select>
-      </label>
-      <div class="panel-grant-row">
-        <label class="field"><span>Mitglied</span>
-          <select name="user" required>
-            <option value="">– auswählen –</option>
-            <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
-          </select>
-        </label>
-        <label class="field panel-count"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
-      </div>
-      <button class="btn btn-danger" type="submit">Karte entfernen</button>
-    </form>
-  </div>
-</section>
-
-<% if (!currentUser.isAdmin) { %>
-  <p class="muted small panel-hint">Preise, Chancen, Handelssteuer und IHK stellt der Admin ein. Änderungen daran siehst du in der Statistik unter „Änderungen“.</p>
-<% } else { %>
-  <%
-    const toInput = (c) => (c / 100).toFixed(2).replace('.', ',');
-    const pctInput = (w) => (w / 100).toFixed(2).replace('.', ',');
-  %>
+  <% if (sub === 'tcg') { %>
   <section class="stats-block" id="tcg">
-    <%- blockHead('TCG: Chancen &amp; Preise', 'Packpreis, Chancen und Verkaufspreise der Seltenheiten. Änderungen gelten sofort. Neue Chancen gelten für alle ab jetzt geöffneten Packs; neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.') %>
+    <%- blockHead('TCG: Chancen &amp; Preise', 'Änderungen gelten sofort: neue Chancen für alle ab jetzt geöffneten Packs, neue Preise auch für schon gezogene Karten (der Wert hängt nur von der Seltenheit ab). Die Chancen müssen zusammen genau 100 % ergeben.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/tcg" class="form admin-tcg-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin>
+      <form method="post" data-reauth action="/admin/tcg" class="form panel-form" data-confirm="TCG-Einstellungen wirklich ändern?" data-tcg-admin data-cards-per-pack="<%= tcg.cardsPerPack %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="field admin-tcg-pack">
-          <span>Packpreis (3 Karten)</span>
+          <span>Packpreis (<%= tcg.cardsPerPack %> Karten)</span>
           <input type="text" name="pack" inputmode="decimal" value="<%= toInput(tcg.packPrice) %>" required>
         </label>
         <div class="table-wrap">
@@ -143,29 +53,173 @@
       </form>
     </div>
   </section>
+<% } %>
 
-  <section class="stats-block" id="handel">
-    <%- blockHead('Handelssteuer', 'Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.') %>
+  <% if (sub === 'steuer') { %>
+  <section class="stats-block" id="steuer">
+    <%- blockHead('Steuern', 'Je Bereich ein Satz (0–50 %).<br><strong>Handel:</strong> wird dem abgezogen, der das Geld bekommt (beim Tausch nur auf den Aufpreis).<br><strong>Broker:</strong> nur auf den Gewinn beim Verkauf; neue Coins oder ETFs fallen automatisch unter ihre Kategorie.<br>Die Spieler sehen die Sätze auf der Handels- bzw. Broker-Seite.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/handel" class="form panel-inline-form">
+      <form method="post" data-reauth action="/admin/steuer" class="form admin-tax-form" data-confirm="Steuersätze wirklich ändern?">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label class="field panel-field-sm">
-          <span>Handelssteuer in % (0–50)</span>
-          <input type="text" name="tax" inputmode="decimal" value="<%= String(tradeTax).replace('.', ',') %>" required>
+        <% ['Handel', 'Broker'].forEach((group) => { %>
+          <fieldset class="admin-tax-group">
+            <legend><%= group %></legend>
+            <% taxCategories.filter((c) => c.group === group).forEach((c) => { %>
+              <label class="field">
+                <span><%= c.label %> in %</span>
+                <input type="text" name="<%= c.key %>" inputmode="decimal" value="<%= String(taxRates[c.key]).replace('.', ',') %>" required>
+                <small class="muted"><%= c.hint %></small>
+              </label>
+            <% }) %>
+          </fieldset>
+        <% }) %>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+<% } %>
+
+  <% if (sub === 'bonus') { %>
+  <section class="stats-block" id="bonus">
+    <%- blockHead('Tagesbonus', `Gilt für alle Mitglieder gleich – außer für die, die gerade im Grading-Shop arbeiten. Gilt ab dem nächsten Bonustag (${bonusTime} Uhr).`) %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/bonus" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="teil" value="bonus">
+        <label class="field admin-tcg-pack">
+          <span>Tagesbonus in € (0 = keiner)</span>
+          <input type="text" name="amount" inputmode="decimal" value="<%= (dailyBonus() / 100).toFixed(2).replace('.', ',') %>" required>
         </label>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>
   </section>
+<% } %>
+<% if (sub === 'grading') { %>
+  <section class="stats-block" id="grading">
+    <%- blockHead('Grading-Shop', 'Lohn pro Auftrag: Putzen (bei 100 % sauber, sonst anteilig) + Benoten (exakte Note, ±1 = halb, ab Stufe 2) + Versiegeln (bei 100 %, ab Stufe 3). Stufe 4 bekommt den Premium-Aufschlag auf alles.<br><br>Die Schätzung rechnet beim Tippen mit den Werten im Formular – vor dem Speichern ausprobieren.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/bonus" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="teil" value="grading">
+        <label class="check admin-ihk-open">
+          <input type="checkbox" name="gradingOpen" value="1" <%= gradingOpen() ? 'checked' : '' %>>
+          <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
+        </label>
+        <div class="admin-gr-grid">
+          <label class="field"><span>Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+          <label class="field"><span>Lohn Putzen in €</span><input type="text" name="gr_pay_clean" inputmode="decimal" value="<%= (gradingSettings.pay.clean / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Lohn Benoten in €</span><input type="text" name="gr_pay_grade" inputmode="decimal" value="<%= (gradingSettings.pay.grade / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Lohn Versiegeln in €</span><input type="text" name="gr_pay_slab" inputmode="decimal" value="<%= (gradingSettings.pay.slab / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <% gradingLevels.slice(1).forEach((l, i) => { %>
+            <label class="field"><span>Ausbau auf Stufe <%= l.level %> („<%= l.name %>“) in €</span><input type="text" name="gr_cost_<%= l.level %>" inputmode="decimal" value="<%= (gradingSettings.costs[i] / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <% }) %>
+          <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
+        </div>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+        <% if (gradingCalc) { const gc = gradingCalc; const pct = (v) => Math.round(v * 100) + ' %'; %>
+          <details class="admin-gr-calc" data-grading-calc="<%= JSON.stringify(gc.input) %>" open>
+            <summary><strong>Verdienst pro Tag</strong> <span class="muted small">Schätzung und tatsächliche Werte</span></summary>
+            <p class="muted small"><strong>Jede Zeile ist der gesamte Tagesverdienst, wenn der Shop auf dieser Stufe steht</strong> (Putzen, Benoten und Versiegeln zusammen) – nicht zusätzlich zur Stufe davor; man arbeitet immer nur auf einer Stufe. Rechnet beim Tippen mit den Werten oben – vor dem Speichern ausprobieren. Alle Aufträge des Tages erledigt; inkl. Seltenheits-Zuschlag der Kundenkarten (Ø +<%= Math.round((gc.input.factor - 1) * 100) %> %) und ab Stufe 3 Folienfunde (Ø <%= euro(Math.round(gc.input.foilValue)) %> pro Auftrag).</p>
+            <div class="table-wrap">
+              <table class="table admin-gr-calc-table">
+                <thead><tr><th>Stufe</th><th class="num">Ausbau</th><% gc.input.profiles.forEach((p) => { %><th class="num"><%= p.label %></th><% }) %><th class="num">Mehr als Stufe davor</th><th class="num">Ausbau bezahlt nach</th></tr></thead>
+                <tbody>
+                  <% const ref = gc.input.profiles[gc.input.profiles.length - 1].key; gc.rows.forEach((r, i) => { %>
+                    <tr>
+                      <td><%= r.level %> · <%= r.name %></td>
+                      <td class="num" data-gc-cost="<%= r.level %>"><%= r.cost ? euro(r.cost) : '–' %></td>
+                      <% gc.input.profiles.forEach((p) => { %><td class="num" data-gc-day="<%= r.level %>-<%= p.key %>"><%= euro(r.perDay[p.key]) %></td><% }) %>
+                      <td class="num" data-gc-gain="<%= r.level %>"><% const g = i ? r.perDay[ref] - gc.rows[i - 1].perDay[ref] : 0; %><%= i ? (g >= 0 ? '+' : '') + euro(g) : '–' %></td>
+                      <td class="num" data-gc-payback="<%= r.level %>"><%= r.payback ? r.payback + ' Tagen' : '–' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <p class="muted small">Zum Vergleich: Tagesbonus <strong data-gc-bonus><%= euro(dailyBonus()) %></strong> pro Tag – entfällt, solange man im Grading-Shop arbeitet. „Mehr als Stufe davor“ und „Ausbau bezahlt nach“ (= Ausbaukosten ÷ Mehrverdienst) (Profil „<%= gc.input.profiles[gc.input.profiles.length - 1].label %>“).</p>
+            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt').join(' · ') %>.</p>
+            <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Folien)</h3>
+            <% if (gc.actual.length) { %>
+              <div class="table-wrap">
+                <table class="table admin-gr-calc-table">
+                  <thead><tr><th>Stufe</th><th class="num">Mitglieder</th><th class="num">Aufträge</th><th class="num">Ø pro Auftrag</th><th class="num">Ø Aufträge/Tag</th><th class="num">Ø pro Arbeitstag</th></tr></thead>
+                  <tbody>
+                    <% gc.actual.forEach((a) => { const l = gradingLevels.find((x) => x.level === a.level); %>
+                      <tr>
+                        <td><%= a.level %><%= l ? ' · ' + l.name : '' %></td>
+                        <td class="num"><%= a.users %></td>
+                        <td class="num"><%= a.jobs %></td>
+                        <td class="num"><%= euro(a.perJob) %></td>
+                        <td class="num"><%= a.jobsPerDay.toFixed(1).replace('.', ',') %></td>
+                        <td class="num"><%= euro(a.perWorkDay) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } else { %>
+              <p class="muted small">In den letzten 30 Tagen wurden noch keine Aufträge erledigt.</p>
+            <% } %>
+          </details>
+        <% } %>
+      </form>
+    </div>
+  </section>
+<% } %>
 
+  <% if (sub === 'folie') { %>
+  <section class="stats-block" id="folie">
+    <%- blockHead('Folie', 'Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit dieser Chance eine Folie. Folierte Karten steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel, die Bank zahlt aber nur ohne Folie.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/folie" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="admin-gr-grid">
+          <label class="field"><span>Fundchance pro versiegelter Karte in %</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung beim Folieren in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+        </div>
+        <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+<% } %>
+
+  <% if (sub === 'lotterie') { %>
+  <section class="stats-block" id="lotterie">
+    <%- blockHead('Lotterien', 'Der Gewinner bekommt alle Einsätze plus den Bank-Gewinn (Geld, Booster Packs, Folien). Ohne verkaufte Lose verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die laufende Runde.') %>
+    <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
+    <div class="panel-cols">
+    <% [['taeglich', 'Tages-Lotterie'], ['woche', 'Wochen-Lotterie (sonntags)'], ['monat', 'Monats-Lotterie (am 28.)']].forEach(([key, label]) => { const ls = lottoSettings[key]; %>
+      <div class="card">
+        <form method="post" data-reauth action="/admin/lotterie" class="form panel-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="kind" value="<%= key %>">
+          <h4><%= label %></h4>
+          <div class="admin-gr-grid">
+            <label class="field"><span>Lospreis in €</span><input type="text" name="price" inputmode="decimal" value="<%= cents(ls.ticketPrice) %>" required></label>
+            <label class="field"><span>Geld aus der Bank in €</span><input type="text" name="cash" inputmode="decimal" value="<%= cents(ls.prizeCash) %>" required></label>
+            <label class="field"><span>Booster Packs</span><input type="number" name="packs" min="0" max="500" step="1" value="<%= ls.prizePacks %>" required></label>
+            <label class="field"><span>Folien</span><input type="number" name="foils" min="0" max="100" step="1" value="<%= ls.prizeFoils %>" required></label>
+          </div>
+          <button class="btn btn-primary" type="submit">Speichern</button>
+        </form>
+      </div>
+    <% }) %>
+    </div>
+  </section>
+<% } %>
+
+  <% if (sub === 'ihk') { %>
   <section class="stats-block" id="ihk">
     <%- blockHead('IHK: Limit &amp; Lohn', 'Quests pro Tag, Dauer, Ziel-Punkte, Lohn und Chance auf ein Booster Pack je Schwierigkeit (Lohn und Pack nur bei Erfolg) – getrennt für normale und Hybrid-Quests. Gilt sofort für neu gestartete Quests.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/ihk" class="form admin-tcg-form">
+      <form method="post" data-reauth action="/admin/ihk" class="form panel-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <label class="check admin-ihk-open">
           <input type="checkbox" name="open" value="1" <%= ihk.settings.open ? 'checked' : '' %>>
-          <span><strong>Für alle Mitglieder verfügbar</strong> – sonst sehen nur Admins die IHK, alle anderen bekommen „derzeit nicht verfügbar“.</span>
+          <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
         </label>
         <label class="field admin-tcg-pack">
           <span>Quests pro Tag</span>
@@ -193,6 +247,64 @@
             </table>
           </div>
         <% }) %>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+<% } %>
+  <% if (sub === 'dungeon') { %>
+  <section class="stats-block" id="dungeon">
+    <%- blockHead('Dungeon: Termine, Lohn &amp; Beute', 'Abstand der Starts, Ziel-Punkte und Lohn (pro Spieler) je Kampf, Beute-Chancen beim Boss und welche Karten Bots bekommen. Gilt ab dem nächsten Start.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/dungeon" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="check admin-ihk-open">
+          <input type="checkbox" name="open" value="1" <%= dungeon.settings.open ? 'checked' : '' %>>
+          <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
+        </label>
+        <label class="field admin-tcg-pack">
+          <span>Start alle … Stunden (1, 2, 3, 4, 6, 8, 12, 24)</span>
+          <input type="number" name="intervalHours" min="1" max="24" step="1" value="<%= dungeon.settings.intervalHours %>" required>
+        </label>
+        <div class="table-wrap">
+          <table class="table admin-tcg-table">
+            <thead><tr><th>Kampf</th><th>Ziel (Punkte)</th><th>Lohn pro Spieler (€)</th></tr></thead>
+            <tbody>
+              <% ['Trash-Kampf 1', 'Trash-Kampf 2', 'Boss'].forEach((label, i) => { %>
+                <tr>
+                  <td><%= label %> <span class="muted small hide-sm">(Standard <%= dungeon.defaults.required[i] %> / <%= euro(dungeon.defaults.rewards[i]) %>)</span></td>
+                  <td><input type="number" name="required_<%= i %>" min="1" max="100000" step="1" value="<%= dungeon.settings.required[i] %>" required aria-label="Ziel-Punkte <%= label %>"></td>
+                  <td><input type="text" name="reward_<%= i %>" inputmode="decimal" value="<%= (dungeon.settings.rewards[i] / 100).toFixed(2).replace('.', ',') %>" required aria-label="Lohn <%= label %>"></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <label class="field admin-tcg-pack">
+          <span>Boss: Chance auf eine Folie pro Spieler (%)</span>
+          <input type="text" name="foilChance" inputmode="decimal" value="<%= String(dungeon.settings.foilChance).replace('.', ',') %>" required>
+        </label>
+        <label class="field admin-tcg-pack">
+          <span>Boss: Chance auf die Boss-Karte pro Spieler (%)</span>
+          <input type="text" name="cardChance" inputmode="decimal" value="<%= String(dungeon.settings.cardChance).replace('.', ',') %>" required>
+        </label>
+        <h3 class="admin-ihk-sub">Bot-Karten: Gewicht je Seltenheit</h3>
+        <p class="muted small">Fehlen Spieler, füllen Bots die Plätze mit einer zufälligen Charakterkarte. Die Gewichte werden in Prozent umgerechnet (z. B. 40 / 35 / 20 / 5).</p>
+        <div class="table-wrap">
+          <table class="table admin-tcg-table">
+            <thead><tr><th>Seltenheit</th><th>Gewicht</th><th>Anteil</th></tr></thead>
+            <tbody>
+              <% const botTotal = tcg.rarities.reduce((s, r) => s + (dungeon.settings.botWeights[r.key] || 0), 0); %>
+              <% tcg.rarities.forEach((r) => { const w = dungeon.settings.botWeights[r.key] || 0; %>
+                <tr class="r-<%= r.key %>">
+                  <td><span class="tcg-dot"></span> <%= r.label %></td>
+                  <td><input type="number" name="bot_<%= r.key %>" min="0" max="10000" step="1" value="<%= w %>" required aria-label="Bot-Gewicht <%= r.label %>"></td>
+                  <td class="muted"><%= botTotal ? (w / botTotal * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) : 0 %> %</td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

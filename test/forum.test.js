@@ -66,6 +66,22 @@ test('Rechte: bearbeiten, löschen, Team-Bereiche, geschlossene Themen', () => {
   assert.ok(can.setStaffOnly(dev) && !can.setStaffOnly(mod));
 });
 
+test('Themen verschieben: Moderation, Team-Bereiche nur Admin/Dev, nicht in denselben Bereich', () => {
+  const member = { _id: 'u1' };
+  const mod = { _id: 'm', isMod: true, canModerate: true };
+  const dev = { _id: 'd', isDev: true, isStaff: true, canModerate: true };
+  const a = { _id: 'a', staffOnly: false };
+  const b = { _id: 'b', staffOnly: false };
+  const team = { _id: 't', staffOnly: true };
+  const teamSub = { _id: 'ts', staffOnly: false };
+  assert.ok(can.moveThread(mod, a, null, b, null) && can.moveThread(dev, a, null, b, null));
+  assert.ok(!can.moveThread(member, a, null, b, null));
+  assert.ok(!can.moveThread(dev, a, null, a, null)); // gleicher Bereich
+  // Mods: weder in noch aus Team-Bereichen (auch nicht deren Unterbereiche)
+  assert.ok(!can.moveThread(mod, a, null, team, null) && !can.moveThread(mod, team, null, a, null) && !can.moveThread(mod, a, null, teamSub, team));
+  assert.ok(can.moveThread(dev, a, null, team, null) && can.moveThread(dev, teamSub, team, b, null));
+});
+
 test('Ungelesen: neuer als der letzte Besuch oder noch nie geöffnet', () => {
   const t = { _id: 't1', lastPostAt: new Date('2026-01-02') };
   assert.equal(isUnread(new Map(), t), true);

@@ -1,11 +1,11 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
-const User = require('../models/User');
 const { TcgOpening } = require('../models/Tcg');
 const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
+const { itemInventory } = require('../items/itemService');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -17,19 +17,17 @@ const wantsJson = (req) => (req.get('Accept') || '').includes('application/json'
 /** Karte für den Client (Pack-Animation) */
 function cardView(card) {
   const r = catalog.rarityByKey[card.rarity];
-  return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, sell: euro(r.sell) };
+  return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, season: card.season, sell: euro(r.sell) };
 }
 
 router.get('/tcg', async (req, res) => {
-  const [coll, stats, rarePulls, packs] = await Promise.all([
+  const [coll, stats, rarePulls, packs, invItems] = await Promise.all([
     collection(req.user),
     TcgOpening.aggregate([{ $match: { user: req.user._id } }, { $group: { _id: null, packs: { $sum: 1 }, spent: { $sum: '$cost' }, best: { $max: '$best' } } }]),
     TcgOpening.find({ best: { $gte: catalog.rarityByKey.holo.rank } }).sort({ createdAt: -1 }).limit(10).lean(),
-    tcg.packInventory(req.user._id),
-    // Besuch merken: neue Packs (Quest, Geschenk) gelten ab jetzt als gesehen
-    User.updateOne({ _id: req.user._id }, { $set: { packsSeenAt: new Date() } }),
+    tcg.packInventory(req.user._id), // ungeöffnete Packs liegen im Inventar – hier nur die Kachel dorthin
+    itemInventory(req.user._id),
   ]);
-  res.locals.newPacks = 0;
 
   res.render('tcg', {
     title: 'TCG',
@@ -40,7 +38,7 @@ router.get('/tcg', async (req, res) => {
     totalWeight: catalog.TOTAL_WEIGHT,
     cardById: catalog.cardById,
     // Favoriten: nur Karten, die es gibt und die man (noch) besitzt
-    favorites: (req.user.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && coll.counts[c.id]),
+    favorites: await tcg.favoriteList(req.user, Object.fromEntries(Object.entries(coll.counts).map(([k, n]) => [k, n - (coll.foiledByCard[k] || 0)]))), // normale Favoriten nur mit unfoliertem Exemplar
     maxFavorites: tcg.MAX_FAVORITES,
     stats: stats[0] || { packs: 0, spent: 0, best: null },
     rarePulls,
@@ -48,6 +46,7 @@ router.get('/tcg', async (req, res) => {
     maxPacksPerPurchase: tcg.MAX_PACKS_PER_PURCHASE,
     packImage: catalog.PACK_IMAGE,
     packs,
+    itemTotal: invItems.reduce((s, i) => s + i.count, 0),
     packType: catalog.DEFAULT_PACK,
     cardsPerPack: catalog.CARDS_PER_PACK,
   });
@@ -59,6 +58,7 @@ router.get('/tcg/album', async (req, res) => {
     title: 'Album',
     ...coll,
     cards: catalog.CARDS,
+    seasons: catalog.SEASONS,
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
     favoriteIds: new Set(req.user.tcgFavorites || []),
@@ -81,7 +81,7 @@ router.post('/tcg/kaufen', async (req, res) => {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/tcg'); // oben bleiben – so lassen sich bequem weitere Packs kaufen
+  res.redirect('/tcg'); // oben bleiben – so lassen sich bequem weitere Packs kaufen (der Inventar-Hinweis zählt mit)
 });
 
 router.post('/tcg/oeffnen', async (req, res) => {
@@ -94,7 +94,7 @@ router.post('/tcg/oeffnen', async (req, res) => {
     if (wantsJson(req)) return res.status(400).json({ error: err.message });
     req.flash('error', err.message);
   }
-  res.redirect('/tcg');
+  res.redirect('/inventar#packs');
 });
 
 /** Aktion ausführen, Meldung setzen, zurück ins Album */

@@ -6,7 +6,14 @@ const { requireLogin } = require('../middleware');
 const { requireReauth } = require('../middleware/reauth');
 const forum = require('../forum/forumService');
 const { render, tagsFor } = require('../forum/render');
-const { str, UserError } = require('../lib/util');
+const { loadEmbeds } = require('../forum/embeds');
+const { empty: reactionList } = require('../forum/reactions');
+const hallOfFame = require('../forum/hallOfFame');
+const { HALL_OF_FAME_KEY } = require('../forum/starters');
+const { str, escapeRegex, UserError } = require('../lib/util');
+const config = require('../config');
+const { toZonedLocalInput } = require('../lib/time');
+const polls = require('../forum/polls');
 
 const router = express.Router();
 router.use('/forum', requireLogin);
@@ -63,11 +70,19 @@ const EMPTY = { threads: 0, posts: 0, last: null, unread: 0 };
 
 // ---------- Übersicht ----------
 router.get('/forum', async (req, res) => {
-  const [cats, stats, reports] = await Promise.all([
+  const q = str(req.query.q).trim().slice(0, 80);
+  const pick = 'category title authorName createdAt replyCount lastPostAt lastPostByName pinned locked';
+  const [cats, stats, reports, reads, latest, found] = await Promise.all([
     ForumCategory.find().sort({ order: 1, createdAt: 1 }).lean(),
     categoryStats(req.user),
     req.user.canModerate ? forum.openReportCount() : 0,
+    forum.readMap(req.user._id),
+    ForumThread.find({ deleted: false }).sort({ createdAt: -1 }).limit(6).select(pick).lean(),
+    // Suche: nur in Thementiteln
+    q ? ForumThread.find({ deleted: false, title: new RegExp(escapeRegex(q), 'i') }).sort({ lastPostAt: -1 }).limit(40).select(pick).lean() : null,
   ]);
+  const catTitle = new Map(cats.map((c) => [String(c._id), c.title]));
+  const withRead = (t) => ({ ...t, unread: forum.isUnread(reads, t), catTitle: catTitle.get(String(t.category)) || '' });
   const withStats = (c) => ({ ...c, stats: stats.get(String(c._id)) || EMPTY });
   const roots = cats
     .filter((c) => !c.parent)
@@ -80,6 +95,11 @@ router.get('/forum', async (req, res) => {
     title: 'Forum',
     roots,
     reports,
+    q,
+    results: found ? found.map(withRead) : null,
+    latest: latest.map(withRead),
+    // Bereiche, in denen dieses Mitglied Themen eröffnen darf (Auswahl bei „+ Neues Thema“)
+    newChoices: cats.filter((c) => forum.can.createThread(req.user, c)),
     canManage: forum.can.manage(req.user),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
     // Hauptbereiche, unter denen dieses Mitglied Unterbereiche anlegen darf
@@ -109,6 +129,7 @@ router.get('/forum/k/:id', async (req, res) => {
   res.render('forum-kategorie', {
     title: cat.title,
     cat,
+    hof: cat.key === HALL_OF_FAME_KEY ? await hallOfFame.load() : null, // Bestenlisten als Kopf über den Themen
     parent,
     subs: subsRaw.map((s) => ({ ...s, stats: stats.get(String(s._id)) || EMPTY })),
     threads: threads.map((t) => ({ ...t, unread: forum.isUnread(reads, t) })),
@@ -117,6 +138,7 @@ router.get('/forum/k/:id', async (req, res) => {
     total,
     canCreate: forum.can.createThread(req.user, cat),
     canManage: forum.can.manageCategory(req.user, cat, parent),
+    canAddSub: !cat.parent && forum.can.manage(req.user) && forum.can.manageCategory(req.user, cat, null),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
   });
 });
@@ -130,12 +152,24 @@ router.get('/forum/k/:id/neu', async (req, res) => {
     return res.redirect(`/forum/k/${cat._id}`);
   }
   const parent = cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
-  res.render('forum-neu', { title: 'Neues Thema', cat, parent, myTags: tagsFor(forum.roleOfUser(req.user)), titleMax: forum.TITLE_MAX, bodyMax: forum.BODY_MAX });
+  res.render('forum-neu', {
+    title: 'Neues Thema',
+    cat,
+    parent,
+    myTags: tagsFor(forum.roleOfUser(req.user)),
+    titleMax: forum.TITLE_MAX,
+    bodyMax: forum.BODY_MAX,
+    // Umfrage (optional)
+    pollQuestionMax: polls.QUESTION_MAX,
+    pollOptionsMax: polls.OPTIONS_MAX,
+    minPollEnd: toZonedLocalInput(new Date(Date.now() + 10 * 60 * 1000), config.timezone),
+  });
 });
 
 router.post('/forum/k/:id/thema', (req, res) =>
   act(req, res, `/forum/k/${req.params.id}/neu`, async () => {
-    const thread = await forum.createThread({ user: req.user, categoryId: req.params.id, title: str(req.body.title), body: req.body.body });
+    const poll = { question: str(req.body.pollQuestion), options: str(req.body.pollOptions), endsAt: str(req.body.pollEndsAt) };
+    const thread = await forum.createThread({ user: req.user, categoryId: req.params.id, title: str(req.body.title), body: req.body.body, poll });
     return `/forum/t/${thread._id}`;
   })
 );
@@ -146,11 +180,26 @@ router.get('/forum/t/:id', async (req, res) => {
   if (!thread) return notFound(res, 'Dieses Thema gibt es nicht (mehr).');
   const [cat, total, reads] = await Promise.all([ForumCategory.findById(thread.category).lean(), ForumPost.countDocuments({ thread: thread._id }), forum.readMap(req.user._id)]);
   const parent = cat && cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
+  const allCats = req.user.canModerate && cat ? await ForumCategory.find().sort({ order: 1, createdAt: 1 }).lean() : [];
+  const moveTargets = [];
+  for (const root of allCats.filter((c) => !c.parent)) {
+    for (const c of [root, ...allCats.filter((s) => String(s.parent) === String(root._id))]) {
+      const p = c === root ? null : root;
+      if (forum.can.moveThread(req.user, cat, parent, c, p)) moveTargets.push({ _id: c._id, label: p ? `${root.title} › ${c.title}` : c.title });
+    }
+  }
   const { page, pages } = pageOf(req, total, forum.POSTS_PER_PAGE);
   const posts = await ForumPost.find({ thread: thread._id }).sort({ createdAt: 1, _id: 1 }).skip((page - 1) * forum.POSTS_PER_PAGE).limit(forum.POSTS_PER_PAGE).lean();
   const lastRead = reads.get(String(thread._id)) || null;
   await forum.markRead(req.user._id, thread._id); // jetzt gilt alles als gelesen
   const mine = (p) => String(p.author) === String(req.user._id);
+  const showOriginal = (p) => p.deleted && forum.can.seeOriginal(req.user) && p.original;
+  // Einbettungen (Wetten, Namen) für alle Beiträge der Seite auf einmal laden
+  const [embeds, reactions, poll] = await Promise.all([
+    loadEmbeds(posts.map((p) => (p.deleted ? (showOriginal(p) ? p.original : null) : p.body))),
+    forum.reactionsFor(posts.map((p) => p._id), req.user._id), // eine Abfrage für alle Beiträge der Seite
+    forum.pollView(thread, req.user),
+  ]);
   res.render('forum-thema', {
     title: thread.title,
     thread,
@@ -161,17 +210,22 @@ router.get('/forum/t/:id', async (req, res) => {
     total,
     posts: posts.map((p) => ({
       ...p,
-      html: p.deleted ? '' : render(p.body),
-      originalHtml: p.deleted && forum.can.seeOriginal(req.user) && p.original ? render(p.original) : null,
+      html: p.deleted ? '' : render(p.body, embeds),
+      originalHtml: showOriginal(p) ? render(p.original, embeds) : null,
       isNew: !mine(p) && (!lastRead || p.createdAt > lastRead), // seit dem letzten Besuch dazugekommen
       mine: mine(p),
       canEdit: forum.can.editPost(req.user, p, thread),
       canDelete: forum.can.deletePost(req.user, p),
+      reactions: reactions.get(String(p._id)) || reactionList(),
+      canReact: forum.can.react(req.user, p, thread),
     })),
+    poll,
     upvoted: thread.upvotes.some((id) => id.equals(req.user._id)),
+    moveTargets,
     canReply: forum.can.reply(req.user, thread),
     myTags: tagsFor(forum.roleOfUser(req.user)),
     bodyMax: forum.BODY_MAX,
+    reasonMax: forum.REASON_MAX,
   });
 });
 
@@ -182,7 +236,31 @@ router.post('/forum/t/:id/antwort', (req, res) =>
   })
 );
 
+// Umfrage: abstimmen, entfernen (Moderation)
+router.post('/forum/t/:id/umfrage', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}#umfrage`, async () => {
+    await forum.vote({ user: req.user, threadId: req.params.id, option: str(req.body.option) });
+    return null;
+  })
+);
+
+router.post('/forum/t/:id/umfrage/entfernen', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}`, async () => {
+    await forum.removePoll({ user: req.user, threadId: req.params.id });
+    req.flash('info', 'Umfrage entfernt.');
+    return null;
+  })
+);
+
 router.post('/forum/t/:id/upvote', (req, res) => act(req, res, `/forum/t/${req.params.id}`, () => forum.toggleUpvote({ user: req.user, threadId: req.params.id }).then(() => null)));
+
+router.post('/forum/t/:id/verschieben', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}`, async () => {
+    const { to } = await forum.moveThread({ user: req.user, threadId: req.params.id, categoryId: str(req.body.category) });
+    req.flash('success', `Thema nach „${to.title}“ verschoben.`);
+    return null;
+  })
+);
 
 router.post('/forum/t/:id/moderation', (req, res) =>
   act(req, res, `/forum/t/${req.params.id}`, async () => {
@@ -224,21 +302,39 @@ router.post('/forum/b/:id/loeschen', (req, res) =>
   })
 );
 
+// Reaktion setzen oder zurücknehmen; zurück auf dieselbe Seite des Themas
+router.post('/forum/b/:id/reaktion', (req, res) =>
+  act(req, res, valid(req.params.id) ? `/forum/b/${req.params.id}/zum-beitrag` : '/forum', async () => {
+    const { post, thread } = await forum.toggleReaction({ user: req.user, postId: req.params.id, reaction: str(req.body.reaction) });
+    const page = Math.max(1, Math.min(9999, Number.parseInt(req.body.seite, 10) || 1));
+    return `/forum/t/${thread._id}?seite=${page}#b-${post._id}`;
+  })
+);
+
 router.post('/forum/b/:id/melden', (req, res) =>
-  act(req, res, '/forum', async () => {
+  act(req, res, valid(req.params.id) ? `/forum/b/${req.params.id}/zum-beitrag` : '/forum', async () => {
     const thread = await forum.report({ user: req.user, postId: req.params.id, reason: str(req.body.reason) });
     req.flash('success', 'Danke – der Beitrag wurde der Moderation gemeldet.');
     return `/forum/t/${thread._id}#b-${req.params.id}`;
   })
 );
 
-// ---------- Meldungen (Moderation) ----------
+// Zurück zu einem Beitrag (z. B. nach einem Fehler beim Melden)
+router.get('/forum/b/:id/zum-beitrag', async (req, res) => {
+  const post = valid(req.params.id) ? await ForumPost.findById(req.params.id).select('thread').lean() : null;
+  res.redirect(post ? `/forum/t/${post.thread}#b-${post._id}` : '/forum');
+});
+
+// ---------- Meldungen und Mod-Log (Moderation) ----------
 router.get('/forum/meldungen', async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
   const reports = await ForumReport.find({ done: false }).sort({ createdAt: -1 }).limit(100).lean();
-  const posts = await ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted thread').lean();
+  const [posts, log] = await Promise.all([
+    ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted thread').lean(),
+    forum.modLogPage(Number.parseInt(req.query.seite, 10) || 1),
+  ]);
   const byId = new Map(posts.map((p) => [String(p._id), p]));
-  res.render('forum-meldungen', { title: 'Meldungen', reports: reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null })) });
+  res.render('forum-meldungen', { title: 'Meldungen', reports: reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null })), log });
 });
 
 // Admin und Devs bestätigen Moderationsaktionen mit ihrem Passwort (wie im Panel); Mods nicht
@@ -247,7 +343,7 @@ const reauthForStaff = (req, res, next) => (req.user && req.user.isStaff ? staff
 
 router.post('/forum/meldungen/:id/erledigt', reauthForStaff, async (req, res, next) => {
   if (!req.user.canModerate) return next('route');
-  if (valid(req.params.id)) await ForumReport.updateOne({ _id: req.params.id }, { $set: { done: true } });
+  await forum.resolveReport({ user: req.user, reportId: req.params.id });
   res.redirect(req.body.zurueck === 'panel' && req.user.isStaff ? '/admin?bereich=moderation#meldungen' : '/forum/meldungen');
 });
 
@@ -276,8 +372,8 @@ router.post('/forum/bereiche', (req, res, next) => {
       if (!forum.can.manageCategory(req.user, parent, null)) throw new UserError('In Team-Bereichen legen nur Admin und Devs Unterbereiche an.');
     }
     await ForumCategory.create({ ...data, parent: parent ? parent._id : null });
-    req.flash('success', `Bereich „${data.title}“ angelegt.`);
-    return '/forum';
+    req.flash('success', `${parent ? 'Unterbereich' : 'Bereich'} „${data.title}“ angelegt.`);
+    return parent ? `/forum/k/${parent._id}` : '/forum';
   });
 });
 

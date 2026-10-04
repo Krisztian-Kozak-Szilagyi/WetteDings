@@ -1,85 +1,264 @@
 <%- include('partials/head') %>
 <% const decided = stats.won + stats.lost; %>
+<% const tier = countTier(achievementCount); %>
 
-<div class="page-head">
-  <div class="ihk-title">
-    <h1><%= profile.username %><%- roleBadge(profile.username) %><%= isMe ? ' (du)' : '' %></h1>
-    <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/duell/neu?gegen=<%= encodeURIComponent(profile.username) %>">Herausfordern</a><% } %>
-    <% if (currentUser.isStaff) { %><a class="btn btn-ghost btn-sm" href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(profile.username) %>">Statistik</a><% } %>
-    <% if (canBan) { %>
-      <details class="mod-menu" data-dropdown>
-        <summary class="btn btn-ghost btn-sm">Moderation</summary>
-        <div class="mod-menu-panel">
-          <form method="post" data-reauth action="/admin/sperren" class="form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich bannen?">
+<section class="pf-hero">
+  <div class="pf-id">
+    <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+    <div class="pf-id-text">
+      <h1 class="pf-name"><%= profile.username %><%- roleBadge(profile.username) %></h1>
+      <% if (profile.realName) { %><p class="pf-realname"><%= profile.realName %></p><% } %>
+      <% if (profile.bio) { %>
+        <p class="pf-bio"><%= profile.bio %></p>
+      <% } else { %>
+        <p class="pf-bio pf-bio-empty"><%= isMe ? 'Erzähl den anderen etwas über dich.' : 'Hier steht noch nichts.' %></p>
+      <% } %>
+      <% if (isMe) { %>
+        <details class="pf-bio-edit">
+          <summary class="btn btn-ghost btn-sm">Text bearbeiten</summary>
+          <form method="post" action="/profil/text" class="form pf-bio-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="user" value="<%= profile._id %>">
-            <input type="hidden" name="zurueck" value="profil">
-            <label class="field admin-tcg-pack">
-              <span>Dauer in Stunden <em><%= currentUser.isAdmin ? '(0 = dauerhaft)' : '(1–' + maxBanHours + ', höchstens 7 Tage)' %></em></span>
-              <input type="number" name="hours" min="<%= currentUser.isAdmin ? 0 : 1 %>" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
-            </label>
             <label class="field">
-              <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
-              <input type="text" name="reason" maxlength="200">
+              <span class="sr-only">Profiltext</span>
+              <textarea name="text" rows="4" maxlength="<%= bioMax %>" data-count="pf-bio-count" placeholder="Wer bist du, was sammelst du, wen forderst du heraus?"><%= profile.bio %></textarea>
             </label>
-            <button class="btn btn-danger" type="submit">Ban</button>
+            <div class="pf-bio-foot">
+              <span class="muted small"><span id="pf-bio-count"><%= Array.from(profile.bio || '').length %></span> / <%= bioMax %></span>
+              <button class="btn btn-primary btn-sm" type="submit">Speichern</button>
+            </div>
           </form>
-          <% if (ban && ban.active && canUnban) { %>
-            <form method="post" data-reauth action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= profile.username %> wirklich entbannen?">
+        </details>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="pf-head-side">
+    <a class="pf-level" href="#erfolge" aria-label="<%= achievementCount %> von <%= achievementTotal %> Erfolgen – zur Liste">
+      <span class="pf-level-label">Erfolge</span>
+      <span class="ach-count ach-count-lg t-<%= tier %>"><span><%= achievementCount %></span></span>
+    </a>
+    <div class="pf-actions">
+      <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/duell/neu?gegen=<%= encodeURIComponent(profile.username) %>">Herausfordern</a><% } %>
+      <% if (currentUser.isStaff) { %><a class="btn btn-ghost btn-sm" href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(profile.username) %>">Statistik</a><a class="btn btn-ghost btn-sm" href="/admin?bereich=protokolle&amp;spieler=<%= encodeURIComponent(profile.username) %>#protokoll">Logs</a><% } %>
+      <% if (canBan) { %>
+        <details class="mod-menu" data-dropdown>
+          <summary class="btn btn-ghost btn-sm">Moderation</summary>
+          <div class="mod-menu-panel">
+            <form method="post" data-reauth action="/admin/sperren" class="form" data-confirm="<%= profile.username %> und alle Geräte des Kontos wirklich bannen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="user" value="<%= profile._id %>">
               <input type="hidden" name="zurueck" value="profil">
-              <button class="btn btn-ghost btn-block" type="submit">Unban</button>
+              <label class="field admin-tcg-pack">
+                <span>Dauer in Stunden <em><%= currentUser.isAdmin ? '(0 = dauerhaft)' : '(1–' + maxBanHours + ', höchstens 7 Tage)' %></em></span>
+                <input type="number" name="hours" min="<%= currentUser.isAdmin ? 0 : 1 %>" max="<%= maxBanHours %>" step="1" value="24" inputmode="numeric" required>
+              </label>
+              <label class="field">
+                <span>Grund <em>(freiwillig – steht im Profil und beim Anmeldeversuch)</em></span>
+                <input type="text" name="reason" maxlength="200">
+              </label>
+              <button class="btn btn-danger" type="submit">Ban</button>
             </form>
+            <% if (ban && ban.active && canUnban) { %>
+              <form method="post" data-reauth action="/admin/sperren/<%= profile._id %>/aufheben" data-confirm="<%= profile.username %> wirklich entbannen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="zurueck" value="profil">
+                <button class="btn btn-ghost btn-block" type="submit">Unban</button>
+              </form>
+            <% } %>
+          </div>
+        </details>
+      <% } %>
+    </div>
+    <span class="muted small">Mitglied seit <%= dayDate(profile.createdAt) %></span>
+  </div>
+</section>
+
+<div class="pf-layout">
+  <div class="pf-main">
+    <div class="stats stats-4">
+      <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
+      <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= totalCards %></span></div>
+      <div class="stat card"><span class="stat-label">Wert der Karten</span><span class="stat-value"><%= euro(cardValue) %></span></div>
+      <div class="stat card">
+        <span class="stat-label">Wetten richtig</span>
+        <span class="stat-value"><%= decided ? Math.round((stats.won / decided) * 100) + ' %' : '–' %></span>
+        <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tcg-coll-head">
+        <h2>Favoriten</h2>
+        <div class="profil-actions">
+          <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>/sammlung">Sammlung ansehen</a>
+          <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/handel/tausch?an=<%= encodeURIComponent(profile.username) %>">Tausch vorschlagen</a><% } %>
+        </div>
+      </div>
+      <% if (!favorites.length) { %>
+        <p class="muted"><%= isMe ? 'Du zeigst noch keine Favoriten. Wähle sie in deinem Album aus.' : profile.username + ' zeigt noch keine Favoriten.' %></p>
+      <% } else { %>
+        <div class="tcg-grid tcg-favs">
+          <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity]; %>
+            <% if (fv.foiledAt) { %>
+              <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
+                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+                <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(fv.foiledAt) %></span>
+              </button>
+              <% return; } %>
+            <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card
+              data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
+              data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= ownedCounts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
+            </button>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card" id="erfolge">
+      <div class="tcg-coll-head">
+        <h2>Erfolge</h2>
+        <span class="muted small"><%= achievementCount %> von <%= achievementTotal %> freigeschaltet</span>
+      </div>
+      <div class="ach-progress" role="progressbar" aria-label="Freigeschaltete Erfolge" aria-valuemin="0" aria-valuemax="<%= achievementTotal %>" aria-valuenow="<%= achievementCount %>">
+        <span style="--p: <%= achievementTotal ? Math.round((achievementCount / achievementTotal) * 100) : 0 %>%"></span>
+      </div>
+      <ul class="ach-list">
+        <% achievements.forEach((a) => { const pinnedHere = pinnedKeys.includes(a.key); %>
+          <li class="ach-row<%= a.earned ? ' is-earned' : ' is-locked' %><%= a.unique ? ' is-unique' : '' %>">
+            <img class="ach-icon" src="/img/erfolge/<%= a.hidden ? 'geheim' : a.key %>.svg?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy">
+            <div class="ach-body">
+              <p class="ach-name"><%= a.name %><% if (a.unique) { %><span class="ach-tag">Einzigartig</span><% } %></p>
+              <p class="ach-text"><%= a.text %></p>
+              <p class="ach-meta">
+                <% if (a.earned) { %>Freigeschaltet am <%= dayDate(a.earnedAt) %><% } else { %>Noch nicht freigeschaltet<% } %>
+                <% if (!a.unique) { %> · <%= shareText(a.share) %> der Mitglieder<% } %>
+              </p>
+            </div>
+            <% if (isMe && a.earned) { %>
+              <form method="post" action="/profil/anheften" class="ach-pin-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="erfolg" value="<%= a.key %>">
+                <button type="submit" class="ach-pin<%= pinnedHere ? ' is-on' : '' %>" aria-pressed="<%= pinnedHere %>" title="<%= pinnedHere ? 'Nicht mehr im Profil oben zeigen' : 'Im Profil oben anheften (höchstens zwei)' %>">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 3l6 6-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" fill="currentColor"/></svg>
+                  <span class="sr-only"><%= pinnedHere ? 'Lösen' : 'Anheften' %></span>
+                </button>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </div>
+  </div>
+
+  <aside class="pf-side">
+    <div class="card pf-showcase">
+      <h2><%= pinnedChosen ? 'Angeheftete Erfolge' : 'Neueste Erfolge' %></h2>
+      <% if (!pinnedAchievements.length) { %>
+        <p class="muted small"><%= isMe ? 'Schalte Erfolge frei – zwei davon kannst du hier anheften.' : 'Noch keine Erfolge.' %></p>
+      <% } else { %>
+        <div class="pf-showcase-grid">
+          <% pinnedAchievements.forEach((a) => { %>
+            <div class="pf-showcase-item<%= a.unique ? ' is-unique' : '' %>" tabindex="0" data-tip="<%= a.text %>">
+              <img src="/img/erfolge/<%= a.key %>.svg?v=<%= assetVersion %>" alt="" width="88" height="88">
+              <span class="pf-showcase-name"><%= a.name %></span>
+            </div>
+          <% }) %>
+        </div>
+        <% if (isMe && !pinnedChosen) { %><p class="muted small pf-hint">Mit der Nadel in der Liste wählst du selbst, welche zwei hier stehen.</p><% } %>
+      <% } %>
+
+      <% if (bans.length || top1) { %>
+        <div class="pf-badges">
+          <% if (top1) { %>
+            <span class="pf-badge pf-badge-top1" tabindex="0" aria-describedby="pf-tip-top1">
+              <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><defs><linearGradient id="pf-g-top1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4"/><stop offset="1" stop-color="#c08a1e"/></linearGradient></defs><path d="M8 34 L6 14 L16 22 L24 9 L32 22 L42 14 L40 34Z" fill="url(#pf-g-top1)"/><rect x="8" y="36" width="32" height="5" rx="2" fill="url(#pf-g-top1)"/><text x="24" y="31" text-anchor="middle" font-size="11" font-weight="900" fill="#3a2a08">1</text></svg>
+              <span class="pf-badge-label">Platz 1</span>
+              <span class="pf-tip" role="tooltip" id="pf-tip-top1">
+                <span class="pf-tip-title">Platz 1 der Rangliste</span>
+                <span class="pf-tip-row">Insgesamt <strong><%= top1 %></strong> ganz oben.</span>
+              </span>
+            </span>
+          <% } %>
+          <% if (bans.length) { const activeBan = bans[0].state === 'aktiv'; %>
+            <span class="pf-badge pf-badge-ban" tabindex="0" aria-describedby="pf-tip-ban">
+              <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M24 4 L41 10 V23 C41 33 33 40 24 44 C15 40 7 33 7 23 V10Z" fill="#3a1418" stroke="#f87171" stroke-width="3"/><g transform="rotate(-40 24 24)" fill="#f87171"><rect x="15" y="13" width="18" height="9" rx="2"/><rect x="22.5" y="21" width="3" height="16" rx="1.5"/></g></svg>
+              <span class="pf-badge-label"><%= activeBan ? 'Gebannt' : bans.length > 1 ? bans.length + '× gebannt' : 'War gebannt' %></span>
+              <span class="pf-tip pf-tip-ban" role="tooltip" id="pf-tip-ban">
+                <span class="pf-tip-title"><%= bans.length === 1 ? 'Ein Ban' : bans.length + ' Bans' %></span>
+                <% bans.forEach((b) => { %>
+                  <span class="pf-ban">
+                    <span class="pf-ban-head">
+                      <strong><%= dayDate(b.at) %></strong>
+                      <span class="pf-ban-state s-<%= b.state %>"><%= b.state === 'aktiv' ? 'läuft noch' : b.state === 'abgelaufen' ? 'abgelaufen' : 'vorzeitig aufgehoben' %></span>
+                    </span>
+                    <span class="pf-tip-row"><em>Dauer</em><%= b.duration || '–' %><% if (b.state === 'aktiv' && b.duration !== 'dauerhaft') { %> (bis <%= dayDate(b.until) %>)<% } %><% if (b.liftedAt) { %> · aufgehoben am <%= dayDate(b.liftedAt) %><% } %></span>
+                    <span class="pf-tip-row"><em>Von</em><%= b.byName || '–' %></span>
+                    <span class="pf-tip-row"><em>Grund</em><%= b.reason || 'kein Grund angegeben' %></span>
+                  </span>
+                <% }) %>
+              </span>
+            </span>
           <% } %>
         </div>
-      </details>
+      <% } %>
+    </div>
+
+    <% if (pfAsset || isMe) { %>
+      <div class="card pf-asset">
+        <h2><%= pfAsset && pfAsset.kind === 'etf' ? 'Lieblings-ETF' : 'Lieblings-Coin' %></h2>
+        <% if (pfAsset) { %>
+          <a class="pf-asset-row" href="/broker/<%= pfAsset.symbol.toLowerCase() %>">
+            <%- include('partials/asset-mark', { sym: pfAsset.symbol, px: 44, imgClass: 'pf-asset-logo', markClass: 'pf-asset-logo' }) %>
+            <span class="pf-asset-text">
+              <span class="pf-asset-name"><%= pfAsset.name %></span>
+              <span class="pf-asset-units"><strong><%= pfAsset.units %></strong> <%= pfAsset.symbol %></span>
+            </span>
+            <span class="pf-asset-value"><%= euro(pfAsset.value) %></span>
+          </a>
+        <% } else { %>
+          <p class="muted small">Zeig hier einen Coin oder ETF aus dem Broker – mit deinem Bestand und seinem Wert.</p>
+        <% } %>
+        <% if (isMe) { %>
+          <form method="post" action="/profil/depot" class="pf-asset-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <select name="symbol" aria-label="Broker-Wert im Profil">
+              <option value="">Keinen zeigen</option>
+              <% pfAssetOptions.forEach((o) => { %><option value="<%= o.symbol %>"<%= pfAsset && pfAsset.symbol === o.symbol ? ' selected' : '' %>><%= o.name %> (<%= o.symbol %>)</option><% }) %>
+            </select>
+            <button class="btn btn-ghost btn-sm" type="submit">Zeigen</button>
+          </form>
+        <% } %>
+      </div>
     <% } %>
-  </div>
-  <span class="muted">Mitglied seit <%= date(profile.createdAt) %></span>
-</div>
-<% if (ban) { %>
-  <p class="ban-note">Dieser Spieler war bereits gebannt, gebannt von: <%= ban.by || '–' %>, Grund: <%= ban.reason || '–' %></p>
-<% } %>
-<% if (top1) { %>
-  <p class="top1-note">Dieser Spieler war <%= top1 %> lang Top 1.</p>
-<% } %>
 
-<div class="stats stats-4">
-  <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
-  <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= totalCards %></span></div>
-  <div class="stat card"><span class="stat-label">Wert der Karten</span><span class="stat-value"><%= euro(cardValue) %></span></div>
-  <div class="stat card">
-    <span class="stat-label">Wetten richtig</span>
-    <span class="stat-value"><%= decided ? Math.round((stats.won / decided) * 100) + ' %' : '–' %></span>
-    <span class="muted small"><%= stats.won %> gewonnen · <%= stats.lost %> verloren</span>
-  </div>
-</div>
-
-<div class="card">
-  <div class="tcg-coll-head">
-    <h2>Favoriten</h2>
-    <div class="profil-actions">
-      <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>/sammlung">Sammlung ansehen</a>
-      <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/handel/tausch?an=<%= encodeURIComponent(profile.username) %>">Tausch vorschlagen</a><% } %>
+    <div class="card pf-mates">
+      <h2>Spielt oft mit</h2>
+      <% if (!playmates.length) { %>
+        <p class="muted small"><%= isMe ? 'Geh in einen Dungeon oder fordere jemanden zum Duell – hier stehen dann deine häufigsten Mitspieler.' : profile.username + ' hat noch mit niemandem zusammen gespielt.' %></p>
+      <% } else { %>
+        <ul class="pf-mate-list">
+          <% playmates.forEach((m) => { const parts = []; if (m.dungeons) parts.push(m.dungeons + (m.dungeons === 1 ? ' Dungeon' : ' Dungeons')); if (m.duels) parts.push(m.duels + (m.duels === 1 ? ' Duell' : ' Duelle')); %>
+            <li>
+              <a class="pf-mate" href="/profil/<%= encodeURIComponent(m.username) %>">
+                <img src="<%= avatarUrl(m) %>?v=<%= assetVersion %>" alt="" width="40" height="40">
+                <span class="pf-mate-text">
+                  <span class="pf-mate-name"><%= m.username %></span>
+                  <span class="muted small"><%= parts.join(' · ') %> zusammen</span>
+                </span>
+                <span class="ach-count t-<%= countTier(m.achievements) %>" title="<%= m.achievements %> <%= m.achievements === 1 ? 'Erfolg' : 'Erfolge' %>"><span><%= m.achievements %></span></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
     </div>
-  </div>
-  <% if (!favorites.length) { %>
-    <p class="muted"><%= isMe ? 'Du zeigst noch keine Favoriten. Wähle sie in deinem Album aus.' : profile.username + ' zeigt noch keine Favoriten.' %></p>
-  <% } else { %>
-    <div class="tcg-grid tcg-favs">
-      <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
-        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card
-          data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
-          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= ownedCounts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
-          <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-          <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-        </button>
-      <% }) %>
-    </div>
-  <% } %>
+  </aside>
 </div>
 
 <%- include('partials/card-zoom') %>
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

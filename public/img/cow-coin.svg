@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="256" height="256" role="img" aria-label="Coinye West (COW)"><title>Coinye West (COW)</title>
+<defs><linearGradient id="cw-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c9ced6"/><stop offset="1" stop-color="#6f7782"/></linearGradient>
+<radialGradient id="cw-face" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#2f8f4e"/><stop offset="1" stop-color="#0d2b17"/></radialGradient>
+<clipPath id="cw-head"><ellipse cx="200" cy="200" rx="86" ry="96"/></clipPath></defs>
+<circle cx="200" cy="200" r="194" fill="url(#cw-rim)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="200" r="150" fill="url(#cw-face)" stroke="#1a161c" stroke-width="12"/>
+<path d="M140,128 C118,118 104,96 108,70 C124,92 142,100 162,106 Z" fill="#f3e3b5" stroke="#1a161c" stroke-width="10" stroke-linejoin="round"/>
+<path d="M260,128 C282,118 296,96 292,70 C276,92 258,100 238,106 Z" fill="#f3e3b5" stroke="#1a161c" stroke-width="10" stroke-linejoin="round"/>
+<ellipse cx="96" cy="172" rx="34" ry="18" transform="rotate(-18 96 172)" fill="#2b2528" stroke="#1a161c" stroke-width="10"/>
+<ellipse cx="304" cy="172" rx="34" ry="18" transform="rotate(18 304 172)" fill="#2b2528" stroke="#1a161c" stroke-width="10"/>
+<ellipse cx="98" cy="173" rx="18" ry="7" transform="rotate(-18 98 173)" fill="#f6a5b8"/>
+<ellipse cx="302" cy="173" rx="18" ry="7" transform="rotate(18 302 173)" fill="#f6a5b8"/>
+<ellipse cx="200" cy="200" rx="86" ry="96" fill="#2b2528"/>
+<g clip-path="url(#cw-head)" fill="#f4f1ea">
+<path d="M104,96 C140,92 170,104 168,130 C166,152 140,150 124,166 C110,180 96,170 96,150 Z"/>
+<path d="M262,100 C282,106 296,128 290,150 C278,146 262,138 254,124 C248,112 252,102 262,100 Z"/>
+</g>
+<ellipse cx="200" cy="200" rx="86" ry="96" fill="none" stroke="#1a161c" stroke-width="12"/>
+<ellipse cx="200" cy="262" rx="72" ry="44" fill="#f6a5b8" stroke="#1a161c" stroke-width="10"/>
+<ellipse cx="176" cy="262" rx="10" ry="14" fill="#1a161c"/>
+<ellipse cx="224" cy="262" rx="10" ry="14" fill="#1a161c"/>
+<rect x="110" y="164" width="84" height="44" rx="10" fill="#ffd23f" stroke="#1a161c" stroke-width="10"/>
+<rect x="206" y="164" width="84" height="44" rx="10" fill="#ffd23f" stroke="#1a161c" stroke-width="10"/>
+<path d="M114,179 H190 M114,193 H190 M210,179 H286 M210,193 H286" stroke="#1a161c" stroke-width="6"/>
+</svg>

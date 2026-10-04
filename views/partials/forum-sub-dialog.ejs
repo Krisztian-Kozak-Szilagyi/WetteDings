@@ -1,0 +1,15 @@
+<%# Dialog „Neuer Unterbereich“ in einem Hauptbereich. locals: root %>
+<dialog class="dialog" id="sub-<%= root._id %>" aria-labelledby="sub-<%= root._id %>-title">
+  <div class="dialog-head">
+    <h2 id="sub-<%= root._id %>-title">Neuer Unterbereich in „<%= root.title %>“</h2>
+    <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+  </div>
+  <form method="post" action="/forum/bereiche" class="form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="parent" value="<%= root._id %>">
+    <label class="field"><span>Name</span><input type="text" name="title" minlength="2" maxlength="60" required></label>
+
+    <label class="field"><span>Reihenfolge (kleinere Zahl = weiter oben)</span><input type="number" name="order" min="0" max="999" value="10"></label>
+    <button class="btn btn-primary" type="submit">Unterbereich anlegen</button>
+  </form>
+</dialog>

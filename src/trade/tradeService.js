@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
-const { Trade, TradeSettings, openFilter } = require('../models/Trade');
+const { Item } = require('../models/Item');
+const { itemByCardId, freeItems, claimItems } = require('../items/itemService');
+const { Trade, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -10,7 +12,8 @@ const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
 const { markSeen } = require('../tcg/tcgService');
-const { logSettingsChange } = require('../stats/settingsLog');
+const taxService = require('../services/taxService');
+const { notify } = require('../services/notifyService');
 
 const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -18,25 +21,19 @@ const MAX_PRICE = 100000000; // 1 Mio. €
 const MAX_OPEN = 20; // offene Angebote pro Person
 const KINDS = ['markt', 'privat', 'tausch'];
 
-// ---------- Einstellungen (Admin) ----------
-const settings = { taxPercent: 0 };
-
-async function loadSettings() {
-  const doc = await TradeSettings.findById('handel').lean();
-  if (doc && Number.isFinite(doc.taxPercent)) settings.taxPercent = doc.taxPercent;
-}
-
-async function saveSettings({ taxPercent, admin }) {
-  await TradeSettings.updateOne({ _id: 'handel' }, { $set: { taxPercent, updatedByName: admin.username } }, { upsert: true });
-  const before = { ...settings };
-  settings.taxPercent = taxPercent;
-  await logSettingsChange({ area: 'handel', before, after: settings, by: admin });
-}
-
+// ---------- Steuer (Sätze je Angebotsart im Admin-Panel, siehe services/taxService) ----------
 /** Steuer in Cent (abgerundet), die dem Empfänger des Geldes abgezogen wird */
-const taxFor = (price, percent = settings.taxPercent) => Math.floor((price * Math.min(100, Math.max(0, percent))) / 100);
+const taxFor = (price, percent = 0) => taxService.taxFor(price, percent);
+/** Steuer auf einen Betrag nach dem aktuellen Satz der Angebotsart (markt, privat, tausch) */
+const taxOf = (price, kind) => taxFor(price, taxService.rate(kind));
+/** Aktuelle Sätze der drei Angebotsarten, z. B. für die Anzeige */
+const taxRates = () => ({ markt: taxService.rate('markt'), privat: taxService.rate('privat'), tausch: taxService.rate('tausch') });
 
-const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
+const cardName = (id) => {
+  const item = itemByCardId(id);
+  return item ? item.label : catalog.cardById[id] ? catalog.cardById[id].name : id;
+};
+const swapHref = (trade) => `/handel/verhandlung/${trade._id}`;
 
 // ---------- Reine Regeln (ohne Datenbank, getestet) ----------
 /**
@@ -45,7 +42,9 @@ const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id)
  */
 function validateOffer({ kind, price, cardId, wantCardId, extraFrom }) {
   if (!KINDS.includes(kind)) throw new UserError('Unbekannte Angebotsart.');
-  if (!catalog.cardById[cardId]) throw new UserError('Bitte wähle eine Karte aus.');
+  if (!catalog.cardById[cardId] && !itemByCardId(cardId)) throw new UserError('Bitte wähle eine Karte aus.');
+  // Gegenstände gibt es nur gegen Geld (Markt oder privat), nicht im Tausch
+  if (kind === 'tausch' && (itemByCardId(cardId) || itemByCardId(wantCardId))) throw new UserError('Gegenstände kann man verkaufen, aber nicht tauschen.');
   if (kind !== 'tausch') {
     if (!Number.isInteger(price) || price < 1 || price > MAX_PRICE) throw new UserError('Bitte gib einen gültigen Preis an.');
     return { extraFrom: null };
@@ -63,7 +62,7 @@ function validateOffer({ kind, price, cardId, wantCardId, extraFrom }) {
  * Verkauf: Käufer zahlt an den Verkäufer. Tausch: je nach extraFrom zahlt der Anbieter oder der Empfänger.
  * Die Steuer fällt nur auf das Geld an und wird dem abgezogen, der es bekommt.
  */
-function settlement(trade, { buyer, taxPercent = settings.taxPercent } = {}) {
+function settlement(trade, { buyer, taxPercent = taxService.rate(trade.kind) } = {}) {
   if (!trade.price) return null;
   let payer = buyer;
   let payee = trade.seller;
@@ -168,11 +167,44 @@ async function freeCopy(userId, cardId, session) {
   return { doc: docs.find((d) => !isLocked(locked, d)) || null, owned: docs.length };
 }
 
+/** Tausch: das gewünschte folierte Exemplar des Empfängers, sofern noch foliert, in seinem Besitz und nicht im Handel */
+async function wantedFoiledCopy(trade, session) {
+  const doc = await TcgCard.findOne({ _id: trade.wantCopy, user: trade.to, foiledAt: { $ne: null } }).select('_id').session(session).lean();
+  if (!doc) return { doc: null };
+  const reason = (await lockedDocs(trade.to, session)).reasons.get(String(doc._id));
+  return { doc: reason === 'folie' ? doc : null };
+}
+
+/** Ein bestimmtes foliertes Exemplar (aus dem Inventar), sofern es nicht schon im Handel ist */
+async function foiledCopy(userId, cardId, copyId, session) {
+  if (!mongoose.isValidObjectId(copyId)) throw new UserError('Diese folierte Karte gibt es nicht.');
+  const doc = await TcgCard.findOne({ _id: copyId, user: userId, card: cardId, foiledAt: { $ne: null } }).select('_id foiledAt').session(session).lean();
+  if (!doc) throw new UserError('Diese folierte Karte besitzt du nicht (mehr).');
+  if ((await lockedDocs(userId, session)).reasons.get(String(doc._id)) !== 'folie') throw new UserError('Diese Karte ist schon im Handel.');
+  return { doc, owned: 1 };
+}
+
 /**
  * Angebot erstellen.
- * markt: für alle, privat: an toName gegen Geld, tausch: an toName gegen dessen Karte wantCardId (+ optional Aufpreis)
+ * markt: für alle, privat: an toName gegen Geld, tausch: an toName gegen dessen Karte wantCardId (+ optional Aufpreis).
+ * copyId: ein bestimmtes foliertes Exemplar anbieten (sonst das älteste freie, unfolierte; cardId ergibt sich dann daraus).
+ * wantCopy: beim Tausch ein bestimmtes foliertes Exemplar des Empfängers haben wollen (wantCardId ergibt sich daraus).
+ * Gegenstände: cardId = "item:<Art>" (itemService.itemCardId) – angeboten wird das älteste freie Stück.
  */
-async function create({ user, kind, cardId, price, toName, wantCardId = null, extraFrom = null, message = '' }) {
+async function create({ user, kind, cardId, price, toName, wantCardId = null, extraFrom = null, message = '', copyId = null, wantCopy = null }) {
+  if (copyId) {
+    if (!mongoose.isValidObjectId(copyId)) throw new UserError('Diese folierte Karte gibt es nicht.');
+    const own = await TcgCard.findOne({ _id: copyId, user: user._id }).select('card').lean();
+    if (!own) throw new UserError('Diese folierte Karte besitzt du nicht (mehr).');
+    cardId = own.card;
+  }
+  let wantDoc = null;
+  if (wantCopy) {
+    if (kind !== 'tausch' || !mongoose.isValidObjectId(wantCopy)) throw new UserError('Diese folierte Karte gibt es nicht.');
+    wantDoc = await TcgCard.findOne({ _id: wantCopy, foiledAt: { $ne: null } }).select('user card foiledAt').lean();
+    if (!wantDoc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
+    wantCardId = wantDoc.card;
+  }
   const valid = validateOffer({ kind, price, cardId, wantCardId, extraFrom });
   // Beim Tausch kann gleich eine erste Nachricht mitgeschickt werden
   const firstMessage = kind === 'tausch' && String(message || '').trim() ? cleanMessage(message) : null;
@@ -184,6 +216,7 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
     if (!to) throw new UserError('Diesen Benutzer gibt es nicht.');
     if (to._id.equals(user._id)) throw new UserError('Du kannst dir nicht selbst ein Angebot machen.');
   }
+  if (wantDoc && !wantDoc.user.equals(to._id)) throw new UserError(`${to.username} besitzt diese folierte Karte nicht (mehr).`);
   if (kind === 'tausch' && !(await TcgCard.exists({ user: to._id, card: wantCardId }))) {
     throw new UserError(`${to.username} besitzt ${cardName(wantCardId)} nicht.`);
   }
@@ -194,10 +227,19 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
   const hours = kind === 'markt' ? MARKET_DAYS * 24 : PRIVATE_HOURS;
   try {
     // Sperrprüfung und Angebot in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder auf eine Quest geschickt wird
-    return await inTransaction(async (session) => {
-      const { doc, owned } = await freeCopy(user._id, cardId, session);
-      if (!doc) throw new UserError(owned ? 'Alle Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Diese Karte besitzt du nicht.');
-      await claim([doc], user._id, session);
+    const created = await inTransaction(async (session) => {
+      const item = itemByCardId(cardId);
+      const { doc, owned } = item
+        ? { doc: (await freeItems(user._id, item.key, session))[0] || null, owned: 0 }
+        : copyId
+          ? await foiledCopy(user._id, cardId, copyId, session)
+          : await freeCopy(user._id, cardId, session);
+      if (!doc) {
+        if (item) throw new UserError(`Du hast keine freie ${item.label} (oder sie steht schon im Handel).`);
+        throw new UserError(owned ? 'Alle Exemplare dieser Karte sind gerade gesperrt (Quest, Handel oder foliert).' : 'Diese Karte besitzt du nicht.');
+      }
+      if (item) await claimItems([doc], user._id, session);
+      else await claim([doc], user._id, session);
 
       // abgelaufene Angebote für dieses Exemplar schließen, damit der eindeutige Index nicht blockiert
       await Trade.updateMany({ cardDoc: doc._id, status: 'offen', expiresAt: { $lte: new Date() } }, { $set: { status: 'zurueckgezogen', closedAt: new Date() } }, { session });
@@ -212,7 +254,10 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
             toName: to ? to.username : null,
             card: cardId,
             cardDoc: doc._id,
+            foiledAt: doc.foiledAt || null,
             wantCard: kind === 'tausch' ? wantCardId : null,
+            wantCopy: wantDoc ? wantDoc._id : null,
+            wantFoiledAt: wantDoc ? wantDoc.foiledAt : null,
             extraFrom: valid.extraFrom,
             price,
             expiresAt: new Date(Date.now() + hours * 3600000),
@@ -228,6 +273,12 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
       );
       return trade;
     });
+    if (kind === 'privat') {
+      await notify(to._id, { area: 'Handel', href: '/handel', text: `${user.username} bietet dir „${cardName(cardId)}“ für ${euro(price)} an.` });
+    } else if (kind === 'tausch') {
+      await notify(to._id, { area: 'Handel', href: swapHref(created), text: `${user.username} möchte „${cardName(cardId)}“ gegen deine „${cardName(wantCardId)}“ tauschen (${termsText(created)}).` });
+    }
+    return created;
   } catch (err) {
     if (err.code === 11000) throw new UserError('Dieses Exemplar ist schon im Handel.');
     throw err;
@@ -251,7 +302,7 @@ async function transfer(money, { title, payerType, payeeType, payerMsg }, sessio
 /** Kaufen/Annehmen (Markt und privat): Käufer zahlt den Preis, Verkäufer bekommt Preis − Steuer, die Karte wechselt den Besitzer */
 async function buy({ user, tradeId }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
-  return inTransaction(async (session) => {
+  const result = await inTransaction(async (session) => {
     const trade = await Trade.findOne({ _id: tradeId, ...openFilter() }).session(session);
     if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
     if (trade.kind === 'tausch') throw new UserError('Ein Tauschangebot kann man nicht kaufen.');
@@ -261,14 +312,19 @@ async function buy({ user, tradeId }) {
     const money = settlement(trade, { buyer: user._id });
     await transfer(money, { title: cardName(trade.card), payerType: 'handel_kauf', payeeType: 'handel_verkauf', payerMsg: 'Dein Guthaben reicht dafür nicht aus.' }, session);
 
-    const moved = await TcgCard.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
-    if (moved.modifiedCount !== 1) throw new UserError('Die Karte ist nicht mehr verfügbar.');
-    await markSeen(user._id, [trade.card], session);
+    const item = itemByCardId(trade.card);
+    const Model = item ? Item : TcgCard;
+    const moved = await Model.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
+    if (moved.modifiedCount !== 1) throw new UserError(item ? 'Der Gegenstand ist nicht mehr verfügbar.' : 'Die Karte ist nicht mehr verfügbar.');
+    if (!item) await markSeen(user._id, [trade.card], session);
 
-    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: settings.taxPercent, tax: money.tax, closedAt: new Date() });
+    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
     await trade.save({ session });
     return { trade, tax: money.tax };
   });
+  const { trade } = result;
+  await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat ${itemByCardId(trade.card) ? 'deine' : 'deine Karte'} „${cardName(trade.card)}“ für ${euro(trade.price)} gekauft.` });
+  return result;
 }
 
 /**
@@ -278,7 +334,7 @@ async function buy({ user, tradeId }) {
  */
 async function acceptSwap({ user, tradeId, version }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
-  return inTransaction(async (session) => {
+  const result = await inTransaction(async (session) => {
     const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', ...openFilter() }).session(session);
     const role = trade && roleOf(trade, user._id);
     if (!role) throw new UserError('Dieses Angebot gibt es nicht mehr.');
@@ -287,12 +343,17 @@ async function acceptSwap({ user, tradeId, version }) {
       throw new UserError('Die Bedingungen wurden gerade geändert. Bitte schau sie dir noch einmal an.');
     }
 
-    // Die Wunschkarte wird erst jetzt gesperrt: freies Exemplar beim Empfänger suchen
-    const { doc } = await freeCopy(trade.to, trade.wantCard, session);
+    // Die Wunschkarte wird erst jetzt gesperrt: freies Exemplar beim Empfänger suchen (bzw. das gewünschte folierte)
+    const { doc } = trade.wantCopy ? await wantedFoiledCopy(trade, session) : await freeCopy(trade.to, trade.wantCard, session);
+    if (!doc && trade.wantCopy) {
+      throw new UserError(role === 'to'
+        ? `Deine folierte ${cardName(trade.wantCard)} ist gerade nicht frei (im Handel) oder nicht mehr foliert.`
+        : `${trade.toName}s folierte ${cardName(trade.wantCard)} ist gerade nicht frei (im Handel) oder nicht mehr foliert.`);
+    }
     if (!doc) {
       throw new UserError(role === 'to'
-        ? `Du hast gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest oder Handel).`
-        : `${trade.toName} hat gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest oder Handel).`);
+        ? `Du hast gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest, Handel oder foliert).`
+        : `${trade.toName} hat gerade kein freies Exemplar von ${cardName(trade.wantCard)} (Quest, Handel oder foliert).`);
     }
     await claim([doc], trade.to, session);
 
@@ -324,13 +385,18 @@ async function acceptSwap({ user, tradeId, version }) {
       buyerName: trade.toName,
       closedBy: user._id, // wer angenommen hat
       wantCardDoc: doc._id,
-      taxPercent: settings.taxPercent,
+      taxPercent: taxService.rate('tausch'),
       tax: money ? money.tax : 0,
       closedAt: new Date(),
     });
     await trade.save({ session });
     return { trade, money, role };
   });
+  const { trade, role } = result;
+  // die andere Seite: Was bekommt sie?
+  const [other, gets, gives] = role === 'to' ? [trade.seller, trade.wantCard, trade.card] : [trade.to, trade.card, trade.wantCard];
+  await notify(other, { area: 'Handel', href: swapHref(trade), text: `${user.username} hat den Tausch angenommen: Du bekommst „${cardName(gets)}“ für „${cardName(gives)}“.` });
+  return result;
 }
 
 // ---------- Verhandlung beim Tausch ----------
@@ -369,6 +435,14 @@ async function sendMessage({ user, tradeId, text }) {
     { $push: { messages: { $each: [{ from: role, text: clean }], $slice: -MAX_MESSAGES } }, $set: { activityAt: now, [seenField(role)]: now } }
   );
   if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot ist nicht mehr offen.');
+  const card = cardName(trade.card);
+  await notify(role === 'seller' ? trade.to : trade.seller, {
+    area: 'Handel',
+    href: swapHref(trade),
+    key: `handel:${trade._id}:nachricht`,
+    text: `${user.username} hat dir in der Verhandlung um „${card}“ geschrieben.`,
+    many: (n) => `${n} neue Nachrichten in der Verhandlung um „${card}“.`,
+  });
 }
 
 /**
@@ -401,6 +475,11 @@ async function changeTerms({ user, tradeId, price, extraFrom, version }) {
     }
   );
   if (res.modifiedCount !== 1) throw new UserError('Die Bedingungen wurden gerade geändert. Bitte schau sie dir noch einmal an.');
+  await notify(role === 'seller' ? trade.to : trade.seller, {
+    area: 'Handel',
+    href: swapHref(trade),
+    text: `${actor} macht einen Gegenvorschlag zum Tausch um „${cardName(trade.card)}“: ${termsText(trade, { price, extraFrom: valid.extraFrom })}.`,
+  });
 }
 
 /** Verkäufer zieht zurück bzw. Empfänger lehnt ab – die Karte wird wieder frei */
@@ -408,18 +487,22 @@ async function close({ user, tradeId, action }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
   const who = action === 'ablehnen' ? { to: user._id } : { seller: user._id };
   const status = action === 'ablehnen' ? 'abgelehnt' : 'zurueckgezogen';
-  const res = await Trade.updateOne({ _id: tradeId, status: 'offen', ...who }, { $set: { status, closedAt: new Date() } });
-  if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  const trade = await Trade.findOneAndUpdate({ _id: tradeId, status: 'offen', ...who }, { $set: { status, closedAt: new Date() } }).select('kind seller to card expiresAt').lean();
+  if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  if (action === 'ablehnen') {
+    await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat dein Angebot „${cardName(trade.card)}“ abgelehnt.` });
+  } else if (trade.to && trade.expiresAt > new Date()) {
+    await notify(trade.to, { area: 'Handel', href: '/handel', text: `${user.username} hat das Angebot „${cardName(trade.card)}“ zurückgezogen.` });
+  }
 }
 
 module.exports = {
   PRIVATE_HOURS,
   MARKET_DAYS,
   MAX_PRICE,
-  settings,
-  loadSettings,
-  saveSettings,
   taxFor,
+  taxOf,
+  taxRates,
   validateOffer,
   settlement,
   openFilter,

@@ -1,36 +1,46 @@
 <%- include('partials/head') %>
+<% const albumCards = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
 
-<div class="page-head">
-  <div class="ihk-title">
+<div class="album-head">
+  <div class="album-title">
     <h1>Album</h1>
+    <div class="tcg-progress">
+      <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
+      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Wert <%= euro(collectionValue) %></span>
+    </div>
   </div>
-  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · Verkaufswert <%= euro(collectionValue) %></span>
-</div>
-
-<div class="card tcg-album-bar">
-  <div>
-    <% if (!dupCount) { %>
-      <p class="muted">Du hast keine doppelten Karten, die verkauft werden könnten.</p>
-    <% } else { %>
-      <p>Du hast <strong><%= dupCount %></strong> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> im Wert von <strong><%= euro(dupValue) %></strong>. Von jeder Karte behältst du eine.</p>
-    <% } %>
-    <p class="muted small">Geschützte Karten (Schloss) werden dabei nicht verkauft – auch ihre Duplikate nicht. Tippe eine Karte an, um sie zu schützen oder als Favorit zu zeigen.</p>
-  </div>
-  <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+  <form class="album-dupes" method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett."
+    title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht verkauft – auch ihre Duplikate nicht.">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <button class="btn btn-primary" type="submit" <%= dupCount ? '' : 'disabled' %>>Alle Duplikate verkaufen<%= dupCount ? ' · ' + euro(dupValue) : '' %></button>
+    <span><%= dupCount ? dupCount + (dupCount === 1 ? ' Duplikat' : ' Duplikate') : 'Keine Duplikate' %><% if (dupCount) { %> · <strong><%= euro(dupValue) %></strong><% } %></span>
+    <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
   </form>
 </div>
 
-<div class="card" id="sammlung">
-  <div class="tcg-coll-head">
-    <h2>Meine Sammlung</h2>
-    <%- include('partials/tcg-filter') %>
-  </div>
+<div class="album-body" id="sammlung">
+  <%- include('partials/tcg-filter') %>
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
-  <%- include('partials/tcg-grid', { mode: 'album' }) %>
+  <%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
+  <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key) })).filter((s) => s.list.length); %>
+  <% if (seasonList.length > 1) { %>
+    <div class="tcg-filter album-season-filter" role="tablist" aria-label="Nach Season filtern">
+      <button type="button" class="chip active" data-album-season="all" role="tab" aria-selected="true">Alle Seasons</button>
+      <% seasonList.forEach((s) => { %>
+        <button type="button" class="chip" data-album-season="<%= s.key %>" role="tab" aria-selected="false"><%= s.label %></button>
+      <% }) %>
+    </div>
+  <% } %>
+  <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
+    <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
+      <div class="album-season-head">
+        <h2 id="season-<%= s.key %>"><%= s.label %></h2>
+        <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
+      </div>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list }) %>
+    </section>
+  <% }) %>
 </div>
 
 <!-- Karte vergrößern -->
@@ -44,34 +54,39 @@
       </div>
     </div>
     <div class="tcg-modal-info">
+      <span class="tcg-modal-rarity"><span class="tcg-dot" data-tcg-modal-dot></span><span data-tcg-modal-rarity></span></span>
       <h2 data-tcg-modal-name></h2>
-      <p><span class="tcg-badge" data-tcg-modal-rarity></span> <span class="muted" data-tcg-modal-count></span></p>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="eins">
-        <button class="btn btn-primary btn-block" type="submit">1 verkaufen · <span data-tcg-sell-text></span></button>
-      </form>
-      <form method="post" action="/tcg/verkaufen" data-tcg-sell-dupes>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <input type="hidden" name="mode" value="duplikate">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <form method="post" action="/tcg/schuetzen" data-tcg-protect>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <form method="post" action="/tcg/favorit" data-tcg-favorite>
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="card" value="">
-        <button class="btn btn-ghost btn-block" type="submit"></button>
-      </form>
-      <p class="muted small" data-tcg-protect-note hidden>Geschützt: Die Duplikate dieser Karte werden nicht verkauft. Einzeln verkaufen geht weiterhin.</p>
+      <p class="tcg-modal-status" data-tcg-modal-count></p>
+      <div class="tcg-modal-actions" data-tcg-owned-actions>
+        <form method="post" action="/tcg/favorit" data-tcg-favorite>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/schuetzen" data-tcg-protect>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/verkaufen" data-tcg-sell-dupes>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="duplikate">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="eins">
+          <button class="btn btn-primary btn-block" type="submit">Verkaufen · <span data-tcg-sell-text></span></button>
+        </form>
+        <p class="muted small" data-tcg-protect-note hidden>Geschützt: Die Duplikate dieser Karte werden nicht verkauft. Einzeln verkaufen geht weiterhin.</p>
+      </div>
+      <a class="btn btn-primary btn-block" href="/handel" data-tcg-former-action hidden>Im Handel suchen</a>
     </div>
   </div>
 </dialog>
 
+<%- include('partials/foil-modal', { favForm: true }) %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

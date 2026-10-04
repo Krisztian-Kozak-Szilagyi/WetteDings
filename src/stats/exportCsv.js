@@ -6,7 +6,7 @@ const BOM = '﻿';
 const SEP = ';';
 const NL = '\r\n';
 
-const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
+const AREA_NAMES = { start: 'Startseite', wetten: 'Wetten', tcg: 'TCG', handel: 'Handel', ihk: 'IHK', grading: 'Grading', coin: 'Coin', lotterie: 'Lotterie', forum: 'Forum', profil: 'Profil & Rangliste', konto: 'Mein Konto', support: 'Support', admin: 'Admin/Dev', info: 'Regeln & Hilfe', sonstiges: 'Sonstiges' };
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const VERDICTS = { 'im-rahmen': 'Im Rahmen', 'zu-oft': 'Auffällig oft', 'zu-selten': 'Auffällig selten', 'wenig-daten': 'Zu wenig Daten' };
 const UNIT_LABELS = { euro: '€', price: '€', percent: '%', count: 'Anzahl', number: 'Zahl', ratio: 'Verhältnis', text: '' };

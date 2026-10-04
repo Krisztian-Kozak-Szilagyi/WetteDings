@@ -1,25 +1,40 @@
 <%- include('partials/head') %>
 
-<nav class="forum-crumbs muted small" aria-label="Pfad">
-  <a href="/forum">Forum</a> ›
-  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a> › <% } %>
+<div class="forum-page forum-thread">
+<nav class="forum-crumbs" aria-label="Pfad">
+  <a href="/forum">Forum</a><span>›</span>
+  <% if (parent) { %><a href="/forum/k/<%= parent._id %>"><%= parent.title %></a><span>›</span><% } %>
   <a href="/forum/k/<%= cat._id %>"><%= cat.title %></a>
 </nav>
 
-<div class="page-head">
-  <h1>Neues Thema</h1>
+<div class="forum-head">
+  <div class="forum-head-text">
+    <h1>Neues Thema</h1>
+    <span class="forum-head-desc">in „<%= cat.title %>“</span>
+  </div>
 </div>
 
-<section class="card">
-  <form method="post" action="/forum/k/<%= cat._id %>/thema" class="form">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <label class="field"><span>Titel</span><input type="text" name="title" minlength="3" maxlength="<%= titleMax %>" required autofocus></label>
-    <div class="field">
-      <label for="thema-text">Text</label>
-      <%- include('partials/forum-editor', { id: 'thema-text', rows: 10, max: bodyMax, myTags }) %>
+<form method="post" action="/forum/k/<%= cat._id %>/thema" class="forum-write">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label class="forum-field"><span class="forum-label">Titel</span><input class="input" type="text" name="title" minlength="3" maxlength="<%= titleMax %>" required autofocus></label>
+  <div class="forum-field">
+    <label class="forum-label" for="thema-text">Text</label>
+    <%- include('partials/forum-editor', { id: 'thema-text', rows: 10, max: bodyMax, myTags }) %>
+  </div>
+  <details class="forum-poll-new">
+    <summary class="forum-label">+ Umfrage hinzufügen (optional)</summary>
+    <div class="forum-poll-fields">
+      <label class="forum-field"><span class="forum-label">Frage</span><input class="input" type="text" name="pollQuestion" maxlength="<%= pollQuestionMax %>" placeholder="z. B. Welche Season soll als Nächstes kommen?"></label>
+      <label class="forum-field"><span class="forum-label">Antworten – eine pro Zeile (2–<%= pollOptionsMax %>)</span><textarea class="forum-poll-options" name="pollOptions" rows="4" maxlength="1000" placeholder="Antwort 1&#10;Antwort 2"></textarea></label>
+      <label class="forum-field"><span class="forum-label">Ende (optional – sonst offen, bis das Thema geschlossen wird)</span><input class="input" type="datetime-local" name="pollEndsAt" min="<%= minPollEnd %>"></label>
+      <p class="muted small">Jedes Mitglied hat eine Stimme. Das Ergebnis sieht man nach der eigenen Stimme oder wenn die Umfrage vorbei ist.</p>
     </div>
+  </details>
+  <div class="forum-write-actions">
+    <a class="btn btn-ghost" href="/forum/k/<%= cat._id %>">Abbrechen</a>
     <button class="btn btn-primary" type="submit">Thema eröffnen</button>
-  </form>
-</section>
+  </div>
+</form>
+</div>
 
 <%- include('partials/foot') %>

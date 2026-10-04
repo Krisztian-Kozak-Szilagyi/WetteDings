@@ -20,8 +20,8 @@ const catalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const ihk = require('../ihk/ihkService');
 const { DIFFICULTIES, questById } = require('../ihk/quests');
-const { ranking } = require('../services/rankService');
-const { bonusFor } = require('../services/bonusService');
+const { ranking, teamIds } = require('../services/rankService');
+const bonusService = require('../services/bonusService');
 const { parseZonedLocal } = require('../lib/time');
 const { ledgerLabels } = require('../lib/viewHelpers');
 const { dayAndHour } = require('./activity');
@@ -29,8 +29,10 @@ const { distribution, quantile } = require('./snapshot');
 const { compareGini } = require('./giniReference');
 
 const TZ = config.timezone;
-const RANGES = [7, 30, 90, 365];
+const RANGES = [1, 7, 30, 90, 365]; // 1 = nur heute (seit 0 Uhr deutscher Zeit), Vergleich mit gestern
 const DEFAULT_RANGE = 30;
+/** Name eines Zeitraums für Auswahl und Texte */
+const rangeLabel = (n) => (n === 1 ? 'Heute' : n === 365 ? '1 Jahr' : `${n} Tage`);
 // Reiter der Statistik-Seite (key = URL-Parameter "bereich", bleibt stabil, damit Links weiter funktionieren)
 const SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Die wichtigsten Kennzahlen und alle Änderungen auf einen Blick.' },
@@ -47,12 +49,16 @@ const LEDGER_GROUPS = [
   { key: 'start', label: 'Startguthaben', types: ['startguthaben'], hint: 'neue Mitglieder' },
   { key: 'bonus', label: 'Tagesbonus', types: ['bonus'], hint: 'für Mitglieder unter der Bonus-Grenze' },
   { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'], hint: 'geschaffte Quests' },
-  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'black_market'], hint: 'Verkäufe an die Bank − Packs und Black Market' },
+  { key: 'dungeon', label: 'Dungeon', types: ['dungeon_lohn'], hint: 'Lohn für gewonnene Kämpfe' },
+  { key: 'erfolg', label: 'Erfolge', types: ['erfolg'], hint: 'Belohnung für freigeschaltete Erfolge' },
+  { key: 'grading', label: 'Grading-Shop', types: ['grading_lohn', 'grading_ausbau'], hint: 'Löhne für Aufträge − Ausbau des Shops' },
+  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'item_verkauf', 'black_market'], hint: 'Verkäufe an die Bank (Karten, Gegenstände) − Packs und Black Market' },
   { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'], hint: 'Verkäufe − Käufe (Kursgewinne/-verluste)' },
   { key: 'wetten', label: 'Wetten', types: ['einsatz', 'auszahlung', 'erstattung', 'provision', 'provision_schiri'], hint: 'noch offene Einsätze und verfallene Gewinne' },
   { key: 'lotterie', label: 'Lotterie', types: ['lotto_los', 'lotto_gewinn'], hint: 'noch nicht gezogene und verfallene Töpfe' },
   { key: 'handel', label: 'Handel', types: ['handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'], hint: 'Handelssteuer' },
   { key: 'loeschung', label: 'Gelöschte Konten', types: ['konto_geloescht'], hint: 'verfallenes Guthaben' },
+  { key: 'team', label: 'Vergaben (Team)', types: ['team_gutschrift', 'team_abzug'], hint: 'Spielgeld, das Admin oder Devs gutgeschrieben oder abgezogen haben' },
 ];
 const groupOfType = Object.fromEntries(LEDGER_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 
@@ -229,7 +235,7 @@ function pullVerdict(count, total, chance) {
 
 // ---------- Markierungen ----------
 
-const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', config: '.env' };
+const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', steuer: 'Steuer', bonus: 'Bonus', grading: 'Grading', folie: 'Folie', config: '.env' };
 
 /** Einstellungsänderungen und Patchnotes im Zeitraum – Markierungen in allen Verläufen */
 async function markers(p) {
@@ -256,13 +262,15 @@ async function markers(p) {
 // ---------- Wirtschaft ----------
 
 async function economy(p) {
+  // Das Team (Admin, Devs) zählt nicht zur Wirtschaft: seine Buchungen, Konten und Aktivität bleiben draußen
+  const noTeam = { user: { $nin: await teamIds() } };
   const [flows, before, snapshots, players, typeTotals, activeDays] = await Promise.all([
-    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
-    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
+    Ledger.aggregate([{ $match: { ...inP(p), ...noTeam } }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
+    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since }, ...noTeam } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     StatDaily.find({ _id: { $gte: p.from, $lte: p.to } }).select('_id wealth').sort({ _id: 1 }).lean(),
     ranking(),
-    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
-    UserActivity.countDocuments({ day: { $gte: p.from, $lte: p.to } }),
+    Ledger.aggregate([{ $match: { ...inP(p), ...noTeam } }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
+    UserActivity.countDocuments({ day: { $gte: p.from, $lte: p.to }, ...noTeam }),
   ]);
 
   // Netto je Bereich und Tag, dazu die Geldmenge (alle Buchungen bis Tagesende)
@@ -291,7 +299,7 @@ async function economy(p) {
     {
       id: 'geldmenge',
       title: 'Geldmenge & Geldfluss',
-      question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es?',
+      question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es? Ohne Admin und Devs (ihre Konten entstehen durch Tests und Vergaben).',
       kpis: [
         { id: 'guthaben', label: 'Guthaben gesamt', value: balanceSum, unit: 'euro', hint: 'Summe aller Kontostände (jetzt)' },
         { id: 'zufluss', label: 'Netto-Geldzufluss', value: periodNet, unit: 'euro', signed: true, compare: true, hint: 'Neu entstandenes minus verschwundenes Geld im Zeitraum' },
@@ -344,7 +352,7 @@ async function economy(p) {
     {
       id: 'verteilung',
       title: 'Vermögensverteilung',
-      question: 'Wie ungleich ist das Vermögen verteilt – im Vergleich zu echten Ländern – und wer bekommt den Tagesbonus?',
+      question: 'Wie ungleich ist das Vermögen verteilt – auch im Vergleich zu echten Ländern? Ohne Admin und Devs.',
       giniCompare,
       kpis: [
         { id: 'vermoegen', label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
@@ -357,7 +365,7 @@ async function economy(p) {
           hint: `0 = alle gleich reich, 1 = einer besitzt alles (jetzt).${giniCompare ? ` Im Ländervergleich: ${giniCompare.text}.` : ''}`,
         },
         { id: 'top10', label: 'Anteil reichste 10 %', value: dist.top10Share, unit: 'percent', hint: 'am Gesamtvermögen (jetzt)' },
-        { id: 'bonus', label: 'Erhalten Tagesbonus', value: players.filter((x) => bonusFor(x.total) > 0).length, unit: 'count', hint: `von ${players.length} Mitgliedern (jetzt)` },
+        { id: 'bonus', label: 'Tagesbonus', value: bonusService.settings.amount, unit: 'euro', hint: 'je Mitglied und Tag, für alle gleich (aktuell eingestellt). Wer im Grading-Shop arbeitet, bekommt keinen.' },
       ],
       charts: [
         { id: 'gini', title: 'Gini-Koeffizient', type: 'line', unit: 'ratio', agg: 'last', series: [{ name: 'Gini', values: fromSnap((s) => s.wealth.total && s.wealth.total.gini) }] },
@@ -450,6 +458,12 @@ async function playersSection(p, now = new Date()) {
       ],
       charts: [{ id: 'dau', title: 'Aktive Mitglieder je Tag', type: 'line', unit: 'number', agg: 'avg', wide: true, series: [{ name: 'Aktiv', values: byDays(p.days, activeByDay) }] }],
       heat: playerDays ? { rows: heat, max: Math.max(1, ...heat.flat()) } : null,
+      hbars: {
+        title: 'Genutzte Bereiche',
+        items: Object.entries(areas)
+          .sort((a, b) => b[1] - a[1])
+          .map(([key, n]) => ({ key, share: pct(n, areaTotal), text: `${n} · ${Math.round(pct(n, areaTotal) * 100)} %` })),
+      },
       notes: activity.length ? [] : ['Aktivitätsdaten werden erst seit dem Statistik-Update gesammelt – die Werte füllen sich ab jetzt Tag für Tag.'],
     },
     {
@@ -458,17 +472,6 @@ async function playersSection(p, now = new Date()) {
       question: 'Kommen neue Mitglieder dazu – und bleiben sie?',
       kpis: [{ id: 'neu', label: 'Neue Mitglieder', value: cohortUsers.length, unit: 'count', compare: true }, retKpi(d1, 'ret1'), retKpi(d7, 'ret7'), retKpi(d30, 'ret30')],
       charts: [{ id: 'neu', title: 'Registrierungen', type: 'bars', unit: 'count', agg: 'sum', wide: true, series: [{ name: 'Registrierungen', values: byDays(p.days, toMap(signups)) }] }],
-    },
-    {
-      id: 'bereiche',
-      title: 'Bereichsnutzung',
-      question: 'Welche Bereiche werden genutzt?',
-      hbars: {
-        items: Object.entries(areas)
-          .sort((a, b) => b[1] - a[1])
-          .map(([key, n]) => ({ key, share: pct(n, areaTotal), text: `${n} · ${Math.round(pct(n, areaTotal) * 100)} %` })),
-      },
-      notes: areaTotal ? [] : ['Noch keine Daten im Zeitraum.'],
     },
   ];
 }
@@ -535,7 +538,7 @@ async function tcg(p, now = new Date()) {
       question: 'Lohnt sich ein Pack – und wie viele werden gekauft?',
       kpis: [
         { id: 'packpreis', label: 'Packpreis', value: packPrice, unit: 'euro', hint: 'aktuell eingestellt' },
-        { id: 'ev', label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: 'Bank-Verkaufswert der 3 Karten im Mittel (aktuelle Chancen und Preise)' },
+        { id: 'ev', label: 'Erwartungswert je Pack', value: Math.round(ev), unit: 'euro', hint: `Bank-Verkaufswert der ${catalog.CARDS_PER_PACK} Karten im Mittel (aktuelle Chancen und Preise)` },
         { id: 'rueckfluss', label: 'Pack-Rückfluss', value: pct(ev, packPrice), unit: 'percent', hint: 'Erwartungswert ÷ Packpreis. Unter 100 %: Packs ziehen im Mittel Geld aus dem Spiel.' },
         { id: 'pack-umsatz', label: 'Pack-Umsatz', value: packSales[0] ? packSales[0].s : 0, unit: 'euro', compare: true },
         { id: 'geoeffnet', label: 'Packs geöffnet', value: sumBy(openingsByDay, 'n'), unit: 'count', compare: true },
@@ -583,13 +586,16 @@ async function tcg(p, now = new Date()) {
     {
       id: 'handel',
       title: 'Handel',
-      question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank?',
+      question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank? Dazu der Black Market (Angebote der Bank, Umsatz verlässt das Spiel).',
       kpis: [
         { id: 'angebote', label: 'Neue Angebote', value: created, unit: 'count', compare: true },
         { id: 'abschluesse', label: 'Abgeschlossene Handelsgeschäfte', value: closed, unit: 'count', compare: true },
         { id: 'abschlussquote', label: 'Abschlussquote', value: pct(closed, created), unit: 'percent', compare: true },
         { id: 'handelsumsatz', label: 'Handelsumsatz', value: sumBy(trades, 'volume'), unit: 'euro', compare: true, hint: 'Kaufpreise und Aufpreise' },
         { id: 'steuer', label: 'Steuer', value: sumBy(trades, 'tax'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
+        { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
+        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
+        { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
       ],
       hbars: {
         title: 'Abschlussquote je Art',
@@ -611,16 +617,6 @@ async function tcg(p, now = new Date()) {
         },
       ],
       notes: created ? [] : ['Keine Handelsangebote im Zeitraum.'],
-    },
-    {
-      id: 'blackmarket',
-      title: 'Black Market',
-      question: 'Wird der Black Market angenommen?',
-      kpis: [
-        { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
-        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
-        { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
-      ],
     },
   ];
 }
@@ -652,7 +648,7 @@ async function games(p) {
         },
       },
     ]),
-    CoinHour.aggregate([{ $match: inP(p, 't') }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }, { $sort: { _id: 1 } }]),
+    CoinHour.aggregate([{ $match: { coin: 'SAM', ...inP(p, 't') } }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }, { $sort: { _id: 1 } }]),
     CoinTrade.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), side: '$side' }, s: { $sum: '$cents' }, users: { $addToSet: '$user' } } }]),
     LotteryRound.find({ status: 'gezogen', ...inP(p, 'drawnAt') }).sort({ drawnAt: 1 }).lean(),
   ]);
@@ -765,17 +761,17 @@ async function games(p) {
     },
     {
       id: 'coin',
-      title: 'Samantha Coin',
+      title: 'Broker (Coins & ETF)',
       question: 'Wie entwickelt sich der Kurs – und gewinnen oder verlieren die Spieler?',
       kpis: [
-        { id: 'kurs', label: 'Kurs am Ende des Zeitraums', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
+        { id: 'kurs', label: 'SAM-Kurs am Ende des Zeitraums', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
         { id: 'coin-netto', label: 'Coin: Gewinn/Verlust der Spieler', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum. Positiv: Coins bringen Geld ins Spiel.' },
         { id: 'coin-kaeufe', label: 'Käufe', value: buys, unit: 'euro', compare: true },
         { id: 'coin-verkaeufe', label: 'Verkäufe', value: sells, unit: 'euro', compare: true },
         { id: 'coin-haendler', label: 'Aktive Coin-Händler', value: traders.size, unit: 'count', compare: true },
       ],
       charts: [
-        { id: 'kurs', title: 'Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
+        { id: 'kurs', title: 'SAM-Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
         {
           id: 'coinvolumen',
           title: 'Handelsvolumen',
@@ -811,16 +807,12 @@ async function games(p) {
 const OVERVIEW_KPIS = [
   ['spieler', 'aktiv-tag'],
   ['spieler', 'neu'],
-  ['spieler', 'ret7'],
   ['wirtschaft', 'zufluss'],
-  ['wirtschaft', 'zufluss-spieler'],
   ['wirtschaft', 'gini'],
   ['tcg', 'rueckfluss'],
-  ['tcg', 'abschluesse'],
+  ['tcg', 'handelsumsatz'],
   ['spiele', 'einsaetze'],
   ['spiele', 'ihk-erfolg'],
-  ['spiele', 'coin-netto'],
-  ['spiele', 'topf'],
 ];
 
 async function overview(p, now) {
@@ -859,6 +851,28 @@ const LOADERS = {
   mitglied: (p, now, opts) => require('./memberStats').member(p, now, opts),
 };
 
+// Kernzahlen je Reiter: groß oben auf der Seite, alle übrigen kompakt in ihren Blöcken
+const PRIMARY = {
+  uebersicht: OVERVIEW_KPIS.map(([, id]) => id),
+  wirtschaft: ['zufluss', 'vermoegen', 'gini', 'median'],
+  spieler: ['aktiv-tag', 'aktiv-30', 'neu', 'ret7'],
+  tcg: ['rueckfluss', 'pack-umsatz', 'handelsumsatz', 'abschlussquote'],
+  spiele: ['einsaetze', 'ihk-erfolg', 'coin-netto', 'topf'],
+  mitglied: ['m-vermoegen', 'm-rang', 'm-zufluss', 'm-tage'],
+};
+// Ist mehr gut (up) oder schlecht (down)? Ohne Eintrag: neutral (z. B. Geldmenge, Preise)
+const GOOD_UP = new Set(['mitglieder', 'aktiv-tag', 'aktiv-7', 'aktiv-30', 'aufrufe', 'aktionen', 'neu', 'ret1', 'ret7', 'ret30', 'vermoegen', 'median', 'geoeffnet', 'pack-umsatz', 'angebote', 'abschluesse', 'abschlussquote', 'handelsumsatz', 'bm-quote', 'bm-umsatz', 'wetten-neu', 'einsaetze', 'teilnehmer', 'duelle', 'tipps', 'ihk-laeufe', 'ihk-erfolg', 'coin-haendler', 'runden', 'topf', 'lose', 'lotto-teilnehmer', 'm-vermoegen', 'm-guthaben', 'm-zufluss', 'm-tage', 'm-aufrufe', 'm-aktionen', 'm-logins', 'm-wett-ergebnis', 'm-rendite', 'm-trefferquote', 'm-glueck', 'm-ihk-erfolg', 'm-coin-netto']);
+const GOOD_DOWN = new Set(['gini', 'top10', 'streitfaelle', 'verfallen', 'ungeoeffnet', 'm-rang']);
+
+/** Kennzahl markieren: primary (Kernzahl), good (Richtung), tone der Veränderung ('good' | 'bad' | null) */
+function rate(k, key) {
+  k.primary = (PRIMARY[key] || []).includes(k.id);
+  k.good = GOOD_UP.has(k.id) ? 'up' : GOOD_DOWN.has(k.id) ? 'down' : null;
+  const dir = k.delta && k.delta.dir;
+  k.tone = k.good && (dir === 'up' || dir === 'down') ? (dir === k.good ? 'good' : 'bad') : null;
+  return k;
+}
+
 // Feste Liste [Schlüssel, Funktion]: der Reiter aus der Adresse wird nur verglichen, nie als Name nachgeschlagen
 const LOADER_LIST = Object.entries(LOADERS);
 
@@ -891,6 +905,7 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
       k.prev = prevKpis.has(k.id) ? prevKpis.get(k.id) : null;
       k.delta = delta(k.value, k.prev, k);
     }
+    for (const k of b.kpis || []) rate(k, found ? found[0] : 'uebersicht');
     b.charts = (b.charts || []).map((c) => (opts.raw ? { ...c, empty: !c.series.some((x) => x.values.some((v) => v !== null && v !== 0)) } : bucketChart(c, p, list)));
   }
   return {
@@ -906,7 +921,10 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
 
 module.exports = {
   SECTIONS,
+  PRIMARY,
+  rate,
   RANGES,
+  rangeLabel,
   DEFAULT_RANGE,
   LEDGER_GROUPS,
   addDays,

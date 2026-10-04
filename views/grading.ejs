@@ -1,0 +1,225 @@
+<%- include('partials/head') %>
+<% const active = shop && shop.active; const locked = active && shop.lockedUntil && new Date(shop.lockedUntil) > new Date(); %>
+
+<div class="gr-page">
+<div class="gr-head">
+  <h1>Grading-Shop</h1>
+  <% if (active) { %>
+    <div class="gr-today">
+      <span>Heute <b><%= used %> / <%= limit %></b></span>
+      <span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="<%= i < used ? 'is-on' : '' %>"></span><% } %></span>
+    </div>
+  <% } %>
+</div>
+<% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
+
+<% if (!active) { %>
+  <%# ---------- Noch kein Job: Vorstellung und Vertrag ---------- %>
+  <section class="gr-hero">
+    <div class="gr-hero-text">
+      <p class="gr-kicker">Stellenangebot</p>
+      <h2>Karten putzen, benoten, versiegeln.</h2>
+      <p class="gr-lead">Sammler schicken dir ihre Karten. Du drehst sie unter der Lampe, wischst jeden Fleck weg, findest Kratzer und bestoßene Ecken – und schickst sie perfekt verpackt zurück. Je weiter du deinen Shop ausbaust, desto mehr Arbeitsschritte und desto mehr Lohn.</p>
+      <ul class="gr-terms">
+        <li><b>Kein Tagesbonus</b>, solange du hier arbeitest – dafür Lohn für jeden Auftrag</li>
+        <li><b><%= contractDays %> Tage Vertrag</b> – so lange keine Kündigung</li>
+        <li>Deine Ausbaustufe bleibt nach einer Kündigung erhalten</li>
+      </ul>
+      <form method="post" action="/grading/annehmen" class="gr-hire" data-confirm="Job im Grading-Shop annehmen? <%= contractDays %> Tage kein Tagesbonus und keine Kündigung.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="check"><input type="checkbox" name="confirm" value="1" required> <span>Verstanden: <%= contractDays %> Tage gebunden, kein Tagesbonus.</span></label>
+        <button class="btn btn-primary btn-lg gr-glow" type="submit">Job annehmen</button>
+      </form>
+    </div>
+    <div class="gr-hero-card" aria-hidden="true">
+      <% if (heroCard) { %>
+        <%# Versiegelte Karte im Slab – wie nach einem Auftrag (Etikett oben, Note 10) %>
+        <div class="gr-hero-slab">
+          <div class="gr-hero-slab-label">
+            <div class="gr-slab-info"><strong>BfW GRADING</strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span><span class="gr-slab-word">GEM MINT</span></div>
+            <div class="gr-slab-grade">10</div>
+          </div>
+          <span class="tcg-slot gr-hero-slab-slot r-<%= heroCard.rarity %>">
+            <span class="tcg-art">
+              <img src="<%= heroCard.image %>" alt="" width="720" height="1008">
+              <% if (heroCard.rarity === 'glitch') { %><img class="tcg-glitch-a" src="<%= heroCard.image %>" alt="" width="720" height="1008"><img class="tcg-glitch-b" src="<%= heroCard.image %>" alt="" width="720" height="1008"><span class="tcg-fx tcg-fx-glitch"></span><% } %>
+            </span>
+          </span>
+          <span class="gr-hero-slab-shine"></span>
+        </div>
+      <% } %>
+    </div>
+  </section>
+<% } else { %>
+  <div class="gr-layout">
+    <div class="gr-main">
+      <% if (jobData) { %>
+        <%# ---------- Arbeitstisch (public/js/grading.js) ---------- %>
+        <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">
+          <div class="gr-ticket">
+            <span class="gr-ticket-label">Auftrag</span>
+            <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
+            <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %><% if (jobData.card.bonus) { %> · +<%= jobData.card.bonus %> % Lohn<% } %></span><% } %>
+            <span class="gr-ticket-for">für <%= jobData.customer %></span>
+          </div>
+
+          <div class="gr-stage" data-gr-stage>
+            <div class="gr-lamp" aria-hidden="true"></div>
+            <div class="gr-zoom" data-gr-zoom>
+              <div class="gr-obj" data-gr-obj></div>
+            </div>
+            <div class="gr-hint" data-gr-hint></div>
+            <%# Maus-Werkzeug: Drehen oder Putzen (Tasten D und P) %>
+            <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
+              <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
+              <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
+            </div>
+            <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
+            <div class="gr-zoom-btns">
+              <button type="button" class="gr-round" data-gr-zoom-step="-1" title="Verkleinern" aria-label="Verkleinern">−</button>
+              <button type="button" class="gr-round" data-gr-zoom-step="1" title="Vergrößern" aria-label="Vergrößern">+</button>
+              <button type="button" class="gr-round" data-gr-zoom-step="0" title="Zurücksetzen" aria-label="Zurücksetzen">⟲</button>
+            </div>
+          </div>
+
+          <ol class="gr-steps" data-gr-steps>
+            <li data-step="clean">Reinigen</li>
+            <% if (jobData.steps.includes('grade')) { %><li data-step="grade">Benoten</li><% } %>
+            <% if (jobData.steps.includes('slab')) { %><li data-step="slab">Versiegeln</li><% } %>
+            <li data-step="send">Zurückschicken</li>
+          </ol>
+
+          <div class="gr-panel" data-gr-panel="clean">
+            <div class="gr-row">
+              <p class="gr-text">Nimm das Werkzeug <b>Putzen</b> und reibe mit gedrückter Maustaste über die Flecken. Mit <b>Drehen</b> wendest du die Karte – auch hinten kann Schmutz sein. Ob sie wirklich sauber ist, musst du selbst entscheiden.
+                <span class="gr-note">Ganz sauber: <%= euro(pay.clean) %> – jeder Rest Schmutz kostet Lohn.</span></p>
+              <button type="button" class="btn btn-primary" data-gr-clean-ok>Fertig geputzt</button>
+            </div>
+          </div>
+
+          <% if (jobData.steps.includes('grade')) { %>
+          <div class="gr-panel" data-gr-panel="grade" hidden>
+            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer siehst du nur, wenn du die Karte schräg ins Licht drehst; zum Heranzoomen Mausrad oder <b>+</b>.
+              <span class="gr-note">Start 10 · Kratzer −1 · bestoßene Ecke −1 · Kante −1 · Knick −3</span></p>
+            <div class="gr-grades" data-gr-grades>
+              <% for (let g = 1; g <= 10; g++) { %><button type="button" class="gr-grade" data-grade="<%= g %>"><%= g %></button><% } %>
+            </div>
+            <div class="gr-row gr-grade-row">
+              <span class="gr-note">Exakt +<%= euro(pay.grade) %> · um 1 daneben +<%= euro(pay.grade / 2) %></span>
+              <button type="button" class="btn btn-primary" data-gr-grade-ok disabled>Note abgeben</button>
+            </div>
+            <div class="gr-result">
+              <div class="gr-verdict" data-gr-verdict hidden></div>
+              <button type="button" class="btn btn-primary" data-gr-grade-next hidden>Weiter</button>
+            </div>
+          </div>
+          <% } %>
+
+          <% if (jobData.steps.includes('slab')) { %>
+          <div class="gr-panel" data-gr-panel="slab" hidden>
+            <p class="gr-text">Stoppe den Regler möglichst genau in der Mitte – so sitzt die Karte gerade im Slab <span class="gr-note">(bis +<%= euro(pay.slab) %>)</span>.</p>
+            <div class="gr-row">
+              <div class="gr-meter" data-gr-meter><span class="gr-meter-zone"></span><span class="gr-meter-needle" data-gr-needle></span></div>
+              <button type="button" class="btn btn-primary" data-gr-seal>Versiegeln</button>
+            </div>
+            <p class="gr-seal-result" data-gr-seal-result></p>
+          </div>
+          <% } %>
+
+          <form method="post" action="/grading/zuruecksenden" class="gr-panel" data-gr-panel="send" data-gr-send hidden>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="clean" value="">
+            <input type="hidden" name="seal" value="">
+            <div class="gr-row">
+              <p class="gr-text"><b>Fertig!</b> Die Karte ist bereit für <%= jobData.customer %>.</p>
+              <button class="btn btn-primary btn-lg gr-glow" type="submit">An <%= jobData.customer %> zurückschicken</button>
+            </div>
+          </form>
+        </section>
+      <% } else { %>
+        <section class="gr-empty">
+          <% if (used < limit) { %>
+            <h2>Neuer Auftrag?</h2>
+            <p>Im Briefkasten warten noch <b><%= limit - used %></b> Karten auf dich.</p>
+            <form method="post" action="/grading/auftrag">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-primary btn-lg gr-glow" type="submit">Nächsten Auftrag annehmen</button>
+            </form>
+          <% } else { %>
+            <h2>Feierabend!</h2>
+            <p>Alle <%= limit %> Aufträge für heute sind erledigt. Morgen ab <%= bonusTime %> Uhr kommen neue.</p>
+          <% } %>
+        </section>
+      <% } %>
+
+      <% if (doneCards.length) { %>
+        <section class="gr-done-wrap">
+          <h2>Heute erledigt</h2>
+          <ul class="gr-done">
+            <% doneCards.forEach((j) => { %>
+              <li class="<%= j.cardInfo ? 'r-' + j.cardInfo.rarity : '' %>">
+                <span class="gr-done-thumb"><% if (j.cardInfo) { %><img src="<%= j.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+                <span class="gr-done-info">
+                  <span><b><%= j.cardInfo ? j.cardInfo.name : j.card %></b> <span class="gr-dim">für <%= j.customer %></span></span>
+                  <span class="gr-done-meta">
+                    <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
+                    <% if (j.seal !== null) { %><span> · Versiegelung <%= j.seal %> %</span><% } %>
+                    <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
+                  </span>
+                </span>
+                <b class="gr-pay">+<%= euro(j.pay) %></b>
+              </li>
+            <% }) %>
+          </ul>
+        </section>
+      <% } %>
+    </div>
+
+    <aside class="gr-side">
+      <section class="gr-shop">
+        <p class="gr-kicker">Stufe <%= info.level %></p>
+        <h2><%= info.name %></h2>
+        <dl class="gr-facts">
+          <dt>Aufträge pro Tag</dt><dd><%= info.jobs %></dd>
+          <dt>Erledigt insgesamt</dt><dd><%= shop.jobsDone %></dd>
+          <dt>Verdient insgesamt</dt><dd><%= euro(shop.earned) %></dd>
+          <dt>Vertrag</dt><dd><%= locked ? 'bis ' + date(shop.lockedUntil) : 'kündbar' %></dd>
+        </dl>
+      </section>
+
+      <section class="gr-tree-wrap">
+        <p class="gr-label">Ausbau</p>
+        <ol class="gr-tree">
+          <% levels.forEach((l) => { const done = l.level <= info.level; %>
+            <li class="<%= done ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>">
+              <span class="gr-tree-dot"><%= done ? '✓' : l.level %></span>
+              <span class="gr-tree-body">
+                <span class="gr-tree-name"><%= l.name %><% if (l.cost) { %><span><%= euro(l.cost) %></span><% } %></span>
+                <span class="gr-tree-perk"><%= l.perk %></span>
+              </span>
+            </li>
+          <% }) %>
+        </ol>
+        <% if (next) { %>
+          <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen für <%= euro(next.cost) %></button>
+          </form>
+        <% } %>
+      </section>
+
+      <% if (locked) { %>
+        <p class="gr-note gr-side-note">Kündigen möglich ab <%= date(shop.lockedUntil) %></p>
+      <% } else { %>
+        <form method="post" action="/grading/kuendigen" class="gr-side-note" data-confirm="Wirklich kündigen? Ab morgen gibt es wieder den Tagesbonus.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Kündigen</button>
+        </form>
+      <% } %>
+    </aside>
+  </div>
+<% } %>
+</div>
+
+<script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

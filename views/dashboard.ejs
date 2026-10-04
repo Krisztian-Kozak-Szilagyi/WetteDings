@@ -1,0 +1,233 @@
+<%- include('partials/head') %>
+<%
+  // Redesign 2026-10 (Nocturne). Same data as before: dash = dashboardService.load(user)
+  const d = dash;
+  const w = d.wealth;
+  const wd = new Intl.DateTimeFormat('de-DE', { weekday: 'short', timeZone: 'UTC' });
+  const dayLabel = (day) => wd.format(new Date(day + 'T12:00:00Z')).replace('.', '');
+  const todayText = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' }).format(new Date());
+  const parts = [
+    { key: 'cash', label: 'Verfügbar', value: w.balance },
+    { key: 'bets', label: 'In Wetten', value: w.inPlay },
+    { key: 'coins', label: 'In Coins', value: w.coinValue },
+    { key: 'cards', label: 'In Karten', value: w.cardValue },
+  ];
+  const partTotal = parts.reduce((s, p) => s + Math.max(0, p.value || 0), 0) || 1;
+  const t = d.today;
+  const ring = 2 * Math.PI * 22;
+  const notes = (locals.bellNotes || []).slice(0, d.notesMax);
+  // Countdown-Kacheln: Symbol je Art und Zeit in Abschnitten (dashboard.js zählt im Sekundentakt weiter)
+  const TIMER_ICONS = {
+    dungeon: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6M16 16l4 4M19 21l2-2"/>',
+    bm: '<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+    woche: '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M14 7v2M14 11v2M14 15v2"/>',
+    monat: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  };
+  const clockParts = (at) => {
+    const s = Math.max(0, Math.floor((at.getTime() - Date.now()) / 1000));
+    const p = [[Math.floor((s % 86400) / 3600), 'Std'], [Math.floor((s % 3600) / 60), 'Min'], [s % 60, 'Sek']];
+    if (s >= 86400) p.unshift([Math.floor(s / 86400), 'Tage']);
+    return p.map(([n, u]) => [String(n).padStart(2, '0'), u]);
+  };
+%>
+
+<div class="dx">
+  <%# ---------- Hero: Gruß + Countdowns | Vermögen ---------- %>
+  <div class="dx-hero">
+    <div class="dx-hero-text">
+      <span class="dx-kicker"><%= todayText %></span>
+      <h1><%= d.greeting %>,<br><span class="dx-name"><%= currentUser.username %></span></h1>
+      <% if (t.items.length) { %><p class="dx-sub"><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %></p><% } %>
+    </div>
+
+    <% if (d.countdowns.length) { %>
+      <div class="dx-timers" aria-label="Countdowns">
+        <% d.countdowns.forEach((c) => { %>
+          <a class="dx-timer dx-timer-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
+            <span class="dx-timer-head">
+              <svg class="dx-timer-ico" viewBox="0 0 24 24" aria-hidden="true"><%- TIMER_ICONS[c.key] || TIMER_ICONS.woche %></svg>
+              <span class="dx-timer-label"><%= c.label %></span>
+            </span>
+            <span class="dx-clock" data-dash-cd="<%= c.at.getTime() %>" data-dash-clock>
+              <% clockParts(c.at).forEach(([n, u]) => { %><span class="dx-seg"><b><%= n %></b><small><%= u %></small></span><% }) %>
+            </span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <section class="dx-wealth" aria-labelledby="dx-wealth-h">
+      <div class="dx-wealth-head">
+        <h2 id="dx-wealth-h" class="dx-label">Vermögen</h2>
+        <% if (w.rank) { %><a class="dx-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %><% if (w.team) { %><span class="dx-rank" title="Admin und Devs zählen nicht in der Rangliste">Team – nicht in der Wertung</span><% } %>
+      </div>
+      <div class="dx-wealth-main">
+        <div class="dx-total">
+          <span class="dx-total-value"><%= euro(w.total) %></span>
+          <% if (w.change) { const up = w.change.diff >= 0; %>
+            <span class="dx-delta <%= up ? 'pos' : 'neg' %>"><%= up ? '▲' : '▼' %> <%= (up ? '+' : '−') + euro(Math.abs(w.change.diff)) %><% if (w.change.pct !== null) { %> · <%= signedPercent(w.change.pct) %><% } %> <small><%= w.points.length %> Tage</small></span>
+          <% } %>
+        </div>
+        <% if (w.curve) { %>
+          <figure class="dx-chart" aria-label="Verlauf der letzten <%= w.points.length %> Tage">
+            <svg viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="dx-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".4"/><stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/></linearGradient></defs>
+              <path d="<%= w.curve.area %>" fill="url(#dx-fill)"/>
+              <path class="dx-chart-line" d="<%= w.curve.line %>" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <figcaption><% w.points.forEach((p) => { %><span><%= dayLabel(p.day) %></span><% }) %></figcaption>
+          </figure>
+        <% } %>
+      </div>
+      <div class="dx-split" role="img" aria-label="Aufteilung des Vermögens">
+        <% parts.forEach((p) => { if (p.value > 0) { %><span class="dx-c-<%= p.key %>" style="flex-grow: <%= (Math.max(0, p.value) / partTotal).toFixed(4) %>"></span><% } }) %>
+      </div>
+      <dl class="dx-parts">
+        <% parts.forEach((p) => { %>
+          <div class="dx-c-<%= p.key %><%= p.value ? '' : ' is-zero' %>"><dt><i></i><%= p.label %></dt><dd><%= euro(p.value) %></dd></div>
+        <% }) %>
+      </dl>
+      <div class="dx-ticks" aria-label="Broker-Kurse">
+      <% d.ticker.forEach((a) => { const up = a.change24h >= 0; %>
+        <a class="dx-tick" href="<%= a.href %>" data-dash-tick="<%= a.symbol %>">
+          <%- include('partials/asset-mark', { sym: a.symbol, px: 26, imgClass: 'dx-tick-logo', markClass: 'dx-tick-mark' }) %>
+          <span class="dx-tick-id"><strong><%= a.symbol %></strong><small><%= a.name %></small></span>
+          <% if (a.spark) { %><svg class="dx-spark <%= up ? 'up' : 'down' %>" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="<%= a.spark %>" vector-effect="non-scaling-stroke"/></svg><% } %>
+          <span class="dx-tick-price"><strong data-dash-price><%= coinPrice(a.price) %></strong><small class="<%= up ? 'pos' : 'neg' %>" data-dash-change><%= signedPercent(a.change24h) %></small></span>
+        </a>
+      <% }) %>
+      </div>
+    </section>
+  </div>
+
+  <%# ---------- Favoriten | Heute ---------- %>
+  <div class="dx-row">
+    <section class="dx-col-wide dx-favs" aria-labelledby="dx-favs-h">
+      <div class="dx-head">
+        <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(d.cardValue) %></div><% } %></div>
+        <a class="dx-link" href="/tcg/album">Zum Album →</a>
+      </div>
+      <% if (!d.cardCount) { %><p class="muted small">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p><% } %>
+      <div class="tcg-grid tcg-favs dx-fav-grid">
+        <% d.favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; %>
+          <% if (fv.foiledAt) { %>
+            <a class="tcg-slot foil-slot r-<%= c.rarity %>" href="/inventar" aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %>">
+              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+            </a>
+          <% } else { %>
+            <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            </a>
+          <% } %>
+        <% }) %>
+        <% for (let i = d.favorites.length; i < d.favMax; i++) { %>
+          <a class="tcg-slot tcg-fav-empty" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><span>+</span></a>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="dx-col-side" aria-labelledby="dx-today-h">
+      <div class="dx-head dx-head-center">
+        <h3 id="dx-today-h">Heute</h3>
+        <span class="dx-ring" title="<%= t.done %> von <%= t.items.length %> erledigt">
+          <svg viewBox="0 0 52 52" aria-hidden="true">
+            <circle class="dx-ring-bg" cx="26" cy="26" r="22"/>
+            <circle class="dx-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.items.length ? t.done / t.items.length : 0))).toFixed(1) %>"/>
+          </svg>
+          <span><%= t.done %>/<%= t.items.length %></span>
+        </span>
+      </div>
+      <div class="dx-tasks">
+        <% t.items.forEach((it) => { %>
+          <a class="dx-task<%= it.done ? ' is-done' : '' %>" href="<%= it.href %>">
+            <span class="dx-check" aria-hidden="true"><% if (it.done) { %>✓<% } %></span>
+            <span class="dx-task-text"><strong><%= it.label %></strong><small><%= it.text %><% if (it.at && !it.done) { %> · <%= relTime(it.at) %><% } %></small></span>
+            <% if (it.progress && !it.done) { %><span class="dx-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>"><span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span></span><% } %>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+  </div>
+
+  <%# ---------- Offene Wetten | Zum Album (wie auf der TCG-Seite) ---------- %>
+  <div class="dx-row dx-row-stretch">
+    <section class="dx-col-wide" aria-labelledby="dx-bets-h">
+      <div class="dx-head">
+        <div><h3 id="dx-bets-h">Deine offenen Wetten</h3><% if (d.bets.count) { %><div class="dx-meta"><%= d.bets.count %> · <%= euro(d.bets.total) %> im Spiel</div><% } %></div>
+        <a class="dx-link" href="/wetten">Alle Wetten →</a>
+      </div>
+      <% if (!d.bets.list.length) { %>
+        <div class="dx-empty"><p>Gerade läuft nichts. Zeit für einen Tipp?</p><a class="btn btn-ghost btn-sm" href="/wetten">Offene Wetten ansehen</a></div>
+      <% } else { %>
+        <div class="dx-bets">
+          <% d.bets.list.forEach((b) => { %>
+            <a class="dx-bet<%= b.open ? '' : ' is-waiting' %>" href="/wetten/<%= b.id %>">
+              <span class="dx-bet-bar"></span>
+              <span class="dx-bet-main">
+                <strong><% if (b.duel) { %><span class="tag tag-accent">Duell</span><% } %><span class="dx-ellip"><%= b.title %></span></strong>
+                <small><% if (b.picked) { %>Dein Tipp: <span class="dx-pick"><%= b.picked %></span> · <% } %><%= b.open ? 'Einsatzschluss ' + relTime(b.at) : 'Wartet auf das Ergebnis' %></small>
+              </span>
+              <span class="dx-bet-money"><strong><%= euro(b.stake) %></strong><small>Topf <%= euro(b.pot) %></small></span>
+            </a>
+          <% }) %>
+        </div>
+        <% if (d.bets.count > d.bets.list.length) { %><a class="dx-link" href="/wetten?tab=meine">Alle <%= d.bets.count %> ansehen →</a><% } %>
+      <% } %>
+    </section>
+
+    <a class="tcg-album-tile dx-album" href="/tcg/album">
+      <span class="tcg-fan" aria-hidden="true">
+        <% d.album.fan.forEach((f) => { %><img src="<%= f.card.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= f.sample ? 'is-sample' : '' %>"><% }) %>
+      </span>
+      <span class="tcg-album-foot">
+        <span class="tcg-album-text">
+          <span class="kicker">Sammlung</span>
+          <span class="tcg-album-title">Zum Album</span>
+          <span class="tcg-progress">
+            <span class="progress"><span style="width: <%= d.album.total ? Math.round(d.album.owned / d.album.total * 100) : 0 %>%"></span></span>
+            <span class="tcg-progress-num"><%= d.album.owned %> / <%= d.album.total %></span>
+          </span>
+        </span>
+        <span class="tcg-album-arrow" aria-hidden="true">→</span>
+      </span>
+    </a>
+  </div>
+
+  <%# ---------- Forum | Benachrichtigungen ---------- %>
+  <div class="dx-pair">
+    <section aria-labelledby="dx-forum-h">
+      <div class="dx-head"><h3 id="dx-forum-h">Forum</h3><a class="dx-link" href="/forum">Zum Forum →</a></div>
+      <% if (!d.threads.length) { %><p class="muted small">Noch keine Themen.</p><% } else { %>
+        <div class="dx-list">
+          <% d.threads.forEach((th) => { %>
+            <a class="dx-item<%= th.unread ? ' is-unread' : '' %>" href="/forum/t/<%= th._id %>?seite=letzte">
+              <span class="dx-dot" aria-hidden="true"></span>
+              <span class="dx-item-main">
+                <strong class="dx-ellip"><%= th.title %></strong>
+                <small><%= th.lastPostByName || '' %><%= th.lastPostByName ? ' · ' : '' %><%= relTime(th.lastPostAt) %> · <%= th.replyCount || 0 %> <%= th.replyCount === 1 ? 'Antwort' : 'Antworten' %></small>
+              </span>
+              <% if (th.unread) { %><span class="tag tag-accent">Neu</span><% } %>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+    <section aria-labelledby="dx-notes-h">
+      <div class="dx-head"><h3 id="dx-notes-h">Benachrichtigungen</h3><% if (locals.bellUnread) { %><span class="dx-meta"><%= bellUnread %> ungelesen</span><% } %></div>
+      <% if (!notes.length) { %><p class="muted small">Nichts Neues – hier erscheint, was dich betrifft.</p><% } else { %>
+        <div class="dx-list">
+          <% notes.forEach((n) => { %>
+            <a class="dx-item dx-item-top<%= n.readAt ? '' : ' is-unread' %>" href="/benachrichtigungen/<%= n._id %>">
+              <span class="dx-dot" aria-hidden="true"></span>
+              <span class="dx-item-main"><span class="dx-note-text"><%= n.text %></span><small><%= n.area %> · <%= relTime(n.at) %></small></span>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</div>
+
+<link rel="stylesheet" href="/css/dashboard.css?v=<%= assetVersion %>">
+<script src="/js/dashboard.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

@@ -1,30 +1,17 @@
 <%
   const openAlerts = deviceMatches.filter((a) => !a.doneAt);
   const doneAlerts = deviceMatches.filter((a) => a.doneAt);
-  const urgent = openAlerts.filter((a) => a.level >= 2).length;
   const count = (n) => (n ? ` <span class="panel-badge panel-badge-inline">${n > 99 ? '99+' : n}</span>` : '');
 %>
 
-<nav class="stats-subnav" aria-label="Abschnitte">
-  <span class="muted small">Springe zu:</span>
-  <a href="#streitfaelle">Streitfälle</a><a href="#meldungen">Meldungen</a><a href="#ban">Bannen</a><a href="#banliste">Ban-Liste</a><a href="#geraete">Mehrfach-Konten</a>
-</nav>
-
+<% if (sub === 'streit') { %>
 <section class="stats-block" id="streitfaelle">
-  <%- blockHead('Streitfälle' + count(counts.disputes), 'Wetten, bei denen Wettersteller und Schiedsrichter unterschiedliche Ergebnisse eingetragen haben. Dort wird nichts ausgezahlt, bis ein Dev mit seiner Stimme entscheidet.') %>
-  <div class="card panel-row">
-    <% if (counts.disputes) { %>
-      <span><strong><%= counts.disputes %> <%= counts.disputes === 1 ? 'Wette wartet' : 'Wetten warten' %></strong> auf eine Entscheidung.</span>
-      <a class="btn btn-primary btn-sm" href="/admin/streitfaelle">Streitfälle entscheiden</a>
-    <% } else { %>
-      <span class="muted">Aktuell gibt es keine Streitfälle.</span>
-      <a class="btn btn-ghost btn-sm" href="/admin/streitfaelle">Ansehen</a>
-    <% } %>
-  </div>
+  <%- blockHead('Streitfälle', 'Ersteller und Schiedsrichter haben unterschiedliche Ergebnisse eingetragen – bis ein Dev entscheidet, wird nichts ausgezahlt. Deine Stimme schließt die Wette sofort und rechnet ab. Ohne Entscheidung werden die Einsätze ' + autoVoidDays + ' Tage nach dem Auswertungstermin automatisch erstattet.') %>
+  <%- include('../partials/dispute-list', { bets: disputes }) %>
 </section>
-
+<% } else if (sub === 'meldungen') { %>
 <section class="stats-block" id="meldungen">
-  <%- blockHead('Gemeldete Beiträge' + count(reports.length), 'Forenbeiträge, die Mitglieder der Moderation gemeldet haben. Prüfe den Beitrag im Forum, greife dort ein (bearbeiten, löschen, Thema schließen) und markiere die Meldung dann als erledigt.') %>
+  <%- blockHead('Gemeldete Beiträge', 'Prüfe den Beitrag im Forum, greife dort ein (bearbeiten, löschen, Thema schließen) und markiere die Meldung dann als erledigt.') %>
   <div class="card">
     <% if (!reports.length) { %>
       <p class="muted">Keine offenen Meldungen.</p>
@@ -57,13 +44,10 @@
     <% } %>
   </div>
 </section>
-
+<% } else if (sub === 'bans') { %>
 <section class="stats-block" id="ban">
-  <%- blockHead('Bannen', 'Ein gebanntes Mitglied wird sofort abgemeldet und kann sich nicht mehr anmelden. Der Ban gilt auch für alle Geräte, mit denen das Konto benutzt wurde: von dort aus ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.') %>
+  <%- blockHead('Bannen', 'Das Mitglied wird sofort abgemeldet. Der Ban gilt auch für alle Geräte des Kontos: von dort ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.' + (currentUser.isAdmin ? '' : '<br><br>Als Dev bannst du für 1 bis ' + maxBanHours + ' Stunden, nicht den Admin und keine anderen Devs, und änderst keinen laufenden Ban eines anderen.')) %>
   <div class="card">
-    <% if (!currentUser.isAdmin) { %>
-      <p class="panel-note small">Als Dev bannst du für <strong>1 bis <%= maxBanHours %> Stunden</strong> (7 Tage). Den Admin und andere Devs kannst du nicht bannen, und einen laufenden Ban eines anderen nicht ändern. Dauerhafte Bans vergibt der Admin.</p>
-    <% } %>
     <form method="post" data-reauth action="/admin/sperren" class="form panel-ban-form" data-confirm="Dieses Mitglied und alle seine Geräte wirklich bannen?">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label class="field">
@@ -115,9 +99,9 @@
     <% } %>
   </div>
 </section>
-
+<% } else { %>
 <section class="stats-block" id="geraete">
-  <%- blockHead('Mehrfach-Konten' + count(urgent), 'Konten, die vom selben Gerät aus benutzt wurden. <strong>Sicher</strong> = derselbe Browser (Geräte-Kennung). <strong>Wahrscheinlich</strong> = gleiche Geräte-Merkmale und gleiche IP-Adresse (z. B. anderer Browser oder privates Fenster). <strong>Möglich</strong> = nur gleiche Geräte-Merkmale – das kommt auch bei baugleichen Geräten vor (Schulrechner, gleiches Handymodell) und zählt nicht fürs Abzeichen.') %>
+  <%- blockHead('Mehrfach-Konten', 'Konten, die vom selben Gerät aus benutzt wurden.<br><strong>Sicher</strong>: derselbe Browser (Geräte-Kennung).<br><strong>Wahrscheinlich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse.<br><strong>Möglich</strong>: nur gleiche Geräte-Merkmale – kommt auch bei baugleichen Geräten vor und zählt nicht fürs Abzeichen.') %>
   <div class="card">
     <% if (!openAlerts.length) { %>
       <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
@@ -144,7 +128,7 @@
             </div>
             <div class="code-actions">
               <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
-                <a class="btn btn-danger btn-sm" href="<%= panelUrl('moderation', 'ban', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
+                <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
               <% }) %>
               <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -165,3 +149,4 @@
     <% } %>
   </div>
 </section>
+<% } %>

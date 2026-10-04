@@ -61,10 +61,8 @@ router.use('/wetten/:id', async (req, res, next) => {
 
 // ---------- Übersicht ----------
 
-router.get('/', async (req, res) => {
-  // Gäste sehen keine Wetten – nur die Startseite mit Anmeldung/Registrierung
-  if (!req.user) return res.render('landing', { title: 'Willkommen' });
-
+// (Die Startseite "/" ist das Dashboard – routes/dashboard.js)
+router.get('/wetten', requireLogin, async (req, res) => {
   const tab = TABS[str(req.query.tab)] ? str(req.query.tab) : 'offen';
   const page = Math.min(500, Math.max(1, parseInt(str(req.query.seite), 10) || 1));
   const q = str(req.query.q).trim().slice(0, 100);
@@ -173,7 +171,7 @@ function refereeCandidates(userId) {
     .lean();
 }
 
-async function newBetForm(req, res, { errors = [], values = {} } = {}, status = 200) {
+async function newBetForm(req, res, { errors = [], errorStep = 0, values = {} } = {}, status = 200) {
   const defaults = {
     title: '',
     description: '',
@@ -189,6 +187,7 @@ async function newBetForm(req, res, { errors = [], values = {} } = {}, status = 
   res.status(status).render('new-bet', {
     title: 'Neue Wette',
     errors,
+    errorStep, // Schritt des Assistenten mit dem ersten Fehler
     values: merged,
     candidates: await refereeCandidates(req.user._id),
     groups: await groups.groupsOf(req.user._id),
@@ -218,35 +217,41 @@ router.post('/wetten', requireLogin, async (req, res) => {
   const now = Date.now();
   const YEAR = 366 * 24 * 60 * 60 * 1000;
 
+  // Fehler mit dem Schritt des Assistenten (views/new-bet.ejs): 0 Frage, 1 Antworten, 2 Details, 3 Schiedsrichter, 4 Zeitplan
   const errors = [];
-  if (values.title.length < 5 || values.title.length > 140) errors.push('Der Titel muss 5–140 Zeichen lang sein.');
-  if (values.description.length > 2000) errors.push('Die Beschreibung darf höchstens 2000 Zeichen lang sein.');
-  if (!values.deadline) errors.push('Bitte gib den Einsatzschluss an (Datum und Uhrzeit).');
-  else if (!deadline) errors.push('Bitte gib einen gültigen Einsatzschluss an.');
-  else if (deadline.getTime() < now + 5 * 60 * 1000) errors.push('Der Einsatzschluss muss mindestens 5 Minuten in der Zukunft liegen.');
-  else if (deadline.getTime() > now + YEAR) errors.push('Der Einsatzschluss darf höchstens ein Jahr in der Zukunft liegen.');
-  if (!values.resultAt) errors.push('Bitte gib den Termin der Auswertung an (Datum und Uhrzeit).');
-  else if (!resultAt) errors.push('Bitte gib einen gültigen Termin für die Auswertung an.');
-  else if (deadline && resultAt < deadline) errors.push('Die Auswertung kann nicht vor dem Einsatzschluss liegen.');
-  else if (deadline && resultAt.getTime() > deadline.getTime() + YEAR) errors.push('Die Auswertung darf höchstens ein Jahr nach dem Einsatzschluss liegen.');
+  let errorStep = null;
+  const fail = (step, msg) => {
+    errors.push(msg);
+    if (errorStep === null || step < errorStep) errorStep = step;
+  };
+  if (values.title.length < 5 || values.title.length > 140) fail(0, 'Der Titel muss 5–140 Zeichen lang sein.');
+  if (values.description.length > 2000) fail(2, 'Die Beschreibung darf höchstens 2000 Zeichen lang sein.');
+  if (!values.deadline) fail(4, 'Bitte gib den Einsatzschluss an (Datum und Uhrzeit).');
+  else if (!deadline) fail(4, 'Bitte gib einen gültigen Einsatzschluss an.');
+  else if (deadline.getTime() < now + 5 * 60 * 1000) fail(4, 'Der Einsatzschluss muss mindestens 5 Minuten in der Zukunft liegen.');
+  else if (deadline.getTime() > now + YEAR) fail(4, 'Der Einsatzschluss darf höchstens ein Jahr in der Zukunft liegen.');
+  if (!values.resultAt) fail(4, 'Bitte gib den Termin der Auswertung an (Datum und Uhrzeit).');
+  else if (!resultAt) fail(4, 'Bitte gib einen gültigen Termin für die Auswertung an.');
+  else if (deadline && resultAt < deadline) fail(4, 'Die Auswertung kann nicht vor dem Einsatzschluss liegen.');
+  else if (deadline && resultAt.getTime() > deadline.getTime() + YEAR) fail(4, 'Die Auswertung darf höchstens ein Jahr nach dem Einsatzschluss liegen.');
 
   // Schiedsrichter: Pflicht, muss ein anderes, existierendes Mitglied sein
   let referee = null;
   if (!values.referee) {
-    errors.push('Bitte wähle einen Schiedsrichter aus, der das Ergebnis mit dir bestätigt.');
+    fail(3, 'Bitte wähle einen Schiedsrichter aus, der das Ergebnis mit dir bestätigt.');
   } else if (!mongoose.isValidObjectId(values.referee) || values.referee === String(req.user._id)) {
-    errors.push('Bitte wähle ein anderes Mitglied als Schiedsrichter aus.');
+    fail(3, 'Bitte wähle ein anderes Mitglied als Schiedsrichter aus.');
   } else {
     referee = await User.findOne({ _id: values.referee, deletedAt: null }).select('username').lean();
-    if (!referee) errors.push('Dieses Mitglied gibt es nicht mehr. Bitte wähle einen anderen Schiedsrichter.');
+    if (!referee) fail(3, 'Dieses Mitglied gibt es nicht mehr. Bitte wähle einen anderen Schiedsrichter.');
   }
 
   // Gruppe (optional): nur eine eigene, aktive Gruppe; der Schiedsrichter muss die Wette sehen können
   let group = null;
   if (values.group) {
     group = (await groups.groupsOf(req.user._id)).find((g) => String(g._id) === values.group) || null;
-    if (!group) errors.push('Diese Gruppe gibt es nicht (mehr) oder du bist kein Mitglied.');
-    else if (referee && !group.members.some((id) => id.equals(referee._id))) errors.push(`Der Schiedsrichter muss Mitglied der Gruppe „${group.name}“ sein.`);
+    if (!group) fail(3, 'Diese Gruppe gibt es nicht (mehr) oder du bist kein Mitglied.');
+    else if (referee && !group.members.some((id) => id.equals(referee._id))) fail(3, `Der Schiedsrichter muss Mitglied der Gruppe „${group.name}“ sein.`);
   }
 
   let options;
@@ -255,14 +260,14 @@ router.post('/wetten', requireLogin, async (req, res) => {
   } else {
     const filled = rawOptions.filter(Boolean);
     const lower = filled.map((o) => o.toLowerCase());
-    if (filled.length < Bet.MIN_OPTIONS) errors.push(`Bitte gib mindestens ${Bet.MIN_OPTIONS} Optionen an.`);
-    if (filled.length > Bet.MAX_OPTIONS) errors.push(`Es sind höchstens ${Bet.MAX_OPTIONS} Optionen möglich.`);
-    if (filled.some((o) => o.length > 60)) errors.push('Eine Option darf höchstens 60 Zeichen lang sein.');
-    if (new Set(lower).size !== lower.length) errors.push('Jede Option darf nur einmal vorkommen.');
+    if (filled.length < Bet.MIN_OPTIONS) fail(1, `Bitte gib mindestens ${Bet.MIN_OPTIONS} Optionen an.`);
+    if (filled.length > Bet.MAX_OPTIONS) fail(1, `Es sind höchstens ${Bet.MAX_OPTIONS} Optionen möglich.`);
+    if (filled.some((o) => o.length > 60)) fail(1, 'Eine Option darf höchstens 60 Zeichen lang sein.');
+    if (new Set(lower).size !== lower.length) fail(1, 'Jede Option darf nur einmal vorkommen.');
     options = filled.map((label, i) => ({ key: `o${i + 1}`, label }));
   }
 
-  if (errors.length) return newBetForm(req, res, { errors, values }, 400);
+  if (errors.length) return newBetForm(req, res, { errors, errorStep, values }, 400);
 
   const bet = await svc.createBet({
     user: req.user,
@@ -568,7 +573,7 @@ router.post('/wetten/:id/loeschen', validId, requireLogin, async (req, res) => {
   try {
     const r = await svc.deleteBet({ actor: req.user, betId: req.params.id });
     req.flash('success', `Wette „${r.title}“ gelöscht.${r.refunded ? ' Alle Einsätze wurden erstattet.' : ''}`);
-    return res.redirect('/');
+    return res.redirect('/wetten');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

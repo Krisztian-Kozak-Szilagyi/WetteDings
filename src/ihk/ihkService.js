@@ -80,8 +80,11 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
  * Fortschrittsbalken – je Fähigkeit einen, jeder braucht required Punkte – und ist erst geschafft, wenn beide voll sind.
  * Ergebnis: ticks mit p (erster Balken) und p2 (zweiter Balken, nur bei Hybrid), total und total2.
  */
+// Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
+const FORKBOMB_STEP = 2;
+
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -90,9 +93,21 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   const open = () => totals.some((x) => x < required);
   const ticks = [];
   let applied = effects.length === 0;
-  let limit = WORK_TIME;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
+  const slow = []; // Forkbomb: [von, bis, Prozent] – in diesen Spiel-Sekunden läuft die Deadline langsamer
+  // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen)
+  const used = (x) => deadlineUsed(x, half, freeze, slow);
   let t = 0;
+  // Angezeigte Werte der Karte [Speed, FIA, FIS, BWL]: ändern sie sich (Boost, Debuff, Ende eines Effekts),
+  // trägt der Takt sie als st – der Browser schreibt sie dann auf die Karte (src/tcg/cardSvg.js).
+  const shown = () => [s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1), s.stats.fia, s.stats.fis, s.stats.bwl].map((v) => Math.round(v));
+  let lastShown = shown().join();
+  const withShown = (tick) => {
+    const now = shown();
+    if (now.join() === lastShown) return tick;
+    lastShown = now.join();
+    return { ...tick, st: now };
+  };
   while (open()) {
     let next = t + interval();
     if (!applied && next > half) {
@@ -100,15 +115,20 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
       effects.forEach((e) => e.apply(s));
       applied = true;
-      ticks.push({ t: half, p: 0, ability: true });
+      ticks.push(withShown({ t: half, p: 0, ability: true }));
       if (s.extraTicks || s.extraTime) {
         // Bloodlust: ganze Runden; Reality Check: Sekunden
         freeze = s.extraTicks * interval() + s.extraTime;
-        limit += freeze;
       }
       next = Math.max(half, t + interval());
     }
-    if (next > limit + 1e-9) break;
+    // Forkbomb: in dieser Runde läuft die Deadline um s.forkbomb % langsamer (erst ab der Halbzeit)
+    if (s.forkbomb > 0 && next > half) slow.push([Math.max(t, half), next, s.forkbomb]);
+    if (used(next) > WORK_TIME + 1e-9) {
+      if (s.forkbomb > 0 && next > half) slow.pop(); // Runde nicht mehr geschafft
+      break;
+    }
+    if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
     const fake = s.fakeNext;
     const crit = rand() < CRIT_CHANCE;
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
@@ -124,7 +144,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     ps.forEach((p, i) => {
       totals[i] += p;
     });
-    ticks.push({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) });
+    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
@@ -138,7 +158,30 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       }
     }
   }
-  return { ticks, total: totals[0], ...(hybrid ? { total2: totals[1] } : {}), success: !open(), freeze: Math.round(freeze * 10) / 10 };
+  const r1 = (v) => Math.round(v * 10) / 10;
+  return {
+    ticks,
+    total: totals[0],
+    ...(hybrid ? { total2: totals[1] } : {}),
+    success: !open(),
+    freeze: r1(freeze),
+    // Forkbomb: verlangsamte Abschnitte und die dadurch gewonnene Zeit (Deadline endet bei WORK_TIME + freeze + extend)
+    slow: slow.map(([a, b, p]) => [r1(a), r1(b), p]),
+    extend: r1(slowGain(half, freeze, slow)),
+  };
+}
+
+/** Überlappung der Strecken [a, b] und [c, d] in Sekunden */
+const overlap = (a, b, c, d) => Math.max(0, Math.min(b, d) - Math.max(a, c));
+
+/** Durch Forkbomb gewonnene Deadline-Sekunden bis zur Spielzeit x (ohne Teile, in denen die Deadline ohnehin steht) */
+function slowGain(half, freeze, slow, x = Infinity) {
+  return slow.reduce((sum, [a, b, p]) => sum + ((overlap(a, b, 0, x) - overlap(a, b, half, Math.min(half + freeze, x))) * p) / 100, 0);
+}
+
+/** Verbrauchte Deadline bis zur Spielzeit x: Bloodlust-Stillstand ab der Halbzeit, Forkbomb verlangsamt */
+function deadlineUsed(x, half, freeze, slow) {
+  return x - overlap(half, half + freeze, 0, x) - slowGain(half, freeze, slow, x);
 }
 
 // ---------- Angebote ----------
@@ -252,11 +295,11 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex }) {
       const locked = await lockedDocs(user._id, session);
       const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
       const doc = await freeDoc(cardId);
-      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel).');
+      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
       const boostDocs = [];
       for (const b of boosts) {
         const d = await freeDoc(b.id);
-        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel).');
+        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
         boostDocs.push(d);
       }
       await claim([doc, ...boostDocs], user._id, session);

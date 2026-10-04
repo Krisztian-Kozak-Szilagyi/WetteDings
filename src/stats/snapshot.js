@@ -5,10 +5,11 @@ const StatDaily = require('../models/StatDaily');
 const { TcgCard, TcgPack } = require('../models/Tcg');
 const { CoinHolding } = require('../models/Coin');
 const { Trade, openFilter } = require('../models/Trade');
-const coinEngine = require('../coin/engine');
+const markets = require('../coin/markets');
 const tcgSettings = require('../tcg/settings');
 const { ranking } = require('../services/rankService');
-const { bonusFor } = require('../services/bonusService');
+const bonusService = require('../services/bonusService');
+const { GradingShop } = require('../models/Grading');
 const { disputedFilter } = require('../services/betService');
 const { dayAndHour } = require('./activity');
 
@@ -54,18 +55,21 @@ const countBy = (rows) => Object.fromEntries(rows.map((r) => [r._id, r.n]));
 
 /** Aktuellen Stand erfassen (ohne zu speichern) */
 async function collect(now = new Date()) {
-  const [players, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed] = await Promise.all([
-    ranking(),
+  const [everyone, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed, grading] = await Promise.all([
+    ranking({ team: true }),
     User.countDocuments({ deletedAt: null }),
     User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
     TcgCard.aggregate([{ $group: { _id: '$rarity', n: { $sum: 1 } } }]),
     TcgPack.countDocuments(),
-    CoinHolding.aggregate([{ $match: { units: { $gt: 0 } } }, { $group: { _id: null, units: { $sum: '$units' }, holders: { $sum: 1 } } }]),
+    CoinHolding.aggregate([{ $match: { units: { $gt: 0 } } }, { $group: { _id: '$coin', units: { $sum: '$units' }, holders: { $sum: 1 } } }]),
     Trade.aggregate([{ $match: openFilter() }, { $group: { _id: '$kind', n: { $sum: 1 } } }]),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(disputedFilter()),
+    GradingShop.countDocuments({ active: true }),
   ]);
   const byRarity = countBy(cardsByRarity);
+  // Vermögen und Verteilung ohne das Team (Admin, Devs); die Kurven je Mitglied (players) behalten es
+  const players = everyone.filter((p) => !p.team);
   return {
     at: now,
     users: { total: users, banned },
@@ -74,14 +78,26 @@ async function collect(now = new Date()) {
       inPlay: sumOf(players, 'inPlay'),
       coinValue: sumOf(players, 'coinValue'),
       cardValue: sumOf(players, 'cardValue'),
-      bonusEligible: players.filter((p) => bonusFor(p.total) > 0).length,
+      // Tagesbonus ist für alle gleich; wer im Grading-Shop arbeitet, bekommt keinen
+      bonusAmount: bonusService.settings.amount,
+      gradingActive: grading,
       total: distribution(players.map((p) => p.total)),
     },
-    coin: { price: coinEngine.isRunning() ? coinEngine.getPrice() : null, units: coins[0] ? coins[0].units : 0, holders: coins[0] ? coins[0].holders : 0 },
+    // coin = Samantha Coin (wie bisher), coins = alle Broker-Werte je Symbol
+    coin: (() => {
+      const sam = coins.find((c) => c._id === 'SAM');
+      return { price: markets.get('SAM').isRunning() ? markets.get('SAM').getPrice() : null, units: sam ? sam.units : 0, holders: sam ? sam.holders : 0 };
+    })(),
+    coins: Object.fromEntries(
+      markets.LIST.map((e) => {
+        const c = coins.find((x) => x._id === e.SYMBOL);
+        return [e.SYMBOL, { price: e.isRunning() ? e.getPrice() : null, units: c ? c.units : 0, holders: c ? c.holders : 0 }];
+      })
+    ),
     cards: { total: Object.values(byRarity).reduce((s, n) => s + n, 0), byRarity, packsUnopened, packPrice: tcgSettings.getPackPrice() },
     market: countBy(offers),
     bets: { open: openBets, disputed },
-    players: players.map((p) => ({ user: p._id, balance: p.balance, inPlay: p.inPlay, coinValue: p.coinValue, cardValue: p.cardValue, total: p.total })),
+    players: everyone.map((p) => ({ user: p._id, balance: p.balance, inPlay: p.inPlay, coinValue: p.coinValue, cardValue: p.cardValue, total: p.total })),
   };
 }
 

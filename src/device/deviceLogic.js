@@ -108,4 +108,40 @@ function unbanError(actor, target) {
   return `Diesen Ban hat ${target.bannedByName || 'jemand anderes'} vergeben – aufheben kann ihn nur der Admin oder wer ihn vergeben hat.`;
 }
 
-module.exports = { COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };
+/**
+ * Alle Bans eines Kontos, älteste zuerst. Ohne Liste (Bans von vor 2026-10-04) nur der letzte aus den Einzelfeldern;
+ * wurde der aufgehoben, ist until null (wann genau, ist nicht bekannt).
+ */
+function banHistory(user) {
+  if (!user) return [];
+  const clean = (b) => ({ at: b.at || null, until: b.until || null, byName: b.byName || null, reason: b.reason || '', liftedAt: b.liftedAt || null });
+  if (Array.isArray(user.banHistory) && user.banHistory.length) return user.banHistory.map(clean);
+  if (!user.bannedAt) return [];
+  return [clean({ at: user.bannedAt, until: user.bannedUntil, byName: user.bannedByName, reason: user.banReason })];
+}
+
+/** Noch laufende Bans der Liste als beendet vermerken (Aufhebung oder Ersatz durch einen neuen Ban) */
+const closeOpenBans = (list, now = new Date()) => list.map((b) => (!b.liftedAt && b.until && new Date(b.until) > now ? { ...b, liftedAt: now } : b));
+
+/** Geplante Dauer eines Bans als Text, z. B. "5 Stunden", "2 Tage 3 Stunden", "dauerhaft" */
+function banDurationText(from, to) {
+  if (isForever(to)) return 'dauerhaft';
+  const h = Math.max(1, Math.round((new Date(to) - new Date(from)) / 3600000));
+  if (h < 24) return `${h} ${h === 1 ? 'Stunde' : 'Stunden'}`;
+  const d = Math.floor(h / 24);
+  const r = h % 24;
+  return `${d} ${d === 1 ? 'Tag' : 'Tage'}${r ? ` ${r} ${r === 1 ? 'Stunde' : 'Stunden'}` : ''}`;
+}
+
+/** Bans fürs Profil, neueste zuerst: { at, duration, state: 'aktiv' | 'abgelaufen' | 'aufgehoben', until, liftedAt, byName, reason } */
+function banTimeline(user, now = Date.now()) {
+  return banHistory(user)
+    .map((b) => ({
+      ...b,
+      duration: b.until ? banDurationText(b.at, b.until) : null,
+      state: b.liftedAt || !b.until ? 'aufgehoben' : new Date(b.until).getTime() > now ? 'aktiv' : 'abgelaufen',
+    }))
+    .sort((x, y) => new Date(y.at) - new Date(x.at));
+}
+
+module.exports = { banHistory, closeOpenBans, banDurationText, banTimeline, COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };

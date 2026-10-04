@@ -27,7 +27,7 @@
               <td class="nowrap"><%= dateSec(e.createdAt) %><% if (e.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
               <td><%- userLink(e.byName, { realName: false }) %></td>
               <td><%- e.all ? '<strong>' + e.toName.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</strong>' : userLink(e.toName, { realName: false }) %></td>
-              <td><span class="badge <%= e.kind === 'entzug' ? 'badge-streitig' : e.kind === 'karte' ? 'badge-entschieden' : 'badge-offen' %>"><%= e.kind === 'entzug' ? 'Entfernt' : e.kind === 'karte' ? 'Karte' : 'Pack' %></span> <%= e.typeLabel %></td>
+              <td><span class="badge <%= e.kind === 'entzug' ? 'badge-streitig' : e.kind === 'karte' || e.kind === 'item' ? 'badge-entschieden' : 'badge-offen' %>"><%= e.kind === 'entzug' ? 'Entfernt' : e.kind === 'karte' ? 'Karte' : e.kind === 'item' ? 'Gegenstand' : 'Pack' %></span> <%= e.typeLabel %></td>
               <td class="num"><%= e.count %></td>
             </tr>
           <% }) %>

@@ -202,7 +202,7 @@
     }
     var details = document.createElement('details');
     details.className = 'stats-table-toggle';
-    details.innerHTML = '<summary class="small">Als Tabelle</summary><div class="table-wrap"><table class="table"><thead><tr><th>Zeitraum</th>' +
+    details.innerHTML = '<summary title="Werte als Tabelle zeigen">Tabelle</summary><div class="table-wrap"><table class="table"><thead><tr><th>Zeitraum</th>' +
       series.map(function (s) { return '<th class="num">' + esc(s.name) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     box.appendChild(details);
   }

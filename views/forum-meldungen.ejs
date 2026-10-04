@@ -1,38 +1,75 @@
 <%- include('partials/head') %>
 
-<div class="page-head">
-  <div class="ihk-title">
+<div class="forum-page forum-thread">
+<nav class="forum-crumbs" aria-label="Pfad">
+  <a href="/forum">Forum</a><span>›</span><span>Meldungen</span>
+</nav>
+
+<div class="forum-head">
+  <div class="forum-head-text">
     <h1>Meldungen</h1>
   </div>
-  <span class="muted">Gemeldete Beiträge, die noch niemand geprüft hat</span>
 </div>
 
-<div class="card">
-  <% if (!reports.length) { %>
-    <p class="muted">Keine offenen Meldungen.</p>
+<% if (!reports.length) { %>
+  <p class="forum-empty">Keine offenen Meldungen.</p>
+<% } else { %>
+  <ol class="forum-reports">
+    <% reports.forEach((r) => { %>
+      <li class="forum-report">
+        <div class="forum-report-head">
+          <span>Gemeldet von <%- userLink(r.byName) %></span>
+          <time><%= dateSec(r.createdAt) %></time>
+        </div>
+        <% if (r.reason) { %><p class="forum-report-reason">„<%= r.reason %>“</p><% } %>
+        <div class="forum-report-post">
+          <% if (r.postDoc) { %>
+            <span class="forum-label">Beitrag von <%= r.postDoc.authorName %></span>
+            <p><%= r.postDoc.deleted ? '(inzwischen gelöscht)' : r.postDoc.body.slice(0, 220) + (r.postDoc.body.length > 220 ? ' …' : '') %></p>
+          <% } else { %><p class="forum-sub">Beitrag nicht mehr vorhanden</p><% } %>
+        </div>
+        <div class="forum-report-actions">
+          <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
+          <form method="post" <%= currentUser.isStaff ? "data-reauth" : "" %> action="/forum/meldungen/<%= r._id %>/erledigt">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
+          </form>
+        </div>
+      </li>
+    <% }) %>
+  </ol>
+<% } %>
+
+<section class="forum-group" id="mod-log">
+  <div class="forum-group-head"><h2>Mod-Log</h2><span class="forum-group-desc">Was die Moderation im Forum getan hat – neueste zuerst</span></div>
+  <% if (!log.entries.length) { %>
+    <p class="forum-empty">Noch keine Einträge.</p>
   <% } else { %>
-    <ul class="code-list">
-      <% reports.forEach((r) => { %>
-        <li class="code-item">
-          <div class="code-main">
-            <span>Gemeldet von <%- userLink(r.byName) %> · <%= dateSec(r.createdAt) %></span>
-          </div>
-          <div class="code-meta muted small">
-            <% if (r.postDoc) { %>
-              Beitrag von <%= r.postDoc.authorName %>: <%= r.postDoc.deleted ? '(inzwischen gelöscht)' : r.postDoc.body.slice(0, 220) + (r.postDoc.body.length > 220 ? ' …' : '') %>
-            <% } else { %>Beitrag nicht mehr vorhanden<% } %>
-          </div>
-          <div class="code-actions">
-            <a class="btn btn-ghost btn-sm" href="/forum/t/<%= r.thread %>#b-<%= r.post %>">Zum Beitrag</a>
-            <form method="post" <%= currentUser.isStaff ? "data-reauth" : "" %> action="/forum/meldungen/<%= r._id %>/erledigt">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
-            </form>
-          </div>
-        </li>
-      <% }) %>
-    </ul>
+    <div class="table-wrap">
+      <table class="table forum-modlog">
+        <thead><tr><th>Zeit</th><th>Wer</th><th>Aktion</th><th>Thema</th><th>Details</th></tr></thead>
+        <tbody>
+          <% log.entries.forEach((e) => { %>
+            <tr>
+              <td class="nowrap"><time datetime="<%= new Date(e.createdAt).toISOString() %>"><%= dateSec(e.createdAt) %></time></td>
+              <td><%- userLink(e.byName, { realName: false }) %></td>
+              <td><%= e.label %></td>
+              <td><% if (e.thread) { %><a href="/forum/t/<%= e.thread %><%= e.post ? '#b-' + e.post : '' %>"><%= e.threadTitle || 'Thema' %></a><% } else { %>–<% } %></td>
+              <td class="forum-modlog-detail"><%= e.detail || '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (log.pages > 1) { %>
+      <div class="log-pager">
+        <% if (log.page > 1) { %><a class="btn btn-ghost btn-sm" href="/forum/meldungen?seite=<%= log.page - 1 %>#mod-log">← Neuere</a><% } %>
+        <span class="muted small">Seite <%= log.page %> / <%= log.pages %></span>
+        <% if (log.page < log.pages) { %><a class="btn btn-ghost btn-sm" href="/forum/meldungen?seite=<%= log.page + 1 %>#mod-log">Ältere →</a><% } %>
+      </div>
+    <% } %>
   <% } %>
+</section>
 </div>
 
 <%- include('partials/foot') %>

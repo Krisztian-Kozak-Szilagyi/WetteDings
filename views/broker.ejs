@@ -1,0 +1,163 @@
+<%- include('partials/head') %>
+<%
+  const up = snap.change24h >= 0;
+  const pl = value - holding.costCents;
+  const eventLabels = { anstieg: 'Kurssprung', einbruch: 'Kurseinbruch', pump: 'Pump', crash: 'Crash' };
+  const sym = snap.symbol;
+  const mood = snap.sentiment === null ? null
+    : snap.sentiment > 0.5 ? { cls: 'pos', label: 'Stark bullisch' } : snap.sentiment > 0.15 ? { cls: 'pos', label: 'Bullisch' }
+    : snap.sentiment < -0.5 ? { cls: 'neg', label: 'Stark bärisch' } : snap.sentiment < -0.15 ? { cls: 'neg', label: 'Bärisch' }
+    : { cls: '', label: 'Neutral' };
+%>
+
+<div class="bx-topbar">
+  <a class="bx-back" href="/broker">← Alle Werte</a>
+  <span class="bx-tax">Steuer auf Gewinne <strong><%= String(brokerTax).replace('.', ',') %> %</strong></span>
+</div>
+<nav class="asset-tabs" aria-label="Werte im Broker">
+  <% assets.forEach((a) => { %>
+    <a class="asset-tab <%= a.active ? 'active' : '' %>" href="<%= a.path %>" <%= a.active ? 'aria-current=page' : '' %>>
+      <span class="asset-tab-head"><strong><%= a.symbol %></strong><span class="asset-kind"><%= a.kind === 'etf' ? 'ETF' : 'Coin' %></span></span>
+      <span class="asset-tab-name"><%= a.name %></span>
+      <span class="asset-tab-price"><span data-asset-price="<%= a.symbol %>"><%= coinPrice(a.price) %></span> <span class="<%= a.change24h >= 0 ? 'pos' : 'neg' %>"><%= signedPercent(a.change24h) %></span></span>
+      <% if (a.value > 0) { %><span class="asset-tab-own">Dein Bestand: <%= euro(a.value) %></span><% } %>
+    </a>
+  <% }) %>
+</nav>
+
+<div class="coin-head">
+  <div class="coin-id">
+    <%- include('partials/asset-mark', { sym, px: 52, imgClass: 'coin-logo', markClass: '' }) %>
+    <div>
+      <h1><%= snap.name %> <span class="muted coin-symbol"><%= sym %></span></h1>
+      <span class="live"><span class="live-dot"></span> Live</span>
+      <% if (mood) { %><span class="etf-mood <%= mood.cls %>" title="Je aktiver die Seite, desto besser die Stimmung">Marktstimmung: <strong><%= mood.label %></strong></span><% } %>
+    </div>
+  </div>
+  <div class="coin-price-box">
+    <div class="coin-price" data-live-price><%= coinPrice(snap.price) %></div>
+    <div class="coin-change <%= up ? 'pos' : 'neg' %>" data-live-change><%= signedPercent(snap.change24h) %> <span class="muted">24 h</span></div>
+  </div>
+</div>
+
+<div class="coin-layout">
+  <section class="coin-main">
+    <div class="card chart-card">
+      <div class="range-tabs" role="tablist" aria-label="Zeitraum">
+        <% [['1h', '1 Std.'], ['24h', '24 Std.'], ['7d', '7 Tage'], ['30d', '30 Tage'], ['all', 'Alles']].forEach(([key, label]) => { %>
+          <button type="button" class="chip <%= key === '24h' ? 'active' : '' %>" data-range="<%= key %>" role="tab" aria-selected="<%= key === '24h' %>"><%= label %></button>
+        <% }) %>
+        <span class="chart-range-change muted small" data-range-change></span>
+      </div>
+      <div class="chart" id="coin-chart" data-range="24h" data-symbol="<%= sym %>">
+        <svg class="chart-svg" aria-label="Kursverlauf" role="img"></svg>
+        <div class="chart-tip" hidden></div>
+        <p class="chart-loading muted small">Kursverlauf wird geladen …</p>
+      </div>
+    </div>
+
+    <div class="coin-stats">
+      <div class="stat"><span class="stat-label">24 h Hoch</span><span class="stat-value stat-value-sm" data-live-high><%= coinPrice(snap.high24h) %></span></div>
+      <div class="stat"><span class="stat-label">24 h Tief</span><span class="stat-value stat-value-sm" data-live-low><%= coinPrice(snap.low24h) %></span></div>
+      <div class="stat"><span class="stat-label">Allzeithoch</span><span class="stat-value stat-value-sm" data-live-ath><%= coinPrice(snap.ath) %></span></div>
+      <div class="stat"><span class="stat-label">Dein Bestand</span><span class="stat-value stat-value-sm"><%= coinAmount(holding.units, sym) %></span></div>
+    </div>
+
+    <div class="coin-lists">
+    <div class="coin-list coin-list-events" data-events>
+      <h4>Marktereignisse</h4>
+      <% if (!events.length) { %>
+        <p class="muted">Bisher keine großen Kursbewegungen.</p>
+      <% } else { %>
+        <ul class="event-list">
+          <% events.forEach((e) => { %>
+            <li class="event event-<%= e.type %>">
+              <span class="event-type"><%= eventLabels[e.type] || e.type %></span>
+              <span class="<%= e.change >= 0 ? 'pos' : 'neg' %>"><%= signedPercent(e.change) %></span>
+              <span class="muted small">auf <%= coinPrice(e.price) %> · <%= relTime(e.at) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="coin-list">
+      <div class="coin-list-head"><h4>Deine letzten Trades</h4><span>letzte 10</span></div>
+      <% if (!trades.length) { %>
+        <p class="muted">Du hast <%= snap.name %> noch nicht gehandelt.</p>
+      <% } else { %>
+        <div class="trade-rows">
+          <% trades.slice(0, 10).forEach((t) => { %>
+            <div class="trade-row">
+              <span class="trade-side <%= t.side === 'kauf' ? 'pos' : 'neg' %>"><%= t.side === 'kauf' ? 'Kauf' : 'Verkauf' %></span>
+              <span class="trade-what"><span><%= coinAmount(t.units, sym) %> <span class="muted">à <%= coinPrice(t.price) %></span></span><span class="trade-when"><%= date(t.createdAt) %></span></span>
+              <span class="trade-sum"><%= euro(t.cents) %></span>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+      <a class="coin-ledger-link" href="/konto/auszug">Vollständiger Kontoauszug im Profil →</a>
+    </div>
+    </div>
+  </section>
+
+  <aside class="coin-side">
+    <div class="card trade-card"
+         data-price="<%= snap.price %>" data-units="<%= holding.units %>" data-cost="<%= holding.costCents %>" data-balance="<%= currentUser.balance %>">
+      <div class="trade-tabs" role="tablist">
+        <button type="button" class="trade-tab active" data-trade-tab="kaufen" role="tab" aria-selected="true">Kaufen</button>
+        <button type="button" class="trade-tab" data-trade-tab="verkaufen" role="tab" aria-selected="false">Verkaufen</button>
+      </div>
+
+      <form method="post" action="/broker/kaufen" class="trade-form" data-trade-form="kaufen" data-confirm-trade="kaufen">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="wert" value="<%= sym %>">
+        <label class="field">
+          <span>Betrag in €</span>
+          <input type="number" name="amount" inputmode="decimal" min="<%= minBuy / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" required data-min-buy data-min-trade="<%= minTrade %>" data-min-share="<%= minBuyShare %>">
+        </label>
+        <div class="quick-amounts">
+          <button type="button" class="chip" data-set-amount="10">10 €</button>
+          <button type="button" class="chip" data-set-amount="50">50 €</button>
+          <button type="button" class="chip" data-set-amount="100">100 €</button>
+          <button type="button" class="chip" data-set-amount="<%= currentUser.balance / 100 %>">Alles</button>
+        </div>
+        <p class="trade-min">Mindestens 10 % des Kurses: <strong data-min-buy-text><%= euro(minBuy) %></strong></p>
+        <p class="estimate" data-trade-preview></p>
+        <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < minBuy ? 'disabled' : '' %>><%= snap.name %> kaufen</button>
+      </form>
+
+      <form method="post" action="/broker/verkaufen" class="trade-form" data-trade-form="verkaufen" data-confirm-trade="verkaufen" hidden>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="wert" value="<%= sym %>">
+        <input type="hidden" name="all" value="0">
+        <label class="field">
+          <span>Betrag in €</span>
+          <input type="number" name="amount" inputmode="decimal" min="<%= minTrade / 100 %>" step="0.01">
+        </label>
+        <div class="quick-amounts">
+          <button type="button" class="chip" data-sell-fraction="0.25">25 %</button>
+          <button type="button" class="chip" data-sell-fraction="0.5">50 %</button>
+          <button type="button" class="chip" data-sell-fraction="1">Alles</button>
+        </div>
+        <p class="estimate" data-trade-preview></p>
+        <button class="btn btn-primary btn-block" type="submit" <%= holding.units <= 0 ? 'disabled' : '' %>><%= snap.name %> verkaufen</button>
+      </form>
+      <p class="trade-note">Ausgeführt zum Kurs im Moment des Absendens.</p>
+    </div>
+
+    <div class="coin-depot">
+      <div class="coin-depot-head"><span>Dein Depot</span><strong><%= coinAmount(holding.units, sym) %></strong></div>
+      <dl class="depot">
+        <div><dt>Aktueller Wert</dt><dd data-live-value><%= euro(value) %></dd></div>
+        <div><dt>Einstand</dt><dd><%= euro(holding.costCents) %><% if (avgPrice) { %> <span class="muted small">(Ø <%= coinPrice(avgPrice) %>)</span><% } %></dd></div>
+        <div><dt>Gewinn / Verlust</dt><dd class="<%= pl > 0 ? 'pos' : pl < 0 ? 'neg' : '' %>" data-live-pl><%= holding.units ? (pl > 0 ? '+' : '') + euro(pl) : '–' %></dd></div>
+        <div><dt>Verfügbares Guthaben</dt><dd><%= euro(currentUser.balance) %></dd></div>
+      </dl>
+    </div>
+
+  </aside>
+</div>
+
+<script src="/js/coin.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

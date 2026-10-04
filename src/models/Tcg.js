@@ -7,6 +7,7 @@ const cardSchema = new Schema(
     card: { type: String, required: true }, // Karten-ID aus dem Katalog, z. B. "krisz-6-glitch"
     rarity: { type: String, required: true },
     opening: { type: Schema.Types.ObjectId, ref: 'TcgOpening', default: null },
+    foiledAt: { type: Date, default: null }, // foliert seit (null = ohne Folie) – siehe src/items
     lastClaimedAt: { type: Date }, // zuletzt für Quest/Handel beansprucht – nur Schreibzugriff gegen gleichzeitige Verkäufe, nicht die Sperre selbst (siehe tcg/locks)
   },
   { timestamps: true }
@@ -18,7 +19,7 @@ const packSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, required: true }, // Pack-Art aus dem Katalog (PACK_TYPES)
-    source: { type: String, enum: ['kauf', 'quest', 'admin'], required: true },
+    source: { type: String, enum: ['kauf', 'quest', 'admin', 'lotto'], required: true },
     cost: { type: Number, default: 0 }, // bezahlter Preis in Cent (0 = geschenkt)
   },
   { timestamps: true }
@@ -34,7 +35,7 @@ const packGrantSchema = new Schema(
     toName: { type: String, required: true }, // bei "an alle": "Alle Mitglieder (n)"
     all: { type: Boolean, default: false }, // an alle Mitglieder vergeben
     recipients: { type: Number, default: 1 }, // Zahl der beschenkten Mitglieder
-    kind: { type: String, enum: ['pack', 'karte', 'entzug'], default: 'pack' }, // entzug = Karte aus der Sammlung entfernt
+    kind: { type: String, enum: ['pack', 'karte', 'entzug', 'item', 'geld', 'geldabzug', 'packentzug', 'itementzug'], default: 'pack' }, // entzug = Karte aus der Sammlung entfernt, item = Gegenstand (Folie), geld/geldabzug = Spielgeld (count = Betrag in Cent)
     type: { type: String, required: true }, // Pack-Art bzw. Karten-ID
     typeLabel: { type: String, required: true },
     count: { type: Number, required: true }, // je Mitglied
@@ -54,6 +55,8 @@ const openingSchema = new Schema(
       default: [],
     },
     best: { type: Number, required: true }, // Rang der seltensten Karte (0 = Crumpled … 5 = Glitch)
+    type: { type: String, default: null }, // Pack-Art (ältere Öffnungen: null)
+    source: { type: String, default: null }, // Herkunft des Packs: kauf | quest | admin | lotto (ältere Öffnungen: null)
   },
   { timestamps: true }
 );

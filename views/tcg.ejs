@@ -11,134 +11,158 @@
     return n < 1.5 ? 'fast jedes' : '1 in ' + (n < 10 ? n.toFixed(1).replace('.', ',') : Math.round(n));
   };
   const canAfford = currentUser.balance >= packPrice;
+  const maxBuy = Math.min(maxPacksPerPurchase, Math.floor(currentUser.balance / packPrice));
+  const packTotal = packs.reduce((s, p) => s + p.count, 0);
+  // Fächer auf der Album-Kachel: die drei seltensten eigenen Karten, sonst Beispielkarten
+  const rank = (c) => (rarityByKey[c.rarity] || { rank: 0 }).rank;
+  let fan = cards.filter((c) => counts[c.id] && !(rarityByKey[c.rarity] || {}).hidden).sort((a, b) => rank(b) - rank(a)).slice(0, 3);
+  if (fan.length < 3) {
+    const sample = ['gold', 'glitch', 'holo'].map((k) => cards.find((c) => c.rarity === k)).filter(Boolean);
+    fan = fan.concat(sample.filter((c) => !fan.includes(c))).slice(0, 3);
+  }
+  if (fan.length === 3) fan = [fan[1], fan[0], fan[2]]; // die seltenste in die Mitte
 %>
 
-<div class="page-head">
-  <h1>Trading Cards</h1>
-  <span class="muted"><%= cardsPerPack %> Karten pro Booster Pack · <%= euro(packPrice) %></span>
-</div>
-
-<div class="tcg-layout">
-  <section class="tcg-main">
-    <div class="card tcg-shop">
-      <form method="post" action="/tcg/kaufen" class="tcg-shop-form">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <input type="hidden" name="type" value="<%= packType %>">
-        <button class="tcg-pack-btn" type="submit" <%= canAfford ? '' : 'disabled' %> aria-label="Booster Pack für <%= euro(packPrice) %> kaufen">
-          <img src="<%= packImage %>" alt="" width="800" height="1280">
+<div class="tcg-page">
+  <section class="tcg-hero">
+    <form method="post" action="/tcg/kaufen" class="tcg-hero-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="type" value="<%= packType %>">
+      <div class="tcg-hero-pack">
+        <span class="tcg-hero-glow" aria-hidden="true"></span>
+        <span class="tcg-pack-btn tcg-pack-art" aria-hidden="true">
+          <img src="<%= packImage %>" alt="" width="800" height="1280" draggable="false">
+        </span>
+      </div>
+      <div class="tcg-hero-info">
+        <span class="kicker">Trading Cards</span>
+        <h1>BfW Holdings<br>Booster Pack</h1>
+        <p class="tcg-hero-sub"><%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon.</p>
+        <button type="button" class="tcg-drops-btn" data-dialog-open="drop-raten">
+          <span class="tcg-drops-gems" aria-hidden="true"><% rarities.filter((r) => !r.dropOnly).forEach((r) => { %><span class="tcg-dot r-<%= r.key %>"></span><% }) %></span>
+          Drop-Raten
         </button>
-        <div class="tcg-shop-info">
-          <h2>BfW Holdings Booster Pack</h2>
-          <p class="muted">Enthält <%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon. Gekaufte Packs landen bei „Meine Packs“ und können dort geöffnet werden.</p>
-          <% const maxBuy = Math.min(maxPacksPerPurchase, Math.floor(currentUser.balance / packPrice)); %>
+        <div class="tcg-buy">
           <div class="tcg-qty" data-tcg-qty data-price="<%= packPrice %>" data-max="<%= Math.max(1, maxBuy) %>">
-            <span class="tcg-qty-label">Anzahl</span>
-            <button type="button" class="btn btn-ghost btn-sm" data-qty-step="-1" aria-label="Ein Pack weniger" <%= canAfford ? '' : 'disabled' %>>−</button>
+            <button type="button" class="btn" data-qty-step="-1" aria-label="Ein Pack weniger" <%= canAfford ? '' : 'disabled' %>>−</button>
             <input type="number" name="count" value="1" min="1" max="<%= Math.max(1, maxBuy) %>" step="1" inputmode="numeric" aria-label="Anzahl Packs" required <%= canAfford ? '' : 'disabled' %>>
-            <button type="button" class="btn btn-ghost btn-sm" data-qty-step="1" aria-label="Ein Pack mehr" <%= canAfford ? '' : 'disabled' %>>+</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-qty-max <%= canAfford ? '' : 'disabled' %>>Max</button>
+            <button type="button" class="btn" data-qty-step="1" aria-label="Ein Pack mehr" <%= canAfford ? '' : 'disabled' %>>+</button>
+            <button type="button" class="btn tcg-qty-max" data-qty-max <%= canAfford ? '' : 'disabled' %>>Max</button>
           </div>
-          <button class="btn btn-primary btn-block" type="submit" data-qty-submit <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
-          <p class="muted small">Verfügbar: <span data-tcg-balance><%= euro(currentUser.balance) %></span></p>
-          <% if (!canAfford) { %><p class="small neg">Dein Guthaben reicht gerade für kein Pack.</p><% } %>
+          <button class="btn btn-primary btn-glow" type="submit" data-qty-submit <%= canAfford ? '' : 'disabled' %>>Pack kaufen · <%= euro(packPrice) %></button>
         </div>
-      </form>
-    </div>
+        <%# Wohin die gekauften Packs gehen – dezent unter dem Kauf-Knopf %>
+        <a class="tcg-buy-dest" href="/inventar">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>
+          Gekaufte Packs landen in deinem <span>Inventar</span> – dort öffnest du sie.
+        </a>
+      </div>
+    </form>
+  </section>
 
-    <div class="card" id="packs">
-      <h2>Meine Packs</h2>
-      <% if (!packs.length) { %>
-        <p class="muted">Du hast keine ungeöffneten Packs.</p>
-      <% } else { %>
-        <ul class="tcg-packs">
-          <% packs.forEach((p) => { %>
-            <li class="tcg-pack-item">
-              <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
-              <div>
-                <strong><%= p.label %></strong>
-                <span class="muted">×<span data-tcg-pack-count="<%= p.key %>"><%= p.count %></span></span>
-              </div>
-              <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= p.image %>">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="type" value="<%= p.key %>">
-                <button class="btn btn-primary btn-sm" type="submit">Öffnen</button>
-              </form>
-            </li>
-          <% }) %>
-        </ul>
-      <% } %>
-    </div>
-
-    <div class="stats stats-3">
-      <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
-      <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= cards.length %></span></div>
-      <div class="stat card"><span class="stat-label">Verkaufswert</span><span class="stat-value"><%= euro(collectionValue) %></span></div>
-    </div>
-
-    <div class="card" id="favoriten">
-      <div class="tcg-coll-head">
+  <section class="tcg-row">
+    <div class="tcg-favs-box" id="favoriten">
+      <div>
         <h2>Meine Favoriten</h2>
-        <a class="btn btn-primary btn-sm" href="/tcg/album">Zum Album</a>
+        <p class="tcg-sub"><%= cardCount %> <%= cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(collectionValue) %></p>
       </div>
       <% if (!cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p>
       <% } else if (!favorites.length) { %>
-        <p class="muted">Zeig hier bis zu <%= maxFavorites %> Lieblingskarten: Öffne dein Album, tippe eine Karte an und wähle „Als Favorit zeigen“.</p>
+        <p class="muted small">Zeig hier bis zu <%= maxFavorites %> Lieblingskarten: Öffne dein Album, tippe eine Karte an und wähle „Als Favorit zeigen“.</p>
       <% } %>
       <div class="tcg-grid tcg-favs">
-        <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
-          <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
-            <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-            <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
-          </a>
+        <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity]; %>
+          <% if (fv.foiledAt) { %>
+            <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
+              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+            </button>
+          <% } else { %>
+            <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
+              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            </a>
+          <% } %>
         <% }) %>
-        <% for (let i = favorites.length; i < maxFavorites && cardCount; i++) { %>
-          <a class="tcg-slot tcg-locked" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><div class="tcg-locked-inner"><span>+</span></div></a>
+        <% for (let i = favorites.length; i < maxFavorites; i++) { %>
+          <a class="tcg-slot tcg-fav-empty" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><span>+</span></a>
         <% } %>
       </div>
     </div>
+
+    <a class="tcg-album-tile" href="/tcg/album">
+      <span class="tcg-fan" aria-hidden="true">
+        <% fan.forEach((c) => { %><img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= counts[c.id] ? '' : 'is-sample' %>"><% }) %>
+      </span>
+      <span class="tcg-album-foot">
+        <span class="tcg-album-text">
+          <span class="kicker">Sammlung</span>
+          <span class="tcg-album-title">Zum Album</span>
+          <span class="tcg-progress">
+            <span class="progress"><span style="width: <%= cards.length ? Math.round(uniqueOwned / cards.length * 100) : 0 %>%"></span></span>
+            <span class="tcg-progress-num"><%= uniqueOwned %> / <%= cards.length %></span>
+          </span>
+        </span>
+        <span class="tcg-album-arrow" aria-hidden="true">→</span>
+      </span>
+    </a>
   </section>
 
-  <aside class="tcg-side">
-    <div class="card">
-      <h2>Drop-Raten</h2>
-      <div class="table-wrap">
-        <table class="table tcg-odds">
-          <thead><tr><th>Seltenheit</th><th class="num">Chance</th><th class="num">Packs</th><th class="num">Wert</th></tr></thead>
-          <tbody>
-            <% rarities.forEach((r) => { %>
-              <tr class="r-<%= r.key %>">
-                <td><span class="tcg-dot"></span> <%= r.label %></td>
-                <td class="num"><%= pct(r.weight) %></td>
-                <td class="num nowrap"><%= packOdds(r.weight) %></td>
-                <td class="num nowrap"><%= euro(r.sell) %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+  <section class="tcg-rare">
+    <div class="tcg-rare-feed">
+    <span class="kicker kicker-muted">Seltene Ziehungen</span>
+    <% if (!rarePulls.length) { %>
+      <p class="muted small">Noch hat niemand eine Holo oder seltener gezogen.</p>
+    <% } else { %>
+      <ul class="tcg-feed">
+        <% rarePulls.forEach((o) => {
+             const bestCard = o.cards.slice().sort((a, b) => (rarityByKey[b.rarity] || { rank: 0 }).rank - (rarityByKey[a.rarity] || { rank: 0 }).rank)[0];
+             const info = cardById[bestCard.card]; const r = rarityByKey[bestCard.rarity]; %>
+          <li class="r-<%= bestCard.rarity %>">
+            <span class="tcg-dot"></span>
+            <span><strong><%- userLink(o.username) %></strong> zog <%= info ? info.name : bestCard.card %> <span class="muted">(<%= r ? r.label : bestCard.rarity %>)</span></span>
+            <span class="muted small nowrap"><%= relTime(o.createdAt) %></span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
     </div>
 
-    <div class="card">
-      <h2>Seltene Ziehungen</h2>
-      <% if (!rarePulls.length) { %>
-        <p class="muted">Noch hat niemand eine Holo oder seltener gezogen.</p>
-      <% } else { %>
-        <ul class="tcg-feed">
-          <% rarePulls.forEach((o) => {
-               const bestCard = o.cards.slice().sort((a, b) => (rarityByKey[b.rarity] || { rank: 0 }).rank - (rarityByKey[a.rarity] || { rank: 0 }).rank)[0];
-               const info = cardById[bestCard.card]; const r = rarityByKey[bestCard.rarity]; %>
-            <li class="r-<%= bestCard.rarity %>">
-              <span class="tcg-dot"></span>
-              <span><strong><%- userLink(o.username) %></strong> zog <strong><%= info ? info.name : bestCard.card %></strong> (<%= r ? r.label : bestCard.rarity %>)</span>
-              <span class="muted small nowrap"><%= relTime(o.createdAt) %></span>
-            </li>
-          <% }) %>
-        </ul>
-      <% } %>
-    </div>
-  </aside>
+    <%# Kachel im Stil des IHK-Start-Knopfs: Karte und Folie, beim Darüberfahren rutscht die Folie über die Karte %>
+    <a class="inv-tile" href="/inventar" id="packs">
+      <span class="inv-tile-art" aria-hidden="true">
+        <img class="inv-tile-pack" src="<%= (cardById['st-ivan-boss'] || {}).image || packImage %>" alt="" width="720" height="1008" loading="lazy">
+        <span class="inv-tile-foil"></span>
+      </span>
+      <span class="inv-tile-text">
+        <span class="kicker">Packs &amp; Gegenstände</span>
+        <span class="inv-tile-title">Zum Inventar<% if (newItems) { %><span class="nav-live" title="Neuer Gegenstand im Inventar" aria-label="Neuer Gegenstand im Inventar"></span><% } %></span>
+        <span class="inv-tile-hint"><%= packTotal %> <%= packTotal === 1 ? 'Pack' : 'Packs' %> · <%= itemTotal %> <%= itemTotal === 1 ? 'Gegenstand' : 'Gegenstände' %></span>
+      </span>
+      <% if (newPacks) { %><span class="nav-badge inv-tile-badge" title="Neue Booster Packs" aria-label="<%= newPacks %> neue Booster Packs"><%= newPacks > 99 ? '99+' : newPacks %></span><% } %>
+      <span class="inv-tile-arrow" aria-hidden="true">→</span>
+    </a>
+  </section>
 </div>
+
+<dialog class="dialog" id="drop-raten" aria-labelledby="drop-raten-title">
+  <div class="dialog-head">
+    <h2 id="drop-raten-title">Drop-Raten</h2>
+    <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+  </div>
+  <table class="table tcg-odds">
+    <thead><tr><th>Seltenheit</th><th class="num">Chance</th><th class="num">Packs</th><th class="num">Wert</th></tr></thead>
+    <tbody>
+      <% rarities.filter((r) => !r.dropOnly).forEach((r) => { %>
+        <tr class="r-<%= r.key %>">
+          <td><span class="tcg-dot"></span><%= r.label %></td>
+          <td class="num"><%= pct(r.weight) %></td>
+          <td class="num nowrap muted"><%= packOdds(r.weight) %></td>
+          <td class="num nowrap"><%= euro(r.sell) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</dialog>
 
 <!-- Pack-Öffnung -->
 <div class="tcg-reveal" data-tcg-reveal hidden>
@@ -156,5 +180,6 @@
   </div>
 </div>
 
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

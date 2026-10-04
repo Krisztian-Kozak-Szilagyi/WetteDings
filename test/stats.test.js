@@ -9,7 +9,7 @@ const { areaOf, dayAndHour, isPageRequest } = require('../src/stats/activity');
 const { quantile, distribution } = require('../src/stats/snapshot');
 const { packLuck } = require('../src/stats/memberStats');
 const exportCsv = require('../src/stats/exportCsv');
-const { addDays, dayList, weekday, isoWeek, period, buckets, aggregate, delta, retention, effectiveChances, pullVerdict } = require('../src/stats/statsService');
+const { addDays, dayList, weekday, isoWeek, period, buckets, aggregate, delta, retention, effectiveChances, pullVerdict, rangeLabel } = require('../src/stats/statsService');
 
 test('Einstellungs-Verlauf: nur geänderte Werte, mit Pfad', () => {
   const before = { packPrice: 8000, weight: { gold: 1100, holo: 250 }, rewards: [1500, 2500] };
@@ -29,7 +29,7 @@ test('Einstellungs-Verlauf: neue und weggefallene Werte', () => {
 
 test('Einstellungs-Verlauf: .env-Werte beim Start', () => {
   const v = configValues();
-  assert.ok(Number.isInteger(v.startBalance) && Number.isInteger(v.duelFeePercent) && Array.isArray(v.bonusTiers));
+  assert.ok(Number.isInteger(v.startBalance) && Number.isInteger(v.duelFeePercent) && typeof v.bonusTime === 'string');
 });
 
 test('Kartenverkauf: Exemplare je Karte zusammengefasst', () => {
@@ -51,6 +51,7 @@ test('Aktivität: Bereich aus dem Pfad', () => {
   assert.equal(areaOf('/handel/tausch'), 'handel');
   assert.equal(areaOf('/wetten/abc/entscheiden'), 'wetten');
   assert.equal(areaOf('/coin-exchange'), 'coin');
+  assert.equal(areaOf('/broker/cow'), 'coin');
   assert.equal(areaOf('/irgendwas'), 'sonstiges');
 });
 
@@ -148,6 +149,22 @@ test('Statistik: Vorzeitraum und Tagesgrenzen', () => {
   assert.equal(prev.to, '2026-09-26');
   assert.equal(prev.from, '2026-09-20');
   assert.equal(prev.until.toISOString(), period(7, now).since.toISOString()); // lückenlos aneinander
+});
+
+test('Statistik: Heute = seit 0 Uhr deutscher Zeit, Vergleich mit gestern', () => {
+  const now = new Date('2026-10-03T22:30:00Z'); // in Berlin schon der 4.10., 0:30 Uhr
+  const today = period(1, now);
+  assert.deepEqual([today.range, today.from, today.to, today.days], [1, '2026-10-04', '2026-10-04', ['2026-10-04']]);
+  assert.equal(today.since.toISOString(), '2026-10-03T22:00:00.000Z');
+  assert.equal(today.until.toISOString(), '2026-10-04T22:00:00.000Z');
+  const yesterday = period(1, now, 1);
+  assert.deepEqual([yesterday.from, yesterday.to], ['2026-10-03', '2026-10-03']);
+  assert.equal(yesterday.until.toISOString(), today.since.toISOString());
+  assert.equal(buckets(today.days).unit, 'tag');
+});
+
+test('Statistik: Namen der Zeiträume', () => {
+  assert.deepEqual([1, 7, 30, 365].map(rangeLabel), ['Heute', '7 Tage', '30 Tage', '1 Jahr']);
 });
 
 test('Statistik: Kalenderwochen nach ISO 8601', () => {
@@ -256,4 +273,17 @@ test('Gini: Einordnung im Ländervergleich', () => {
   assert.equal(rows[self].name, 'BfW');
   assert.equal(rows[self - 1].name, 'Deutschland');
   assert.equal(rows[self + 1].name, 'USA');
+});
+
+test('Statistik: Kernzahlen und Bewertung der Veränderung', () => {
+  const { rate, PRIMARY } = require('../src/stats/statsService');
+  const up = (id) => ({ id, delta: { dir: 'up' } });
+  assert.deepStrictEqual([rate(up('aktiv-tag'), 'spieler').primary, rate(up('aktiv-tag'), 'spieler').tone], [true, 'good']);
+  assert.equal(rate(up('gini'), 'wirtschaft').tone, 'bad'); // höhere Ungleichheit ist schlecht
+  assert.equal(rate({ id: 'm-rang', delta: { dir: 'down' } }, 'mitglied').tone, 'good'); // kleinerer Rang ist besser
+  assert.equal(rate(up('guthaben'), 'wirtschaft').tone, null); // Geldmenge: neutral
+  assert.equal(rate({ id: 'einsaetze', delta: { dir: 'flat' } }, 'spiele').tone, null);
+  assert.equal(rate(up('aufrufe'), 'spieler').primary, false);
+  // höchstens 4 Kernzahlen je Reiter (außer Übersicht), damit oben eine Reihe bleibt
+  for (const [key, ids] of Object.entries(PRIMARY)) if (key !== 'uebersicht') assert.ok(ids.length <= 4, key);
 });

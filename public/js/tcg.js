@@ -27,17 +27,31 @@
   }
 
   // ---------- Filter der Sammlung ----------
-  // Jeder Filter wirkt nur auf das Raster in seiner .card (die Tauschseite hat zwei Raster)
+  // Jeder Filter wirkt nur auf das Raster in seiner .card bzw. [data-filter-scope] (die Tauschseite hat zwei Raster)
   $all('[data-tcg-filter]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var key = btn.getAttribute('data-tcg-filter');
-      var scope = btn.closest('.card') || document;
+      var scope = btn.closest('.card, [data-filter-scope]') || document;
       $all('[data-tcg-filter]', scope).forEach(function (b) {
         b.classList.toggle('active', b === btn);
         b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
       });
       $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
         slot.hidden = key !== 'all' && slot.getAttribute('data-rarity') !== key;
+      });
+    });
+  });
+
+  // ---------- Season-Filter im Album: blendet ganze Season-Sektionen aus ----------
+  $all('[data-album-season]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.getAttribute('data-album-season');
+      $all('[data-album-season]').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+      });
+      $all('[data-album-season-section]').forEach(function (sec) {
+        sec.hidden = key !== 'all' && sec.getAttribute('data-album-season-section') !== key;
       });
     });
   });
@@ -106,16 +120,28 @@
       var count = parseInt(d.count, 10) || 0;
       var rank = parseInt(d.rank, 10) || 0;
       var sell = parseInt(d.sell, 10) || 0;
+      var noBank = d.noBank === '1'; // Boss-Karten: die Bank kauft sie nicht, Schutz vor dem Duplikat-Verkauf ist überflüssig
 
-      tilt.className = 'tcg-zoom r-' + d.rarity;
+      var former = d.former === '1';
+      tilt.className = 'tcg-zoom r-' + d.rarity + (former ? ' is-former' : '');
       $('[data-tcg-modal-img]', modal).src = d.image;
       $('[data-tcg-modal-img]', modal).alt = d.name + ' (' + d.rarityLabel + ')';
       $('[data-tcg-modal-name]', modal).textContent = d.name;
-      var badge = $('[data-tcg-modal-rarity]', modal);
-      badge.textContent = d.rarityLabel;
-      badge.className = 'tcg-badge r-' + d.rarity;
-      $('[data-tcg-modal-count]', modal).textContent = count === 1 ? '1 Stück im Besitz' : count + ' Stück im Besitz';
+      $('[data-tcg-modal-dot]', modal).className = 'tcg-dot r-' + d.rarity;
+      $('[data-tcg-modal-rarity]', modal).textContent = d.rarityLabel + (d.no ? ' · #' + d.no : '');
+      var foiled = parseInt(d.foiled, 10) || 0;
+      $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
+        : (count ? (count === 1 ? '1× im Besitz' : count + '× im Besitz') : '') + (foiled ? (count ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
+        + (noBank ? ' · Wert ' + d.sellText + ' (nur Handel, die Bank kauft sie nicht)' : '');
+      $('[data-tcg-owned-actions]', modal).hidden = former;
+      $('[data-tcg-former-action]', modal).hidden = !former;
+      if (former) {
+        if (typeof modal.showModal === 'function') modal.showModal();
+        else modal.setAttribute('open', '');
+        return;
+      }
 
+      sellOne.hidden = count < 1 || noBank; // nur folierte Exemplare: die Bank kauft sie nicht
       sellOne.querySelector('input[name="card"]').value = d.tcgCard;
       $('[data-tcg-sell-text]', sellOne).textContent = d.sellText;
       if (rank >= RARE_RANK) {
@@ -127,13 +153,14 @@
       // Schutz vor dem Duplikat-Verkauf und Favorit
       var isProtected = d.protected === '1';
       protectForm.querySelector('input[name="card"]').value = d.tcgCard;
-      protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Vor Duplikat-Verkauf schützen';
-      protectNote.hidden = !isProtected;
+      protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Schützen (Schloss)';
+      protectNote.hidden = !isProtected || noBank;
+      protectForm.hidden = noBank;
       favoriteForm.querySelector('input[name="card"]').value = d.tcgCard;
-      favoriteForm.querySelector('button').textContent = d.favorite === '1' ? 'Nicht mehr als Favorit zeigen' : 'Als Favorit zeigen';
+      favoriteForm.querySelector('button').textContent = d.favorite === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
 
-      sellDupes.hidden = count < 2 || isProtected;
-      if (count > 1 && !isProtected) {
+      sellDupes.hidden = count < 2 || isProtected || noBank;
+      if (count > 1 && !isProtected && !noBank) {
         var total = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(((count - 1) * sell) / 100);
         sellDupes.querySelector('input[name="card"]').value = d.tcgCard;
         sellDupes.querySelector('button').textContent = 'Duplikate verkaufen (' + (count - 1) + '×) · ' + total;
@@ -243,12 +270,13 @@
     state.cards.forEach(function (c, i) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'tcg-flip r-' + c.rarity + (c.rank >= RARE_RANK ? ' tcg-rare-hint' : '');
+      btn.className = 'tcg-flip r-' + c.rarity;
       btn.style.animationDelay = i * 140 + 'ms';
       btn.setAttribute('aria-label', 'Karte ' + (i + 1) + ' aufdecken');
       btn.innerHTML =
+        '<span class="tcg-aura" aria-hidden="true"></span>' +
         '<span class="tcg-flip-inner">' +
-          '<span class="tcg-face tcg-back"><span class="tcg-back-logo"><span>BfW</span></span></span>' +
+          '<span class="tcg-face tcg-back season-' + (c.season || 'pre-season') + '"></span>' + // Rückseite je Season
           '<span class="tcg-face tcg-front"><img alt="" width="720" height="1008"><span class="tcg-shine"></span></span>' +
         '</span>' +
         '<span class="tcg-flip-label"><span class="tcg-dot"></span><span></span></span>';
@@ -263,6 +291,7 @@
         neu.textContent = 'Neu';
         btn.querySelector('.tcg-flip-label').appendChild(neu);
       }
+      if (c.rarity === 'glitch') addMatrix(btn);
       btn.addEventListener('click', function () { flip(btn, c); });
       cardsBox.appendChild(btn);
     });
@@ -273,6 +302,57 @@
     doneBtn.hidden = true;
     var first = cardsBox.querySelector('.tcg-flip');
     if (first) first.focus();
+  }
+
+  // Glitch: grüne Ziffernspalten über der Kartenkante (einzelne schwach auf der Karte);
+  // bei Hover fallen sie, die Ziffern wechseln und manche Spalten flackern
+  function randomDigits(n) {
+    var s = '';
+    for (var i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
+    return s;
+  }
+  // [links in %, Schriftgröße in px, Deckkraft, auf der Karte]
+  var MATRIX_COLS = [
+    [-13, 11, 0.9], [-7, 15, 1], [-1, 12, 0.85], [4, 9, 0.6], [22, 10, 0.3, true], [47, 14, 0.22, true],
+    [71, 10, 0.3, true], [90, 9, 0.55], [95, 13, 0.85], [101, 15, 1], [108, 11, 0.9],
+  ];
+  function addMatrix(btn) {
+    var layer = document.createElement('span');
+    layer.className = 'tcg-matrix';
+    layer.setAttribute('aria-hidden', 'true');
+    var spans = [];
+    MATRIX_COLS.forEach(function (spec) {
+      var col = document.createElement('span');
+      col.className = 'tcg-matrix-col' + (spec[3] ? ' in' : '') + (Math.random() < 0.35 ? ' flicker' : '');
+      col.style.left = spec[0] + '%';
+      col.style.fontSize = spec[1] + Math.round(Math.random() * 2 - 1) + 'px';
+      col.style.opacity = spec[2];
+      col.style.setProperty('--op', spec[2]);
+      col.style.setProperty('--delay', (-Math.random() * 2).toFixed(2) + 's');
+      var inner = document.createElement('span');
+      inner.textContent = randomDigits(80);
+      inner.style.setProperty('--dur', (1.2 + Math.random() * 1.8).toFixed(2) + 's');
+      inner.style.setProperty('--delay', (-Math.random() * 2).toFixed(2) + 's');
+      col.appendChild(inner);
+      layer.appendChild(col);
+      spans.push(inner);
+    });
+    btn.insertBefore(layer, btn.querySelector('.tcg-flip-label'));
+    var timer = null;
+    btn.addEventListener('mouseenter', function () {
+      if (timer) return;
+      timer = setInterval(function () {
+        spans.forEach(function (sp) {
+          var t = sp.textContent.split('');
+          for (var k = 0; k < 6; k++) t[Math.floor(Math.random() * t.length)] = Math.floor(Math.random() * 10);
+          sp.textContent = t.join('');
+        });
+      }, 90);
+    });
+    btn.addEventListener('mouseleave', function () {
+      clearInterval(timer);
+      timer = null;
+    });
   }
 
   function flip(btn, c) {

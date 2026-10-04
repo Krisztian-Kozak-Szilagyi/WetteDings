@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" preserveAspectRatio="xMidYMid slice">
+  <!-- Platzhalter für das Dungeon-Bild (Querformat). Wird später durch das echte Bild ersetzt. -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="58%" r="60%">
+      <stop offset="0" stop-color="#3b3366"/>
+      <stop offset=".55" stop-color="#1d1b33"/>
+      <stop offset="1" stop-color="#0e0f1a"/>
+    </radialGradient>
+    <linearGradient id="table" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2236"/>
+      <stop offset="1" stop-color="#161320"/>
+    </linearGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse" patternTransform="skewX(-28)">
+      <path d="M64 0H0V64" fill="none" stroke="#9184d9" stroke-opacity=".14" stroke-width="2"/>
+    </pattern>
+    <radialGradient id="torch" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffcf7a" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="640" fill="url(#glow)"/>
+  <!-- Tor -->
+  <path d="M640 430V250a160 160 0 0 1 320 0v180z" fill="#0b0b14" stroke="#4a4270" stroke-width="10"/>
+  <path d="M600 430V240a200 200 0 0 1 400 0v190" fill="none" stroke="#2d2848" stroke-width="22"/>
+  <g fill="#3a345c">
+    <rect x="560" y="300" width="40" height="130"/><rect x="1000" y="300" width="40" height="130"/>
+  </g>
+  <circle cx="530" cy="290" r="70" fill="url(#torch)"/><circle cx="1070" cy="290" r="70" fill="url(#torch)"/>
+  <rect x="524" y="290" width="12" height="44" fill="#5b4632"/><rect x="1064" y="290" width="12" height="44" fill="#5b4632"/>
+  <!-- Spieltisch mit Raster -->
+  <path d="M0 430H1600V640H0z" fill="url(#table)"/>
+  <path d="M0 430H1600V640H0z" fill="url(#grid)"/>
+  <path d="M0 430H1600" stroke="#9184d9" stroke-opacity=".35" stroke-width="3"/>
+  <!-- Figuren -->
+  <g fill="#9184d9" fill-opacity=".55">
+    <circle cx="620" cy="520" r="20"/><path d="M596 590q24-60 48 0z"/>
+    <circle cx="800" cy="540" r="20"/><path d="M776 610q24-60 48 0z"/>
+    <circle cx="980" cy="520" r="20"/><path d="M956 590q24-60 48 0z"/>
+  </g>
+  <text x="800" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="26" letter-spacing="6" fill="#b5abfc" fill-opacity=".7">DUNGEON · BILD FOLGT</text>
+</svg>

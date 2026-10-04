@@ -16,6 +16,10 @@ const coinStateSchema = new Schema(
       type: new Schema({ slot: Number, at: Number, log: Number }, { _id: false }),
       default: null,
     },
+    // Nur ETF: Trend (Log-Rendite pro Tag), sein Zielwert aus der Aktivität und die Marktstimmung (−1 … +1)
+    mu: { type: Number, default: 0 },
+    muTarget: { type: Number, default: 0 },
+    sentiment: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -71,11 +75,13 @@ const tradeSchema = new Schema(
     side: { type: String, enum: ['kauf', 'verkauf'], required: true },
     units: { type: Number, required: true },
     price: { type: Number, required: true },
-    cents: { type: Number, required: true },
+    cents: { type: Number, required: true }, // beim Verkauf: Erlös nach Steuer
+    tax: { type: Number, default: 0 }, // Cent, Steuer auf den Gewinn (nur Verkauf)
   },
   { timestamps: true }
 );
 tradeSchema.index({ user: 1, createdAt: -1 });
+tradeSchema.index({ createdAt: -1 }); // Protokolle: alle Käufe und Verkäufe
 
 module.exports = {
   CoinState: model('CoinState', coinStateSchema),

@@ -6,15 +6,18 @@ const Bet = require('../models/Bet');
 const Comment = require('../models/Comment');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const { ForumThread, ForumPost, ForumRead, ForumReport } = require('../models/Forum');
+const { ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReaction } = require('../models/Forum');
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
+const { Item } = require('../models/Item');
 const Group = require('../models/Group');
 const roles = require('./roles');
 const { CoinHolding } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
+const { GradingShop, GradingJob } = require('../models/Grading');
 const { Trade } = require('../models/Trade');
+const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const { inTransaction } = require('./betService');
 const { UserError } = require('../lib/util');
 const deviceService = require('../device/deviceService');
@@ -47,6 +50,7 @@ async function propagateName(userId, oldName, name, session) {
     ForumThread.updateMany({ lastPostBy: userId }, { $set: { lastPostByName: name } }, opt),
     ForumPost.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
     ForumReport.updateMany({ by: userId }, { $set: { byName: name } }, opt),
+    ForumReaction.updateMany({ user: userId }, { $set: { userName: name } }, opt),
     RegistrationCode.updateMany({ createdBy: userId }, { $set: { createdByName: name } }, opt),
     RegistrationCode.updateMany({ usedBy: userId }, { $set: { usedByName: name } }, opt),
     TcgOpening.updateMany({ user: userId }, { $set: { username: name } }, opt),
@@ -56,6 +60,12 @@ async function propagateName(userId, oldName, name, session) {
     PackGrant.updateMany({ by: userId }, { $set: { byName: name } }, opt),
     PackGrant.updateMany({ to: userId }, { $set: { toName: name } }, opt),
   ]);
+  // Dungeon: Plätze, Einladungen und Chat (nacheinander, weil es dieselben Dokumente sind)
+  for (const M of [DungeonParty, DungeonRun]) {
+    await M.updateMany({ 'members.user': userId }, { $set: { 'members.$[m].name': name } }, { ...opt, arrayFilters: [{ 'm.user': userId }] });
+    await M.updateMany({ 'chat.user': userId }, { $set: { 'chat.$[c].name': name } }, { ...opt, arrayFilters: [{ 'c.user': userId }] });
+  }
+  await DungeonParty.updateMany({ 'invites.user': userId }, { $set: { 'invites.$[i].name': name } }, { ...opt, arrayFilters: [{ 'i.user': userId }] });
 }
 
 /** Wann darf der Name frühestens wieder geändert werden? (null = sofort) */
@@ -78,6 +88,8 @@ async function rename({ user, username }) {
     await inTransaction(async (session) => {
       await User.updateOne({ _id: user._id }, { $set: { username: name, usernameLower: lower, usernameChangedAt: new Date() } }, { session });
       await propagateName(user._id, user.username, name, session);
+      // Mod-Log nur beim Umbenennen – nach einer Kontolöschung bleibt dort der Name stehen, unter dem gehandelt wurde
+      await ForumModLog.updateMany({ by: user._id }, { $set: { byName: name } }, { session });
     });
   } catch (err) {
     if (err && err.code === 11000) throw new UserError('Dieser Benutzername ist bereits vergeben.');
@@ -119,6 +131,8 @@ async function deleteAccount({ user, password }) {
           realName: null,
           tcgProtected: [],
           tcgFavorites: [],
+          bio: '',
+          pinnedAchievements: [],
           tcgSeen: [],
         },
         $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
@@ -132,10 +146,13 @@ async function deleteAccount({ user, password }) {
     await Promise.all([
       TcgCard.deleteMany({ user: id }, opt),
       TcgPack.deleteMany({ user: id }, opt),
+      Item.deleteMany({ user: id }, opt),
       CoinHolding.deleteMany({ user: id }, opt),
       // laufende Quest abbrechen (ihre Karte gibt es nicht mehr); abgeschlossene bleiben für die Statistik
       IhkRun.deleteMany({ user: id, status: 'laeuft' }, opt),
       IhkState.deleteOne({ _id: id }, opt),
+      GradingShop.deleteOne({ _id: id }, opt),
+      GradingJob.deleteMany({ user: id }, opt),
       // offene Handelsangebote verschwinden; abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),
       Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),
@@ -146,6 +163,13 @@ async function deleteAccount({ user, password }) {
       ForumThread.updateMany({ upvotes: id }, { $pull: { upvotes: id } }, opt),
       ForumRead.deleteMany({ user: id }, opt),
       ForumReport.deleteMany({ by: id }, opt),
+      // Reaktionen zeigen den Namen im Tooltip → entfernen. Umfrage-Stimmen bleiben an der anonymen Hülle:
+      // sie enthalten nur die gewählte Antwort und sind nirgends einem Namen zugeordnet; so ändern sich
+      // abgeschlossene Ergebnisse nicht rückwirkend (wie bei den Spielverläufen oben)
+      ForumReaction.deleteMany({ user: id }, opt),
+      require('../models/Notification').deleteMany({ user: id }, opt),
+      // Erfolge löschen – nur Einzelstücke bleiben an der neutralen Hülle, damit sie nie ein zweites Mal vergeben werden
+      require('../models/Achievement').deleteMany({ user: id, key: { $nin: require('../achievements/list').SPECIAL.map(([k]) => k) } }, opt),
       // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus
       Group.updateMany({ owner: id }, { $set: { deleted: true } }, opt),
       Group.updateMany({ members: id, owner: { $ne: id } }, { $pull: { members: id } }, opt),
@@ -153,6 +177,13 @@ async function deleteAccount({ user, password }) {
     // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
     await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
+    // Dungeon: Anmeldungen verlassen (leere verschwinden, die Leitung geht weiter), Chat-Nachrichten entfernen;
+    // im laufenden Durchlauf spielt der Platz ohne Lohn zu Ende (die Karte gibt es nicht mehr)
+    await DungeonParty.updateMany({ $or: [{ 'members.user': id }, { 'invites.user': id }, { 'chat.user': id }] }, { $pull: { members: { user: id }, invites: { user: id }, chat: { user: id } } }, opt);
+    await DungeonParty.deleteMany({ members: { $size: 0 } }, opt);
+    await DungeonParty.updateMany({ leader: id }, [{ $set: { leader: { $arrayElemAt: ['$members.user', 0] } } }], opt);
+    await DungeonRun.updateMany({ 'chat.user': id }, { $pull: { chat: { user: id } } }, opt);
+    await DungeonRun.updateMany({ 'members.user': id, status: 'laeuft' }, { $set: { 'members.$[m].user': null, 'members.$[m].reward': 0, 'members.$[m].foil': false, 'members.$[m].bossCard': false } }, { ...opt, arrayFilters: [{ 'm.user': id }] });
   });
   await roles.load();
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)

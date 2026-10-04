@@ -35,7 +35,7 @@ async function member(p, now, { user }) {
   const mine = { user: uid };
   const [rank, flows, before, snapshots, activity, positionsSettled, staked, created, refereed, openings, cardsNow, trades, runs, coinTrades, holding, entries, wins, duels] =
     await Promise.all([
-      ranking(),
+      ranking({ team: true }), // mit Team, damit auch Admin und Devs ihre Werte sehen
       Ledger.aggregate([{ $match: { ...mine, ...s.inP(p) } }, { $group: { _id: { d: s.dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' }, n: { $sum: 1 }, meta: { $push: '$meta' } } }]),
       Ledger.aggregate([{ $match: { ...mine, createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
       StatDaily.find({ _id: { $gte: p.from, $lte: p.to } }, { players: { $elemMatch: { user: uid } } }).lean(),
@@ -51,13 +51,15 @@ async function member(p, now, { user }) {
       CoinTrade.aggregate([{ $match: { ...mine, ...s.inP(p) } }, { $group: { _id: '$side', s: { $sum: '$cents' }, n: { $sum: 1 } } }]),
       CoinHolding.findOne({ ...mine, coin: 'SAM' }).lean(),
       LotteryEntry.find({ ...mine, ...s.inP(p) }).select('tickets').lean(),
-      LotteryRound.find({ winner: uid, ...s.inP(p, 'drawnAt') }).select('pot').lean(),
+      LotteryRound.find({ winner: uid, ...s.inP(p, 'drawnAt') }).select('pot prizeCash').lean(),
       Bet.countDocuments({ 'duel.state': { $exists: true }, $or: [{ creator: uid }, { 'duel.opponent': uid }], ...s.inP(p) }),
     ]);
 
   // ---------- Vermögen und Geldfluss ----------
-  const index = rank.findIndex((r) => r._id.equals(uid));
-  const row = rank[index] || { balance: 0, inPlay: 0, coinValue: 0, cardValue: 0, total: 0 };
+  const row = rank.find((r) => r._id.equals(uid)) || { balance: 0, inPlay: 0, coinValue: 0, cardValue: 0, total: 0 };
+  // Platz nur unter den Spielern – das Team ist nicht in der Wertung
+  const ranked = rank.filter((r) => !r.team);
+  const index = ranked.findIndex((r) => r._id.equals(uid));
   const net = Object.fromEntries(s.LEDGER_GROUPS.map((g) => [g.key, {}]));
   const dayNet = {};
   const byType = {};
@@ -129,7 +131,7 @@ async function member(p, now, { user }) {
       title: 'Vermögen',
       question: `Wie steht ${user.username} da – und woher kommt das Geld?`,
       kpis: [
-        { id: 'm-rang', label: 'Rang', value: index >= 0 ? `${index + 1}. von ${rank.length}` : '–', unit: 'text', hint: 'nach Gesamtvermögen (jetzt)' },
+        { id: 'm-rang', label: 'Rang', value: row.team ? 'Team' : index >= 0 ? `${index + 1}. von ${ranked.length}` : '–', unit: 'text', hint: row.team ? 'Admin und Devs sind nicht in der Wertung' : 'nach Gesamtvermögen (jetzt)' },
         { id: 'm-vermoegen', label: 'Gesamtvermögen', value: row.total, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
         { id: 'm-guthaben', label: 'Guthaben', value: row.balance, unit: 'euro', hint: 'jetzt' },
         { id: 'm-zufluss', label: 'Guthaben-Veränderung', value: Object.values(dayNet).reduce((a, v) => a + v, 0), unit: 'euro', signed: true, compare: true, hint: 'Veränderung des Guthabens im Zeitraum' },
@@ -160,7 +162,7 @@ async function member(p, now, { user }) {
       title: 'Aktivität',
       question: 'Wie oft und wann spielt das Mitglied – und wo?',
       kpis: [
-        { id: 'm-tage', label: 'Aktive Tage', value: activity.length, unit: 'count', compare: true, hint: `von ${p.range} Tagen` },
+        { id: 'm-tage', label: 'Aktive Tage', value: activity.length, unit: 'count', compare: true, hint: p.range === 1 ? 'heute' : `von ${p.range} Tagen` },
         { id: 'm-aufrufe', label: 'Seitenaufrufe', value: views, unit: 'count', compare: true },
         { id: 'm-aktionen', label: 'Aktionen', value: actions, unit: 'count', compare: true },
         { id: 'm-logins', label: 'Anmeldungen', value: logins, unit: 'count', compare: true },
@@ -254,7 +256,7 @@ async function member(p, now, { user }) {
         { id: 'm-coin-trades', label: 'Coin-Trades', value: (coin.kauf ? coin.kauf.n : 0) + (coin.verkauf ? coin.verkauf.n : 0), unit: 'count', compare: true },
         { id: 'm-coin-bestand', label: 'Coin-Bestand', value: holding ? holding.units / 1e8 : 0, unit: 'number', hint: 'SAM (jetzt)' },
         { id: 'm-lose', label: 'Lose gekauft', value: tickets, unit: 'count', compare: true, hint: `für ${(-sumType('lotto_los') / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` },
-        { id: 'm-lotto-gewinne', label: 'Lotterie-Gewinne', value: s.sumBy(wins, 'pot'), unit: 'euro', compare: true, hint: `${wins.length}× gewonnen` },
+        { id: 'm-lotto-gewinne', label: 'Lotterie-Gewinne', value: s.sumBy(wins, 'pot') + s.sumBy(wins, 'prizeCash'), unit: 'euro', compare: true, hint: `${wins.length}× gewonnen` },
       ],
     },
   ];

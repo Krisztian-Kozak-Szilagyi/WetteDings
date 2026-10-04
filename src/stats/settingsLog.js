@@ -39,7 +39,6 @@ function configValues() {
     creatorFeePercent: config.creatorFeePercent,
     duelFeePercent: require('../services/duelService').DUEL_FEE_PERCENT, // erst hier laden: vermeidet Require-Zyklen
     autoVoidDays: config.autoVoidDays,
-    bonusTiers: config.bonusTiers,
     bonusTime: config.bonusTime,
     lotteryTicketPrice: config.lotteryTicketPrice,
     lotteryTime: config.lotteryTime,

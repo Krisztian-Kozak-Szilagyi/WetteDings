@@ -19,19 +19,19 @@ test('Gewichte ergeben 100 % und werden seltener', () => {
   assert.equal(catalog.chance('sith'), 0.0001);
   assert.equal(sell('icon'), 400000);
   assert.equal(sell('sith'), 1000000);
-  // Die geheime Seltenheit erscheint nicht in den Drop-Raten
-  assert.deepEqual(catalog.visibleRarities().map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon']);
+  // Die geheime Seltenheit erscheint nicht in den Drop-Raten; Boss (nur Beute) steht im Album-Filter, nicht in den Drop-Raten
+  assert.deepEqual(catalog.visibleRarities().map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon', 'boss']);
+  assert.deepEqual(catalog.visibleRarities().filter((r) => !r.dropOnly).map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon']);
   assert.equal(catalog.chance('bockhaber'), 0.003);
 });
 
-test('Ein Pack ist im Schnitt weniger wert als sein Preis', () => {
+test('Erwartungswert eines Packs (5 Karten)', () => {
   const ev = catalog.expectedPackValue();
-  assert.equal(Math.round(ev), 7156);
-  assert.ok(ev < config.tcgPackPrice, `Erwartungswert ${ev} muss unter ${config.tcgPackPrice} liegen`);
+  assert.equal(Math.round(ev), 7066);
 });
 
-test('2× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {
-  assert.ok(2 * sell('crumpled') + sell('bfwler') <= config.tcgPackPrice - 500);
+test('4× Crumpled + 1× BFWler bleibt mindestens 5 € im Minus', () => {
+  assert.ok(4 * sell('crumpled') + sell('bfwler') <= config.tcgPackPrice - 500);
 });
 
 test('Seltenheit je Wurf (Grenzen)', () => {
@@ -52,13 +52,16 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 90);
+  assert.equal(catalog.CARDS.length, 91);
+  assert.equal(catalog.cardsBySeason['pre-season'].length, 90);
   assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
   assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
   assert.equal(catalog.cardById['sigrist-3-glitch'].name, 'Sigrist');
   assert.equal(catalog.cardById['oliver-the-sigrist-sith'].name, 'Oliver the Sigrist');
   assert.equal(catalog.cardById['oliver-the-sigrist-sith'].rarity, 'sith');
-  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Sammlung
+  const pre = catalog.cardsBySeason['pre-season'];
+  assert.equal(pre[pre.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Pre-Season
+  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'st-ivan-boss'); // Boss-Karten stehen ganz hinten
   assert.deepEqual(catalog.cardsByRarity.sith.map((c) => c.id), ['oliver-the-sigrist-sith']);
   assert.equal(catalog.cardById['aleks-5-bockhaber'].name, 'Aleks');
   assert.equal(catalog.cardById['seven-3-gold'].name, '7');
@@ -112,8 +115,8 @@ test('Admin-Chancen: nur gültig, wenn zusammen genau 100 %', () => {
   assert.ok(settings.validWeights(filled));
 });
 
-test('Ein Pack hat 3 Karten', () => {
-  assert.equal(catalog.drawPack().length, 3);
+test('Ein Pack hat 5 Karten', () => {
+  assert.equal(catalog.drawPack().length, 5);
 });
 
 test('Packs kaufen: Anzahl 1 bis Obergrenze, nur ganze Zahlen', async () => {
@@ -152,4 +155,18 @@ test('Namen als Profil-Links: maskiert, verschachtelt als span, gelöschte Konte
   assert.equal(userLink('<b>x'), '<a class="user-link" href="/profil/%3Cb%3Ex">&lt;b&gt;x</a>');
   assert.equal(userLink('geloescht-ab12cd34'), 'geloescht-ab12cd34');
   assert.equal(userLink(''), '');
+});
+
+test('Boss-Karte: 5.000 € Wert, Folie steigert ihn, die Bank kauft sie nicht', () => {
+  const catalog = require('../src/tcg/catalog');
+  const foil = require('../src/items/foil');
+  const { sellValueExpr } = require('../src/tcg/tcgService');
+  const boss = catalog.rarityByKey.boss;
+  assert.strictEqual(boss.sell, 500000);
+  assert.strictEqual(boss.noBank, true);
+  // Ranglisten-/Profilwert kennt die Boss-Seltenheit
+  const branches = sellValueExpr().$floor.$add[0].$multiply[0].$switch.branches;
+  assert.ok(branches.some((b) => b.case.$eq[1] === 'boss' && b.then === 500000));
+  // foliert ist sie mehr wert als ohne Folie
+  assert.ok(foil.cardValue(boss.sell, new Date(Date.now() - 3 * 86400000)) > boss.sell);
 });

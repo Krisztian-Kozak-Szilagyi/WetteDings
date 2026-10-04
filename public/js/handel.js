@@ -5,6 +5,10 @@
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
+  // ---------- Black Market: nach einem Kauf (#blackmarket) aufgeklappt zeigen ----------
+  var bm = $('details#blackmarket');
+  if (bm && window.location.hash === '#blackmarket') bm.open = true;
+
   // ---------- Miniaturen in den Angeboten vergrößern ----------
   var zoom = $('[data-zoom-modal]');
   if (zoom) {
@@ -28,6 +32,13 @@
       badge.textContent = d.rarityLabel;
       badge.className = 'tcg-badge r-' + d.rarity;
       $('[data-zoom-meta]', zoom).textContent = 'Kartenwert ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
+      // Fremde Sammlung: von hier aus einen Tausch für diese Karte vorschlagen
+      var tradeLink = $('[data-zoom-trade]', zoom);
+      if (tradeLink) {
+        tradeLink.hidden = !d.tradeHref;
+        if (d.tradeHref) tradeLink.href = d.tradeHref;
+        else tradeLink.removeAttribute('href');
+      }
       if (typeof zoom.showModal === 'function') zoom.showModal();
       else zoom.setAttribute('open', '');
     });
@@ -174,9 +185,14 @@
     var badge = $('[data-trade-rarity]', modal);
     badge.textContent = d.rarityLabel;
     badge.className = 'tcg-badge r-' + d.rarity;
-    $('[data-trade-meta]', modal).textContent = d.free + ' frei · Kartenwert ' + d.sellText;
-    // Karte in alle drei Formulare eintragen (Tausch nutzt "karte", weil es per GET zur Auswahlseite geht)
-    $all('input[name="card"], input[name="karte"]', modal).forEach(function (input) { input.value = d.tradeCard; });
+    var copy = d.tradeCopy || '';
+    $('[data-trade-meta]', modal).textContent = copy ? 'Foliert am ' + d.foilDate + ' · Wert ' + d.sellText : d.free + ' frei · Kartenwert ' + d.sellText;
+    $('[data-trade-art]', modal).classList.toggle('is-foiled', !!copy);
+    // Karte in alle drei Formulare eintragen (Tausch nutzt "karte", weil es per GET zur Auswahlseite geht);
+    // ein foliertes Exemplar wird über "copy" bzw. "f:<Exemplar>" genau bestimmt
+    $all('input[name="card"]', modal).forEach(function (input) { input.value = d.tradeCard; });
+    $all('input[name="copy"]', modal).forEach(function (input) { input.value = copy; });
+    $all('input[name="karte"]', modal).forEach(function (input) { input.value = copy ? 'f:' + copy : d.tradeCard; });
 
     if (typeof modal.showModal === 'function') modal.showModal();
     else modal.setAttribute('open', '');
@@ -199,7 +215,9 @@
   var query = new URLSearchParams(window.location.search);
   var backCard = query.get('karte');
   if (backCard) {
-    var backSlot = $all('[data-trade-card]').filter(function (s) { return s.dataset.tradeCard === backCard; })[0];
+    var backSlot = $all('[data-trade-card]').filter(function (s) {
+      return backCard.indexOf('f:') === 0 ? s.dataset.tradeCopy === backCard.slice(2) : s.dataset.tradeCard === backCard && !s.dataset.tradeCopy;
+    })[0];
     if (backSlot) {
       openFor(backSlot, query.get('reiter') || 'markt');
       if (query.get('an')) {
