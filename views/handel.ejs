@@ -50,9 +50,8 @@
             <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
           </button>
           <div class="bm-info">
-            <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><%= r.label %> · <%= c.name %></span>
+            <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><% ownTag(c.id) %></span>
             <span class="bm-price"><strong><%= euro(o.price) %></strong><span>Wert <%= euro(r.sell || 0) %></span></span>
-            <% ownTag(c.id) %>
             <% if (sold) { %>
               <span class="muted small">an <%- userLink(o.buyerName) %></span>
             <% } else { %>
