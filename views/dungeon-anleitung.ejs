@@ -1,0 +1,37 @@
+<%- include('partials/head') %>
+
+<div class="narrow prose">
+  <div class="page-head">
+    <h1>Dungeon – So funktioniert's</h1>
+  </div>
+
+  <div class="card">
+    <h2>Worum geht's?</h2>
+    <p>Alle <strong><%= settings.intervalHours %> Stunden</strong> startet ein Dungeon für je <strong>drei Spieler</strong>. Ihr kämpft euch durch zwei Gegner und am Ende gegen einen Boss. Jeder Gegner hat eine <strong>Deadline</strong>: Füllt ihr seinen Fortschrittsbalken nicht rechtzeitig, ist der Dungeon vorbei.</p>
+    <ol>
+      <li><strong>Karten wählen:</strong> Klicke eine Charakterkarte an und, wenn du willst, eine Boost-Karte. Die Karten sind ab der Anmeldung bis zum Ende des Dungeons gesperrt – verloren gehen sie nie.</li>
+      <li><strong>Allein oder als Gruppe:</strong> Allein angemeldete Spieler werden beim Start zusammengelost. Als Gruppe lädst du bis zu zwei Mitglieder ein und habt bis zum Ende einen gemeinsamen Chat. Freie Plätze übernehmen Bots mit eigenen Karten.</li>
+      <li><strong>Bis zum Start:</strong> Karten tauschen, abmelden oder die Gruppe verlassen geht bis <%= lockSeconds %> Sekunden vor dem Start.</li>
+      <li><strong>Der Kampf:</strong> Alle drei Karten arbeiten gleichzeitig, ihre Punkte landen im gemeinsamen Balken. Welche Fachrichtung (FIA, FIS oder BWL) ein Gegner braucht, verrät nur seine Geschichte – passende Karten bringen deutlich mehr.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Boost-Karten</h2>
+    <p>Boost-Karten wirken wie in der IHK zur Halbzeit eines Kampfes. Manche helfen nur dem eigenen Charakter (z. B. Energydrink oder Kaffee), andere der <strong>ganzen Gruppe</strong> – etwa Ömer, die Hundekarten oder Mauch. Dieselbe Gruppen-Fähigkeit zählt nur einmal, auch wenn sie zwei Spieler mitbringen.</p>
+  </div>
+
+  <div class="card">
+    <h2>Beute</h2>
+    <ul>
+      <li>Jeder gewonnene Kampf bringt jedem Spieler Geld: <%= euro(settings.rewards[0]) %> und <%= euro(settings.rewards[1]) %> für die beiden Gegner, <%= euro(settings.rewards[2]) %> für den Boss.</li>
+      <li>Fällt der Boss, würfelt jeder Spieler für sich: mit etwas Glück gibt es eine <strong>Folie</strong> oder die <strong>Karte des Bosses</strong>.</li>
+      <li>Verliert ihr einen Kampf, behaltet ihr das Geld der Kämpfe davor.</li>
+    </ul>
+    <p class="muted small">Die Beute siehst du am Ende in einem Fenster; Folien landen im Inventar.</p>
+  </div>
+
+  <p><a class="btn btn-ghost" href="/dungeon">← Zurück zum Dungeon</a></p>
+</div>
+
+<%- include('partials/foot') %>

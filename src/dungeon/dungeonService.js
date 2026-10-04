@@ -24,7 +24,8 @@ const TEAM_SIZE = 3;
 const LOCK_SECONDS = 10; // so lange vor dem Start kann man sich nicht mehr abmelden (und nicht mehr beitreten)
 // Wiedergabe (echte Sekunden): Einleitung, je Kampf, Pause dazwischen
 const INTRO_SECONDS = 8;
-const FIGHT_SECONDS = 40;
+const FIGHT_SECONDS = 45; // volle Zeit eines Kampfes (IHK: 15 Sekunden)
+const MIN_FIGHT_SECONDS = 20; // so lange dauert auch ein schnell gewonnener Kampf
 const PAUSE_SECONDS = 6;
 const CHAT_MAX = 100; // so viele Nachrichten bleiben im Chat
 const CHAT_TEXT_MAX = 300;
@@ -40,7 +41,7 @@ const DEFAULTS = {
   open: false,
   intervalHours: 2,
   required: [700, 850, 1200], // simuliert mit drei Bot-Karten samt Boost (Schnitt FIA/FIS/BWL): ~91 % / ~79 % / ~40 % – passende Karten deutlich mehr
-  rewards: [1000, 1500, 4000],
+  rewards: [5000, 5000, 15000],
   foilChance: 2,
   cardChance: 1,
   botWeights: { crumpled: 40, bfwler: 35, gold: 20, holo: 5, bockhaber: 0, glitch: 0, icon: 0, sith: 0 },
@@ -200,8 +201,9 @@ function fight(members, stat, required, rand = random) {
   // Fähigkeiten, die erst nach dem Sieg ausgelöst hätten, zählen nicht
   const used = abilities.filter((a) => ticks.some((x) => x.ability && x.m === a.m));
   const success = total >= required;
-  // Wiedergabe: ein gewonnener Kampf endet früher (beim Sieg), ein verlorener dauert bis zum Ablauf der Zeit
-  const seconds = Math.max(5, Math.round((FIGHT_SECONDS * (success ? doneAt : limit)) / limit * 10) / 10);
+  // Wiedergabe: ein gewonnener Kampf endet früher (beim Sieg, aber frühestens nach MIN_FIGHT_SECONDS),
+  // ein verlorener dauert bis zum Ablauf der Zeit
+  const seconds = Math.max(MIN_FIGHT_SECONDS, Math.round((FIGHT_SECONDS * (success ? doneAt : limit)) / limit * 10) / 10);
   return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, seconds };
 }
 
@@ -237,16 +239,18 @@ const makeTeams = (entries, rand = random) => {
 
 // ---------- Anmeldung ----------
 /** Freie Exemplare (nicht foliert, nicht gesperrt) – als Kartenliste für die Auswahl */
-async function availableCards(userId) {
+/** ownDungeon: die eigenen, schon für den Dungeon gesperrten Karten zählen als frei (Karten tauschen vor dem Start) */
+async function availableCards(userId, { ownDungeon = false } = {}) {
   const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
-  const ids = [...new Set(docs.filter((d) => !isLocked(locked, d)).map((d) => d.card))];
+  const free = (d) => !isLocked(locked, d) || (ownDungeon && locked.reasons.get(String(d._id)) === 'dungeon');
+  const ids = [...new Set(docs.filter(free).map((d) => d.card))];
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = ids.map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
   return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => !c.isCharacter && canBoost(c)) };
 }
 
 /** Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag */
-async function memberEntry(user, cardId, boostId, session) {
+async function memberEntry(user, cardId, boostId, session, { ownDungeon = false } = {}) {
   const card = catalog.cardById[cardId];
   if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   let boost = null;
@@ -259,6 +263,8 @@ async function memberEntry(user, cardId, boostId, session) {
     if (!owned.some((id) => isCoffee(catalog.cardById[id]))) throw new UserError(`${boost.name} kann nur ausgespielt werden, wenn du eine Kaffee-Karte besitzt.`);
   }
   const locked = await lockedDocs(user._id, session);
+  // Karten tauschen: die bisher eingesetzten Exemplare sind wieder wählbar
+  if (ownDungeon) [...locked.reasons].filter(([, r]) => r === 'dungeon').forEach(([id]) => locked.reasons.delete(id));
   const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
   const doc = await freeDoc(card.id);
   if (!doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
@@ -341,6 +347,27 @@ async function decline({ user, partyId }) {
 }
 
 /** Abmelden bzw. Gruppe verlassen (bis kurz vor dem Start). Der Leiter gibt die Leitung weiter. */
+/** Karten tauschen, ohne die Anmeldung oder Gruppe zu verlassen (bis kurz vor dem Start) */
+async function changeCards({ user, cardId, boostId }) {
+  const party = await partyOf(user._id);
+  if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
+  if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
+  await inTransaction(async (session) => {
+    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true });
+    const res = await DungeonParty.updateOne(
+      { _id: party._id, 'members.user': user._id },
+      { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc } },
+      { session }
+    );
+    if (!res.matchedCount) throw new UserError('Du bist für keinen Dungeon angemeldet.');
+  });
+}
+
+/** Beute-Fenster nur einmal zeigen: für diesen Spieler als gesehen markieren */
+async function markLootSeen(runId, userId) {
+  await DungeonRun.updateOne({ _id: runId }, { $set: { 'members.$[m].seen': true } }, { arrayFilters: [{ 'm.user': userId }] });
+}
+
 async function leave({ user }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
@@ -522,6 +549,8 @@ module.exports = {
   accept,
   decline,
   leave,
+  changeCards,
+  markLootSeen,
   chat,
   startDue,
   finishDue,

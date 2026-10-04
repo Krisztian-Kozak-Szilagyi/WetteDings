@@ -118,11 +118,23 @@
     if (!document.hidden) poll();
   }, 3000);
 
+  // ---------- Beute-Fenster: Spieler für Spieler aufdecken ----------
+  const lootDlg = document.querySelector('[data-dg-loot]');
+  if (lootDlg && typeof lootDlg.showModal === 'function') {
+    lootDlg.showModal();
+    const rows = [...lootDlg.querySelectorAll('[data-dg-loot-row]')];
+    rows.forEach((row, i) => setTimeout(() => row.classList.add('is-shown'), 400 + i * 700));
+    lootDlg.querySelector('[data-dg-loot-close]').addEventListener('click', () => lootDlg.close());
+  }
+
   // ---------- Wiedergabe der Kämpfe ----------
   // Ablauf: Einleitung, dann je Kampf seine Dauer (gewonnene enden beim Sieg) und eine Pause mit Countdown.
   const dataEl = document.getElementById('dg-playback');
   if (!dataEl) return;
   const pb = JSON.parse(dataEl.textContent);
+  pb.fights.forEach((f) => {
+    f.seconds = f.seconds || pb.fightSeconds;
+  });
   const pbOffset = Date.now() - pb.now;
   const elapsed = () => (Date.now() - pbOffset - pb.startedAt) / 1000;
   const starts = [];
@@ -186,10 +198,12 @@
 
   const secs = (x) => Math.max(0, Math.ceil(x)) + ' s';
 
+  // Fortschritt füllt sich bis zum Ziel; die Deadline läuft ab
   function setBars(f, done, game) {
-    const left = Math.max(0, f.required - done);
-    hpBar.style.width = (left / f.required) * 100 + '%';
-    hpLabel.textContent = left ? left + ' / ' + f.required : 'Besiegt!';
+    const have = Math.min(done, f.required);
+    const left = f.required - have;
+    hpBar.style.width = (have / f.required) * 100 + '%';
+    hpLabel.textContent = left ? have + ' / ' + f.required : 'Geschafft!';
     const timeLeft = Math.max(0, f.limit - game) / f.limit;
     timeBar.style.width = timeLeft * 100 + '%';
     timeBar.classList.toggle('is-low', timeLeft < 0.25);

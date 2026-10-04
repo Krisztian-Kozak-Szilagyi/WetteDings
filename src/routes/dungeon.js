@@ -50,7 +50,7 @@ const playback = (run, d, now) => ({
   pause: dungeon.PAUSE_SECONDS,
   fights: run.fights.map((f, i) => {
     const def = d.fights[i] || {};
-    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit, seconds: f.seconds, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
+    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
   }),
 });
 
@@ -75,8 +75,16 @@ router.get('/dungeon', async (req, res) => {
   }
   while (slots.length < dungeon.TEAM_SIZE) slots.push({ empty: true, solo: phase === 'solo' });
 
-  const needCards = phase === 'frei';
-  const cards = needCards ? await dungeon.availableCards(me) : null;
+  // Kartenauswahl: zum Anmelden/Beitreten – und angemeldet zum Tauschen (eigene Dungeon-Karten zählen als frei)
+  const mine = party ? party.members.find((m) => same(m.user, me)) : null;
+  const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party });
+
+  // Beute-Fenster: einmal nach dem Ende des Durchlaufs
+  const myRunEntry = run && run.status === 'fertig' ? run.members.find((m) => same(m.user, me)) : null;
+  const loot = myRunEntry && !myRunEntry.seen
+    ? { success: run.success, players: run.members.filter((m) => m.user).map((m) => ({ name: m.name, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
+    : null;
+  if (loot) await dungeon.markLootSeen(run._id, me);
 
   res.render('dungeon', {
     title: 'Dungeon',
@@ -97,6 +105,8 @@ router.get('/dungeon', async (req, res) => {
     playback: running && runDungeon ? playback(running, runDungeon, now) : null,
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
+    current: mine ? { card: mine.card, boost: mine.boost } : null,
+    loot,
     rarityByKey: catalog.rarityByKey,
     settings: dungeon.settings,
     chatMax: dungeon.CHAT_TEXT_MAX,
@@ -134,6 +144,12 @@ const partyId = (req) => {
 
 router.post('/dungeon/anmelden', (req, res) =>
   handle(req, res, () => dungeon.register({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null, solo: str(req.body.mode) !== 'gruppe' }).then(() => null))
+);
+
+router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS }));
+
+router.post('/dungeon/karten', (req, res) =>
+  handle(req, res, () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null }).then(() => null))
 );
 
 router.post('/dungeon/einladen', (req, res) => handle(req, res, () => dungeon.invite({ user: req.user, name: str(req.body.name) }).then(() => null)));

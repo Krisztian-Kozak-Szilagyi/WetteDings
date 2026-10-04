@@ -3825,7 +3825,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-slot.is-me .dg-slot-card > img:first-child { box-shadow: 0 0 0 2px var(--color-accent-300), 0 10px 24px rgba(0, 0, 0, .45); }
 .dg-slot.is-bot .dg-slot-card > img:first-child { filter: saturate(.75); }
 .dg-slot.is-casting .dg-slot-card > img:first-child { box-shadow: 0 0 0 2px #e9c766, 0 0 30px rgba(233, 199, 102, .7); }
-.dg-slot-boost { position: absolute; right: -8px; bottom: -8px; width: 38% !important; border-radius: 6px !important; transform: rotate(8deg); }
 .dg-slot-placeholder { display: grid; place-items: center; aspect-ratio: 720 / 1008; width: 100%; border-radius: 10px; border: 2px dashed var(--color-neutral-700); color: var(--color-neutral-500); font-size: 13px; text-align: center; padding: 10px; background: rgba(255, 255, 255, .02); }
 .dg-slot.is-invited .dg-slot-placeholder { border-color: var(--color-accent-700); color: var(--color-accent-400); }
 .dg-slot-name { font-weight: 600; font-size: 14px; text-align: center; overflow-wrap: anywhere; }
@@ -3895,11 +3894,10 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 
 /* Dungeon: Balken im Kampf (Gegner und Zeit) und Countdown in den Pausen */
 .dg-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-.dg-bar { display: grid; grid-template-columns: 58px minmax(0, 1fr) 92px; align-items: center; gap: 10px; }
+.dg-bar { display: grid; grid-template-columns: 96px minmax(0, 1fr) 92px; align-items: center; gap: 10px; }
 .dg-bar-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-400); }
 .dg-bar-track { position: relative; display: block; height: 16px; border-radius: 8px; background: rgba(0, 0, 0, .55); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); overflow: hidden; }
 .dg-bar-fill { position: absolute; inset: 0 auto 0 0; width: 100%; transition: width .25s linear; }
-.dg-bar.is-hp .dg-bar-fill { background: linear-gradient(90deg, #991b1b, #ef4444); }
 .dg-bar.is-time .dg-bar-track { height: 10px; }
 .dg-bar.is-time .dg-bar-fill { background: linear-gradient(90deg, #b45309, #fbbf24); }
 .dg-bar.is-time .dg-bar-fill.is-low { background: linear-gradient(90deg, #b91c1c, #f97316); animation: dg-blink 1s steps(2) infinite; }
@@ -3908,14 +3906,51 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-next { margin: 4px 0 0; font-size: 15px; font-weight: 600; color: var(--color-accent-300); }
 @keyframes dg-blink { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .dg-bar.is-time .dg-bar-fill.is-low { animation: none; } }
-@media (max-width: 480px) { .dg-bar { grid-template-columns: 48px minmax(0, 1fr) 74px; gap: 8px; } }
+@media (max-width: 480px) { .dg-bar { grid-template-columns: 82px minmax(0, 1fr) 64px; gap: 8px; } }
 
-/* Dungeon-Start-Kacheln: Figur oben, Stempel darunter (verdeckt den Körper nicht); beim Hover hebt sich die Figur */
-.dg-start-tiles .ihk-start-art { width: 62px; height: 66px; }
-.dg-start-tiles .ihk-start-doc { left: 50%; top: 0; transform: translateX(-50%); transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+
+/* Dungeon-Start-Kacheln: Stempel wie in der IHK (schräg oben, beim Hover nach unten – hier etwas weiter),
+   die Figur hebt sich beim Hover ein wenig */
+.dg-start-tiles .ihk-start-art { width: 64px; }
+.dg-start-tiles .ihk-start-doc { left: 8px; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
 .dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-doc,
-.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-doc { transform: translateX(-50%) translateY(-6px); }
-.dg-start-tiles .ihk-start-stamp { left: 50%; right: auto; bottom: 0; padding: 2px 5px; font-size: 9px; letter-spacing: .06em; transform: translateX(-50%) rotate(-8deg); }
+.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-doc { transform: rotate(-6deg) translateY(-5px); }
 .dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-stamp,
-.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-stamp { transform: translateX(-50%) rotate(-8deg) scale(1.08); }
+.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-stamp { transform: rotate(-12deg) translateY(6px); }
 @media (prefers-reduced-motion: reduce) { .dg-start-tiles .ihk-start-doc { transition: none; } }
+
+/* Dungeon: unter dem Bild Stationen und Balken */
+.dg-hero-wrap { display: flex; flex-direction: column; gap: 12px; }
+.dg-under { display: flex; flex-direction: column; gap: 12px; }
+.dg-under .dg-steps { margin: 0; }
+.dg-under .dg-steps li { background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.dg-under .dg-steps li.is-active { box-shadow: 0 0 0 1px var(--color-accent-400); }
+.dg-bar.is-progress .dg-bar-fill { width: 0; background: linear-gradient(90deg, #15803d, #4ade80); }
+
+/* Boost-Karte unter jedem Platz */
+.dg-slot-boostrow { display: flex; align-items: center; gap: 8px; max-width: 200px; width: 100%; padding: 6px 8px; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); font-size: 12px; }
+.dg-slot-boostrow img { width: 30px; height: auto; border-radius: 4px; flex: none; }
+.dg-slot-boostrow > span { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dg-slot-boostrow.is-none { color: var(--color-neutral-500); }
+.dg-boost-kicker { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+
+.dg-swap summary { cursor: var(--cur-pointer); font-weight: 600; }
+.dg-swap[open] summary { margin-bottom: 8px; }
+.dg-swap > p { margin: 0; }
+.dg-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+.dg-foot a:only-child { margin-left: auto; }
+
+/* Beute-Fenster */
+.dg-loot { width: min(92vw, 440px); padding: 22px; border: 0; border-radius: var(--radius-lg); color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-lg); }
+.dg-loot::backdrop { background: rgba(8, 9, 16, .7); }
+.dg-loot h2 { margin: 4px 0 14px; }
+.dg-loot-list { margin: 0 0 18px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.dg-loot-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-bg); opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
+.dg-loot-row.is-shown { opacity: 1; transform: none; }
+.dg-loot-row.is-me { box-shadow: 0 0 0 1px var(--color-accent-400); }
+.dg-loot-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.dg-loot-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 13px; background: var(--color-neutral-900); }
+.dg-loot-chip.is-money { color: #86efac; }
+.dg-loot-chip.is-foil { color: #a8d8ff; }
+.dg-loot-chip.is-card { color: #e9c766; }
+@media (prefers-reduced-motion: reduce) { .dg-loot-row { transition: none; } }

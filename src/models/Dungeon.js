@@ -46,6 +46,7 @@ const runSchema = new Schema(
             reward: { type: Number, default: 0 }, // Cent
             foil: { type: Boolean, default: false }, // Folie vom Boss
             bossCard: { type: Boolean, default: false }, // Boss-Karte (wird nachgereicht, sobald sie gezeichnet ist)
+            seen: { type: Boolean, default: false }, // Beute-Fenster schon gezeigt
           },
           { _id: false }
         ),
