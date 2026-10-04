@@ -3017,7 +3017,6 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 }
 .lotto-prize-img img:nth-last-child(2) { transform: translateX(-10px) rotate(-9deg); }
 .lotto-prize-img img:nth-last-child(3) { transform: translateX(10px) rotate(9deg); }
-.lotto-bank { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--color-neutral-400); }
 .lotto-history-items { display: block; font-size: 11px; color: var(--color-neutral-500); }
 
 /* Kacheln zu den anderen Lotterien (im Stil der Album-Kachel) */
@@ -3037,6 +3036,14 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   box-shadow: 0 12px 26px rgba(0, 0, 0, .55), 0 0 0 1px var(--color-neutral-800);
 }
 .lotto-tile-fan img:nth-child(2) { z-index: 1; }
+/* Monats-Lotterie: Folie so hoch wie ein Pack, daneben eine Geld-Karte */
+.lotto-tile-fan img.is-foil { left: -36.5px; width: 73px; }
+.lotto-tile-cash {
+  left: -32px; top: 0; width: 64px; height: 102px; display: flex; align-items: center; justify-content: center; border-radius: 6px;
+  font-size: 36px; font-weight: 500; color: var(--color-accent-300); text-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 60%, transparent);
+  background: radial-gradient(90% 60% at 50% 40%, var(--color-accent-800), transparent 80%), linear-gradient(160deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .55), 0 0 0 1px var(--color-neutral-800), inset 0 0 0 4px var(--color-surface), inset 0 0 0 5px var(--color-accent-700);
+}
 .lotto-tile-fan > :nth-child(1) { transform: translateX(-26px) rotate(-10deg); }
 .lotto-tile-fan > :nth-child(3) { transform: translateX(26px) rotate(10deg); }
 .lotto-tile:hover .lotto-tile-fan > :nth-child(1) { transform: translateX(-48px) rotate(-16deg); }

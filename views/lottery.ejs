@@ -42,8 +42,6 @@
               <strong><%= round.prizeFoils %>×</strong><span><%= round.prizeFoils === 1 ? 'Folie' : 'Folien' %></span>
             </div>
           <% } %>
-          <% const bank = [round.prizeCash ? euro(round.prizeCash) : '', round.prizePacks ? round.prizePacks + (round.prizePacks === 1 ? ' Booster Pack' : ' Booster Packs') : '', round.prizeFoils ? round.prizeFoils + (round.prizeFoils === 1 ? ' Folie' : ' Folien') : ''].filter(Boolean); %>
-          <p class="lotto-bank"><%= bank.length ? 'Die Bank legt ' + bank.join(' + ') + ' drauf' : 'Kein Bank-Gewinn' %> · plus alle Einsätze</p>
         </div>
       <% } %>
       <div class="lotto-countdown" data-countdown-parts="<%= new Date(round.drawAt).getTime() %>">
@@ -143,8 +141,13 @@
               <span class="lotto-ticket">7</span><span class="lotto-ticket">13</span><span class="lotto-ticket">42</span>
             <% } else { %>
               <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
-              <img src="<%= tr.prizeFoils ? prizeImages.folie : prizeImages.pack %>" alt="" width="720" height="1008" loading="lazy">
-              <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
+              <% if (t.key === 'monat') { %>
+                <img class="is-foil" src="<%= prizeImages.folie %>" alt="" width="720" height="1008" loading="lazy">
+                <span class="lotto-tile-cash">€</span>
+              <% } else { %>
+                <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
+                <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
+              <% } %>
             <% } %>
           </span>
           <span class="tcg-album-foot">
