@@ -16,7 +16,7 @@
 <div class="stats stats-auto">
   <div class="stat card"><span class="stat-label">Verfügbar</span><span class="stat-value"><%= euro(currentUser.balance) %></span></div>
   <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
-  <div class="stat card"><span class="stat-label">In Samantha Coin</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/coin-exchange">Zur Coin Exchange</a></div>
+  <div class="stat card"><span class="stat-label">Im Broker</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/broker">Zum Broker</a></div>
   <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><span class="muted small">inkl. ungeöffneter Packs</span></div>
   <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
 </div>
@@ -83,7 +83,7 @@
         <% ledger.forEach((l) => { %>
           <tr>
             <td class="nowrap"><%= date(l.createdAt) %></td>
-            <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } else if (l.betTitle) { %> · <span class="muted"><%= l.betTitle %></span><% } %></td>
+            <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } else if (l.betTitle) { %> · <span class="muted"><%= l.betTitle %></span><% } else if (l.type === 'coin_kauf' || l.type === 'coin_verkauf') { %> · <span class="muted">Samantha Coin</span><% } %></td>
             <td class="num <%= l.amount > 0 ? 'pos' : 'neg' %>"><%= l.amount > 0 ? '+' : '' %><%= euro(l.amount) %></td>
           </tr>
         <% }) %>

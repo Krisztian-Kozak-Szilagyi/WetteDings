@@ -6,7 +6,7 @@ const config = require('./src/config');
 const { createApp } = require('./src/app');
 const { startJobs } = require('./src/jobs');
 const { migrate } = require('./src/migrate');
-const coinEngine = require('./src/coin/engine');
+const markets = require('./src/coin/markets');
 const tcgSettings = require('./src/tcg/settings');
 
 async function main() {
@@ -26,7 +26,7 @@ async function main() {
   await require('./src/forum/forumService').seed(); // Forum: Bereiche beim ersten Start
   await require('./src/forum/forumService').migratePatchnotes(); // alte Patchnotes ins Forum
   await require('./src/services/roles').load(); // Devs für die Abzeichen neben Namen
-  await coinEngine.start();
+  await markets.start(); // Broker: SAM, COW, BTCG
 
   const app = createApp();
   const server = app.listen(config.port, config.host, () => {
@@ -37,7 +37,7 @@ async function main() {
   const shutdown = async (signal) => {
     console.log(`${signal} empfangen, fahre herunter …`);
     setTimeout(() => process.exit(1), 10000).unref();
-    await coinEngine.stop(); // Kurs zuerst speichern
+    await markets.stop(); // Kurse zuerst speichern
     server.close(async () => {
       await mongoose.disconnect();
       process.exit(0);

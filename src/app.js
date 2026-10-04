@@ -127,6 +127,7 @@ function createApp() {
   app.use(dailyBonus);
   app.use(csrf);
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
+  app.use(require('./coin/etfTrend').trackPulse); // Aktionen der Mitglieder bewegen den BfW-TCG ETF
   // Abzeichen im Menü. Alle Zähler laufen gleichzeitig – so kostet das pro Seitenaufruf nur die Dauer der
   // langsamsten Abfrage statt der Summe aller (die Datenbank liegt nicht auf diesem Server).
   app.use(async (req, res, next) => {

@@ -21,7 +21,7 @@
 
   function greeting() {
     return 'Hallo ' + name + '! Ich bin Warren Buffett, der Support-Bot von BfW Holdings. ' +
-      'Frag mich alles zur Seite – Wetten, Coin Exchange, Lotterie, TCG oder dein Konto.';
+      'Frag mich alles zur Seite – Wetten, Broker, Lotterie, TCG oder dein Konto.';
   }
 
   // Falls das Modell doch Markdown schickt: Zeichen entfernen, Text behalten

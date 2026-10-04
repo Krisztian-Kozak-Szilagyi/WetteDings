@@ -7,6 +7,7 @@
   var POLL_MS = 5000;
   var HISTORY_REFRESH_MS = 60000;
   var UNITS = 1e8;
+  var SYMBOL = chartEl.getAttribute('data-symbol') || 'SAM';
   var SPANS = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3, '30d': 30 * 86400e3, all: null };
 
   var svg = chartEl.querySelector('.chart-svg');
@@ -28,7 +29,7 @@
   var euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   function fmtEuro(cents) { return euroFmt.format(cents / 100); }
   function fmtPct(x) { return (x > 0 ? '+' : '') + (x * 100).toFixed(2).replace('.', ',') + ' %'; }
-  function fmtCoins(units) { return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format(units / UNITS) + ' SAM'; }
+  function fmtCoins(units) { return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format(units / UNITS) + ' ' + SYMBOL; }
   function fmtTime(t) {
     var d = new Date(t);
     if (range === '1h' || range === '24h') return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -145,7 +146,7 @@
 
   // ---------- Daten laden ----------
   function loadHistory() {
-    return fetch('/coin-exchange/api/verlauf?bereich=' + encodeURIComponent(range), { credentials: 'same-origin' })
+    return fetch('/broker/api/verlauf?wert=' + encodeURIComponent(SYMBOL) + '&bereich=' + encodeURIComponent(range), { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (data) {
         if (data.range !== range) return;
@@ -181,7 +182,7 @@
   }
 
   function poll() {
-    fetch('/coin-exchange/api/kurs', { credentials: 'same-origin' })
+    fetch('/broker/api/kurs?wert=' + encodeURIComponent(SYMBOL), { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (s) {
         var priceEl = document.querySelector('[data-live-price]');
@@ -196,6 +197,7 @@
         setText('[data-live-high]', fmtPrice(s.high24h));
         setText('[data-live-low]', fmtPrice(s.low24h));
         setText('[data-live-ath]', fmtPrice(s.ath));
+        setText('[data-asset-price="' + SYMBOL + '"]', fmtPrice(s.price));
         updateDepot(s.price);
         updateMinBuy(s.price);
         addLivePoint(s.at, s.price);

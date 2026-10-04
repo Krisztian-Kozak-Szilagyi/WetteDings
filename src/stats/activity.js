@@ -17,6 +17,7 @@ const AREAS = {
   ihk: 'ihk',
   dungeon: 'ihk',
   grading: 'grading',
+  broker: 'coin',
   'coin-exchange': 'coin',
   lotterie: 'lotterie',
   forum: 'forum',

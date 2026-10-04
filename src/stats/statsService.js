@@ -654,7 +654,7 @@ async function games(p) {
         },
       },
     ]),
-    CoinHour.aggregate([{ $match: inP(p, 't') }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }, { $sort: { _id: 1 } }]),
+    CoinHour.aggregate([{ $match: { coin: 'SAM', ...inP(p, 't') } }, { $sort: { t: 1 } }, { $group: { _id: dayOf('$t'), c: { $last: '$c' } } }, { $sort: { _id: 1 } }]),
     CoinTrade.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), side: '$side' }, s: { $sum: '$cents' }, users: { $addToSet: '$user' } } }]),
     LotteryRound.find({ status: 'gezogen', ...inP(p, 'drawnAt') }).sort({ drawnAt: 1 }).lean(),
   ]);
@@ -767,17 +767,17 @@ async function games(p) {
     },
     {
       id: 'coin',
-      title: 'Samantha Coin',
+      title: 'Broker (Coins & ETF)',
       question: 'Wie entwickelt sich der Kurs – und gewinnen oder verlieren die Spieler?',
       kpis: [
-        { id: 'kurs', label: 'Kurs am Ende des Zeitraums', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
+        { id: 'kurs', label: 'SAM-Kurs am Ende des Zeitraums', value: coinDays.length ? coinDays[coinDays.length - 1].c : null, unit: 'price' },
         { id: 'coin-netto', label: 'Coin: Gewinn/Verlust der Spieler', value: sells - buys, unit: 'euro', signed: true, compare: true, hint: 'Verkäufe − Käufe im Zeitraum. Positiv: Coins bringen Geld ins Spiel.' },
         { id: 'coin-kaeufe', label: 'Käufe', value: buys, unit: 'euro', compare: true },
         { id: 'coin-verkaeufe', label: 'Verkäufe', value: sells, unit: 'euro', compare: true },
         { id: 'coin-haendler', label: 'Aktive Coin-Händler', value: traders.size, unit: 'count', compare: true },
       ],
       charts: [
-        { id: 'kurs', title: 'Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
+        { id: 'kurs', title: 'SAM-Kurs (Tagesschluss)', type: 'line', unit: 'price', agg: 'last', series: [{ name: 'Kurs', values: byDays(p.days, toMap(coinDays, 'c'), null) }] },
         {
           id: 'coinvolumen',
           title: 'Handelsvolumen',

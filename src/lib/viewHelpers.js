@@ -101,8 +101,8 @@ const ledgerLabels = {
   provision: 'Provision (Wettersteller)',
   provision_schiri: 'Provision (Schiedsrichter)',
   bonus: 'Tagesbonus',
-  coin_kauf: 'Samantha Coin gekauft',
-  coin_verkauf: 'Samantha Coin verkauft',
+  coin_kauf: 'Broker: Kauf',
+  coin_verkauf: 'Broker: Verkauf',
   lotto_los: 'Lotterielos gekauft',
   lotto_gewinn: 'Lotteriegewinn',
   tcg_pack: 'Booster Pack gekauft',
@@ -126,9 +126,9 @@ function coinPrice(p) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(p);
 }
 
-/** Coin-Menge aus Einheiten (1e-8), z. B. "12,3456 SAM" */
-function coinAmount(units) {
-  return `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format((units || 0) / 1e8)} SAM`;
+/** Menge eines Broker-Werts aus Einheiten (1e-8), z. B. "12,3456 SAM" */
+function coinAmount(units, symbol = 'SAM') {
+  return `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 }).format((units || 0) / 1e8)} ${symbol}`;
 }
 
 /** Prozent mit Vorzeichen, z. B. "+4,21 %" */

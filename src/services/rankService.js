@@ -1,6 +1,6 @@
 // Rangliste nach Gesamtvermögen – und die Zeit, die ein Mitglied auf Platz 1 verbracht hat
 const User = require('../models/User');
-const coinEngine = require('../coin/engine');
+const markets = require('../coin/markets');
 const tcgSettings = require('../tcg/settings');
 const { sellValueExpr } = require('../tcg/tcgService');
 
@@ -9,10 +9,13 @@ const MAX_GAP_MS = 5 * 60 * 1000; // längere Pausen (Neustart, Ausfall) zählen
 
 /**
  * Alle Mitglieder nach Gesamtvermögen, bestes zuerst. Gesamtvermögen = Kontostand + offene Einsätze + Wert der
- * Samantha Coins zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis).
+ * Broker-Bestände (Coins, ETF) zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis).
  */
 function ranking({ limit = 0 } = {}) {
-  const centsPerUnit = coinEngine.isRunning() ? (coinEngine.getPrice() * 100) / 1e8 : 0;
+  // Cent je Einheit (1e-8) für jeden laufenden Broker-Wert
+  const prices = markets.prices();
+  const branches = Object.entries(prices).map(([sym, p]) => ({ case: { $eq: ['$$h.coin', sym] }, then: (p * 100) / 1e8 }));
+  const centsPerUnit = branches.length ? { $switch: { branches, default: 0 } } : 0;
   const pipeline = [
     { $match: { deletedAt: null } }, // gelöschte Konten erscheinen nicht
     {
@@ -50,7 +53,7 @@ function ranking({ limit = 0 } = {}) {
     {
       $addFields: {
         inPlay: { $ifNull: [{ $first: '$open.s' }, 0] },
-        coinValue: { $floor: { $multiply: [{ $ifNull: [{ $sum: '$coins.units' }, 0] }, centsPerUnit] } },
+        coinValue: { $floor: { $sum: { $map: { input: '$coins', as: 'h', in: { $multiply: ['$$h.units', centsPerUnit] } } } } },
         cardValue: { $add: [{ $ifNull: [{ $first: '$cards.s' }, 0] }, { $multiply: [{ $size: '$packs' }, tcgSettings.getPackPrice()] }] },
       },
     },

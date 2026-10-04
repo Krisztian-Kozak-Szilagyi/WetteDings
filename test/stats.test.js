@@ -51,6 +51,7 @@ test('Aktivität: Bereich aus dem Pfad', () => {
   assert.equal(areaOf('/handel/tausch'), 'handel');
   assert.equal(areaOf('/wetten/abc/entscheiden'), 'wetten');
   assert.equal(areaOf('/coin-exchange'), 'coin');
+  assert.equal(areaOf('/broker/cow'), 'coin');
   assert.equal(areaOf('/irgendwas'), 'sonstiges');
 });
 

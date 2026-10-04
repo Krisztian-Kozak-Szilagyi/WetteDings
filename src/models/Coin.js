@@ -16,6 +16,10 @@ const coinStateSchema = new Schema(
       type: new Schema({ slot: Number, at: Number, log: Number }, { _id: false }),
       default: null,
     },
+    // Nur ETF: Trend (Log-Rendite pro Tag), sein Zielwert aus der Aktivität und die Marktstimmung (−1 … +1)
+    mu: { type: Number, default: 0 },
+    muTarget: { type: Number, default: 0 },
+    sentiment: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

@@ -5,7 +5,7 @@ const StatDaily = require('../models/StatDaily');
 const { TcgCard, TcgPack } = require('../models/Tcg');
 const { CoinHolding } = require('../models/Coin');
 const { Trade, openFilter } = require('../models/Trade');
-const coinEngine = require('../coin/engine');
+const markets = require('../coin/markets');
 const tcgSettings = require('../tcg/settings');
 const { ranking } = require('../services/rankService');
 const bonusService = require('../services/bonusService');
@@ -61,7 +61,7 @@ async function collect(now = new Date()) {
     User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
     TcgCard.aggregate([{ $group: { _id: '$rarity', n: { $sum: 1 } } }]),
     TcgPack.countDocuments(),
-    CoinHolding.aggregate([{ $match: { units: { $gt: 0 } } }, { $group: { _id: null, units: { $sum: '$units' }, holders: { $sum: 1 } } }]),
+    CoinHolding.aggregate([{ $match: { units: { $gt: 0 } } }, { $group: { _id: '$coin', units: { $sum: '$units' }, holders: { $sum: 1 } } }]),
     Trade.aggregate([{ $match: openFilter() }, { $group: { _id: '$kind', n: { $sum: 1 } } }]),
     Bet.countDocuments({ status: 'offen' }),
     Bet.countDocuments(disputedFilter()),
@@ -81,7 +81,17 @@ async function collect(now = new Date()) {
       gradingActive: grading,
       total: distribution(players.map((p) => p.total)),
     },
-    coin: { price: coinEngine.isRunning() ? coinEngine.getPrice() : null, units: coins[0] ? coins[0].units : 0, holders: coins[0] ? coins[0].holders : 0 },
+    // coin = Samantha Coin (wie bisher), coins = alle Broker-Werte je Symbol
+    coin: (() => {
+      const sam = coins.find((c) => c._id === 'SAM');
+      return { price: markets.get('SAM').isRunning() ? markets.get('SAM').getPrice() : null, units: sam ? sam.units : 0, holders: sam ? sam.holders : 0 };
+    })(),
+    coins: Object.fromEntries(
+      markets.LIST.map((e) => {
+        const c = coins.find((x) => x._id === e.SYMBOL);
+        return [e.SYMBOL, { price: e.isRunning() ? e.getPrice() : null, units: c ? c.units : 0, holders: c ? c.holders : 0 }];
+      })
+    ),
     cards: { total: Object.values(byRarity).reduce((s, n) => s + n, 0), byRarity, packsUnopened, packPrice: tcgSettings.getPackPrice() },
     market: countBy(offers),
     bets: { open: openBets, disputed },
