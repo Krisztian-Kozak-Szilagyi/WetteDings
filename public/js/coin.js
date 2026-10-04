@@ -313,6 +313,18 @@
     });
   });
 
+  // ---------- Marktereignisse: nur so viele, wie neben "Deine letzten Trades" ganz hineinpassen ----------
+  var eventsBox = document.querySelector('[data-events]');
+  function fitEvents() {
+    if (!eventsBox) return;
+    var items = eventsBox.querySelectorAll('.event');
+    items.forEach(function (li) { li.hidden = false; });
+    var bottom = eventsBox.getBoundingClientRect().bottom;
+    items.forEach(function (li) { if (li.getBoundingClientRect().bottom > bottom + 1) li.hidden = true; });
+  }
+  fitEvents();
+  window.addEventListener('resize', function () { clearTimeout(fitEvents.t); fitEvents.t = setTimeout(fitEvents, 120); });
+
   loadHistory();
   setInterval(poll, POLL_MS);
   historyTimer = setInterval(loadHistory, HISTORY_REFRESH_MS);

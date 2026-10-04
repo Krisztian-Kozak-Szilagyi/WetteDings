@@ -4352,3 +4352,11 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-depot-box { align-items: center; }
 .bx-row-head .bx-sort.bx-col-price, .bx-row-head .bx-sort.bx-col-depot { justify-content: center; padding-right: 0; }
 .bx-row-head .bx-sort.bx-col-price::after, .bx-row-head .bx-sort.bx-col-depot::after { content: ''; flex: none; width: 1.2em; } /* Gegengewicht zum Pfeil: Text bleibt mittig */
+
+/* Marktereignisse: nie länger als "Deine letzten Trades" daneben (nur wenn beide Spalten nebeneinander stehen);
+   coin.js blendet Ereignisse aus, die nicht mehr ganz hineinpassen */
+.coin-lists { container-type: inline-size; }
+@container (min-width: 544px) {
+  .coin-list-events { contain: size; min-height: 230px; overflow: hidden; }
+}
+.coin-list .event[hidden] { display: none; }

@@ -26,7 +26,7 @@ async function page(req, res, engine) {
   const [holdings, trades, events] = await Promise.all([
     trade.getHoldings(req.user._id),
     CoinTrade.find({ user: req.user._id, coin: symbol }).sort({ createdAt: -1 }).limit(10).lean(),
-    engine.recentEvents(8),
+    engine.recentEvents(10),
   ]);
   const holding = holdings[symbol];
   const snap = engine.snapshot();
