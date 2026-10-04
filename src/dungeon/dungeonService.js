@@ -41,7 +41,12 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 const DEFAULTS = {
   open: false,
   intervalHours: 2,
-  required: [700, 850, 1200], // simuliert mit drei Bot-Karten samt Boost (Schnitt FIA/FIS/BWL): ~91 % / ~79 % / ~40 % – passende Karten deutlich mehr
+  // Simuliert mit EINEM Team für alle drei Kämpfe (Kampf 1 BWL, Kampf 2 FIA, Boss FIS), je 1500 Läufe:
+  // - nur Crumpled/BFWler: Kampf 1 nur perfekt kombiniert (~23 %), Kampf 2 praktisch nie
+  // - bis Gold: optimal kombiniert Kampf 1+2 sicher, Boss nie
+  // - Voll-Holo optimal kombiniert: Boss ~55 %; mit einer Bockhaber ~98 % (passende Werte ohne Kombos ~64 %)
+  // - Glitch im Team: sicher. Drei Bots (Standard-Gewichte) schaffen kaum Kampf 1.
+  required: [1950, 2550, 3200],
   rewards: [5000, 5000, 15000],
   foilChance: 2,
   cardChance: 1,

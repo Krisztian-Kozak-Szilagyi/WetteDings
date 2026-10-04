@@ -38,6 +38,8 @@ test('Der Dungeon wechselt mit jedem Termin', () => {
   const b = d.slotAfter(a.getTime(), 2);
   assert.notEqual(dungeonForSlot(a, 2).key, dungeonForSlot(b, 2).key);
   for (const dg of DUNGEONS) {
+    // gleiche Reihenfolge der Fachrichtungen in allen Dungeons – die Ziel-Punkte gelten für alle (Balancing)
+    assert.deepEqual(dg.fights.map((f) => f.stat), ['bwl', 'fia', 'fis']);
     assert.equal(dg.fights.length, 3);
     assert.equal(dg.fights.filter((f) => f.boss).length, 1);
     assert.ok(dg.fights[2].boss);
