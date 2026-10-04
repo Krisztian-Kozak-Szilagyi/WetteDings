@@ -333,7 +333,7 @@ async function inventory(userId) {
 function sellValueExpr(field = '$rarity') {
   const sell = {
     $switch: {
-      branches: catalog.RARITIES.map((r) => ({ case: { $eq: [field, r.key] }, then: r.sell })),
+      branches: catalog.ALL_RARITIES.map((r) => ({ case: { $eq: [field, r.key] }, then: r.sell })),
       default: 0,
     },
   };

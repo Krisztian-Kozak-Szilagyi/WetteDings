@@ -1,9 +1,7 @@
 <%- include('partials/head') %>
 <%
   const owned = rows.filter((r) => r.value > 0).length;
-  const mark = (r) => r.symbol === 'SAM'
-    ? '<img class="bx-mark-img" src="/img/sam-coin.svg?v=' + assetVersion + '" alt="" width="36" height="36">'
-    : '<span class="asset-mark bx-mark asset-mark-' + r.symbol.toLowerCase() + '" aria-hidden="true">' + (r.symbol === 'BTCG' ? 'B·TCG' : r.symbol) + '</span>';
+  const mark = (r) => include('partials/asset-mark', { sym: r.symbol, px: 36, imgClass: 'bx-mark-img', markClass: 'bx-mark' });
 %>
 
 <div class="bx-head">

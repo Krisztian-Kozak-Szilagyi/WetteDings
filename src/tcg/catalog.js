@@ -49,9 +49,10 @@ const TOTAL_WEIGHT = RARITIES.reduce((s, r) => s + r.weight, 0);
 /**
  * Seltenheiten, die nie aus Packs kommen, sondern nur als Beute (z. B. Boss-Karte aus dem Dungeon).
  * Sie stehen nicht in RARITIES (Pack-Chancen, Admin-Chancen, Bots, Grading bleiben unberührt), sind aber über
- * rarityByKey, cardsByRarity und visibleRarities() überall bekannt. noBank = die Bank kauft sie nicht an.
+ * rarityByKey, cardsByRarity und visibleRarities() überall bekannt. noBank = die Bank kauft sie nicht an;
+ * sell ist dann nur der Kartenwert (zählt zum Vermögen, foliert mit Wertsteigerung), kein Ankaufspreis.
  */
-const DROP_RARITIES = [{ key: 'boss', label: 'Boss', weight: 0, sell: 0, dropOnly: true, noBank: true }];
+const DROP_RARITIES = [{ key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true }];
 const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES];
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
 // Die Chancen ergeben dabei immer zusammen TOTAL_WEIGHT (= 100 %).

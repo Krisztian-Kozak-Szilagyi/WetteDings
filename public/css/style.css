@@ -447,7 +447,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .coin-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .coin-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .coin-id h1 { margin: 0; }
-.sam-mark { width: 52px; height: 52px; flex: none; }
+.coin-logo { width: 52px; height: 52px; flex: none; }
 .coin-symbol { font-weight: 600; font-size: .7em; }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ja); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ja) 60%, transparent); animation: pulse 2s infinite; }
@@ -4252,7 +4252,6 @@ a.dg-start-tile:hover { color: var(--text); }
 .asset-tab-price .pos, .asset-tab-price .neg { font-size: 12px; margin-left: 4px; }
 .asset-tab-own { font-size: 11px; color: var(--color-neutral-500); }
 .asset-mark { display: grid; place-items: center; width: 56px; height: 56px; flex: none; border-radius: 50%; font-size: 14px; font-weight: 700; letter-spacing: .02em; color: #fff; }
-.asset-mark-cow { background: radial-gradient(circle at 30% 30%, #f5d76e, #b8860b 70%); color: #2a1c00; box-shadow: 0 0 18px rgba(245, 215, 110, .35); }
 .asset-mark-btcg { border-radius: 14px; font-size: 12px; background: linear-gradient(140deg, #4f6bd8, #24306b); box-shadow: 0 0 18px rgba(79, 107, 216, .35); }
 .etf-mood { display: block; margin-top: 4px; font-size: 12px; color: var(--color-neutral-400); }
 .etf-mood strong { font-weight: 500; }
@@ -4585,3 +4584,17 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 .dg-pick.is-blocked { cursor: var(--cur-no); }
 .dg-pick.is-blocked img { filter: grayscale(1) brightness(.55); }
 .dg-pick.is-blocked .dg-pick-name { color: var(--color-neutral-600); }
+
+/* Profil: gewählter Broker-Wert in der Seitenleiste (Bestand + Wert) */
+.pf-asset-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: var(--radius-md); color: var(--text); text-decoration: none; }
+.pf-asset-row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.pf-asset-logo { width: 44px; height: 44px; flex: none; }
+.asset-mark.pf-asset-logo { font-size: 9px; }
+.asset-mark-btcg.pf-asset-logo { border-radius: 11px; font-size: 8px; }
+.pf-asset-text { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.pf-asset-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-asset-units { font-size: 13px; color: var(--color-neutral-400); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-asset-units strong { font-weight: 600; color: var(--text); }
+.pf-asset-value { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-asset-form { display: flex; gap: 8px; margin: 12px 0 0; }
+.pf-asset-form select { flex: 1; min-width: 0; margin: 0; }

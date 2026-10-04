@@ -99,3 +99,12 @@ test('ETF-Aktivität: nur echte Aktionen zählen', () => {
   assert.ok(!etf.countsAsAction('POST', '/geraet'));
   assert.ok(!etf.countsAsAction('POST', '/dungeon/beute-gesehen'));
 });
+
+test('Profil-Depot: Bestand mit zwei Nachkommastellen, abgerundet', () => {
+  const { unitsText, UNITS } = require('../src/coin/tradeService');
+  assert.strictEqual(unitsText(0), '0,00');
+  assert.strictEqual(unitsText(null), '0,00');
+  assert.strictEqual(unitsText(12.349 * UNITS), '12,34');
+  assert.strictEqual(unitsText(0.29 * UNITS), '0,29');
+  assert.strictEqual(unitsText(1234.5 * UNITS), '1.234,50');
+});

@@ -65,7 +65,7 @@
       <% } else if (mode === 'trade') { %>
         <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
           data-trade-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>"
-          data-image="<%= c.image %>" data-free="<%= freeN %>" data-sell-text="<%= r.noBank ? '–' : euro(r.sell) %>"
+          data-image="<%= c.image %>" data-free="<%= freeN %>" data-sell-text="<%= euro(r.sell) %>"
           aria-label="<%= c.name %>, <%= r.label %>, <%= freeN %> frei – handeln">
           <% inner() %>
         </button>

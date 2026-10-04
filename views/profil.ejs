@@ -205,6 +205,34 @@
       <% } %>
     </div>
 
+    <% if (pfAsset || isMe) { %>
+      <div class="card pf-asset">
+        <h2><%= pfAsset && pfAsset.kind === 'etf' ? 'Lieblings-ETF' : 'Lieblings-Coin' %></h2>
+        <% if (pfAsset) { %>
+          <a class="pf-asset-row" href="/broker/<%= pfAsset.symbol.toLowerCase() %>">
+            <%- include('partials/asset-mark', { sym: pfAsset.symbol, px: 44, imgClass: 'pf-asset-logo', markClass: 'pf-asset-logo' }) %>
+            <span class="pf-asset-text">
+              <span class="pf-asset-name"><%= pfAsset.name %></span>
+              <span class="pf-asset-units"><strong><%= pfAsset.units %></strong> <%= pfAsset.symbol %></span>
+            </span>
+            <span class="pf-asset-value"><%= euro(pfAsset.value) %></span>
+          </a>
+        <% } else { %>
+          <p class="muted small">Zeig hier einen Coin oder ETF aus dem Broker – mit deinem Bestand und seinem Wert.</p>
+        <% } %>
+        <% if (isMe) { %>
+          <form method="post" action="/profil/depot" class="pf-asset-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <select name="symbol" aria-label="Broker-Wert im Profil">
+              <option value="">Keinen zeigen</option>
+              <% pfAssetOptions.forEach((o) => { %><option value="<%= o.symbol %>"<%= pfAsset && pfAsset.symbol === o.symbol ? ' selected' : '' %>><%= o.name %> (<%= o.symbol %>)</option><% }) %>
+            </select>
+            <button class="btn btn-ghost btn-sm" type="submit">Zeigen</button>
+          </form>
+        <% } %>
+      </div>
+    <% } %>
+
     <div class="card pf-mates">
       <h2>Spielt oft mit</h2>
       <% if (!playmates.length) { %>

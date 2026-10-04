@@ -12,6 +12,8 @@ const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 const achievementService = require('../achievements/achievementService');
 const achievementLogic = require('../achievements/logic');
+const markets = require('../coin/markets');
+const trade = require('../coin/tradeService');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -31,9 +33,10 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements profileAsset').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
-  const [owned, mine, statsAgg, earned, shares, playmates] = await Promise.all([
+  const assetEngine = profile.profileAsset ? markets.get(profile.profileAsset) : null; // nur Werte aus der festen Liste
+  const [owned, mine, statsAgg, earned, shares, playmates, assetHolding] = await Promise.all([
     inventory(profile._id),
     inventory(req.user._id), // eigene Karten: "du besitzt …" in der großen Ansicht
     Position.aggregate([
@@ -43,6 +46,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     achievementService.earnedOf(profile._id),
     achievementService.shares(),
     achievementService.playmates(profile._id),
+    assetEngine ? trade.getHolding(profile._id, assetEngine.SYMBOL) : null,
   ]);
   // Erfolge: Liste (freigeschaltete zuerst), angeheftete oben rechts – ohne eigene Auswahl die zwei neuesten
   const achievements = achievementLogic.profileList(achievementService.ACHIEVEMENTS, earned, shares.counts, shares.members);
@@ -84,12 +88,27 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     shareText: achievementLogic.shareText,
     bioMax: achievementLogic.BIO_MAX,
     ownedCounts: Object.fromEntries(mine.map((o) => [o._id, o.n])),
+    // Seitenleiste: gewählter Broker-Wert mit Bestand (2 Nachkommastellen) und aktuellem Wert
+    pfAsset: assetEngine
+      ? (() => {
+          const snap = assetEngine.snapshot();
+          return { symbol: snap.symbol, name: snap.name, kind: snap.kind, units: trade.unitsText(assetHolding.units), value: trade.valueCents(assetHolding.units, snap.price) };
+        })()
+      : null,
+    pfAssetOptions: markets.LIST.map((e) => e.snapshot()).map((x) => ({ symbol: x.symbol, name: x.name })),
   });
 });
 
 // Eigener Profiltext (für alle Mitglieder sichtbar)
 router.post('/profil/text', requireLogin, async (req, res) => {
   await User.updateOne({ _id: req.user._id }, { $set: { bio: achievementLogic.cleanBio(req.body.text) } });
+  res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
+});
+
+// Broker-Wert für die Profil-Seitenleiste wählen (leer = keinen zeigen)
+router.post('/profil/depot', requireLogin, async (req, res) => {
+  const engine = markets.get(str(req.body.symbol));
+  await User.updateOne({ _id: req.user._id }, { $set: { profileAsset: engine ? engine.SYMBOL : null } });
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
 });
 

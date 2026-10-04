@@ -22,6 +22,8 @@ const euroText = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
 /** Wert eines Bestands in Cent zum Kurs price */
 const valueCents = (units, price) => Math.floor((units / UNITS) * price * 100);
+// Bestand als Text mit genau zwei Nachkommastellen, abgerundet (z. B. "12,34") – fürs Profil
+const unitsText = (units) => (Math.floor(((units || 0) / UNITS) * 100 + 1e-9) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Kaufen für einen Euro-Betrag (Cent) zum aktuellen Kurs */
 async function buy({ user, symbol = 'SAM', cents }) {
@@ -106,4 +108,4 @@ async function coinValueCents(userId) {
   return list.reduce((sum, h) => sum + (prices[h.coin] ? valueCents(h.units, prices[h.coin]) : 0), 0);
 }
 
-module.exports = { UNITS, MIN_TRADE_CENTS, MIN_BUY_SHARE, minBuyCents, valueCents, buy, sell, getHolding, getHoldings, coinValueCents };
+module.exports = { UNITS, MIN_TRADE_CENTS, MIN_BUY_SHARE, minBuyCents, valueCents, unitsText, buy, sell, getHolding, getHoldings, coinValueCents };

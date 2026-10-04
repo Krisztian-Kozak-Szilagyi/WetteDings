@@ -24,7 +24,7 @@
 
 <div class="coin-head">
   <div class="coin-id">
-    <% if (sym === 'SAM') { %><%- include('partials/coin-sam') %><% } else { %><span class="asset-mark asset-mark-<%= sym.toLowerCase() %>" aria-hidden="true"><%= sym === 'BTCG' ? 'B·TCG' : sym %></span><% } %>
+    <%- include('partials/asset-mark', { sym, px: 52, imgClass: 'coin-logo', markClass: '' }) %>
     <div>
       <h1><%= snap.name %> <span class="muted coin-symbol"><%= sym %></span></h1>
       <span class="live"><span class="live-dot"></span> Live</span>
