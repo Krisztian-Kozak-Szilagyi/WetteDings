@@ -876,37 +876,45 @@
     });
   });
 
-  // Vergaben: nur die Felder der gewählten Art zeigen, Höchstzahl und Knopf anpassen
+  // Vergaben: Aktion (vergeben/entfernen) und Was wählen – nur die passenden Felder zeigen, Höchstzahl und Knopf anpassen
   var grant = document.querySelector('[data-grant-form]');
   if (grant) {
-    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], entzug: [50, 50], geld: [1, 1], geldabzug: [1, 1] }; // [ein Mitglied, alle]; Geld: Betrag statt Anzahl
-    var SINGLE = ['entzug', 'geldabzug']; // nur bei einem einzelnen Mitglied
+    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], geld: [1, 1] }; // vergeben: [ein Mitglied, alle]; Geld: Betrag statt Anzahl
+    var BUTTON = {
+      vergeben: { pack: 'Packs vergeben', karte: 'Karte vergeben', item: 'Gegenstand vergeben', geld: 'Geld gutschreiben' },
+      entfernen: { pack: 'Packs entfernen', karte: 'Karte entfernen', item: 'Gegenstand entfernen', geld: 'Geld abziehen' },
+    };
     var user = grant.querySelector('[name="user"]');
     var members = document.getElementById(user.getAttribute('list'));
     var allOption = members ? members.querySelector('[data-not]') : null;
     var count = grant.querySelector('[name="count"]');
     var submit = grant.querySelector('[data-grant-submit]');
+    var picked = function (name, fallback) {
+      var el = grant.querySelector('[name="' + name + '"]:checked');
+      return el ? el.value : fallback;
+    };
     var update = function () {
-      var checked = grant.querySelector('[name="art"]:checked');
-      var art = checked ? checked.value : 'pack';
+      var aktion = picked('aktion', 'vergeben');
+      var was = picked('was', 'pack');
+      var remove = aktion === 'entfernen';
       grant.querySelectorAll('[data-for]').forEach(function (f) {
-        var on = f.getAttribute('data-for').split(' ').indexOf(art) >= 0;
+        var on = f.getAttribute('data-for').split(' ').indexOf(was) >= 0;
         f.hidden = !on;
         f.querySelectorAll('select, input').forEach(function (i) { i.disabled = !on; i.required = on; });
       });
-      // "Alle Mitglieder" nur, wo es erlaubt ist (Vorschlag aus der Liste nehmen bzw. wieder einsetzen)
+      // "Alle Mitglieder" nur beim Vergeben (Vorschlag aus der Liste nehmen bzw. wieder einsetzen)
       var toAll = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i.test(user.value.trim()); // wie ALL_MEMBERS in routes/admin.js
       if (allOption) {
-        var single = SINGLE.indexOf(art) >= 0;
-        if (single && allOption.parentNode) allOption.remove();
-        if (!single && !allOption.parentNode) members.insertBefore(allOption, members.firstChild);
-        if (single && toAll) user.value = '';
+        if (remove && allOption.parentNode) allOption.remove();
+        if (!remove && !allOption.parentNode) members.insertBefore(allOption, members.firstChild);
+        if (remove && toAll) user.value = '';
       }
-      var max = MAX[art][toAll && SINGLE.indexOf(art) < 0 ? 1 : 0];
+      var max = remove ? 50 : MAX[was][toAll ? 1 : 0];
       count.max = max;
       if (Number(count.value) > max) count.value = max;
-      submit.textContent = checked ? checked.getAttribute('data-button') : 'Vergeben';
-      submit.className = 'btn ' + (SINGLE.indexOf(art) >= 0 ? 'btn-danger' : 'btn-primary');
+      submit.textContent = BUTTON[aktion][was];
+      submit.className = 'btn ' + (remove ? 'btn-danger' : 'btn-primary');
+      grant.setAttribute('data-confirm', remove ? 'Wirklich entfernen?' : 'Diese Vergabe wirklich ausführen?');
     };
     grant.addEventListener('change', update);
     user.addEventListener('input', update);

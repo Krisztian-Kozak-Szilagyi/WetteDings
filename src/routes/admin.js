@@ -705,8 +705,21 @@ async function revokeMoneyFrom(req) {
 // "alle" oder der Vorschlag "Alle Mitglieder (12)" – genau so, damit ein Name wie "Allessandro" nicht passt
 const ALL_MEMBERS = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i;
 
+// Aktion (vergeben/entfernen) und Was (pack, karte, item, geld) -> Art der Vergabe
+const GRANT_ART = {
+  'vergeben:pack': 'pack',
+  'vergeben:karte': 'karte',
+  'vergeben:item': 'item',
+  'vergeben:geld': 'geld',
+  'entfernen:pack': 'packentzug',
+  'entfernen:karte': 'entzug',
+  'entfernen:item': 'itementzug',
+  'entfernen:geld': 'geldabzug',
+};
+const SINGLE_ARTS = ['entzug', 'geldabzug', 'packentzug', 'itementzug']; // nur bei einem einzelnen Mitglied
+
 router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
-  const art = str(req.body.art);
+  const art = str(req.body.art) || GRANT_ART[`${str(req.body.aktion)}:${str(req.body.was)}`] || '';
   // Empfänger kommt als Name (Eingabefeld mit Vorschlägen): in die ID umwandeln, "Alle Mitglieder" -> "alle"
   const target = str(req.body.user).trim();
   let user = target;
@@ -720,6 +733,10 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
     user = String(found._id);
   }
   const body = { ...req.body, user };
+  if (user === 'alle' && SINGLE_ARTS.includes(art)) {
+    req.flash('error', 'Entfernen geht nur bei einem einzelnen Mitglied.');
+    return res.redirect(GRANT_URL);
+  }
   if (art === 'pack') {
     req.body = { ...body, type: str(body.pack) };
     await (str(body.user) === 'alle' ? blessEveryone(req) : grantPacksTo(req));
@@ -733,22 +750,38 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
     req.body = body;
     await grantMoneyTo(req);
   } else if (art === 'geldabzug') {
-    if (str(body.user) === 'alle') req.flash('error', 'Geld lässt sich nur bei einem einzelnen Mitglied abziehen.');
-    else {
-      req.body = body;
-      await revokeMoneyFrom(req);
-    }
+    req.body = body;
+    await revokeMoneyFrom(req);
   } else if (art === 'entzug') {
-    if (str(body.user) === 'alle') req.flash('error', 'Karten lassen sich nur bei einem einzelnen Mitglied entfernen.');
-    else {
-      req.body = body;
-      await revokeCardFrom(req);
-    }
+    req.body = body;
+    await revokeCardFrom(req);
+  } else if (art === 'packentzug' || art === 'itementzug') {
+    req.body = body;
+    await revokeInventory(req, art);
   } else {
     req.flash('error', 'Bitte auswählen, was vergeben werden soll.');
   }
   res.redirect(GRANT_URL);
 });
+
+// Booster Packs oder Gegenstände aus dem Inventar eines Mitglieds entfernen (z. B. versehentlich vergeben)
+async function revokeInventory(req, kind) {
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const user = mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (!user) return req.flash('error', 'Bitte ein Mitglied auswählen – entfernen geht nur bei einem einzelnen Mitglied.');
+  if (!Number.isInteger(count) || count < 1 || count > 50) return req.flash('error', 'Es können 1 bis 50 Stück entfernt werden.');
+  try {
+    const r = kind === 'packentzug'
+      ? await tcgService.revokePacks({ userId: user._id, type: str(req.body.pack), count })
+      : await itemService.revokeItems({ userId: user._id, type: str(req.body.item), count });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind, type: r.type.key, typeLabel: r.type.label, count: r.removed });
+    req.flash('success', `${r.removed}× ${r.type.label} bei ${user.username} entfernt (noch ${r.remaining} übrig).`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+}
 
 /** Neue Vergaben anderer seit dem letzten Blick (Abzeichen für den Admin) */
 const packLogNewCount = (user) => PackGrant.countDocuments({ by: { $ne: user._id }, createdAt: { $gt: user.packLogSeenAt || new Date(0) } });

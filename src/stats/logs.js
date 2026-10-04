@@ -434,7 +434,7 @@ async function ledgerLog(query, { player = null, all = false } = {}) {
 
 // ---------- Vergaben durch Admin und Devs (Packs, Karten, Gegenstände, entfernte Karten) ----------
 
-const GRANT_KIND = { pack: 'Pack', karte: 'Karte', item: 'Gegenstand', entzug: 'Entfernt', geld: 'Geld', geldabzug: 'Geld abgezogen' };
+const GRANT_KIND = { pack: 'Pack', karte: 'Karte', item: 'Gegenstand', entzug: 'Karte entfernt', geld: 'Geld', geldabzug: 'Geld abgezogen', packentzug: 'Pack entfernt', itementzug: 'Gegenstand entfernt' };
 
 function grantRow(g) {
   return { at: g.createdAt, by: g.byName, to: g.toName, all: !!g.all, kind: g.kind || 'pack', kindLabel: GRANT_KIND[g.kind || 'pack'] || g.kind, what: g.typeLabel, count: g.count, recipients: g.recipients || 1 };

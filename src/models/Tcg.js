@@ -35,7 +35,7 @@ const packGrantSchema = new Schema(
     toName: { type: String, required: true }, // bei "an alle": "Alle Mitglieder (n)"
     all: { type: Boolean, default: false }, // an alle Mitglieder vergeben
     recipients: { type: Number, default: 1 }, // Zahl der beschenkten Mitglieder
-    kind: { type: String, enum: ['pack', 'karte', 'entzug', 'item', 'geld', 'geldabzug'], default: 'pack' }, // entzug = Karte aus der Sammlung entfernt, item = Gegenstand (Folie), geld/geldabzug = Spielgeld (count = Betrag in Cent)
+    kind: { type: String, enum: ['pack', 'karte', 'entzug', 'item', 'geld', 'geldabzug', 'packentzug', 'itementzug'], default: 'pack' }, // entzug = Karte aus der Sammlung entfernt, item = Gegenstand (Folie), geld/geldabzug = Spielgeld (count = Betrag in Cent)
     type: { type: String, required: true }, // Pack-Art bzw. Karten-ID
     typeLabel: { type: String, required: true },
     count: { type: Number, required: true }, // je Mitglied

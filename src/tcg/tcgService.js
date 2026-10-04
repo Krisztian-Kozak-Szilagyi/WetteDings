@@ -114,6 +114,24 @@ async function revokeCards({ userId, cardId, count = 1 }) {
   return result;
 }
 
+/**
+ * Ungeöffnete Booster Packs einer Art aus dem Inventar entfernen (Admin/Dev, z. B. nach einer falschen Vergabe),
+ * die neuesten zuerst. Gibt { type, removed, remaining } zurück.
+ */
+async function revokePacks({ userId, type, count = 1 }) {
+  const t = packType(type);
+  const result = await inTransaction(async (session) => {
+    const packs = await TcgPack.find({ user: userId, type: t.key }).sort({ createdAt: -1 }).select('_id').session(session).lean();
+    if (packs.length < count) throw new UserError(packs.length ? `Das Mitglied hat nur ${packs.length} ungeöffnete ${t.label}.` : `Das Mitglied hat kein ungeöffnetes ${t.label}.`);
+    const ids = packs.slice(0, count).map((p) => p._id);
+    const res = await TcgPack.deleteMany({ _id: { $in: ids }, user: userId }, { session });
+    if (res.deletedCount !== ids.length) throw new UserError('Das Inventar hat sich geändert. Bitte versuche es erneut.');
+    return { type: t, removed: ids.length, remaining: packs.length - ids.length };
+  });
+  await notify(userId, { area: 'Inventar', href: '/inventar', text: `Das Team hat ${result.removed > 1 ? result.removed + '× ' : 'ein '}${t.label} aus deinem Inventar entfernt.` });
+  return result;
+}
+
 /** Ein Booster Pack aus dem Inventar öffnen (das älteste dieser Art). Gibt die gezogenen Karten zurück. */
 async function openPack({ user, type }) {
   const t = packType(type);
@@ -349,4 +367,5 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { soldMeta, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = {
+  revokePacks, soldMeta, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
