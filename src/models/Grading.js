@@ -46,6 +46,8 @@ const jobSchema = new Schema(
 // Pro Mitglied höchstens ein offener Auftrag
 jobSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { status: 'offen' } });
 jobSchema.index({ user: 1, day: 1 });
+jobSchema.index({ createdAt: -1 }); // Protokolle: alle Aufträge
+jobSchema.index({ user: 1, createdAt: -1 });
 
 // Admin-Einstellungen (ein Dokument, _id "grading")
 const settingsSchema = new Schema(

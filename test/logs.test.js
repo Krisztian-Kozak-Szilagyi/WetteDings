@@ -144,3 +144,62 @@ test('Protokolle-Export: Dateiname ohne Umlaute und Sonderzeichen', () => {
   assert.equal(logs.exportFileName('packs', 'Jürgen Ä.', 'csv', now), 'protokoll-packs-juergen-ae-2026-10-04.csv');
   assert.equal(logs.exportFileName('ihk', null, 'json', now), 'protokoll-ihk-2026-10-04.json');
 });
+
+test('Protokolle: Wetten – Ergebnis, Streitfall, Topf und Provision', () => {
+  const base = { _id: new mongoose.Types.ObjectId(), title: 'Regnet es?', options: [{ key: 'ja', label: 'Ja', total: 3000 }, { key: 'nein', label: 'Nein', total: 2000 }], creatorName: 'anna', refereeName: 'ben', createdAt: new Date(), deadline: new Date() };
+  const done = logs.betRow({ ...base, status: 'entschieden', outcome: 'nein', resolvedVia: 'dev', resolvedByName: 'admin', resolvedAt: new Date(), resolutionNote: 'Laut Wetterdienst', creatorFee: 100, refereeFee: 50, participants: 4 });
+  assert.equal(done.result, 'Ergebnis: Nein');
+  assert.equal(done.via, 'Dev (Streitfall)');
+  assert.equal(done.pot, 5000);
+  assert.equal(done.fees, 150);
+  assert.equal(done.note, 'Laut Wetterdienst');
+  assert.equal(logs.betRow({ ...base, status: 'offen', disputed: true }).result, 'Strittig');
+  const voided = logs.betRow({ ...base, status: 'annulliert', voidReason: 'Doppelt' });
+  assert.deepStrictEqual([voided.result, voided.note], ['Annulliert', 'Doppelt']);
+});
+
+test('Protokolle: Einsätze – offen, gewonnen, verloren, erstattet', () => {
+  const bet = { title: 'Regnet es?', options: [{ key: 'ja', label: 'Ja' }] };
+  const p = { bet: new mongoose.Types.ObjectId(), username: 'anna', side: 'ja', amount: 1000, createdAt: new Date() };
+  assert.deepStrictEqual([logs.stakeRow({ ...p, payout: null }, bet).state, logs.stakeRow({ ...p, payout: null }, bet).net], ['offen', null]);
+  const won = logs.stakeRow({ ...p, payout: 2500 }, bet);
+  assert.deepStrictEqual([won.state, won.net, won.side], ['gewonnen', 1500, 'Ja']);
+  assert.equal(logs.stakeRow({ ...p, payout: 0 }, bet).state, 'verloren');
+  assert.equal(logs.stakeRow({ ...p, payout: 1000 }, bet).state, 'erstattet');
+  assert.equal(logs.stakeRow({ ...p, payout: null }, undefined).bet, '(gelöschte Wette)');
+});
+
+test('Protokolle: Broker, Lotterie, Grading und Buchungen', () => {
+  const buy = logs.coinRow({ coin: 'SAM', side: 'kauf', units: 150000000, price: 12.5, cents: 1875, createdAt: new Date() }, 'anna');
+  assert.equal(buy.asset, 'Samantha Coin (SAM)');
+  assert.equal(buy.cents, -1875); // Kauf = Abbuchung
+  assert.equal(logs.coinRow({ coin: 'SAM', side: 'verkauf', units: 1, price: 1, cents: 500, createdAt: new Date() }).cents, 500);
+
+  const ticket = logs.lottoRow({ type: 'lotto_los', amount: -300, createdAt: new Date(), meta: { kind: 'woche', count: 3, round: 7 } }, 'anna');
+  assert.deepStrictEqual([ticket.kind, ticket.lottery, ticket.count, ticket.round], ['Lose gekauft', 'Wochen-Lotterie', 3, 7]);
+  const daily = logs.lottoRow({ type: 'lotto_gewinn', amount: 9000, createdAt: new Date() }, 'anna');
+  assert.deepStrictEqual([daily.kind, daily.lottery, daily.count], ['Gewinn', 'Tages-Lotterie', null]);
+
+  const job = logs.gradingRow({ level: 2, card: crumpled.id, customer: 'Kunde', grade: 8, guess: 7, clean: 90, seal: null, pay: 1200, status: 'fertig', foilFound: true, createdAt: new Date(), doneAt: new Date() }, 'anna');
+  assert.deepStrictEqual([job.shop, job.done, job.foil], ['Grading-Labor', true, true]);
+
+  const booking = logs.ledgerRow({ type: 'bonus', amount: 500, createdAt: new Date() }, 'anna');
+  assert.deepStrictEqual([booking.kind, booking.betId], ['Tagesbonus', null]);
+});
+
+test('Protokolle-Export: jeder Log hat eine CSV-Spalte je Wert', () => {
+  const at = new Date();
+  const samples = {
+    wetten: logs.betRow({ _id: 'x', title: 'T', options: [{ key: 'ja', label: 'Ja', total: 1 }], creatorName: 'a', status: 'offen', createdAt: at, deadline: at }),
+    einsaetze: logs.stakeRow({ bet: 'x', username: 'a', side: 'ja', amount: 1, payout: null, createdAt: at }, null),
+    broker: logs.coinRow({ coin: 'SAM', side: 'kauf', units: 1, price: 1, cents: 1, createdAt: at }, 'a'),
+    lotterie: logs.lottoRow({ type: 'lotto_los', amount: -1, createdAt: at }, 'a'),
+    konto: logs.ledgerRow({ type: 'bonus', amount: 1, createdAt: at }, 'a'),
+    grading: logs.gradingRow({ level: 1, card: crumpled.id, customer: 'K', grade: 5, status: 'offen', pay: 0, createdAt: at }, 'a'),
+  };
+  for (const [key, row] of Object.entries(samples)) {
+    const lines = logs.toCsv(key, { total: 1, rows: [row] }).slice(1).split('\r\n').filter(Boolean);
+    assert.equal(lines[1].split(';').length, lines[0].split(';').length, key);
+  }
+  assert.equal(logs.LOGS.length, logs.LOGS.filter((l) => logs.LOG_GROUPS.some((g) => g.key === l.group)).length);
+});

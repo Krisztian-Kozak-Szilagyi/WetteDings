@@ -16,5 +16,6 @@ const ledgerSchema = new Schema(
 
 ledgerSchema.index({ user: 1, createdAt: -1 });
 ledgerSchema.index({ type: 1, createdAt: -1 }); // Protokolle: alle Buchungen einer Art
+ledgerSchema.index({ createdAt: -1 }); // Protokolle: alle Buchungen
 
 module.exports = model('Ledger', ledgerSchema);

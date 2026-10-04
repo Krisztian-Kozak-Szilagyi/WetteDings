@@ -8,25 +8,41 @@ const { Trade } = require('../models/Trade');
 const { TcgOpening } = require('../models/Tcg');
 const { IhkRun } = require('../models/Ihk');
 const { DungeonRun } = require('../models/Dungeon');
+const Bet = require('../models/Bet');
+const Position = require('../models/Position');
+const { CoinTrade } = require('../models/Coin');
+const { GradingJob } = require('../models/Grading');
+const coinMarkets = require('../coin/markets');
+const { LEVELS: GRADING_LEVELS } = require('../grading/gradingService');
 const tcgCatalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
 const { questById, difficulty } = require('../ihk/quests');
 const { dungeonByKey } = require('../dungeon/dungeons');
-const { euro } = require('../lib/viewHelpers');
+const { euro, ledgerLabels, optionLabel, coinAmount } = require('../lib/viewHelpers');
 const { field, num } = require('./exportCsv');
 const config = require('../config');
 
 const LOG_PAGE = 50;
 const EXPORT_MAX = 20000; // Obergrenze für den Export (alle Seiten auf einmal)
 
-// Die Logs im Reiter "Protokolle" (key = ?log=…, page = eigener Seiten-Parameter)
+// Die Logs im Reiter "Protokolle" (key = ?log=…, page = eigener Seiten-Parameter, group = Gruppe in der Auswahl)
+const LOG_GROUPS = [
+  { key: 'spiel', label: 'Spiel' },
+  { key: 'tcg', label: 'TCG' },
+];
 const LOGS = [
-  { key: 'handel', label: 'Handel', page: 'handelseite' },
-  { key: 'packs', label: 'Pack-Öffnungen', page: 'packseite' },
-  { key: 'verkauf', label: 'Verkäufe & Käufe', page: 'verkaufseite' },
-  { key: 'ihk', label: 'IHK-Quests', page: 'ihkseite' },
-  { key: 'dungeon', label: 'Dungeons', page: 'dungeonseite' },
+  { key: 'wetten', label: 'Wetten', page: 'wettenseite', group: 'spiel' },
+  { key: 'einsaetze', label: 'Einsätze', page: 'einsatzseite', group: 'spiel' },
+  { key: 'broker', label: 'Broker', page: 'brokerseite', group: 'spiel' },
+  { key: 'lotterie', label: 'Lotterie', page: 'lottoseite', group: 'spiel' },
+  { key: 'konto', label: 'Alle Buchungen', page: 'kontoseite', group: 'spiel' },
+  { key: 'handel', label: 'Handel', page: 'handelseite', group: 'tcg' },
+  { key: 'packs', label: 'Pack-Öffnungen', page: 'packseite', group: 'tcg' },
+  { key: 'verkauf', label: 'Verkäufe & Käufe', page: 'verkaufseite', group: 'tcg' },
+  { key: 'ihk', label: 'IHK-Quests', page: 'ihkseite', group: 'tcg' },
+  { key: 'dungeon', label: 'Dungeons', page: 'dungeonseite', group: 'tcg' },
+  { key: 'grading', label: 'Grading', page: 'gradingseite', group: 'tcg' },
 ];
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
@@ -249,6 +265,167 @@ async function dungeonLog(query, { player = null, all = false } = {}) {
   return { ...pg, rows: docs.map((r) => dungeonRow(r, player && player._id)) };
 }
 
+// ---------- Wetten: erstellt, entschieden, annulliert ----------
+
+const BET_STATUS = { offen: 'Offen', entschieden: 'Entschieden', annulliert: 'Annulliert' };
+const RESOLVED_VIA = { ersteller: 'Ersteller allein', einstimmig: 'Ersteller und Schiedsrichter', dev: 'Dev (Streitfall)', system: 'Automatisch', schiedsrichter: 'Schiedsrichter' };
+
+function betRow(b) {
+  const pot = (b.options || []).reduce((n, o) => n + (o.total || 0), 0);
+  let result = BET_STATUS[b.status] || b.status;
+  if (b.status === 'entschieden') result = `Ergebnis: ${optionLabel(b, b.outcome)}${b.refunded ? ' (erstattet)' : ''}`;
+  else if (b.status === 'offen' && b.disputed) result = 'Strittig';
+  return {
+    at: b.createdAt,
+    id: String(b._id),
+    title: b.title,
+    duel: !!b.duel,
+    group: b.groupName,
+    creator: b.creatorName,
+    referee: b.refereeName,
+    options: (b.options || []).map((o) => o.label),
+    status: b.status,
+    result,
+    via: RESOLVED_VIA[b.resolvedVia] || null,
+    resolvedBy: b.resolvedByName,
+    resolvedAt: b.resolvedAt,
+    note: b.status === 'annulliert' ? b.voidReason : b.resolutionNote,
+    pot,
+    participants: b.participants || 0,
+    fees: (b.creatorFee || 0) + (b.refereeFee || 0),
+    deadline: b.deadline,
+  };
+}
+
+async function betLog(query, { player = null, all = false } = {}) {
+  let filter = {};
+  if (player) {
+    // erstellt, als Schiedsrichter, als Duell-Gegner oder mit Einsatz dabei
+    const joined = await Position.distinct('bet', { user: player._id });
+    filter = { $or: [{ creator: player._id }, { referee: player._id }, { 'duel.opponent': player._id }, { _id: { $in: joined } }] };
+  }
+  const { docs, ...pg } = await paged(Bet, filter, { createdAt: -1, _id: -1 }, query.wettenseite, 'title type options creatorName refereeName groupName duel status outcome disputed resolvedVia resolvedByName resolvedAt voidReason resolutionNote participants creatorFee refereeFee refunded deadline createdAt', all);
+  return { ...pg, rows: docs.map(betRow) };
+}
+
+// ---------- Einsätze: wer auf was gesetzt hat und was zurückkam ----------
+
+function stakeRow(p, bet) {
+  const settled = p.payout !== null && p.payout !== undefined;
+  return {
+    at: p.createdAt,
+    player: p.username,
+    betId: String(p.bet),
+    bet: bet ? bet.title : '(gelöschte Wette)',
+    side: bet ? optionLabel(bet, p.side) : p.side,
+    amount: p.amount,
+    payout: settled ? p.payout : null,
+    net: settled ? p.payout - p.amount : null,
+    settledAt: p.settledAt,
+    state: !settled ? 'offen' : p.payout > p.amount ? 'gewonnen' : p.payout === p.amount ? 'erstattet' : 'verloren',
+  };
+}
+
+async function stakeLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { user: player._id } : {};
+  const { docs, ...pg } = await paged(Position, filter, { createdAt: -1, _id: -1 }, query.einsatzseite, null, all);
+  const bets = await Bet.find({ _id: { $in: [...new Set(docs.map((p) => String(p.bet)))] } }).select('title options').lean();
+  const byId = new Map(bets.map((b) => [String(b._id), b]));
+  return { ...pg, rows: docs.map((p) => stakeRow(p, byId.get(String(p.bet)))) };
+}
+
+// ---------- Broker: Käufe und Verkäufe von Coins und ETF ----------
+
+function coinRow(t, name) {
+  const engine = coinMarkets.get(t.coin);
+  return {
+    at: t.createdAt,
+    player: name || '–',
+    asset: engine ? `${engine.NAME} (${t.coin})` : t.coin,
+    side: t.side === 'kauf' ? 'Kauf' : 'Verkauf',
+    units: t.units,
+    unitsText: coinAmount(t.units, t.coin),
+    price: t.price,
+    cents: t.side === 'kauf' ? -t.cents : t.cents,
+  };
+}
+
+async function coinLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { user: player._id } : {};
+  const { docs, ...pg } = await paged(CoinTrade, filter, { createdAt: -1, _id: -1 }, query.brokerseite, null, all);
+  const names = await namesOf(docs.map((t) => t.user));
+  return { ...pg, rows: docs.map((t) => coinRow(t, names.get(String(t.user)))) };
+}
+
+// ---------- Lotterie: Lose und Gewinne ----------
+
+const LOTTO_KIND = { woche: 'Wochen-Lotterie', monat: 'Monats-Lotterie' };
+
+function lottoRow(l, name) {
+  const m = l.meta || {};
+  return {
+    at: l.createdAt,
+    player: name || '–',
+    kind: l.type === 'lotto_gewinn' ? 'Gewinn' : 'Lose gekauft',
+    lottery: LOTTO_KIND[m.kind] || 'Tages-Lotterie',
+    count: m.count || null, // Zahl der Lose (erst seit diesem Update gespeichert)
+    round: m.round || null,
+    ticket: m.ticket || null, // Gewinnlos
+    amount: l.amount,
+  };
+}
+
+async function lottoLog(query, { player = null, all = false } = {}) {
+  const filter = { type: { $in: ['lotto_los', 'lotto_gewinn'] }, ...(player ? { user: player._id } : {}) };
+  const { docs, ...pg } = await paged(Ledger, filter, { createdAt: -1, _id: -1 }, query.lottoseite, null, all);
+  const names = await namesOf(docs.map((l) => l.user));
+  return { ...pg, rows: docs.map((l) => lottoRow(l, names.get(String(l.user)))) };
+}
+
+// ---------- Grading: Aufträge ----------
+
+function gradingRow(j, name) {
+  const level = GRADING_LEVELS.find((l) => l.level === j.level);
+  return {
+    at: j.doneAt || j.createdAt,
+    startedAt: j.createdAt,
+    player: name || '–',
+    shop: level ? level.name : `Stufe ${j.level}`,
+    card: cardLabel(j.card),
+    customer: j.customer,
+    done: j.status === 'fertig',
+    grade: j.grade,
+    guess: j.guess,
+    clean: j.clean,
+    seal: j.seal,
+    pay: j.pay,
+    foil: j.foilFound,
+  };
+}
+
+async function gradingLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { user: player._id } : {};
+  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound doneAt createdAt', all);
+  const names = await namesOf(docs.map((j) => j.user));
+  return { ...pg, rows: docs.map((j) => gradingRow(j, names.get(String(j.user)))) };
+}
+
+// ---------- Alle Buchungen (Kontoauszug aller Spieler), optional nur eine Art (?buchung=…) ----------
+
+const LEDGER_TYPES = Object.keys(ledgerLabels);
+
+function ledgerRow(l, name) {
+  return { at: l.createdAt, player: name || '–', type: l.type, kind: ledgerLabels[l.type] || l.type, text: l.betTitle || '', betId: l.bet ? String(l.bet) : null, amount: l.amount };
+}
+
+async function ledgerLog(query, { player = null, all = false } = {}) {
+  const type = LEDGER_TYPES.includes(query.buchung) ? query.buchung : null;
+  const filter = { ...(type ? { type } : {}), ...(player ? { user: player._id } : {}) };
+  const { docs, ...pg } = await paged(Ledger, filter, { createdAt: -1, _id: -1 }, query.kontoseite, 'user type amount betTitle bet createdAt', all);
+  const names = await namesOf(docs.map((l) => l.user));
+  return { ...pg, type, types: LEDGER_TYPES.map((k) => ({ key: k, label: ledgerLabels[k] })), rows: docs.map((l) => ledgerRow(l, names.get(String(l.user)))) };
+}
+
 // ---------- Export: CSV für Excel (wie die Statistik: Semikolon, Dezimalkomma, UTF-8 mit BOM) ----------
 
 const csvDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: config.timezone });
@@ -257,10 +434,36 @@ const csvDate = (d) => (d ? csvDateFmt.format(new Date(d)).replace(',', '') : ''
 const csvEuro = (cents) => (typeof cents === 'number' ? num(cents / 100, 2) : '');
 const cardsText = (items) => items.map((c) => `${c.count > 1 ? c.count + '× ' : ''}${c.label}`).join(', ');
 const yesNo = (b) => (b ? 'ja' : '');
+const STAKE_STATE = { offen: 'Offen', gewonnen: 'Gewonnen', verloren: 'Verloren', erstattet: 'Erstattet' };
+const csvNum = (v, digits) => (typeof v === 'number' ? num(v, digits) : '');
 const IHK_STATE = { laeuft: 'Läuft', geschafft: 'Geschafft', gescheitert: 'Gescheitert' };
 
 // Kopfzeile und Zeilen je Log (eine Zeile pro Eintrag; Dungeons: eine Zeile pro Teilnehmer, damit Excel filtern kann)
 const CSV = {
+  wetten: {
+    head: ['Erstellt', 'Wette', 'Duell', 'Gruppe', 'Ersteller', 'Schiedsrichter', 'Optionen', 'Einsatzschluss', 'Status', 'Ergebnis', 'Entschieden über', 'Entschieden von', 'Entschieden am', 'Begründung', 'Topf (€)', 'Teilnehmer', 'Provision (€)'],
+    rows: (b) => [[csvDate(b.at), b.title, yesNo(b.duel), b.group || '', b.creator, b.referee || '', b.options.join(' / '), csvDate(b.deadline), BET_STATUS[b.status] || b.status, b.result === BET_STATUS[b.status] ? '' : b.result, b.via || '', b.resolvedBy || '', csvDate(b.resolvedAt), b.note || '', csvEuro(b.pot), b.participants, csvEuro(b.fees)]],
+  },
+  einsaetze: {
+    head: ['Zeitpunkt', 'Spieler', 'Wette', 'Gesetzt auf', 'Einsatz (€)', 'Auszahlung (€)', 'Gewinn/Verlust (€)', 'Status', 'Abgerechnet'],
+    rows: (p) => [[csvDate(p.at), p.player, p.bet, p.side, csvEuro(p.amount), p.payout === null ? '' : csvEuro(p.payout), p.net === null ? '' : csvEuro(p.net), STAKE_STATE[p.state], csvDate(p.settledAt)]],
+  },
+  broker: {
+    head: ['Zeitpunkt', 'Spieler', 'Wert', 'Art', 'Menge', 'Kurs (€)', 'Betrag (€)'],
+    rows: (t) => [[csvDate(t.at), t.player, t.asset, t.side, csvNum(t.units / 1e8, 8), csvNum(t.price, 6), csvEuro(t.cents)]],
+  },
+  lotterie: {
+    head: ['Zeitpunkt', 'Spieler', 'Art', 'Lotterie', 'Lose', 'Runde', 'Gewinnlos', 'Betrag (€)'],
+    rows: (l) => [[csvDate(l.at), l.player, l.kind, l.lottery, l.count || '', l.round || '', l.ticket || '', csvEuro(l.amount)]],
+  },
+  konto: {
+    head: ['Zeitpunkt', 'Spieler', 'Buchung', 'Text', 'Betrag (€)'],
+    rows: (l) => [[csvDate(l.at), l.player, l.kind, l.text, csvEuro(l.amount)]],
+  },
+  grading: {
+    head: ['Angenommen', 'Erledigt', 'Spieler', 'Shop', 'Karte', 'Kunde', 'Echte Note', 'Geschätzte Note', 'Sauberkeit (%)', 'Versiegelung', 'Lohn (€)', 'Folie gefunden'],
+    rows: (j) => [[csvDate(j.startedAt), j.done ? csvDate(j.at) : '', j.player, j.shop, j.card, j.customer, j.done ? j.grade : '', csvNum(j.guess, 0), csvNum(j.clean, 0), csvNum(j.seal, 0), j.done ? csvEuro(j.pay) : '', yesNo(j.foil)]],
+  },
   handel: {
     head: ['Zeitpunkt', 'Von', 'An', 'Karte', 'Gegenleistung', 'Steuer (€)', 'Art', 'Mehrfach-Konto'],
     rows: (t) => [[csvDate(t.at), t.from, t.to, t.card, t.back, csvEuro(t.tax), t.kind, yesNo(t.flagged)]],
@@ -315,7 +518,7 @@ function exportFileName(key, playerName, ext, now = new Date()) {
   return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
-const LOADERS = { handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog };
+const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog };
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
@@ -329,6 +532,7 @@ module.exports = {
   toCsv,
   exportFileName,
   LOGS,
+  LOG_GROUPS,
   logByKey,
   pageOf,
   cardLabel,
@@ -344,4 +548,10 @@ module.exports = {
   sellRow,
   ihkRow,
   dungeonRow,
+  betRow,
+  stakeRow,
+  coinRow,
+  lottoRow,
+  gradingRow,
+  ledgerRow,
 };

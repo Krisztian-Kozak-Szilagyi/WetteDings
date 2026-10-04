@@ -80,6 +80,7 @@ const tradeSchema = new Schema(
   { timestamps: true }
 );
 tradeSchema.index({ user: 1, createdAt: -1 });
+tradeSchema.index({ createdAt: -1 }); // Protokolle: alle Käufe und Verkäufe
 
 module.exports = {
   CoinState: model('CoinState', coinStateSchema),

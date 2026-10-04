@@ -6,7 +6,8 @@
   // Adresse im Protokoll-Reiter: Spieler-Filter und gewählter Log bleiben erhalten
   const logUrl = (extra = {}, key = logKey) => panelUrl('protokolle', 'protokoll', { log: key, ...(playerQ ? { spieler: playerQ } : {}), ...extra });
   // Export: gleicher Log und gleiche Filter, ohne Seite
-  const exportLink = (format) => '/admin/protokolle/export?' + new URLSearchParams({ log: logKey, ...(playerQ ? { spieler: playerQ } : {}), ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...(format ? { format } : {}) });
+  const exportLink = (format) => '/admin/protokolle/export?' + new URLSearchParams({ log: logKey, ...(playerQ ? { spieler: playerQ } : {}), ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...(data && data.type ? { buchung: data.type } : {}), ...(format ? { format } : {}) });
+  const kontoLink = (extra) => logUrl({ ...(data && data.type ? { buchung: data.type } : {}), ...extra });
   const handelLink = (extra) => logUrl({ ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...extra });
   // Seiten blättern (jeder Log hat seinen eigenen Seiten-Parameter)
   const pager = (d, link) => d.pages > 1
@@ -26,17 +27,21 @@
 </nav>
 
 <section class="stats-block" id="protokoll">
-  <%- blockHead('Protokolle' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Was im Spiel passiert ist, neueste Einträge zuerst: Handel, geöffnete Packs samt gezogener Karten, Verkäufe an die Bank und Black-Market-Käufe, IHK-Quests und Dungeons. Mit einem Spielernamen siehst du nur dessen Einträge.') %>
+  <%- blockHead('Protokolle' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Was auf der Seite passiert ist, neueste Einträge zuerst: Wetten und Einsätze, Broker, Lotterie, alle Kontobuchungen sowie im TCG Handel, geöffnete Packs, Verkäufe, IHK-Quests, Dungeons und Grading. Mit einem Spielernamen siehst du nur dessen Einträge.') %>
 
   <div class="stats-toolbar log-toolbar">
     <div class="stats-toolbar-row">
-      <div class="stats-toolbar-group">
-        <span class="stats-toolbar-label">Protokoll</span>
-        <nav class="stats-range" aria-label="Protokoll wählen">
-          <% logs.forEach((l) => { %>
-            <a class="<%= l.key === logKey ? 'active' : '' %>" href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
-          <% }) %>
-        </nav>
+      <div class="log-pick">
+        <% logGroups.forEach((g) => { %>
+          <div class="stats-toolbar-group">
+            <span class="stats-toolbar-label"><%= g.label %></span>
+            <nav class="stats-range" aria-label="Protokolle: <%= g.label %>">
+              <% logs.filter((l) => l.group === g.key).forEach((l) => { %>
+                <a class="<%= l.key === logKey ? 'active' : '' %>" href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
+              <% }) %>
+            </nav>
+          </div>
+        <% }) %>
       </div>
       <% if (data) { %>
         <div class="stats-toolbar-group stats-toolbar-actions">
@@ -80,6 +85,24 @@
       <% } %>
     </div>
 
+    <% if (data && logKey === 'konto') { %>
+      <div class="stats-toolbar-row">
+        <div class="stats-toolbar-group">
+          <span class="stats-toolbar-label">Buchung</span>
+        </div>
+        <form method="get" action="/admin#protokoll" class="stats-member-pick log-search">
+          <input type="hidden" name="bereich" value="protokolle">
+          <input type="hidden" name="log" value="konto">
+          <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
+          <label class="sr-only" for="konto-art">Art der Buchung</label>
+          <select id="konto-art" name="buchung">
+            <option value="">Alle Arten</option>
+            <% data.types.forEach((t) => { %><option value="<%= t.key %>" <%= t.key === data.type ? 'selected' : '' %>><%= t.label %></option><% }) %>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="submit">Anzeigen</button>
+        </form>
+      </div>
+    <% } %>
     <% if (data && logKey === 'handel') { %>
       <div class="stats-toolbar-row">
         <div class="stats-toolbar-group">
@@ -243,6 +266,166 @@
         </div>
       <% } %>
       <%- pager(data, logUrl) %>
+    <% } else if (data && logKey === 'wetten') { %>
+      <p class="muted small">Jede Wette mit Ersteller, Schiedsrichter, Topf und wie sie ausgegangen ist – wer sie entschieden hat und mit welcher Begründung. Mit einem Spieler: alle Wetten, die er erstellt, geschiedst oder mitgewettet hat.</p>
+      <p class="muted small"><%= countLine(data, 'Wette', 'Wetten') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Wetten.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Erstellt</th><th>Wette</th><th>Ersteller / Schiri</th><th>Ergebnis</th><th class="num">Topf</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((b) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(b.at) %></td>
+                  <td><a href="/wetten/<%= b.id %>"><%= b.title %></a><% if (b.duel) { %> <span class="badge badge-duell">Duell</span><% } %><br><span class="muted small"><%= b.options.join(' / ') %><%= b.group ? ' · Gruppe ' + b.group : '' %></span></td>
+                  <td><%- userLink(b.creator, { realName: false }) %><% if (b.referee) { %><br><span class="muted small">Schiri:</span> <%- userLink(b.referee, { realName: false }) %><% } %></td>
+                  <td>
+                    <span class="badge <%= b.status === 'entschieden' ? 'badge-entschieden' : b.status === 'annulliert' ? 'badge-annulliert' : b.result === 'Strittig' ? 'badge-streitig' : 'badge-offen' %>"><%= b.result %></span>
+                    <% if (b.resolvedAt) { %><br><span class="muted small"><%= b.via ? b.via : '' %><%= b.resolvedBy ? ' · ' + b.resolvedBy : '' %> · <%= dateSec(b.resolvedAt) %></span><% } %>
+                    <% if (b.note) { %><br><span class="muted small">„<%= b.note %>“</span><% } %>
+                  </td>
+                  <td class="num nowrap"><%= euro(b.pot) %><br><span class="muted small"><%= b.participants %> Teilnehmer</span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'einsaetze') { %>
+      <p class="muted small">Jeder Einsatz: wer auf welche Option gesetzt hat, wie viel und was nach der Auswertung ausgezahlt wurde.</p>
+      <p class="muted small"><%= countLine(data, 'Einsatz', 'Einsätze') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Einsätze.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Wette</th><th>Gesetzt auf</th><th class="num">Einsatz</th><th class="num">Ergebnis</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((p) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(p.at) %></td>
+                  <td><%- userLink(p.player, { realName: false }) %></td>
+                  <td><a href="/wetten/<%= p.betId %>"><%= p.bet %></a></td>
+                  <td><%= p.side %></td>
+                  <td class="num nowrap"><%= euro(p.amount) %></td>
+                  <td class="num nowrap"><% if (p.state === 'offen') { %><span class="badge badge-offen">Offen</span><% } else { %><%- signedEuro(p.net) %><br><span class="muted small"><%= p.state === 'gewonnen' ? 'Gewonnen' : p.state === 'erstattet' ? 'Erstattet' : 'Verloren' %> · <%= euro(p.payout) %> zurück</span><% } %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'broker') { %>
+      <p class="muted small">Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag.</p>
+      <p class="muted small"><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Käufe oder Verkäufe.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Wert</th><th>Art</th><th class="num">Menge</th><th class="num">Kurs</th><th class="num">Betrag</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((t) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(t.at) %></td>
+                  <td><%- userLink(t.player, { realName: false }) %></td>
+                  <td><%= t.asset %></td>
+                  <td class="nowrap"><span class="badge <%= t.side === 'Kauf' ? 'badge-offen' : 'badge-entschieden' %>"><%= t.side %></span></td>
+                  <td class="num nowrap"><%= t.unitsText %></td>
+                  <td class="num nowrap"><%= coinPrice(t.price) %></td>
+                  <td class="num nowrap"><%- signedEuro(t.cents) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'lotterie') { %>
+      <p class="muted small">Gekaufte Lose und Gewinne aller Lotterien. Losanzahl, Runde und Gewinnlos werden erst seit diesem Update gespeichert.</p>
+      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Lose gekauft.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Lotterie</th><th>Art</th><th class="num">Betrag</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((l) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(l.at) %></td>
+                  <td><%- userLink(l.player, { realName: false }) %></td>
+                  <td><%= l.lottery %><%= l.round ? ' · Runde ' + l.round : '' %></td>
+                  <td><% if (l.kind === 'Gewinn') { %><span class="badge badge-entschieden">Gewinn</span><%= l.ticket ? ' mit Los ' + l.ticket : '' %><% } else { %><%= l.count ? l.count + (l.count === 1 ? ' Los' : ' Lose') : 'Lose' %> gekauft<% } %></td>
+                  <td class="num nowrap"><%- signedEuro(l.amount) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'grading') { %>
+      <p class="muted small">Jeder Grading-Auftrag mit Karte, Kunde, echter und geschätzter Note, Sauberkeit, Versiegelung und Lohn.</p>
+      <p class="muted small"><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Grading-Aufträge.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Angenommen</th><th>Spieler</th><th>Karte</th><th>Bewertung</th><th class="num">Lohn</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((j) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(j.startedAt) %></td>
+                  <td><%- userLink(j.player, { realName: false }) %><br><span class="muted small"><%= j.shop %></span></td>
+                  <td><%= j.card %><br><span class="muted small">für <%= j.customer %></span></td>
+                  <td>
+                    <% if (!j.done) { %><span class="badge badge-wartend">In Arbeit</span>
+                    <% } else { %>
+                      <span class="small">Note <%= j.grade %><%= j.guess !== null && j.guess !== undefined ? ' · geschätzt ' + j.guess : '' %><%= j.clean !== null && j.clean !== undefined ? ' · sauber ' + j.clean + ' %' : '' %><%= j.seal !== null && j.seal !== undefined ? ' · Siegel ' + j.seal : '' %></span><% if (j.foil) { %><br><span class="muted small">+ Folie gefunden</span><% } %>
+                    <% } %>
+                  </td>
+                  <td class="num nowrap"><%= j.done ? euro(j.pay) : '–' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'konto') { %>
+      <p class="muted small">Jede Buchung auf den Spielgeldkonten – der Kontoauszug aller Spieler: Tagesbonus, Erfolge, Provisionen, Grading-Ausbau, Startguthaben und alles andere. Oben lässt sich die Art der Buchung wählen.</p>
+      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %><%= data.type ? ' · ' + data.types.find((t) => t.key === data.type).label : '' %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Keine Buchungen gefunden.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Buchung</th><th class="num">Betrag</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((l) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(l.at) %></td>
+                  <td><%- userLink(l.player, { realName: false }) %></td>
+                  <td><%= l.kind %><% if (l.text) { %><br><span class="muted small"><% if (l.betId) { %><a href="/wetten/<%= l.betId %>"><%= l.text %></a><% } else { %><%= l.text %><% } %></span><% } %></td>
+                  <td class="num nowrap"><%- signedEuro(l.amount) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, kontoLink) %>
     <% } %>
   </div>
 </section>
