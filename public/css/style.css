@@ -147,7 +147,9 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
   display: flex; align-items: center; gap: clamp(8px, 2vw, 28px); height: 60px;
 }
 .brand { display: flex; align-items: center; flex: none; color: var(--text); }
-.brand-logo { display: block; height: 30px; width: auto; }
+.brand { gap: 10px; }
+.brand-logo { display: block; height: 32px; width: 32px; }
+.brand-name { font-size: 17px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
 
 .nav {
   display: flex; align-items: stretch; align-self: stretch; flex: 1; min-width: 0;
@@ -265,7 +267,8 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 }
 @media (max-width: 480px) {
   .topbar-inner { padding: 0 16px; gap: 10px; }
-  .brand-logo { height: 26px; }
+  .brand-logo { height: 28px; width: 28px; }
+  .brand-name { font-size: 15px; }
   .balance-name { display: none; }
 }
 
@@ -1719,20 +1722,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .tcg-flip.flipped .tcg-back { visibility: hidden; }
 .tcg-front img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tcg-back {
-  display: grid; place-items: center; border: 3px solid #3b2a63;
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .035) 0 8px, transparent 8px 16px),
-    radial-gradient(circle at 50% 45%, #3a1f73, #140b2b 70%);
+  display: grid; place-items: center; border: 0;
+  background: var(--gr-back); /* Rückseite je Season (Grafik mit Logo), siehe „Kartenrückseiten“ unten */
   box-shadow: 0 12px 30px rgba(0, 0, 0, .5);
   transition: box-shadow .3s, visibility 0s .3s;
 }
 .tcg-flip:not(.flipped):hover .tcg-back { box-shadow: 0 0 0 2px rgba(255, 255, 255, .5), 0 16px 34px rgba(0, 0, 0, .6); }
-.tcg-back-logo {
-  display: grid; place-items: center; width: 50%; aspect-ratio: 1; transform: rotate(45deg);
-  border: 3px solid #d8b56a; background: #1a0f33; color: #fff; font-weight: 900; font-size: clamp(.8rem, 2.2vw, 1.7rem);
-  text-shadow: -2px 0 #ff2d6f, 2px 0 #29e0ff;
-}
-.tcg-back-logo > span { transform: rotate(-45deg); }
 .tcg-flip-label {
   display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; font-weight: 800; font-size: .9rem;
   opacity: 0; transform: translateY(-6px); transition: opacity .3s .45s, transform .3s .45s;
@@ -2394,9 +2389,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 
 /* ---------- Grading-Shop (views/grading.ejs, public/js/grading.js) ---------- */
 :root {
-  --gr-back: url('/img/bfw-holdings-logo-dark-bg.svg') center / 62% no-repeat,
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .045) 0 6px, transparent 6px 12px),
-    radial-gradient(circle at 50% 38%, #17605a, #042f2e 72%);
+  --gr-back: url('/img/tcg-backs/pre-season.webp') center / cover no-repeat;
 }
 .admin-gr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; margin-bottom: 14px; }
 .gr-kicker { margin: 0 0 4px; font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--primary); }
@@ -3186,9 +3179,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 
 /* Grading (Redesign) */
 :root {
-  --gr-back: url('/img/bfw-holdings-logo-dark-bg.svg') center / 62% no-repeat,
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .04) 0 6px, transparent 6px 12px),
-    radial-gradient(circle at 50% 38%, #3b3570, #161826 72%);
+  --gr-back: url('/img/tcg-backs/pre-season.webp') center / cover no-repeat;
   --gr-green: oklch(0.8 0.14 155);
   --gr-red: oklch(0.74 0.14 25);
   --gr-yellow: oklch(0.85 0.13 85);
@@ -4369,15 +4360,10 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .album-season-head .tcg-progress-num { font-size: 13px; }
 
 /* ---------- Kartenrückseiten je Season (Klasse "season-<key>", src/tcg/seasons.js) ----------
-   Pre-Season = die bisherigen Rückseiten (ohne eigene Regel). Season 1 = Platzhalter, bis die Grafik fertig ist;
-   dann hier --gr-back auf url('/img/tcg-backs/season-1.webp') center / cover umstellen. */
+   Die Grafiken (public/img/tcg-backs) tragen das BfW-Logo schon selbst. Pre-Season = Standard (--gr-back in :root). */
 .season-season-1 {
-  --gr-back: url('/img/bfw-holdings-logo-dark-bg.svg') center / 62% no-repeat,
-    repeating-linear-gradient(45deg, rgba(255, 214, 140, .05) 0 6px, transparent 6px 12px),
-    radial-gradient(circle at 50% 38%, #7c1622, #2a0507 72%);
+  --gr-back: url('/img/tcg-backs/season-1.webp') center / cover no-repeat;
 }
-.tcg-back.season-season-1 { border-color: #b8873a; background: var(--gr-back); }
-.tcg-back.season-season-1 .tcg-back-logo { display: none; }
 
 /* ---------- Kartenwerte geändert (Boost/Debuff) in IHK und Dungeon: Zahl steigt auf, Karte leuchtet kurz ---------- */
 .ihk-floater.is-stat-up, .ihk-floater.is-stat-down, .dg-pop.is-stat-up, .dg-pop.is-stat-down {

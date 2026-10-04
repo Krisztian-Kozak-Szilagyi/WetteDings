@@ -50,7 +50,6 @@
   el('div', 'gr-glare', front);
 
   var back = el('div', 'gr-face gr-back', card);
-  el('div', 'gr-back-logo', back);
   el('div', 'gr-glare', back);
 
   // Flecken: hp 1 → 0 durch Reiben. Ob alles weg ist, muss der Spieler selbst sehen – es gibt keine Anzeige.

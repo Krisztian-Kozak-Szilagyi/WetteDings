@@ -275,7 +275,7 @@
       btn.innerHTML =
         '<span class="tcg-aura" aria-hidden="true"></span>' +
         '<span class="tcg-flip-inner">' +
-          '<span class="tcg-face tcg-back season-' + (c.season || 'pre-season') + '"><span class="tcg-back-logo"><span>BfW</span></span></span>' + // Rückseite je Season
+          '<span class="tcg-face tcg-back season-' + (c.season || 'pre-season') + '"></span>' + // Rückseite je Season
           '<span class="tcg-face tcg-front"><img alt="" width="720" height="1008"><span class="tcg-shine"></span></span>' +
         '</span>' +
         '<span class="tcg-flip-label"><span class="tcg-dot"></span><span></span></span>';
