@@ -4153,7 +4153,7 @@ button.dg-boost-card:hover, button.dg-boost-card:focus-visible { outline: 0; tra
 .dg-hero-title:hover, .dg-hero-title:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
 .dg-story-page { display: flex; flex-direction: column; gap: 16px; }
 .dg-story { padding: 4px 0; }
-.dg-story p { margin: 0 0 14px; font-size: 16px; line-height: 1.7; text-wrap: balance; hyphens: auto; } /* ausgeglichene Zeilen statt einzelner Wörter am Ende */
+.dg-story p { margin: 0 0 14px; font-size: 16px; line-height: 1.7; }
 .dg-story p:last-child { margin-bottom: 0; font-weight: 600; }
 /* „Dungeon“ über dem Titel: durchsichtiges Glas (Liquid-Glass-Stil) mit nur einem Hauch Rot – Unschärfe, Lichtkante oben, leichter Glanz */
 .dg-hero-text .kicker {
