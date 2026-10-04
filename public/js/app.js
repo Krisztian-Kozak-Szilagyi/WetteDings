@@ -657,3 +657,45 @@
     if (out) out.textContent = String(Array.from(el.value).length);
   });
 })();
+
+// Admin: Grading – Verdienst pro Tag live schätzen (gleiche Rechnung wie src/grading/estimate.js)
+(function () {
+  var box = document.querySelector('[data-grading-calc]');
+  if (!box) return;
+  var form = box.closest('form');
+  var input;
+  try { input = JSON.parse(box.getAttribute('data-grading-calc')); } catch (e) { return; }
+  var fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  var val = function (name) {
+    var el = form.querySelector('[name="' + name + '"]');
+    var v = parseFloat(String(el ? el.value : '').replace(/\s|€|%/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(v) && v >= 0 ? v : 0;
+  };
+  var set = function (sel, text) { var el = box.querySelector(sel); if (el) el.textContent = text; };
+  var recalc = function () {
+    var jobs = val('gr_jobs');
+    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100 };
+    var premium = val('gr_premium');
+    var ref = input.profiles[input.profiles.length - 1].key;
+    var prev = null;
+    input.levels.forEach(function (l, i) {
+      var cost = i ? val('gr_cost_' + l.level) * 100 : 0;
+      var day = {};
+      input.profiles.forEach(function (p) {
+        var j = (pay.clean * p.clean) / 100;
+        if (l.steps.indexOf('grade') >= 0) j += pay.grade * (p.exact + p.near / 2);
+        if (l.steps.indexOf('slab') >= 0) j += (pay.slab * p.seal) / 100;
+        j = j * (l.premium ? 1 + premium / 100 : 1) * input.factor;
+        if (l.steps.indexOf('slab') >= 0 && p.seal > 0) j += input.foilValue;
+        day[p.key] = Math.round(jobs * j);
+        set('[data-gc-day="' + l.level + '-' + p.key + '"]', fmt.format(day[p.key] / 100));
+      });
+      set('[data-gc-cost="' + l.level + '"]', cost ? fmt.format(cost / 100) : '–');
+      var gain = prev ? day[ref] - prev[ref] : 0;
+      set('[data-gc-payback="' + l.level + '"]', i && gain > 0 ? Math.ceil(cost / gain) + ' Tagen' : '–');
+      prev = day;
+    });
+    set('[data-gc-bonus]', fmt.format(val('amount')));
+  };
+  form.addEventListener('input', recalc);
+})();

@@ -8,7 +8,9 @@ const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const { logSettingsChange } = require('../stats/settingsLog');
 const catalog = require('../tcg/catalog');
-const { rollGradingFoil } = require('../items/itemService');
+const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
+const foil = require('../items/foil');
+const estimate = require('./estimate');
 const { notify } = require('../services/notifyService');
 
 // ---------- Spielregeln (Demo-Werte) ----------
@@ -264,7 +266,34 @@ async function finishJob({ user, clean, seal }) {
   return done;
 }
 
+// ---------- Lohn-Schätzung fürs Admin-Panel ----------
+/** Feste Werte für die Schätzung (Stufen, Seltenheits-Faktor, Folienwert pro versiegeltem Auftrag, Profile) */
+function estimateInput() {
+  const folie = ITEM_TYPES.find((t) => t.key === 'folie');
+  return {
+    levels: LEVELS.map(({ level, name, steps, premium }) => ({ level, name, steps, premium: !!premium })),
+    factor: estimate.rarityFactor(CUSTOMER_RARITIES, (k) => (catalog.cardsByRarity[k] || []).length > 0),
+    foilValue: ((foil.settings.gradingChance / 10000) * (folie ? folie.sell : 0)),
+    profiles: estimate.PROFILES,
+  };
+}
+
+/** Schätzung mit den aktuellen Einstellungen */
+const estimateNow = () => estimate.estimate({ ...estimateInput(), settings: { jobs: settings.jobs, pay: PAY, costs: settings.costs, premium: settings.premium } });
+
+/** Tatsächlich verdient (letzte days Tage, ohne Folien) je Stufe: Aufträge, Ø Lohn pro Auftrag und pro Arbeitstag */
+async function actualStats(days = 30) {
+  const since = new Date(Date.now() - days * 864e5);
+  const rows = await GradingJob.aggregate([
+    { $match: { status: 'fertig', doneAt: { $gte: since } } },
+    { $group: { _id: { level: '$level', user: '$user', day: '$day' }, n: { $sum: 1 }, pay: { $sum: '$pay' } } },
+    { $group: { _id: '$_id.level', jobs: { $sum: '$n' }, pay: { $sum: '$pay' }, workDays: { $sum: 1 }, users: { $addToSet: '$_id.user' } } },
+    { $sort: { _id: 1 } },
+  ]);
+  return rows.map((r) => ({ level: r._id, jobs: r.jobs, users: r.users.length, perJob: Math.round(r.pay / r.jobs), jobsPerDay: r.jobs / r.workDays, perWorkDay: Math.round(r.pay / r.workDays) }));
+}
+
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

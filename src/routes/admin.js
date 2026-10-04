@@ -143,6 +143,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
+    // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
+    gradingCalc: needs('spielwerte') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     taxCategories: taxService.CATEGORIES,
     taxRates: taxService.rates,
     log, // { key, data } des gewählten Protokolls

@@ -211,6 +211,51 @@
           <% }) %>
           <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
         </div>
+        <% if (gradingCalc) { const gc = gradingCalc; const pct = (v) => Math.round(v * 100) + ' %'; %>
+          <div class="admin-gr-calc" data-grading-calc="<%= JSON.stringify(gc.input) %>">
+            <h3 class="admin-ihk-sub">Verdienst pro Tag (Schätzung)</h3>
+            <p class="muted small">Rechnet beim Tippen mit den Werten oben – vor dem Speichern ausprobieren. Alle Aufträge des Tages erledigt; inkl. Seltenheits-Zuschlag der Kundenkarten (Ø +<%= Math.round((gc.input.factor - 1) * 100) %> %) und ab Stufe 3 Folienfunde (Ø <%= euro(Math.round(gc.input.foilValue)) %> pro Auftrag).</p>
+            <div class="table-wrap">
+              <table class="table admin-gr-calc-table">
+                <thead><tr><th>Stufe</th><th class="num">Ausbau</th><% gc.input.profiles.forEach((p) => { %><th class="num"><%= p.label %></th><% }) %><th class="num">Ausbau bezahlt nach</th></tr></thead>
+                <tbody>
+                  <% gc.rows.forEach((r) => { %>
+                    <tr>
+                      <td><%= r.level %> · <%= r.name %></td>
+                      <td class="num" data-gc-cost="<%= r.level %>"><%= r.cost ? euro(r.cost) : '–' %></td>
+                      <% gc.input.profiles.forEach((p) => { %><td class="num" data-gc-day="<%= r.level %>-<%= p.key %>"><%= euro(r.perDay[p.key]) %></td><% }) %>
+                      <td class="num" data-gc-payback="<%= r.level %>"><%= r.payback ? r.payback + ' Tagen' : '–' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <p class="muted small">Zum Vergleich: Tagesbonus <strong data-gc-bonus><%= euro(dailyBonus()) %></strong> pro Tag – entfällt, solange man im Grading-Shop arbeitet. „Ausbau bezahlt nach“ = Ausbaukosten ÷ Mehrverdienst gegenüber der Stufe davor (Profil „<%= gc.input.profiles[gc.input.profiles.length - 1].label %>“).</p>
+            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt').join(' · ') %>.</p>
+            <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Folien)</h3>
+            <% if (gc.actual.length) { %>
+              <div class="table-wrap">
+                <table class="table admin-gr-calc-table">
+                  <thead><tr><th>Stufe</th><th class="num">Mitglieder</th><th class="num">Aufträge</th><th class="num">Ø pro Auftrag</th><th class="num">Ø Aufträge/Tag</th><th class="num">Ø pro Arbeitstag</th></tr></thead>
+                  <tbody>
+                    <% gc.actual.forEach((a) => { const l = gradingLevels.find((x) => x.level === a.level); %>
+                      <tr>
+                        <td><%= a.level %><%= l ? ' · ' + l.name : '' %></td>
+                        <td class="num"><%= a.users %></td>
+                        <td class="num"><%= a.jobs %></td>
+                        <td class="num"><%= euro(a.perJob) %></td>
+                        <td class="num"><%= a.jobsPerDay.toFixed(1).replace('.', ',') %></td>
+                        <td class="num"><%= euro(a.perWorkDay) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } else { %>
+              <p class="muted small">In den letzten 30 Tagen wurden noch keine Aufträge erledigt.</p>
+            <% } %>
+          </div>
+        <% } %>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

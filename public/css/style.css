@@ -2400,6 +2400,9 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   --gr-back: url('/img/tcg-backs/pre-season.webp') center / cover no-repeat;
 }
 .admin-gr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; margin-bottom: 14px; }
+.admin-gr-calc { margin: 4px 0 16px; }
+.admin-gr-calc .table-wrap { margin-bottom: 8px; }
+.admin-gr-calc-table td.num, .admin-gr-calc-table th.num { white-space: nowrap; }
 .gr-kicker { margin: 0 0 4px; font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--primary); }
 .gr-ok { color: var(--ja); font-weight: 600; }
 .gr-bad { color: var(--nein); font-weight: 600; }
