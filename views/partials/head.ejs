@@ -18,6 +18,16 @@
     // Menüpunkte samt Abzeichen – einmal aufgebaut, oben in der Leiste und (Handy/Tablet) im Profil-Menü gezeigt
     const cap = (n) => (n > 99 ? '99+' : n);
     const navItems = [];
+    const navGroup = (key, label, items) => {
+      const sum = {};
+      items.forEach((it) => it.badges.forEach((bd) => {
+        if (!sum[bd.cls]) sum[bd.cls] = { n: 0, cls: bd.cls, title: [], aria: [] };
+        sum[bd.cls].n += bd.n; sum[bd.cls].title.push(it.label + ': ' + bd.title); sum[bd.cls].aria.push(bd.aria);
+      }));
+      const badges = Object.values(sum).map((bd) => ({ n: bd.n, cls: bd.cls, title: bd.title.join(' · '), aria: bd.aria.join(', ') }));
+      const live = items.filter((it) => it.live).map((it) => it.live).join(' · ');
+      return { group: key, label, items, badges, live, active: items.some((it) => it.active) };
+    };
     if (currentUser) {
       // Abzeichen: neue Gruppen-Wetten (eigene Farbe) haben Vorrang vor neuen öffentlichen; fehlende eigene Stimmen zählen immer
       const betRed = betVotePending + (betNewGroup ? 0 : betNewPublic);
@@ -25,9 +35,13 @@
       if (betNewGroup) betBadges.push({ n: betNewGroup, cls: 'nav-badge-group', title: 'Neue Wetten in deinen Gruppen', aria: betNewGroup + ' neue Wetten in deinen Gruppen' });
       if (betRed) betBadges.push({ n: betRed, cls: '', title: betVotePending ? 'Wetten, in denen deine Stimme zum Ergebnis fehlt' + (betNewGroup || !betNewPublic ? '' : ', und neue Wetten') : 'Neue Wetten', aria: betRed + ' Wetten: neu oder deine Stimme fehlt' });
       navItems.push({ href: '/rangliste', label: 'Rangliste', active: currentPath === '/rangliste', badges: [] });
-      navItems.push({ href: '/wetten', label: 'Wetten', active: currentPath === '/wetten' || currentPath.startsWith('/wetten/'), badges: betBadges });
-      navItems.push({ href: '/broker', label: 'Broker', active: currentPath === '/broker' || currentPath.startsWith('/broker/'), badges: [] });
-      navItems.push({ href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] });
+      // Wetten, Broker und Lotterie stecken im Aufklappmenü "Zocken"; seine Abzeichen = Summe der Unterpunkte (je Farbe)
+      const zocken = [
+        { href: '/wetten', label: 'Wetten', active: currentPath === '/wetten' || currentPath.startsWith('/wetten/'), badges: betBadges },
+        { href: '/broker', label: 'Broker', active: currentPath === '/broker' || currentPath.startsWith('/broker/'), badges: [] },
+        { href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] },
+      ];
+      navItems.push(navGroup('zocken', 'Zocken', zocken));
       navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });
       const tradeBadges = [];
       if (tradeMarketNew) tradeBadges.push({ n: tradeMarketNew, cls: 'nav-badge-market', title: 'Neu auf dem Markt', aria: tradeMarketNew + ' neue Markt-Angebote' });
@@ -50,11 +64,29 @@
       }
 
     }
-    const navLink = (it) => {
-      let h = '<a href="' + it.href + '"' + (it.active ? ' class="active" aria-current="page"' : '') + '>' + it.label;
+    const navBadges = (it) => {
+      let h = '';
       it.badges.forEach((b) => { h += '<span class="nav-badge ' + b.cls + '" title="' + b.title + '" aria-label="' + b.aria + '">' + cap(b.n) + '</span>'; });
       if (it.live) h += '<span class="nav-live" title="' + it.live + '" aria-label="' + it.live + '"></span>';
-      return h + '</a>';
+      return h;
+    };
+    // Leiste: Gruppe = Aufklappmenü (details, Animation in style.css, Hover/Schließen in app.js)
+    const navTop = (it) => {
+      if (!it.group) return navLink(it);
+      let h = '<details class="nav-group' + (it.active ? ' active' : '') + '" data-nav-group>'
+        + '<summary' + (it.active ? ' class="active"' : '') + '>' + it.label + navBadges(it)
+        + '<svg class="nav-group-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>'
+        + '<div class="nav-group-panel">';
+      return h + it.items.map(navLink).join('') + '</div></details>';
+    };
+    // Profil-Menü (Handy/Tablet): Gruppe = kleine Überschrift + Unterpunkte
+    const navMenu = (it) => {
+      if (!it.group) return navLink(it);
+      return '<div class="menu-nav-group"><span class="menu-nav-head">' + it.label + '</span>' + it.items.map(navLink).join('') + '</div>';
+    };
+    const navLink = (it) => {
+      let h = '<a href="' + it.href + '"' + (it.active ? ' class="active" aria-current="page"' : '') + '>' + it.label;
+      return h + navBadges(it) + '</a>';
     };
   %>
   <header class="topbar">
@@ -65,7 +97,7 @@
 
       <% if (currentUser) { %>
         <nav id="hauptnavigation" class="nav" aria-label="Hauptmenü">
-          <% navItems.forEach((it) => { %><%- navLink(it) %><% }) %>
+          <% navItems.forEach((it) => { %><%- navTop(it) %><% }) %>
         </nav>
       <% } %>
 
@@ -128,7 +160,7 @@
             </summary>
             <div class="user-menu-list" role="menu">
               <div class="menu-nav">
-                <% navItems.forEach((it) => { %><%- navLink(it) %><% }) %>
+                <% navItems.forEach((it) => { %><%- navMenu(it) %><% }) %>
               </div>
               <a role="menuitem" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Profil ansehen</a>
               <a role="menuitem" href="/inventar">Inventar</a>

@@ -153,10 +153,9 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 
 .nav {
   display: flex; align-items: stretch; align-self: stretch; flex: 1; min-width: 0;
-  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
 }
 .nav::-webkit-scrollbar { display: none; }
-.nav > a, .menu-nav > a {
+.nav > a, .menu-nav a {
   position: relative; display: flex; align-items: center; gap: 6px; white-space: nowrap;
   padding: 0 clamp(6px, .9vw, 12px); border-radius: var(--radius-md);
   font-size: clamp(13px, 1.2vw, 14px); font-weight: 500; color: var(--color-neutral-400);
@@ -178,6 +177,60 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 /* Black Market geöffnet: pulsierender lila Punkt */
 .nav-live { width: 7px; height: 7px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #a855f7; animation: bmPulse 1.6s ease-in-out infinite; }
 @keyframes bmPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+
+/* Aufklappmenü in der Leiste ("Zocken"): Panel klappt mit Schwung auf, Einträge laufen nacheinander ein */
+.nav-group { position: relative; display: flex; }
+.nav-group > summary {
+  position: relative; display: flex; align-items: center; gap: 6px; white-space: nowrap; list-style: none;
+  padding: 0 clamp(6px, .9vw, 12px); border-radius: var(--radius-md); cursor: var(--cur-pointer);
+  font-size: clamp(13px, 1.2vw, 14px); font-weight: 500; color: var(--color-neutral-400);
+}
+.nav-group > summary::-webkit-details-marker { display: none; }
+.nav-group > summary:hover, .nav-group[open] > summary { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.nav-group > summary.active { color: var(--text); }
+.nav-group > summary.active::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 2px;
+  background: var(--color-accent); box-shadow: 0 0 12px var(--color-accent);
+}
+.nav-group-chev { flex: none; opacity: .7; transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
+.nav-group[open] .nav-group-chev { transform: rotate(180deg); opacity: 1; }
+.nav-group-panel {
+  position: absolute; left: 50%; top: calc(100% + 6px); z-index: 60; min-width: 190px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-radius: var(--radius-lg); background: var(--color-surface);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-neutral-800), 0 18px 40px -18px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  transform-origin: 50% 0; transform: translateX(-50%);
+}
+/* leuchtende Kante oben am Panel */
+.nav-group-panel::before {
+  content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-accent-300), transparent); opacity: .8;
+}
+.nav-group[open] .nav-group-panel { animation: navDrop .38s cubic-bezier(.2, .9, .25, 1.15) both; }
+.nav-group.is-closing .nav-group-panel { animation: navLift .18s ease-in both; }
+.nav-group-panel > a {
+  display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-radius: var(--radius-md); white-space: nowrap;
+  font-size: 14px; font-weight: 500; color: var(--color-neutral-300);
+  transition: background .15s, color .15s, transform .15s;
+}
+.nav-group-panel > a .nav-badge:first-of-type { margin-left: auto; }
+.nav-group-panel > a:hover, .nav-group-panel > a:focus-visible {
+  color: var(--text); background: color-mix(in srgb, var(--color-accent) 12%, transparent); transform: translateX(3px);
+}
+.nav-group-panel > a.active { color: var(--color-accent-300); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.nav-group[open] .nav-group-panel > a { animation: navItemIn .32s ease-out both; }
+.nav-group[open] .nav-group-panel > a:nth-child(2) { animation-delay: .05s; }
+.nav-group[open] .nav-group-panel > a:nth-child(3) { animation-delay: .1s; }
+.nav-group[open] .nav-group-panel > a:nth-child(4) { animation-delay: .15s; }
+@keyframes navDrop {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scaleY(.6); clip-path: inset(0 0 100% 0 round 12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scaleY(1); clip-path: inset(0 0 0 0 round 12px); }
+}
+@keyframes navLift { to { opacity: 0; transform: translateX(-50%) translateY(-6px) scaleY(.85); } }
+@keyframes navItemIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-group[open] .nav-group-panel, .nav-group[open] .nav-group-panel > a, .nav-group.is-closing .nav-group-panel { animation: none; }
+}
 
 .nav-user { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
 .nav-user form { margin: 0; }
@@ -258,11 +311,14 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 @media (max-width: 1100px) {
   .nav { display: none; }
   .menu-nav { display: flex; flex-direction: column; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--color-divider); }
-  .menu-nav > a { padding: 9px 12px; font-size: 14px; color: var(--text); }
-  .menu-nav > a:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
-  .menu-nav > a.active { color: var(--color-accent-300); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-  .menu-nav > a .nav-badge { margin-left: auto; }
-  .menu-nav > a .nav-badge + .nav-badge { margin-left: 0; }
+  .menu-nav a { padding: 9px 12px; font-size: 14px; color: var(--text); }
+  .menu-nav a:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+  .menu-nav a.active { color: var(--color-accent-300); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+  .menu-nav a .nav-badge { margin-left: auto; }
+  .menu-nav a .nav-badge + .nav-badge { margin-left: 0; }
+  .menu-nav-group { display: flex; flex-direction: column; }
+  .menu-nav-group > a { padding-left: 22px; }
+  .menu-nav-head { padding: 8px 12px 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
   .menu-dot { display: block; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--color-accent-300); box-shadow: 0 0 0 2px var(--color-bg); }
 }
 @media (max-width: 480px) {

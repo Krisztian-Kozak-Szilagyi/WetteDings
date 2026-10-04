@@ -912,3 +912,44 @@
   }
 })();
 
+
+// Aufklappmenüs in der Leiste ("Zocken"): mit Maus beim Drüberfahren auf, sonst per Klick;
+// schließen bei Klick daneben, Escape oder Mausverlassen – mit kurzer Schließ-Animation (style.css)
+(function () {
+  var groups = document.querySelectorAll('[data-nav-group]');
+  if (!groups.length) return;
+  var hover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function close(g) {
+    if (!g.open || g.classList.contains('is-closing')) return;
+    if (still) { g.open = false; return; }
+    g.classList.add('is-closing');
+    setTimeout(function () { g.classList.remove('is-closing'); g.open = false; }, 170);
+  }
+  function open(g) {
+    g.classList.remove('is-closing');
+    groups.forEach(function (o) { if (o !== g) close(o); });
+    g.open = true;
+  }
+  groups.forEach(function (g) {
+    var summary = g.querySelector('summary');
+    var timer = null;
+    summary.addEventListener('click', function (e) {
+      e.preventDefault();
+      // mit Maus ist es beim Klick schon offen (Hover) – dann nicht gleich wieder zuklappen
+      if (g.open && !g.classList.contains('is-closing') && !hover) close(g); else open(g);
+    });
+    if (hover) {
+      g.addEventListener('mouseenter', function () { clearTimeout(timer); open(g); });
+      g.addEventListener('mouseleave', function () { clearTimeout(timer); timer = setTimeout(function () { close(g); }, 160); });
+    }
+    g.addEventListener('focusout', function (e) { if (!g.contains(e.relatedTarget)) close(g); });
+  });
+  document.addEventListener('click', function (e) {
+    groups.forEach(function (g) { if (!g.contains(e.target)) close(g); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    groups.forEach(function (g) { if (g.open) { close(g); g.querySelector('summary').focus(); } });
+  });
+})();
