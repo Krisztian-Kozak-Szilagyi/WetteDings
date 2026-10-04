@@ -879,7 +879,8 @@
   // Vergaben: nur die Felder der gewählten Art zeigen, Höchstzahl und Knopf anpassen
   var grant = document.querySelector('[data-grant-form]');
   if (grant) {
-    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], entzug: [50, 50] }; // [ein Mitglied, alle]
+    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], entzug: [50, 50], geld: [1, 1], geldabzug: [1, 1] }; // [ein Mitglied, alle]; Geld: Betrag statt Anzahl
+    var SINGLE = ['entzug', 'geldabzug']; // nur bei einem einzelnen Mitglied
     var user = grant.querySelector('[name="user"]');
     var members = document.getElementById(user.getAttribute('list'));
     var allOption = members ? members.querySelector('[data-not]') : null;
@@ -896,15 +897,16 @@
       // "Alle Mitglieder" nur, wo es erlaubt ist (Vorschlag aus der Liste nehmen bzw. wieder einsetzen)
       var toAll = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i.test(user.value.trim()); // wie ALL_MEMBERS in routes/admin.js
       if (allOption) {
-        if (art === 'entzug' && allOption.parentNode) allOption.remove();
-        if (art !== 'entzug' && !allOption.parentNode) members.insertBefore(allOption, members.firstChild);
-        if (art === 'entzug' && toAll) user.value = '';
+        var single = SINGLE.indexOf(art) >= 0;
+        if (single && allOption.parentNode) allOption.remove();
+        if (!single && !allOption.parentNode) members.insertBefore(allOption, members.firstChild);
+        if (single && toAll) user.value = '';
       }
-      var max = MAX[art][toAll && art !== 'entzug' ? 1 : 0];
+      var max = MAX[art][toAll && SINGLE.indexOf(art) < 0 ? 1 : 0];
       count.max = max;
       if (Number(count.value) > max) count.value = max;
       submit.textContent = checked ? checked.getAttribute('data-button') : 'Vergeben';
-      submit.className = 'btn ' + (art === 'entzug' ? 'btn-danger' : 'btn-primary');
+      submit.className = 'btn ' + (SINGLE.indexOf(art) >= 0 ? 'btn-danger' : 'btn-primary');
     };
     grant.addEventListener('change', update);
     user.addEventListener('input', update);

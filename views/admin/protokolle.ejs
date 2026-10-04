@@ -406,7 +406,7 @@
                   <td class="nowrap"><%= dateSec(g.at) %></td>
                   <td><%- userLink(g.by, { realName: false }) %></td>
                   <td><% if (g.all) { %><strong><%= g.to %></strong><% } else { %><%- userLink(g.to, { realName: false }) %><% } %></td>
-                  <td><span class="badge <%= g.kind === 'entzug' ? 'badge-streitig' : g.kind === 'pack' ? 'badge-offen' : 'badge-entschieden' %>"><%= g.kindLabel %></span> <%= g.what %></td>
+                  <td><span class="badge <%= g.kind === 'entzug' || g.kind === 'geldabzug' ? 'badge-streitig' : g.kind === 'pack' ? 'badge-offen' : 'badge-entschieden' %>"><%= g.kindLabel %></span> <%= g.what %></td>
                   <td class="num"><%= g.count %></td>
                 </tr>
               <% }) %>

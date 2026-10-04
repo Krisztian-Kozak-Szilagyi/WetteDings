@@ -8,6 +8,8 @@ const { requireReauth } = require('../middleware/reauth');
 const { PackGrant } = require('../models/Tcg');
 const roles = require('../services/roles');
 const betService = require('../services/betService');
+const Ledger = require('../models/Ledger');
+const { notify } = require('../services/notifyService');
 const { verdictRole } = require('../lib/verdict');
 const { UserError, str } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
@@ -655,6 +657,51 @@ router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL)
 
 // Ein Formular für alle Vergaben (Reiter "Vergaben"): art = pack | karte | item | entzug; user = Mitglied oder "alle".
 // Die Felder heißen je Art anders (pack, card, item) und werden für die einzelnen Vergaben umbenannt.
+// ---------- Spielgeld gutschreiben oder abziehen (Bugfixes, Tests, Aktionen) ----------
+const MONEY_MAX = 10000000; // 100.000 € je Mitglied und Vorgang
+
+/** Betrag aus dem Formular in Cent (1 Cent bis MONEY_MAX) oder null */
+function moneyAmount(value) {
+  const cents = parseEuro(str(value).trim());
+  return Number.isInteger(cents) && cents >= 1 && cents <= MONEY_MAX ? cents : null;
+}
+
+async function grantMoneyTo(req) {
+  const cents = moneyAmount(req.body.amount);
+  const target = str(req.body.user);
+  const toAll = target === 'alle';
+  const user = !toAll && mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  if (cents === null) return req.flash('error', `Bitte einen Betrag zwischen 0,01 € und ${euro(MONEY_MAX)} angeben.`);
+  if (!toAll && !user) return req.flash('error', 'Bitte ein Mitglied oder „Alle Mitglieder“ auswählen.');
+  const ids = toAll ? await allMemberIds() : [user._id];
+  await betService.inTransaction(async (session) => {
+    await User.updateMany({ _id: { $in: ids } }, { $inc: { balance: cents } }, { session });
+    await Ledger.insertMany(ids.map((id) => ({ user: id, type: 'team_gutschrift', amount: cents, betTitle: `vom Team (${req.user.username})` })), { session });
+  });
+  await notify(ids, { area: 'Konto', href: '/konto/auszug', text: `Das Team hat dir ${euro(cents)} gutgeschrieben.` });
+  await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'geld', type: 'geld', typeLabel: euro(cents), count: cents });
+  req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${euro(cents)} bekommen.` : `${euro(cents)} an ${user.username} gutgeschrieben.`);
+}
+
+async function revokeMoneyFrom(req) {
+  const cents = moneyAmount(req.body.amount);
+  const target = str(req.body.user);
+  const user = mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username balance').lean() : null;
+  if (cents === null) return req.flash('error', `Bitte einen Betrag zwischen 0,01 € und ${euro(MONEY_MAX)} angeben.`);
+  if (!user) return req.flash('error', 'Bitte ein Mitglied auswählen – Geld lässt sich nur bei einem einzelnen Mitglied abziehen.');
+  // nie unter 0 €: nur abziehen, wenn das Guthaben reicht (gleichzeitige Buchungen eingeschlossen)
+  const done = await betService.inTransaction(async (session) => {
+    const res = await User.updateOne({ _id: user._id, balance: { $gte: cents } }, { $inc: { balance: -cents } }, { session });
+    if (!res.modifiedCount) return false;
+    await Ledger.create([{ user: user._id, type: 'team_abzug', amount: -cents, betTitle: `durch das Team (${req.user.username})` }], { session });
+    return true;
+  });
+  if (!done) return req.flash('error', `${user.username} hat nur ${euro(user.balance)} Guthaben – so viel lässt sich nicht abziehen.`);
+  await notify([user._id], { area: 'Konto', href: '/konto/auszug', text: `Das Team hat dir ${euro(cents)} abgezogen.` });
+  await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'geldabzug', type: 'geld', typeLabel: euro(cents), count: cents });
+  req.flash('success', `${euro(cents)} bei ${user.username} abgezogen.`);
+}
+
 // "alle" oder der Vorschlag "Alle Mitglieder (12)" – genau so, damit ein Name wie "Allessandro" nicht passt
 const ALL_MEMBERS = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i;
 
@@ -682,6 +729,15 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
   } else if (art === 'item') {
     req.body = { ...body, type: str(body.item) };
     await grantItemsTo(req);
+  } else if (art === 'geld') {
+    req.body = body;
+    await grantMoneyTo(req);
+  } else if (art === 'geldabzug') {
+    if (str(body.user) === 'alle') req.flash('error', 'Geld lässt sich nur bei einem einzelnen Mitglied abziehen.');
+    else {
+      req.body = body;
+      await revokeMoneyFrom(req);
+    }
   } else if (art === 'entzug') {
     if (str(body.user) === 'alle') req.flash('error', 'Karten lassen sich nur bei einem einzelnen Mitglied entfernen.');
     else {
