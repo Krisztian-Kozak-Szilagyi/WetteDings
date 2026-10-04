@@ -2782,10 +2782,6 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .new-bet { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
 .new-bet-head h1 { margin: 0 0 10px; }
 .new-bet-head p { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
-.new-bet-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
-.fact-box { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-accent-800); background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
-.fact-box strong { font-size: 14px; font-weight: 500; }
-.fact-box span { font-size: 12px; color: var(--color-neutral-400); }
 .new-bet-form { gap: 28px; }
 .new-bet-form .field small { font-size: 12px; color: var(--color-neutral-500); }
 .new-bet-form input[type="text"], .new-bet-form select, .new-bet-form input[type="datetime-local"] { min-height: 44px; }
@@ -2801,6 +2797,22 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .new-bet-submit p { margin: 0; font-size: 12px; color: var(--color-neutral-500); max-width: 360px; }
 .new-bet-submit .btn { min-height: 46px; padding: 0 26px; font-size: 15px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 25%, transparent); }
 @media (max-width: 480px) { .new-bet-form .type-picker { grid-template-columns: 1fr; } .new-bet-submit .btn { width: 100%; } }
+/* Neue Wette als Assistent (public/js/app.js, [data-wizard]) */
+.new-bet-head { display: flex; flex-direction: column; gap: 10px; }
+.wizard-progress { display: flex; flex-direction: column; gap: 6px; }
+.wizard-bar { display: block; height: 4px; border-radius: 999px; background: var(--color-neutral-800); overflow: hidden; }
+.wizard-bar > span { display: block; height: 100%; width: 0; background: var(--color-accent); transition: width .25s ease; }
+.wizard-q { display: block; margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text); }
+.new-bet-form.is-wizard .wizard-step { min-height: 170px; display: flex; flex-direction: column; gap: 18px; }
+.wizard-nav { display: flex; justify-content: space-between; gap: 12px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
+.wizard-nav .btn { min-height: 44px; min-width: 120px; }
+.wizard-nav [data-wizard-next] { margin-left: auto; }
+.wizard-summary { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; padding: 14px 16px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.wizard-summary dt { font-size: 12px; color: var(--color-neutral-400); padding-top: 2px; }
+.wizard-summary dd { margin: 0; display: flex; justify-content: space-between; gap: 10px; white-space: pre-line; overflow-wrap: anywhere; }
+.wizard-edit { flex: none; align-self: flex-start; padding: 0; border: 0; background: none; color: var(--color-accent-300); font: inherit; font-size: 12px; cursor: var(--cur-pointer, pointer); }
+.wizard-edit:hover { text-decoration: underline; }
+@media (max-width: 480px) { .wizard-summary { grid-template-columns: 1fr; gap: 2px; } .wizard-summary dd { margin-bottom: 8px; } .wizard-nav .btn { min-width: 0; flex: 1; } }
 
 /* Rangliste (Redesign) */
 .rang-page { display: flex; flex-direction: column; gap: 40px; }

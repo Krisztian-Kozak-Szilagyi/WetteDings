@@ -1,59 +1,49 @@
 <%- include('partials/head') %>
-
+<%
+  // Assistent in Schritten (public/js/app.js, [data-wizard]): je Schritt eine Frage. Ohne JS stehen alle Schritte
+  // untereinander und das Formular funktioniert wie eine normale Seite. errorStep: Schritt mit dem ersten Fehler.
+  const STEPS = ['Frage', 'Antworten', 'Details', 'Schiedsrichter', 'Zeitplan', 'Prüfen'];
+%>
 <div class="new-bet">
-    <div class="new-bet-head">
-      <h1>Neue Wette aufstellen</h1>
-      <p>Eine Frage oder Aussage, die später eindeutig entschieden werden kann.</p>
+  <div class="new-bet-head">
+    <h1>Neue Wette</h1>
+    <div class="wizard-progress" data-wizard-progress hidden>
+      <span class="muted small" data-wizard-label></span>
+      <span class="wizard-bar"><span data-wizard-bar></span></span>
     </div>
+  </div>
 
-    <div class="new-bet-facts">
-      <div class="fact-box">
-        <strong>Ihr entscheidet zu zweit</strong>
-        <span>Du und dein Schiedsrichter tragt das Ergebnis ein. Ausgezahlt wird nur bei Einigkeit – sonst entscheidet ein Dev.</span>
-      </div>
-      <div class="fact-box">
-        <strong><%= feePercent %> % vom Topf als Provision</strong>
-        <span>Ihr beide setzt nicht mit und teilt euch die Provision je zur Hälfte (nicht bei Annullierung oder wenn alle ihren Einsatz zurückbekommen).</span>
-      </div>
-    </div>
+  <% if (errors.length) { %>
+    <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+  <% } %>
 
-    <% if (errors.length) { %>
-      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
-    <% } %>
+  <form method="post" action="/wetten" class="form new-bet-form" data-wizard data-start-step="<%= errorStep %>" data-steps="<%= STEPS.join('|') %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-    <form method="post" action="/wetten" class="form new-bet-form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Frage / Aussage</span>
-        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Wer gewinnt am Samstag: Bayern oder Dortmund?">
-        <small class="muted">Später nur noch von einem Admin änderbar.</small>
+        <span class="wizard-q">Worauf wird gewettet?</span>
+        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Gewinnt Bayern am Samstag gegen Dortmund?">
+        <small class="muted">Eine Frage oder Aussage, die sich später eindeutig entscheiden lässt.</small>
       </label>
+    </section>
 
-      <label class="field">
-        <span>Details &amp; Regeln <em class="muted">(optional)</em></span>
-        <textarea name="description" rows="3" maxlength="2000" placeholder="Wie wird entschieden? Was gilt bei Verlängerung, Absage usw.?"><%= values.description %></textarea>
-        <small class="muted">Später bearbeitbar – Änderungen werden für alle sichtbar protokolliert.</small>
-      </label>
-
+    <section class="wizard-step" data-step>
       <fieldset class="field">
-        <legend>Art der Wette</legend>
+        <legend class="wizard-q">Welche Antworten gibt es?</legend>
         <div class="type-picker">
           <label class="type-option">
             <input type="radio" name="type" value="janein" <%= values.type !== 'optionen' ? 'checked' : '' %>>
             <span class="type-option-title">Ja / Nein</span>
-            <span class="type-option-sub">Die Aussage trifft zu – oder eben nicht.</span>
           </label>
           <label class="type-option">
             <input type="radio" name="type" value="optionen" <%= values.type === 'optionen' ? 'checked' : '' %>>
             <span class="type-option-title">Eigene Optionen</span>
-            <span class="type-option-sub">Du legst mindestens <%= minOptions %> Antwortmöglichkeiten fest.</span>
           </label>
         </div>
       </fieldset>
 
       <div class="field" data-type-panel="optionen" <%= values.type !== 'optionen' ? 'hidden' : '' %>>
-        <span>Optionen</span>
         <div class="option-inputs" data-max="<%= maxOptions %>" data-min="<%= minOptions %>">
           <% values.options.forEach((o, i) => { %>
             <div class="option-input">
@@ -64,53 +54,71 @@
           <% }) %>
         </div>
         <button type="button" class="btn btn-ghost btn-sm add-option" data-add-option>+ Option hinzufügen</button>
-        <small class="muted">Mindestens <%= minOptions %>, höchstens <%= maxOptions %> Optionen. <strong>Nach dem Veröffentlichen können keine Optionen mehr hinzugefügt oder geändert werden.</strong></small>
+        <small class="muted"><%= minOptions %> bis <%= maxOptions %> Optionen.</small>
       </div>
+    </section>
 
-      <div class="new-bet-grid">
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Sichtbar für</span>
-        <select name="group">
-          <option value="">Alle Mitglieder (öffentlich)</option>
-          <% groups.forEach((g) => { %>
-            <option value="<%= g._id %>" <%= values.group === String(g._id) ? 'selected' : '' %>>Nur Gruppe „<%= g.name %>“ (<%= g.members.length %> Mitglieder)</option>
-          <% }) %>
-        </select>
-        <small class="muted"><% if (groups.length) { %>Bei einer Gruppen-Wette sehen und setzen nur die Mitglieder der Gruppe; auch der Schiedsrichter muss dazugehören. Das lässt sich später nicht mehr ändern.<% } else { %>Du bist in keiner Gruppe. Im Profil-Menü oben rechts unter <a href="/konto/gruppen">Wett-Gruppen</a> kannst du eine Gruppe anlegen und Mitglieder einladen – dann lassen sich Wetten nur für diese Gruppe aufstellen.<% } %></small>
+        <span class="wizard-q">Regeln und Details <em class="muted">(optional)</em></span>
+        <textarea name="description" rows="5" maxlength="2000" placeholder="Was gilt bei Verlängerung, Absage oder Gleichstand?"><%= values.description %></textarea>
       </label>
+    </section>
 
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Schiedsrichter</span>
+        <span class="wizard-q">Wer entscheidet mit dir?</span>
         <select name="referee" required <%= candidates.length ? '' : 'disabled' %>>
-          <option value="">– Mitglied auswählen –</option>
+          <option value="">Schiedsrichter wählen …</option>
           <% candidates.forEach((u) => { %>
             <option value="<%= u._id %>" <%= values.referee === String(u._id) ? 'selected' : '' %>><%= u.username %></option>
           <% }) %>
         </select>
-        <small class="muted">Bestätigt mit dir das Ergebnis, setzt <strong>nicht mit</strong> und ist später nicht änderbar.</small>
-        <% if (!candidates.length) { %>
-          <small class="neg">Es gibt bisher kein weiteres Mitglied, das als Schiedsrichter einspringen könnte.</small>
-        <% } %>
+        <% if (!candidates.length) { %><small class="neg">Es gibt noch kein weiteres Mitglied, das Schiedsrichter sein kann.</small><% } %>
       </label>
+      <% if (groups.length) { %>
+        <label class="field">
+          <span>Sichtbar für</span>
+          <select name="group">
+            <option value="">Alle Mitglieder</option>
+            <% groups.forEach((g) => { %>
+              <option value="<%= g._id %>" <%= values.group === String(g._id) ? 'selected' : '' %>>Gruppe „<%= g.name %>“</option>
+            <% }) %>
+          </select>
+          <small class="muted">In einer Gruppen-Wette muss auch der Schiedsrichter zur Gruppe gehören.</small>
+        </label>
+      <% } %>
+    </section>
 
-      <label class="field">
-        <span>Einsatzschluss</span>
-        <input type="datetime-local" name="deadline" value="<%= values.deadline %>" min="<%= minDeadline %>" required>
-        <small class="muted">Danach sind keine Einsätze mehr möglich.</small>
-      </label>
-
-      <label class="field">
-        <span>Auswertung</span>
-        <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required>
-        <small class="muted">Wann das Ergebnis feststeht. Frühestens zum Einsatzschluss.</small>
-      </label>
+    <section class="wizard-step" data-step>
+      <p class="wizard-q">Wann ist Schluss?</p>
+      <div class="new-bet-grid">
+        <label class="field">
+          <span>Einsätze bis</span>
+          <input type="datetime-local" name="deadline" value="<%= values.deadline %>" min="<%= minDeadline %>" required>
+        </label>
+        <label class="field">
+          <span>Ergebnis steht fest am</span>
+          <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required>
+        </label>
       </div>
+    </section>
 
+    <section class="wizard-step" data-step>
+      <p class="wizard-q" data-wizard-only hidden>Alles richtig?</p>
+      <dl class="wizard-summary" data-wizard-summary hidden></dl>
+      <p class="muted small">Du und dein Schiedsrichter setzt nicht mit und teilt euch <%= feePercent %> % vom Topf. Seid ihr euch beim Ergebnis nicht einig, entscheidet ein Dev. Frage, Antworten, Schiedsrichter und Gruppe lassen sich danach nicht mehr ändern.</p>
       <div class="new-bet-submit">
-        <p>Mit dem Veröffentlichen bestätigst du die <a href="/regeln" target="_blank">Regeln</a> – insbesondere, dass du den Ausgang nicht manipulierst.</p>
+        <p>Mit dem Veröffentlichen bestätigst du die <a href="/regeln" target="_blank">Regeln</a>.</p>
         <button class="btn btn-primary btn-lg" type="submit">Wette veröffentlichen</button>
       </div>
-    </form>
+    </section>
+
+    <div class="wizard-nav" data-wizard-nav hidden>
+      <button type="button" class="btn btn-ghost" data-wizard-back>Zurück</button>
+      <button type="button" class="btn btn-primary" data-wizard-next>Weiter</button>
+    </div>
+  </form>
 </div>
 
 <%- include('partials/foot') %>

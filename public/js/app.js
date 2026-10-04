@@ -297,6 +297,141 @@
     renumber();
   }
 
+  // Neue Wette als Assistent: ein Schritt nach dem anderen (views/new-bet.ejs). Ohne JS bleiben alle Schritte sichtbar.
+  var wizard = document.querySelector('[data-wizard]');
+  if (wizard) {
+    var steps = Array.prototype.slice.call(wizard.querySelectorAll('[data-step]'));
+    var names = (wizard.getAttribute('data-steps') || '').split('|');
+    var nav = wizard.querySelector('[data-wizard-nav]');
+    var backBtn = wizard.querySelector('[data-wizard-back]');
+    var nextBtn = wizard.querySelector('[data-wizard-next]');
+    var progress = document.querySelector('[data-wizard-progress]');
+    var label = document.querySelector('[data-wizard-label]');
+    var bar = document.querySelector('[data-wizard-bar]');
+    var summary = wizard.querySelector('[data-wizard-summary]');
+    var current = Math.min(steps.length - 1, Math.max(0, parseInt(wizard.getAttribute('data-start-step'), 10) || 0));
+    wizard.noValidate = true; // geprüft wird je Schritt (und am Ende auf dem Server)
+
+    var field = function (name) { return wizard.querySelector('[name="' + name + '"]'); };
+    var selectedText = function (sel) { return sel && sel.value ? sel.options[sel.selectedIndex].text : ''; };
+    var fmtDate = function (v) {
+      if (!v) return '–';
+      var d = new Date(v);
+      return isNaN(d) ? v : d.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + ' Uhr';
+    };
+
+    // Eigene Prüfungen, die das Browser-Formular nicht kennt
+    function customError(step) {
+      if (step.contains(field('options'))) {
+        var type = wizard.querySelector('input[name="type"]:checked');
+        if (type && type.value === 'optionen') {
+          var filled = Array.prototype.map.call(wizard.querySelectorAll('input[name="options"]'), function (i) { return i.value.trim().toLowerCase(); }).filter(Boolean);
+          var min = Number(wizard.querySelector('.option-inputs').dataset.min) || 2;
+          if (filled.length < min) return { el: wizard.querySelector('input[name="options"]'), msg: 'Bitte gib mindestens ' + min + ' Optionen an.' };
+          if (new Set(filled).size !== filled.length) return { el: wizard.querySelector('input[name="options"]'), msg: 'Jede Option darf nur einmal vorkommen.' };
+        }
+      }
+      var deadline = field('deadline');
+      var resultAt = field('resultAt');
+      if (step.contains(resultAt) && deadline.value && resultAt.value && resultAt.value < deadline.value) {
+        return { el: resultAt, msg: 'Das Ergebnis kann nicht vor dem Einsatzschluss feststehen.' };
+      }
+      return null;
+    }
+
+    function stepValid(step) {
+      var inputs = step.querySelectorAll('input, select, textarea');
+      for (var i = 0; i < inputs.length; i++) {
+        var el = inputs[i];
+        if (el.closest('[hidden]') || el.disabled) continue;
+        if (!el.checkValidity()) { el.reportValidity(); return false; }
+      }
+      var err = customError(step);
+      if (err) {
+        err.el.setCustomValidity(err.msg);
+        err.el.reportValidity();
+        err.el.addEventListener('input', function clear() { err.el.setCustomValidity(''); err.el.removeEventListener('input', clear); });
+        return false;
+      }
+      return true;
+    }
+
+    function fillSummary() {
+      var type = wizard.querySelector('input[name="type"]:checked');
+      var answers = type && type.value === 'optionen'
+        ? Array.prototype.map.call(wizard.querySelectorAll('input[name="options"]'), function (i) { return i.value.trim(); }).filter(Boolean).join(' · ')
+        : 'Ja · Nein';
+      var rows = [
+        ['Frage', field('title').value.trim()],
+        ['Antworten', answers],
+        ['Details', field('description').value.trim() || '–'],
+        ['Schiedsrichter', selectedText(field('referee')) || '–'],
+      ];
+      if (field('group')) rows.push(['Sichtbar für', selectedText(field('group')) || 'Alle Mitglieder']);
+      rows.push(['Einsätze bis', fmtDate(field('deadline').value)], ['Ergebnis am', fmtDate(field('resultAt').value)]);
+      summary.textContent = '';
+      rows.forEach(function (r, i) {
+        var dt = document.createElement('dt');
+        var dd = document.createElement('dd');
+        var edit = document.createElement('button');
+        dt.textContent = r[0];
+        dd.textContent = r[1];
+        edit.type = 'button';
+        edit.className = 'wizard-edit';
+        edit.textContent = 'Ändern';
+        // Zeile → Schritt: Frage 0, Antworten 1, Details 2, Schiedsrichter/Gruppe 3, Termine 4
+        var target = [0, 1, 2, 3, field('group') ? 3 : 4, 4, 4][i];
+        edit.addEventListener('click', function () { show(target); });
+        dd.appendChild(edit);
+        summary.appendChild(dt);
+        summary.appendChild(dd);
+      });
+    }
+
+    function show(i) {
+      current = i;
+      steps.forEach(function (s, n) { s.hidden = n !== i; });
+      var last = i === steps.length - 1;
+      backBtn.hidden = i === 0;
+      nextBtn.hidden = last;
+      // Optionaler Schritt ohne Eingabe: "Überspringen" statt "Weiter"
+      var desc = field('description');
+      nextBtn.textContent = steps[i].contains(desc) && !desc.value.trim() ? 'Überspringen' : 'Weiter';
+      label.textContent = 'Schritt ' + (i + 1) + ' von ' + steps.length + ' · ' + (names[i] || '');
+      bar.style.width = ((i + 1) / steps.length) * 100 + '%';
+      if (last) fillSummary();
+      var focus = steps[i].querySelector('input:not([type="radio"]):not([hidden]), select, textarea');
+      if (focus && !last) focus.focus({ preventScroll: true });
+    }
+
+    nextBtn.addEventListener('click', function () {
+      if (stepValid(steps[current])) show(current + 1);
+    });
+    backBtn.addEventListener('click', function () { show(current - 1); });
+    var desc = field('description');
+    desc.addEventListener('input', function () { if (steps[current].contains(desc)) nextBtn.textContent = desc.value.trim() ? 'Weiter' : 'Überspringen'; });
+    // Enter in einem Textfeld geht zum nächsten Schritt statt das Formular abzuschicken
+    wizard.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || current === steps.length - 1) return;
+      e.preventDefault();
+      if (e.target.name !== 'options') nextBtn.click(); // in den Optionen schickt Enter nichts ab und blättert nicht weiter
+    });
+    // Abschicken nur, wenn alle Schritte stimmen – sonst zum ersten fehlerhaften Schritt
+    wizard.addEventListener('submit', function (e) {
+      for (var n = 0; n < steps.length; n++) {
+        show(n);
+        if (!stepValid(steps[n])) { e.preventDefault(); return; }
+      }
+    });
+
+    nav.hidden = false;
+    progress.hidden = false;
+    summary.hidden = false;
+    wizard.querySelectorAll('[data-wizard-only]').forEach(function (el) { el.hidden = false; });
+    wizard.classList.add('is-wizard');
+    show(current);
+  }
+
   // Einsatz-Formular: Schnellbeträge, möglicher Gewinn, Bestätigung in zwei Schritten
   var euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
   document.querySelectorAll('.stake-form').forEach(function (form) {
