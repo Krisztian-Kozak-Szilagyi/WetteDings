@@ -96,13 +96,14 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
     if (name && !member) res.locals.flash = { type: 'error', message: `Das Mitglied „${name}“ gibt es nicht.` };
   }
   if (key === 'mitglied' && !member) {
-    return res.render('statistik', { title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
+    return res.render('statistik', { title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
   }
   const data = await stats.section(key, range, new Date(), { user: member });
   res.render('statistik', {
     title: 'Statistik',
     sections: stats.SECTIONS,
     ranges: stats.RANGES,
+    rangeLabel: stats.rangeLabel,
     active: key,
     range: data.period.range,
     member,
@@ -116,7 +117,8 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
       labels: data.labels,
       longLabels: data.longLabels,
       markers: data.markers.filter((m) => m.i !== undefined).map((m) => ({ i: m.i, short: m.short, label: m.label, kind: m.kind })),
-      charts: data.blocks.flatMap((b) => b.charts).filter((c) => !c.empty),
+      // Heute: keine Verläufe (je Diagramm nur ein Wert)
+      charts: data.period.range === 1 ? [] : data.blocks.flatMap((b) => b.charts).filter((c) => !c.empty),
     },
   });
 });

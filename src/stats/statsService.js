@@ -29,8 +29,10 @@ const { distribution, quantile } = require('./snapshot');
 const { compareGini } = require('./giniReference');
 
 const TZ = config.timezone;
-const RANGES = [7, 30, 90, 365];
+const RANGES = [1, 7, 30, 90, 365]; // 1 = nur heute (seit 0 Uhr deutscher Zeit), Vergleich mit gestern
 const DEFAULT_RANGE = 30;
+/** Name eines Zeitraums für Auswahl und Texte */
+const rangeLabel = (n) => (n === 1 ? 'Heute' : n === 365 ? '1 Jahr' : `${n} Tage`);
 // Reiter der Statistik-Seite (key = URL-Parameter "bereich", bleibt stabil, damit Links weiter funktionieren)
 const SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Die wichtigsten Kennzahlen und alle Änderungen auf einen Blick.' },
@@ -910,6 +912,7 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
 module.exports = {
   SECTIONS,
   RANGES,
+  rangeLabel,
   DEFAULT_RANGE,
   LEDGER_GROUPS,
   addDays,
