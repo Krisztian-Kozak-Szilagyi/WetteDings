@@ -114,3 +114,33 @@ test('Protokolle: jeder Log hat einen eigenen Seiten-Parameter', () => {
   assert.equal(new Set(pages).size, pages.length);
   assert.ok(logs.logByKey.handel && logs.logByKey.dungeon);
 });
+
+test('Protokolle-Export: CSV für Excel mit BOM, Semikolon, Euro mit Komma und Titel', () => {
+  const data = {
+    total: 1,
+    rows: [logs.sellRow({ type: 'tcg_verkauf', amount: 1550, createdAt: new Date('2026-10-04T18:20:17Z'), meta: { cards: [{ card: crumpled.id, rarity: 'crumpled', count: 3 }] } }, 'anna')],
+  };
+  const csv = logs.toCsv('verkauf', data, { title: 'Protokoll – Verkäufe' });
+  assert.ok(csv.startsWith('\uFEFF'));
+  const lines = csv.slice(1).split('\r\n');
+  assert.equal(lines[0], 'Protokoll – Verkäufe');
+  assert.equal(lines[3], 'Zeitpunkt;Spieler;Art;Anzahl;Karten / Gegenstände;Betrag (€)');
+  assert.equal(lines[4], `04.10.2026 20:20:17;anna;An die Bank verkauft;3;3× ${logs.cardLabel(crumpled.id)};15,5`);
+});
+
+test('Protokolle-Export: Dungeons mit einer Zeile pro Teilnehmer, gekürzte Exporte markiert', () => {
+  const d = DUNGEONS[0];
+  const row = logs.dungeonRow({ dungeon: d.key, status: 'fertig', success: true, startedAt: new Date(), endsAt: new Date(), fights: d.fights.map((f) => ({ key: f.key, success: true })), members: [{ user: new mongoose.Types.ObjectId(), name: 'anna', card: crumpled.id, reward: 25000, foil: true }, { user: null, name: 'Bot', card: glitch.id }] });
+  const lines = logs.toCsv('dungeon', { total: 5, rows: [row] }, { title: 'T' }).split('\r\n');
+  assert.match(lines[1], /Einträge: 1 von 5 \(gekürzt\)/);
+  const body = lines.slice(4).filter(Boolean);
+  assert.equal(body.length, 2);
+  assert.match(body[0], /;anna;;;.*;250;ja;$/);
+  assert.match(body[1], /;Bot;ja;/);
+});
+
+test('Protokolle-Export: Dateiname ohne Umlaute und Sonderzeichen', () => {
+  const now = new Date('2026-10-04T12:00:00Z');
+  assert.equal(logs.exportFileName('packs', 'Jürgen Ä.', 'csv', now), 'protokoll-packs-juergen-ae-2026-10-04.csv');
+  assert.equal(logs.exportFileName('ihk', null, 'json', now), 'protokoll-ihk-2026-10-04.json');
+});

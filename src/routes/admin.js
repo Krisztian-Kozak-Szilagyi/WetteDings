@@ -79,7 +79,7 @@ router.get('/admin', requireStaff, async (req, res) => {
   counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts;
   counts.protokolle = counts.suspicious + counts.packLogNew;
 
-  const users = needs('moderation', 'spielwerte', 'team')
+  const users = needs('moderation', 'spielwerte', 'team', 'protokolle')
     ? await User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean()
     : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
@@ -146,10 +146,28 @@ router.get('/admin', requireStaff, async (req, res) => {
     tradeTax: tradeService.settings.taxPercent,
     log, // { key, data } des gewählten Protokolls
     logs: logs.LOGS,
+    exportMax: logs.EXPORT_MAX,
     player, // { q, user } aus ?spieler=
     logKey: logs.logByKey[req.query.log] ? req.query.log : 'handel',
     newSuspicious,
   });
+});
+
+// ---------- Protokolle exportieren: gewählter Log samt Filtern, alle Seiten (CSV für Excel oder JSON) ----------
+router.get('/admin/protokolle/export', requireStaff, async (req, res) => {
+  const player = await logs.resolvePlayer(req.query);
+  if (player.q && !player.user) return res.status(404).render('error', { title: 'Export', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
+  const { key, data } = await logs.loadLog(req.query, { player: player.user, all: true });
+  const playerName = player.user ? player.user.username : null;
+  const title = ['Protokoll', logs.logByKey[key].label, playerName].filter(Boolean).join(' – ');
+  if (req.query.format === 'json') {
+    res.attachment(logs.exportFileName(key, playerName, 'json'));
+    // Beträge in Cent, Zeitpunkte als ISO-Datum
+    return res.json({ title, created: new Date(), units: { betrag: 'Cent' }, player: playerName, total: data.total, rows: data.rows });
+  }
+  res.attachment(logs.exportFileName(key, playerName, 'csv'));
+  res.type('text/csv; charset=utf-8');
+  res.send(logs.toCsv(key, data, { title }));
 });
 
 // ---------- Streitfälle: Wettersteller und Schiedsrichter sind sich nicht einig ----------

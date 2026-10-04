@@ -5,6 +5,8 @@
   const current = logs.find((l) => l.key === logKey);
   // Adresse im Protokoll-Reiter: Spieler-Filter und gewählter Log bleiben erhalten
   const logUrl = (extra = {}, key = logKey) => panelUrl('protokolle', 'protokoll', { log: key, ...(playerQ ? { spieler: playerQ } : {}), ...extra });
+  // Export: gleicher Log und gleiche Filter, ohne Seite
+  const exportLink = (format) => '/admin/protokolle/export?' + new URLSearchParams({ log: logKey, ...(playerQ ? { spieler: playerQ } : {}), ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...(format ? { format } : {}) });
   const handelLink = (extra) => logUrl({ ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...extra });
   // Seiten blättern (jeder Log hat seinen eigenen Seiten-Parameter)
   const pager = (d, link) => d.pages > 1
@@ -25,38 +27,84 @@
 
 <section class="stats-block" id="protokoll">
   <%- blockHead('Protokolle' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Was im Spiel passiert ist, neueste Einträge zuerst: Handel, geöffnete Packs samt gezogener Karten, Verkäufe an die Bank und Black-Market-Käufe, IHK-Quests und Dungeons. Mit einem Spielernamen siehst du nur dessen Einträge.') %>
-  <div class="card">
-    <form method="get" action="/admin#protokoll" class="leader-search" role="search">
-      <input type="hidden" name="bereich" value="protokolle">
-      <input type="hidden" name="log" value="<%= logKey %>">
-      <label class="sr-only" for="log-spieler">Spieler</label>
-      <input type="search" id="log-spieler" name="spieler" value="<%= playerQ %>" maxlength="40" placeholder="Spielername (leer = alle) …">
-      <button class="btn btn-ghost btn-sm" type="submit">Filtern</button>
-      <% if (playerQ) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: logKey }) %>">Alle Spieler</a><% } %>
-    </form>
-    <% if (playerMissing) { %>
-      <p class="muted">Es gibt kein Mitglied „<%= playerQ %>“. Bitte den genauen Namen eingeben.</p>
-    <% } else if (player.user) { %>
-      <p class="muted small">Nur Einträge von <%- userLink(player.user.username, { realName: false }) %> · <a href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(player.user.username) %>">Statistik</a> · <a href="/admin/pack-log?suche=<%= encodeURIComponent(player.user.username) %>">Vergaben</a></p>
-    <% } %>
-    <nav class="stats-subnav log-tabs" aria-label="Protokolle">
-      <% logs.forEach((l) => { %>
-        <a href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
-      <% }) %>
-    </nav>
+
+  <div class="stats-toolbar log-toolbar">
+    <div class="stats-toolbar-row">
+      <div class="stats-toolbar-group">
+        <span class="stats-toolbar-label">Protokoll</span>
+        <nav class="stats-range" aria-label="Protokoll wählen">
+          <% logs.forEach((l) => { %>
+            <a class="<%= l.key === logKey ? 'active' : '' %>" href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
+          <% }) %>
+        </nav>
+      </div>
+      <% if (data) { %>
+        <div class="stats-toolbar-group stats-toolbar-actions">
+          <details class="stats-menu" data-dropdown>
+            <summary class="btn btn-ghost btn-sm"><%- icon('download') %> Export</summary>
+            <div class="stats-menu-panel">
+              <a class="stats-menu-item" href="<%= exportLink() %>" download>
+                <strong>CSV für Excel</strong>
+                <span class="muted small">„<%= current.label %>“<%= player.user ? ' von ' + player.user.username : '' %>, alle <%= data.total %> Einträge<%= data.total > exportMax ? ' (höchstens ' + exportMax + ')' : '' %></span>
+              </a>
+              <a class="stats-menu-item" href="<%= exportLink('json') %>" download>
+                <strong>JSON</strong>
+                <span class="muted small">Rohwerte für eigene Auswertungen (Beträge in Cent)</span>
+              </a>
+              <span class="muted small stats-menu-hint">Der Export nimmt Spieler und Suche mit, aber alle Seiten.</span>
+            </div>
+          </details>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="stats-toolbar-row">
+      <div class="stats-toolbar-group">
+        <span class="stats-toolbar-label">Spieler</span>
+      </div>
+      <form method="get" action="/admin#protokoll" class="stats-member-pick" role="search">
+        <input type="hidden" name="bereich" value="protokolle">
+        <input type="hidden" name="log" value="<%= logKey %>">
+        <label class="sr-only" for="log-spieler">Spieler</label>
+        <input id="log-spieler" type="search" name="spieler" list="log-members" autocomplete="off" maxlength="40" placeholder="Alle Spieler – Namen eingeben …" value="<%= playerQ %>">
+        <button class="btn btn-primary btn-sm" type="submit">Anzeigen</button>
+        <% if (playerQ) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: logKey }) %>">Alle</a><% } %>
+      </form>
+      <datalist id="log-members"><% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %></datalist>
+      <% if (player.user) { %>
+        <div class="stats-toolbar-group stats-toolbar-actions">
+          <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(player.user.username) %>">Profil</a>
+          <a class="btn btn-ghost btn-sm" href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(player.user.username) %>">Statistik</a>
+          <a class="btn btn-ghost btn-sm" href="/admin/pack-log?suche=<%= encodeURIComponent(player.user.username) %>">Vergaben</a>
+        </div>
+      <% } %>
+    </div>
 
     <% if (data && logKey === 'handel') { %>
+      <div class="stats-toolbar-row">
+        <div class="stats-toolbar-group">
+          <span class="stats-toolbar-label">Suche</span>
+        </div>
+        <form method="get" action="/admin#protokoll" class="stats-member-pick log-search" role="search">
+          <input type="hidden" name="bereich" value="protokolle">
+          <input type="hidden" name="log" value="handel">
+          <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
+          <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
+          <input type="search" id="handel-suche" name="handelsuche" value="<%= data.q %>" maxlength="40" placeholder="Name oder Karte …">
+          <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= data.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
+          <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+          <% if (data.q || data.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= logUrl() %>">Zurücksetzen</a><% } %>
+        </form>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <% if (playerMissing) { %>
+      <p class="muted">Es gibt kein Mitglied „<%= playerQ %>“. Bitte einen Namen aus der Liste wählen.</p>
+    <% } %>
+    <% if (data && logKey === 'handel') { %>
       <p class="muted small">Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.</p>
-      <form method="get" action="/admin#protokoll" class="leader-search" role="search">
-        <input type="hidden" name="bereich" value="protokolle">
-        <input type="hidden" name="log" value="handel">
-        <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
-        <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
-        <input type="search" id="handel-suche" name="handelsuche" value="<%= data.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
-        <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= data.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
-        <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
-        <% if (data.q || data.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= logUrl() %>">Alle</a><% } %>
-      </form>
       <p class="muted small"><%= countLine(data, 'Geschäft', 'Geschäfte') %><%= data.onlySuspicious ? ' · nur Mehrfach-Konten' : '' %><%= data.q ? ' · Suche „' + data.q + '“' : '' %></p>
       <% if (!data.rows.length) { %>
         <p class="muted"><%= data.q || player.user ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>

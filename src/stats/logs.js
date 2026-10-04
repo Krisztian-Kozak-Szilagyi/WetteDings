@@ -14,8 +14,11 @@ const deviceService = require('../device/deviceService');
 const { questById, difficulty } = require('../ihk/quests');
 const { dungeonByKey } = require('../dungeon/dungeons');
 const { euro } = require('../lib/viewHelpers');
+const { field, num } = require('./exportCsv');
+const config = require('../config');
 
 const LOG_PAGE = 50;
+const EXPORT_MAX = 20000; // Obergrenze für den Export (alle Seiten auf einmal)
 
 // Die Logs im Reiter "Protokolle" (key = ?log=…, page = eigener Seiten-Parameter)
 const LOGS = [
@@ -82,10 +85,10 @@ async function namesOf(ids) {
   return new Map(users.map((u) => [String(u._id), u.username]));
 }
 
-/** Gemeinsamer Ablauf: zählen, Seite wählen, Zeilen laden */
-async function paged(Model, filter, sort, pageValue, select) {
-  const { total, pages, page } = pageOf(pageValue, await Model.countDocuments(filter));
-  let q = Model.find(filter).sort(sort).skip((page - 1) * LOG_PAGE).limit(LOG_PAGE);
+/** Gemeinsamer Ablauf: zählen, Seite wählen, Zeilen laden – mit all (Export) alle Einträge bis EXPORT_MAX */
+async function paged(Model, filter, sort, pageValue, select, all = false) {
+  const { total, pages, page } = all ? { total: await Model.countDocuments(filter), pages: 1, page: 1 } : pageOf(pageValue, await Model.countDocuments(filter));
+  let q = all ? Model.find(filter).sort(sort).limit(EXPORT_MAX) : Model.find(filter).sort(sort).skip((page - 1) * LOG_PAGE).limit(LOG_PAGE);
   if (select) q = q.select(select);
   return { total, pages, page, docs: await q.lean() };
 }
@@ -97,7 +100,7 @@ async function paged(Model, filter, sort, pageValue, select) {
  * Geschäfte zwischen Mehrfach-Konten (Hinweis "sicher"/"wahrscheinlich") sind markiert, neue seit seenAt zusätzlich "Neu";
  * mit ?verdacht=1 nur diese.
  */
-async function tradeLog(query, { player = null, seenAt = null } = {}) {
+async function tradeLog(query, { player = null, seenAt = null, all = false } = {}) {
   const q = queryText(query.handelsuche);
   const onlySuspicious = query.verdacht === '1';
   const pairs = await deviceService.flaggedPairs();
@@ -110,7 +113,7 @@ async function tradeLog(query, { player = null, seenAt = null } = {}) {
     const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
     and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }] });
   }
-  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt');
+  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt', all);
   const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
@@ -147,9 +150,9 @@ function packRow(o) {
   };
 }
 
-async function packLog(query, { player = null } = {}) {
+async function packLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(TcgOpening, filter, { createdAt: -1, _id: -1 }, query.packseite);
+  const { docs, ...pg } = await paged(TcgOpening, filter, { createdAt: -1, _id: -1 }, query.packseite, null, all);
   return { ...pg, rows: docs.map(packRow) };
 }
 
@@ -170,9 +173,9 @@ function sellRow(l, name) {
   return { at: l.createdAt, player: name || '–', kind: SELL_LABEL[l.type] || l.type, items, amount: l.amount };
 }
 
-async function sellLog(query, { player = null } = {}) {
+async function sellLog(query, { player = null, all = false } = {}) {
   const filter = { type: { $in: SELL_TYPES }, ...(player ? { user: player._id } : {}) };
-  const { docs, ...pg } = await paged(Ledger, filter, { createdAt: -1, _id: -1 }, query.verkaufseite);
+  const { docs, ...pg } = await paged(Ledger, filter, { createdAt: -1, _id: -1 }, query.verkaufseite, null, all);
   const names = await namesOf(docs.map((l) => l.user));
   return { ...pg, rows: docs.map((l) => sellRow(l, names.get(String(l.user)))) };
 }
@@ -199,9 +202,9 @@ function ihkRow(r, name) {
   };
 }
 
-async function ihkLog(query, { player = null } = {}) {
+async function ihkLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(IhkRun, filter, { createdAt: -1, _id: -1 }, query.ihkseite, 'user quest difficulty card boost boost2 success reward status endsAt collectedAt pack createdAt');
+  const { docs, ...pg } = await paged(IhkRun, filter, { createdAt: -1, _id: -1 }, query.ihkseite, 'user quest difficulty card boost boost2 success reward status endsAt collectedAt pack createdAt', all);
   const names = await namesOf(docs.map((r) => r.user));
   return { ...pg, rows: docs.map((r) => ihkRow(r, names.get(String(r.user)))) };
 }
@@ -240,10 +243,76 @@ function dungeonRow(r, playerId = null) {
   };
 }
 
-async function dungeonLog(query, { player = null } = {}) {
+async function dungeonLog(query, { player = null, all = false } = {}) {
   const filter = player ? { 'members.user': player._id } : {};
-  const { docs, ...pg } = await paged(DungeonRun, filter, { startedAt: -1, _id: -1 }, query.dungeonseite, 'dungeon members success fights.key fights.success startedAt endsAt status');
+  const { docs, ...pg } = await paged(DungeonRun, filter, { startedAt: -1, _id: -1 }, query.dungeonseite, 'dungeon members success fights.key fights.success startedAt endsAt status', all);
   return { ...pg, rows: docs.map((r) => dungeonRow(r, player && player._id)) };
+}
+
+// ---------- Export: CSV für Excel (wie die Statistik: Semikolon, Dezimalkomma, UTF-8 mit BOM) ----------
+
+const csvDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: config.timezone });
+/** Zeitpunkt als "TT.MM.JJJJ HH:MM:SS" (Excel erkennt das als Datum) */
+const csvDate = (d) => (d ? csvDateFmt.format(new Date(d)).replace(',', '') : '');
+const csvEuro = (cents) => (typeof cents === 'number' ? num(cents / 100, 2) : '');
+const cardsText = (items) => items.map((c) => `${c.count > 1 ? c.count + '× ' : ''}${c.label}`).join(', ');
+const yesNo = (b) => (b ? 'ja' : '');
+const IHK_STATE = { laeuft: 'Läuft', geschafft: 'Geschafft', gescheitert: 'Gescheitert' };
+
+// Kopfzeile und Zeilen je Log (eine Zeile pro Eintrag; Dungeons: eine Zeile pro Teilnehmer, damit Excel filtern kann)
+const CSV = {
+  handel: {
+    head: ['Zeitpunkt', 'Von', 'An', 'Karte', 'Gegenleistung', 'Steuer (€)', 'Art', 'Mehrfach-Konto'],
+    rows: (t) => [[csvDate(t.at), t.from, t.to, t.card, t.back, csvEuro(t.tax), t.kind, yesNo(t.flagged)]],
+  },
+  packs: {
+    head: ['Zeitpunkt', 'Spieler', 'Pack', 'Herkunft', 'Kosten (€)', 'Karten (Anzahl)', 'Gezogene Karten', 'Beste Seltenheit'],
+    rows: (o) => [[csvDate(o.at), o.player, o.pack, o.source, csvEuro(o.cost), o.cards.reduce((n, c) => n + c.count, 0), cardsText(o.cards), o.best || '']],
+  },
+  verkauf: {
+    head: ['Zeitpunkt', 'Spieler', 'Art', 'Anzahl', 'Karten / Gegenstände', 'Betrag (€)'],
+    rows: (l) => [[csvDate(l.at), l.player, l.kind, l.items.reduce((n, c) => n + c.count, 0), cardsText(l.items), csvEuro(l.amount)]],
+  },
+  ihk: {
+    head: ['Gestartet', 'Ende', 'Spieler', 'Quest', 'Schwierigkeit', 'Karte', 'Boost', 'Ergebnis', 'Lohn (€)', 'Pack-Fund', 'Abgeholt'],
+    rows: (r) => [[csvDate(r.at), csvDate(r.endsAt), r.player, r.quest, r.difficulty, r.card, r.boosts.join(', '), IHK_STATE[r.state], r.state === 'laeuft' ? '' : csvEuro(r.reward), r.pack || '', csvDate(r.collectedAt)]],
+  },
+  dungeon: {
+    head: ['Gestartet', 'Ende', 'Dungeon', 'Ergebnis', 'Kämpfe gewonnen', 'Gescheitert an', 'Teilnehmer', 'Bot', 'Anführer', 'Karte', 'Boost', 'Lohn (€)', 'Folie', 'Boss-Karte'],
+    rows: (r) =>
+      r.members.map((m) => [
+        csvDate(r.startedAt),
+        csvDate(r.at),
+        r.dungeon,
+        r.running ? 'Läuft' : r.success ? 'Boss besiegt' : 'Rückzug',
+        r.progress,
+        r.failedAt || '',
+        m.name,
+        yesNo(m.bot),
+        yesNo(m.leader),
+        m.card,
+        m.boost || '',
+        m.bot || r.running ? '' : csvEuro(m.reward),
+        yesNo(m.foil),
+        yesNo(m.bossCard),
+      ]),
+  },
+};
+
+/** Einen geladenen Log als CSV-Text (mit Titelzeile) */
+function toCsv(key, data, { title } = {}) {
+  const spec = CSV[key];
+  const lines = [];
+  if (title) lines.push([title], [`Erstellt: ${csvDate(new Date())}`, `Einträge: ${data.rows.length}${data.total > data.rows.length ? ` von ${data.total} (gekürzt)` : ''}`], []);
+  lines.push(spec.head, ...data.rows.flatMap(spec.rows));
+  return '\uFEFF' + lines.map((cells) => cells.map(field).join(';')).join('\r\n') + '\r\n';
+}
+
+/** Dateiname, z. B. protokoll-packs-anna-2026-10-04.csv */
+function exportFileName(key, playerName, ext, now = new Date()) {
+  const slug = (v) => String(v).toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone }).format(now); // JJJJ-MM-TT
+  return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
 const LOADERS = { handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog };
@@ -256,6 +325,9 @@ async function loadLog(query, opts = {}) {
 
 module.exports = {
   LOG_PAGE,
+  EXPORT_MAX,
+  toCsv,
+  exportFileName,
   LOGS,
   logByKey,
   pageOf,
