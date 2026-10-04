@@ -692,6 +692,7 @@
       });
       set('[data-gc-cost="' + l.level + '"]', cost ? fmt.format(cost / 100) : '–');
       var gain = prev ? day[ref] - prev[ref] : 0;
+      set('[data-gc-gain="' + l.level + '"]', i ? (gain >= 0 ? '+' : '') + fmt.format(gain / 100) : '–');
       set('[data-gc-payback="' + l.level + '"]', i && gain > 0 ? Math.ceil(cost / gain) + ' Tagen' : '–');
       prev = day;
     });
