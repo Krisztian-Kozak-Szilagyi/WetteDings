@@ -86,6 +86,8 @@ const runSchema = new Schema(
 );
 runSchema.index({ 'members.user': 1, status: 1 });
 runSchema.index({ status: 1, endsAt: 1 });
+runSchema.index({ startedAt: -1 }); // Protokolle: alle Durchläufe, neueste zuerst
+runSchema.index({ 'members.user': 1, startedAt: -1 });
 
 // Admin-Einstellungen (ein Dokument, _id "dungeon")
 const settingsSchema = new Schema(

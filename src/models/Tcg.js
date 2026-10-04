@@ -55,6 +55,8 @@ const openingSchema = new Schema(
       default: [],
     },
     best: { type: Number, required: true }, // Rang der seltensten Karte (0 = Crumpled … 5 = Glitch)
+    type: { type: String, default: null }, // Pack-Art (ältere Öffnungen: null)
+    source: { type: String, default: null }, // Herkunft des Packs: kauf | quest | admin | lotto (ältere Öffnungen: null)
   },
   { timestamps: true }
 );

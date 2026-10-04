@@ -2278,6 +2278,14 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .stats-subnav > span { flex: none; margin-right: 4px; }
 .stats-subnav a { flex: none; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: .85rem; font-weight: 600; white-space: nowrap; }
 .stats-subnav a:hover { text-decoration: none; color: var(--text); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+/* Protokolle im Panel: Werkzeugleiste wie in der Statistik */
+.log-toolbar { margin-bottom: 12px; }
+.log-toolbar .stats-toolbar-row:first-child { border-top: 0; }
+.log-toolbar .stats-range { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.log-toolbar .stats-range::-webkit-scrollbar { display: none; }
+.log-search { max-width: 560px; }
+.log-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; min-width: 0; }
+.log-search select { flex: 1; min-width: 0; min-height: 36px; }
 
 /* Themenblock */
 .stats-block { margin: 8px 0 36px; scroll-margin-top: 120px; }

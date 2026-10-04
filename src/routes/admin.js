@@ -6,7 +6,6 @@ const Position = require('../models/Position');
 const { requireAdmin, requireStaff } = require('../middleware');
 const { requireReauth } = require('../middleware/reauth');
 const { PackGrant } = require('../models/Tcg');
-const { Trade } = require('../models/Trade');
 const roles = require('../services/roles');
 const betService = require('../services/betService');
 const { verdictRole } = require('../lib/verdict');
@@ -27,6 +26,7 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
+const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
 const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
@@ -40,7 +40,7 @@ const PANEL_SECTIONS = [
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
   { key: 'team', label: 'Team & Einladungen', icon: 'users', description: 'Neue Mitglieder per Code einladen und – als Admin – Devs und Mods ernennen.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer, Tagesbonus, Grading und IHK einstellen.' },
-  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Handel-Log und Vergabe-Log: wer wem welche Karte oder welches Pack gegeben hat.' },
+  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Wetten, Einsätze, Broker, Lotterie, Kontobuchungen und das TCG (Handel, Packs, Verkäufe, IHK, Dungeons, Grading) – für alle oder einen einzelnen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
 
@@ -57,64 +57,6 @@ async function openReports() {
   const posts = await ForumPost.find({ _id: { $in: reports.map((r) => r.post) } }).select('authorName body deleted').lean();
   const byId = new Map(posts.map((p) => [String(p._id), p]));
   return reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null }));
-}
-
-// ---------- Handel-Log (Admin und Devs): wer wem welche Karte gegeben hat und wann ----------
-const TRADE_LOG_PAGE = 50;
-const KIND_LABEL = { markt: 'Markt', privat: 'Privatverkauf', tausch: 'Tausch' };
-
-/**
- * Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte.
- * Geschäfte zwischen Mehrfach-Konten (Hinweis "sicher"/"wahrscheinlich") sind markiert, neue seit seenAt zusätzlich "Neu";
- * mit ?verdacht=1 nur diese.
- */
-async function tradeLog(query, seenAt) {
-  const q = (typeof query.handelsuche === 'string' ? query.handelsuche : '').trim().slice(0, 40);
-  const onlySuspicious = query.verdacht === '1';
-  const pairs = await deviceService.flaggedPairs();
-  const filter = { status: 'verkauft' };
-  if (onlySuspicious) filter.$and = [deviceService.tradeFilterForPairs(pairs)];
-  if (q) {
-    const rx = new RegExp(escapeRegex(q), 'i');
-    // Karten über ihren angezeigten Namen finden (z. B. "St. Ivan") – gespeichert ist nur die Karten-ID
-    const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
-    filter.$or = [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }];
-  }
-  const total = await Trade.countDocuments(filter);
-  const pages = Math.max(1, Math.ceil(total / TRADE_LOG_PAGE));
-  const page = Math.min(pages, Math.max(1, Number.parseInt(query.handelseite, 10) || 1));
-  const rows = await Trade.find(filter)
-    .select('kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt')
-    .sort({ closedAt: -1, _id: -1 })
-    .skip((page - 1) * TRADE_LOG_PAGE)
-    .limit(TRADE_LOG_PAGE)
-    .lean();
-  const card = (id) => {
-    const c = tcgCatalog.cardById[id];
-    const item = itemService.itemByCardId(id);
-    if (item) return `${item.label} (Gegenstand)`;
-    return c ? `${c.name} (${tcgCatalog.rarityByKey[c.rarity].label})` : id;
-  };
-  const seen = seenAt ? new Date(seenAt).getTime() : 0;
-  return {
-    q,
-    onlySuspicious,
-    total,
-    page,
-    pages,
-    rows: rows.map((t) => {
-      // "An" ist beim Verkauf der Käufer, beim Tausch der Empfänger des Angebots
-      const to = t.kind === 'tausch' ? t.toName : t.buyerName;
-      let back = euro(t.price); // Gegenleistung
-      if (t.kind === 'tausch') {
-        back = card(t.wantCard);
-        if (t.price > 0) back += ` + ${euro(t.price)} von ${t.extraFrom === 'to' ? to : t.sellerName}`;
-      }
-      const flagged = pairs.has(deviceService.tradePairKey(t));
-      const isNew = flagged && new Date(t.closedAt).getTime() > seen;
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: card(t.card), back, tax: t.tax, flagged, isNew };
-    }),
-  };
 }
 
 router.get('/admin', requireStaff, async (req, res) => {
@@ -137,21 +79,23 @@ router.get('/admin', requireStaff, async (req, res) => {
   counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts;
   counts.protokolle = counts.suspicious + counts.packLogNew;
 
-  const users = needs('moderation', 'spielwerte', 'team')
+  const users = needs('moderation', 'spielwerte', 'team', 'protokolle')
     ? await User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean()
     : [];
-  const [stats, reports, deviceMatches, codes, trades] = await Promise.all([
+  // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
+  const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
+  const [stats, reports, deviceMatches, codes, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
     needs('moderation') ? openReports() : [],
     needs('moderation') ? deviceService.listAlerts() : [],
     needs('team') ? listActiveCodes() : [],
-    // Handel-Log: abgeschlossene Verkäufe und Tausche
-    needs('protokolle') ? tradeLog(req.query, me.suspiciousSeenAt) : null,
+    // gewählter Log (Handel, Pack-Öffnungen, Verkäufe, IHK, Dungeons); unbekannter Spieler: nichts laden
+    needs('protokolle') && !(player.q && !player.user) ? logs.loadLog(req.query, { player: player.user, seenAt: me.suspiciousSeenAt }) : null,
   ]);
   // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
-  const newSuspicious = needs('protokolle') ? counts.suspicious : 0;
+  const newSuspicious = log && log.key === 'handel' ? counts.suspicious : 0;
   if (newSuspicious) {
     await User.updateOne({ _id: me._id }, { $set: { suspiciousSeenAt: new Date() } });
     res.locals.tradeAlerts = 0;
@@ -201,9 +145,31 @@ router.get('/admin', requireStaff, async (req, res) => {
     gradingLevels: grading.LEVELS,
     taxCategories: taxService.CATEGORIES,
     taxRates: taxService.rates,
-    trades,
+    log, // { key, data } des gewählten Protokolls
+    logs: logs.LOGS,
+    logGroups: logs.LOG_GROUPS,
+    exportMax: logs.EXPORT_MAX,
+    player, // { q, user } aus ?spieler=
+    logKey: logs.logByKey[req.query.log] ? req.query.log : 'handel',
     newSuspicious,
   });
+});
+
+// ---------- Protokolle exportieren: gewählter Log samt Filtern, alle Seiten (CSV für Excel oder JSON) ----------
+router.get('/admin/protokolle/export', requireStaff, async (req, res) => {
+  const player = await logs.resolvePlayer(req.query);
+  if (player.q && !player.user) return res.status(404).render('error', { title: 'Export', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
+  const { key, data } = await logs.loadLog(req.query, { player: player.user, all: true });
+  const playerName = player.user ? player.user.username : null;
+  const title = ['Protokoll', logs.logByKey[key].label, playerName].filter(Boolean).join(' – ');
+  if (req.query.format === 'json') {
+    res.attachment(logs.exportFileName(key, playerName, 'json'));
+    // Beträge in Cent, Zeitpunkte als ISO-Datum
+    return res.json({ title, created: new Date(), units: { betrag: 'Cent' }, player: playerName, total: data.total, rows: data.rows });
+  }
+  res.attachment(logs.exportFileName(key, playerName, 'csv'));
+  res.type('text/csv; charset=utf-8');
+  res.send(logs.toCsv(key, data, { title }));
 });
 
 // ---------- Streitfälle: Wettersteller und Schiedsrichter sind sich nicht einig ----------

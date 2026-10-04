@@ -17,5 +17,6 @@ const positionSchema = new Schema(
 positionSchema.index({ bet: 1, user: 1 }, { unique: true });
 positionSchema.index({ user: 1, createdAt: -1 });
 positionSchema.index({ user: 1, payout: 1 });
+positionSchema.index({ createdAt: -1 }); // Protokolle: alle Einsätze
 
 module.exports = model('Position', positionSchema);

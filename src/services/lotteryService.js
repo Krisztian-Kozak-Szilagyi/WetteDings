@@ -210,7 +210,7 @@ async function buyTickets({ user, count, kind = 'taeglich' }) {
       });
       await LotteryRound.updateOne({ _id: round._id }, { $inc: { participants: 1 } }, { session });
     }
-    await Ledger.create([{ user: user._id, type: 'lotto_los', amount: -cost, ...(k.kind ? { meta: { kind: k.kind } } : {}) }], { session });
+    await Ledger.create([{ user: user._id, type: 'lotto_los', amount: -cost, meta: { ...(k.kind ? { kind: k.kind } : {}), count, round: round.number } }], { session });
     return { count, cost, range, round: round.number };
   });
 }
@@ -269,8 +269,9 @@ async function drawDueRound(now = new Date(), key = 'taeglich') {
       winningTicket = drawn.ticket;
       if (cash) {
         await User.updateOne({ _id: winner.user }, { $inc: { balance: cash } }, { session });
-        const meta = k.kind ? { kind: k.kind, bank: round.prizeCash || 0 } : undefined;
-        await Ledger.create([{ user: winner.user, type: 'lotto_gewinn', amount: cash, ...(meta ? { meta } : {}) }], { session });
+        // Runde und Gewinnlos für die Protokolle im Panel
+        const meta = { ...(k.kind ? { kind: k.kind, bank: round.prizeCash || 0 } : {}), round: round.number, ticket: winningTicket };
+        await Ledger.create([{ user: winner.user, type: 'lotto_gewinn', amount: cash, meta }], { session });
       }
       if (packs) {
         await TcgPack.insertMany(Array.from({ length: packs }, () => ({ user: winner.user, type: catalog.DEFAULT_PACK, source: 'lotto', cost: 0 })), { session });

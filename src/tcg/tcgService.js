@@ -126,7 +126,7 @@ async function openPack({ user, type }) {
 
     const best = Math.max(...drawn.map((c) => catalog.rarityByKey[c.rarity].rank));
     const [opening] = await TcgOpening.create(
-      [{ user: user._id, username: user.username, cost: pack.cost, cards: drawn.map((c) => ({ card: c.id, rarity: c.rarity })), best }],
+      [{ user: user._id, username: user.username, cost: pack.cost, type: t.key, source: pack.source, cards: drawn.map((c) => ({ card: c.id, rarity: c.rarity })), best }],
       { session }
     );
     await TcgCard.insertMany(
