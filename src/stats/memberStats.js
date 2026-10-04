@@ -160,7 +160,7 @@ async function member(p, now, { user }) {
       title: 'Aktivität',
       question: 'Wie oft und wann spielt das Mitglied – und wo?',
       kpis: [
-        { id: 'm-tage', label: 'Aktive Tage', value: activity.length, unit: 'count', compare: true, hint: `von ${p.range} Tagen` },
+        { id: 'm-tage', label: 'Aktive Tage', value: activity.length, unit: 'count', compare: true, hint: p.range === 1 ? 'heute' : `von ${p.range} Tagen` },
         { id: 'm-aufrufe', label: 'Seitenaufrufe', value: views, unit: 'count', compare: true },
         { id: 'm-aktionen', label: 'Aktionen', value: actions, unit: 'count', compare: true },
         { id: 'm-logins', label: 'Anmeldungen', value: logins, unit: 'count', compare: true },

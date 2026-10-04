@@ -4,7 +4,9 @@
   const prev = data ? data.previous : null;
   const curRange = range;
   const dd = (d) => d.split('-').reverse().join('.');
-  const span = (a) => `${dd(a.from).slice(0, 6)}–${dd(a.to)}`;
+  const span = (a) => (a.from === a.to ? dd(a.from) : `${dd(a.from).slice(0, 6)}–${dd(a.to)}`);
+  // Heute: Vergleich mit gestern, keine Verläufe (nur ein Wert je Diagramm)
+  const isToday = !!(p && p.range === 1);
   // Das gewählte Mitglied bleibt beim Wechsel des Zeitraums erhalten
   const link = (bereich, tage, block) => '/admin/statistik?' + new URLSearchParams({ bereich, tage: String(tage), ...(bereich === 'mitglied' && member ? { spieler: member.username } : {}) }) + (block ? '#' + block : '');
   // Export des aktuellen Reiters (oder eines Blocks) mit denselben Einstellungen
@@ -45,8 +47,8 @@
   </div>
   <% if (data) { %>
     <div class="stats-period">
-      <span class="stats-period-main"><%- icon('calendar') %> <%= span(p) %></span>
-      <span class="muted small">Vergleich mit <%= span(prev) %></span>
+      <span class="stats-period-main"><%- icon('calendar') %> <%= isToday ? 'Heute, ' + span(p) : span(p) %></span>
+      <span class="muted small">Vergleich mit <%= isToday ? 'gestern' : span(prev) %><%= isToday ? ' · Verläufe ab 7 Tagen' : '' %></span>
     </div>
   <% } %>
 </header>
@@ -65,7 +67,7 @@
       <span class="stats-toolbar-label">Zeitraum</span>
       <nav class="stats-range" aria-label="Zeitraum">
         <% ranges.forEach((r) => { %>
-          <a class="<%= r === curRange ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === curRange) { %>aria-current="true"<% } %>><%= r === 365 ? '1 Jahr' : r + ' Tage' %></a>
+          <a class="<%= r === curRange ? 'active' : '' %>" href="<%= link(active, r) %>" <% if (r === curRange) { %>aria-current="true"<% } %>><%= rangeLabel(r) %></a>
         <% }) %>
       </nav>
     </div>
@@ -176,7 +178,7 @@
             <span class="stat-label"><%= k.label %> <%- info(k.hint) %></span>
             <span class="stat-value"><%= k.unit === 'text' ? k.value : fmt({ value: k.value, unit: k.unit, signed: k.signed }) %></span>
             <% if (d) { %>
-              <span class="stats-delta stats-delta-<%= k.delta.dir %>"><span aria-hidden="true"><%= k.delta.dir === 'up' ? '▲' : k.delta.dir === 'down' ? '▼' : '●' %></span> <%= d %> <span class="muted">ggü. Vorzeitraum</span></span>
+              <span class="stats-delta stats-delta-<%= k.delta.dir %>"><span aria-hidden="true"><%= k.delta.dir === 'up' ? '▲' : k.delta.dir === 'down' ? '▼' : '●' %></span> <%= d %> <span class="muted"><%= isToday ? 'ggü. gestern' : 'ggü. Vorzeitraum' %></span></span>
             <% } else if (k.compare) { %>
               <span class="stats-delta stats-delta-none">kein Vergleich möglich</span>
             <% } %>
@@ -256,7 +258,7 @@
       </div>
     <% } %>
 
-    <% const charts = b.charts || []; const shown = charts.filter((c) => !c.empty); const empty = charts.filter((c) => c.empty); %>
+    <% const charts = isToday ? [] : b.charts || []; const shown = charts.filter((c) => !c.empty); const empty = charts.filter((c) => c.empty); %>
     <% if (shown.length) { %>
       <div class="stats-charts">
         <% shown.forEach((c) => { %>
