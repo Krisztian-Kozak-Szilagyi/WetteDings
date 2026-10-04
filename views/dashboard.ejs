@@ -16,6 +16,19 @@
   const t = d.today;
   const ring = 2 * Math.PI * 22;
   const notes = (locals.bellNotes || []).slice(0, d.notesMax);
+  // Countdown-Kacheln: Symbol je Art und Zeit in Abschnitten (dashboard.js zählt im Sekundentakt weiter)
+  const TIMER_ICONS = {
+    dungeon: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6M16 16l4 4M19 21l2-2"/>',
+    bm: '<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+    woche: '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M14 7v2M14 11v2M14 15v2"/>',
+    monat: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  };
+  const clockParts = (at) => {
+    const s = Math.max(0, Math.floor((at.getTime() - Date.now()) / 1000));
+    const p = [[Math.floor((s % 86400) / 3600), 'Std'], [Math.floor((s % 3600) / 60), 'Min'], [s % 60, 'Sek']];
+    if (s >= 86400) p.unshift([Math.floor(s / 86400), 'Tage']);
+    return p.map(([n, u]) => [String(n).padStart(2, '0'), u]);
+  };
 %>
 
 <div class="dx">
@@ -29,8 +42,13 @@
         <div class="dx-timers" aria-label="Countdowns">
           <% d.countdowns.forEach((c) => { %>
             <a class="dx-timer dx-timer-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
-              <span class="dx-timer-label"><%= c.label %></span>
-              <strong data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></strong>
+              <span class="dx-timer-head">
+                <svg class="dx-timer-ico" viewBox="0 0 24 24" aria-hidden="true"><%- TIMER_ICONS[c.key] || TIMER_ICONS.woche %></svg>
+                <span class="dx-timer-label"><%= c.label %></span>
+              </span>
+              <span class="dx-clock" data-dash-cd="<%= c.at.getTime() %>" data-dash-clock>
+                <% clockParts(c.at).forEach(([n, u]) => { %><span class="dx-seg"><b><%= n %></b><small><%= u %></small></span><% }) %>
+              </span>
             </a>
           <% }) %>
         </div>

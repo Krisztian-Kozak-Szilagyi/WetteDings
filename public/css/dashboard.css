@@ -118,16 +118,28 @@
 /* Favoriten unten bündig mit „Heute“ (Platz bleibt oben) */
 .dx-favs { justify-content: flex-end; }
 /* Countdowns im Hero als Kacheln unter der Begrüßung */
-.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 6px; }
-.dx-timer { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 10px 14px; border-radius: var(--radius-lg, 8px);
-  background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); color: var(--color-text); transition: box-shadow .2s; }
-.dx-timer:hover { box-shadow: 0 0 0 1px var(--color-accent-700); color: var(--color-text); }
-.dx-timer-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dx-timer strong { font-size: 20px; font-weight: 500; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dx-timer strong.is-soon { color: var(--color-accent-200); }
-.dx-timer.is-live { background: linear-gradient(160deg, color-mix(in srgb, #a855f7 16%, var(--color-surface)), var(--color-surface)); box-shadow: 0 0 0 1px color-mix(in srgb, #c084fc 45%, transparent); }
-.dx-timer.is-live .dx-timer-label { color: #d8b4fe; }
-.dx-timer.is-live strong { color: #e9d5ff; }
+.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; margin-top: 6px; }
+/* --tc = Farbe der Kachel je Art */
+.dx-timer { --tc: var(--color-accent); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 14px 14px 12px; border-radius: 10px; color: var(--color-text);
+  background: radial-gradient(110% 90% at 100% 0%, color-mix(in srgb, var(--tc) 22%, transparent), transparent 65%), linear-gradient(180deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 40%, var(--color-bg)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 28%, transparent), 0 8px 24px rgba(0, 0, 0, .25); transition: box-shadow .25s, transform .25s; }
+.dx-timer::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 2px; border-radius: 0 0 2px 2px; background: var(--tc); box-shadow: 0 0 12px var(--tc); opacity: .85; }
+.dx-timer:hover { color: var(--color-text); transform: translateY(-2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 60%, transparent), 0 0 28px color-mix(in srgb, var(--tc) 25%, transparent); }
+.dx-timer-dungeon { --tc: #f0606a; } .dx-timer-bm { --tc: #c084fc; } .dx-timer-woche { --tc: var(--color-accent); } .dx-timer-monat { --tc: var(--r-gold, #e3b341); }
+.dx-timer-head { display: flex; align-items: flex-start; gap: 8px; }
+.dx-timer-ico { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--tc); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tc) 60%, transparent)); }
+.dx-timer-label { font-size: 11px; line-height: 1.35; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-400); overflow-wrap: anywhere; }
+.dx-clock { display: flex; gap: 4px; }
+.dx-seg { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 0 4px; border-radius: 6px; background: color-mix(in srgb, var(--color-bg) 75%, transparent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
+.dx-seg b { font-size: 20px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.dx-seg small { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.dx-clock.is-now { justify-content: center; padding: 6px 0; font-size: 18px; font-weight: 500; color: var(--tc); }
+/* Unter einer Stunde: Ziffern in der Kachelfarbe, die Kachel atmet */
+.dx-clock.is-soon .dx-seg b { color: var(--tc); text-shadow: 0 0 10px color-mix(in srgb, var(--tc) 60%, transparent); }
+.dx-timer:has(.dx-clock.is-soon), .dx-timer.is-live { animation: dxGlow 2.4s ease-in-out infinite; }
+@keyframes dxGlow { 50% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 70%, transparent), 0 0 26px color-mix(in srgb, var(--tc) 30%, transparent); } }
+.dx-timer.is-live .dx-timer-label { color: #e9d5ff; }
+@media (prefers-reduced-motion: reduce) { .dx-timer.is-live, .dx-timer:has(.dx-clock.is-soon) { animation: none; } }
 
 /* Forum | Benachrichtigungen */
 .dx-pair { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); }
@@ -154,6 +166,9 @@
   .dx-parts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dx-fav-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dx-total-value { font-size: 32px; }
+  .dx-seg b { font-size: 17px; }
+  .dx-timer { padding: 12px 10px 10px; }
+  .dx-timer::before { left: 10px; right: 10px; }
 }
 
 /* "Duell"/"Neu"-Markierung (.tag aus style.css, Akzentfarbe nur hier) */

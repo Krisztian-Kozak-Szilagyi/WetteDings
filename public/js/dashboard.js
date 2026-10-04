@@ -2,12 +2,36 @@
 (function () {
   var cds = document.querySelectorAll('[data-dash-cd]');
   var pad = function (n) { return String(n).padStart(2, '0'); };
+  // Kachel-Uhr (data-dash-clock): Abschnitte Tage/Std/Min/Sek, sonst Text "1 T 02:03:04"
+  function clock(el, parts) {
+    var segs = el.querySelectorAll('.dx-seg');
+    if (segs.length !== parts.length) {
+      el.textContent = '';
+      parts.forEach(function (p) {
+        var seg = document.createElement('span');
+        seg.className = 'dx-seg';
+        seg.appendChild(document.createElement('b'));
+        var u = document.createElement('small');
+        u.textContent = p[1];
+        seg.appendChild(u);
+        el.appendChild(seg);
+      });
+      segs = el.querySelectorAll('.dx-seg');
+    }
+    parts.forEach(function (p, i) { segs[i].firstChild.textContent = pad(p[0]); });
+  }
   function tick() {
     cds.forEach(function (el) {
       var s = Math.floor((Number(el.getAttribute('data-dash-cd')) - Date.now()) / 1000);
-      if (s <= 0) { el.textContent = 'jetzt'; el.classList.add('is-now'); return; }
+      if (s <= 0) { el.textContent = 'jetzt'; el.classList.add('is-now'); el.classList.remove('is-soon'); return; }
       var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-      el.textContent = (d ? d + ' T ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s % 60);
+      if (el.hasAttribute('data-dash-clock')) {
+        var parts = [[h, 'Std'], [m, 'Min'], [s % 60, 'Sek']];
+        if (d) parts.unshift([d, 'Tage']);
+        clock(el, parts);
+      } else {
+        el.textContent = (d ? d + ' T ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s % 60);
+      }
       el.classList.toggle('is-soon', s < 3600);
     });
   }
