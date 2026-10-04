@@ -4295,8 +4295,8 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-spark path { fill: none; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .bx-spark.up path { stroke: var(--ja); }
 .bx-spark.down path { stroke: var(--nein); }
-.bx-col-price { display: flex; justify-content: center; text-align: center; }
-.bx-price { display: inline-block; box-sizing: border-box; width: 100%; max-width: 140px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 500; text-align: center; background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.bx-col-price { display: flex; justify-content: flex-end; text-align: right; }
+.bx-price { display: inline-block; box-sizing: border-box; width: 100%; max-width: 130px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 500; text-align: right; background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
 .bx-col-depot { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
 .bx-depot { font-weight: 500; }
 .bx-col-depot small { font-size: 11px; }
@@ -4322,10 +4322,18 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 
 /* Broker-Übersicht: sortierbare Spaltenköpfe */
-.bx-sort { padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.bx-sort { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; padding: 0; border: 0; background: none; text-align: left; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
 .bx-sort:hover, .bx-sort.sort-asc, .bx-sort.sort-desc { color: var(--text); }
-.bx-sort.num { text-align: right; }
-.bx-sort:not(.num)::after, .bx-sort.num::before { content: ''; display: inline-block; width: 1.2em; text-align: center; }
-.bx-sort.sort-asc:not(.num)::after, .bx-sort.num.sort-asc::before { content: '▲'; }
-.bx-sort.sort-desc:not(.num)::after, .bx-sort.num.sort-desc::before { content: '▼'; }
-.bx-row-head .bx-col-price { justify-content: center; }
+.bx-sort::before { content: ''; flex: none; width: 1.2em; text-align: center; }
+.bx-sort.sort-asc::before { content: '▲'; }
+.bx-sort.sort-desc::before { content: '▼'; }
+/* Zahlen-Spalten (auch Kurs und Depot): Kopf rechtsbündig, Pfeil links vom Text; Kurs-Kopf endet über dem Text im Feld */
+.bx-sort.num, .bx-sort.bx-col-price { justify-content: flex-end; text-align: right; }
+.bx-sort.bx-col-price { padding-right: 14px; }
+.bx-row-head .bx-sort.bx-col-depot { flex-direction: row; align-items: center; }
+/* Platz zwischen Mini-Chart und Kurs */
+.bx-col-spark { padding-right: 8px; }
+/* linksbündige Köpfe (Markt, Sentiment): Pfeil ragt in den Abstand, der Text steht bündig über den Werten */
+.bx-sort:not(.num):not(.bx-col-price) { margin-left: -1.2em; }
+@media (max-width: 1100px) { .bx-row-head .bx-sort.bx-col-depot { display: none; } }
+@media (max-width: 700px) { .bx-row-head .bx-sort { display: none; } }
