@@ -189,13 +189,12 @@
     <div class="handel-block" id="sammlung" data-filter-scope>
       <div class="handel-block-head">
         <h4>Deine Sammlung</h4>
-        <% if (coll.cardCount) { %><span class="muted small">Karte antippen zum Anbieten · gesperrte Karten (Quest, Handel oder foliert) sind ausgegraut · folierte Karten bietest du im <a href="/inventar#folierte">Inventar</a> an</span><% } %>
       </div>
       <% if (!coll.cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>
       <% } else { %>
         <%- include('partials/tcg-filter', { counts: coll.counts }) %>
-        <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard }) %>
+        <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard, foiledCopies: coll.foiledCopies }) %>
       <% } %>
     </div>
   </section>
@@ -284,7 +283,7 @@
 <dialog class="trade-dialog" data-trade-modal aria-label="Karte handeln">
   <button type="button" class="trade-dialog-close" data-trade-close aria-label="Schließen">×</button>
   <div class="trade-dialog-body">
-    <img alt="" data-trade-img width="720" height="1008">
+    <span class="trade-dialog-art" data-trade-art><img alt="" data-trade-img width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span></span>
     <div>
       <h2 data-trade-name></h2>
       <p><span class="tcg-badge" data-trade-rarity></span> <span class="muted small" data-trade-meta></span></p>
@@ -298,6 +297,7 @@
       <form method="post" action="/handel/angebot" class="form" data-trade-pane="markt">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="card" value="">
+        <input type="hidden" name="copy" value="">
         <label class="field">
           <span>Preis in €</span>
           <input type="text" name="price" inputmode="decimal" placeholder="z. B. 50" required>
@@ -309,6 +309,7 @@
       <form method="post" action="/handel/angebot" class="form" data-trade-pane="privat" hidden>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="card" value="">
+        <input type="hidden" name="copy" value="">
         <label class="field">
           <span>An</span>
           <input type="text" name="to" list="trade-users" autocomplete="off" placeholder="Benutzername" required>

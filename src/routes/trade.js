@@ -114,7 +114,7 @@ async function handle(req, res, fn, back = '/handel', next = '/handel') {
 router.post('/handel/angebot', (req, res) => {
   const copyId = str(req.body.copy) || null;
   const itemKey = str(req.body.item);
-  const back = copyId ? '/inventar#folierte' : itemKey ? '/inventar#gegenstaende' : '/handel';
+  const back = itemKey ? '/inventar#gegenstaende' : '/handel';
   return handle(
     req,
     res,

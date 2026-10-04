@@ -113,5 +113,21 @@
         <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
       </button>
     <% }) } %>
+    <% if (mode === 'trade') { (foiledCopies[c.id] || []).forEach((f) => { %>
+      <% if (f.lock) { %>
+        <div class="tcg-slot foil-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese folierte Karte ist gerade gesperrt (<%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %>)">
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %><span class="tcg-exam-badge"><%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %></span></span>
+          <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
+        </div>
+      <% } else { %>
+        <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
+          data-trade-card="<%= c.id %>" data-trade-copy="<%= f.id %>" data-foil-date="<%= dayDate(f.foiledAt) %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>"
+          data-image="<%= c.image %>" data-free="1" data-sell-text="<%= euro(f.value) %>"
+          aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %> – handeln">
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %></span>
+          <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
+        </button>
+      <% } %>
+    <% }) } %>
   <% }) %>
 </div>
