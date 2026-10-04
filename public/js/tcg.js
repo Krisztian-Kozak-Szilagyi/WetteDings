@@ -274,6 +274,7 @@
         neu.textContent = 'Neu';
         btn.querySelector('.tcg-flip-label').appendChild(neu);
       }
+      if (c.rarity === 'glitch') addMatrix(btn);
       btn.addEventListener('click', function () { flip(btn, c); });
       cardsBox.appendChild(btn);
     });
@@ -284,6 +285,44 @@
     doneBtn.hidden = true;
     var first = cardsBox.querySelector('.tcg-flip');
     if (first) first.focus();
+  }
+
+  // Glitch: grüne Ziffernspalten links und rechts der Karte; bei Hover fallen sie und die Ziffern wechseln
+  function randomDigits(n) {
+    var s = '';
+    for (var i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
+    return s;
+  }
+  function addMatrix(btn) {
+    var aura = btn.querySelector('.tcg-aura');
+    var spans = [];
+    [-24, -17, -10, 104, 111, 118].forEach(function (left) {
+      var col = document.createElement('span');
+      col.className = 'tcg-matrix-col';
+      col.style.left = left + '%';
+      var inner = document.createElement('span');
+      inner.textContent = randomDigits(80);
+      inner.style.setProperty('--dur', (1.4 + Math.random() * 1.4).toFixed(2) + 's');
+      inner.style.setProperty('--delay', (-Math.random() * 2).toFixed(2) + 's');
+      col.appendChild(inner);
+      aura.appendChild(col);
+      spans.push(inner);
+    });
+    var timer = null;
+    btn.addEventListener('mouseenter', function () {
+      if (timer) return;
+      timer = setInterval(function () {
+        spans.forEach(function (sp) {
+          var t = sp.textContent.split('');
+          for (var k = 0; k < 6; k++) t[Math.floor(Math.random() * t.length)] = Math.floor(Math.random() * 10);
+          sp.textContent = t.join('');
+        });
+      }, 90);
+    });
+    btn.addEventListener('mouseleave', function () {
+      clearInterval(timer);
+      timer = null;
+    });
   }
 
   function flip(btn, c) {
