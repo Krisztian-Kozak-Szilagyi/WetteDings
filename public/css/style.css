@@ -3859,7 +3859,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-admin { align-self: flex-start; }
 .dg-start-tiles { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
 .dg-start-tiles .ihk-start-tile { flex: 1 1 280px; }
-.dg-chat-list { max-height: 400px; }
 
 .dg-pick-sub { margin: 0; font-size: 11px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
 .dg-pick-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); }
@@ -3909,16 +3908,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 @media (max-width: 480px) { .dg-bar { grid-template-columns: 82px minmax(0, 1fr) 64px; gap: 8px; } }
 
 
-/* Dungeon-Start-Kacheln: Stempel wie in der IHK (schräg oben, beim Hover nach unten – hier etwas weiter),
-   die Figur hebt sich beim Hover ein wenig */
-.dg-start-tiles .ihk-start-tile { min-height: 96px; }
-.dg-start-tiles .ihk-start-art { width: 64px; height: 72px; }
-.dg-start-tiles .ihk-start-doc { left: 8px; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
-.dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-doc,
-.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-doc { transform: rotate(-6deg) translateY(-5px); }
-.dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-stamp,
-.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-stamp { transform: rotate(-12deg) translateY(6px); }
-@media (prefers-reduced-motion: reduce) { .dg-start-tiles .ihk-start-doc { transition: none; } }
 
 /* Dungeon: unter dem Bild Stationen und Balken */
 .dg-hero-wrap { display: flex; flex-direction: column; gap: 12px; }
@@ -3947,14 +3936,6 @@ button.dg-slot-boostrow:hover, button.dg-slot-boostrow:focus-visible { outline: 
 .dg-loot::backdrop { background: rgba(8, 9, 16, .7); }
 .dg-loot h2 { margin: 4px 0 14px; }
 .dg-loot-list { margin: 0 0 18px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.dg-loot-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-bg); opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
-.dg-loot-row.is-shown { opacity: 1; transform: none; }
-.dg-loot-row.is-me { box-shadow: 0 0 0 1px var(--color-accent-400); }
-.dg-loot-items { display: flex; flex-wrap: wrap; gap: 6px; }
-.dg-loot-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 13px; background: var(--color-neutral-900); }
-.dg-loot-chip.is-money { color: #86efac; }
-.dg-loot-chip.is-foil { color: #a8d8ff; }
-.dg-loot-chip.is-card { color: #e9c766; }
 @media (prefers-reduced-motion: reduce) { .dg-loot-row { transition: none; } }
 
 /* Dungeon: Karten vergrößern */
@@ -3963,12 +3944,6 @@ button.dg-slot-boostrow:hover, button.dg-slot-boostrow:focus-visible { outline: 
 .dg-slot.is-me .dg-slot-zoom img { box-shadow: 0 0 0 2px var(--color-accent-300), 0 10px 24px rgba(0, 0, 0, .45); }
 .dg-slot.is-bot .dg-slot-zoom img { filter: saturate(.75); }
 .dg-slot.is-casting .dg-slot-zoom img { box-shadow: 0 0 0 2px #e9c766, 0 0 30px rgba(233, 199, 102, .7); }
-.dg-zoom-btn {
-  position: absolute; top: 6px; right: 6px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-  border: 0; border-radius: 50%; font-size: 15px; line-height: 1; color: var(--color-text); cursor: var(--cur-zoom-in);
-  background: rgba(14, 15, 26, .75); box-shadow: 0 0 0 1px var(--color-neutral-700); opacity: .8; transition: opacity .15s, box-shadow .15s;
-}
-.dg-zoom-btn:hover, .dg-zoom-btn:focus-visible { opacity: 1; outline: 0; box-shadow: 0 0 0 1px var(--color-accent-300); }
 
 /* Dungeon: Kartenauswahl mit Suche, Filter und Seiten */
 .dg-picklist { display: flex; flex-direction: column; gap: 12px; margin-top: 26px; }
@@ -3995,20 +3970,61 @@ button.dg-slot-boostrow:hover, button.dg-slot-boostrow:focus-visible { outline: 
   box-shadow: 0 0 0 1px var(--color-accent-800); transition: box-shadow .25s ease;
 }
 .dg-help-tile:hover, .dg-help-tile:focus-visible { outline: 0; color: var(--text); box-shadow: 0 0 0 1px var(--color-accent), 0 0 40px color-mix(in srgb, var(--color-accent) 25%, transparent); }
-.dg-help-fan { position: absolute; left: 50%; top: 26px; width: 0; height: 180px; }
-.dg-help-fan img {
-  position: absolute; left: -54px; top: 0; width: 108px; max-width: none; height: auto; border-radius: 8px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, .55), 0 0 0 1px var(--color-neutral-800);
-  transform-origin: 50% 120%; transition: transform .45s cubic-bezier(.2, .8, .2, 1);
-}
-.dg-help-fan img:nth-child(1) { transform: translateX(-26px) rotate(-8deg); }
-.dg-help-fan img:nth-child(3) { transform: translateX(26px) rotate(8deg); }
-.dg-help-tile:hover .dg-help-fan img:nth-child(1) { transform: translateX(-62px) rotate(-16deg); }
-.dg-help-tile:hover .dg-help-fan img:nth-child(2) { transform: translateY(-10px); }
-.dg-help-tile:hover .dg-help-fan img:nth-child(3) { transform: translateX(62px) rotate(16deg); }
 .dg-help-foot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .dg-help-text { display: flex; flex-direction: column; gap: 6px; }
 .dg-help-title { font-size: 22px; font-weight: 500; letter-spacing: -.02em; }
 .dg-help-hint { font-size: 12px; color: var(--color-neutral-500); }
 .dg-help-tile:hover .tcg-album-arrow { transform: translateX(4px); }
-@media (prefers-reduced-motion: reduce) { .dg-help-fan img { transition: none; } }
+
+/* Dungeon-Start-Kacheln: Emblem mit Linien-Symbol, hebt sich beim Hover leicht an */
+.dg-start-emblem {
+  display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 16px;
+  color: var(--color-accent-300); background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-accent-700); transition: transform .3s cubic-bezier(.2, .8, .2, 1), box-shadow .3s ease, color .3s ease;
+}
+.dg-start-emblem svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.dg-start-tile:not(:disabled):hover .dg-start-emblem,
+.dg-start-tile:not(:disabled):focus-visible .dg-start-emblem { transform: translateY(-3px); color: var(--color-accent-200); box-shadow: inset 0 0 0 1px var(--color-accent-400), 0 0 22px color-mix(in srgb, var(--color-accent) 45%, transparent); }
+@media (prefers-reduced-motion: reduce) { .dg-start-emblem { transition: none; } }
+
+/* Chat füllt die Spalte bis zur Unterkante der Plätze (samt Boost-Karten) */
+.dg-table:not(.no-chat) { align-items: stretch; }
+.dg-chat { position: relative; display: block; min-height: 320px; }
+.dg-chat-inner { position: absolute; inset: 14px; display: flex; flex-direction: column; gap: 8px; }
+.dg-chat-list { flex: 1 1 0; min-height: 0; max-height: none; }
+@media (max-width: 860px) { .dg-chat { min-height: 360px; } }
+
+/* Anleitungs-Kachel mit Dungeon-Bild */
+.dg-help-art { position: absolute; inset: 0 0 auto; height: 72%; overflow: hidden; }
+.dg-help-art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; transform: scale(1.15); transition: transform .6s cubic-bezier(.2, .8, .2, 1), filter .6s ease; filter: brightness(.85); }
+.dg-help-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, var(--color-bg) 100%); }
+.dg-help-tile:hover .dg-help-art img, .dg-help-tile:focus-visible .dg-help-art img { transform: scale(1.25); filter: brightness(1.05); }
+@media (prefers-reduced-motion: reduce) { .dg-help-art img { transition: none; } }
+
+/* Lupe: erscheint dezent beim Überfahren der Karte (auf Touch-Geräten immer sichtbar) */
+.dg-zoom-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 50%; color: #fff; cursor: var(--cur-zoom-in);
+  background: rgba(14, 15, 26, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .18), 0 4px 12px rgba(0, 0, 0, .4);
+  opacity: 0; transform: scale(.85); transition: opacity .2s ease, transform .2s ease, background .2s ease;
+}
+.dg-zoom-btn svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.dg-pick:hover .dg-zoom-btn, .dg-zoom-btn:focus-visible { opacity: 1; transform: none; outline: 0; }
+.dg-zoom-btn:hover { background: var(--color-accent-700); }
+@media (hover: none) { .dg-zoom-btn { opacity: .85; transform: none; } }
+
+/* Beute-Fenster: je Beute eine Zeile – Name links, Beute-Blase rechts */
+.dg-loot-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-radius: var(--radius-md);
+  background: var(--color-bg); opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease;
+}
+.dg-loot-row.is-shown { opacity: 1; transform: none; }
+.dg-loot-row.is-me { box-shadow: inset 0 0 0 1px var(--color-accent-700); }
+.dg-loot-name { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.dg-loot-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dg-loot-chip.is-money { color: #86efac; background: rgba(34, 197, 94, .12); box-shadow: inset 0 0 0 1px rgba(134, 239, 172, .35); }
+.dg-loot-chip.is-foil { color: #1e1b3a; background: linear-gradient(90deg, #a8d8ff, #e9d5ff, #fbcfe8); box-shadow: 0 0 14px rgba(255, 255, 255, .55), 0 0 0 1px rgba(255, 255, 255, .7); }
+.dg-loot-chip.is-card { color: #fcd34d; background: linear-gradient(90deg, rgba(251, 191, 36, .22), rgba(245, 158, 11, .12)); box-shadow: inset 0 0 0 1px rgba(251, 191, 36, .7), 0 0 16px rgba(251, 191, 36, .45); }
+.dg-loot-chip.is-none { color: var(--color-neutral-500); background: var(--color-neutral-900); }
+@media (prefers-reduced-motion: reduce) { .dg-loot-row { transition: none; } }

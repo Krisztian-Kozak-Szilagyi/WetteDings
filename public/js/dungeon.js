@@ -193,7 +193,7 @@
   if (lootDlg && typeof lootDlg.showModal === 'function') {
     lootDlg.showModal();
     const rows = [...lootDlg.querySelectorAll('[data-dg-loot-row]')];
-    rows.forEach((row, i) => setTimeout(() => row.classList.add('is-shown'), 400 + i * 700));
+    rows.forEach((row, i) => setTimeout(() => row.classList.add('is-shown'), 400 + i * 450));
     lootDlg.querySelector('[data-dg-loot-close]').addEventListener('click', () => lootDlg.close());
   }
 

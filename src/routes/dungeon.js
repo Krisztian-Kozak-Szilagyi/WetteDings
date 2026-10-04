@@ -82,7 +82,7 @@ router.get('/dungeon', async (req, res) => {
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   const myRunEntry = run && run.status === 'fertig' ? run.members.find((m) => same(m.user, me)) : null;
   const loot = myRunEntry && !myRunEntry.seen
-    ? { success: run.success, players: run.members.filter((m) => m.user).map((m) => ({ name: m.name, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
+    ? { success: run.success, players: run.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
     : null;
   if (loot) await dungeon.markLootSeen(run._id, me);
 
@@ -106,8 +106,6 @@ router.get('/dungeon', async (req, res) => {
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
-    // Fächer auf der Anleitungs-Kachel: die drei stärksten eigenen Charaktere (sonst Beispielkarten)
-    helpFan: (cards && cards.characters.length >= 3 ? cards.characters : catalog.CARDS.filter((c) => c.isCharacter && c.rarity === 'gold')).slice(0, 3),
     loot,
     rarityByKey: catalog.rarityByKey,
     settings: dungeon.settings,
