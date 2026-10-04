@@ -45,7 +45,7 @@ const CUSTOMERS = ['Sammler Günther', 'Frau Hildebrandt', 'Kevin (12)', 'Onkel 
 // jobs = Aufträge pro Tag (alle Stufen), pay = Lohn in Cent pro Schritt (clean: ganz sauber; grade: exakte Note,
 // ±1 = halb; slab: perfekt versiegelt), costs = Ausbaukosten in Cent für Stufe 2, 3, 4, premium = Lohn-Aufschlag
 // in % auf Stufe 4
-const DEFAULTS = { open: false, jobs: 10, pay: { clean: 2500, grade: 2000, slab: 1500 }, costs: [150000, 500000, 1200000], premium: 30 };
+const DEFAULTS = { open: false, jobs: 10, pay: { clean: 2500, grade: 3000, slab: 3500 }, costs: [100000, 150000, 180000], premium: 30 };
 const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs] };
 const PAY = settings.pay; // gleiches Objekt – Änderungen im Admin-Panel gelten sofort
 const validCents = (v) => Number.isInteger(v) && v >= 0 && v <= 100000000;
