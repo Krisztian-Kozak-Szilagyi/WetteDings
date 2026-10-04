@@ -12,7 +12,7 @@ const CATEGORIES = [
   { key: 'allgemein', title: 'Allgemein', description: 'Alles rund um BfW Holdings.', parent: null, order: 1 },
   { key: 'plauderecke', title: 'Plauderecke', description: 'Für alles, was sonst nirgends passt.', parent: 'allgemein', order: 0 },
   { key: 'wetten', title: 'Wetten & Duelle', titles: ['Wetten'], description: 'Ideen, Diskussionen und Streitfälle zu Wetten und Duellen.', parent: 'allgemein', order: 1 },
-  { key: 'coins', title: 'Coin Exchange', description: 'Broker, Coins und ETFs: Kurse, Strategien, Prognosen.', parent: 'allgemein', order: 2 },
+  { key: 'coins', title: 'Broker', titles: ['Coin Exchange'], description: 'Broker, Coins und ETFs: Kurse, Strategien, Prognosen.', parent: 'allgemein', order: 2 },
   { key: 'ihk', title: 'IHK-Quests', titles: ['IHK'], description: 'Quests, Karten-Kombinationen, Tipps.', parent: 'allgemein', order: 3 },
   { key: 'feedback', title: 'Feedback & Bugs', description: 'Wünsche, Fehler und Verbesserungen.', parent: 'allgemein', order: 4 },
   { key: 'halloffame', title: 'Hall of Fame', description: 'Die größten Gewinne und seltensten Pulls – automatisch aktuell.', parent: 'allgemein', order: 5 },

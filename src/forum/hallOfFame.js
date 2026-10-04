@@ -32,7 +32,7 @@ function bestCard(cards) {
   let best = null;
   for (const c of cards || []) {
     const r = catalog.rarityByKey[c.rarity];
-    if (r && (!best || r.rank > best.rarity.rank)) best = { card: c.card, rarity: r };
+    if (r && !r.hidden && (!best || r.rank > best.rarity.rank)) best = { card: c.card, rarity: r }; // geheime Seltenheiten (Sith) nicht verraten
   }
   return best;
 }
