@@ -35,7 +35,7 @@ async function member(p, now, { user }) {
   const mine = { user: uid };
   const [rank, flows, before, snapshots, activity, positionsSettled, staked, created, refereed, openings, cardsNow, trades, runs, coinTrades, holding, entries, wins, duels] =
     await Promise.all([
-      ranking(),
+      ranking({ team: true }), // mit Team, damit auch Admin und Devs ihre Werte sehen
       Ledger.aggregate([{ $match: { ...mine, ...s.inP(p) } }, { $group: { _id: { d: s.dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' }, n: { $sum: 1 }, meta: { $push: '$meta' } } }]),
       Ledger.aggregate([{ $match: { ...mine, createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
       StatDaily.find({ _id: { $gte: p.from, $lte: p.to } }, { players: { $elemMatch: { user: uid } } }).lean(),
@@ -56,8 +56,10 @@ async function member(p, now, { user }) {
     ]);
 
   // ---------- Vermögen und Geldfluss ----------
-  const index = rank.findIndex((r) => r._id.equals(uid));
-  const row = rank[index] || { balance: 0, inPlay: 0, coinValue: 0, cardValue: 0, total: 0 };
+  const row = rank.find((r) => r._id.equals(uid)) || { balance: 0, inPlay: 0, coinValue: 0, cardValue: 0, total: 0 };
+  // Platz nur unter den Spielern – das Team ist nicht in der Wertung
+  const ranked = rank.filter((r) => !r.team);
+  const index = ranked.findIndex((r) => r._id.equals(uid));
   const net = Object.fromEntries(s.LEDGER_GROUPS.map((g) => [g.key, {}]));
   const dayNet = {};
   const byType = {};
@@ -129,7 +131,7 @@ async function member(p, now, { user }) {
       title: 'Vermögen',
       question: `Wie steht ${user.username} da – und woher kommt das Geld?`,
       kpis: [
-        { id: 'm-rang', label: 'Rang', value: index >= 0 ? `${index + 1}. von ${rank.length}` : '–', unit: 'text', hint: 'nach Gesamtvermögen (jetzt)' },
+        { id: 'm-rang', label: 'Rang', value: row.team ? 'Team' : index >= 0 ? `${index + 1}. von ${ranked.length}` : '–', unit: 'text', hint: row.team ? 'Admin und Devs sind nicht in der Wertung' : 'nach Gesamtvermögen (jetzt)' },
         { id: 'm-vermoegen', label: 'Gesamtvermögen', value: row.total, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
         { id: 'm-guthaben', label: 'Guthaben', value: row.balance, unit: 'euro', hint: 'jetzt' },
         { id: 'm-zufluss', label: 'Guthaben-Veränderung', value: Object.values(dayNet).reduce((a, v) => a + v, 0), unit: 'euro', signed: true, compare: true, hint: 'Veränderung des Guthabens im Zeitraum' },

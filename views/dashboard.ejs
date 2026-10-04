@@ -59,7 +59,7 @@
     <section class="dx-wealth" aria-labelledby="dx-wealth-h">
       <div class="dx-wealth-head">
         <h2 id="dx-wealth-h" class="dx-label">Vermögen</h2>
-        <% if (w.rank) { %><a class="dx-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %>
+        <% if (w.rank) { %><a class="dx-rank<%= w.rank <= 3 ? ' is-top' : '' %>" href="/rangliste">Platz <strong><%= w.rank %></strong> von <%= w.players %></a><% } %><% if (w.team) { %><span class="dx-rank" title="Admin und Devs zählen nicht in der Rangliste">Team – nicht in der Wertung</span><% } %>
       </div>
       <div class="dx-wealth-main">
         <div class="dx-total">

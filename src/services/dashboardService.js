@@ -74,19 +74,22 @@ const upcoming = (list, now = Date.now()) => list.filter((e) => e && e.at && e.a
 async function wealth(user) {
   const today = bonusService.today();
   const [list, days] = await Promise.all([
-    rankService.ranking(),
+    rankService.ranking({ team: true }), // mit Team: auch Admin und Devs sehen ihr Vermögen
     StatDaily.aggregate([
       { $match: { _id: { $gte: dayBefore(today, CURVE_DAYS - 1), $lt: today } } },
       { $project: { p: { $filter: { input: '$players', cond: { $eq: ['$$this.user', user._id] } } } } },
       { $sort: { _id: 1 } },
     ]),
   ]);
-  const i = list.findIndex((r) => r._id.equals(user._id));
-  const me = i >= 0 ? list[i] : { balance: user.balance, inPlay: 0, coinValue: 0, cardValue: 0, total: user.balance };
+  const mine = list.find((r) => r._id.equals(user._id));
+  const me = mine || { balance: user.balance, inPlay: 0, coinValue: 0, cardValue: 0, total: user.balance };
+  // Platz nur unter den Spielern – das Team ist nicht in der Wertung
+  const ranked = list.filter((r) => !r.team);
+  const i = ranked.findIndex((r) => r._id.equals(user._id));
   const points = days.filter((d) => d.p.length).map((d) => ({ day: d._id, total: d.p[0].total }));
   points.push({ day: today, total: me.total });
   const values = points.map((p) => p.total);
-  return { ...me, rank: i >= 0 ? i + 1 : null, players: list.length, points, curve: curve(values), change: change(values) };
+  return { ...me, team: !!(mine && mine.team), rank: i >= 0 ? i + 1 : null, players: ranked.length, points, curve: curve(values), change: change(values) };
 }
 
 /** Eigene offene Einsätze, nach der nächsten Frist sortiert */
