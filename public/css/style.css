@@ -4181,8 +4181,10 @@ a.dg-start-tile:hover { color: var(--text); }
 /* Rangliste: eigene Zeilen-Hintergründe für die ersten drei – Platz 1 golden mit wanderndem Glanz */
 .leaderboard tr.top-1, .leaderboard tr.top-2, .leaderboard tr.top-3 { position: relative; }
 .leaderboard tr.top-1 {
-  background: linear-gradient(100deg, rgba(242, 193, 78, .26), rgba(242, 193, 78, .10) 35%, rgba(255, 236, 170, .22) 50%, rgba(242, 193, 78, .08) 65%, rgba(242, 193, 78, .03));
-  background-size: 250% 100%; animation: rank-gold 7s ease-in-out infinite;
+  /* Glanz: schmaler, kühl-weißer Streifen über dem ruhigen Gold, damit er sich vom Gold abhebt */
+  background: linear-gradient(100deg, transparent 42%, rgba(235, 245, 255, .16) 48%, rgba(255, 255, 255, .26) 50%, rgba(235, 245, 255, .16) 52%, transparent 58%) 100% 0 / 300% 100% no-repeat,
+    linear-gradient(100deg, rgba(242, 193, 78, .26), rgba(242, 193, 78, .10) 45%, rgba(242, 193, 78, .03));
+  animation: rank-gold 7s ease-in-out infinite;
 }
 .leaderboard tr.top-2 { background: linear-gradient(100deg, rgba(207, 211, 229, .18), rgba(207, 211, 229, .06) 45%, rgba(207, 211, 229, .02)); }
 .leaderboard tr.top-3 { background: linear-gradient(100deg, rgba(201, 144, 103, .18), rgba(201, 144, 103, .06) 45%, rgba(201, 144, 103, .02)); }
@@ -4192,5 +4194,5 @@ a.dg-start-tile:hover { color: var(--text); }
 .leaderboard tr.top-1 td { box-shadow: inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, 0 0 18px rgba(242, 193, 78, .35), inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td a { color: #fff4cf; }
-@keyframes rank-gold { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+@keyframes rank-gold { 0%, 100% { background-position: 100% 0, 0 0; } 50% { background-position: 0 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .leaderboard tr.top-1 { animation: none; } }
