@@ -1,0 +1,148 @@
+/* Dashboard-Redesign (Nocturne-Stil, passend zur TCG-Seite). Nur Klassen mit Präfix .dx – berührt nichts anderes.
+   Nutzt vorhandene Variablen aus style.css: --color-accent(-200…-900), --color-surface, --color-bg, --color-text,
+   --color-neutral-*, --color-divider, --radius-md/-lg, --r-gold, --r-holo, --warn, --ja. Fallbacks in Klammern. */
+.dx { --dx-pos: var(--ja, oklch(0.8 0.14 155)); --dx-neg: oklch(0.74 0.14 25); --dx-line: var(--color-divider, color-mix(in srgb, var(--color-text) 10%, transparent));
+  --dx-cash: var(--color-accent); --dx-bets: var(--warn, oklch(0.85 0.13 85)); --dx-coins: var(--ja, oklch(0.8 0.14 155)); --dx-cards: var(--r-holo, #a8d8ff); --dx-gold: var(--r-gold, #e3b341);
+  display: flex; flex-direction: column; gap: 48px; }
+.dx h1, .dx h2, .dx h3 { margin: 0; font-weight: 500; }
+.dx h3 { font-size: 18px; }
+.dx .pos { color: var(--dx-pos); } .dx .neg { color: var(--dx-neg); }
+.dx-ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dx-label, .dx-kicker { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 500; }
+.dx-meta { font-size: 13px; color: var(--color-neutral-500); margin-top: 4px; }
+.dx-link { font-size: 13px; color: var(--color-neutral-400); white-space: nowrap; }
+.dx-link:hover { color: var(--color-text); }
+.dx-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.dx-head-center { align-items: center; }
+
+/* Hero */
+.dx-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 40px; align-items: center; }
+.dx-hero-text { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.dx-kicker { display: flex; align-items: center; gap: 8px; color: var(--color-accent-300); }
+.dx-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); animation: dxPulse 1.6s ease-in-out infinite; }
+@keyframes dxPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+.dx-hero h1 { font-size: clamp(32px, 1.4rem + 2vw, 44px); line-height: 1.05; letter-spacing: -.025em; }
+.dx-name { color: var(--color-accent-300); }
+.dx-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
+.dx-cds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.dx-cd { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dx-line); color: var(--color-neutral-400); font-size: 12px; white-space: nowrap; transition: border-color .2s, color .2s; }
+.dx-cd:hover { border-color: var(--color-accent-600); color: var(--color-text); }
+.dx-cd strong { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--color-text); }
+.dx-cd strong.is-soon { color: var(--color-accent-200); }
+.dx-cd.is-live { border-color: color-mix(in srgb, #c084fc 55%, transparent); background: color-mix(in srgb, #a855f7 12%, transparent); }
+.dx-cd.is-live strong { color: #e9d5ff; }
+
+/* Vermögen */
+.dx-wealth { display: flex; flex-direction: column; gap: 18px; padding: 22px; border-radius: var(--radius-lg, 8px);
+  background: radial-gradient(120% 80% at 100% 0%, var(--color-accent-900), transparent 70%), linear-gradient(160deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-800), 0 0 48px color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.dx-wealth-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.dx-wealth-head .dx-label { font-size: 11px; color: var(--color-neutral-500); }
+.dx-rank { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; color: var(--color-neutral-300); background: color-mix(in srgb, var(--color-accent) 12%, transparent); box-shadow: inset 0 0 0 1px var(--color-accent-800); }
+.dx-rank strong { font-weight: 500; color: var(--color-accent-300); }
+.dx-rank.is-top { background: color-mix(in srgb, var(--dx-gold) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dx-gold) 45%, transparent); }
+.dx-rank.is-top strong { color: var(--dx-gold); }
+.dx-rank:hover { color: var(--color-text); }
+.dx-wealth-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.dx-total { display: flex; flex-direction: column; gap: 8px; }
+.dx-total-value { font-size: 38px; font-weight: 500; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.dx-delta { font-size: 13px; font-variant-numeric: tabular-nums; }
+.dx-delta small { font-size: 13px; color: var(--color-neutral-500); }
+.dx-chart { flex: 1 1 160px; max-width: 240px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.dx-chart svg { width: 100%; height: 64px; overflow: visible; }
+.dx-chart-line { fill: none; stroke: var(--color-accent); stroke-width: 2; filter: drop-shadow(0 0 6px var(--color-accent)); }
+.dx-chart figcaption { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-neutral-600); }
+.dx-split { display: flex; gap: 2px; height: 6px; border-radius: 6px; overflow: hidden; }
+.dx-split span { background: var(--dx-c); box-shadow: 0 0 8px var(--dx-c); }
+.dx-c-cash { --dx-c: var(--dx-cash); } .dx-c-bets { --dx-c: var(--dx-bets); } .dx-c-coins { --dx-c: var(--dx-coins); } .dx-c-cards { --dx-c: var(--dx-cards); }
+.dx-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 16px; margin: 0; }
+.dx-parts dt { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-500); }
+.dx-parts dt i { width: 7px; height: 7px; transform: rotate(45deg); border-radius: 1px; background: var(--dx-c); }
+.dx-parts dd { margin: 2px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.dx-parts .is-zero dd { color: var(--color-neutral-500); }
+.dx-tick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 0 -6px -6px; border-radius: var(--radius-md, 8px); color: var(--color-text); background: color-mix(in srgb, var(--color-bg) 60%, transparent); }
+.dx-tick + .dx-tick { margin-top: -12px; }
+.dx-tick:hover { background: var(--color-bg); color: var(--color-text); }
+.dx-tick-logo, .dx-tick-mark { width: 26px; height: 26px; flex: none; }
+.dx-tick-id, .dx-tick-price { display: flex; flex-direction: column; line-height: 1.2; }
+.dx-tick-id strong, .dx-tick-price strong { font-size: 13px; font-weight: 500; }
+.dx-tick-id small { font-size: 11px; color: var(--color-neutral-500); }
+.dx-tick-price { align-items: flex-end; font-variant-numeric: tabular-nums; }
+.dx-tick-price small { font-size: 11px; }
+.dx-spark { flex: 1; min-width: 40px; height: 26px; }
+.dx-spark path { fill: none; stroke-width: 1.5; }
+.dx-spark.up path { stroke: var(--dx-pos); } .dx-spark.down path { stroke: var(--dx-neg); }
+.dx-tick.is-flash { animation: dxFlash .8s ease; }
+@keyframes dxFlash { from { box-shadow: inset 0 0 0 1px var(--color-accent); } to { box-shadow: inset 0 0 0 1px transparent; } }
+
+/* Reihen */
+.dx-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+.dx-row-stretch { align-items: stretch; }
+.dx-col-wide { flex: 2 1 520px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dx-col-side { flex: 1 1 280px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dx-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: var(--radius-lg, 8px); box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-400); font-size: 14px; }
+.dx-empty p { margin: 0; }
+
+/* Offene Wetten */
+.dx-bets { display: flex; flex-direction: column; gap: 8px; }
+.dx-bet { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: var(--radius-lg, 8px); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); color: var(--color-text); transition: box-shadow .2s; }
+.dx-bet:hover { box-shadow: 0 0 0 1px var(--color-accent-700); color: var(--color-text); }
+.dx-bet-bar { width: 3px; align-self: stretch; border-radius: 3px; background: var(--color-accent); box-shadow: 0 0 10px var(--color-accent); }
+.dx-bet.is-waiting .dx-bet-bar { background: var(--color-neutral-600); box-shadow: none; }
+.dx-bet-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.dx-bet-main strong { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; min-width: 0; }
+.dx-bet-main strong .tag { flex: none; }
+.dx-bet-main small { font-size: 12px; color: var(--color-neutral-500); }
+.dx-pick { color: var(--color-accent-300); }
+.dx-bet-money { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; font-variant-numeric: tabular-nums; }
+.dx-bet-money strong { font-size: 14px; font-weight: 500; }
+.dx-bet-money small { font-size: 11px; color: var(--color-neutral-500); }
+
+/* Heute */
+.dx-ring { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--color-neutral-300); }
+.dx-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.dx-ring circle { fill: none; stroke-width: 4; }
+.dx-ring-bg { stroke: var(--color-neutral-800); }
+.dx-ring-fg { stroke: var(--color-accent); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--color-accent)); transition: stroke-dashoffset .6s ease; }
+.dx-tasks { display: flex; flex-direction: column; border-radius: var(--radius-lg, 8px); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
+.dx-task { display: flex; align-items: center; gap: 12px; padding: 11px 14px; color: var(--color-text); }
+.dx-task + .dx-task { border-top: 1px solid var(--dx-line); }
+.dx-task:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); color: var(--color-text); }
+.dx-check { width: 18px; height: 18px; flex: none; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--color-bg); box-shadow: inset 0 0 0 1.5px var(--color-neutral-600); }
+.dx-task.is-done .dx-check { background: var(--color-accent-300); box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 60%, transparent); }
+.dx-task-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dx-task-text strong { font-size: 13px; font-weight: 500; }
+.dx-task.is-done .dx-task-text strong { color: var(--color-neutral-400); }
+.dx-task-text small { font-size: 11px; color: var(--color-neutral-500); }
+.dx-task-progress { width: 44px; height: 3px; flex: none; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
+.dx-task-progress span { display: block; height: 100%; background: var(--color-accent); }
+
+/* Favoriten + Album: nutzt die TCG-Klassen; nur Platz anpassen */
+.dx-fav-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.dx-album { flex: 1 1 280px; min-height: 340px; }
+
+/* Forum | Benachrichtigungen */
+.dx-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 40px; }
+.dx-pair > section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dx-list { display: flex; flex-direction: column; }
+.dx-item { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 4px; border-bottom: 1px solid var(--dx-line); color: var(--color-neutral-300); }
+.dx-item-top { align-items: start; }
+.dx-item:hover { background: color-mix(in srgb, var(--color-text) 3%, transparent); color: var(--color-text); }
+.dx-dot { width: 7px; height: 7px; border-radius: 50%; }
+.dx-item-top .dx-dot { margin-top: 6px; }
+.dx-item.is-unread { color: var(--color-text); }
+.dx-item.is-unread .dx-dot { background: var(--color-accent-300); box-shadow: 0 0 8px var(--color-accent); }
+.dx-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dx-item-main strong { font-size: 14px; font-weight: 400; }
+.dx-item.is-unread .dx-item-main strong { font-weight: 500; }
+.dx-item-main small { font-size: 11px; color: var(--color-neutral-500); }
+.dx-note-text { font-size: 13px; line-height: 1.45; text-wrap: pretty; }
+
+@media (max-width: 640px) {
+  .dx { gap: 36px; }
+  .dx-fav-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx-total-value { font-size: 32px; }
+}
+
+/* "Duell"/"Neu"-Markierung (.tag aus style.css, Akzentfarbe nur hier) */
+.dx .tag-accent { background: var(--color-accent-800); color: var(--color-accent-200); }
