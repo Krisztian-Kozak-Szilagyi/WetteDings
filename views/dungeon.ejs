@@ -75,7 +75,6 @@
         <input type="text" name="text" maxlength="<%= chatMax %>" placeholder="Nachricht …" autocomplete="off" aria-label="Nachricht an die Gruppe">
         <button class="btn btn-primary btn-sm" type="submit">Senden</button>
       </form>
-      <p class="dg-chat-note muted small">Der Chat wird gelöscht, sobald der Dungeon vorbei ist.</p>
     </aside>
   <% } %>
 </section>
@@ -173,13 +172,35 @@
   <% if (!invitations.length) { %>
     <section class="dg-register card">
       <h2>Für den nächsten Dungeon anmelden</h2>
-      <p class="muted">Zwei Kämpfe gegen Gegnerhorden, am Ende ein Boss. Welche Fachrichtung gebraucht wird, verrät nur die Geschichte. Gewonnene Kämpfe bringen Geld, der Boss mit etwas Glück eine Folie oder seine eigene Karte.</p>
+      <p class="muted">Klicke eine Charakterkarte an – sie wird markiert und ist ausgewählt. Genauso wählst du darunter eine Boost-Karte (oder „Ohne Boost“).</p>
       <form method="post" action="/dungeon/anmelden">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <% picker() %>
-        <div class="dg-buttons">
-          <button class="btn btn-primary" type="submit" name="mode" value="solo" <%= cards.characters.length ? '' : 'disabled' %>>Allein anmelden</button>
-          <button class="btn btn-ghost" type="submit" name="mode" value="gruppe" <%= cards.characters.length ? '' : 'disabled' %>>Gruppe gründen</button>
+        <div class="dg-start-tiles">
+          <button class="ihk-start-tile" type="submit" name="mode" value="solo" <%= cards.characters.length ? '' : 'disabled' %>>
+            <span class="ihk-start-art" aria-hidden="true">
+              <svg class="ihk-start-doc" width="54" height="64" viewBox="0 0 54 64"><circle cx="27" cy="20" r="10"/><path d="M9 58c0-12 8-20 18-20s18 8 18 20z"/></svg>
+              <span class="ihk-start-stamp">SOLO</span>
+            </span>
+            <span class="ihk-start-text">
+              <span class="kicker">Mitspieler werden zugelost</span>
+              <span class="ihk-start-title">Allein anmelden</span>
+              <span class="ihk-start-hint">Keine freie Charakterkarte</span>
+            </span>
+            <span class="ihk-start-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="ihk-start-tile" type="submit" name="mode" value="gruppe" <%= cards.characters.length ? '' : 'disabled' %>>
+            <span class="ihk-start-art" aria-hidden="true">
+              <svg class="ihk-start-doc" width="54" height="64" viewBox="0 0 54 64"><circle cx="17" cy="22" r="8"/><circle cx="37" cy="22" r="8"/><path d="M3 58c0-10 6-17 14-17s14 7 14 17zM23 58c0-10 6-17 14-17s14 7 14 17z"/></svg>
+              <span class="ihk-start-stamp">GRUPPE</span>
+            </span>
+            <span class="ihk-start-text">
+              <span class="kicker">Freunde einladen</span>
+              <span class="ihk-start-title">Gruppe gründen</span>
+              <span class="ihk-start-hint">Keine freie Charakterkarte</span>
+            </span>
+            <span class="ihk-start-arrow" aria-hidden="true">→</span>
+          </button>
         </div>
       </form>
     </section>
