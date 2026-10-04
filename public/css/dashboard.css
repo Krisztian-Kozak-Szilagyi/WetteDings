@@ -21,7 +21,7 @@
 .dx-hero { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); align-items: center; }
 /* Links: Gruß, darunter die Countdowns; rechts das Vermögen über beide Zeilen */
 .dx-hero > .dx-hero-text { grid-column: 1; align-self: end; }
-.dx-hero > .dx-timers { grid-column: 1; align-self: start; }
+.dx-hero > .dx-timers { grid-column: 1; align-self: end; }
 .dx-hero > .dx-wealth { grid-column: 2; grid-row: 1 / span 2; }
 .dx-hero-text { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .dx-kicker { display: flex; align-items: center; gap: 8px; color: var(--color-accent-300); }
