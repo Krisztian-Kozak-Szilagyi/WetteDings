@@ -94,6 +94,43 @@ const modLogSchema = new Schema(
 );
 modLogSchema.index({ createdAt: -1 });
 
+// Reaktion auf einen Beitrag (feste Auswahl, siehe forum/reactions.js) – je Mitglied, Beitrag und Reaktion höchstens einmal
+const reactionSchema = new Schema(
+  {
+    post: { type: Schema.Types.ObjectId, ref: 'ForumPost', required: true },
+    thread: { type: Schema.Types.ObjectId, ref: 'ForumThread', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    userName: { type: String, required: true }, // für den Tooltip "wer hat reagiert"
+    reaction: { type: String, required: true }, // key aus REACTIONS
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+reactionSchema.index({ post: 1, user: 1, reaction: 1 }, { unique: true });
+reactionSchema.index({ user: 1 });
+
+// Umfrage in einem Thema (höchstens eine je Thema, angelegt mit dem Thema)
+const pollSchema = new Schema(
+  {
+    thread: { type: Schema.Types.ObjectId, ref: 'ForumThread', required: true },
+    question: { type: String, required: true },
+    options: { type: [new Schema({ key: String, label: String }, { _id: false })], default: [] },
+    endsAt: { type: Date, default: null }, // null = offen, bis das Thema geschlossen wird
+  },
+  { timestamps: true }
+);
+pollSchema.index({ thread: 1 }, { unique: true });
+
+// Eine Stimme: je Mitglied und Umfrage genau eine
+const pollVoteSchema = new Schema(
+  {
+    poll: { type: Schema.Types.ObjectId, ref: 'ForumPoll', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    option: { type: String, required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+pollVoteSchema.index({ poll: 1, user: 1 }, { unique: true });
+
 module.exports = {
   ForumCategory: model('ForumCategory', categorySchema),
   ForumThread: model('ForumThread', threadSchema),
@@ -101,4 +138,7 @@ module.exports = {
   ForumRead: model('ForumRead', readSchema),
   ForumReport: model('ForumReport', reportSchema),
   ForumModLog: model('ForumModLog', modLogSchema),
+  ForumReaction: model('ForumReaction', reactionSchema),
+  ForumPoll: model('ForumPoll', pollSchema),
+  ForumPollVote: model('ForumPollVote', pollVoteSchema),
 };

@@ -21,6 +21,15 @@
     <label class="forum-label" for="thema-text">Text</label>
     <%- include('partials/forum-editor', { id: 'thema-text', rows: 10, max: bodyMax, myTags }) %>
   </div>
+  <details class="forum-poll-new">
+    <summary class="forum-label">+ Umfrage hinzufügen (optional)</summary>
+    <div class="forum-poll-fields">
+      <label class="forum-field"><span class="forum-label">Frage</span><input class="input" type="text" name="pollQuestion" maxlength="<%= pollQuestionMax %>" placeholder="z. B. Welche Season soll als Nächstes kommen?"></label>
+      <label class="forum-field"><span class="forum-label">Antworten – eine pro Zeile (2–<%= pollOptionsMax %>)</span><textarea class="forum-poll-options" name="pollOptions" rows="4" maxlength="1000" placeholder="Antwort 1&#10;Antwort 2"></textarea></label>
+      <label class="forum-field"><span class="forum-label">Ende (optional – sonst offen, bis das Thema geschlossen wird)</span><input class="input" type="datetime-local" name="pollEndsAt" min="<%= minPollEnd %>"></label>
+      <p class="muted small">Jedes Mitglied hat eine Stimme. Das Ergebnis sieht man nach der eigenen Stimme oder wenn die Umfrage vorbei ist.</p>
+    </div>
+  </details>
   <div class="forum-write-actions">
     <a class="btn btn-ghost" href="/forum/k/<%= cat._id %>">Abbrechen</a>
     <button class="btn btn-primary" type="submit">Thema eröffnen</button>

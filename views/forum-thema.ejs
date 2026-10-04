@@ -50,6 +50,45 @@
   </div>
 <% } %>
 
+<% if (poll) { %>
+  <%# Umfrage: Ergebnis erst nach der eigenen Stimme oder wenn sie vorbei ist %>
+  <section class="forum-poll" id="umfrage" aria-labelledby="umfrage-frage">
+    <div class="forum-poll-head">
+      <span class="forum-label">Umfrage<%= poll.closed ? ' · beendet' : poll.endsAt ? ' · bis ' + date(poll.endsAt) : '' %></span>
+      <% if (poll.canRemove) { %>
+        <form method="post" action="/forum/t/<%= thread._id %>/umfrage/entfernen" data-confirm="Diese Umfrage samt allen Stimmen entfernen?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="link-btn forum-del" type="submit">Umfrage entfernen</button>
+        </form>
+      <% } %>
+    </div>
+    <h2 id="umfrage-frage"><%= poll.question %></h2>
+    <% if (poll.canVote) { %>
+      <form method="post" action="/forum/t/<%= thread._id %>/umfrage" class="forum-poll-vote">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% poll.options.forEach((o) => { %>
+          <label class="check"><input type="radio" name="option" value="<%= o.key %>" required><span><%= o.label %></span></label>
+        <% }) %>
+        <div class="forum-poll-foot">
+          <button class="btn btn-primary btn-sm" type="submit">Abstimmen</button>
+          <span class="muted small"><%= poll.total %> <%= poll.total === 1 ? 'Stimme' : 'Stimmen' %> bisher – das Ergebnis siehst du nach deiner Stimme.</span>
+        </div>
+      </form>
+    <% } else if (poll.rows) { %>
+      <ol class="forum-poll-results">
+        <% poll.rows.forEach((r) => { %>
+          <li class="<%= r.key === poll.myVote ? 'is-mine' : '' %> <%= r.leading ? 'is-leading' : '' %>">
+            <span class="forum-poll-label"><%= r.label %><% if (r.key === poll.myVote) { %> <span class="muted small">(deine Stimme)</span><% } %></span>
+            <span class="forum-poll-num"><%= r.percent %> % · <%= r.count %></span>
+            <span class="forum-poll-bar" aria-hidden="true"><span style="width: <%= r.percent %>%"></span></span>
+          </li>
+        <% }) %>
+      </ol>
+      <p class="muted small"><%= poll.total %> <%= poll.total === 1 ? 'Stimme' : 'Stimmen' %></p>
+    <% } %>
+  </section>
+<% } %>
+
 <ol class="forum-posts">
   <% posts.forEach((p) => { %>
     <li class="forum-post <%= p.isNew ? 'is-new' : '' %> <%= p.mine ? 'is-mine' : '' %> <%= p.deleted ? 'is-deleted' : '' %>" id="b-<%= p._id %>">
@@ -71,6 +110,21 @@
           <% } %>
         <% } else { %>
           <div class="pn-body prose"><%- p.html %></div>
+          <% const shown = p.canReact ? p.reactions : p.reactions.filter((r) => r.count); %>
+          <% if (shown.length) { %>
+            <%# Reaktionen: ein Klick setzt, der zweite nimmt zurück; im Tooltip steht, wer reagiert hat %>
+            <form method="post" action="/forum/b/<%= p._id %>/reaktion" class="forum-reactions">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="seite" value="<%= page %>">
+              <% shown.forEach((r) => { const tip = r.label + (r.who ? ': ' + r.who : ''); %>
+                <% if (p.canReact) { %>
+                  <button class="forum-react <%= r.mine ? 'is-on' : '' %> <%= r.count ? '' : 'is-zero' %>" type="submit" name="reaction" value="<%= r.key %>" title="<%= tip %>" aria-pressed="<%= r.mine %>" aria-label="<%= r.label %>: <%= r.count %><%= r.mine ? ' (deine Reaktion)' : '' %>"><span aria-hidden="true"><%= r.emoji %></span><% if (r.count) { %><span class="forum-react-n"><%= r.count %></span><% } %></button>
+                <% } else { %>
+                  <span class="forum-react <%= r.mine ? 'is-on' : '' %>" title="<%= tip %>" aria-label="<%= r.label %>: <%= r.count %>"><span aria-hidden="true"><%= r.emoji %></span><span class="forum-react-n"><%= r.count %></span></span>
+                <% } %>
+              <% }) %>
+            </form>
+          <% } %>
           <div class="forum-post-foot">
             <span class="forum-post-actions">
               <% if (canReply) { %><a href="#antwort">Antworten</a><% } %>

@@ -7,9 +7,13 @@ const { requireReauth } = require('../middleware/reauth');
 const forum = require('../forum/forumService');
 const { render, tagsFor } = require('../forum/render');
 const { loadEmbeds } = require('../forum/embeds');
+const { empty: reactionList } = require('../forum/reactions');
 const hallOfFame = require('../forum/hallOfFame');
 const { HALL_OF_FAME_KEY } = require('../forum/starters');
 const { str, escapeRegex, UserError } = require('../lib/util');
+const config = require('../config');
+const { toZonedLocalInput } = require('../lib/time');
+const polls = require('../forum/polls');
 
 const router = express.Router();
 router.use('/forum', requireLogin);
@@ -148,12 +152,24 @@ router.get('/forum/k/:id/neu', async (req, res) => {
     return res.redirect(`/forum/k/${cat._id}`);
   }
   const parent = cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
-  res.render('forum-neu', { title: 'Neues Thema', cat, parent, myTags: tagsFor(forum.roleOfUser(req.user)), titleMax: forum.TITLE_MAX, bodyMax: forum.BODY_MAX });
+  res.render('forum-neu', {
+    title: 'Neues Thema',
+    cat,
+    parent,
+    myTags: tagsFor(forum.roleOfUser(req.user)),
+    titleMax: forum.TITLE_MAX,
+    bodyMax: forum.BODY_MAX,
+    // Umfrage (optional)
+    pollQuestionMax: polls.QUESTION_MAX,
+    pollOptionsMax: polls.OPTIONS_MAX,
+    minPollEnd: toZonedLocalInput(new Date(Date.now() + 10 * 60 * 1000), config.timezone),
+  });
 });
 
 router.post('/forum/k/:id/thema', (req, res) =>
   act(req, res, `/forum/k/${req.params.id}/neu`, async () => {
-    const thread = await forum.createThread({ user: req.user, categoryId: req.params.id, title: str(req.body.title), body: req.body.body });
+    const poll = { question: str(req.body.pollQuestion), options: str(req.body.pollOptions), endsAt: str(req.body.pollEndsAt) };
+    const thread = await forum.createThread({ user: req.user, categoryId: req.params.id, title: str(req.body.title), body: req.body.body, poll });
     return `/forum/t/${thread._id}`;
   })
 );
@@ -179,7 +195,11 @@ router.get('/forum/t/:id', async (req, res) => {
   const mine = (p) => String(p.author) === String(req.user._id);
   const showOriginal = (p) => p.deleted && forum.can.seeOriginal(req.user) && p.original;
   // Einbettungen (Wetten, Namen) für alle Beiträge der Seite auf einmal laden
-  const embeds = await loadEmbeds(posts.map((p) => (p.deleted ? (showOriginal(p) ? p.original : null) : p.body)));
+  const [embeds, reactions, poll] = await Promise.all([
+    loadEmbeds(posts.map((p) => (p.deleted ? (showOriginal(p) ? p.original : null) : p.body))),
+    forum.reactionsFor(posts.map((p) => p._id), req.user._id), // eine Abfrage für alle Beiträge der Seite
+    forum.pollView(thread, req.user),
+  ]);
   res.render('forum-thema', {
     title: thread.title,
     thread,
@@ -196,7 +216,10 @@ router.get('/forum/t/:id', async (req, res) => {
       mine: mine(p),
       canEdit: forum.can.editPost(req.user, p, thread),
       canDelete: forum.can.deletePost(req.user, p),
+      reactions: reactions.get(String(p._id)) || reactionList(),
+      canReact: forum.can.react(req.user, p, thread),
     })),
+    poll,
     upvoted: thread.upvotes.some((id) => id.equals(req.user._id)),
     moveTargets,
     canReply: forum.can.reply(req.user, thread),
@@ -210,6 +233,22 @@ router.post('/forum/t/:id/antwort', (req, res) =>
   act(req, res, `/forum/t/${req.params.id}#antwort`, async () => {
     const { post } = await forum.reply({ user: req.user, threadId: req.params.id, body: req.body.body });
     return `/forum/t/${req.params.id}?seite=letzte#b-${post._id}`;
+  })
+);
+
+// Umfrage: abstimmen, entfernen (Moderation)
+router.post('/forum/t/:id/umfrage', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}#umfrage`, async () => {
+    await forum.vote({ user: req.user, threadId: req.params.id, option: str(req.body.option) });
+    return null;
+  })
+);
+
+router.post('/forum/t/:id/umfrage/entfernen', (req, res) =>
+  act(req, res, `/forum/t/${req.params.id}`, async () => {
+    await forum.removePoll({ user: req.user, threadId: req.params.id });
+    req.flash('info', 'Umfrage entfernt.');
+    return null;
   })
 );
 
@@ -260,6 +299,15 @@ router.post('/forum/b/:id/loeschen', (req, res) =>
   act(req, res, '/forum', async () => {
     const { post, thread } = await forum.deletePost({ user: req.user, postId: req.params.id });
     return `/forum/t/${thread._id}#b-${post._id}`;
+  })
+);
+
+// Reaktion setzen oder zurücknehmen; zurück auf dieselbe Seite des Themas
+router.post('/forum/b/:id/reaktion', (req, res) =>
+  act(req, res, valid(req.params.id) ? `/forum/b/${req.params.id}/zum-beitrag` : '/forum', async () => {
+    const { post, thread } = await forum.toggleReaction({ user: req.user, postId: req.params.id, reaction: str(req.body.reaction) });
+    const page = Math.max(1, Math.min(9999, Number.parseInt(req.body.seite, 10) || 1));
+    return `/forum/t/${thread._id}?seite=${page}#b-${post._id}`;
   })
 );
 

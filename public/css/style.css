@@ -3629,6 +3629,38 @@ a.forum-embed:hover { box-shadow: inset 0 0 0 1px var(--color-accent-700); }
 .forum-embed-sub { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-neutral-400); }
 .forum-mention { font-weight: 500; }
 
+/* Forum: Reaktionen */
+.forum-reactions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.forum-react {
+  display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: 999px;
+  background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-300);
+  font: 500 12px var(--font); font-variant-numeric: tabular-nums; line-height: 1;
+}
+button.forum-react { cursor: var(--cur-pointer, pointer); }
+button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600); }
+.forum-react.is-zero { opacity: .45; }
+.forum-react.is-zero:hover, .forum-react.is-zero:focus-visible { opacity: 1; }
+.forum-react.is-on { color: var(--color-accent-200); background: var(--color-accent-900); box-shadow: inset 0 0 0 1px var(--color-accent-700); }
+
+/* Forum: Umfrage */
+.forum-poll { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.forum-poll h2 { margin: 0; font-size: 18px; }
+.forum-poll p { margin: 0; }
+.forum-poll-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.forum-poll-head form { margin: 0; }
+.forum-poll-vote { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.forum-poll-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
+.forum-poll-results { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.forum-poll-results li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; font-size: 14px; }
+.forum-poll-num { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--color-neutral-400); }
+.forum-poll-bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--color-neutral-800); overflow: hidden; }
+.forum-poll-bar span { display: block; height: 100%; border-radius: inherit; background: var(--color-neutral-500); }
+.forum-poll-results li.is-leading .forum-poll-bar span { background: var(--color-accent); }
+.forum-poll-results li.is-mine .forum-poll-label { font-weight: 500; }
+.forum-poll-new summary { cursor: var(--cur-pointer, pointer); }
+.forum-poll-fields { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
+.forum-field textarea.forum-poll-options { min-height: 100px; }
+
 /* Forum: Hall of Fame */
 .forum-hof-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px 32px; padding: 16px 6px 4px; }
 .forum-hof-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }

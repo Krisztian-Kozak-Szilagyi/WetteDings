@@ -6,7 +6,7 @@ const Bet = require('../models/Bet');
 const Comment = require('../models/Comment');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const { ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog } = require('../models/Forum');
+const { ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReaction } = require('../models/Forum');
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
@@ -50,6 +50,7 @@ async function propagateName(userId, oldName, name, session) {
     ForumThread.updateMany({ lastPostBy: userId }, { $set: { lastPostByName: name } }, opt),
     ForumPost.updateMany({ author: userId }, { $set: { authorName: name } }, opt),
     ForumReport.updateMany({ by: userId }, { $set: { byName: name } }, opt),
+    ForumReaction.updateMany({ user: userId }, { $set: { userName: name } }, opt),
     RegistrationCode.updateMany({ createdBy: userId }, { $set: { createdByName: name } }, opt),
     RegistrationCode.updateMany({ usedBy: userId }, { $set: { usedByName: name } }, opt),
     TcgOpening.updateMany({ user: userId }, { $set: { username: name } }, opt),
@@ -162,6 +163,10 @@ async function deleteAccount({ user, password }) {
       ForumThread.updateMany({ upvotes: id }, { $pull: { upvotes: id } }, opt),
       ForumRead.deleteMany({ user: id }, opt),
       ForumReport.deleteMany({ by: id }, opt),
+      // Reaktionen zeigen den Namen im Tooltip → entfernen. Umfrage-Stimmen bleiben an der anonymen Hülle:
+      // sie enthalten nur die gewählte Antwort und sind nirgends einem Namen zugeordnet; so ändern sich
+      // abgeschlossene Ergebnisse nicht rückwirkend (wie bei den Spielverläufen oben)
+      ForumReaction.deleteMany({ user: id }, opt),
       require('../models/Notification').deleteMany({ user: id }, opt),
       // Erfolge löschen – nur Einzelstücke bleiben an der neutralen Hülle, damit sie nie ein zweites Mal vergeben werden
       require('../models/Achievement').deleteMany({ user: id, key: { $nin: require('../achievements/list').SPECIAL.map(([k]) => k) } }, opt),
