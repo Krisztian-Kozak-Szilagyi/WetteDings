@@ -987,7 +987,7 @@
     var rnd = seeded(code);
 
     // Schriftgröße: groß und fett, aber nie breiter als der Rahmen um die Linie
-    var maxW = 880 * k;
+    var maxW = 840 * k;
     var size = 170 * k;
     var font = function (s) { return '900 ' + s + 'px ' + FONT; };
     var lx = c.getContext('2d');
@@ -1006,33 +1006,33 @@
     t.textBaseline = 'alphabetic';
     var cx = layer.width / 2;
     var by = pad + size * 0.95;
-    var off = 6 * k;
-    t.globalAlpha = 0.9;
+    var off = 3.5 * k;
+    t.globalAlpha = 0.85;
     t.fillStyle = '#ff2d6f'; t.fillText(code, cx - off, by);
-    t.fillStyle = '#22e6ff'; t.fillText(code, cx + off, by + 1 * k);
+    t.fillStyle = '#22e6ff'; t.fillText(code, cx + off, by);
     t.globalAlpha = 1;
     t.shadowColor = 'rgba(83, 236, 150, .55)';
-    t.shadowBlur = 18 * k;
+    t.shadowBlur = 14 * k;
     t.fillStyle = '#f4fff9'; t.fillText(code, cx, by);
     t.shadowBlur = 0;
 
-    // Scanlines: jede dritte/vierte Zeile ausdünnen
+    // Scanlines: ganz leicht, damit der Code gut lesbar bleibt
     t.globalCompositeOperation = 'destination-out';
-    t.fillStyle = 'rgba(0, 0, 0, .38)';
-    for (var y = 0; y < layer.height; y += 4 * k) t.fillRect(0, y, layer.width, 1.6 * k);
+    t.fillStyle = 'rgba(0, 0, 0, .14)';
+    for (var y = 0; y < layer.height; y += 5 * k) t.fillRect(0, y, layer.width, 1 * k);
     t.globalCompositeOperation = 'source-over';
 
-    // Glitch-Streifen: einige waagerechte Bänder seitlich versetzt
+    // Glitch: nur zwei hauchdünne, leicht versetzte Streifen (Code bleibt lesbar)
     var glitched = document.createElement('canvas');
     glitched.width = layer.width;
     glitched.height = layer.height;
     var g = glitched.getContext('2d');
     g.drawImage(layer, 0, 0);
-    var bands = 4 + Math.floor(rnd() * 3);
+    var bands = 2;
     for (var b = 0; b < bands; b++) {
-      var bh = (4 + rnd() * 14) * k;
-      var bt = pad + rnd() * (size * 1.05 - bh);
-      var shift = (rnd() < 0.5 ? -1 : 1) * (6 + rnd() * 18) * k;
+      var bh = (2 + rnd() * 3) * k;
+      var bt = pad + size * (0.3 + b * 0.35 + rnd() * 0.15);
+      var shift = (b ? -1 : 1) * (3 + rnd() * 4) * k;
       g.clearRect(0, bt, glitched.width, bh);
       g.drawImage(layer, 0, bt, layer.width, bh, shift, bt, layer.width, bh);
     }
