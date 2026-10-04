@@ -287,27 +287,40 @@
     if (first) first.focus();
   }
 
-  // Glitch: grüne Ziffernspalten links und rechts der Karte; bei Hover fallen sie und die Ziffern wechseln
+  // Glitch: grüne Ziffernspalten über der Kartenkante (einzelne schwach auf der Karte);
+  // bei Hover fallen sie, die Ziffern wechseln und manche Spalten flackern
   function randomDigits(n) {
     var s = '';
     for (var i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
     return s;
   }
+  // [links in %, Schriftgröße in px, Deckkraft, auf der Karte]
+  var MATRIX_COLS = [
+    [-13, 11, 0.9], [-7, 15, 1], [-1, 12, 0.85], [4, 9, 0.6], [22, 10, 0.3, true], [47, 14, 0.22, true],
+    [71, 10, 0.3, true], [90, 9, 0.55], [95, 13, 0.85], [101, 15, 1], [108, 11, 0.9],
+  ];
   function addMatrix(btn) {
-    var aura = btn.querySelector('.tcg-aura');
+    var layer = document.createElement('span');
+    layer.className = 'tcg-matrix';
+    layer.setAttribute('aria-hidden', 'true');
     var spans = [];
-    [-24, -17, -10, 104, 111, 118].forEach(function (left) {
+    MATRIX_COLS.forEach(function (spec) {
       var col = document.createElement('span');
-      col.className = 'tcg-matrix-col';
-      col.style.left = left + '%';
+      col.className = 'tcg-matrix-col' + (spec[3] ? ' in' : '') + (Math.random() < 0.35 ? ' flicker' : '');
+      col.style.left = spec[0] + '%';
+      col.style.fontSize = spec[1] + Math.round(Math.random() * 2 - 1) + 'px';
+      col.style.opacity = spec[2];
+      col.style.setProperty('--op', spec[2]);
+      col.style.setProperty('--delay', (-Math.random() * 2).toFixed(2) + 's');
       var inner = document.createElement('span');
       inner.textContent = randomDigits(80);
-      inner.style.setProperty('--dur', (1.4 + Math.random() * 1.4).toFixed(2) + 's');
+      inner.style.setProperty('--dur', (1.2 + Math.random() * 1.8).toFixed(2) + 's');
       inner.style.setProperty('--delay', (-Math.random() * 2).toFixed(2) + 's');
       col.appendChild(inner);
-      aura.appendChild(col);
+      layer.appendChild(col);
       spans.push(inner);
     });
+    btn.insertBefore(layer, btn.querySelector('.tcg-flip-label'));
     var timer = null;
     btn.addEventListener('mouseenter', function () {
       if (timer) return;
