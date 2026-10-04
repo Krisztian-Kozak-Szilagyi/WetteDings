@@ -3810,9 +3810,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-stage { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
 .dg-stage-title { margin: 0; font-weight: 600; font-size: 17px; }
 .dg-stage-text { margin: 0; color: var(--color-neutral-300); font-size: 14px; min-height: 1.4em; text-wrap: pretty; }
-.dg-hp { position: relative; height: 18px; border-radius: 9px; background: rgba(0, 0, 0, .5); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); overflow: hidden; }
-.dg-hp-bar { position: absolute; inset: 0 auto 0 0; width: 100%; background: linear-gradient(90deg, #b91c1c, #ef4444); transition: width .25s linear; }
-.dg-hp-label { position: relative; display: block; text-align: center; font-size: 11px; line-height: 18px; font-weight: 600; letter-spacing: .04em; }
 .dg-steps { display: flex; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .dg-steps li { padding: 3px 9px; border-radius: 999px; background: rgba(0, 0, 0, .4); color: var(--color-neutral-500); }
 .dg-steps li.is-active { color: var(--color-text); box-shadow: 0 0 0 1px var(--color-accent-400); }
@@ -3895,3 +3892,30 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
   .dg-slot-stats { display: none; }
   .dg-hero-text { padding: 14px 16px; }
 }
+
+/* Dungeon: Balken im Kampf (Gegner und Zeit) und Countdown in den Pausen */
+.dg-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.dg-bar { display: grid; grid-template-columns: 58px minmax(0, 1fr) 92px; align-items: center; gap: 10px; }
+.dg-bar-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-400); }
+.dg-bar-track { position: relative; display: block; height: 16px; border-radius: 8px; background: rgba(0, 0, 0, .55); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); overflow: hidden; }
+.dg-bar-fill { position: absolute; inset: 0 auto 0 0; width: 100%; transition: width .25s linear; }
+.dg-bar.is-hp .dg-bar-fill { background: linear-gradient(90deg, #991b1b, #ef4444); }
+.dg-bar.is-time .dg-bar-track { height: 10px; }
+.dg-bar.is-time .dg-bar-fill { background: linear-gradient(90deg, #b45309, #fbbf24); }
+.dg-bar.is-time .dg-bar-fill.is-low { background: linear-gradient(90deg, #b91c1c, #f97316); animation: dg-blink 1s steps(2) infinite; }
+.dg-bar-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.dg-bars-hint { margin: 0; font-size: 12px; color: var(--color-neutral-500); }
+.dg-next { margin: 4px 0 0; font-size: 15px; font-weight: 600; color: var(--color-accent-300); }
+@keyframes dg-blink { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .dg-bar.is-time .dg-bar-fill.is-low { animation: none; } }
+@media (max-width: 480px) { .dg-bar { grid-template-columns: 48px minmax(0, 1fr) 74px; gap: 8px; } }
+
+/* Dungeon-Start-Kacheln: Figur oben, Stempel darunter (verdeckt den Körper nicht); beim Hover hebt sich die Figur */
+.dg-start-tiles .ihk-start-art { width: 62px; height: 66px; }
+.dg-start-tiles .ihk-start-doc { left: 50%; top: 0; transform: translateX(-50%); transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-doc,
+.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-doc { transform: translateX(-50%) translateY(-6px); }
+.dg-start-tiles .ihk-start-stamp { left: 50%; right: auto; bottom: 0; padding: 2px 5px; font-size: 9px; letter-spacing: .06em; transform: translateX(-50%) rotate(-8deg); }
+.dg-start-tiles .ihk-start-tile:not(:disabled):hover .ihk-start-stamp,
+.dg-start-tiles .ihk-start-tile:not(:disabled):focus-visible .ihk-start-stamp { transform: translateX(-50%) rotate(-8deg) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .dg-start-tiles .ihk-start-doc { transition: none; } }

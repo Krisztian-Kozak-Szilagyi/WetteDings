@@ -18,7 +18,20 @@
       <div class="dg-stage" data-dg-stage>
         <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>
-        <div class="dg-hp" data-dg-hp hidden><span class="dg-hp-bar" data-dg-hp-bar></span><span class="dg-hp-label" data-dg-hp-label></span></div>
+        <div class="dg-bars" data-dg-bars hidden>
+          <div class="dg-bar is-hp">
+            <span class="dg-bar-label">Gegner</span>
+            <span class="dg-bar-track"><span class="dg-bar-fill" data-dg-hp-bar></span></span>
+            <span class="dg-bar-value" data-dg-hp-label></span>
+          </div>
+          <div class="dg-bar is-time">
+            <span class="dg-bar-label">Zeit</span>
+            <span class="dg-bar-track"><span class="dg-bar-fill" data-dg-time-bar></span></span>
+            <span class="dg-bar-value" data-dg-time-label></span>
+          </div>
+          <p class="dg-bars-hint">Den Gegner besiegen, bevor die Zeit abläuft – sonst ist der Dungeon vorbei.</p>
+        </div>
+        <p class="dg-next" data-dg-next hidden></p>
         <ol class="dg-steps" aria-label="Kämpfe">
           <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
         </ol>

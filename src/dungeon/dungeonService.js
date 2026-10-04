@@ -15,7 +15,7 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
-const { resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
+const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { dungeonByKey, dungeonForSlot } = require('./dungeons');
@@ -39,7 +39,7 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 const DEFAULTS = {
   open: false,
   intervalHours: 2,
-  required: [700, 850, 1200], // simuliert mit drei Bot-Karten: ~88 % / ~78 % / ~30 % (passende Karten deutlich mehr)
+  required: [700, 850, 1200], // simuliert mit drei Bot-Karten samt Boost (Schnitt FIA/FIS/BWL): ~91 % / ~79 % / ~40 % – passende Karten deutlich mehr
   rewards: [1000, 1500, 4000],
   foilChance: 2,
   cardChance: 1,
@@ -130,20 +130,58 @@ function botCard(rand = random, weights = settings.botWeights) {
   return cards[Math.floor(rand() * cards.length)];
 }
 
+/**
+ * Boost-Karte eines Bots: zufällige Karte, die im Boost-Slot wirkt (ohne Hermann, der eine Kaffee-Karte braucht).
+ * Jede Karte zählt mit dem Gewicht ihrer Seltenheit (botWeights); ist dort keine dabei, gleich wahrscheinlich.
+ */
+function botBoost(rand = random, weights = settings.botWeights) {
+  const pool = catalog.CARDS.filter((c) => canBoost(c) && !needsCoffee(c));
+  if (!pool.length) return null;
+  const w = (c) => weights[c.rarity] || 0;
+  const total = pool.reduce((s, c) => s + w(c), 0);
+  if (!total) return pool[Math.floor(rand() * pool.length)];
+  let x = rand() * total;
+  for (const c of pool) {
+    x -= w(c);
+    if (x < 0) return c;
+  }
+  return pool[pool.length - 1];
+}
+
 // ---------- Kampf ----------
+// Boost-Fähigkeiten, die im Dungeon der ganzen Gruppe helfen: Ömer (FIS für die befreundeten Karten), Hundekarten
+// (alle freundlichen Charaktere), Mauch (schickt die Gruppe zum Gruschteln) und Matzes Hundekarte-Bonus, sobald
+// irgendwer einen Hund mitbringt. Bloodlust und Reality Check treffen den Gegner – also die Deadline aller.
+const TEAM_KEYS = new Set(['osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
+
+/** Fähigkeiten eines Spielers: eigene Karte + eigener Boost, dazu die Gruppen-Fähigkeiten der Boosts der anderen */
+function teamEffects(members, m) {
+  const mem = members[m];
+  const out = resolveAll(mem.card, mem.boost ? [mem.boost] : []).map((e) => ({ ...e, from: m }));
+  members.forEach((other, o) => {
+    if (o === m || !other.boost) return;
+    for (const e of resolve(mem.card, other.boost)) {
+      if (TEAM_KEYS.has(e.key) && !out.some((x) => x.key === e.key && x.label === e.label)) out.push({ ...e, from: o });
+    }
+  });
+  return out;
+}
+
 /**
  * Ein Kampf: Jeder Spieler arbeitet wie in der IHK (eigene Takte, Krits und Fähigkeiten zur Halbzeit) –
- * die Punkte aller drei landen in einem gemeinsamen Balken. Geschafft, sobald required erreicht ist.
- * members: [{ card, boost }] (Katalog-Karten). Ergebnis: ticks [{ m, t, p, crit, ability, destroy }] nach Zeit.
+ * die Punkte aller drei landen in einem gemeinsamen Balken. Geschafft, sobald required erreicht ist,
+ * verloren, wenn die Zeit (limit, Spiel-Sekunden) vorher abläuft.
+ * members: [{ card, boost }] (Katalog-Karten). Ergebnis: ticks [{ m, t, p, crit, ability, destroy }] nach Zeit,
+ * abilities [{ m, from, team, label, text }] (from = wessen Karte die Fähigkeit bringt).
  */
 function fight(members, stat, required, rand = random) {
   const events = [];
   const abilities = [];
   let limit = WORK_TIME;
   members.forEach((mem, m) => {
-    const effects = resolveAll(mem.card, mem.boost ? [mem.boost] : []);
+    const effects = teamEffects(members, m);
     const r = simulate(mem.card.stats, stat, required, rand, effects);
-    if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, label: e.label, text: e.text }));
+    if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text }));
     limit = Math.max(limit, WORK_TIME + r.freeze);
     r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}) }));
   });
@@ -161,7 +199,10 @@ function fight(members, stat, required, rand = random) {
   }
   // Fähigkeiten, die erst nach dem Sieg ausgelöst hätten, zählen nicht
   const used = abilities.filter((a) => ticks.some((x) => x.ability && x.m === a.m));
-  return { ticks, abilities: used, total: Math.min(total, required), success: total >= required, doneAt, limit };
+  const success = total >= required;
+  // Wiedergabe: ein gewonnener Kampf endet früher (beim Sieg), ein verlorener dauert bis zum Ablauf der Zeit
+  const seconds = Math.max(5, Math.round((FIGHT_SECONDS * (success ? doneAt : limit)) / limit * 10) / 10);
+  return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, seconds };
 }
 
 /** Alle Kämpfe eines Dungeons; nach einer Niederlage ist Schluss */
@@ -175,8 +216,8 @@ function playDungeon(dungeon, members, rand = random, opts = settings) {
   return fights;
 }
 
-/** Wiedergabedauer in Sekunden für so viele Kämpfe */
-const runSeconds = (count) => INTRO_SECONDS + count * FIGHT_SECONDS + Math.max(0, count - 1) * PAUSE_SECONDS;
+/** Wiedergabedauer in Sekunden: Einleitung, Kämpfe, danach jeweils eine Pause (nach dem letzten fürs Ergebnis) */
+const runSeconds = (fights) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds + PAUSE_SECONDS, 0);
 
 /** Lohn und Beute pro Spieler (Bots bekommen nichts) */
 function rewardsFor(fights, isBot, rand = random, opts = settings) {
@@ -339,7 +380,8 @@ async function startTeam(slot, parties, players, chatLog, now) {
     const card = botCard();
     const name = BOT_NAMES.find((n) => !usedBots.has(n)) || 'Bot';
     usedBots.add(name);
-    members.push({ user: null, name, card: card.id, cardDoc: null, boost: null, boostDoc: null, bot: true });
+    const boost = botBoost();
+    members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, bot: true });
   }
   const fights = playDungeon(
     dungeon,
@@ -353,7 +395,7 @@ async function startTeam(slot, parties, players, chatLog, now) {
     const del = await DungeonParty.deleteMany({ _id: { $in: ids } }, { session });
     if (del.deletedCount !== ids.length) throw new Error('Dungeon-Anmeldung wurde gleichzeitig verändert.');
     await DungeonRun.create(
-      [{ slot, dungeon: dungeon.key, members: runMembers, fights, success, startedAt: new Date(now), endsAt: new Date(now + runSeconds(fights.length) * 1000), chat: chatLog }],
+      [{ slot, dungeon: dungeon.key, members: runMembers, fights, success, startedAt: new Date(now), endsAt: new Date(now + runSeconds(fights) * 1000), chat: chatLog }],
       { session }
     );
   });
@@ -466,6 +508,8 @@ module.exports = {
   registrationSlot,
   isLockedIn,
   botCard,
+  botBoost,
+  teamEffects,
   fight,
   playDungeon,
   runSeconds,

@@ -45,11 +45,12 @@ const playback = (run, d, now) => ({
   startedAt: new Date(run.startedAt).getTime(),
   endsAt: new Date(run.endsAt).getTime(),
   intro: dungeon.INTRO_SECONDS,
-  fightSeconds: dungeon.FIGHT_SECONDS,
+  fightSeconds: dungeon.FIGHT_SECONDS, // volle Zeit eines Kampfes in echten Sekunden (Zeit-Balken)
+  names: run.members.map((m) => m.name),
   pause: dungeon.PAUSE_SECONDS,
   fights: run.fights.map((f, i) => {
     const def = d.fights[i] || {};
-    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
+    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit, seconds: f.seconds, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
   }),
 });
 

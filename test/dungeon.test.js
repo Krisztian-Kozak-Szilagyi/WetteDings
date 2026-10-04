@@ -95,7 +95,36 @@ test('Einzelspieler werden in Dreiergruppen gelost', () => {
   assert.deepEqual(d.makeTeams([]), []);
 });
 
-test('Wiedergabe: Dauer wächst mit der Zahl der Kämpfe', () => {
-  assert.equal(d.runSeconds(1), d.INTRO_SECONDS + d.FIGHT_SECONDS);
-  assert.equal(d.runSeconds(3), d.INTRO_SECONDS + 3 * d.FIGHT_SECONDS + 2 * d.PAUSE_SECONDS);
+test('Wiedergabe: gewonnene Kämpfe enden früher, verlorene dauern die volle Zeit', () => {
+  const team = [{ card: card('krisz-3-gold') }, { card: card('adrian-3-gold') }, { card: card('aleks-3-gold') }];
+  const lost = d.fight(team, 'fia', 100000);
+  assert.equal(lost.seconds, d.FIGHT_SECONDS);
+  const won = d.fight(team, 'fia', 200);
+  assert.ok(won.success && won.seconds >= 5 && won.seconds < d.FIGHT_SECONDS);
+  assert.equal(d.runSeconds([won, lost]), d.INTRO_SECONDS + won.seconds + lost.seconds + 2 * d.PAUSE_SECONDS);
+});
+
+test('Bots bringen eine Boost-Karte mit', () => {
+  const { canBoost, needsCoffee } = require('../src/ihk/abilities');
+  for (let i = 0; i < 200; i++) {
+    const b = d.botBoost();
+    assert.ok(b && canBoost(b) && !needsCoffee(b));
+  }
+});
+
+test('Gruppen-Boosts (Ömer, Hunde, Mauch) wirken auf alle, persönliche nur auf den eigenen Spieler', () => {
+  const team = [{ card: card('krisz-3-gold'), boost: card('bfw-energy-gold') }, { card: card('adrian-3-gold'), boost: card('hugo-holo') }, { card: card('aleks-3-gold') }];
+  const keys = (m) => d.teamEffects(team, m).map((e) => e.key);
+  // Hugo (Hund) hilft allen dreien, BFW Energy nur Krisz selbst (Nachtschicht + Energy)
+  assert.ok([0, 1, 2].every((m) => keys(m).includes('hund')));
+  assert.ok(keys(0).includes('bfw-energy') && keys(0).includes('nachtschicht'));
+  assert.ok(!keys(1).includes('bfw-energy') && !keys(2).includes('nachtschicht'));
+  const omer = catalog.CARDS.find((c) => c.id.startsWith('omer-'));
+  if (omer) {
+    const t2 = [{ card: card('krisz-3-gold'), boost: omer }, { card: card('adrian-3-gold') }, { card: card('aleks-3-gold') }];
+    assert.ok([0, 1, 2].every((m) => d.teamEffects(t2, m).some((e) => e.key === 'osmanen' && e.from === 0)));
+  }
+  // derselbe Gruppen-Boost zweimal zählt nur einmal
+  const t3 = [{ card: card('krisz-3-gold'), boost: card('hugo-holo') }, { card: card('adrian-3-gold'), boost: card('hugo-holo') }, { card: card('aleks-3-gold') }];
+  assert.equal(d.teamEffects(t3, 2).filter((e) => e.key === 'hund').length, 1);
 });

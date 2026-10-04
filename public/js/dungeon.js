@@ -119,24 +119,33 @@
   }, 3000);
 
   // ---------- Wiedergabe der Kämpfe ----------
+  // Ablauf: Einleitung, dann je Kampf seine Dauer (gewonnene enden beim Sieg) und eine Pause mit Countdown.
   const dataEl = document.getElementById('dg-playback');
   if (!dataEl) return;
   const pb = JSON.parse(dataEl.textContent);
   const pbOffset = Date.now() - pb.now;
   const elapsed = () => (Date.now() - pbOffset - pb.startedAt) / 1000;
-  const fightStart = (i) => pb.intro + i * (pb.fightSeconds + pb.pause);
+  const starts = [];
+  pb.fights.reduce((t, f) => {
+    starts.push(t);
+    return t + f.seconds + pb.pause;
+  }, pb.intro);
+  const total = (pb.endsAt - pb.startedAt) / 1000;
 
   const titleEl = page.querySelector('[data-dg-fight-title]');
   const textEl = page.querySelector('[data-dg-fight-text]');
-  const hpEl = page.querySelector('[data-dg-hp]');
+  const barsEl = page.querySelector('[data-dg-bars]');
   const hpBar = page.querySelector('[data-dg-hp-bar]');
   const hpLabel = page.querySelector('[data-dg-hp-label]');
+  const timeBar = page.querySelector('[data-dg-time-bar]');
+  const timeLabel = page.querySelector('[data-dg-time-label]');
+  const nextEl = page.querySelector('[data-dg-next]');
   const logList = page.querySelector('[data-dg-log-list]');
   const slotEls = [...page.querySelectorAll('[data-dg-slot]')];
-  const names = slotEls.map((el) => (el.querySelector('.dg-slot-name') || {}).textContent || '');
+  const names = pb.names || [];
 
-  // Fortschritt je Kampf: wie viele Ticks schon gezeigt wurden, ob das Ende schon gemeldet ist
-  const shown = pb.fights.map(() => ({ ticks: 0, started: false, ended: false }));
+  // Fortschritt je Kampf: wie viele Ticks schon gezeigt wurden, ob Beginn/Ende schon gemeldet sind
+  const shown = pb.fights.map(() => ({ ticks: 0, started: false, ended: false, team: new Set() }));
   let first = true; // beim ersten Durchlauf (Seite mitten im Kampf geöffnet) keine Effekte nachholen
 
   function log(text, cls) {
@@ -158,6 +167,13 @@
     setTimeout(() => s.remove(), 1400);
   }
 
+  function cast(m) {
+    pop(m, '★', 'is-ability');
+    if (first || !slotEls[m]) return;
+    slotEls[m].classList.add('is-casting');
+    setTimeout(() => slotEls[m].classList.remove('is-casting'), 900);
+  }
+
   function step(active) {
     page.querySelectorAll('[data-dg-step]').forEach((li) => {
       const i = Number(li.dataset.dgStep);
@@ -168,27 +184,44 @@
     });
   }
 
+  const secs = (x) => Math.max(0, Math.ceil(x)) + ' s';
+
+  function setBars(f, done, game) {
+    const left = Math.max(0, f.required - done);
+    hpBar.style.width = (left / f.required) * 100 + '%';
+    hpLabel.textContent = left ? left + ' / ' + f.required : 'Besiegt!';
+    const timeLeft = Math.max(0, f.limit - game) / f.limit;
+    timeBar.style.width = timeLeft * 100 + '%';
+    timeBar.classList.toggle('is-low', timeLeft < 0.25);
+    timeLabel.textContent = left ? secs(timeLeft * pb.fightSeconds) : '–';
+  }
+
   function frame() {
     const t = elapsed();
-    let active = -1;
+    let active = -1; // Kampf, der gerade läuft
+    let after = -1; // zuletzt beendeter Kampf (in der Pause danach)
     pb.fights.forEach((f, i) => {
       const s = shown[i];
-      const t0 = fightStart(i);
+      const t0 = starts[i];
       if (t < t0) return;
       if (!s.started) {
         s.started = true;
         log((f.boss ? 'Boss: ' : 'Kampf: ') + f.title, 'is-head');
       }
-      const game = Math.min(1, (t - t0) / pb.fightSeconds) * f.limit;
+      const end = f.success ? f.doneAt : f.limit;
+      const game = Math.min(1, (t - t0) / f.seconds) * end;
       while (s.ticks < f.ticks.length && f.ticks[s.ticks].t <= game) {
         const x = f.ticks[s.ticks++];
         if (x.ability) {
-          f.abilities.filter((a) => a.m === x.m).forEach((a) => log(names[x.m] + ': ' + a.label + ' – ' + a.text, 'is-ability'));
-          pop(x.m, '★', 'is-ability');
-          if (slotEls[x.m] && !first) {
-            slotEls[x.m].classList.add('is-casting');
-            setTimeout(() => slotEls[x.m].classList.remove('is-casting'), 900);
-          }
+          f.abilities.filter((a) => a.m === x.m).forEach((a) => {
+            if (!a.team) log(names[a.m] + ': ' + a.label + ' – ' + a.text, 'is-ability');
+            else if (!s.team.has(a.from + a.label)) {
+              s.team.add(a.from + a.label);
+              log('Ganze Gruppe: ' + a.label + ' – ' + a.text + ' (Boost von ' + names[a.from] + ')', 'is-ability');
+              cast(a.from);
+            }
+          });
+          cast(x.m);
         } else if (x.destroy) {
           pop(x.m, 'Zerstört!', 'is-crit');
         } else {
@@ -196,33 +229,34 @@
         }
       }
       const done = f.ticks.slice(0, s.ticks).reduce((sum, x) => sum + (x.p || 0), 0);
-      const over = t >= t0 + pb.fightSeconds;
-      if (!over) {
+      if (t < t0 + f.seconds) {
         active = i;
         titleEl.textContent = f.title;
         textEl.textContent = f.text;
-        hpEl.hidden = false;
-        const left = Math.max(0, f.required - done);
-        hpBar.style.width = (left / f.required) * 100 + '%';
-        hpLabel.textContent = left ? left + ' / ' + f.required : 'Besiegt!';
-      }
-      if (over && !s.ended) {
-        s.ended = true;
-        log(f.success ? f.successText : f.failText, f.success ? 'is-win' : 'is-loss');
+        setBars(f, done, game);
+      } else {
+        after = i;
+        if (!s.ended) {
+          s.ended = true;
+          setBars(f, done, game);
+          log(f.success ? f.successText : f.failText, f.success ? 'is-win' : 'is-loss');
+        }
       }
     });
+
+    barsEl.hidden = active < 0 && after < 0;
+    nextEl.hidden = active >= 0;
     if (active < 0) {
-      const last = pb.fights.findIndex((f, i) => shown[i].ended && !f.success);
-      if (t < pb.intro) {
-        hpEl.hidden = true;
-      } else if (t * 1000 >= pb.endsAt - pb.startedAt) {
-        titleEl.textContent = last >= 0 ? 'Rückzug!' : 'Geschafft!';
-        textEl.textContent = 'Die Beute wird verteilt …';
-        hpEl.hidden = true;
+      if (after < 0) {
+        nextEl.textContent = 'Der erste Kampf beginnt in ' + secs(pb.intro - t);
       } else {
-        titleEl.textContent = 'Kurze Verschnaufpause …';
-        textEl.textContent = '';
-        hpEl.hidden = true;
+        const f = pb.fights[after];
+        const last = after === pb.fights.length - 1;
+        titleEl.textContent = f.success ? f.title + ': besiegt!' : f.title + ': Zeit abgelaufen – Rückzug!';
+        textEl.textContent = f.success ? f.successText : f.failText;
+        if (!last) nextEl.textContent = 'Nächster Kampf in ' + secs(starts[after + 1] - t);
+        else if (t < total) nextEl.textContent = 'Beute wird verteilt in ' + secs(total - t);
+        else nextEl.textContent = 'Beute wird verteilt …';
       }
     }
     step(active);
