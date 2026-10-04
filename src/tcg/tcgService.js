@@ -245,7 +245,7 @@ async function toggleCard(user, field, cardId, check) {
     await User.updateOne({ _id: user._id }, { $pull: { [field]: cardId } });
     return false;
   }
-  if (!(await TcgCard.exists({ user: user._id, card: cardId }))) throw new UserError('Du besitzt diese Karte nicht.');
+  if (!(await TcgCard.exists({ user: user._id, card: cardId, foiledAt: null }))) throw new UserError('Du besitzt diese Karte nicht (folierte Exemplare zählen hier einzeln).');
   if (check) check();
   await User.updateOne({ _id: user._id }, { $addToSet: { [field]: cardId } });
   return true;
@@ -264,7 +264,7 @@ async function pruneCardLists(user) {
   if (!ids.length) return lists;
   const cardIds = ids.filter((id) => !isFoilFav(id));
   const [ownedCards, foils] = await Promise.all([
-    cardIds.length ? TcgCard.distinct('card', { user: user._id, card: { $in: cardIds } }) : [],
+    cardIds.length ? TcgCard.distinct('card', { user: user._id, card: { $in: cardIds }, foiledAt: null }) : [],
     ownedFoilFavs(user._id, ids),
   ]);
   const owned = new Set([...ownedCards, ...[...foils.keys()].map((k) => FOIL_FAV + k)]);

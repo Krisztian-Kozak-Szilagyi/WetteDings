@@ -23,7 +23,7 @@
       <% if (!mine.cardCount) { %>
         <p class="muted">Du hast noch keine Karten zum Tauschen.</p>
       <% } else { %>
-        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'card', picked: pickCard, showMissing: false, counts: mine.counts, lockedByCard: mine.lockedByCard }) %>
+        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'card', picked: pickCard, showMissing: false, counts: mine.counts, lockedByCard: mine.lockedByCard, foiledByCard: mine.foiledByCard }) %>
       <% if (myFoiled.length) { %>
         <h3 class="trade-foil-head">Folierte Karten</h3>
         <div class="tcg-grid tcg-pick-grid">

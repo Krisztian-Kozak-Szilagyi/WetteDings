@@ -38,7 +38,7 @@ router.get('/tcg', async (req, res) => {
     totalWeight: catalog.TOTAL_WEIGHT,
     cardById: catalog.cardById,
     // Favoriten: nur Karten, die es gibt und die man (noch) besitzt
-    favorites: await tcg.favoriteList(req.user, coll.counts),
+    favorites: await tcg.favoriteList(req.user, Object.fromEntries(Object.entries(coll.counts).map(([k, n]) => [k, n - (coll.foiledByCard[k] || 0)]))), // normale Favoriten nur mit unfoliertem Exemplar
     maxFavorites: tcg.MAX_FAVORITES,
     stats: stats[0] || { packs: 0, spent: 0, best: null },
     rarePulls,

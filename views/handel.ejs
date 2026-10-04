@@ -194,7 +194,7 @@
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>
       <% } else { %>
         <%- include('partials/tcg-filter', { counts: coll.counts }) %>
-        <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard, foiledCopies: coll.foiledCopies }) %>
+        <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard, foiledCopies: coll.foiledCopies, foiledByCard: coll.foiledByCard }) %>
       <% } %>
     </div>
   </section>

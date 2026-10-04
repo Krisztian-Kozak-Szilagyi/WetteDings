@@ -25,10 +25,11 @@
   };
 %>
 <div class="tcg-grid<%= isAlbum ? ' tcg-album' : '' %><%= mode === 'pick' ? ' tcg-pick-grid' : '' %>">
-  <% cards.forEach((c, idx) => { const n = counts[c.id] || 0; const r = rarityByKey[c.rarity]; %>
-    <% if (!n && !showMissing) return; %>
-    <% const lk = locks[c.id]; const lockLabel = lk ? ({ handel: 'Im Handel', folie: 'Foliert' })[lk.reason] || 'Auf Quest' : ''; %>
-    <% const freeN = n - (lk ? lk.n : 0); %>
+  <% cards.forEach((c, idx) => { const r = rarityByKey[c.rarity]; %>
+    <% const foiledN = foiledBy[c.id] || (foiledCopies[c.id] || []).length; const n = Math.max(0, (counts[c.id] || 0) - foiledN); %>
+    <% if (!n && !showMissing && !(foiledCopies[c.id] || []).length) return; %>
+    <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : 'Auf Quest'; %>
+    <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>
       <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
@@ -43,9 +44,8 @@
       <% const inner = () => { %>
         <span class="tcg-art">
           <%- art(c) %>
-          <% if (prot || fav || (isAlbum && foiledBy[c.id])) { %>
+          <% if (prot || fav) { %>
             <span class="tcg-marks">
-              <% if (isAlbum && foiledBy[c.id]) { %><span class="tcg-mark tcg-mark-foil" title="<%= foiledBy[c.id] %>× foliert (Inventar)">F</span><% } %>
               <% if (prot) { %><span class="tcg-mark tcg-mark-lock" title="Geschützt"><svg viewBox="0 0 256 256" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96Z"/></svg></span><% } %>
               <% if (fav) { %><span class="tcg-mark tcg-mark-fav" title="Favorit"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="m12 2 3 6.6 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.2l1.4-7L2 9.4l7-.8L12 2Z"/></svg></span><% } %>
             </span>
@@ -84,6 +84,7 @@
           <% inner() %>
         </div>
       <% } %>
+    <% } else if (!showMissing) { %>
     <% } else if (seenIds.has(c.id)) { %>
       <% if (isAlbum) { %>
         <button type="button" class="tcg-slot tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen"
