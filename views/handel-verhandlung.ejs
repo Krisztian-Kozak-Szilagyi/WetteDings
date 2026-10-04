@@ -33,13 +33,13 @@
       <div class="nego-cards">
         <figure class="nego-card">
           <figcaption>Du gibst</figcaption>
-          <%- include('partials/trade-thumbs', { a: give }) %>
+          <%- include('partials/trade-thumbs', { a: give, aFoil: role === 'seller' ? t.foiledAt : t.wantFoiledAt }) %>
           <span><strong><%= give.name %></strong> <span class="tcg-badge r-<%= give.rarity %>"><%= rar(give).label %></span><% const giveFoil = role === 'seller' ? t.foiledAt : t.wantFoiledAt; if (giveFoil) { %> <span class="foil-tag">Foliert · <%= dayDate(giveFoil) %></span><% } %></span>
         </figure>
         <svg class="nego-swap" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
         <figure class="nego-card">
           <figcaption>Du bekommst</figcaption>
-          <%- include('partials/trade-thumbs', { a: get }) %>
+          <%- include('partials/trade-thumbs', { a: get, aFoil: role === 'seller' ? t.wantFoiledAt : t.foiledAt }) %>
           <span><strong><%= get.name %></strong> <span class="tcg-badge r-<%= get.rarity %>"><%= rar(get).label %></span><% const getFoil = role === 'seller' ? t.wantFoiledAt : t.foiledAt; if (getFoil) { %> <span class="foil-tag">Foliert · <%= dayDate(getFoil) %></span><% } %></span>
         </figure>
       </div>
@@ -122,6 +122,7 @@
 </div>
 
 <%- include('partials/card-zoom') %>
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

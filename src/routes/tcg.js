@@ -38,7 +38,7 @@ router.get('/tcg', async (req, res) => {
     totalWeight: catalog.TOTAL_WEIGHT,
     cardById: catalog.cardById,
     // Favoriten: nur Karten, die es gibt und die man (noch) besitzt
-    favorites: (req.user.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && coll.counts[c.id]),
+    favorites: await tcg.favoriteList(req.user, coll.counts),
     maxFavorites: tcg.MAX_FAVORITES,
     stats: stats[0] || { packs: 0, spent: 0, best: null },
     rarePulls,

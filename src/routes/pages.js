@@ -7,7 +7,7 @@ const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
 const rankService = require('../services/rankService');
-const { inventory } = require('../tcg/tcgService');
+const { inventory, favoriteList } = require('../tcg/tcgService');
 const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 
@@ -60,7 +60,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     totalCards: catalog.CARDS.length,
     cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
     stats: statsAgg[0] || { won: 0, lost: 0 },
-    favorites: (profile.tcgFavorites || []).map((id) => catalog.cardById[id]).filter((c) => c && has.has(c.id)),
+    favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n]))),
     rarityByKey: catalog.rarityByKey,
     ownedCounts: Object.fromEntries(mine.map((o) => [o._id, o.n])),
   });

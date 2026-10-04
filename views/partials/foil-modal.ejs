@@ -1,0 +1,16 @@
+<%#
+  Großansicht folierter Karten (public/js/foil-view.js) – einmal pro Seite einbinden.
+  favForm: true im Album – dann lässt sich die Karte als Favorit zeigen.
+%>
+<dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
+  <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
+  <div class="foil-modal-stage" data-foil-stage></div>
+  <% if (locals.favForm) { %>
+    <form method="post" action="/tcg/favorit" class="foil-modal-actions" data-foil-fav hidden>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="card" value="">
+      <button class="btn btn-primary" type="submit">☆ Als Favorit zeigen</button>
+    </form>
+  <% } %>
+</dialog>
+<script src="/js/foil-view.js?v=<%= assetVersion %>" defer></script>

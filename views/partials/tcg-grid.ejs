@@ -11,6 +11,8 @@
   const showMissing = locals.showMissing !== false;
   const locks = locals.lockedByCard || {};
   const foiledBy = locals.foiledByCard || {};
+  const foiledCopies = locals.foiledCopies || {};
+  const favoriteIds = locals.favoriteIds || new Set();
   const isAlbum = mode === 'album';
   // Effekte je Seltenheit: Glanzstreifen, Regenbogen, Glitch
   const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch' })[rarity] || '';
@@ -28,7 +30,7 @@
     <% const lk = locks[c.id]; const lockLabel = lk ? ({ handel: 'Im Handel', folie: 'Foliert' })[lk.reason] || 'Auf Quest' : ''; %>
     <% const freeN = n - (lk ? lk.n : 0); %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
-    <% if (n && freeN <= 0 && !(isAlbum && lk && lk.reason === 'folie')) { %>
+    <% if (n && freeN <= 0) { %>
       <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
@@ -102,5 +104,14 @@
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden ? '???' : r.label %></span>
       </div>
     <% } %>
+    <%# Folierte Exemplare: eigener Platz je Exemplar (Album: auch als Favorit wählbar; fremde Sammlung: nur ansehen) %>
+    <% if (isAlbum || mode === 'view') { (foiledCopies[c.id] || []).forEach((f) => { const favKey = 'f:' + f.id; const favOn = isAlbum && favoriteIds.has(favKey); %>
+      <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn } : {}) %>
+        aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %><%= favOn ? ', Favorit' : '' %> – ansehen">
+        <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %></span>
+        <% if (favOn) { %><span class="tcg-marks"><span class="tcg-mark tcg-mark-fav" title="Favorit"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="m12 2 3 6.6 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.2l1.4-7L2 9.4l7-.8L12 2Z"/></svg></span></span><% } %>
+        <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
+      </button>
+    <% }) } %>
   <% }) %>
 </div>

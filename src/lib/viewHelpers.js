@@ -12,6 +12,16 @@ const rtf = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
 const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
+const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/**
+ * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
+ * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
+ */
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false } = {}) {
+  let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-date="${escAttr(dayDate(foiledAt))}"`;
+  if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
+  return h;
+}
 /** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
 const dayDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: config.timezone });
 const dayDate = (d) => (d ? dayDateFmt.format(new Date(d)) : '–');
@@ -132,6 +142,7 @@ module.exports = {
   euro,
   date,
   dayDate,
+  foilViewAttrs,
   dateSec,
   relTime,
   pool,

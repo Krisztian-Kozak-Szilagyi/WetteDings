@@ -5,7 +5,14 @@ const catalog = require('./catalog');
 const { inventory } = require('./tcgService');
 
 async function collection(user) {
-  const [owned, locked] = await Promise.all([inventory(user._id), lockedDocs(user._id)]);
+  const [owned, locked, foiledDocs] = await Promise.all([
+    inventory(user._id),
+    lockedDocs(user._id),
+    TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card foiledAt').sort({ foiledAt: 1 }).lean(),
+  ]);
+  // Folierte Exemplare je Karte – im Album und in fremden Sammlungen eigene Plätze: { cardId: [{ id, foiledAt }] }
+  const foiledCopies = {};
+  for (const d of foiledDocs) (foiledCopies[d.card] = foiledCopies[d.card] || []).push({ id: String(d._id), foiledAt: d.foiledAt });
   // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
   const lockedByCard = {};
   for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card').lean()) {
@@ -28,6 +35,7 @@ async function collection(user) {
     free,
     lockedByCard,
     foiledByCard,
+    foiledCopies,
     protectedIds,
     uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
     cardCount: owned.reduce((s, o) => s + o.n, 0),

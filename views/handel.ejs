@@ -99,7 +99,7 @@
           <% incoming.forEach((t) => { const { c, r } = line(t.card); %>
             <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
               <li class="trade-item trade-swap">
-                <%- include('partials/trade-thumbs', { a: c, b: w.c }) %>
+                <%- include('partials/trade-thumbs', { a: c, b: w.c, aFoil: t.foiledAt, bFoil: t.wantFoiledAt }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Tausch · von <%= t.sellerName %></span>
                   <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
@@ -124,7 +124,7 @@
               </li>
             <% } else { const lacks = t.price - bal; %>
               <li class="trade-item r-<%= c.rarity %>">
-                <%- include('partials/trade-thumbs', { a: c }) %>
+                <%- include('partials/trade-thumbs', { a: c, aFoil: t.foiledAt }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Privat · von <%= t.sellerName %></span>
                   <span class="trade-title"><strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
@@ -168,7 +168,7 @@
         <ul class="trade-list trade-market">
           <% market.forEach((t) => { const { c, r } = line(t.card); const lacks = t.price - bal; %>
             <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
-              <%- include('partials/trade-thumbs', { a: c }) %>
+              <%- include('partials/trade-thumbs', { a: c, aFoil: t.foiledAt }) %>
               <div class="trade-info">
                 <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
                 <span class="trade-meta">von <a href="/profil/<%= encodeURIComponent(t.sellerName) %>"><%= t.sellerName %></a><%- roleBadge(t.sellerName) %> · Wert <%= euro(c.isItem ? c.sell : foil.cardValue(r.sell || 0, t.foiledAt)) %></span>
@@ -222,7 +222,7 @@
         <ul class="my-offers">
           <% mine.forEach((t) => { const { c, r } = line(t.card); const w = t.kind === 'tausch' ? line(t.wantCard) : null; %>
             <li class="my-offer">
-              <%- include('partials/trade-thumbs', { a: c, b: w && w.c }) %>
+              <%- include('partials/trade-thumbs', { a: c, b: w && w.c, aFoil: t.foiledAt, bFoil: t.wantFoiledAt }) %>
               <div class="my-offer-info">
                 <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong><% foilTag(t.foiledAt) %><% foilTag(t.wantFoiledAt) %>
                 <span><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %> · läuft ab <%= relTime(t.expiresAt) %></span>
@@ -334,6 +334,7 @@
   </div>
 </dialog>
 
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

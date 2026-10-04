@@ -111,19 +111,8 @@
     <div class="foil-grid">
       <% foiled.forEach((f) => { %>
         <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
-          <button type="button" class="foil-card" data-foil-zoom aria-label="<%= f.card.name %> groß ansehen">
-            <span class="foil-inner">
-              <span class="foil-face foil-front">
-                <img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008">
-                <span class="foil-sheen" aria-hidden="true"></span>
-                <span class="foil-ticket"><b><%= f.card.name %></b><span><%= f.rarity.label %></span></span>
-              </span>
-              <span class="foil-face foil-back" aria-hidden="true">
-                <span class="foil-back-art"></span>
-                <span class="foil-sheen"></span>
-                <span class="foil-ticket foil-ticket-back"><span>Foliert am</span><b><%= dayDate(f.foiledAt) %></b></span>
-              </span>
-            </span>
+          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt) %> aria-label="<%= f.card.name %> groß ansehen">
+            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label }) %>
           </button>
           <div class="foil-info">
             <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
@@ -165,11 +154,7 @@
   </section>
 </div>
 
-<!-- Folierte Karte groß (public/js/inventar.js): ziehen dreht sie in 3D, antippen dreht sie um -->
-<dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
-  <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
-  <div class="foil-modal-stage" data-foil-stage></div>
-</dialog>
+<%- include('partials/foil-modal') %>
 
 <!-- Pack-Öffnung (public/js/tcg.js) -->
 <div class="tcg-reveal" data-tcg-reveal hidden>
@@ -188,5 +173,4 @@
 </div>
 
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
-<script src="/js/inventar.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

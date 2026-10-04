@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard, TcgOpening, TcgPack } = require('../models/Tcg');
@@ -224,6 +225,19 @@ async function sellAllDuplicates({ user }) {
 
 const MAX_FAVORITES = 4;
 
+// Favoriten können auch ein bestimmtes foliertes Exemplar sein: "f:<Exemplar-ID>" (statt der Karten-ID)
+const FOIL_FAV = 'f:';
+const isFoilFav = (id) => typeof id === 'string' && id.startsWith(FOIL_FAV);
+const foilFavDoc = (id) => (isFoilFav(id) && mongoose.isValidObjectId(id.slice(FOIL_FAV.length)) ? id.slice(FOIL_FAV.length) : null);
+
+/** Folierte Exemplare (aus "f:<id>"-Einträgen), die der Nutzer noch besitzt und die noch foliert sind: Map docId → Dokument */
+async function ownedFoilFavs(userId, ids) {
+  const docIds = ids.map(foilFavDoc).filter(Boolean);
+  if (!docIds.length) return new Map();
+  const docs = await TcgCard.find({ _id: { $in: docIds }, user: userId, foiledAt: { $ne: null } }).select('card foiledAt').lean();
+  return new Map(docs.map((d) => [String(d._id), d]));
+}
+
 /** Karten-ID in einer Liste am Nutzer ein- bzw. austragen. Gibt true zurück, wenn sie danach enthalten ist. */
 async function toggleCard(user, field, cardId, check) {
   if (!catalog.cardById[cardId]) throw new UserError('Diese Karte gibt es nicht.');
@@ -248,7 +262,12 @@ async function pruneCardLists(user) {
   const lists = { tcgFavorites: user.tcgFavorites || [], tcgProtected: user.tcgProtected || [] };
   const ids = [...new Set([...lists.tcgFavorites, ...lists.tcgProtected])];
   if (!ids.length) return lists;
-  const owned = new Set(await TcgCard.distinct('card', { user: user._id, card: { $in: ids } }));
+  const cardIds = ids.filter((id) => !isFoilFav(id));
+  const [ownedCards, foils] = await Promise.all([
+    cardIds.length ? TcgCard.distinct('card', { user: user._id, card: { $in: cardIds } }) : [],
+    ownedFoilFavs(user._id, ids),
+  ]);
+  const owned = new Set([...ownedCards, ...[...foils.keys()].map((k) => FOIL_FAV + k)]);
   const gone = ids.filter((id) => !owned.has(id));
   if (!gone.length) return lists;
   await User.updateOne({ _id: user._id }, { $pull: { tcgFavorites: { $in: gone }, tcgProtected: { $in: gone } } });
@@ -258,9 +277,38 @@ async function pruneCardLists(user) {
 /** Favorit (Anzeige auf der TCG-Seite) umschalten – höchstens MAX_FAVORITES (gezählt werden nur Karten, die man noch besitzt) */
 async function toggleFavorite({ user, cardId }) {
   const { tcgFavorites } = await pruneCardLists(user);
+  if (isFoilFav(cardId)) {
+    if (tcgFavorites.includes(cardId)) {
+      await User.updateOne({ _id: user._id }, { $pull: { tcgFavorites: cardId } });
+      return false;
+    }
+    if (!(await ownedFoilFavs(user._id, [cardId])).size) throw new UserError('Diese folierte Karte besitzt du nicht.');
+    if (tcgFavorites.length >= MAX_FAVORITES) throw new UserError(`Du kannst höchstens ${MAX_FAVORITES} Favoriten zeigen. Entferne zuerst einen.`);
+    await User.updateOne({ _id: user._id }, { $addToSet: { tcgFavorites: cardId } });
+    return true;
+  }
   return toggleCard({ ...user, tcgFavorites }, 'tcgFavorites', cardId, () => {
     if (tcgFavorites.length >= MAX_FAVORITES) throw new UserError(`Du kannst höchstens ${MAX_FAVORITES} Favoriten zeigen. Entferne zuerst einen.`);
   });
+}
+
+/**
+ * Favoriten eines Mitglieds zum Anzeigen: [{ key, card, foiledAt }] – foiledAt nur bei folierten Exemplaren.
+ * counts = { cardId: Anzahl } des Mitglieds; Karten, die es nicht mehr besitzt, fallen weg.
+ */
+async function favoriteList(owner, counts) {
+  const ids = owner.tcgFavorites || [];
+  const foils = await ownedFoilFavs(owner._id, ids);
+  return ids
+    .map((id) => {
+      if (isFoilFav(id)) {
+        const d = foils.get(id.slice(FOIL_FAV.length));
+        return d && catalog.cardById[d.card] ? { key: id, card: catalog.cardById[d.card], foiledAt: d.foiledAt } : null;
+      }
+      const card = catalog.cardById[id];
+      return card && counts[id] ? { key: id, card, foiledAt: null } : null;
+    })
+    .filter(Boolean);
 }
 
 /** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch des Inventars – für das Abzeichen im Menü */
@@ -298,4 +346,4 @@ async function cardValueCents(userId) {
   return (agg[0] ? agg[0].s : 0) + packs * settings.getPackPrice();
 }
 
-module.exports = { soldMeta, MAX_FAVORITES, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+module.exports = { soldMeta, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

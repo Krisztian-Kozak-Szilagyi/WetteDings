@@ -67,7 +67,13 @@
     <p class="muted"><%= isMe ? 'Du zeigst noch keine Favoriten. Wähle sie in deinem Album aus.' : profile.username + ' zeigt noch keine Favoriten.' %></p>
   <% } else { %>
     <div class="tcg-grid tcg-favs">
-      <% favorites.forEach((c) => { const r = rarityByKey[c.rarity]; %>
+      <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity]; %>
+        <% if (fv.foiledAt) { %>
+          <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
+            <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+            <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(fv.foiledAt) %></span>
+          </button>
+          <% return; } %>
         <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card
           data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
           data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= ownedCounts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
@@ -80,6 +86,7 @@
 </div>
 
 <%- include('partials/card-zoom') %>
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

@@ -24,5 +24,6 @@
   <%- include('partials/tcg-grid', { mode: 'view', lockedByCard: {}, linkFor: isMe ? null : tradeLink }) %>
 </div>
 
+<%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>
