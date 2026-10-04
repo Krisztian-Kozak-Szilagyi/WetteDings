@@ -38,9 +38,14 @@ async function grant(userId, key) {
   return !!granted;
 }
 
-/** Einzelstücke an die vorgesehenen Konten (beim Start; ohne Konto passiert nichts) */
+/**
+ * Einzelstücke an die vorgesehenen Konten (beim Start; ohne Konto passiert nichts). Jedes nur ein einziges Mal:
+ * Hatte es schon jemand (auch ein inzwischen gelöschtes Konto), wird es nie wieder vergeben – sonst könnte sich
+ * jemand nach einer Namensänderung oder Löschung den freien Namen nehmen und es abholen.
+ */
 async function grantSpecial() {
   for (const [key, name] of SPECIAL) {
+    if (await Achievement.exists({ key })) continue;
     const user = await User.findOne({ usernameLower: name, deletedAt: null }).select('_id').lean();
     if (user && (await grant(user._id, key))) console.log(`Erfolg "${key}" an ${name} vergeben.`);
   }
@@ -50,12 +55,15 @@ async function grantSpecial() {
 let checking = null; // laufende Prüfung (nie zwei gleichzeitig)
 let again = false; // während einer Prüfung kam eine neue Aktion → danach noch einmal prüfen
 let soonTimer = null;
+let lastRun = 0;
+const MIN_GAP = 10000; // höchstens alle 10 Sekunden eine Prüfung, auch wenn jemand viele Aktionen abschickt
 
 function checkAll() {
   if (checking) {
     again = true;
     return checking;
   }
+  lastRun = Date.now();
   checking = runCheck().finally(() => {
     checking = null;
     if (again) {
@@ -68,11 +76,12 @@ function checkAll() {
 
 /**
  * Nach einer Aktion eines Mitglieds (POST): in 2 Sekunden prüfen – mehrere Aktionen kurz hintereinander lösen nur
- * eine Prüfung aus. Das Fenster erscheint dann beim nächsten Seitenaufruf. Der 5-Minuten-Job bleibt als Rückfall
+ * eine Prüfung aus (und höchstens alle 10 Sekunden eine). Das Fenster erscheint dann beim nächsten Seitenaufruf. Der 5-Minuten-Job bleibt als Rückfall
  * (z. B. für Lotterie-Ziehung und Zeit auf Platz 1, die ohne Aktion entstehen).
  */
 function soon(delay = 2000) {
   if (soonTimer) return;
+  delay = Math.max(delay, lastRun + MIN_GAP - Date.now());
   soonTimer = setTimeout(() => {
     soonTimer = null;
     checkAll().catch((err) => console.error('Erfolge-Fehler:', err));

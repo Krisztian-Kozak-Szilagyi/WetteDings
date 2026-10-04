@@ -67,35 +67,51 @@ const ACHIEVEMENTS = [
   {
     key: 'alles-auf-rot',
     name: 'Alles auf Rot',
-    text: 'Setze in einer einzigen Wette mindestens 1.000 €.',
+    text: 'Setze in einer einzigen Wette mindestens 1.000 € – und lass es darauf ankommen (erstattete Einsätze zählen nicht).',
     icon: { glyph: 'dice', tone: 'red', frame: 'bronze' },
-    holders: () => Position.distinct('user', { amount: { $gte: 100000 } }),
+    // nur entschiedene Einsätze: Gewinn oder Verlust, keine Erstattung (Auszahlung = Einsatz)
+    holders: () => Position.distinct('user', { amount: { $gte: 100000 }, payout: { $ne: null }, $expr: { $ne: ['$payout', '$amount'] } }),
   },
   {
     key: 'high-noon',
     name: 'High Noon',
-    text: 'Gewinne 5 Duelle.',
+    text: 'Gewinne 5 Duelle gegen mindestens 3 verschiedene Gegner.',
     icon: { glyph: 'sabers', tone: 'silver', frame: 'gold' },
     holders: async () => {
       const duels = await Bet.distinct('_id', { duel: { $exists: true }, status: 'entschieden' });
-      return duels.length ? countAtLeast(Position, { bet: { $in: duels }, ...won }, 5) : [];
+      if (!duels.length) return [];
+      const rows = await Position.aggregate([
+        { $match: { bet: { $in: duels }, ...won } },
+        { $lookup: { from: 'bets', localField: 'bet', foreignField: '_id', as: 'b', pipeline: [{ $project: { creator: 1, 'duel.opponent': 1 } }] } },
+        { $unwind: '$b' },
+        { $project: { user: 1, rival: { $cond: [{ $eq: ['$user', '$b.creator'] }, '$b.duel.opponent', '$b.creator'] } } },
+        { $group: { _id: '$user', n: { $sum: 1 }, rivals: { $addToSet: '$rival' } } },
+        { $match: { n: { $gte: 5 }, 'rivals.2': { $exists: true } } },
+      ]);
+      return rows.map((r) => r._id);
     },
   },
   {
     key: 'unbestechlich',
     name: 'Unbestechlich',
-    text: 'Entscheide als Schiedsrichter 10 Wetten, ohne dass ein Streitfall daraus wird.',
+    text: 'Entscheide als Schiedsrichter 10 Wetten, in denen auf beiden Seiten Geld lag, ohne dass ein Streitfall daraus wird.',
     icon: { glyph: 'scales', tone: 'blue', frame: 'silver' },
-    holders: () => countAtLeast(Bet, { referee: { $ne: null }, status: 'entschieden', disputed: { $ne: true } }, 10, '$referee'),
+    holders: () =>
+      countAtLeast(
+        Bet,
+        { referee: { $ne: null }, status: 'entschieden', disputed: { $ne: true }, $expr: { $gte: [{ $size: { $filter: { input: '$options', cond: { $gt: ['$$this.total', 0] } } } }, 2] } },
+        10,
+        '$referee'
+      ),
   },
 
   // ---- Lotterie & Broker ----
   {
     key: 'glueckspilz',
     name: 'Glückspilz',
-    text: 'Gewinne eine Ziehung der Lotterie.',
+    text: 'Gewinne eine Ziehung der Lotterie mit mindestens drei Teilnehmern.',
     icon: { glyph: 'clover', tone: 'green', frame: 'bronze' },
-    holders: () => LotteryRound.distinct('winner', { winner: { $ne: null } }),
+    holders: () => LotteryRound.distinct('winner', { winner: { $ne: null }, participants: { $gte: 3 } }),
   },
   {
     key: 'wolf',
@@ -135,15 +151,16 @@ const ACHIEVEMENTS = [
   {
     key: 'haendler',
     name: 'Hart verhandelt',
-    text: 'Schließe 10 Geschäfte im Handel ab – als Käufer, Verkäufer oder Tauschpartner.',
+    text: 'Schließe 10 Geschäfte im Handel mit mindestens 5 verschiedenen Mitgliedern ab – als Käufer, Verkäufer oder Tauschpartner.',
     icon: { glyph: 'swap', tone: 'blue', frame: 'bronze' },
     holders: async () => {
       const rows = await Trade.aggregate([
         { $match: { status: 'verkauft' } },
-        { $project: { users: { $setUnion: [['$seller'], [{ $ifNull: ['$buyer', '$to'] }]] } } },
-        { $unwind: '$users' },
-        { $group: { _id: '$users', n: { $sum: 1 } } },
-        { $match: { _id: { $ne: null }, n: { $gte: 10 } } },
+        { $project: { pair: [{ me: '$seller', other: { $ifNull: ['$buyer', '$to'] } }, { me: { $ifNull: ['$buyer', '$to'] }, other: '$seller' }] } },
+        { $unwind: '$pair' },
+        { $match: { 'pair.me': { $ne: null }, 'pair.other': { $ne: null } } },
+        { $group: { _id: '$pair.me', n: { $sum: 1 }, partners: { $addToSet: '$pair.other' } } },
+        { $match: { n: { $gte: 10 }, 'partners.4': { $exists: true } } },
       ]);
       return rows.map((r) => r._id);
     },

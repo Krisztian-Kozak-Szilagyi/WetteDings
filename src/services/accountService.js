@@ -161,7 +161,8 @@ async function deleteAccount({ user, password }) {
       ForumRead.deleteMany({ user: id }, opt),
       ForumReport.deleteMany({ by: id }, opt),
       require('../models/Notification').deleteMany({ user: id }, opt),
-      require('../models/Achievement').deleteMany({ user: id }, opt),
+      // Erfolge löschen – nur Einzelstücke bleiben an der neutralen Hülle, damit sie nie ein zweites Mal vergeben werden
+      require('../models/Achievement').deleteMany({ user: id, key: { $nin: require('../achievements/list').SPECIAL.map(([k]) => k) } }, opt),
       // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus
       Group.updateMany({ owner: id }, { $set: { deleted: true } }, opt),
       Group.updateMany({ members: id, owner: { $ne: id } }, { $pull: { members: id } }, opt),
