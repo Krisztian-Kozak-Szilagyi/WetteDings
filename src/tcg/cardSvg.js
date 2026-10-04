@@ -12,15 +12,23 @@ const CHAR_EM = 0.5;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// Bilder als data-URI: SVGs in <img> dürfen keine weiteren Dateien nachladen
-const artCache = new Map();
+// Bilder als data-URI: SVGs in <img> dürfen keine weiteren Dateien nachladen.
+// Zwischengespeichert je Datei samt Änderungszeit – ein ausgetauschtes Bild gilt sofort, ohne Neustart.
+const artCache = new Map(); // file -> { mtime, data }
 function artData(file) {
-  if (!artCache.has(file)) {
-    const ext = path.extname(file).slice(1).toLowerCase();
-    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-    artCache.set(file, `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`);
+  let mtime = 0;
+  try {
+    mtime = fs.statSync(file).mtimeMs;
+  } catch {
+    // Datei fehlt – readFileSync wirft gleich die eigentliche Fehlermeldung
   }
-  return artCache.get(file);
+  const hit = artCache.get(file);
+  if (hit && hit.mtime === mtime) return hit.data;
+  const ext = path.extname(file).slice(1).toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+  const data = `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+  artCache.set(file, { mtime, data });
+  return data;
 }
 
 /** Text in Zeilen umbrechen, die bei dieser Schriftgröße ungefähr in maxWidth passen */

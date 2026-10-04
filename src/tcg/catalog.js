@@ -115,15 +115,13 @@ function loadCards(dir = IMAGE_DIR) {
         name: (data && data.name) || prettyName(m[1].toLowerCase()),
         rarity,
         season: data && seasonByKey[data.season] ? data.season : DEFAULT_SEASON,
-        image: imageUrl(file),
         stats,
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
-      if (framed) {
-        Object.assign(card, { frame: data.frame, ability: data.ability || '', artFile: path.join(dir, file) });
-        card.image = cardImage(card);
-      }
+      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', artFile: path.join(dir, file) });
+      // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
+      Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
       return card;
     })
     .filter(Boolean)
