@@ -1,6 +1,6 @@
 <%- include('partials/head') %>
 
-<%# Ganze Geschichte eines Dungeons im Original (Englisch), oben dasselbe Banner wie auf der Dungeon-Seite %>
+<%# Ganze Geschichte eines Dungeons, oben dasselbe Banner wie auf der Dungeon-Seite %>
 <div class="dg-story-page">
   <section class="dg-hero dg-story-hero">
     <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1983" height="793">
@@ -11,19 +11,21 @@
     </div>
   </section>
 
-  <div class="dg-story" lang="en">
-    <% dg.story.forEach((p) => { %><p><%= p %></p><% }) %>
+  <div class="dg-story">
+    <% dg.story.forEach((p) => { const parts = dg.book ? p.split(dg.book) : [p]; %>
+      <p><% parts.forEach((x, i) => { %><%= x %><% if (i < parts.length - 1) { %><em><%= dg.book %></em><% } }) %></p>
+    <% }) %>
   </div>
 
-  <a class="ihk-start-tile dg-start-tile" href="/dungeon">
-    <span class="dg-start-emblem" aria-hidden="true">
-      <svg width="30" height="30" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>
-    </span>
+  <a class="ihk-start-tile dg-start-tile dg-back-tile" href="/dungeon">
+    <span class="ihk-start-arrow" aria-hidden="true">←</span>
     <span class="ihk-start-text">
       <span class="kicker">Der Ruf ist ergangen</span>
       <span class="ihk-start-title">Zurück zum Dungeon</span>
     </span>
-    <span class="ihk-start-arrow" aria-hidden="true">→</span>
+    <span class="dg-start-emblem" aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>
+    </span>
   </a>
 </div>
 

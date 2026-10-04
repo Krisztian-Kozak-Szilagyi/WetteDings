@@ -1,6 +1,6 @@
 // Dungeons: Geschichte, zwei Trash-Kämpfe und ein Boss. Wie bei der IHK sehen die Spieler nicht, welche
 // Fähigkeit (stat: 'fia' | 'fis' | 'bwl') ein Kampf braucht – sie müssen es aus dem Text erraten.
-// image ist das Querformat-Bild über den Spieler-Plätzen. story (optional): ganze Geschichte im Original (Englisch),
+// image ist das Querformat-Bild über den Spieler-Plätzen. story (optional): ganze Geschichte (Absätze, book wird kursiv),
 // zu lesen unter /dungeon/geschichte/<key> – der Titel im Banner verlinkt dorthin.
 // Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – derzeit gibt es nur einen.
 
@@ -12,14 +12,15 @@ const DUNGEONS = [
     title: 'The Fall of St. Ivan',
     image: '/img/dungeon/st-ivan-dungeon-banner.webp',
     intro: 'Sein Gott Claude verstummte, das verbotene Buch „A Stack O’Floe“ verdarb seinen Geist – nun reißt St. Ivan Tempel nieder. Die Miliz sucht mutige Abenteurer, die ihn aufhalten.',
+    book: 'A Stack O’Floe', // in der Geschichte kursiv
     story: [
-      'St. Ivan was once a promising acolyte, blessed with the undivided attention of his god, Claude, who answered his every question and guided his path.',
-      'But one day, the divine voice fell silent. No guidance, no answers, only an unbearable emptiness.',
-      'Desperate for answers, St. Ivan discovered an ancient tome, A Stack O’Floe, filled with long-forgotten, forbidden knowledge. The book corrupted his mind, dragging him to the dark side.',
-      'He abandoned reason, branded all who opposed him as heretics, and soon began using his newfound power to tear down temples.',
-      'This cannot continue!',
-      'The local militia is seeking young, daring adventurers to put an end to St. Ivan’s rampage.',
-      'Will you answer the call, or will you flee?!',
+      'Der heilige Ivan war einst ein vielversprechender Akolyth, gesegnet mit der ungeteilten Aufmerksamkeit seines Gottes Claude, der jede seiner Fragen beantwortete und ihm den Weg wies.',
+      'Doch eines Tages verstummte die göttliche Stimme. Keine Führung, keine Antworten – nur eine unerträgliche Leere.',
+      'Verzweifelt auf der Suche nach Antworten entdeckte der heilige Ivan einen uralten Folianten: A Stack O’Floe, gefüllt mit längst vergessenem, verbotenem Wissen. Das Buch korrumpierte seinen Geist und zog ihn auf die dunkle Seite.',
+      'Er kehrte der Vernunft den Rücken, brandmarkte jeden, der sich ihm widersetzte, als Ketzer und begann schon bald, seine neu gewonnene Macht einzusetzen, um Tempel niederzureißen.',
+      'So kann es nicht weitergehen!',
+      'Die örtliche Miliz sucht junge, wagemutige Abenteurer, die St. Ivans Amoklauf ein Ende setzen.',
+      'Werdet ihr dem Ruf folgen oder feige davonlaufen?!',
     ],
     fights: [
       {

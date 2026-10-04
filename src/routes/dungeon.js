@@ -149,7 +149,7 @@ router.post('/dungeon/anmelden', (req, res) =>
 
 router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS }));
 
-// Ganze Geschichte eines Dungeons (Englisch, Original) – der Titel im Banner verlinkt hierher
+// Ganze Geschichte eines Dungeons – der Titel im Banner verlinkt hierher
 router.get('/dungeon/geschichte/:key', (req, res, next) => {
   const dg = DUNGEONS.find((d) => d.key === req.params.key && d.story);
   if (!dg) return next();
