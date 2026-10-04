@@ -152,7 +152,8 @@
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
     const items = [...box.querySelectorAll('[data-dg-item]')];
     const search = box.querySelector('[data-dg-search]');
-    const rarity = box.querySelector('[data-dg-rarity]');
+    const chips = [...box.querySelectorAll('[data-dg-rar]')];
+    let rarity = '';
     const prev = box.querySelector('[data-dg-prev]');
     const next = box.querySelector('[data-dg-next]');
     const info = box.querySelector('[data-dg-pageinfo]');
@@ -160,7 +161,7 @@
     let pageNo = 0;
     const matches = () => {
       const q = search ? search.value.trim().toLowerCase() : '';
-      const r = rarity ? rarity.value : '';
+      const r = rarity;
       return items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
     };
     function render() {
@@ -182,7 +183,17 @@
     const checked = items.findIndex((it) => it.querySelector('input:checked'));
     if (checked > 0) pageNo = Math.floor(checked / PER_PAGE);
     if (search) search.addEventListener('input', () => { pageNo = 0; render(); });
-    if (rarity) rarity.addEventListener('change', () => { pageNo = 0; render(); });
+    chips.forEach((chip) =>
+      chip.addEventListener('click', () => {
+        rarity = chip.dataset.dgRar;
+        chips.forEach((c) => {
+          c.classList.toggle('active', c === chip);
+          c.setAttribute('aria-selected', c === chip ? 'true' : 'false');
+        });
+        pageNo = 0;
+        render();
+      })
+    );
     prev.addEventListener('click', () => { pageNo--; render(); });
     next.addEventListener('click', () => { pageNo++; render(); });
     render();

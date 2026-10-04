@@ -21,7 +21,6 @@
       <% if (phase === 'laeuft') { %>
         <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>
-        <p class="dg-next" data-dg-next hidden></p>
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
         <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
@@ -35,6 +34,7 @@
       <ol class="dg-steps" aria-label="Kämpfe">
         <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
       </ol>
+      <p class="dg-next" data-dg-next hidden></p>
       <div class="dg-bars" data-dg-bars hidden>
         <div class="dg-bar is-progress">
           <span class="dg-bar-label">Fortschritt</span>
@@ -64,15 +64,17 @@
           </div>
           <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %></span>
           <span class="dg-slot-stats"><%= statLine(s.card) %></span>
-          <%# Boost-Karte: für alle Spieler gleich sichtbar %>
-          <% if (s.boost) { %>
-            <button type="button" class="dg-slot-boostrow" <%- zoomAttrs(s.boost) %> aria-label="Boost <%= s.boost.name %> vergrößern">
-              <img src="<%= s.boost.image %>" alt="" width="720" height="1008" loading="lazy">
-              <span><span class="dg-boost-kicker">Boost</span><%= s.boost.name %></span>
-            </button>
-          <% } else { %>
-            <div class="dg-slot-boostrow is-none"><span><span class="dg-boost-kicker">Boost</span>keiner</span></div>
-          <% } %>
+          <%# Boost-Karte: eigener kleiner Kartenplatz unter dem Charakter, für alle Spieler gleich %>
+          <div class="dg-boost<%= s.boost ? ' r-' + s.boost.rarity : ' is-none' %>">
+            <span class="dg-boost-label">Boost</span>
+            <% if (s.boost) { %>
+              <button type="button" class="dg-boost-card" <%- zoomAttrs(s.boost) %> aria-label="Boost <%= s.boost.name %> vergrößern"><img src="<%= s.boost.image %>" alt="" width="720" height="1008" loading="lazy"></button>
+              <span class="dg-boost-name"><%= s.boost.name %></span>
+            <% } else { %>
+              <span class="dg-boost-card dg-boost-empty"></span>
+              <span class="dg-boost-name muted">kein Boost</span>
+            <% } %>
+          </div>
         </div>
       <% } else if (s.invited) { %>
         <div class="dg-slot is-empty is-invited">
@@ -131,15 +133,21 @@
     <div class="dg-pick-head">
       <h3 class="dg-pick-sub"><%= kind === 'card' ? 'Charakter' : 'Boost (Booster-Karte)' %></h3>
       <% if (list.length) { %>
-        <div class="dg-pick-tools">
+        <label class="dg-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
           <input type="search" data-dg-search placeholder="Karte suchen …" aria-label="<%= kind === 'card' ? 'Charakter' : 'Boost-Karte' %> suchen" autocomplete="off">
-          <select data-dg-rarity aria-label="Seltenheit">
-            <option value="">Alle Seltenheiten</option>
-            <% rars.forEach((r) => { %><option value="<%= r %>"><%= rarityByKey[r].label %></option><% }) %>
-          </select>
-        </div>
+        </label>
       <% } %>
     </div>
+    <% if (list.length) { %>
+      <%# Seltenheits-Filter wie im Album; Zahl = wählbare Karten dieser Seltenheit %>
+      <div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
+        <button type="button" class="chip active" data-dg-rar="" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<span class="chip-count"><%= list.length %></span></button>
+        <% Object.values(rarityByKey).filter((r) => !r.hidden || rars.includes(r.key)).sort((a, b) => a.rank - b.rank).forEach((r) => { %>
+          <button type="button" class="chip r-<%= r.key %>" data-dg-rar="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %><span class="chip-count"><%= list.filter((c) => c.rarity === r.key).length %></span></button>
+        <% }) %>
+      </div>
+    <% } %>
     <div class="dg-pick-pager">
       <button type="button" class="dg-page-btn" data-dg-prev aria-label="Vorherige Seite" hidden>‹</button>
       <div class="dg-pick-grid">
