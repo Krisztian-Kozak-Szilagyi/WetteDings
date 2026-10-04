@@ -10,6 +10,7 @@
     : { cls: '', label: 'Neutral' };
 %>
 
+<a class="bx-back" href="/broker">← Alle Werte</a>
 <nav class="asset-tabs" aria-label="Werte im Broker">
   <% assets.forEach((a) => { %>
     <a class="asset-tab <%= a.active ? 'active' : '' %>" href="<%= a.path %>" <%= a.active ? 'aria-current=page' : '' %>>

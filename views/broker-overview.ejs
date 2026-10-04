@@ -1,0 +1,74 @@
+<%- include('partials/head') %>
+<%
+  const owned = rows.filter((r) => r.value > 0).length;
+  const mark = (r) => r.symbol === 'SAM'
+    ? '<img class="bx-mark-img" src="/img/sam-coin.svg?v=' + assetVersion + '" alt="" width="36" height="36">'
+    : '<span class="asset-mark bx-mark asset-mark-' + r.symbol.toLowerCase() + '" aria-hidden="true">' + (r.symbol === 'BTCG' ? 'B·TCG' : r.symbol) + '</span>';
+%>
+
+<div class="bx-head">
+  <h1>Broker</h1>
+  <span class="live"><span class="live-dot"></span> Live · Kurse alle 5 Sekunden</span>
+</div>
+
+<div class="bx-filters" role="toolbar" aria-label="Filter">
+  <button type="button" class="chip active" data-bx-filter="alle" aria-pressed="true">Alle</button>
+  <button type="button" class="chip" data-bx-filter="depot" aria-pressed="false">Mein Depot<% if (owned) { %> <span class="chip-count"><%= owned %></span><% } %></button>
+  <button type="button" class="chip" data-bx-filter="coin" aria-pressed="false">Coins</button>
+  <button type="button" class="chip" data-bx-filter="etf" aria-pressed="false">ETFs</button>
+</div>
+
+<div class="bx-table" data-bx-table>
+  <div class="bx-row bx-row-head" aria-hidden="true">
+    <span>Markt</span>
+    <span class="num">Änderung 24 h</span>
+    <span class="bx-col-spark"></span>
+    <span class="num">Kurs</span>
+    <span class="num bx-col-depot">Dein Depot</span>
+    <span class="bx-col-range">52-Wochen-Spanne</span>
+    <span class="bx-col-sent" title="Anteil der Käufe an allen Trades der letzten <%= sentimentDays %> Tage">Sentiment</span>
+  </div>
+
+  <% rows.forEach((r) => { const up = r.change24h >= 0; %>
+    <a class="bx-row" href="<%= r.path %>" data-bx-row data-symbol="<%= r.symbol %>" data-kind="<%= r.kind %>" data-owned="<%= r.value > 0 ? 1 : 0 %>">
+      <span class="bx-market">
+        <%- mark(r) %>
+        <span class="bx-names"><strong><%= r.symbol %></strong><span><%= r.name %></span></span>
+        <% if (r.kind === 'etf') { %><span class="asset-kind">ETF</span><% } %>
+      </span>
+      <span class="num bx-change <%= up ? 'pos' : 'neg' %>" data-bx-change>
+        <strong><%= (up ? '+' : '−') + coinPrice(Math.abs(r.changeAbs)) %></strong>
+        <small><%= up ? '▲' : '▼' %> <%= signedPercent(r.change24h) %></small>
+      </span>
+      <span class="bx-col-spark">
+        <% if (r.spark) { %>
+          <svg class="bx-spark <%= up ? 'up' : 'down' %>" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="<%= r.spark %>"/></svg>
+        <% } %>
+      </span>
+      <span class="num"><span class="bx-price" data-bx-price><%= coinPrice(r.price) %></span></span>
+      <span class="num bx-col-depot">
+        <% if (r.value > 0) { %>
+          <span class="bx-depot"><%= euro(r.value) %></span>
+          <small class="<%= r.pl > 0 ? 'pos' : r.pl < 0 ? 'neg' : 'muted' %>"><%= (r.pl > 0 ? '+' : '') + euro(r.pl) %></small>
+        <% } else { %><span class="muted">–</span><% } %>
+      </span>
+      <span class="bx-col-range">
+        <span class="bx-range-nums"><span><%= coinPrice(r.lo) %></span><span><%= coinPrice(r.hi) %></span></span>
+        <span class="bx-range-bar"><span class="bx-range-pin" style="--pos: <%= (r.pos * 100).toFixed(1) %>%"></span></span>
+      </span>
+      <span class="bx-col-sent">
+        <% if (r.buyShare === null) { %>
+          <span class="bx-sent-label muted">Noch keine Trades</span>
+          <span class="bx-sent-bar"></span>
+        <% } else { const buy = Math.round(r.buyShare * 100); %>
+          <span class="bx-sent-label"><strong><%= buy %> %</strong> kaufen</span>
+          <span class="bx-sent-bar has-trades" title="<%= r.trades %> Trades in den letzten <%= sentimentDays %> Tagen: <%= buy %> % Käufe, <%= 100 - buy %> % Verkäufe"><span style="--w: <%= buy %>%"></span></span>
+        <% } %>
+      </span>
+    </a>
+  <% }) %>
+  <p class="bx-empty muted" data-bx-empty hidden>Du hast noch nichts im Depot.</p>
+</div>
+
+<script src="/js/broker-list.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

@@ -4265,3 +4265,57 @@ a.dg-start-tile:hover { color: var(--text); }
 .etf-mood strong { font-weight: 500; }
 .etf-mood.pos strong { color: var(--ja); }
 .etf-mood.neg strong { color: var(--nein); }
+
+/* Broker-Übersicht: Liste aller Werte (wie bei einem Broker) */
+.bx-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.bx-head h1 { margin: 0; font-size: clamp(28px, 1.3rem + 1.4vw, 36px); }
+.bx-head .live { font-size: 12px; color: var(--color-neutral-400); }
+.bx-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.bx-filters .chip { height: 32px; min-height: 0; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
+.bx-filters .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-accent-700); }
+.bx-table { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
+.bx-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) minmax(100px, .9fr) 130px minmax(100px, .9fr) minmax(110px, .9fr) minmax(150px, 1.2fr) minmax(150px, 1.2fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
+.bx-row:last-of-type { border-bottom: 0; }
+a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transparent); text-decoration: none; }
+.bx-row[hidden] { display: none; }
+.bx-row-head { padding-top: 14px; padding-bottom: 10px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.bx-row .num { text-align: right; }
+.bx-market { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.bx-mark-img, .bx-mark { width: 36px; height: 36px; flex: none; }
+.asset-mark.bx-mark { font-size: 10px; }
+.asset-mark-btcg.bx-mark { border-radius: 9px; font-size: 8px; }
+.bx-names { display: flex; flex-direction: column; min-width: 0; }
+.bx-names strong { font-size: 14px; letter-spacing: .02em; }
+.bx-names span { font-size: 12px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bx-market .asset-kind { margin-left: auto; padding: 2px 6px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.bx-change { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.bx-change strong { font-size: 15px; font-weight: 500; }
+.bx-change small { font-size: 11px; }
+.bx-spark { display: block; width: 100%; height: 32px; overflow: visible; }
+.bx-spark path { fill: none; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.bx-spark.up path { stroke: var(--ja); }
+.bx-spark.down path { stroke: var(--nein); }
+.bx-price { display: inline-block; padding: 8px 14px; min-width: 100%; border-radius: 999px; font-size: 14px; font-weight: 500; text-align: right; background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.bx-col-depot { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.bx-depot { font-weight: 500; }
+.bx-col-depot small { font-size: 11px; }
+.bx-range-nums { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-neutral-300); }
+.bx-range-bar { position: relative; display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--color-neutral-800); }
+.bx-range-pin { position: absolute; top: -4px; left: var(--pos); width: 0; height: 0; transform: translateX(-5px); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--color-accent-300); }
+.bx-sent-label { display: block; font-size: 12px; color: var(--color-neutral-400); }
+.bx-sent-label strong { font-weight: 500; color: var(--text); }
+.bx-sent-bar { position: relative; display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
+.bx-sent-bar.has-trades { background: color-mix(in srgb, var(--nein) 55%, transparent); }
+.bx-sent-bar > span { position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: 3px; background: var(--ja); }
+.bx-empty { padding: 18px; margin: 0; }
+.bx-back { display: inline-block; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
+@media (max-width: 1100px) {
+  .bx-row { grid-template-columns: minmax(160px, 1.6fr) minmax(90px, .9fr) 100px minmax(100px, .9fr) minmax(140px, 1.2fr); }
+  .bx-col-depot, .bx-col-range { display: none; }
+}
+@media (max-width: 700px) {
+  .bx-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; padding: 12px 14px; }
+  .bx-row-head { display: none; }
+  .bx-col-spark, .bx-col-sent, .bx-market .asset-kind { display: none; }
+  .bx-price { min-width: 0; padding: 6px 10px; font-size: 13px; }
+}

@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
-const { CoinTrade } = require('../models/Coin');
+const { CoinTrade, CoinHour } = require('../models/Coin');
 const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
 const { str, parseEuro, UserError } = require('../lib/util');
@@ -11,7 +11,10 @@ const RANGES = ['1h', '24h', '7d', '30d', 'all'];
 
 /** Engine zum Symbol aus URL oder Formular (nur aus der festen Liste), sonst null */
 const marketOf = (value) => markets.get(String(value || '').toUpperCase());
-const pathOf = (engine) => (engine.SYMBOL === 'SAM' ? '/broker' : `/broker/${engine.SYMBOL.toLowerCase()}`);
+const pathOf = (engine) => `/broker/${engine.SYMBOL.toLowerCase()}`;
+const DAY = 24 * 60 * 60 * 1000;
+const SENTIMENT_DAYS = 7; // Sentiment: Anteil der Käufe an allen Trades der letzten 7 Tage
+const SPARK_POINTS = 48;
 
 // Früher hieß der Broker "Coin Exchange": alte Links und Lesezeichen weiterleiten
 router.get(/^\/coin-exchange(\/.*)?$/, (req, res) => res.redirect(301, '/broker'));
@@ -49,7 +52,62 @@ async function page(req, res, engine) {
   });
 }
 
-router.get('/broker', (req, res) => page(req, res, markets.get('SAM')));
+/** Sparkline-Pfad (SVG, 120×32) aus [[t, Kurs], …] */
+function sparkPath(points) {
+  if (points.length < 2) return '';
+  const step = Math.max(1, Math.floor(points.length / SPARK_POINTS));
+  const pts = points.filter((p, i) => i % step === 0 || i === points.length - 1).map((p) => p[1]);
+  const lo = Math.min(...pts);
+  const hi = Math.max(...pts);
+  const span = hi - lo || 1;
+  return pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 120).toFixed(1)},${(30 - ((v - lo) / span) * 28).toFixed(1)}`).join(' ');
+}
+
+/** Übersicht aller Werte (Liste wie bei einem Broker) */
+async function overview(req, res) {
+  const yearAgo = new Date(Date.now() - 365 * DAY);
+  const [holdings, ranges, sides, histories] = await Promise.all([
+    trade.getHoldings(req.user._id),
+    CoinHour.aggregate([{ $match: { t: { $gte: yearAgo } } }, { $group: { _id: '$coin', lo: { $min: '$l' }, hi: { $max: '$h' } } }]),
+    CoinTrade.aggregate([
+      { $match: { createdAt: { $gte: new Date(Date.now() - SENTIMENT_DAYS * DAY) } } },
+      { $group: { _id: { coin: '$coin', side: '$side' }, n: { $sum: 1 } } },
+    ]),
+    Promise.all(markets.LIST.map((e) => e.history('24h'))),
+  ]);
+  const rows = markets.LIST.map((e, i) => {
+    const s = e.snapshot();
+    const r = ranges.find((x) => x._id === e.SYMBOL);
+    const lo = Math.min(r ? r.lo : s.price, s.price);
+    const hi = Math.max(r ? r.hi : s.price, s.price);
+    const count = (side) => (sides.find((x) => x._id.coin === e.SYMBOL && x._id.side === side) || { n: 0 }).n;
+    const buys = count('kauf');
+    const total = buys + count('verkauf');
+    const h = holdings[e.SYMBOL];
+    const value = trade.valueCents(h.units, s.price);
+    return {
+      ...s,
+      path: pathOf(e),
+      spark: sparkPath(histories[i]),
+      changeAbs: s.price - s.price / (1 + s.change24h),
+      lo,
+      hi,
+      pos: hi > lo ? (s.price - lo) / (hi - lo) : 0.5,
+      buyShare: total ? buys / total : null,
+      trades: total,
+      value,
+      pl: h.units ? value - h.costCents : null,
+    };
+  });
+  res.render('broker-overview', { title: 'Broker', rows, sentimentDays: SENTIMENT_DAYS });
+}
+
+router.get('/broker/api/uebersicht', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(markets.LIST.map((e) => e.snapshot()));
+});
+
+router.get('/broker', overview);
 
 // ---------- JSON für die Live-Ansicht ----------
 
@@ -69,7 +127,6 @@ router.get('/broker/api/verlauf', async (req, res) => {
 router.get('/broker/:wert', (req, res, next) => {
   const engine = marketOf(req.params.wert);
   if (!engine) return next();
-  if (engine.SYMBOL === 'SAM') return res.redirect('/broker');
   return page(req, res, engine);
 });
 
