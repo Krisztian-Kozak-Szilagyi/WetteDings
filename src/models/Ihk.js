@@ -35,6 +35,8 @@ const runSchema = new Schema(
 // Pro Nutzer höchstens eine laufende Quest
 runSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { status: 'laeuft' } });
 runSchema.index({ user: 1, day: 1 });
+runSchema.index({ createdAt: -1 }); // Protokolle: alle Quests, neueste zuerst
+runSchema.index({ user: 1, createdAt: -1 });
 
 // Die drei angebotenen Quests pro Nutzer (zufällig, jede Schwierigkeit höchstens einmal)
 const stateSchema = new Schema({

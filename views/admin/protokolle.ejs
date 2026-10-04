@@ -1,57 +1,207 @@
 <%
-  const logLink = (extra) => panelUrl('protokolle', 'handellog', { ...(trades.q ? { handelsuche: trades.q } : {}), ...(trades.onlySuspicious ? { verdacht: '1' } : {}), ...extra });
+  const playerQ = player.q;
+  const playerMissing = !!(playerQ && !player.user);
+  const data = log ? log.data : null;
+  const current = logs.find((l) => l.key === logKey);
+  // Adresse im Protokoll-Reiter: Spieler-Filter und gewählter Log bleiben erhalten
+  const logUrl = (extra = {}, key = logKey) => panelUrl('protokolle', 'protokoll', { log: key, ...(playerQ ? { spieler: playerQ } : {}), ...extra });
+  const handelLink = (extra) => logUrl({ ...(data && data.q ? { handelsuche: data.q } : {}), ...(data && data.onlySuspicious ? { verdacht: '1' } : {}), ...extra });
+  // Seiten blättern (jeder Log hat seinen eigenen Seiten-Parameter)
+  const pager = (d, link) => d.pages > 1
+    ? `<div class="log-pager">${d.page > 1 ? `<a class="btn btn-ghost btn-sm" href="${link({ [current.page]: d.page - 1 })}">← Neuere</a>` : ''}<span class="muted small">Seite ${d.page} / ${d.pages}</span>${d.page < d.pages ? `<a class="btn btn-ghost btn-sm" href="${link({ [current.page]: d.page + 1 })}">Ältere →</a>` : ''}</div>`
+    : '';
+  const countLine = (d, one, many) => `${d.total} ${d.total === 1 ? one : many}${player.user ? ' von ' + player.user.username : ''} · Seite ${d.page} von ${d.pages}`;
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Kartenliste: "2× Name (Seltenheit)", seltene ab Holo hervorgehoben
+  const cardList = (items) => items.length
+    ? items.map((c) => `<span class="nowrap">${c.count > 1 ? c.count + '× ' : ''}${c.rare ? '<strong>' + esc(c.label) + '</strong>' : esc(c.label)}</span>`).join(', ')
+    : '<span class="muted">–</span>';
+  const signedEuro = (c) => `<span class="${c < 0 ? 'neg' : 'pos'}">${c > 0 ? '+' : ''}${euro(c)}</span>`;
 %>
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#handellog">Handel-Log</a><a href="#packlog">Vergabe-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
+  <a href="#protokoll">Protokolle</a><a href="#packlog">Vergabe-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
 </nav>
 
-<section class="stats-block" id="handellog">
-  <%- blockHead('Handel-Log' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Alle abgeschlossenen Geschäfte, neueste zuerst: wer wem welche Karte gegeben hat, was zurückkam und wann. „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.') %>
+<section class="stats-block" id="protokoll">
+  <%- blockHead('Protokolle' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Was im Spiel passiert ist, neueste Einträge zuerst: Handel, geöffnete Packs samt gezogener Karten, Verkäufe an die Bank und Black-Market-Käufe, IHK-Quests und Dungeons. Mit einem Spielernamen siehst du nur dessen Einträge.') %>
   <div class="card">
-    <form method="get" action="/admin#handellog" class="leader-search" role="search">
+    <form method="get" action="/admin#protokoll" class="leader-search" role="search">
       <input type="hidden" name="bereich" value="protokolle">
-      <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
-      <input type="search" id="handel-suche" name="handelsuche" value="<%= trades.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
-      <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= trades.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
-      <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
-      <% if (trades.q || trades.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'handellog') %>">Alle</a><% } %>
+      <input type="hidden" name="log" value="<%= logKey %>">
+      <label class="sr-only" for="log-spieler">Spieler</label>
+      <input type="search" id="log-spieler" name="spieler" value="<%= playerQ %>" maxlength="40" placeholder="Spielername (leer = alle) …">
+      <button class="btn btn-ghost btn-sm" type="submit">Filtern</button>
+      <% if (playerQ) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: logKey }) %>">Alle Spieler</a><% } %>
     </form>
-    <p class="muted small"><%= trades.total %> <%= trades.total === 1 ? 'Geschäft' : 'Geschäfte' %><%= trades.onlySuspicious ? ' zwischen Mehrfach-Konten' : '' %><%= trades.q ? ' für „' + trades.q + '“' : '' %> · Seite <%= trades.page %> von <%= trades.pages %></p>
-    <% if (!trades.rows.length) { %>
-      <p class="muted"><%= trades.q ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
-    <% } else { %>
-      <div class="table-wrap">
-        <table class="table trade-log">
-          <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Karte</th><th>Gegenleistung</th><th>Art</th></tr></thead>
-          <tbody>
-            <% trades.rows.forEach((t) => { %>
-              <tr class="<%= t.flagged ? 'trade-flagged' : '' %>">
-                <td class="nowrap"><%= dateSec(t.at) %><% if (t.flagged) { %><br><span class="badge trade-flag" title="Beide Konten werden vom selben Gerät aus benutzt">Mehrfach-Konto</span><% } %><% if (t.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
-                <td><%- userLink(t.from, { realName: false }) %></td>
-                <td><%- userLink(t.to, { realName: false }) %></td>
-                <td><%= t.card %></td>
-                <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
-                <td class="nowrap"><%= t.kind %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+    <% if (playerMissing) { %>
+      <p class="muted">Es gibt kein Mitglied „<%= playerQ %>“. Bitte den genauen Namen eingeben.</p>
+    <% } else if (player.user) { %>
+      <p class="muted small">Nur Einträge von <%- userLink(player.user.username, { realName: false }) %> · <a href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(player.user.username) %>">Statistik</a> · <a href="/admin/pack-log?suche=<%= encodeURIComponent(player.user.username) %>">Vergaben</a></p>
     <% } %>
-    <% if (trades.pages > 1) { %>
-      <div class="log-pager">
-        <% if (trades.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= logLink({ handelseite: trades.page - 1 }) %>">← Neuere</a><% } %>
-        <span class="muted small">Seite <%= trades.page %> / <%= trades.pages %></span>
-        <% if (trades.page < trades.pages) { %><a class="btn btn-ghost btn-sm" href="<%= logLink({ handelseite: trades.page + 1 }) %>">Ältere →</a><% } %>
-      </div>
+    <nav class="stats-subnav log-tabs" aria-label="Protokolle">
+      <% logs.forEach((l) => { %>
+        <a href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
+      <% }) %>
+    </nav>
+
+    <% if (data && logKey === 'handel') { %>
+      <p class="muted small">Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.</p>
+      <form method="get" action="/admin#protokoll" class="leader-search" role="search">
+        <input type="hidden" name="bereich" value="protokolle">
+        <input type="hidden" name="log" value="handel">
+        <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
+        <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
+        <input type="search" id="handel-suche" name="handelsuche" value="<%= data.q %>" maxlength="40" placeholder="Name oder Karte suchen …">
+        <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= data.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
+        <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
+        <% if (data.q || data.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= logUrl() %>">Alle</a><% } %>
+      </form>
+      <p class="muted small"><%= countLine(data, 'Geschäft', 'Geschäfte') %><%= data.onlySuspicious ? ' · nur Mehrfach-Konten' : '' %><%= data.q ? ' · Suche „' + data.q + '“' : '' %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted"><%= data.q || player.user ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Karte</th><th>Gegenleistung</th><th>Art</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((t) => { %>
+                <tr class="<%= t.flagged ? 'trade-flagged' : '' %>">
+                  <td class="nowrap"><%= dateSec(t.at) %><% if (t.flagged) { %><br><span class="badge trade-flag" title="Beide Konten werden vom selben Gerät aus benutzt">Mehrfach-Konto</span><% } %><% if (t.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
+                  <td><%- userLink(t.from, { realName: false }) %></td>
+                  <td><%- userLink(t.to, { realName: false }) %></td>
+                  <td><%= t.card %></td>
+                  <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
+                  <td class="nowrap"><%= t.kind %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, handelLink) %>
+
+    <% } else if (data && logKey === 'packs') { %>
+      <p class="muted small">Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.</p>
+      <p class="muted small"><%= countLine(data, 'Pack', 'Packs') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine geöffneten Packs.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Pack</th><th>Gezogene Karten</th><th>Beste</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((o) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(o.at) %></td>
+                  <td><%- userLink(o.player, { realName: false }) %></td>
+                  <td><%= o.pack %><br><span class="muted small"><%= o.source %><%= o.cost ? ' · ' + euro(o.cost) : '' %></span></td>
+                  <td><%- cardList(o.cards) %></td>
+                  <td class="nowrap"><%= o.best || '–' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'verkauf') { %>
+      <p class="muted small">Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.</p>
+      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Verkäufe.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Spieler</th><th>Art</th><th>Karten / Gegenstände</th><th class="num">Betrag</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((l) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(l.at) %></td>
+                  <td><%- userLink(l.player, { realName: false }) %></td>
+                  <td class="nowrap"><%= l.kind %></td>
+                  <td><%- cardList(l.items) %></td>
+                  <td class="num nowrap"><%- signedEuro(l.amount) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'ihk') { %>
+      <p class="muted small">Jede gestartete IHK-Quest mit eingesetzten Karten, Ergebnis, Lohn und Pack-Fund. Bei laufenden Quests steht das Ergebnis schon fest, wird hier aber erst nach Ablauf gezeigt.</p>
+      <p class="muted small"><%= countLine(data, 'Quest', 'Quests') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine IHK-Quests.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Gestartet</th><th>Spieler</th><th>Quest</th><th>Karten</th><th>Ergebnis</th><th class="num">Lohn</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((r) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(r.at) %></td>
+                  <td><%- userLink(r.player, { realName: false }) %></td>
+                  <td><%= r.quest %><br><span class="muted small"><%= r.difficulty %></span></td>
+                  <td><%= r.card %><% if (r.boosts.length) { %><br><span class="muted small">Boost: <%= r.boosts.join(', ') %></span><% } %></td>
+                  <td class="nowrap">
+                    <% if (r.state === 'laeuft') { %><span class="badge badge-wartend">Läuft</span><br><span class="muted small">bis <%= dateSec(r.endsAt) %></span>
+                    <% } else { %><span class="badge <%= r.state === 'geschafft' ? 'badge-entschieden' : 'badge-streitig' %>"><%= r.state === 'geschafft' ? 'Geschafft' : 'Gescheitert' %></span><% if (r.pack) { %><br><span class="muted small">+ <%= r.pack %></span><% } %><% } %>
+                  </td>
+                  <td class="num nowrap"><%= r.state === 'laeuft' ? '–' : r.reward ? euro(r.reward) : '–' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'dungeon') { %>
+      <p class="muted small">Jeder Dungeon-Durchlauf mit Gruppe, eingesetzten Karten und Beute je Spieler. Bots sind kursiv<%= player.user ? ', der gesuchte Spieler ist fett' : '' %>.</p>
+      <p class="muted small"><%= countLine(data, 'Durchlauf', 'Durchläufe') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Dungeon-Durchläufe.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Gestartet</th><th>Dungeon</th><th>Ergebnis</th><th>Gruppe und Beute</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((r) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(r.startedAt) %></td>
+                  <td><%= r.dungeon %></td>
+                  <td class="nowrap">
+                    <% if (r.running) { %><span class="badge badge-wartend">Läuft</span><br><span class="muted small">bis <%= dateSec(r.at) %></span>
+                    <% } else { %><span class="badge <%= r.success ? 'badge-entschieden' : 'badge-streitig' %>"><%= r.success ? 'Boss besiegt' : 'Rückzug' %></span><br><span class="muted small"><%= r.progress %> Kämpfe<%= r.failedAt ? ' · gescheitert an ' + r.failedAt : '' %></span><% } %>
+                  </td>
+                  <td>
+                    <% r.members.forEach((m) => {
+                      const loot = [m.reward ? euro(m.reward) : null, m.foil ? 'Folie' : null, m.bossCard ? 'Boss-Karte' : null].filter(Boolean); %>
+                      <div>
+                        <% if (m.bot) { %><em><%= m.name %></em> <span class="muted small">(Bot)</span><% } else if (m.highlight) { %><strong><%- userLink(m.name, { realName: false }) %></strong><% } else { %><%- userLink(m.name, { realName: false }) %><% } %><%= m.leader ? ' ★' : '' %>
+                        <span class="muted small">– <%= m.card %><%= m.boost ? ' + ' + m.boost : '' %></span>
+                        <% if (!m.bot && !r.running) { %><span class="small"> · <%= loot.length ? loot.join(', ') : 'keine Beute' %></span><% } %>
+                      </div>
+                    <% }) %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
     <% } %>
   </div>
 </section>
 
 <section class="stats-block" id="packlog">
   <%- blockHead('Vergabe-Log' + (packLogNew ? ` <span class="panel-badge panel-badge-inline">${packLogNew} neu</span>` : ''), 'Jede Vergabe von Booster Packs und Karten durch Admin oder Devs – auch „Bless everyone“: wer, wem, was, wie viele und wann, mit Suche.') %>
-  <a class="card panel-link-card" href="/admin/pack-log">
+  <a class="card panel-link-card" href="/admin/pack-log<%= player.user ? '?suche=' + encodeURIComponent(player.user.username) : '' %>">
     <%- icon('list') %>
     <div><strong>Vergabe-Log öffnen</strong><span class="muted small"><%= packLogNew ? packLogNew + ' neue Vergaben seit deinem letzten Blick' : 'Alle Vergaben, neueste zuerst' %></span></div>
     <span aria-hidden="true">→</span>

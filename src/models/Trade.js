@@ -51,6 +51,7 @@ const tradeSchema = new Schema(
 tradeSchema.index({ status: 1, kind: 1, expiresAt: 1 });
 tradeSchema.index({ to: 1, status: 1 });
 tradeSchema.index({ seller: 1, status: 1 });
+tradeSchema.index({ buyer: 1, closedAt: -1 }); // Protokolle: Geschäfte eines Spielers
 // Ein Exemplar kann nur in einem offenen Angebot stecken
 tradeSchema.index({ cardDoc: 1 }, { unique: true, partialFilterExpression: { status: 'offen' } });
 
