@@ -455,6 +455,12 @@ async function playersSection(p, now = new Date()) {
       ],
       charts: [{ id: 'dau', title: 'Aktive Mitglieder je Tag', type: 'line', unit: 'number', agg: 'avg', wide: true, series: [{ name: 'Aktiv', values: byDays(p.days, activeByDay) }] }],
       heat: playerDays ? { rows: heat, max: Math.max(1, ...heat.flat()) } : null,
+      hbars: {
+        title: 'Genutzte Bereiche',
+        items: Object.entries(areas)
+          .sort((a, b) => b[1] - a[1])
+          .map(([key, n]) => ({ key, share: pct(n, areaTotal), text: `${n} · ${Math.round(pct(n, areaTotal) * 100)} %` })),
+      },
       notes: activity.length ? [] : ['Aktivitätsdaten werden erst seit dem Statistik-Update gesammelt – die Werte füllen sich ab jetzt Tag für Tag.'],
     },
     {
@@ -463,17 +469,6 @@ async function playersSection(p, now = new Date()) {
       question: 'Kommen neue Mitglieder dazu – und bleiben sie?',
       kpis: [{ id: 'neu', label: 'Neue Mitglieder', value: cohortUsers.length, unit: 'count', compare: true }, retKpi(d1, 'ret1'), retKpi(d7, 'ret7'), retKpi(d30, 'ret30')],
       charts: [{ id: 'neu', title: 'Registrierungen', type: 'bars', unit: 'count', agg: 'sum', wide: true, series: [{ name: 'Registrierungen', values: byDays(p.days, toMap(signups)) }] }],
-    },
-    {
-      id: 'bereiche',
-      title: 'Bereichsnutzung',
-      question: 'Welche Bereiche werden genutzt?',
-      hbars: {
-        items: Object.entries(areas)
-          .sort((a, b) => b[1] - a[1])
-          .map(([key, n]) => ({ key, share: pct(n, areaTotal), text: `${n} · ${Math.round(pct(n, areaTotal) * 100)} %` })),
-      },
-      notes: areaTotal ? [] : ['Noch keine Daten im Zeitraum.'],
     },
   ];
 }
@@ -588,13 +583,16 @@ async function tcg(p, now = new Date()) {
     {
       id: 'handel',
       title: 'Handel',
-      question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank?',
+      question: 'Wird gehandelt – und zu welchen Preisen im Vergleich zur Bank? Dazu der Black Market (Angebote der Bank, Umsatz verlässt das Spiel).',
       kpis: [
         { id: 'angebote', label: 'Neue Angebote', value: created, unit: 'count', compare: true },
         { id: 'abschluesse', label: 'Abgeschlossene Handelsgeschäfte', value: closed, unit: 'count', compare: true },
         { id: 'abschlussquote', label: 'Abschlussquote', value: pct(closed, created), unit: 'percent', compare: true },
         { id: 'handelsumsatz', label: 'Handelsumsatz', value: sumBy(trades, 'volume'), unit: 'euro', compare: true, hint: 'Kaufpreise und Aufpreise' },
         { id: 'steuer', label: 'Steuer', value: sumBy(trades, 'tax'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
+        { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
+        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
+        { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
       ],
       hbars: {
         title: 'Abschlussquote je Art',
@@ -616,16 +614,6 @@ async function tcg(p, now = new Date()) {
         },
       ],
       notes: created ? [] : ['Keine Handelsangebote im Zeitraum.'],
-    },
-    {
-      id: 'blackmarket',
-      title: 'Black Market',
-      question: 'Wird der Black Market angenommen?',
-      kpis: [
-        { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
-        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
-        { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
-      ],
     },
   ];
 }
@@ -816,16 +804,12 @@ async function games(p) {
 const OVERVIEW_KPIS = [
   ['spieler', 'aktiv-tag'],
   ['spieler', 'neu'],
-  ['spieler', 'ret7'],
   ['wirtschaft', 'zufluss'],
-  ['wirtschaft', 'zufluss-spieler'],
   ['wirtschaft', 'gini'],
   ['tcg', 'rueckfluss'],
-  ['tcg', 'abschluesse'],
+  ['tcg', 'handelsumsatz'],
   ['spiele', 'einsaetze'],
   ['spiele', 'ihk-erfolg'],
-  ['spiele', 'coin-netto'],
-  ['spiele', 'topf'],
 ];
 
 async function overview(p, now) {
@@ -864,6 +848,28 @@ const LOADERS = {
   mitglied: (p, now, opts) => require('./memberStats').member(p, now, opts),
 };
 
+// Kernzahlen je Reiter: groß oben auf der Seite, alle übrigen kompakt in ihren Blöcken
+const PRIMARY = {
+  uebersicht: OVERVIEW_KPIS.map(([, id]) => id),
+  wirtschaft: ['zufluss', 'vermoegen', 'gini', 'median'],
+  spieler: ['aktiv-tag', 'aktiv-30', 'neu', 'ret7'],
+  tcg: ['rueckfluss', 'pack-umsatz', 'handelsumsatz', 'abschlussquote'],
+  spiele: ['einsaetze', 'ihk-erfolg', 'coin-netto', 'topf'],
+  mitglied: ['m-vermoegen', 'm-rang', 'm-zufluss', 'm-tage'],
+};
+// Ist mehr gut (up) oder schlecht (down)? Ohne Eintrag: neutral (z. B. Geldmenge, Preise)
+const GOOD_UP = new Set(['mitglieder', 'aktiv-tag', 'aktiv-7', 'aktiv-30', 'aufrufe', 'aktionen', 'neu', 'ret1', 'ret7', 'ret30', 'vermoegen', 'median', 'geoeffnet', 'pack-umsatz', 'angebote', 'abschluesse', 'abschlussquote', 'handelsumsatz', 'bm-quote', 'bm-umsatz', 'wetten-neu', 'einsaetze', 'teilnehmer', 'duelle', 'tipps', 'ihk-laeufe', 'ihk-erfolg', 'coin-haendler', 'runden', 'topf', 'lose', 'lotto-teilnehmer', 'm-vermoegen', 'm-guthaben', 'm-zufluss', 'm-tage', 'm-aufrufe', 'm-aktionen', 'm-logins', 'm-wett-ergebnis', 'm-rendite', 'm-trefferquote', 'm-glueck', 'm-ihk-erfolg', 'm-coin-netto']);
+const GOOD_DOWN = new Set(['gini', 'top10', 'streitfaelle', 'verfallen', 'ungeoeffnet', 'm-rang']);
+
+/** Kennzahl markieren: primary (Kernzahl), good (Richtung), tone der Veränderung ('good' | 'bad' | null) */
+function rate(k, key) {
+  k.primary = (PRIMARY[key] || []).includes(k.id);
+  k.good = GOOD_UP.has(k.id) ? 'up' : GOOD_DOWN.has(k.id) ? 'down' : null;
+  const dir = k.delta && k.delta.dir;
+  k.tone = k.good && (dir === 'up' || dir === 'down') ? (dir === k.good ? 'good' : 'bad') : null;
+  return k;
+}
+
 // Feste Liste [Schlüssel, Funktion]: der Reiter aus der Adresse wird nur verglichen, nie als Name nachgeschlagen
 const LOADER_LIST = Object.entries(LOADERS);
 
@@ -896,6 +902,7 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
       k.prev = prevKpis.has(k.id) ? prevKpis.get(k.id) : null;
       k.delta = delta(k.value, k.prev, k);
     }
+    for (const k of b.kpis || []) rate(k, found ? found[0] : 'uebersicht');
     b.charts = (b.charts || []).map((c) => (opts.raw ? { ...c, empty: !c.series.some((x) => x.values.some((v) => v !== null && v !== 0)) } : bucketChart(c, p, list)));
   }
   return {
@@ -911,6 +918,8 @@ async function section(key, rangeDays, now = new Date(), opts = {}) {
 
 module.exports = {
   SECTIONS,
+  PRIMARY,
+  rate,
   RANGES,
   rangeLabel,
   DEFAULT_RANGE,

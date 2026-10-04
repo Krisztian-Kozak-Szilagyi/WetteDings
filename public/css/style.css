@@ -4905,3 +4905,35 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .panel-rights-box > summary { cursor: var(--cur-pointer, pointer); }
 .panel-rights-box[open] > summary { margin-bottom: 10px; }
 
+/* ---------- Statistik im Panel: Kernzahlen, kompakte Kennzahlen, weniger Bedienelemente ---------- */
+.stats-core { margin: 4px 0 28px; }
+.stats-kpis-core { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stats-kpi.is-core { padding: 18px 20px; gap: 6px; }
+.stats-kpi.is-core .stat-value { font-size: 1.9rem; }
+.stats-kpis-compact { grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.stats-kpis-compact .stats-kpi { padding: 10px 12px; gap: 2px; }
+.stats-kpis-compact .stat-value { font-size: 1.05rem; }
+.stats-kpi .stat-label { display: flex; align-items: center; gap: 6px; }
+.stats-kpi .stat-label a { color: inherit; }
+.stats-kpi .stat-label a:hover { color: var(--text); }
+.stats-kpi .help-tip > summary { width: 18px; height: 18px; font-size: 11px; }
+.stats-delta.is-good { color: var(--ja); }
+.stats-delta.is-bad { color: var(--nein); }
+.stats-delta.is-good > span[aria-hidden], .stats-delta.is-bad > span[aria-hidden] { color: inherit; }
+.stats-block-tools { display: flex; align-items: center; gap: 6px; flex: none; }
+.stats-more {
+  list-style: none; display: inline-grid; place-items: center; width: 28px; height: 22px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); font-weight: 700; line-height: 1; cursor: var(--cur-pointer, pointer);
+}
+.stats-more::-webkit-details-marker { display: none; }
+.stats-more:hover { color: var(--text); border-color: var(--primary); }
+.stats-block-tools .stats-menu-panel { right: 0; left: auto; }
+.stats-card-title { display: flex; align-items: center; gap: 8px; }
+.stats-chart-card { position: relative; }
+.stats-table-toggle > summary { position: absolute; top: 14px; right: 16px; color: var(--muted); font-size: 12px; cursor: var(--cur-pointer, pointer); list-style: none; }
+.stats-table-toggle > summary::-webkit-details-marker { display: none; }
+.stats-table-toggle > summary:hover { color: var(--text); }
+.stats-table-toggle[open] > summary { color: var(--primary); }
+.panel-hero .stats-icon { width: 14px; height: 14px; vertical-align: -2px; }
+@media (max-width: 900px) { .stats-kpis-core { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stats-kpi.is-core .stat-value { font-size: 1.4rem; } }
+
