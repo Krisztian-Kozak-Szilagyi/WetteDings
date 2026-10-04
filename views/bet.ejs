@@ -218,7 +218,7 @@
       <ul class="bet-people">
         <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; const me = myPosition && String(p._id) === String(myPosition._id); %>
           <li class="<%= me ? 'me' : '' %>">
-            <span class="bet-people-name"><%- userLink(p.username) %><% if (me) { %> <span class="tag tag-me">Du</span><% } %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></span>
+            <span class="bet-people-name"><%- userLink(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></span>
             <span class="bet-people-opt <%= optClass(bet, p.side) %>"><span class="opt-dot"></span><%= optionLabel(bet, p.side) %></span>
             <span class="bet-people-amt"><%= euro(p.amount) %>
               <% if (settled) { %>

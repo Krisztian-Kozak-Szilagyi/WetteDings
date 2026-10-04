@@ -118,6 +118,76 @@
     if (!document.hidden) poll();
   }, 3000);
 
+  // ---------- Karte groß ansehen (Plätze und Kartenauswahl) ----------
+  const zoom = document.querySelector('[data-zoom-modal]');
+  if (zoom) {
+    const tilt = zoom.querySelector('[data-zoom-tilt]');
+    if (window.tcgBindTilt) window.tcgBindTilt(tilt);
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-dg-zoom]');
+      if (!btn) return;
+      e.preventDefault(); // in der Kartenauswahl: vergrößern, nicht auswählen
+      const d = btn.dataset;
+      tilt.className = 'tcg-zoom r-' + d.rarity;
+      const img = zoom.querySelector('[data-zoom-img]');
+      img.src = d.image;
+      img.alt = d.name + ' (' + d.rarityLabel + ')';
+      zoom.querySelector('[data-zoom-name]').textContent = d.name;
+      const badge = zoom.querySelector('[data-zoom-rarity]');
+      badge.textContent = d.rarityLabel;
+      badge.className = 'tcg-badge r-' + d.rarity;
+      zoom.querySelector('[data-zoom-meta]').textContent = d.meta || '';
+      if (typeof zoom.showModal === 'function') zoom.showModal();
+      else zoom.setAttribute('open', '');
+    });
+    const close = () => (typeof zoom.close === 'function' ? zoom.close() : zoom.removeAttribute('open'));
+    zoom.querySelector('[data-zoom-close]').addEventListener('click', close);
+    zoom.addEventListener('click', (e) => {
+      if (e.target === zoom) close();
+    });
+  }
+
+  // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 20 Karten ----------
+  const PER_PAGE = 20;
+  page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
+    const items = [...box.querySelectorAll('[data-dg-item]')];
+    const search = box.querySelector('[data-dg-search]');
+    const rarity = box.querySelector('[data-dg-rarity]');
+    const prev = box.querySelector('[data-dg-prev]');
+    const next = box.querySelector('[data-dg-next]');
+    const info = box.querySelector('[data-dg-pageinfo]');
+    const empty = box.querySelector('[data-dg-empty]');
+    let pageNo = 0;
+    const matches = () => {
+      const q = search ? search.value.trim().toLowerCase() : '';
+      const r = rarity ? rarity.value : '';
+      return items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
+    };
+    function render() {
+      const list = matches();
+      const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+      pageNo = Math.min(Math.max(0, pageNo), pages - 1);
+      const from = pageNo * PER_PAGE;
+      const visible = new Set(list.slice(from, from + PER_PAGE));
+      items.forEach((it) => {
+        it.hidden = !visible.has(it);
+      });
+      prev.hidden = next.hidden = pages <= 1;
+      prev.disabled = pageNo === 0;
+      next.disabled = pageNo >= pages - 1;
+      info.textContent = pages > 1 ? 'Seite ' + (pageNo + 1) + ' von ' + pages : '';
+      empty.hidden = list.length > 0;
+    }
+    // Anfangs die Seite mit der schon gewählten Karte zeigen
+    const checked = items.findIndex((it) => it.querySelector('input:checked'));
+    if (checked > 0) pageNo = Math.floor(checked / PER_PAGE);
+    if (search) search.addEventListener('input', () => { pageNo = 0; render(); });
+    if (rarity) rarity.addEventListener('change', () => { pageNo = 0; render(); });
+    prev.addEventListener('click', () => { pageNo--; render(); });
+    next.addEventListener('click', () => { pageNo++; render(); });
+    render();
+  });
+
   // ---------- Beute-Fenster: Spieler für Spieler aufdecken ----------
   const lootDlg = document.querySelector('[data-dg-loot]');
   if (lootDlg && typeof lootDlg.showModal === 'function') {

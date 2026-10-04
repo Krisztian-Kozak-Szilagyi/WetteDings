@@ -2,6 +2,9 @@
 <%
   const statLine = (c) => c && c.stats ? `⚡${c.stats.speed} · FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
   const canLeave = (phase === 'solo' || phase === 'gruppe') && !lockedIn;
+  // Karte groß ansehen (partials/card-zoom, public/js/dungeon.js)
+  const escAttr = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const zoomAttrs = (c) => `data-dg-zoom data-image="${escAttr(c.image)}" data-name="${escAttr(c.name)}" data-rarity="${escAttr(c.rarity)}" data-rarity-label="${escAttr(rarityByKey[c.rarity].label)}" data-meta="${escAttr(statLine(c))}"`;
 %>
 
 <div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
@@ -50,27 +53,27 @@
 </div>
 
 <%# Tisch: drei Plätze nebeneinander, rechts der Gruppen-Chat %>
-<section class="dg-table<%= hasChat ? '' : ' no-chat' %>">
+<section class="dg-table<%= hasChat || phase === 'frei' ? '' : ' no-chat' %>">
   <div class="dg-slots">
     <% slots.forEach((s, i) => { %>
       <% if (s.card) { %>
         <div class="dg-slot r-<%= s.card.rarity %><%= s.me ? ' is-me' : '' %><%= s.bot ? ' is-bot' : '' %>" data-dg-slot="<%= i %>">
           <% if (s.leader) { %><span class="dg-leader" title="Gruppenleiter" aria-label="Gruppenleiter">♛</span><% } %>
           <div class="dg-slot-card">
-            <img src="<%= s.card.image %>" alt="<%= s.card.name %>" width="720" height="1008" loading="lazy">
+            <button type="button" class="dg-slot-zoom" <%- zoomAttrs(s.card) %> aria-label="<%= s.card.name %> vergrößern"><img src="<%= s.card.image %>" alt="<%= s.card.name %>" width="720" height="1008" loading="lazy"></button>
             <span class="dg-pop-layer" data-dg-pops></span>
           </div>
           <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %></span>
           <span class="dg-slot-stats"><%= statLine(s.card) %></span>
           <%# Boost-Karte: für alle Spieler gleich sichtbar %>
-          <div class="dg-slot-boostrow<%= s.boost ? '' : ' is-none' %>">
-            <% if (s.boost) { %>
+          <% if (s.boost) { %>
+            <button type="button" class="dg-slot-boostrow" <%- zoomAttrs(s.boost) %> aria-label="Boost <%= s.boost.name %> vergrößern">
               <img src="<%= s.boost.image %>" alt="" width="720" height="1008" loading="lazy">
               <span><span class="dg-boost-kicker">Boost</span><%= s.boost.name %></span>
-            <% } else { %>
-              <span><span class="dg-boost-kicker">Boost</span>keiner</span>
-            <% } %>
-          </div>
+            </button>
+          <% } else { %>
+            <div class="dg-slot-boostrow is-none"><span><span class="dg-boost-kicker">Boost</span>keiner</span></div>
+          <% } %>
         </div>
       <% } else if (s.invited) { %>
         <div class="dg-slot is-empty is-invited">
@@ -103,39 +106,70 @@
         <button class="btn btn-primary btn-sm" type="submit">Senden</button>
       </form>
     </aside>
+  <% } else if (phase === 'frei') { %>
+    <a class="dg-help-tile" href="/dungeon/anleitung">
+      <span class="dg-help-fan" aria-hidden="true">
+        <% helpFan.forEach((c) => { %><img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy"><% }) %>
+      </span>
+      <span class="dg-help-foot">
+        <span class="dg-help-text">
+          <span class="kicker">Dungeon</span>
+          <span class="dg-help-title">So funktioniert's</span>
+          <span class="dg-help-hint">Ablauf, Boosts und Beute</span>
+        </span>
+        <span class="tcg-album-arrow" aria-hidden="true">→</span>
+      </span>
+    </a>
   <% } %>
 </section>
 
-<%# Kartenauswahl (Anmeldung, Beitritt, Tauschen). sel = schon gewählte Karten %>
+<%# Kartenauswahl (Anmeldung, Beitritt, Tauschen). sel = schon gewählte Karten.
+    Je Liste: Suche, Seltenheits-Filter und Seiten mit höchstens 20 Karten (public/js/dungeon.js) %>
+<% const pickList = (kind, list, sel) => { const rars = [...new Set(list.map((c) => c.rarity))].sort((a, b) => rarityByKey[a].rank - rarityByKey[b].rank); %>
+  <div class="dg-picklist" data-dg-picklist>
+    <div class="dg-pick-head">
+      <h3 class="dg-pick-sub"><%= kind === 'card' ? 'Charakter' : 'Boost (Booster-Karte)' %></h3>
+      <% if (list.length) { %>
+        <div class="dg-pick-tools">
+          <input type="search" data-dg-search placeholder="Karte suchen …" aria-label="<%= kind === 'card' ? 'Charakter' : 'Boost-Karte' %> suchen" autocomplete="off">
+          <select data-dg-rarity aria-label="Seltenheit">
+            <option value="">Alle Seltenheiten</option>
+            <% rars.forEach((r) => { %><option value="<%= r %>"><%= rarityByKey[r].label %></option><% }) %>
+          </select>
+        </div>
+      <% } %>
+    </div>
+    <div class="dg-pick-pager">
+      <button type="button" class="dg-page-btn" data-dg-prev aria-label="Vorherige Seite" hidden>‹</button>
+      <div class="dg-pick-grid">
+        <% if (kind === 'boost') { %>
+          <label class="dg-pick dg-pick-none">
+            <input type="radio" name="boost" value="" <%= !sel || !sel.boost ? 'checked' : '' %>>
+            <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
+          </label>
+        <% } %>
+        <% list.forEach((c, i) => { const checked = kind === 'card' ? (sel ? sel.card === c.id : i === 0) : !!sel && sel.boost === c.id; %>
+          <label class="dg-pick r-<%= c.rarity %>" data-dg-item data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>">
+            <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= kind === 'card' ? 'required' : '' %> <%= checked ? 'checked' : '' %>>
+            <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
+            <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> vergrößern">⤢</button>
+            <span class="dg-pick-name"><%= c.name %> <span class="muted">(<%= rarityByKey[c.rarity].label %>)</span></span>
+            <% if (kind === 'card') { %><span class="dg-pick-stats"><%= statLine(c) %></span><% } %>
+          </label>
+        <% }) %>
+      </div>
+      <button type="button" class="dg-page-btn" data-dg-next aria-label="Nächste Seite" hidden>›</button>
+    </div>
+    <p class="dg-page-info muted small" data-dg-pageinfo></p>
+    <p class="muted small" data-dg-empty hidden>Keine passende Karte.</p>
+  </div>
+<% } %>
 <% const picker = (sel) => { %>
   <% if (!cards.characters.length) { %>
     <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest, im Handel oder foliert können nicht mit.</p>
   <% } else { %>
-    <h3 class="dg-pick-sub">Charakter</h3>
-    <div class="dg-pick-grid">
-      <% cards.characters.forEach((c, i) => { %>
-        <label class="dg-pick r-<%= c.rarity %>">
-          <input type="radio" name="card" value="<%= c.id %>" required <%= (sel ? sel.card === c.id : i === 0) ? 'checked' : '' %>>
-          <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
-          <span class="dg-pick-name"><%= c.name %> <span class="muted">(<%= rarityByKey[c.rarity].label %>)</span></span>
-          <span class="dg-pick-stats"><%= statLine(c) %></span>
-        </label>
-      <% }) %>
-    </div>
-    <h3 class="dg-pick-sub">Boost (Booster-Karte)</h3>
-    <div class="dg-pick-grid">
-      <label class="dg-pick dg-pick-none">
-        <input type="radio" name="boost" value="" <%= !sel || !sel.boost ? 'checked' : '' %>>
-        <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
-      </label>
-      <% cards.boosts.forEach((c) => { %>
-        <label class="dg-pick r-<%= c.rarity %>">
-          <input type="radio" name="boost" value="<%= c.id %>" <%= sel && sel.boost === c.id ? 'checked' : '' %>>
-          <img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy">
-          <span class="dg-pick-name"><%= c.name %></span>
-        </label>
-      <% }) %>
-    </div>
+    <% pickList('card', cards.characters, sel) %>
+    <% pickList('boost', cards.boosts, sel) %>
   <% } %>
 <% } %>
 
@@ -241,29 +275,12 @@
   <% } %>
 <% } %>
 
-<%# Verlauf des letzten Durchlaufs (die Beute zeigt einmalig das Fenster) %>
-<% if (resultSlots) { %>
-  <section class="dg-result card<%= run.success ? ' is-win' : ' is-loss' %>">
-    <h2>Letzter Dungeon: <%= runDungeon ? runDungeon.title : 'Dungeon' %> – <%= run.success ? 'Boss besiegt!' : 'Rückzug' %></h2>
-    <ol class="dg-result-fights">
-      <% (runDungeon ? runDungeon.fights : []).forEach((f, i) => { const r = run.fights[i]; %>
-        <li class="<%= !r ? 'is-skipped' : r.success ? 'is-win' : 'is-loss' %>">
-          <strong><%= f.title %></strong> – <%= !r ? 'nicht erreicht' : r.success ? f.success : f.fail %>
-        </li>
-      <% }) %>
-    </ol>
-  </section>
+<% if (currentUser.isAdmin && phase !== 'laeuft') { %>
+  <form method="post" action="/dungeon/sofort-starten" class="dg-foot">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-ghost btn-sm" type="submit">Admin: alle Anmeldungen jetzt starten</button>
+  </form>
 <% } %>
-
-<div class="dg-foot">
-  <% if (currentUser.isAdmin && phase !== 'laeuft') { %>
-    <form method="post" action="/dungeon/sofort-starten">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn btn-ghost btn-sm" type="submit">Admin: alle Anmeldungen jetzt starten</button>
-    </form>
-  <% } %>
-  <a class="btn btn-ghost btn-sm" href="/dungeon/anleitung">So funktioniert's</a>
-</div>
 </div>
 
 <%# Beute: nach dem Ende einmal als Fenster – Spieler für Spieler aufgedeckt %>
@@ -274,7 +291,7 @@
     <ul class="dg-loot-list">
       <% loot.players.forEach((p) => { %>
         <li class="dg-loot-row<%= p.me ? ' is-me' : '' %>" data-dg-loot-row>
-          <strong class="dg-loot-name"><%= p.name %><%= p.me ? ' (du)' : '' %></strong>
+          <strong class="dg-loot-name"><%= p.name %></strong>
           <span class="dg-loot-items">
             <span class="dg-loot-chip is-money"><%= p.reward ? euro(p.reward) : 'kein Geld' %></span>
             <% if (p.foil) { %><span class="dg-loot-chip is-foil"><img src="/img/items/folie.svg" alt="" width="20" height="20"> Folie</span><% } %>
@@ -287,5 +304,7 @@
   </dialog>
 <% } %>
 
+<%- include('partials/card-zoom') %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/dungeon.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

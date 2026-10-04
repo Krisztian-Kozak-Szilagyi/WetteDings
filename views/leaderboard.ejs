@@ -18,7 +18,6 @@
         <img class="podium-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="">
         <span class="podium-name"><%= u.username %><%- roleBadge(u.username) %></span>
         <span class="podium-total"><%= euro(u.total) %></span>
-        <% if (me) { %><span class="podium-me">Du</span><% } %>
       </a>
     <% }) %>
   </div>

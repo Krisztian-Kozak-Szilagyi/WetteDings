@@ -56,7 +56,7 @@
         <div class="lotto-entries">
           <% entries.forEach((e) => { const me = String(e.user) === String(currentUser._id); %>
             <div class="lotto-entry<%= me ? ' me' : '' %>">
-              <span class="lotto-entry-name"><%- userLink(e.username) %><% if (me) { %><small>Du</small><% } %></span>
+              <span class="lotto-entry-name"><%- userLink(e.username) %></span>
               <span class="lotto-entry-nums hide-sm"><%= e.ranges.map(fmtRange).join(', ') %></span>
               <span class="lotto-entry-count"><%= e.tickets %> <%= e.tickets === 1 ? 'Los' : 'Lose' %></span>
               <strong><%= Math.round((e.tickets / round.tickets) * 100) %> %</strong>
