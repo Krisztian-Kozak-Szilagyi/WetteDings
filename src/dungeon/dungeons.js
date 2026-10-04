@@ -1,15 +1,16 @@
 // Dungeons: Geschichte, zwei Trash-Kämpfe und ein Boss. Wie bei der IHK sehen die Spieler nicht, welche
 // Fähigkeit (stat: 'fia' | 'fis' | 'bwl') ein Kampf braucht – sie müssen es aus dem Text erraten.
-// image ist das Querformat-Bild über den Spieler-Plätzen (vorerst ein Platzhalter).
+// image ist das Querformat-Bild über den Spieler-Plätzen (vorerst dasselbe Banner für alle).
 // Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – so kann man sich vorher darauf einstellen.
 
 const PLACEHOLDER = '/img/dungeon/placeholder.svg';
+const BANNER = '/img/dungeon/st-ivan-dungeon-banner.webp'; // vorerst für alle Dungeons
 
 const DUNGEONS = [
   {
     key: 'serverraum',
     title: 'Der Serverraum im Keller',
-    image: PLACEHOLDER,
+    image: BANNER,
     intro: 'Seit Tagen dringt aus dem Keller ein seltsames Brummen. Niemand traut sich mehr hinunter – bis heute. Drei mutige Azubis nehmen die Taschenlampe und steigen die Treppe hinab.',
     fights: [
       {
@@ -42,7 +43,7 @@ const DUNGEONS = [
   {
     key: 'pruefungsamt',
     title: 'Das verlorene Prüfungsamt',
-    image: PLACEHOLDER,
+    image: BANNER,
     intro: 'Ganz oben im Altbau soll es ein Büro geben, in dem alle verschwundenen Prüfungsunterlagen liegen. Der Aufzug fährt nur noch in den dritten Stock – den Rest müsst ihr euch erkämpfen.',
     fights: [
       {
