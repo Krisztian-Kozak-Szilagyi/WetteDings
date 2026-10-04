@@ -35,13 +35,13 @@
       if (betNewGroup) betBadges.push({ n: betNewGroup, cls: 'nav-badge-group', title: 'Neue Wetten in deinen Gruppen', aria: betNewGroup + ' neue Wetten in deinen Gruppen' });
       if (betRed) betBadges.push({ n: betRed, cls: '', title: betVotePending ? 'Wetten, in denen deine Stimme zum Ergebnis fehlt' + (betNewGroup || !betNewPublic ? '' : ', und neue Wetten') : 'Neue Wetten', aria: betRed + ' Wetten: neu oder deine Stimme fehlt' });
       navItems.push({ href: '/rangliste', label: 'Rangliste', active: currentPath === '/rangliste', badges: [] });
-      // Wetten, Broker und Lotterie stecken im Aufklappmenü "Zocken"; seine Abzeichen = Summe der Unterpunkte (je Farbe)
-      const zocken = [
+      // Wetten, Broker und Lotterie stecken im Aufklappmenü "Gambling"; seine Abzeichen = Summe der Unterpunkte (je Farbe)
+      const gambling = [
         { href: '/wetten', label: 'Wetten', active: currentPath === '/wetten' || currentPath.startsWith('/wetten/'), badges: betBadges },
         { href: '/broker', label: 'Broker', active: currentPath === '/broker' || currentPath.startsWith('/broker/'), badges: [] },
         { href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] },
       ];
-      navItems.push(navGroup('zocken', 'Zocken', zocken));
+      navItems.push(navGroup('gambling', 'Gambling', gambling));
       navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });
       const tradeBadges = [];
       if (tradeMarketNew) tradeBadges.push({ n: tradeMarketNew, cls: 'nav-badge-market', title: 'Neu auf dem Markt', aria: tradeMarketNew + ' neue Markt-Angebote' });

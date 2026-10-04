@@ -178,7 +178,7 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
 .nav-live { width: 7px; height: 7px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #a855f7; animation: bmPulse 1.6s ease-in-out infinite; }
 @keyframes bmPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
 
-/* Aufklappmenü in der Leiste ("Zocken"): Panel klappt mit Schwung auf, Einträge laufen nacheinander ein */
+/* Aufklappmenü in der Leiste ("Gambling"): Panel klappt mit Schwung auf, Einträge laufen nacheinander ein */
 .nav-group { position: relative; display: flex; }
 .nav-group > summary {
   position: relative; display: flex; align-items: center; gap: 6px; white-space: nowrap; list-style: none;
@@ -186,7 +186,8 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
   font-size: clamp(13px, 1.2vw, 14px); font-weight: 500; color: var(--color-neutral-400);
 }
 .nav-group > summary::-webkit-details-marker { display: none; }
-.nav-group > summary:hover, .nav-group[open] > summary { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.nav-group > summary:focus:not(:focus-visible) { outline: none; }
+.nav-group > summary:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
 .nav-group > summary.active { color: var(--text); }
 .nav-group > summary.active::after {
   content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 2px;
@@ -198,13 +199,8 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
   position: absolute; left: 50%; top: calc(100% + 6px); z-index: 60; min-width: 190px; padding: 6px;
   display: flex; flex-direction: column; gap: 2px;
   border-radius: var(--radius-lg); background: var(--color-surface);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-neutral-800), 0 18px 40px -18px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  box-shadow: var(--shadow-lg), 0 18px 40px -18px color-mix(in srgb, var(--color-accent) 45%, transparent);
   transform-origin: 50% 0; transform: translateX(-50%);
-}
-/* leuchtende Kante oben am Panel */
-.nav-group-panel::before {
-  content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--color-accent-300), transparent); opacity: .8;
 }
 .nav-group[open] .nav-group-panel { animation: navDrop .38s cubic-bezier(.2, .9, .25, 1.15) both; }
 .nav-group.is-closing .nav-group-panel { animation: navLift .18s ease-in both; }

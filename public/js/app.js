@@ -913,7 +913,7 @@
 })();
 
 
-// Aufklappmenüs in der Leiste ("Zocken"): mit Maus beim Drüberfahren auf, sonst per Klick;
+// Aufklappmenüs in der Leiste ("Gambling"): mit Maus beim Drüberfahren auf, sonst per Klick;
 // schließen bei Klick daneben, Escape oder Mausverlassen – mit kurzer Schließ-Animation (style.css)
 (function () {
   var groups = document.querySelectorAll('[data-nav-group]');
