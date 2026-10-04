@@ -24,13 +24,6 @@
 .dx-hero h1 { font-size: clamp(32px, 1.4rem + 2vw, 44px); line-height: 1.05; letter-spacing: -.025em; }
 .dx-name { color: var(--color-accent-300); }
 .dx-sub { margin: 0; color: var(--color-neutral-400); font-size: 15px; }
-.dx-cds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.dx-cd { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--dx-line); color: var(--color-neutral-400); font-size: 12px; white-space: nowrap; transition: border-color .2s, color .2s; }
-.dx-cd:hover { border-color: var(--color-accent-600); color: var(--color-text); }
-.dx-cd strong { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--color-text); }
-.dx-cd strong.is-soon { color: var(--color-accent-200); }
-.dx-cd.is-live { border-color: color-mix(in srgb, #c084fc 55%, transparent); background: color-mix(in srgb, #a855f7 12%, transparent); }
-.dx-cd.is-live strong { color: #e9d5ff; }
 
 /* Vermögen */
 .dx-wealth { display: flex; flex-direction: column; gap: 18px; padding: 22px; border-radius: var(--radius-lg, 8px);
@@ -121,9 +114,20 @@
 /* Favoriten + Album: nutzt die TCG-Klassen; nur Platz anpassen */
 .dx-fav-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .dx-album { min-height: 300px; }
-/* Favoriten so groß, dass sie bis zum Boden von „Heute“ reichen: Kartenbreite --fav-w setzt dashboard.js */
-.dx-row-favs.is-fit { grid-template-columns: max-content minmax(0, 1fr); }
-.dx-row-favs.is-fit .dx-fav-grid { grid-template-columns: repeat(var(--fav-n, 4), var(--fav-w)); }
+
+/* Countdowns über den Favoriten: füllen den Platz neben „Heute“, die Favoriten sitzen unten bündig */
+.dx-favcol { justify-content: space-between; gap: 20px; }
+.dx-favs { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dx-timers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.dx-timer { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 10px 14px; border-radius: var(--radius-lg, 8px);
+  background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); color: var(--color-text); transition: box-shadow .2s; }
+.dx-timer:hover { box-shadow: 0 0 0 1px var(--color-accent-700); color: var(--color-text); }
+.dx-timer-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dx-timer strong { font-size: 20px; font-weight: 500; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dx-timer strong.is-soon { color: var(--color-accent-200); }
+.dx-timer.is-live { background: linear-gradient(160deg, color-mix(in srgb, #a855f7 16%, var(--color-surface)), var(--color-surface)); box-shadow: 0 0 0 1px color-mix(in srgb, #c084fc 45%, transparent); }
+.dx-timer.is-live .dx-timer-label { color: #d8b4fe; }
+.dx-timer.is-live strong { color: #e9d5ff; }
 
 /* Forum | Benachrichtigungen */
 .dx-pair { display: grid; grid-template-columns: var(--dx-cols); gap: var(--dx-gap); }

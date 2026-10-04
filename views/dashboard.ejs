@@ -25,16 +25,6 @@
       <span class="dx-kicker"><%= todayText %></span>
       <h1><%= d.greeting %>,<br><span class="dx-name"><%= currentUser.username %></span></h1>
       <% if (t.items.length) { %><p class="dx-sub"><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %></p><% } %>
-      <% if (d.countdowns.length) { %>
-        <div class="dx-cds" aria-label="Countdowns">
-          <% d.countdowns.forEach((c) => { %>
-            <a class="dx-cd<%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
-              <span><%= c.label %></span>
-              <strong data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></strong>
-            </a>
-          <% }) %>
-        </div>
-      <% } %>
     </div>
 
     <section class="dx-wealth" aria-labelledby="dx-wealth-h">
@@ -82,8 +72,19 @@
   </div>
 
   <%# ---------- Favoriten | Heute ---------- %>
-  <div class="dx-row dx-row-favs" data-dash-favrow>
-    <section class="dx-col-wide dx-favs" aria-labelledby="dx-favs-h">
+  <div class="dx-row">
+    <div class="dx-col-wide dx-favcol">
+      <% if (d.countdowns.length) { %>
+        <div class="dx-timers" aria-label="Countdowns">
+          <% d.countdowns.forEach((c) => { %>
+            <a class="dx-timer dx-timer-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>" title="<%= date(c.at) %>">
+              <span class="dx-timer-label"><%= c.label %></span>
+              <strong data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></strong>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    <section class="dx-favs" aria-labelledby="dx-favs-h">
       <div class="dx-head">
         <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(d.cardValue) %></div><% } %></div>
         <a class="dx-link" href="/tcg/album">Zum Album →</a>
@@ -106,6 +107,7 @@
         <% } %>
       </div>
     </section>
+    </div>
 
     <section class="dx-col-side" aria-labelledby="dx-today-h">
       <div class="dx-head dx-head-center">
