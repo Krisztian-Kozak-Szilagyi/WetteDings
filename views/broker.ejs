@@ -10,7 +10,10 @@
     : { cls: '', label: 'Neutral' };
 %>
 
-<a class="bx-back" href="/broker">← Alle Werte</a>
+<div class="bx-topbar">
+  <a class="bx-back" href="/broker">← Alle Werte</a>
+  <span class="bx-tax">Steuer auf Gewinne <strong><%= String(brokerTax).replace('.', ',') %> %</strong></span>
+</div>
 <nav class="asset-tabs" aria-label="Werte im Broker">
   <% assets.forEach((a) => { %>
     <a class="asset-tab <%= a.active ? 'active' : '' %>" href="<%= a.path %>" <%= a.active ? 'aria-current=page' : '' %>>

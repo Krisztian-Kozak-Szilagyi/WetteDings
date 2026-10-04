@@ -75,7 +75,8 @@ const tradeSchema = new Schema(
     side: { type: String, enum: ['kauf', 'verkauf'], required: true },
     units: { type: Number, required: true },
     price: { type: Number, required: true },
-    cents: { type: Number, required: true },
+    cents: { type: Number, required: true }, // beim Verkauf: Erlös nach Steuer
+    tax: { type: Number, default: 0 }, // Cent, Steuer auf den Gewinn (nur Verkauf)
   },
   { timestamps: true }
 );

@@ -4,7 +4,7 @@ const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
 const { Item } = require('../models/Item');
 const { itemByCardId, freeItems, claimItems } = require('../items/itemService');
-const { Trade, TradeSettings, openFilter } = require('../models/Trade');
+const { Trade, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -12,7 +12,7 @@ const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { collection } = require('../tcg/collection');
 const { markSeen } = require('../tcg/tcgService');
-const { logSettingsChange } = require('../stats/settingsLog');
+const taxService = require('../services/taxService');
 const { notify } = require('../services/notifyService');
 
 const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 Stunden ab
@@ -21,23 +21,13 @@ const MAX_PRICE = 100000000; // 1 Mio. €
 const MAX_OPEN = 20; // offene Angebote pro Person
 const KINDS = ['markt', 'privat', 'tausch'];
 
-// ---------- Einstellungen (Admin) ----------
-const settings = { taxPercent: 0 };
-
-async function loadSettings() {
-  const doc = await TradeSettings.findById('handel').lean();
-  if (doc && Number.isFinite(doc.taxPercent)) settings.taxPercent = doc.taxPercent;
-}
-
-async function saveSettings({ taxPercent, admin }) {
-  await TradeSettings.updateOne({ _id: 'handel' }, { $set: { taxPercent, updatedByName: admin.username } }, { upsert: true });
-  const before = { ...settings };
-  settings.taxPercent = taxPercent;
-  await logSettingsChange({ area: 'handel', before, after: settings, by: admin });
-}
-
+// ---------- Steuer (Sätze je Angebotsart im Admin-Panel, siehe services/taxService) ----------
 /** Steuer in Cent (abgerundet), die dem Empfänger des Geldes abgezogen wird */
-const taxFor = (price, percent = settings.taxPercent) => Math.floor((price * Math.min(100, Math.max(0, percent))) / 100);
+const taxFor = (price, percent = 0) => taxService.taxFor(price, percent);
+/** Steuer auf einen Betrag nach dem aktuellen Satz der Angebotsart (markt, privat, tausch) */
+const taxOf = (price, kind) => taxFor(price, taxService.rate(kind));
+/** Aktuelle Sätze der drei Angebotsarten, z. B. für die Anzeige */
+const taxRates = () => ({ markt: taxService.rate('markt'), privat: taxService.rate('privat'), tausch: taxService.rate('tausch') });
 
 const cardName = (id) => {
   const item = itemByCardId(id);
@@ -72,7 +62,7 @@ function validateOffer({ kind, price, cardId, wantCardId, extraFrom }) {
  * Verkauf: Käufer zahlt an den Verkäufer. Tausch: je nach extraFrom zahlt der Anbieter oder der Empfänger.
  * Die Steuer fällt nur auf das Geld an und wird dem abgezogen, der es bekommt.
  */
-function settlement(trade, { buyer, taxPercent = settings.taxPercent } = {}) {
+function settlement(trade, { buyer, taxPercent = taxService.rate(trade.kind) } = {}) {
   if (!trade.price) return null;
   let payer = buyer;
   let payee = trade.seller;
@@ -328,7 +318,7 @@ async function buy({ user, tradeId }) {
     if (moved.modifiedCount !== 1) throw new UserError(item ? 'Der Gegenstand ist nicht mehr verfügbar.' : 'Die Karte ist nicht mehr verfügbar.');
     if (!item) await markSeen(user._id, [trade.card], session);
 
-    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: settings.taxPercent, tax: money.tax, closedAt: new Date() });
+    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
     await trade.save({ session });
     return { trade, tax: money.tax };
   });
@@ -395,7 +385,7 @@ async function acceptSwap({ user, tradeId, version }) {
       buyerName: trade.toName,
       closedBy: user._id, // wer angenommen hat
       wantCardDoc: doc._id,
-      taxPercent: settings.taxPercent,
+      taxPercent: taxService.rate('tausch'),
       tax: money ? money.tax : 0,
       closedAt: new Date(),
     });
@@ -510,10 +500,9 @@ module.exports = {
   PRIVATE_HOURS,
   MARKET_DAYS,
   MAX_PRICE,
-  settings,
-  loadSettings,
-  saveSettings,
   taxFor,
+  taxOf,
+  taxRates,
   validateOffer,
   settlement,
   openFilter,

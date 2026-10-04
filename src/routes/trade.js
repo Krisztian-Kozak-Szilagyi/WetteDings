@@ -41,8 +41,8 @@ router.get('/handel', async (req, res) => {
     rarities: catalog.visibleRarities(),
     cardInfo,
     rarityByKey: tradeRarities(),
-    taxPercent: trade.settings.taxPercent,
-    taxFor: trade.taxFor,
+    taxRates: trade.taxRates(),
+    taxFor: trade.taxOf,
     canAccept: trade.canAccept,
     isUnread: trade.isUnread,
     termsText: trade.termsText,
@@ -92,7 +92,7 @@ router.get('/handel/tausch', async (req, res) => {
     pickWant: str(req.query.will),
     pickPrice: str(req.query.preis),
     pickFrom: str(req.query.zahlt),
-    taxPercent: trade.settings.taxPercent,
+    taxPercent: trade.taxRates().tausch,
     privateHours: trade.PRIVATE_HOURS,
   });
 });
@@ -177,8 +177,8 @@ router.get('/handel/verhandlung/:id', async (req, res) => {
     rarityByKey: tradeRarities(),
     termsText: trade.termsText,
     settlement: trade.settlement,
-    taxFor: trade.taxFor,
-    taxPercent: trade.settings.taxPercent,
+    taxFor: (price) => trade.taxOf(price, 'tausch'),
+    taxPercent: trade.taxRates().tausch,
     messageMax: trade.MESSAGE_MAX,
   });
 });

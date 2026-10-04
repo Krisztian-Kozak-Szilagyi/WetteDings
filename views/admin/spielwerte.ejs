@@ -1,6 +1,6 @@
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#folie">Folie</a><a href="#lotterie">Lotterie</a><a href="#ihk">IHK</a><a href="#dungeon">Dungeon</a><% } %>
+  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#steuer">Steuern</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#folie">Folie</a><a href="#lotterie">Lotterie</a><a href="#ihk">IHK</a><a href="#dungeon">Dungeon</a><% } %>
 </nav>
 
 <div class="panel-warning" role="note">
@@ -164,15 +164,23 @@
     </div>
   </section>
 
-  <section class="stats-block" id="handel">
-    <%- blockHead('Handelssteuer', 'Anteil, der dem Verkäufer bei jedem Handel (privat und Markt) vom Erlös abgezogen wird. Die Spieler sehen den aktuellen Satz auf der Handelsseite.') %>
+  <section class="stats-block" id="steuer">
+    <%- blockHead('Steuern', 'Jeder Bereich hat seinen eigenen Satz (0–50 %). Handel: wird dem abgezogen, der das Geld bekommt (beim Tausch nur auf den Aufpreis). Broker: nur auf den Gewinn beim Verkauf, je Kategorie – neue Coins oder ETFs fallen automatisch unter ihre Kategorie. Die Spieler sehen die Sätze oben auf der Handels- bzw. Broker-Seite.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/handel" class="form panel-inline-form">
+      <form method="post" data-reauth action="/admin/steuer" class="form admin-tax-form" data-confirm="Steuersätze wirklich ändern?">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label class="field panel-field-sm">
-          <span>Handelssteuer in % (0–50)</span>
-          <input type="text" name="tax" inputmode="decimal" value="<%= String(tradeTax).replace('.', ',') %>" required>
-        </label>
+        <% ['Handel', 'Broker'].forEach((group) => { %>
+          <fieldset class="admin-tax-group">
+            <legend><%= group %></legend>
+            <% taxCategories.filter((c) => c.group === group).forEach((c) => { %>
+              <label class="field">
+                <span><%= c.label %> in %</span>
+                <input type="text" name="<%= c.key %>" inputmode="decimal" value="<%= String(taxRates[c.key]).replace('.', ',') %>" required>
+                <small class="muted"><%= c.hint %></small>
+              </label>
+            <% }) %>
+          </fieldset>
+        <% }) %>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

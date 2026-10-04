@@ -21,7 +21,7 @@ const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const foil = require('../items/foil');
 const lotteryService = require('../services/lotteryService');
-const tradeService = require('../trade/tradeService');
+const taxService = require('../services/taxService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
@@ -199,7 +199,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
-    tradeTax: tradeService.settings.taxPercent,
+    taxCategories: taxService.CATEGORIES,
+    taxRates: taxService.rates,
     trades,
     newSuspicious,
   });
@@ -290,17 +291,16 @@ router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?b
   res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : panelUrl('moderation', 'banliste'));
 });
 
-// ---------- Handel: Steuer ----------
-router.post('/admin/handel', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
-  const tax = Number(String(typeof req.body.tax === 'string' ? req.body.tax : '').replace(',', '.'));
-  if (!Number.isFinite(tax) || tax < 0 || tax > 50) {
-    req.flash('error', 'Die Steuer muss zwischen 0 und 50 % liegen.');
+// ---------- Steuern: je Bereich ein Satz (Handel: Markt, Privat, Tausch; Broker: Coins, ETFs) ----------
+router.post('/admin/steuer', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const { rates, error } = taxService.parseRates(req.body);
+  if (error) {
+    req.flash('error', error);
   } else {
-    const taxPercent = Math.round(tax * 10) / 10;
-    await tradeService.saveSettings({ taxPercent, admin: req.user });
-    req.flash('success', `Handelssteuer auf ${String(taxPercent).replace('.', ',')} % gesetzt.`);
+    await taxService.saveSettings({ rates, admin: req.user });
+    req.flash('success', 'Steuersätze gespeichert.');
   }
-  res.redirect(panelUrl('spielwerte', 'handel'));
+  res.redirect(panelUrl('spielwerte', 'steuer'));
 });
 
 // ---------- Tagesbonus und Grading-Shop ----------

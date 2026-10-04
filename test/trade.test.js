@@ -11,7 +11,7 @@ const [A, B] = catalog.CARDS.map((c) => c.id);
 const rejects = (fn, re) => assert.throws(fn, (err) => err instanceof UserError && re.test(err.message));
 
 test('Handelssteuer: standardmäßig 0 %, wird abgerundet und begrenzt', () => {
-  assert.equal(trade.settings.taxPercent, 0);
+  assert.deepEqual(trade.taxRates(), { markt: 0, privat: 0, tausch: 0 });
   assert.equal(trade.taxFor(10000), 0);
   assert.equal(trade.taxFor(10000, 5), 500);
   assert.equal(trade.taxFor(999, 5), 49); // 49,95 Cent -> abgerundet
