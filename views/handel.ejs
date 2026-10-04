@@ -5,12 +5,13 @@
   // Folierte Karte: Hinweis mit Datum (die Folie geht mit der Karte an den Käufer)
   const foilTag = (at) => { if (at) { %> <span class="foil-tag" title="Foliert am <%= dayDate(at) %> – steigt täglich im Wert, kann nicht an die Bank verkauft oder auf Quests geschickt werden">Foliert · <%= dayDate(at) %></span><% } };
   const line = (id) => { const c = cardInfo(id); return { c, r: rarityByKey[c.rarity] || { label: '' } }; };
-  const taxText = String(taxPercent).replace('.', ',');
+  const pctText = (p) => String(p).replace('.', ',') + ' %';
+  const taxSame = taxRates.markt === taxRates.privat && taxRates.privat === taxRates.tausch;
   // Aufpreis eines Tauschs aus meiner Sicht: { iPay, text }
   const extra = (t) => {
     if (!t.price) return { iPay: false, text: 'ohne Aufpreis' };
     const iPay = (String(t.seller) === me) === (t.extraFrom === 'seller');
-    return { iPay, text: iPay ? 'du zahlst ' + euro(t.price) + ' drauf' : 'du bekommst ' + euro(t.price - taxFor(t.price)) + ' drauf' + (taxFor(t.price) ? ' (nach Steuer)' : '') };
+    return { iPay, text: iPay ? 'du zahlst ' + euro(t.price) + ' drauf' : 'du bekommst ' + euro(t.price - taxFor(t.price, 'tausch')) + ' drauf' + (taxFor(t.price, 'tausch') ? ' (nach Steuer)' : '') };
   };
   // Hinweis, ob ich die Karte schon besitze
   const ownTag = (id) => { if (String(id).startsWith('item:')) return; const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
@@ -21,7 +22,11 @@
 <div class="handel-page">
 <div class="page-head">
   <h1>Handel</h1>
-  <span class="muted">Handelssteuer <strong><%= taxText %> %</strong><% if (taxPercent > 0) { %> · vom Erlös abgezogen<% } %></span>
+  <% if (taxSame) { %>
+    <span class="muted">Handelssteuer <strong><%= pctText(taxRates.markt) %></strong><% if (taxRates.markt > 0) { %> · vom Erlös abgezogen<% } %></span>
+  <% } else { %>
+    <span class="muted">Steuer: Markt <strong><%= pctText(taxRates.markt) %></strong> · Privat <strong><%= pctText(taxRates.privat) %></strong> · Tausch <strong><%= pctText(taxRates.tausch) %></strong></span>
+  <% } %>
 </div>
 
 <% { const bm = blackMarket; const left = bm.offers.filter((o) => !o.buyer).length; const cdAt = (bm.open ? bm.closesAt : bm.opensAt).getTime(); %>
@@ -206,7 +211,7 @@
           <li><strong>Markt:</strong> jeder kann kaufen, <%= marketDays %> Tage gültig.</li>
           <li><strong>Privat:</strong> Verkauf an ein Mitglied, <%= privateHours %> Std. gültig.</li>
           <li><strong>Tausch:</strong> deine Karte gegen eine aus der Sammlung eines Mitglieds, optional mit Aufpreis, <%= privateHours %> Std. gültig.</li>
-          <li>Angebotene Karten sind bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf Geld fallen <%= taxText %> % Steuer an.<% } else { %>Aktuell fällt keine Steuer an.<% } %></li>
+          <li>Angebotene Karten sind bis dahin gesperrt. <% if (taxSame && !taxRates.markt) { %>Aktuell fällt keine Steuer an.<% } else if (taxSame) { %>Auf Geld fallen <%= pctText(taxRates.markt) %> Steuer an.<% } else { %>Steuer auf Geld: Markt <%= pctText(taxRates.markt) %>, Privat <%= pctText(taxRates.privat) %>, Tausch <%= pctText(taxRates.tausch) %> (auf den Aufpreis).<% } %></li>
         </ul>
       </details>
     </div>
@@ -227,8 +232,8 @@
                   <span><%= extra(t).text %></span>
                   <span class="trade-title"><% swapState(t, 'seller') %></span>
                   <a class="small" href="/handel/verhandlung/<%= t._id %>"><%= canAccept(t, 'seller') ? 'Gegenvorschlag ansehen' : 'Verhandeln' %> →</a>
-                <% } else if (taxFor(t.price)) { %>
-                  <span>Erlös nach Steuer <%= euro(t.price - taxFor(t.price)) %></span>
+                <% } else if (taxFor(t.price, t.kind)) { %>
+                  <span>Erlös nach Steuer <%= euro(t.price - taxFor(t.price, t.kind)) %></span>
                 <% } %>
               </div>
               <% if (!w) { %><span class="my-offer-price"><%= euro(t.price) %></span><% } %>
@@ -301,7 +306,7 @@
           <input type="text" name="price" inputmode="decimal" placeholder="z. B. 50" required>
         </label>
         <button class="btn btn-primary btn-block" type="submit">Auf den Markt stellen</button>
-        <p class="muted small">Jeder kann kaufen. <%= marketDays %> Tage gültig<%= taxPercent > 0 ? ', ' + taxText + ' % Steuer auf den Erlös' : '' %>.</p>
+        <p class="muted small">Jeder kann kaufen. <%= marketDays %> Tage gültig<%= taxRates.markt > 0 ? ', ' + pctText(taxRates.markt) + ' Steuer auf den Erlös' : '' %>.</p>
       </form>
 
       <form method="post" action="/handel/angebot" class="form" data-trade-pane="privat" hidden>
@@ -317,7 +322,7 @@
           <input type="text" name="price" inputmode="decimal" placeholder="z. B. 50" required>
         </label>
         <button class="btn btn-primary btn-block" type="submit">Angebot senden</button>
-        <p class="muted small">Nur diese Person kann annehmen. <%= privateHours %> Std. gültig.</p>
+        <p class="muted small">Nur diese Person kann annehmen. <%= privateHours %> Std. gültig<%= taxRates.privat > 0 ? ', ' + pctText(taxRates.privat) + ' Steuer auf den Erlös' : '' %>.</p>
       </form>
 
       <form method="get" action="/handel/tausch" class="form" data-trade-pane="tausch" hidden>

@@ -232,7 +232,7 @@ function pullVerdict(count, total, chance) {
 
 // ---------- Markierungen ----------
 
-const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', bonus: 'Bonus', grading: 'Grading', folie: 'Folie', config: '.env' };
+const AREA_SHORT = { tcg: 'TCG', ihk: 'IHK', handel: 'Handel', steuer: 'Steuer', bonus: 'Bonus', grading: 'Grading', folie: 'Folie', config: '.env' };
 
 /** Einstellungsänderungen und Patchnotes im Zeitraum – Markierungen in allen Verläufen */
 async function markers(p) {

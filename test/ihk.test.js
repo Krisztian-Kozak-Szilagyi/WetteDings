@@ -238,3 +238,29 @@ test('Booster Pack für eine geschaffte Quest: Chance je Schwierigkeit, Hybrid g
     [ihk.settings.packChances, ihk.settings.hybrid.packChances] = saved;
   }
 });
+
+test('Forkbomb (St. Ivan, the Forsaken): Deadline läuft langsamer, jede Runde 2 % weniger', () => {
+  const { simulate, WORK_TIME } = require('../src/ihk/ihkService');
+  const { resolveAll } = require('../src/ihk/abilities');
+  const catalog = require('../src/tcg/catalog');
+  const boss = catalog.cardById['st-ivan-boss'];
+  const effects = resolveAll(boss, []);
+  assert.ok(effects.some((e) => e.key === 'forkbomb'));
+  const stats = { speed: 50, fia: 10, fis: 10, bwl: 10 };
+  const rand = () => 0.5;
+  const plain = simulate(stats, 'fia', 1e9, rand, []);
+  const fb = simulate(stats, 'fia', 1e9, rand, effects);
+  assert.ok(fb.slow.length > 0);
+  assert.strictEqual(fb.slow[0][2], 30);
+  for (let i = 1; i < fb.slow.length; i++) assert.strictEqual(fb.slow[i][2], Math.max(0, fb.slow[i - 1][2] - 2));
+  assert.ok(fb.extend > 0);
+  // nie schlechter als ohne; der letzte Takt liegt vor dem Ende der verlängerten Deadline
+  assert.ok(fb.total >= plain.total);
+  // schnelle Karte (kurze Runden): die gewonnene Zeit reicht für eine zusätzliche Runde
+  const fast = { speed: 99, fia: 10, fis: 10, bwl: 10 };
+  assert.ok(simulate(fast, 'fia', 1e9, rand, effects).ticks.filter((x) => !x.ability).length > simulate(fast, 'fia', 1e9, rand, []).ticks.length);
+  assert.ok(fb.ticks[fb.ticks.length - 1].t <= WORK_TIME + fb.freeze + fb.extend + 1e-6);
+  // ohne Forkbomb ändert sich nichts
+  assert.deepStrictEqual(plain.slow, []);
+  assert.strictEqual(plain.extend, 0);
+});

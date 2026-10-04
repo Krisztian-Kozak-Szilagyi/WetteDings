@@ -2,6 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const { CoinTrade, CoinHour } = require('../models/Coin');
 const markets = require('../coin/markets');
+const taxService = require('../services/taxService');
 const trade = require('../coin/tradeService');
 const { str, parseEuro, UserError } = require('../lib/util');
 const { euro, coinPrice, coinAmount } = require('../lib/viewHelpers');
@@ -38,6 +39,7 @@ async function page(req, res, engine) {
   });
   res.render('broker', {
     title: `Broker · ${snap.name}`,
+    brokerTax: taxService.rate(engine.kind),
     snap,
     assets,
     basePath: pathOf(engine),
@@ -99,7 +101,7 @@ async function overview(req, res) {
       pl: h.units ? value - h.costCents : null,
     };
   });
-  res.render('broker-overview', { title: 'Broker', rows, sentimentDays: SENTIMENT_DAYS });
+  res.render('broker-overview', { title: 'Broker', rows, sentimentDays: SENTIMENT_DAYS, brokerTax: { coin: taxService.rate('coin'), etf: taxService.rate('etf') } });
 }
 
 router.get('/broker/api/uebersicht', (req, res) => {
@@ -158,7 +160,7 @@ router.post('/broker/verkaufen', (req, res) =>
     const cents = all ? null : parseEuro(str(req.body.amount));
     if (!all && cents === null) throw new UserError('Bitte gib einen gültigen Betrag ein.');
     const r = await trade.sell({ user: req.user, symbol: engine.SYMBOL, cents, all });
-    const pl = r.profit >= 0 ? `Gewinn ${euro(r.profit)}` : `Verlust ${euro(-r.profit)}`;
+    const pl = (r.profit >= 0 ? `Gewinn ${euro(r.profit)}` : `Verlust ${euro(-r.profit)}`) + (r.tax ? `, Steuer ${euro(r.tax)}` : '');
     return `Verkauft: ${coinAmount(r.units, engine.SYMBOL)} für ${euro(r.cents)} (Kurs ${coinPrice(r.price)}, ${pl}).`;
   })
 );

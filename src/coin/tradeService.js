@@ -4,6 +4,7 @@ const { CoinHolding, CoinTrade } = require('../models/Coin');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const markets = require('./markets');
+const taxService = require('../services/taxService');
 
 /** Engine zum Symbol; unbekannte Symbole sind ein Nutzerfehler */
 function engineOf(symbol) {
@@ -81,10 +82,13 @@ async function sell({ user, symbol = 'SAM', cents, all = false }) {
     );
     if (res.modifiedCount !== 1) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 
-    await User.updateOne({ _id: user._id }, { $inc: { balance: proceeds } }, { session });
-    await CoinTrade.create([{ user: user._id, coin: symbol, side: 'verkauf', units, price, cents: proceeds }], { session });
-    await Ledger.create([{ user: user._id, type: 'coin_verkauf', amount: proceeds, betTitle: engine.NAME }], { session });
-    return { units, price, cents: proceeds, profit: proceeds - costReduce };
+    // Steuer nur auf den Gewinn (Erlös − anteiliger Einstand), Satz je Kategorie (Coins, ETFs)
+    const tax = taxService.gainTax(proceeds, costReduce, taxService.rate(engine.kind));
+    const net = proceeds - tax;
+    await User.updateOne({ _id: user._id }, { $inc: { balance: net } }, { session });
+    await CoinTrade.create([{ user: user._id, coin: symbol, side: 'verkauf', units, price, cents: net, tax }], { session });
+    await Ledger.create([{ user: user._id, type: 'coin_verkauf', amount: net, betTitle: engine.NAME }], { session });
+    return { units, price, cents: net, tax, profit: net - costReduce };
   });
 }
 

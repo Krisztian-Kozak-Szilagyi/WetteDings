@@ -19,6 +19,6 @@ module.exports = {
     // Regeln dafür (stehen absichtlich nicht auf der Karte): Reinigung (z. B. St. Ivans „Backup“) hebt den
     // Effekt auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.
     abilityName: 'Forkbomb',
-    ability: 'Alle gegnerischen Karten werden 20 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
+    ability: 'Alle gegnerischen Karten werden 30 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
   },
 };

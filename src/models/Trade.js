@@ -55,8 +55,8 @@ tradeSchema.index({ buyer: 1, closedAt: -1 }); // Protokolle: Geschäfte eines S
 // Ein Exemplar kann nur in einem offenen Angebot stecken
 tradeSchema.index({ cardDoc: 1 }, { unique: true, partialFilterExpression: { status: 'offen' } });
 
-// Admin-Einstellungen (ein Dokument, _id "handel")
-const settingsSchema = new Schema({ _id: { type: String, default: 'handel' }, taxPercent: Number, updatedByName: String }, { timestamps: true });
+// Admin-Einstellungen: _id "steuer" = Steuersätze je Bereich (services/taxService); "handel" = alte einheitliche Handelssteuer
+const settingsSchema = new Schema({ _id: { type: String, default: 'handel' }, taxPercent: Number, rates: { markt: Number, privat: Number, tausch: Number, coin: Number, etf: Number }, updatedByName: String }, { timestamps: true });
 
 /** Offene Angebote: Status "offen" und nicht abgelaufen (abgelaufene bleiben "offen", gelten aber nicht mehr) */
 const openFilter = () => ({ status: 'offen', expiresAt: { $gt: new Date() } });

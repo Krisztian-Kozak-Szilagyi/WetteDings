@@ -89,6 +89,11 @@ function resolve(main, boost) {
     const pct = HERMANN[boost.rarity];
     add({ key: 'hermann', label: 'Hermann', text: `Die Aufgabe ist zwei Runden lang ${pct} % stärker – danach wird sie vollständig zerstört.`, fx: 'fx-aura', target: 'player', enemyFx: 'fx-bloodlust', apply: (s) => { s.doom = { factor: 1 + pct / 100, ticks: 2 }; } });
   }
+  // St. Ivan, the Forsaken (Boss-Karte): Forkbomb – die Deadline läuft 30 % langsamer, jede Runde 2 % weniger.
+  // Eigentlich für gegnerische Karten (kommender Spielmodus); in IHK und Dungeon trifft es die Aufgabe.
+  if (m === 'st-ivan-boss') {
+    add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
+  }
   return out;
 }
 
