@@ -94,16 +94,24 @@ function speedSvg(frame, value, base) {
   );
 }
 
-function abilitySvg(frame, text) {
-  if (!text) return '';
+// title = Name der Fähigkeit (fett, über dem Text); der Text passt sich dem restlichen Platz an
+function abilitySvg(frame, text, title) {
+  if (!text && !title) return '';
   const b = frame.text;
   const c = frame.colors;
-  const { size, lines } = fitText(text, b);
+  const titleSize = title ? b.size + 3 : 0;
+  const titleLh = titleSize * 1.25;
+  const { size, lines } = text ? fitText(text, { ...b, h: b.h - titleLh }) : { size: b.size, lines: [] };
   const lh = size * b.lineHeight;
-  // senkrecht mittig; die Grundlinie liegt etwa 0,8 Schriftgrößen unter der Zeilenoberkante
-  const top = b.y + (b.h - lines.length * lh) / 2 + size * 0.8 + (lh - size) / 2;
-  const tspans = lines.map((l, i) => `<tspan x="${b.x + b.w / 2}" y="${(top + i * lh).toFixed(1)}">${esc(l)}</tspan>`).join('');
-  return `<text text-anchor="middle" font-size="${size}" font-style="italic" fill="${c.text}" stroke-width="2" ${textAttrs(c)}>${tspans}</text>`;
+  // Block (Titel + Text) senkrecht mittig; die Grundlinie liegt etwa 0,8 Schriftgrößen unter der Zeilenoberkante
+  const blockTop = b.y + (b.h - titleLh - lines.length * lh) / 2;
+  const top = blockTop + titleLh + size * 0.8 + (lh - size) / 2;
+  const cx = b.x + b.w / 2;
+  const head = title
+    ? `<text x="${cx}" y="${(blockTop + titleSize * 0.95).toFixed(1)}" text-anchor="middle" font-size="${titleSize}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(title)}</text>`
+    : '';
+  const tspans = lines.map((l, i) => `<tspan x="${cx}" y="${(top + i * lh).toFixed(1)}">${esc(l)}</tspan>`).join('');
+  return head + (lines.length ? `<text text-anchor="middle" font-size="${size}" font-style="italic" fill="${c.text}" stroke-width="2" ${textAttrs(c)}>${tspans}</text>` : '');
 }
 
 /**
@@ -122,7 +130,7 @@ function render(card, values = {}) {
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
     speedSvg(frame, v.speed, base.speed) +
     statsSvg(frame, v, base) +
-    abilitySvg(frame, card.ability) +
+    abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'
   );
 }

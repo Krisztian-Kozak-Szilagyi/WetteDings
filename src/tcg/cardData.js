@@ -7,6 +7,7 @@
 //   frame:   Rahmen-Layout aus src/tcg/frames.js (wo die Fenster auf dem Bild liegen)
 //   name:    Name wie auf der Karte (sonst aus dem Dateinamen)
 //   stats:   [Speed, FIA, FIS, BWL]
+//   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
 module.exports = {
   'st-ivan-boss': {
@@ -14,7 +15,10 @@ module.exports = {
     frame: 'gilded',
     name: 'St. Ivan, the Forsaken',
     stats: [96, 95, 99, 90],
-    // Forkbomb (Idee: Krisztian) – wirkt auf gegnerische Karten, also erst im kommenden Spielmodus
-    ability: '„Forkbomb“: Alle gegnerischen Karten werden 20 % langsamer, jede Runde lässt der Effekt um 2 % nach. Reinigende Karten (z. B. St. Ivans „Backup“) heben ihn auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.',
+    // Forkbomb (Idee: Krisztian) – wirkt auf gegnerische Karten, also erst im kommenden Spielmodus.
+    // Regeln dafür (stehen absichtlich nicht auf der Karte): Reinigung (z. B. St. Ivans „Backup“) hebt den
+    // Effekt auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.
+    abilityName: 'Forkbomb',
+    ability: 'Alle gegnerischen Karten werden 20 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
   },
 };

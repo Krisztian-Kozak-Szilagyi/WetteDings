@@ -120,7 +120,7 @@ function loadCards(dir = IMAGE_DIR) {
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
-      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', artFile: path.join(dir, file) });
+      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
       return card;
@@ -145,7 +145,7 @@ function cardImage(card, values = {}) {
   } catch {
     // Datei fehlt – ohne Bildversion
   }
-  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.ability, mtime])).digest('hex').slice(0, 10);
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, mtime])).digest('hex').slice(0, 10);
   const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }
