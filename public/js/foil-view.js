@@ -21,7 +21,7 @@
     return e;
   }
 
-  /** Große Karte: vorne Bild + Etikett (Name, Seltenheit), hinten BfW-Rückseite + Etikett mit Datum */
+  /** Große Karte: vorne Bild + Grading-Etikett (Name, Seltenheit, Note 10), hinten BfW-Rückseite + Zertifikat mit Foliendatum */
   function build(d, foiling) {
     var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : ''));
     card.tabIndex = 0;
@@ -34,15 +34,23 @@
     img.alt = '';
     img.draggable = false;
     el('span', 'foil-sheen', front);
+    // Etikett wie beim Grading-Slab: folierte Karten haben immer Note 10
     var t = el('span', 'foil-ticket', front);
-    el('b', '', t, d.name);
-    el('span', '', t, d.rarityLabel);
+    var info = el('span', 'gr-slab-info', t);
+    el('strong', '', info, 'BfW GRADING');
+    el('span', '', info, d.name + ' · ' + d.rarityLabel);
+    el('span', 'gr-slab-word', info, 'GEM MINT');
+    el('span', 'gr-slab-grade', t, '10');
     var back = el('span', 'foil-face foil-back', inner);
     el('span', 'foil-back-art', back);
     el('span', 'foil-sheen', back);
-    var tb = el('span', 'foil-ticket foil-ticket-back', back);
-    el('span', '', tb, 'Foliert am');
-    el('b', '', tb, d.date);
+    // Rückseite: Zertifikat mit Foliendatum und Strichcode
+    var tb = el('span', 'foil-ticket', back);
+    var cert = el('span', 'gr-slab-cert', tb);
+    el('strong', '', cert, 'BfW GRADING');
+    el('span', '', cert, 'Foliert am ' + d.date);
+    el('span', '', cert, 'Note 10 · GEM MINT');
+    el('span', 'gr-slab-barcode', tb);
     return card;
   }
 
