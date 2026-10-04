@@ -251,7 +251,7 @@ test('Forkbomb (St. Ivan, the Forsaken): Deadline läuft langsamer, jede Runde 2
   const plain = simulate(stats, 'fia', 1e9, rand, []);
   const fb = simulate(stats, 'fia', 1e9, rand, effects);
   assert.ok(fb.slow.length > 0);
-  assert.strictEqual(fb.slow[0][2], 20);
+  assert.strictEqual(fb.slow[0][2], 30);
   for (let i = 1; i < fb.slow.length; i++) assert.strictEqual(fb.slow[i][2], Math.max(0, fb.slow[i - 1][2] - 2));
   assert.ok(fb.extend > 0);
   // nie schlechter als ohne; der letzte Takt liegt vor dem Ende der verlängerten Deadline
