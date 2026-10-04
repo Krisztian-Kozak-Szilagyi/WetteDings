@@ -579,6 +579,13 @@
     '</filter></svg>';
   var add = function () { document.body.insertAdjacentHTML('afterbegin', svg); };
   if (document.body) add(); else document.addEventListener('DOMContentLoaded', add);
+})();
+
+// Eigener Block: Der Block oben verlässt die Funktion früh (return), wenn es auf der Seite z. B. keinen Flammen-Namen gibt –
+// was hier steht, muss auf jeder Seite laufen.
+(function () {
+  'use strict';
+
   // Neuer Erfolg: Fenster wie das Beute-Fenster. Ist beim Laden schon einer offen, sofort zeigen; sonst alle 10 Sekunden
   // (und kurz nach jeder Aktion) nachfragen – so springt es auch ohne Neuladen auf, z. B. direkt nach dem Packöffnen.
   // Esc schließt nicht; „Weiter“ bestätigt im Hintergrund und zeigt gleich den nächsten Erfolg, falls noch einer wartet.
