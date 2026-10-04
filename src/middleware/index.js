@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
 const { maybeGrantDailyBonus } = require('../services/bonusService');
-const { euro, date } = require('../lib/viewHelpers');
+const { date } = require('../lib/viewHelpers');
 const deviceLogic = require('../device/deviceLogic');
 const deviceService = require('../device/deviceService');
 
@@ -86,17 +86,14 @@ async function device(req, res, next) {
   next();
 }
 
-/** Tagesbonus beim ersten Seitenaufruf des Tages gutschreiben und direkt anzeigen */
+/** Tagesbonus beim ersten Seitenaufruf des Tages gutschreiben */
 async function dailyBonus(req, res, next) {
   if (!req.user || req.method !== 'GET') return next();
   try {
     const granted = await maybeGrantDailyBonus(req.user);
     if (granted) {
+      // Kontostand oben sofort aktuell; keine Meldung (Krisztian: keine grünen Bestätigungen) – die Buchung steht im Kontoauszug
       req.user.balance = granted.balance;
-      const text = `Tagesbonus: ${euro(granted.amount)} wurden dir gutgeschrieben.`;
-      res.locals.flash = res.locals.flash
-        ? { ...res.locals.flash, message: `${res.locals.flash.message} ${text}` }
-        : { type: 'success', message: text };
     }
   } catch (err) {
     // Ein Fehler beim Bonus darf die Seite nicht blockieren
