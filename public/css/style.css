@@ -4723,7 +4723,12 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .dash-today { grid-column: span 4; }
 .dash-ticker { grid-column: 1 / -1; }
 .dash-bets { grid-column: span 7; }
-.dash-cds { grid-column: span 5; }
+.dash-album { grid-column: span 5; min-height: 300px; }
+/* Countdowns: Leiste unter der Begrüßung */
+.dash-cds { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: -8px; }
+.dash-cds .dash-cd { margin: 0; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.dash-cds .dash-cd:hover { background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-accent-700); }
+.dash-cds .dash-cd-bm.is-live { box-shadow: 0 0 0 1px color-mix(in srgb, #a855f7 45%, transparent), 0 0 24px color-mix(in srgb, #a855f7 14%, transparent); }
 .dash-forum, .dash-notes { grid-column: span 6; }
 .dash-favs { grid-column: 1 / -1; }
 
@@ -4833,7 +4838,7 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .dash-fav-grid.tcg-favs { grid-template-columns: repeat(auto-fill, minmax(120px, 160px)); }
 
 @media (max-width: 1100px) {
-  .dash-wealth, .dash-today, .dash-bets, .dash-cds, .dash-forum, .dash-notes { grid-column: 1 / -1; }
+  .dash-wealth, .dash-today, .dash-bets, .dash-album, .dash-forum, .dash-notes { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
   .dash-hero { padding: 24px 18px 22px; }

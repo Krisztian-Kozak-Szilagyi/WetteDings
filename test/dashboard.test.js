@@ -41,3 +41,18 @@ test('Dashboard: Termine sortiert, vergangene fallen weg', () => {
   const list = dash.upcoming([{ key: 'b', at: at(5) }, { key: 'old', at: at(-1) }, { key: 'a', at: at(1) }, null], now);
   assert.deepEqual(list.map((e) => e.key), ['a', 'b']);
 });
+
+test('Dashboard: Album-Fächer zeigt die seltensten eigenen Karten, sonst Beispielkarten, nie geheime', () => {
+  const rar = { gold: { rank: 2 }, holo: { rank: 3 }, glitch: { rank: 5 }, sith: { rank: 7, hidden: true }, crumpled: { rank: 0 } };
+  const cards = [
+    { id: 'a', rarity: 'crumpled' },
+    { id: 'b', rarity: 'gold' },
+    { id: 'c', rarity: 'holo' },
+    { id: 'd', rarity: 'glitch' },
+    { id: 's', rarity: 'sith' },
+  ];
+  assert.deepEqual(dash.albumFan(cards, { a: 1, b: 1, c: 2, d: 1, s: 1 }, rar).map((f) => f.card.id), ['d', 'c', 'b']);
+  const empty = dash.albumFan(cards, {}, rar);
+  assert.deepEqual(empty.map((f) => [f.card.id, f.sample]), [['b', true], ['d', true], ['c', true]]);
+  assert.deepEqual(dash.albumFan(cards, { s: 1, a: 1 }, rar).map((f) => f.card.id), ['a', 'b', 'd']);
+});

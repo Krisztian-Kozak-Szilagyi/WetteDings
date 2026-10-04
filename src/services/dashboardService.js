@@ -14,6 +14,7 @@ const lottery = require('./lotteryService');
 const markets = require('../coin/markets');
 const blackMarket = require('../tcg/blackMarket');
 const { favoriteList, inventory } = require('../tcg/tcgService');
+const catalog = require('../tcg/catalog');
 const forumService = require('../forum/forumService');
 const ihk = require('../ihk/ihkService');
 const grading = require('../grading/gradingService');
@@ -174,16 +175,34 @@ async function ticker() {
   });
 }
 
-/** Lieblingskarten (wie im Profil) */
-async function favorites(user) {
-  if (!(user.tcgFavorites || []).length) return [];
+/**
+ * Fächer der Album-Kachel (wie auf der TCG-Seite): die drei seltensten eigenen Karten, sonst Beispielkarten.
+ * Geheime Seltenheiten zeigt sie nicht. Gibt [{ card, sample }] zurück.
+ */
+function albumFan(cards, counts, rarityByKey) {
+  const rank = (c) => (rarityByKey[c.rarity] || { rank: 0 }).rank;
+  let fan = cards.filter((c) => counts[c.id] && !(rarityByKey[c.rarity] || {}).hidden).sort((a, b) => rank(b) - rank(a)).slice(0, 3);
+  if (fan.length < 3) {
+    const sample = ['gold', 'glitch', 'holo'].map((k) => cards.find((c) => c.rarity === k)).filter(Boolean);
+    fan = fan.concat(sample.filter((c) => !fan.includes(c))).slice(0, 3);
+  }
+  return fan.map((card) => ({ card, sample: !counts[card.id] }));
+}
+
+/** Sammlung: Album-Kachel (Fächer, Fortschritt) und Lieblingskarten (wie im Profil) */
+async function collectionInfo(user) {
   const owned = await inventory(user._id);
-  return favoriteList(user, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)])));
+  const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
+  const favs = (user.tcgFavorites || []).length ? await favoriteList(user, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))) : [];
+  return {
+    favorites: favs,
+    album: { fan: albumFan(catalog.CARDS, counts, catalog.rarityByKey), owned: catalog.CARDS.filter((c) => counts[c.id]).length, total: catalog.CARDS.length },
+  };
 }
 
 async function load(user) {
-  const [w, bets, today, cds, threads, tick, favs] = await Promise.all([wealth(user), openBets(user), todayStatus(user), countdowns(user), forumLatest(user), ticker(), favorites(user)]);
-  return { greeting: greeting(), wealth: w, bets, today, countdowns: cds, threads, ticker: tick, favorites: favs, notesMax: NOTES_MAX };
+  const [w, bets, today, cds, threads, tick, coll] = await Promise.all([wealth(user), openBets(user), todayStatus(user), countdowns(user), forumLatest(user), ticker(), collectionInfo(user)]);
+  return { greeting: greeting(), wealth: w, bets, today, countdowns: cds, threads, ticker: tick, favorites: coll.favorites, album: coll.album, notesMax: NOTES_MAX };
 }
 
-module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, load };
+module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, albumFan, load };

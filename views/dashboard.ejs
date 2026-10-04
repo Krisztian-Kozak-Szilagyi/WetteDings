@@ -31,6 +31,17 @@
     </div>
   </header>
 
+  <% if (d.countdowns.length) { %>
+    <section class="dash-cds" aria-label="Countdowns">
+      <% d.countdowns.forEach((c) => { %>
+        <a class="dash-cd dash-cd-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>">
+          <span class="dash-cd-label"><strong><%= c.label %></strong><small><%= date(c.at) %></small></span>
+          <span class="dash-cd-time" data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></span>
+        </a>
+      <% }) %>
+    </section>
+  <% } %>
+
   <div class="dash-grid">
     <%# ---------- Vermögen ---------- %>
     <section class="dash-card dash-wealth" aria-labelledby="dash-wealth-h">
@@ -152,20 +163,23 @@
       <% } %>
     </section>
 
-    <%# ---------- Countdowns ---------- %>
-    <section class="dash-card dash-cds" aria-labelledby="dash-cds-h">
-      <div class="dash-card-head"><h2 id="dash-cds-h">Countdowns</h2></div>
-      <ul class="dash-list">
-        <% d.countdowns.forEach((c) => { %>
-          <li>
-            <a class="dash-cd dash-cd-<%= c.key %><%= c.live ? ' is-live' : '' %>" href="<%= c.href %>">
-              <span class="dash-cd-label"><strong><%= c.label %></strong><small><%= date(c.at) %></small></span>
-              <span class="dash-cd-time" data-dash-cd="<%= c.at.getTime() %>"><%= relTime(c.at) %></span>
-            </a>
-          </li>
-        <% }) %>
-      </ul>
-    </section>
+    <%# ---------- Album (wie auf der TCG-Seite) ---------- %>
+    <a class="tcg-album-tile dash-album" href="/tcg/album">
+      <span class="tcg-fan" aria-hidden="true">
+        <% d.album.fan.forEach((f) => { %><img src="<%= f.card.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= f.sample ? 'is-sample' : '' %>"><% }) %>
+      </span>
+      <span class="tcg-album-foot">
+        <span class="tcg-album-text">
+          <span class="kicker">Sammlung</span>
+          <span class="tcg-album-title">Zum Album</span>
+          <span class="tcg-progress">
+            <span class="progress"><span style="width: <%= d.album.total ? Math.round(d.album.owned / d.album.total * 100) : 0 %>%"></span></span>
+            <span class="tcg-progress-num"><%= d.album.owned %> / <%= d.album.total %></span>
+          </span>
+        </span>
+        <span class="tcg-album-arrow" aria-hidden="true">→</span>
+      </span>
+    </a>
 
     <%# ---------- Forum ---------- %>
     <section class="dash-card dash-forum" aria-labelledby="dash-forum-h">
