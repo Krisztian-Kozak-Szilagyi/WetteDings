@@ -55,3 +55,17 @@ test('Stufen: aufsteigende Kosten, jede Stufe mindestens so viele Schritte wie d
   assert.equal(levelInfo(99).level, LEVELS.length);
   assert.equal(levelInfo(0).level, 1);
 });
+
+test('Grading: Kundenkarten erst ab Holo, seltener = weniger Chance und mehr Lohn', () => {
+  const { CUSTOMER_RARITIES, rarityBonus, rollCard } = require('../src/grading/gradingService');
+  const catalog = require('../src/tcg/catalog');
+  assert.deepStrictEqual(CUSTOMER_RARITIES.map(([k]) => k), ['holo', 'bockhaber', 'glitch', 'icon', 'boss', 'sith']);
+  assert.deepStrictEqual(CUSTOMER_RARITIES.map(([, , b]) => b), [0, 5, 10, 15, 20, 50]);
+  for (let i = 1; i < CUSTOMER_RARITIES.length; i++) assert.ok(CUSTOMER_RARITIES[i][1] < CUSTOMER_RARITIES[i - 1][1]);
+  const allowed = new Set(CUSTOMER_RARITIES.map(([k]) => k));
+  for (let i = 0; i < 500; i++) assert.ok(allowed.has(catalog.cardById[rollCard()].rarity));
+  assert.strictEqual(rarityBonus('crumpled'), 0);
+  assert.strictEqual(payFor({ level: 1, rarity: 'sith' }), Math.round(PAY.clean * 1.5));
+  assert.strictEqual(payFor({ level: 1, rarity: 'bockhaber' }), Math.round(PAY.clean * 1.05));
+  assert.strictEqual(payFor({ level: 4, grade: 8, guess: 8, seal: 100, rarity: 'boss' }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3 * 1.2));
+});

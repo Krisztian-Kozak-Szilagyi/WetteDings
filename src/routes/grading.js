@@ -33,7 +33,7 @@ router.get('/grading', async (req, res) => {
     jobData: job
       ? {
           steps: grading.levelInfo(job.level).steps,
-          card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
+          card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
           customer: job.customer,
           cert: String(parseInt(String(job._id).slice(-7), 16) % 100000000).padStart(8, '0'), // Zertifikatsnummer fürs Slab-Etikett
           spots: job.spots,

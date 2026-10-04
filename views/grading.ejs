@@ -59,7 +59,7 @@
           <div class="gr-ticket">
             <span class="gr-ticket-label">Auftrag</span>
             <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
-            <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %></span><% } %>
+            <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %><% if (jobData.card.bonus) { %> · +<%= jobData.card.bonus %> % Lohn<% } %></span><% } %>
             <span class="gr-ticket-for">für <%= jobData.customer %></span>
           </div>
 
@@ -162,8 +162,7 @@
                 <span class="gr-done-info">
                   <span><b><%= j.cardInfo ? j.cardInfo.name : j.card %></b> <span class="gr-dim">für <%= j.customer %></span></span>
                   <span class="gr-done-meta">
-                    <% if (j.clean !== null && j.clean !== undefined) { %><span class="<%= j.clean === 100 ? 'gr-ok' : '' %>">Sauberkeit <%= j.clean %> %</span><% } %>
-                    <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>"> · Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
+                    <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
                     <% if (j.seal !== null) { %><span> · Versiegelung <%= j.seal %> %</span><% } %>
                     <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
                   </span>

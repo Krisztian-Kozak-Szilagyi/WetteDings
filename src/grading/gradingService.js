@@ -21,8 +21,21 @@ const LEVELS = [
   { level: 1, name: 'Putzstube', steps: ['clean'], perk: 'Karten reinigen und zurückschicken' },
   { level: 2, name: 'Grading-Labor', steps: ['clean', 'grade'], perk: 'Karten benoten (1–10) – richtige Noten bringen Extra-Lohn' },
   { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'grade', 'slab'], perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
-  { level: 4, name: 'Premium-Labor', steps: ['clean', 'grade', 'slab'], premium: true, perk: 'Sammler bringen nur noch seltene Karten (ab Gold) – mehr Lohn' },
+  { level: 4, name: 'Premium-Labor', steps: ['clean', 'grade', 'slab'], premium: true, perk: 'Stammkunden zahlen besser – mehr Lohn' },
 ];
+
+// Karten der Kunden: erst ab Holo (wer schickt schon eine Crumpled zur Echtheitsprüfung?).
+// [Seltenheit, Gewicht, Lohn-Zuschlag in %] – je seltener, desto unwahrscheinlicher und desto mehr Lohn
+const CUSTOMER_RARITIES = [
+  ['holo', 45, 0],
+  ['bockhaber', 25, 5],
+  ['glitch', 14, 10],
+  ['icon', 9, 15],
+  ['boss', 5, 20],
+  ['sith', 2, 50],
+];
+/** Lohn-Zuschlag in % für die Seltenheit der Kundenkarte (0, wenn unbekannt) */
+const rarityBonus = (rarity) => (CUSTOMER_RARITIES.find(([k]) => k === rarity) || [null, 0, 0])[2];
 
 const CUSTOMERS = ['Sammler Günther', 'Frau Hildebrandt', 'Kevin (12)', 'Onkel Horst', 'Auktionshaus Lemke', 'Dr. Brösel', 'Tante Uschi', 'Herr Kowalski', 'Jacqueline', 'Investor Maximilian', 'Oma Erna', 'Der Typ vom Flohmarkt'];
 
@@ -76,11 +89,11 @@ function weighted(weights) {
   return 0;
 }
 
-/** Karte des Kunden: wie beim Pack nach Seltenheit gewürfelt (ohne geheime); Premium-Labor nur ab Gold */
-function rollCard(level) {
-  const rarities = catalog.RARITIES.filter((r) => !r.hidden && catalog.cardsByRarity[r.key].length && (level < 4 || r.rank >= catalog.rarityByKey.gold.rank));
-  const r = rarities[weighted(rarities.map((x) => Math.max(1, x.weight)))];
-  return pick(catalog.cardsByRarity[r.key]).id;
+/** Karte des Kunden: Seltenheit nach CUSTOMER_RARITIES (nur Seltenheiten, zu denen es Karten gibt) */
+function rollCard() {
+  const list = CUSTOMER_RARITIES.filter(([k]) => (catalog.cardsByRarity[k] || []).length);
+  const [key] = list[weighted(list.map(([, w]) => w))];
+  return pick(catalog.cardsByRarity[key]).id;
 }
 
 /** Flecken auf Vorder- und Rückseite (Positionen in % der Kartenfläche) */
@@ -120,7 +133,7 @@ function gradeFor(defects) {
 }
 
 /** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %) */
-function payFor({ level, clean = 100, grade, guess, seal }) {
+function payFor({ level, clean = 100, grade, guess, seal, rarity }) {
   const info = levelInfo(level);
   let pay = Math.round((PAY.clean * Math.max(0, Math.min(100, clean))) / 100);
   if (info.steps.includes('grade')) {
@@ -129,7 +142,7 @@ function payFor({ level, clean = 100, grade, guess, seal }) {
     else if (diff === 1) pay += PAY.grade / 2;
   }
   if (info.steps.includes('slab')) pay += Math.round((PAY.slab * Math.max(0, Math.min(100, seal))) / 100);
-  return Math.round(pay * info.factor);
+  return Math.round(pay * info.factor * (1 + rarityBonus(rarity) / 100));
 }
 
 // ---------- Ablauf ----------
@@ -197,7 +210,7 @@ async function takeJob({ user }) {
       user: user._id,
       day: today(),
       level: info.level,
-      card: rollCard(info.level),
+      card: rollCard(),
       customer: pick(CUSTOMERS),
       spots: rollSpots(),
       defects,
@@ -237,13 +250,13 @@ async function finishJob({ user, clean, seal }) {
     if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
     if (info.steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
     const sealQ = info.steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
-    const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ });
+    const card = catalog.cardById[job.card];
+    const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity });
     const foilFound = sealQ > 0 && (await rollGradingFoil({ userId: user._id, session }));
     Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, foilFound, doneAt: new Date() });
     await job.save({ session });
     await User.updateOne({ _id: user._id }, { $inc: { balance: pay } }, { session });
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay } }, { session });
-    const card = catalog.cardById[job.card];
     await Ledger.create([{ user: user._id, type: 'grading_lohn', amount: pay, betTitle: card ? `${card.name} für ${job.customer}` : job.customer }], { session });
     return job.toObject();
   });
@@ -254,4 +267,4 @@ async function finishJob({ user, clean, seal }) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
