@@ -22,7 +22,7 @@ module.exports = {
       plate: '#4a0b10',
       plateBorder: '#d6a54c',
       up: '#8fe8a8', // gebuffter Wert (z. B. durch einen Boost im Kampf)
-      down: '#a8bfff', // geschwächter Wert
+      down: '#ff9b9b', // geschwächter Wert (Debuff)
     },
   },
 };

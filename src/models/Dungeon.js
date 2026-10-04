@@ -29,7 +29,8 @@ partySchema.index({ 'members.user': 1 }, { unique: true });
 partySchema.index({ 'invites.user': 1 });
 partySchema.index({ slot: 1 });
 
-const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean }, { _id: false });
+// st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate
+const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
 
 // Ein Dungeon-Durchlauf (drei Spieler, Bots füllen auf). Alle Kämpfe werden beim Start ausgewürfelt und
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.

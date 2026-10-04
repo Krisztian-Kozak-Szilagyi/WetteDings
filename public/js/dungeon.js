@@ -263,7 +263,42 @@
     s.textContent = text;
     el.append(s);
     setTimeout(() => s.remove(), 1400);
+    return s;
   }
+
+  // ---------- Kartenwerte live (nur Rahmen-Karten): jeder Kampf beginnt mit den Grundwerten ----------
+  const cardInfo = pb.cards || [];
+  const curStats = cardInfo.map((c) => (c ? c.stats : null));
+  cardInfo.forEach((c) => c && Object.values(c.imgs).forEach((u) => { new Image().src = u; })); // vorladen
+  const STAT_LABELS = ['Speed', 'FIA', 'FIS', 'BWL'];
+  const flash = (el, cls) => {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  };
+  // quiet: ohne Anzeige der Änderung (Rücksetzen zu Kampfbeginn)
+  function setCard(m, st, url, quiet) {
+    const btn = slotEls[m] && slotEls[m].querySelector('.dg-slot-zoom');
+    const img = btn && btn.querySelector('img');
+    const prev = curStats[m];
+    curStats[m] = st;
+    if (img && url && img.getAttribute('src') !== url) {
+      img.src = url;
+      btn.dataset.image = url; // Großansicht zeigt dieselben Werte
+    }
+    if (quiet || first || !prev || !btn) return;
+    // Jede geänderte Eigenschaft steigt auf: grün ▲ (Buff), rot ▼ (Debuff) – auch bei alten Karten
+    let n = 0;
+    st.forEach((v, k) => {
+      if (v === prev[k]) return;
+      const el = pop(m, STAT_LABELS[k] + (v > prev[k] ? ' ▲ ' : ' ▼ ') + v, v > prev[k] ? 'is-stat-up' : 'is-stat-down');
+      if (el) el.style.marginTop = n++ * 34 - 40 + 'px'; // mehrere Werte untereinander
+    });
+    if (st.some((v, k) => v > prev[k])) flash(btn, 'fx-stat-up');
+    if (st.some((v, k) => v < prev[k])) flash(btn, 'fx-stat-down');
+  }
+  const showStats = (m, st) => cardInfo[m] && st && setCard(m, st, cardInfo[m].imgs[st.join(',')]);
+  const resetStats = () => cardInfo.forEach((c, m) => c && setCard(m, c.stats, c.base, true));
 
   function cast(m) {
     pop(m, '★', 'is-ability');
@@ -307,12 +342,14 @@
       if (!s.started) {
         s.started = true;
         log((f.boss ? 'Boss: ' : 'Kampf: ') + f.title, 'is-head');
+        resetStats();
       }
       const end = f.success ? f.doneAt : f.limit;
       const g0 = f.start || 0;
       const game = g0 + Math.min(1, (t - t0) / f.seconds) * (end - g0);
       while (s.ticks < f.ticks.length && f.ticks[s.ticks].t <= game) {
         const x = f.ticks[s.ticks++];
+        if (x.st) showStats(x.m, x.st);
         if (x.ability) {
           f.abilities.filter((a) => a.m === x.m).forEach((a) => {
             if (!a.team) log(names[a.m] + ': ' + a.label + ' – ' + a.text, 'is-ability');

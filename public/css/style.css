@@ -4378,3 +4378,21 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 .tcg-back.season-season-1 { border-color: #b8873a; background: var(--gr-back); }
 .tcg-back.season-season-1 .tcg-back-logo { display: none; }
+
+/* ---------- Kartenwerte geändert (Boost/Debuff) in IHK und Dungeon: Zahl steigt auf, Karte leuchtet kurz ---------- */
+.ihk-floater.is-stat-up, .ihk-floater.is-stat-down, .dg-pop.is-stat-up, .dg-pop.is-stat-down {
+  padding: 2px 9px; border-radius: 999px; font-size: 14px; font-weight: 800; white-space: nowrap; letter-spacing: .02em;
+  animation-duration: 1.8s; text-shadow: none;
+}
+.ihk-floater.is-stat-up, .ihk-floater.is-stat-down { top: 16%; }
+.is-stat-up { color: #dcfce7; background: rgba(21, 128, 61, .9); box-shadow: 0 0 0 1px #4ade80, 0 0 14px rgba(74, 222, 128, .6); }
+.is-stat-down { color: #fee2e2; background: rgba(153, 27, 27, .9); box-shadow: 0 0 0 1px #f87171, 0 0 14px rgba(248, 113, 113, .6); }
+@keyframes fx-stat-up { 30% { filter: drop-shadow(0 0 3px #4ade80) drop-shadow(0 0 16px rgba(74, 222, 128, .8)) brightness(1.12); } }
+@keyframes fx-stat-down { 30% { filter: drop-shadow(0 0 3px #f87171) drop-shadow(0 0 16px rgba(248, 113, 113, .8)) saturate(.7); } }
+.fx-stat-up img { animation: fx-stat-up 1.4s ease-out; }
+.fx-stat-down img { animation: fx-stat-down 1.4s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fx-stat-up img, .fx-stat-down img, .dg-pop.is-stat-up, .dg-pop.is-stat-down { animation: none !important; } }
+
+/* Boss-Seltenheit (nur Beute): Farbe für Punkt, Rahmen und „?“-Platzhalter im Album */
+.r-boss { --rar: #e0a646; }
+.r-boss .tcg-locked-inner { border-color: #e0a646; color: #e0a646; opacity: 1; }

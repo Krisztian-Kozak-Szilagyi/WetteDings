@@ -268,6 +268,44 @@
   var enemy = document.querySelector('.ihk-slot-enemy');
 
   var ticks = data.ticks.filter(function (t) { return !t.ability; });
+
+  // ---------- Kartenwerte live: Boost/Debuff schreibt die neuen Werte auf die Karte (nur Rahmen-Karten) ----------
+  var playerImg = player ? player.querySelector('img') : null;
+  var imgs = data.imgs || {};
+  var curStats = data.base;
+  Object.keys(imgs).forEach(function (k) { new Image().src = imgs[k]; }); // vorladen, damit der Wechsel sofort sitzt
+  var STAT_LABELS = ['Speed', 'FIA', 'FIS', 'BWL'];
+  function showStats(st, quiet) {
+    if (!st) return;
+    var prev = curStats;
+    curStats = st;
+    if (playerImg && imgs[st.join(',')]) {
+      playerImg.src = imgs[st.join(',')];
+      player.setAttribute('data-zoom', playerImg.src); // Großansicht zeigt dieselben Werte
+    }
+    if (!prev || quiet) return;
+    // Jede geänderte Eigenschaft steigt als Zahl auf: grün ▲ (Buff) bzw. rot ▼ (Debuff) – auch bei alten Karten
+    var up = false;
+    var down = false;
+    st.forEach(function (v, k) {
+      if (v === prev[k]) return;
+      if (v > prev[k]) up = true; else down = true;
+      var el = document.createElement('span');
+      el.className = 'ihk-floater ' + (v > prev[k] ? 'is-stat-up' : 'is-stat-down');
+      el.textContent = STAT_LABELS[k] + (v > prev[k] ? ' ▲ ' : ' ▼ ') + v;
+      el.style.left = (10 + k * 22) + '%';
+      floaters.appendChild(el);
+      setTimeout(function () { el.remove(); }, 1800);
+    });
+    if (up) bump(player, 'fx-stat-up');
+    if (down) bump(player, 'fx-stat-down');
+  }
+  // Werte am Ende: letzter Wechsel bis zum Schluss
+  function lastStats() {
+    var st = null;
+    data.ticks.forEach(function (t) { if (t.st) st = t.st; });
+    return st;
+  }
   var hasAbility = data.ticks.some(function (t) { return t.ability; }) && data.abilities.length;
   var total = 0;
   var i = 0;
@@ -453,6 +491,7 @@
       if (a.enemyFx) enemy && enemy.classList.add(a.enemyFx);
       playEffect(player, a.key);
     });
+    data.ticks.forEach(function (t) { if (t.ability && t.st) showStats(t.st); });
     boostSlots.forEach(function (b) { if (b.querySelector('img')) bump(b, 'fx-flash'); });
   }
   function finish() {
@@ -460,6 +499,7 @@
     done = true;
     while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
     if (hasAbility && (data.success ? last >= half : true)) activate();
+    showStats(lastStats(), true);
     render(endT);
     skip.hidden = true;
     result.hidden = false;
@@ -473,6 +513,7 @@
       total += ticks[i].p;
       total2 += ticks[i].p2 || 0;
       floater(ticks[i]);
+      showStats(ticks[i].st);
       i++;
     }
     render(Math.min(t, endT));

@@ -1,6 +1,6 @@
 // Karten mit gezeichnetem Rahmen als SVG: Bild (eingebettet) + Werte + Fähigkeitstext, passend zum Rahmen-Layout
 // (src/tcg/frames.js). Ausgeliefert unter /img/tcg/karte/<id>.svg – überall nutzbar wie ein normales Kartenbild (<img>).
-// Abweichende Werte (Boost im Kampf, ?fia=110) werden farbig gezeigt: höher = grün, niedriger = blau.
+// Abweichende Werte (Boost im Kampf, ?fia=110) werden farbig gezeigt: höher = grün ▲, niedriger = rot ▼.
 const fs = require('fs');
 const path = require('path');
 const FRAMES = require('./frames');
@@ -48,6 +48,13 @@ function fitText(text, box) {
 }
 
 const colorFor = (value, base, c) => (value > base ? c.up : value < base ? c.down : c.value);
+// kleines Dreieck neben einem geänderten Wert: ▲ Buff, ▼ Debuff (Mittelpunkt x/y, Größe r)
+function arrow(x, y, value, base, c, r = 8) {
+  if (value === base) return '';
+  const up = value > base;
+  const pts = up ? [[x - r, y + r * 0.7], [x + r, y + r * 0.7], [x, y - r * 0.9]] : [[x - r, y - r * 0.7], [x + r, y - r * 0.7], [x, y + r * 0.9]];
+  return `<path d="M${pts.map((p) => p.map((n) => n.toFixed(1)).join(' ')).join(' L')} Z" fill="${up ? c.up : c.down}" stroke="${c.outline}" stroke-width="2" stroke-linejoin="round"/>`;
+}
 const textAttrs = (c) => `font-family="${esc(FONT)}" paint-order="stroke" stroke="${c.outline}" stroke-linejoin="round"`;
 
 function statsSvg(frame, values, base) {
@@ -57,7 +64,8 @@ function statsSvg(frame, values, base) {
       const v = values[s.key];
       return (
         `<text x="${s.x}" y="${s.y - 18}" text-anchor="middle" font-size="16" font-weight="700" letter-spacing="3" fill="${c.label}" stroke-width="3" ${textAttrs(c)}>${s.label}</text>` +
-        `<text x="${s.x}" y="${s.y + 26}" text-anchor="middle" font-size="${v >= 100 ? 36 : 42}" font-weight="700" fill="${colorFor(v, base[s.key], c)}" stroke-width="4" ${textAttrs(c)}>${v}</text>`
+        `<text x="${s.x}" y="${s.y + 26}" text-anchor="middle" font-size="${v >= 100 ? 36 : 42}" font-weight="700" fill="${colorFor(v, base[s.key], c)}" stroke-width="4" ${textAttrs(c)}>${v}</text>` +
+        arrow(s.x + 39, s.y - 24, v, base[s.key], c)
       );
     })
     .join('');
@@ -73,7 +81,8 @@ function speedSvg(frame, value, base) {
   return (
     `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.h / 2}" fill="${c.plate}" stroke="${c.plateBorder}" stroke-width="3"/>` +
     `<path transform="translate(${bx} ${cy - 12 * k}) scale(${k})" d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" fill="${c.value}"/>` +
-    `<text x="${p.x + p.w * 0.62}" y="${cy + 12}" text-anchor="middle" font-size="34" font-weight="700" fill="${colorFor(value, base, c)}" stroke-width="3" ${textAttrs(c)}>${value}</text>`
+    `<text x="${p.x + p.w * 0.62}" y="${cy + 12}" text-anchor="middle" font-size="34" font-weight="700" fill="${colorFor(value, base, c)}" stroke-width="3" ${textAttrs(c)}>${value}</text>` +
+    arrow(p.x + p.w + 14, cy, value, base, c, 9)
   );
 }
 

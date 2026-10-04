@@ -21,7 +21,7 @@ const runSchema = new Schema(
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean }, { _id: false })], default: [] },
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte
     total: { type: Number, required: true },
     total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },

@@ -151,6 +151,21 @@ function cardImage(card, values = {}) {
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }
 
+/**
+ * Bilder einer Rahmen-Karte für die Werte-Wechsel einer Kampf-Wiedergabe: { "Speed,FIA,FIS,BWL": URL }.
+ * ticks: Takte aus ihkService.simulate (st = neue Werte). Karten ohne Rahmen (Werte im Bild) liefern {}.
+ */
+function statImages(card, ticks) {
+  const out = {};
+  if (!card || !card.frame) return out;
+  for (const t of ticks || []) {
+    const st = t && t.st;
+    if (!st || st.length !== 4) continue;
+    out[st.join(',')] = cardImage(card, { speed: st[0], fia: st[1], fis: st[2], bwl: st[3] });
+  }
+  return out;
+}
+
 /** Seltenheit würfeln: roll ist eine Zahl 0 … TOTAL_WEIGHT−1 */
 function rarityForRoll(roll) {
   let acc = 0;
@@ -197,6 +212,7 @@ module.exports = {
   seasonByKey,
   cardsBySeason,
   cardImage,
+  statImages,
   DEFAULT_SELL,
   DEFAULT_WEIGHT,
   TOTAL_WEIGHT,

@@ -50,6 +50,8 @@ router.get('/ihk', async (req, res) => {
     offers,
     canReroll,
     runCard: running ? catalog.cardById[running.card] : null,
+    // Kartenbilder mit geänderten Werten (Boost/Debuff) für die Wiedergabe – nur Rahmen-Karten
+    runImages: running ? catalog.statImages(catalog.cardById[running.card], running.ticks) : {},
     runBoost: running && running.boost ? catalog.cardById[running.boost] : null,
     runBoost2: running && running.boost2 ? catalog.cardById[running.boost2] : null,
     cards,

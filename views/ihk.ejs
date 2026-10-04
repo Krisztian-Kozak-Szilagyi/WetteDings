@@ -107,7 +107,7 @@
         <span>Quest läuft … noch <strong data-ihk-countdown="<%= new Date(run.endsAt).getTime() %>">–</strong></span>
       </div>
     <% } else if (phase === 'result') { %>
-      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [] }) %>'>
+      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, abilities: run.abilities || [], imgs: runImages, base: runCard && runCard.stats ? [runCard.stats.speed, runCard.stats.fia, runCard.stats.fis, runCard.stats.bwl] : null }) %>'>
         <% const twoBars = quest.hybrid && run.total2 != null; %>
         <div class="ihk-bar-label"><span>Fortschritt<%= twoBars ? ' 1' : '' %></span><span data-ihk-points>0 / <%= run.required %></span></div>
         <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress" data-ihk-progress></span></div>

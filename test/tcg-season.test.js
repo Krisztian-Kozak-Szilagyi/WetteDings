@@ -89,3 +89,40 @@ test('SVG-Werte aus der Query: nur ganze Zahlen bis 999', () => {
   assert.deepEqual(cardSvg.valuesFromQuery({ fia: ['1', '2'] }), {});
   assert.deepEqual(cardSvg.valuesFromQuery(undefined), {});
 });
+
+test('Kampf-Takte tragen geänderte Kartenwerte (st): Buff zur Halbzeit, Debuff, Ende eines Effekts', () => {
+  const { simulate } = require('../src/ihk/ihkService');
+  const { resolve } = require('../src/ihk/abilities');
+  const avg = () => 0.5;
+  const c = boss();
+  // ohne Fähigkeit: nie st
+  assert.ok(simulate(c.stats, 'bwl', 1e9, avg).ticks.every((t) => !t.st));
+  // BFW Energy: alle Stats +10 % ab Halbzeit – BWL 90 -> 99
+  const energy = simulate(c.stats, 'bwl', 1e9, avg, resolve(c, catalog.cardById['bfw-energy-gold']));
+  const changes = energy.ticks.filter((t) => t.st);
+  assert.equal(changes.length, 1);
+  assert.ok(changes[0].ability);
+  assert.deepEqual(changes[0].st, [96, 105, 109, 99]);
+  // Mauch: erst langsamer (Debuff), nach 2 Runden alle Werte höher
+  const mauch = Object.values(catalog.cardById).find((x) => x.id.startsWith('mauch-') && x.rarity === 'holo');
+  const m = simulate(c.stats, 'bwl', 1e9, avg, resolve(c, mauch)).ticks.filter((t) => t.st).map((t) => t.st);
+  assert.equal(m.length, 2);
+  assert.ok(m[0][0] < 96, 'Speed sinkt');
+  assert.ok(m[1][0] > 96 && m[1][3] > 90, 'danach alles höher');
+});
+
+test('Bilder je Werte-Wechsel: nur Rahmen-Karten, Schlüssel "Speed,FIA,FIS,BWL"', () => {
+  const ticks = [{ t: 1 }, { t: 2, st: [96, 105, 109, 99] }];
+  const imgs = catalog.statImages(boss(), ticks);
+  assert.deepEqual(Object.keys(imgs), ['96,105,109,99']);
+  assert.match(imgs['96,105,109,99'], /\?fia=105&fis=109&bwl=99&v=/);
+  assert.deepEqual(catalog.statImages(catalog.cardById['adrian-1-crumpled'], ticks), {});
+});
+
+test('SVG: geänderte Werte bekommen ein Dreieck (▲ Buff / ▼ Debuff)', () => {
+  const { colors } = FRAMES.gilded;
+  assert.ok(!cardSvg.render(boss()).includes('<path d="M'));
+  const s = cardSvg.render(boss(), { bwl: 99, speed: 50 });
+  assert.equal((s.match(/<path d="M/g) || []).length, 2);
+  assert.ok(s.includes(`fill="${colors.up}" stroke="${colors.outline}"`) && s.includes(`fill="${colors.down}" stroke="${colors.outline}"`));
+});

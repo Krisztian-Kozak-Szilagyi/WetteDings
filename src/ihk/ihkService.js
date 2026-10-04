@@ -93,6 +93,16 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   let limit = WORK_TIME;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
   let t = 0;
+  // Angezeigte Werte der Karte [Speed, FIA, FIS, BWL]: ändern sie sich (Boost, Debuff, Ende eines Effekts),
+  // trägt der Takt sie als st – der Browser schreibt sie dann auf die Karte (src/tcg/cardSvg.js).
+  const shown = () => [s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1), s.stats.fia, s.stats.fis, s.stats.bwl].map((v) => Math.round(v));
+  let lastShown = shown().join();
+  const withShown = (tick) => {
+    const now = shown();
+    if (now.join() === lastShown) return tick;
+    lastShown = now.join();
+    return { ...tick, st: now };
+  };
   while (open()) {
     let next = t + interval();
     if (!applied && next > half) {
@@ -100,7 +110,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
       effects.forEach((e) => e.apply(s));
       applied = true;
-      ticks.push({ t: half, p: 0, ability: true });
+      ticks.push(withShown({ t: half, p: 0, ability: true }));
       if (s.extraTicks || s.extraTime) {
         // Bloodlust: ganze Runden; Reality Check: Sekunden
         freeze = s.extraTicks * interval() + s.extraTime;
@@ -124,7 +134,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     ps.forEach((p, i) => {
       totals[i] += p;
     });
-    ticks.push({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) });
+    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag

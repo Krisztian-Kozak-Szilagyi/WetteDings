@@ -47,6 +47,12 @@ const playback = (run, d, now) => ({
   intro: dungeon.INTRO_SECONDS,
   fightSeconds: dungeon.FIGHT_SECONDS, // volle Zeit eines Kampfes in echten Sekunden (Zeit-Balken)
   names: run.members.map((m) => m.name),
+  // je Platz: Kartenbilder mit geänderten Werten (Boost/Debuff) – nur Rahmen-Karten; base = Grundbild
+  cards: run.members.map((m, i) => {
+    const card = catalog.cardById[m.card];
+    const ticks = run.fights.flatMap((f) => f.ticks.filter((x) => x.m === i));
+    return card && card.stats ? { base: card.image, stats: [card.stats.speed, card.stats.fia, card.stats.fis, card.stats.bwl], imgs: catalog.statImages(card, ticks) } : null;
+  }),
   pause: dungeon.PAUSE_SECONDS,
   fights: run.fights.map((f, i) => {
     const def = d.fights[i] || {};
