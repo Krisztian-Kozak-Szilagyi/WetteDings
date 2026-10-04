@@ -4181,8 +4181,8 @@ a.dg-start-tile:hover { color: var(--text); }
 /* Rangliste: eigene Zeilen-Hintergründe für die ersten drei – Platz 1 golden mit wanderndem Glanz */
 .leaderboard tr.top-1, .leaderboard tr.top-2, .leaderboard tr.top-3 { position: relative; }
 .leaderboard tr.top-1 {
-  /* Glanz: schmaler, kühl-weißer Streifen über dem ruhigen Gold, damit er sich vom Gold abhebt */
-  background: linear-gradient(100deg, transparent 42%, rgba(235, 245, 255, .16) 48%, rgba(255, 255, 255, .26) 50%, rgba(235, 245, 255, .16) 52%, transparent 58%) 100% 0 / 300% 100% no-repeat,
+  /* Glanz: warmer Bernstein-/Kupfer-Streifen über dem ruhigen Gold – passt zum Gold, hebt sich aber ab */
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 140, 50, .14) 46%, rgba(255, 120, 40, .28) 50%, rgba(255, 140, 50, .14) 54%, transparent 60%) 100% 0 / 300% 100% no-repeat,
     linear-gradient(100deg, rgba(242, 193, 78, .26), rgba(242, 193, 78, .10) 45%, rgba(242, 193, 78, .03));
   animation: rank-gold 7s ease-in-out infinite;
 }
