@@ -3005,6 +3005,48 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .lotto-how[open] summary::after { transform: rotate(180deg); }
 .lotto-how summary:hover { color: var(--text); }
 .lotto-how ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.55; color: var(--color-neutral-400); }
+/* Wochen-/Monats-Lotterie: Gewinne aus der Bank im Jackpot (Bilder der Gegenstände, bei mehreren als Fächer) */
+.lotto-prizes { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 32px; }
+.lotto-prize { display: flex; align-items: center; gap: 12px; }
+.lotto-prize > strong { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.lotto-prize > span:last-child { font-size: 13px; color: var(--color-neutral-400); }
+.lotto-prize-img { display: grid; width: 48px; padding: 0 10px; }
+.lotto-prize-img img {
+  grid-area: 1 / 1; width: 100%; max-width: none; height: auto; border-radius: 5px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .5), 0 0 0 1px var(--color-neutral-800);
+}
+.lotto-prize-img img:nth-last-child(2) { transform: translateX(-10px) rotate(-9deg); }
+.lotto-prize-img img:nth-last-child(3) { transform: translateX(10px) rotate(9deg); }
+.lotto-bank { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--color-neutral-400); }
+.lotto-history-items { display: block; font-size: 11px; color: var(--color-neutral-500); }
+
+/* Kacheln zu den anderen Lotterien (im Stil der Album-Kachel) */
+.lotto-switch { display: flex; flex-direction: column; gap: 12px; }
+.lotto-tile {
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px;
+  min-height: 224px; padding: 18px; border-radius: var(--radius-lg); overflow: hidden; color: var(--text);
+  background: radial-gradient(120% 70% at 50% 0%, var(--color-accent-800), transparent 70%), linear-gradient(180deg, var(--color-surface), var(--color-bg));
+  box-shadow: 0 0 0 1px var(--color-accent-800); transition: box-shadow .25s ease;
+}
+.lotto-tile:hover { color: var(--text); box-shadow: 0 0 0 1px var(--color-accent), 0 0 40px color-mix(in srgb, var(--color-accent) 25%, transparent); }
+.lotto-tile:hover .tcg-album-arrow { transform: translateX(4px); }
+.lotto-tile-fan { position: absolute; left: 50%; top: 18px; width: 0; height: 104px; }
+.lotto-tile-fan > * { position: absolute; transform-origin: 50% 120%; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+.lotto-tile-fan img {
+  left: -32px; top: 0; width: 64px; max-width: none; height: auto; border-radius: 6px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .55), 0 0 0 1px var(--color-neutral-800);
+}
+.lotto-tile-fan img:nth-child(2) { z-index: 1; }
+.lotto-tile-fan > :nth-child(1) { transform: translateX(-26px) rotate(-10deg); }
+.lotto-tile-fan > :nth-child(3) { transform: translateX(26px) rotate(10deg); }
+.lotto-tile:hover .lotto-tile-fan > :nth-child(1) { transform: translateX(-48px) rotate(-16deg); }
+.lotto-tile:hover .lotto-tile-fan > :nth-child(2) { transform: translateY(-6px); }
+.lotto-tile:hover .lotto-tile-fan > :nth-child(3) { transform: translateX(48px) rotate(16deg); }
+.lotto-tile-fan .lotto-ticket { left: -40px; top: 24px; width: 80px; justify-content: center; padding: 0; box-shadow: 0 10px 22px rgba(0, 0, 0, .45); }
+.lotto-tile-fan .lotto-ticket:nth-child(2) { z-index: 1; background: linear-gradient(135deg, var(--color-accent-700), var(--color-surface)); }
+.lotto-tile-title { font-size: 20px; font-weight: 500; letter-spacing: -.02em; }
+.lotto-tile-pot { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.lotto-tile-pot small { font-size: 12px; font-weight: 400; color: var(--color-neutral-400); }
 .lotto-winner-banner {
   display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; margin-bottom: 24px; border-radius: var(--radius-lg);
   background: var(--ja-soft); color: var(--ja); box-shadow: 0 0 0 1px var(--ja);

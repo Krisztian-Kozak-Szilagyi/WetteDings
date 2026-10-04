@@ -4,19 +4,22 @@
   const chance = round.tickets ? myTickets / round.tickets : 0;
   const fmtRange = (r) => r.from === r.to ? String(r.from) : r.from + '–' + r.to;
   const affordable = Math.max(0, Math.min(maxTickets, Math.floor(currentUser.balance / ticketPrice)));
+  const big = lotto.key !== 'taeglich';
+  const jackpotOf = (r) => r.pot + (r.prizeCash || 0);
+  const items = (r) => [r.prizePacks ? r.prizePacks + (r.prizePacks === 1 ? ' Pack' : ' Packs') : '', r.prizeFoils ? r.prizeFoils + (r.prizeFoils === 1 ? ' Folie' : ' Folien') : ''].filter(Boolean).join(' · ');
 %>
 
-<div hidden data-live-root data-live-url="/lotterie/stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= round._id %>|<%= lastDrawn ? lastDrawn._id : '-' %>"></div>
+<div hidden data-live-root data-live-url="<%= lotto.path %>/stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= round._id %>|<%= lastDrawn ? lastDrawn._id : '-' %>"></div>
 
 <div class="page-head">
-  <h1>Lotterie</h1>
-  <span class="muted">Täglich · Ziehung um <%= drawTime %> Uhr · neue Runde ab <%= lotteryTime %> Uhr</span>
+  <h1><%= lotto.title %></h1>
+  <span class="muted"><%= lotto.schedule %></span>
 </div>
 
 <% if (iWonLast) { %>
   <div class="lotto-winner-banner">
     <strong>Glückwunsch! Du hast die letzte Ziehung gewonnen.</strong>
-    <span><%= euro(lastDrawn.pot) %> wurden dir gutgeschrieben (Los Nr. <%= lastDrawn.winningTicket %>).</span>
+    <span><%= euro(jackpotOf(lastDrawn)) %><%= items(lastDrawn) ? " und " + items(lastDrawn) : "" %> wurden dir gutgeschrieben (Los Nr. <%= lastDrawn.winningTicket %>).</span>
   </div>
 <% } %>
 
@@ -24,7 +27,25 @@
   <section class="lotto-main">
     <div class="lotto-jackpot">
       <span class="lotto-label">Runde #<%= round.number %> · Jackpot</span>
-      <span class="lotto-pot" data-live="pot"><%= euro(round.pot) %></span>
+      <span class="lotto-pot" data-live="pot"><%= euro(jackpotOf(round)) %></span>
+      <% if (big) { %>
+        <div class="lotto-prizes" data-live="prizes">
+          <% if (round.prizePacks) { %>
+            <div class="lotto-prize">
+              <span class="lotto-prize-img"><% for (let i = 0; i < Math.min(3, round.prizePacks); i++) { %><img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy"><% } %></span>
+              <strong><%= round.prizePacks %>×</strong><span>Booster Pack</span>
+            </div>
+          <% } %>
+          <% if (round.prizeFoils) { %>
+            <div class="lotto-prize">
+              <span class="lotto-prize-img"><% for (let i = 0; i < Math.min(3, round.prizeFoils); i++) { %><img src="<%= prizeImages.folie %>" alt="" width="720" height="1008" loading="lazy"><% } %></span>
+              <strong><%= round.prizeFoils %>×</strong><span><%= round.prizeFoils === 1 ? 'Folie' : 'Folien' %></span>
+            </div>
+          <% } %>
+          <% const bank = [round.prizeCash ? euro(round.prizeCash) : '', round.prizePacks ? round.prizePacks + (round.prizePacks === 1 ? ' Booster Pack' : ' Booster Packs') : '', round.prizeFoils ? round.prizeFoils + (round.prizeFoils === 1 ? ' Folie' : ' Folien') : ''].filter(Boolean); %>
+          <p class="lotto-bank"><%= bank.length ? 'Die Bank legt ' + bank.join(' + ') + ' drauf' : 'Kein Bank-Gewinn' %> · plus alle Einsätze</p>
+        </div>
+      <% } %>
       <div class="lotto-countdown" data-countdown-parts="<%= new Date(round.drawAt).getTime() %>">
         <div><span data-cd="h">–</span><small>Std.</small></div>
         <div><span data-cd="m">–</span><small>Min.</small></div>
@@ -79,7 +100,7 @@
                 <tr class="<%= h.winner && String(h.winner) === String(currentUser._id) ? 'me' : '' %>">
                   <td class="muted">#<%= h.number %></td>
                   <td class="nowrap"><%= date(h.drawnAt) %></td>
-                  <td class="num"><%= euro(h.pot) %></td>
+                  <td class="num"><%= euro(jackpotOf(h)) %><% if (items(h)) { %><small class="lotto-history-items"><%= items(h) %></small><% } %></td>
                   <td><% if (h.winnerName) { %><%- userLink(h.winnerName) %><% } else if (h.tickets > 0) { %><span class="muted">– (Topf verfallen)</span><% } else { %><span class="muted">– (keine Lose)</span><% } %></td>
                   <td class="num hide-sm<%= h.winningTicket ? '' : ' muted' %>"><%= h.winningTicket ? h.winningTicket + ' / ' + h.tickets : '–' %></td>
                 </tr>
@@ -95,7 +116,7 @@
     <div class="lotto-buy">
       <div class="lotto-buy-head"><h4>Lose kaufen</h4><span class="muted">1 Los = <%= euro(ticketPrice) %></span></div>
       <% if (selling) { %>
-        <form method="post" action="/lotterie/kaufen" class="lotto-form" data-price="<%= ticketPrice %>">
+        <form method="post" action="<%= lotto.path %>/kaufen" class="lotto-form" data-price="<%= ticketPrice %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <div class="lotto-qty-row">
             <div class="lotto-stepper">
@@ -114,12 +135,45 @@
       <% } %>
     </div>
 
+    <nav class="lotto-switch" aria-label="Weitere Lotterien">
+      <% lottoTiles.forEach((t) => { const tr = t.round; %>
+        <a class="lotto-tile is-<%= t.key %>" href="<%= t.path %>">
+          <span class="lotto-tile-fan" aria-hidden="true">
+            <% if (t.key === 'taeglich') { %>
+              <span class="lotto-ticket">7</span><span class="lotto-ticket">13</span><span class="lotto-ticket">42</span>
+            <% } else { %>
+              <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
+              <img src="<%= tr.prizeFoils ? prizeImages.folie : prizeImages.pack %>" alt="" width="720" height="1008" loading="lazy">
+              <img src="<%= prizeImages.pack %>" alt="" width="800" height="1280" loading="lazy">
+            <% } %>
+          </span>
+          <span class="tcg-album-foot">
+            <span class="tcg-album-text">
+              <span class="kicker"><%= t.key === 'woche' ? 'Jeden Sonntag' : t.key === 'monat' ? 'Am 28. des Monats' : 'Jeden Tag' %></span>
+              <span class="lotto-tile-title"><%= t.name %></span>
+              <span class="lotto-tile-pot"><%= euro(jackpotOf(tr)) %><% if (items(tr)) { %> <small>+ <%= items(tr) %></small><% } %></span>
+            </span>
+            <span class="tcg-album-arrow" aria-hidden="true">→</span>
+          </span>
+        </a>
+      <% }) %>
+    </nav>
+
     <details class="lotto-how">
       <summary>So funktioniert's</summary>
       <ul>
-        <li>Jeden Tag gibt es eine Lotterie. Lose können bis zur Ziehung gekauft werden.</li>
-        <li>Die Ziehung ist am Folgetag um <%= drawTime %> Uhr – 1 Minute bevor um <%= lotteryTime %> Uhr die nächste Lotterie beginnt.</li>
-        <li>Jedes Los hat eine Nummer. Gezogen wird eine Nummer per Zufall – wer das Los besitzt, bekommt den gesamten Topf.</li>
+        <% if (lotto.key === 'woche') { %>
+          <li>Jede Woche gibt es eine Wochen-Lotterie. Lose können bis zur Ziehung gekauft werden.</li>
+          <li>Die Ziehung ist jeden Sonntag um <%= bigDrawTime %> Uhr – 30 Minuten nach der täglichen Ziehung.</li>
+        <% } else if (lotto.key === 'monat') { %>
+          <li>Jeden Monat gibt es eine Monats-Lotterie. Lose können bis zur Ziehung gekauft werden.</li>
+          <li>Die Ziehung ist am 28. jedes Monats um <%= bigDrawTime %> Uhr – 30 Minuten nach der täglichen Ziehung. Fällt der 28. auf einen Sonntag, werden Wochen- und Monats-Lotterie gleichzeitig gezogen.</li>
+        <% } else { %>
+          <li>Jeden Tag gibt es eine Lotterie. Lose können bis zur Ziehung gekauft werden.</li>
+          <li>Die Ziehung ist am Folgetag um <%= drawTime %> Uhr – 1 Minute bevor um <%= lotteryTime %> Uhr die nächste Lotterie beginnt.</li>
+        <% } %>
+        <li>Jedes Los hat eine Nummer. Gezogen wird eine Nummer per Zufall – wer das Los besitzt, bekommt den gesamten Topf<%= big ? ' und den Gewinn aus der Bank' : '' %>.</li>
+        <% if (big) { %><li>Werden keine Lose verkauft, verfällt der Bank-Gewinn – die nächste Runde bietet ihn neu an.</li><% } %>
         <li>Mehr Lose = höhere Chance. Maximal <%= maxTickets %> Lose pro Kauf.</li>
       </ul>
     </details>

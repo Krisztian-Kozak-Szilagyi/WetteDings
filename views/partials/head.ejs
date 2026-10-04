@@ -27,7 +27,7 @@
       navItems.push({ href: '/', label: 'Wetten', active: currentPath === '/', badges: betBadges });
       navItems.push({ href: '/rangliste', label: 'Rangliste', active: currentPath === '/rangliste', badges: [] });
       navItems.push({ href: '/coin-exchange', label: 'Coin Exchange', active: currentPath === '/coin-exchange', badges: [] });
-      navItems.push({ href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie', badges: [] });
+      navItems.push({ href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] });
       navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });
       const tradeBadges = [];
       if (tradeMarketNew) tradeBadges.push({ n: tradeMarketNew, cls: 'nav-badge-market', title: 'Neu auf dem Markt', aria: tradeMarketNew + ' neue Markt-Angebote' });

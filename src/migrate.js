@@ -5,11 +5,22 @@ const { IhkRun } = require('./models/Ihk');
 const { Trade } = require('./models/Trade');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
+const { LotteryRound } = require('./models/Lottery');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
  */
 async function migrate() {
+  // Wochen-/Monats-Lotterie: Rundennummer und offene Runde gelten jetzt je Lotterie-Art – alte Indizes entfernen
+  const lottoIdx = await LotteryRound.collection.indexes().catch(() => []);
+  for (const name of ['number_1', 'status_1']) {
+    if (lottoIdx.some((i) => i.name === name)) {
+      await LotteryRound.collection.dropIndex(name);
+      console.log(`Migration: Lotterie-Index ${name} entfernt.`);
+    }
+  }
+  await LotteryRound.createIndexes();
+
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [
     {

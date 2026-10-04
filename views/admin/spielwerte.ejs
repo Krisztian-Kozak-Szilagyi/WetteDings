@@ -1,6 +1,6 @@
 <nav class="stats-subnav" aria-label="Abschnitte">
   <span class="muted small">Springe zu:</span>
-  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#folie">Folie</a><a href="#ihk">IHK</a><a href="#dungeon">Dungeon</a><% } %>
+  <a href="#vergeben">Packs &amp; Karten vergeben</a><% if (currentUser.isAdmin) { %><a href="#tcg">TCG-Chancen &amp; Preise</a><a href="#handel">Handelssteuer</a><a href="#bonus">Tagesbonus &amp; Grading</a><a href="#folie">Folie</a><a href="#lotterie">Lotterie</a><a href="#ihk">IHK</a><a href="#dungeon">Dungeon</a><% } %>
 </nav>
 
 <div class="panel-warning" role="note">
@@ -222,6 +222,27 @@
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>
+  </section>
+
+  <section class="stats-block" id="lotterie">
+    <%- blockHead('Wochen- &amp; Monats-Lotterie', 'Lospreis und Gewinn aus der Bank. Der Gewinner bekommt alle Einsätze und zusätzlich diesen Bank-Gewinn (Geld, Booster Packs, Folien). Werden keine Lose verkauft, verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die gerade laufende Runde.') %>
+    <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
+    <% [['woche', 'Wochen-Lotterie (sonntags)'], ['monat', 'Monats-Lotterie (am 28.)']].forEach(([key, label]) => { const ls = lottoSettings[key]; %>
+      <div class="card">
+        <form method="post" data-reauth action="/admin/lotterie" class="form admin-tcg-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="kind" value="<%= key %>">
+          <h4><%= label %></h4>
+          <div class="admin-gr-grid">
+            <label class="field"><span>Lospreis in €</span><input type="text" name="price" inputmode="decimal" value="<%= cents(ls.ticketPrice) %>" required></label>
+            <label class="field"><span>Geld aus der Bank in €</span><input type="text" name="cash" inputmode="decimal" value="<%= cents(ls.prizeCash) %>" required></label>
+            <label class="field"><span>Booster Packs</span><input type="number" name="packs" min="0" max="500" step="1" value="<%= ls.prizePacks %>" required></label>
+            <label class="field"><span>Folien</span><input type="number" name="foils" min="0" max="100" step="1" value="<%= ls.prizeFoils %>" required></label>
+          </div>
+          <button class="btn btn-primary" type="submit">Speichern</button>
+        </form>
+      </div>
+    <% }) %>
   </section>
 
   <section class="stats-block" id="ihk">

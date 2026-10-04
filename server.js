@@ -21,6 +21,7 @@ async function main() {
   await require('./src/services/bonusService').loadSettings(); // Tagesbonus
   await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?
   await require('./src/items/foil').loadSettings(); // Folie: Fundchance und Wertsteigerung
+  await require('./src/services/lotteryService').loadSettings(); // Wochen-/Monats-Lotterie: Lospreis und Bank-Gewinn
   await require('./src/stats/settingsLog').logConfigOnStart(); // geänderte .env-Werte im Einstellungs-Verlauf vermerken
   await require('./src/forum/forumService').seed(); // Forum: Bereiche beim ersten Start
   await require('./src/forum/forumService').migratePatchnotes(); // alte Patchnotes ins Forum

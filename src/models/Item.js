@@ -6,7 +6,7 @@ const itemSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, required: true }, // Gegenstands-Art aus ITEM_TYPES (src/items/itemService.js), z. B. "folie"
-    source: { type: String, enum: ['grading', 'admin', 'dungeon', 'handel'], required: true },
+    source: { type: String, enum: ['grading', 'admin', 'dungeon', 'handel', 'lotto'], required: true },
     lastClaimedAt: { type: Date }, // zuletzt für Handel/Folieren beansprucht – nur für gleichzeitige Zugriffe (siehe itemService)
   },
   { timestamps: true }

@@ -51,7 +51,7 @@ async function member(p, now, { user }) {
       CoinTrade.aggregate([{ $match: { ...mine, ...s.inP(p) } }, { $group: { _id: '$side', s: { $sum: '$cents' }, n: { $sum: 1 } } }]),
       CoinHolding.findOne({ ...mine, coin: 'SAM' }).lean(),
       LotteryEntry.find({ ...mine, ...s.inP(p) }).select('tickets').lean(),
-      LotteryRound.find({ winner: uid, ...s.inP(p, 'drawnAt') }).select('pot').lean(),
+      LotteryRound.find({ winner: uid, ...s.inP(p, 'drawnAt') }).select('pot prizeCash').lean(),
       Bet.countDocuments({ 'duel.state': { $exists: true }, $or: [{ creator: uid }, { 'duel.opponent': uid }], ...s.inP(p) }),
     ]);
 
@@ -254,7 +254,7 @@ async function member(p, now, { user }) {
         { id: 'm-coin-trades', label: 'Coin-Trades', value: (coin.kauf ? coin.kauf.n : 0) + (coin.verkauf ? coin.verkauf.n : 0), unit: 'count', compare: true },
         { id: 'm-coin-bestand', label: 'Coin-Bestand', value: holding ? holding.units / 1e8 : 0, unit: 'number', hint: 'SAM (jetzt)' },
         { id: 'm-lose', label: 'Lose gekauft', value: tickets, unit: 'count', compare: true, hint: `für ${(-sumType('lotto_los') / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` },
-        { id: 'm-lotto-gewinne', label: 'Lotterie-Gewinne', value: s.sumBy(wins, 'pot'), unit: 'euro', compare: true, hint: `${wins.length}× gewonnen` },
+        { id: 'm-lotto-gewinne', label: 'Lotterie-Gewinne', value: s.sumBy(wins, 'pot') + s.sumBy(wins, 'prizeCash'), unit: 'euro', compare: true, hint: `${wins.length}× gewonnen` },
       ],
     },
   ];

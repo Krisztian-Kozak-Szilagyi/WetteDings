@@ -20,6 +20,7 @@ const bonusService = require('../services/bonusService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const foil = require('../items/foil');
+const lotteryService = require('../services/lotteryService');
 const tradeService = require('../trade/tradeService');
 const { DIFFICULTIES } = require('../ihk/quests');
 const { parseEuro } = require('../lib/util');
@@ -174,6 +175,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     packTypes: tcgCatalog.PACK_TYPES,
     itemTypes: itemService.ITEM_TYPES,
     foilSettings: foil.settings,
+    lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     grantCards: tcgCatalog.RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     packLogNew: counts.packLogNew,
@@ -455,6 +457,30 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
     req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
   }
   res.redirect(panelUrl('spielwerte', 'folie'));
+});
+
+// Wochen-/Monats-Lotterie: Lospreis und Gewinn aus der Bank (gilt sofort, auch für die offene Runde)
+router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const k = lotteryService.KINDS.find((x) => x.key !== 'taeglich' && x.key === str(req.body.kind));
+  const count = (v) => (/^\d{1,6}$/.test(str(v).trim()) ? Number(str(v).trim()) : NaN);
+  if (!k) {
+    req.flash('error', 'Diese Lotterie gibt es nicht.');
+  } else {
+    const values = {
+      ticketPrice: parseEuro(str(req.body.price)),
+      prizeCash: parseEuro(str(req.body.cash)),
+      prizePacks: count(req.body.packs),
+      prizeFoils: count(req.body.foils),
+    };
+    const err = lotteryService.settingsError(values);
+    if (err) {
+      req.flash('error', `${k.name}: ${err}`);
+    } else {
+      await lotteryService.saveSettings({ admin: req.user, key: k.key, values });
+      req.flash('success', `${k.name} gespeichert: Los ${euro(values.ticketPrice)}, Bank-Gewinn ${lotteryService.prizeText({ cash: values.prizeCash, packs: values.prizePacks, foils: values.prizeFoils })}.`);
+    }
+  }
+  res.redirect(panelUrl('spielwerte', 'lotterie'));
 });
 
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------

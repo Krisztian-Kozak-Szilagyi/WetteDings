@@ -19,7 +19,7 @@ const packSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, required: true }, // Pack-Art aus dem Katalog (PACK_TYPES)
-    source: { type: String, enum: ['kauf', 'quest', 'admin'], required: true },
+    source: { type: String, enum: ['kauf', 'quest', 'admin', 'lotto'], required: true },
     cost: { type: Number, default: 0 }, // bezahlter Preis in Cent (0 = geschenkt)
   },
   { timestamps: true }
