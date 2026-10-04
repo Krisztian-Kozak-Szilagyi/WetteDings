@@ -4170,4 +4170,5 @@ button.dg-boost-card:hover, button.dg-boost-card:focus-visible { outline: 0; tra
 }
 a.dg-start-tile { width: min(100%, 460px); text-decoration: none; } /* Geschichte: Zurück-Kachel wie „Allein anmelden“ */
 a.dg-start-tile:hover { color: var(--text); }
+.dg-back-tile .ihk-start-arrow { margin-right: 1rem; }
 .dg-back-tile.ihk-start-tile:hover .ihk-start-arrow { transform: translateX(-4px); } /* zurück: Pfeil nach links */
