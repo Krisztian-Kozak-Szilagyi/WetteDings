@@ -133,16 +133,19 @@ router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   res.redirect(safeRedirect(str(req.body.zurueck), '/'));
 });
 
-// Sammlung eines Mitglieds (nur ansehen); bei fremden Sammlungen führt ein Klick auf eine Karte zum Tauschangebot
+// Sammlung eines Mitglieds (nur ansehen); ein Klick vergrößert die Karte, bei fremden Sammlungen lässt sich dort ein Tausch vorschlagen
 router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
   const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username').lean();
   if (!profile) return res.status(404).render('error', { title: 'Sammlung', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const isMe = profile._id.equals(req.user._id);
+  const [coll, mine] = await Promise.all([collection(profile), isMe ? null : inventory(req.user._id)]);
   res.render('profil-sammlung', {
     title: `Sammlung von ${profile.username}`,
     profile,
     isMe,
-    ...(await collection(profile)),
+    ...coll,
+    // eigene Karten: "du besitzt …" in der großen Ansicht (eigene Sammlung: die gezeigten Zahlen)
+    ownedCounts: mine ? Object.fromEntries(mine.map((o) => [o._id, o.n])) : coll.counts,
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,

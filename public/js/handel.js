@@ -32,6 +32,13 @@
       badge.textContent = d.rarityLabel;
       badge.className = 'tcg-badge r-' + d.rarity;
       $('[data-zoom-meta]', zoom).textContent = 'Kartenwert ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
+      // Fremde Sammlung: von hier aus einen Tausch für diese Karte vorschlagen
+      var tradeLink = $('[data-zoom-trade]', zoom);
+      if (tradeLink) {
+        tradeLink.hidden = !d.tradeHref;
+        if (d.tradeHref) tradeLink.href = d.tradeHref;
+        else tradeLink.removeAttribute('href');
+      }
       if (typeof zoom.showModal === 'function') zoom.showModal();
       else zoom.setAttribute('open', '');
     });

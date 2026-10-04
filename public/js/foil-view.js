@@ -2,12 +2,14 @@
   'use strict';
 
   // Folierte Karte groß ansehen (Inventar, Album, Profil, Handel): Auslöser ist ein Element mit data-foil-view
-  // (data-image, data-name, data-rarity, data-rarity-label, data-date; im Album zusätzlich data-fav/data-fav-on).
+  // (data-image, data-name, data-rarity, data-rarity-label, data-date; im Album zusätzlich data-fav/data-fav-on,
+  // in fremden Sammlungen data-trade-href).
   // Ziehen dreht die Karte in 3D, antippen dreht sie um. Dialog: views/partials/foil-modal.ejs
   var modal = document.querySelector('[data-foil-modal]');
   if (!modal || !modal.showModal) return;
   var stage = modal.querySelector('[data-foil-stage]');
   var favForm = modal.querySelector('[data-foil-fav]');
+  var tradeBox = modal.querySelector('[data-foil-trade]');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var view = null;
@@ -99,6 +101,11 @@
         favForm.querySelector('input[name="card"]').value = d.fav;
         favForm.querySelector('button').textContent = d.favOn === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
       }
+    }
+    // Fremde Sammlung: Tausch für dieses Exemplar vorschlagen
+    if (tradeBox) {
+      tradeBox.hidden = !d.tradeHref;
+      if (d.tradeHref) tradeBox.querySelector('a').href = d.tradeHref;
     }
 
     card.addEventListener('pointerdown', function (e) {
