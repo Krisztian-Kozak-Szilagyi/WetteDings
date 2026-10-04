@@ -24,8 +24,8 @@
       const betBadges = [];
       if (betNewGroup) betBadges.push({ n: betNewGroup, cls: 'nav-badge-group', title: 'Neue Wetten in deinen Gruppen', aria: betNewGroup + ' neue Wetten in deinen Gruppen' });
       if (betRed) betBadges.push({ n: betRed, cls: '', title: betVotePending ? 'Wetten, in denen deine Stimme zum Ergebnis fehlt' + (betNewGroup || !betNewPublic ? '' : ', und neue Wetten') : 'Neue Wetten', aria: betRed + ' Wetten: neu oder deine Stimme fehlt' });
-      navItems.push({ href: '/', label: 'Wetten', active: currentPath === '/', badges: betBadges });
       navItems.push({ href: '/rangliste', label: 'Rangliste', active: currentPath === '/rangliste', badges: [] });
+      navItems.push({ href: '/', label: 'Wetten', active: currentPath === '/', badges: betBadges });
       navItems.push({ href: '/broker', label: 'Broker', active: currentPath === '/broker' || currentPath.startsWith('/broker/'), badges: [] });
       navItems.push({ href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] });
       navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });

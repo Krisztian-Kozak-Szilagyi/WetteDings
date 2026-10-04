@@ -27,7 +27,7 @@
     <% if (sym === 'SAM') { %><%- include('partials/coin-sam') %><% } else { %><span class="asset-mark asset-mark-<%= sym.toLowerCase() %>" aria-hidden="true"><%= sym === 'BTCG' ? 'B·TCG' : sym %></span><% } %>
     <div>
       <h1><%= snap.name %> <span class="muted coin-symbol"><%= sym %></span></h1>
-      <span class="live"><span class="live-dot"></span> Live · Kurs alle <%= snap.tickMs / 1000 %> Sekunden</span>
+      <span class="live"><span class="live-dot"></span> Live</span>
       <% if (mood) { %><span class="etf-mood <%= mood.cls %>" title="Je aktiver die Seite, desto besser die Stimmung">Marktstimmung: <strong><%= mood.label %></strong></span><% } %>
     </div>
   </div>

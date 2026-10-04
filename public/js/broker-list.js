@@ -32,6 +32,39 @@
     if (saved && document.querySelector('[data-bx-filter="' + saved.replace(/[^a-z]/g, '') + '"]')) applyFilter(saved);
   } catch (e) { /* egal */ }
 
+  // ---------- Sortieren (Klick auf eine Spalte; erneuter Klick dreht die Richtung) ----------
+  var sortKey = null;
+  var sortDir = 1;
+  var sortBtns = document.querySelectorAll('[data-bx-sort]');
+  function sortRows() {
+    if (!sortKey) return;
+    var attr = 'data-sort-' + sortKey;
+    var sorted = rows.slice().sort(function (a, b) {
+      var x = a.getAttribute(attr);
+      var y = b.getAttribute(attr);
+      var cmp = sortKey === 'name' ? x.localeCompare(y, 'de') : Number(x) - Number(y);
+      return cmp * sortDir;
+    });
+    sorted.forEach(function (row) { table.insertBefore(row, empty); });
+  }
+  sortBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.getAttribute('data-bx-sort');
+      if (sortKey === key) sortDir = -sortDir;
+      else {
+        sortKey = key;
+        sortDir = key === 'name' ? 1 : -1; // Zahlen: zuerst die größten
+      }
+      sortBtns.forEach(function (b) {
+        var on = b === btn;
+        b.classList.toggle('sort-asc', on && sortDir === 1);
+        b.classList.toggle('sort-desc', on && sortDir === -1);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      sortRows();
+    });
+  });
+
   // ---------- Live-Kurse ----------
   function fmtPrice(p) {
     var digits = p >= 1 ? 2 : p >= 0.01 ? 4 : 6;
@@ -58,6 +91,8 @@
             priceEl.textContent = fmtPrice(s.price);
           }
           last[s.symbol] = s.price;
+          row.setAttribute('data-sort-price', String(s.price));
+          row.setAttribute('data-sort-change', String(s.change24h));
           var ch = row.querySelector('[data-bx-change]');
           if (ch) {
             var up = s.change24h >= 0;
@@ -68,6 +103,7 @@
           }
         });
       })
+      .then(function () { if (sortKey === 'price' || sortKey === 'change') sortRows(); })
       .catch(function () { /* nächster Versuch */ });
   }
   setInterval(poll, 5000);

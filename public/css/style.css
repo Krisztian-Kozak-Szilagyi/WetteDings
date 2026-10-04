@@ -4295,7 +4295,8 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .bx-spark path { fill: none; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .bx-spark.up path { stroke: var(--ja); }
 .bx-spark.down path { stroke: var(--nein); }
-.bx-price { display: inline-block; padding: 8px 14px; min-width: 100%; border-radius: 999px; font-size: 14px; font-weight: 500; text-align: right; background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.bx-col-price { display: flex; justify-content: center; text-align: center; }
+.bx-price { display: inline-block; box-sizing: border-box; width: 100%; max-width: 140px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 500; text-align: center; background: var(--color-bg); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
 .bx-col-depot { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
 .bx-depot { font-weight: 500; }
 .bx-col-depot small { font-size: 11px; }
@@ -4317,5 +4318,14 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
   .bx-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; padding: 12px 14px; }
   .bx-row-head { display: none; }
   .bx-col-spark, .bx-col-sent, .bx-market .asset-kind { display: none; }
-  .bx-price { min-width: 0; padding: 6px 10px; font-size: 13px; }
+  .bx-price { width: auto; padding: 6px 10px; font-size: 13px; }
 }
+
+/* Broker-Übersicht: sortierbare Spaltenköpfe */
+.bx-sort { padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.bx-sort:hover, .bx-sort.sort-asc, .bx-sort.sort-desc { color: var(--text); }
+.bx-sort.num { text-align: right; }
+.bx-sort:not(.num)::after, .bx-sort.num::before { content: ''; display: inline-block; width: 1.2em; text-align: center; }
+.bx-sort.sort-asc:not(.num)::after, .bx-sort.num.sort-asc::before { content: '▲'; }
+.bx-sort.sort-desc:not(.num)::after, .bx-sort.num.sort-desc::before { content: '▼'; }
+.bx-row-head .bx-col-price { justify-content: center; }
