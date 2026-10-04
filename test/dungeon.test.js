@@ -98,10 +98,14 @@ test('Einzelspieler werden in Dreiergruppen gelost', () => {
 test('Wiedergabe: gewonnene Kämpfe enden früher, verlorene dauern die volle Zeit', () => {
   const team = [{ card: card('krisz-3-gold') }, { card: card('adrian-3-gold') }, { card: card('aleks-3-gold') }];
   const lost = d.fight(team, 'fia', 100000);
-  assert.equal(lost.seconds, d.FIGHT_SECONDS);
+  assert.ok(lost.seconds <= d.FIGHT_SECONDS && Math.abs(lost.seconds - (d.FIGHT_SECONDS * (lost.limit - lost.start)) / lost.limit) <= 0.1);
   const won = d.fight(team, 'fia', 200);
-  assert.ok(won.success && won.seconds >= 5 && won.seconds < d.FIGHT_SECONDS);
-  assert.equal(d.runSeconds([won, lost]), d.INTRO_SECONDS + won.seconds + lost.seconds + 2 * d.PAUSE_SECONDS);
+  assert.ok(won.success && won.seconds > 0 && won.seconds < d.FIGHT_SECONDS);
+  // gleichmäßiges Tempo: Sieg-Zeitpunkt (Spielzeit) im selben Verhältnis wie bei der vollen Zeit
+  assert.ok(Math.abs(won.seconds - (d.FIGHT_SECONDS * (won.doneAt - won.start)) / won.limit) <= 1);
+  // die Wiedergabe beginnt höchstens eine Sekunde vor dem ersten Treffer
+  assert.ok(won.start <= won.ticks[0].t && (won.ticks[0].t - won.start) * d.FIGHT_SECONDS / won.limit <= 1.05);
+  assert.equal(d.runSeconds([won, lost]), d.INTRO_SECONDS + won.seconds + lost.seconds + d.PAUSE_SECONDS + 2);
 });
 
 test('Bots bringen eine Boost-Karte mit', () => {

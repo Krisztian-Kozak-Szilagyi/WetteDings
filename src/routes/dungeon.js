@@ -50,14 +50,15 @@ const playback = (run, d, now) => ({
   pause: dungeon.PAUSE_SECONDS,
   fights: run.fights.map((f, i) => {
     const def = d.fights[i] || {};
-    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
+    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, start: f.start || 0, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
   }),
 });
 
 router.get('/dungeon', async (req, res) => {
   const me = req.user._id;
   const now = Date.now();
-  const { party, invitations, run, rev } = await dungeon.pageState(me);
+  await dungeon.finishOwnDue(me);
+  const { party, invitations, run, unseen, rev } = await dungeon.pageState(me);
   const running = run && run.status === 'laeuft' ? run : null;
   const slot = party ? party.slot : dungeon.registrationSlot(now);
   const next = dungeonForSlot(slot, dungeon.settings.intervalHours);
@@ -80,11 +81,10 @@ router.get('/dungeon', async (req, res) => {
   const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party });
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
-  const myRunEntry = run && run.status === 'fertig' ? run.members.find((m) => same(m.user, me)) : null;
-  const loot = myRunEntry && !myRunEntry.seen
-    ? { success: run.success, players: run.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
+  // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
+  const loot = unseen
+    ? { id: String(unseen._id), success: unseen.success, players: unseen.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
     : null;
-  if (loot) await dungeon.markLootSeen(run._id, me);
 
   res.render('dungeon', {
     title: 'Dungeon',
@@ -117,6 +117,7 @@ router.get('/dungeon', async (req, res) => {
 
 // Für die Seite: Fingerabdruck (bei Änderung neu laden) und Chat
 router.get('/dungeon/status', async (req, res) => {
+  await dungeon.finishOwnDue(req.user._id); // Ende sofort auswerten, sobald die Zeit um ist
   const [{ rev }, chat] = await Promise.all([dungeon.pageState(req.user._id), dungeon.chatFor(req.user._id)]);
   res.set('Cache-Control', 'no-store');
   res.json({
@@ -151,6 +152,13 @@ router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', {
 router.post('/dungeon/karten', (req, res) =>
   handle(req, res, () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null }).then(() => null))
 );
+
+// Beute-Fenster geschlossen (per fetch)
+router.post('/dungeon/beute-gesehen', async (req, res) => {
+  const id = str(req.body.run);
+  if (mongoose.isValidObjectId(id)) await dungeon.markLootSeen(id, req.user._id);
+  res.json({ ok: true });
+});
 
 router.post('/dungeon/einladen', (req, res) => handle(req, res, () => dungeon.invite({ user: req.user, name: str(req.body.name) }).then(() => null)));
 

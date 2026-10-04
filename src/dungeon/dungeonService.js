@@ -25,11 +25,12 @@ const LOCK_SECONDS = 10; // so lange vor dem Start kann man sich nicht mehr abme
 // Wiedergabe (echte Sekunden): Einleitung, je Kampf, Pause dazwischen
 const INTRO_SECONDS = 8;
 const FIGHT_SECONDS = 45; // volle Zeit eines Kampfes (IHK: 15 Sekunden)
-const MIN_FIGHT_SECONDS = 20; // so lange dauert auch ein schnell gewonnener Kampf
-const PAUSE_SECONDS = 6;
+const PAUSE_SECONDS = 6; // Pause zwischen zwei Kämpfen
+const END_SECONDS = 2; // nach dem letzten Kampf, dann wird die Beute verteilt
 const CHAT_MAX = 100; // so viele Nachrichten bleiben im Chat
 const CHAT_TEXT_MAX = 300;
 const RESULT_MINUTES = 30; // so lange zeigt die Seite das Ergebnis des letzten Durchlaufs
+const LOOT_DAYS = 7; // so lange wartet das Beute-Fenster darauf, gesehen zu werden
 const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 
 // ---------- Einstellungen (Admin) ----------
@@ -201,10 +202,12 @@ function fight(members, stat, required, rand = random) {
   // Fähigkeiten, die erst nach dem Sieg ausgelöst hätten, zählen nicht
   const used = abilities.filter((a) => ticks.some((x) => x.ability && x.m === a.m));
   const success = total >= required;
-  // Wiedergabe: ein gewonnener Kampf endet früher (beim Sieg, aber frühestens nach MIN_FIGHT_SECONDS),
-  // ein verlorener dauert bis zum Ablauf der Zeit
-  const seconds = Math.max(MIN_FIGHT_SECONDS, Math.round((FIGHT_SECONDS * (success ? doneAt : limit)) / limit * 10) / 10);
-  return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, seconds };
+  // Wiedergabe in gleichmäßigem Tempo (volle Zeit = FIGHT_SECONDS): ein gewonnener Kampf endet beim Sieg,
+  // ein verlorener mit Ablauf der Deadline. Sie beginnt erst eine Sekunde vor dem ersten Treffer (start,
+  // Spielzeit) – die Takte davor bringen noch keine Punkte, die Deadline läuft dabei trotzdem.
+  const start = Math.max(0, Math.round(((ticks.length ? ticks[0].t : 0) - limit / FIGHT_SECONDS) * 10) / 10);
+  const seconds = Math.max(1, Math.round((FIGHT_SECONDS * ((success ? doneAt : limit) - start)) / limit * 10) / 10);
+  return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, start, seconds };
 }
 
 /** Alle Kämpfe eines Dungeons; nach einer Niederlage ist Schluss */
@@ -218,8 +221,8 @@ function playDungeon(dungeon, members, rand = random, opts = settings) {
   return fights;
 }
 
-/** Wiedergabedauer in Sekunden: Einleitung, Kämpfe, danach jeweils eine Pause (nach dem letzten fürs Ergebnis) */
-const runSeconds = (fights) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds + PAUSE_SECONDS, 0);
+/** Wiedergabedauer in Sekunden: Einleitung, Kämpfe mit Pausen dazwischen, kurzer Abschluss */
+const runSeconds = (fights) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * PAUSE_SECONDS + END_SECONDS;
 
 /** Lohn und Beute pro Spieler (Bots bekommen nichts) */
 function rewardsFor(fights, isBot, rand = random, opts = settings) {
@@ -489,6 +492,12 @@ async function finishDue({ now = Date.now() } = {}) {
   }
 }
 
+/** Hat dieser Spieler einen Durchlauf, dessen Zeit um ist? Dann sofort abschließen (statt auf den Job zu warten). */
+async function finishOwnDue(userId) {
+  const due = await DungeonRun.exists({ 'members.user': userId, status: 'laeuft', endsAt: { $lte: new Date() } });
+  if (due) await finishDue();
+}
+
 async function tick() {
   await startDue();
   await finishDue();
@@ -498,10 +507,12 @@ async function tick() {
 /** Alles, was die Dungeon-Seite für diesen Spieler braucht */
 async function pageState(userId) {
   const since = new Date(Date.now() - RESULT_MINUTES * 60000);
-  const [party, invitations, run] = await Promise.all([
+  const [party, invitations, run, unseen] = await Promise.all([
     DungeonParty.findOne({ 'members.user': userId }).lean(),
     DungeonParty.find({ 'invites.user': userId }).lean(),
     DungeonRun.findOne({ 'members.user': userId, $or: [{ status: 'laeuft' }, { endsAt: { $gte: since } }] }).sort({ startedAt: -1 }).lean(),
+    // Beute, deren Fenster noch nicht weggeklickt wurde (auch wenn man zwischendurch woanders war)
+    DungeonRun.findOne({ status: 'fertig', endsAt: { $gte: new Date(Date.now() - LOOT_DAYS * 86400000) }, members: { $elemMatch: { user: userId, seen: { $ne: true } } } }).sort({ endsAt: -1 }).lean(),
   ]);
   // Fingerabdruck: ändert er sich, lädt die Seite neu (Beitritte, Einladungen, Start, Ende)
   const rev = crypto
@@ -509,7 +520,7 @@ async function pageState(userId) {
     .update(JSON.stringify([party && [party._id, party.leader, party.members.map((m) => m.user), party.invites.map((i) => i.user)], invitations.map((p) => p._id), run && [run._id, run.status]]))
     .digest('hex')
     .slice(0, 12);
-  return { party, invitations, run, rev };
+  return { party, invitations, run, unseen, rev };
 }
 
 /** Chat, den dieser Spieler gerade sieht (Gruppe vor dem Start, sonst laufender Durchlauf) */
@@ -554,6 +565,7 @@ module.exports = {
   chat,
   startDue,
   finishDue,
+  finishOwnDue,
   tick,
   pageState,
   chatFor,

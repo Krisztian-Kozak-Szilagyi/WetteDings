@@ -63,6 +63,7 @@ const runSchema = new Schema(
             reward: Number, // Cent pro Spieler
             limit: Number, // Zeit für den Kampf in Spiel-Sekunden
             seconds: Number, // Dauer der Wiedergabe in echten Sekunden
+            start: Number, // ab dieser Spielzeit wird abgespielt (kurz vor dem ersten Treffer)
             ticks: { type: [tickSchema], default: [] },
             abilities: { type: [new Schema({ m: Number, from: Number, team: Boolean, label: String, text: String }, { _id: false })], default: [] },
             total: Number,

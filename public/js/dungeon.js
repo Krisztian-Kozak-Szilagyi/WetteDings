@@ -206,6 +206,11 @@
     const rows = [...lootDlg.querySelectorAll('[data-dg-loot-row]')];
     rows.forEach((row, i) => setTimeout(() => row.classList.add('is-shown'), 400 + i * 450));
     lootDlg.querySelector('[data-dg-loot-close]').addEventListener('click', () => lootDlg.close());
+    // erst beim Schließen (Weiter oder Esc) als gesehen merken – Neuladen zeigt es sonst erneut
+    lootDlg.addEventListener('close', () => {
+      const body = new URLSearchParams(new FormData(lootDlg.querySelector('[data-dg-loot-form]')));
+      fetch('/dungeon/beute-gesehen', { method: 'POST', body, credentials: 'same-origin' }).catch(() => {});
+    });
   }
 
   // ---------- Wiedergabe der Kämpfe ----------
@@ -304,7 +309,8 @@
         log((f.boss ? 'Boss: ' : 'Kampf: ') + f.title, 'is-head');
       }
       const end = f.success ? f.doneAt : f.limit;
-      const game = Math.min(1, (t - t0) / f.seconds) * end;
+      const g0 = f.start || 0;
+      const game = g0 + Math.min(1, (t - t0) / f.seconds) * (end - g0);
       while (s.ticks < f.ticks.length && f.ticks[s.ticks].t <= game) {
         const x = f.ticks[s.ticks++];
         if (x.ability) {
@@ -354,6 +360,8 @@
         else nextEl.textContent = 'Beute wird verteilt …';
       }
     }
+    // Zeit um: jede Sekunde nachfragen, damit das Ergebnis ohne Wartezeit erscheint
+    if (t >= total && Math.floor(t * 4) % 4 === 0) poll();
     step(active);
     first = false;
   }

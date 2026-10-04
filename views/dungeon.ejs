@@ -131,7 +131,7 @@
 <% const pickList = (kind, list, sel) => { const rars = [...new Set(list.map((c) => c.rarity))].sort((a, b) => rarityByKey[a].rank - rarityByKey[b].rank); %>
   <div class="dg-picklist" data-dg-picklist>
     <div class="dg-pick-head">
-      <h3 class="dg-pick-sub"><%= kind === 'card' ? 'Charakter' : 'Boost (Booster-Karte)' %></h3>
+      <h3 class="dg-pick-sub"><%= kind === 'card' ? 'Charakter' : 'Boost' %></h3>
       <% if (list.length) { %>
         <label class="dg-search">
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
@@ -310,6 +310,10 @@
         <% }) %>
       <% }) %>
     </ul>
+    <form data-dg-loot-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="run" value="<%= loot.id %>">
+    </form>
     <button class="btn btn-primary" type="button" data-dg-loot-close>Weiter</button>
   </dialog>
 <% } %>
