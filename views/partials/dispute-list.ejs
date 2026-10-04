@@ -1,19 +1,8 @@
-<%- include('partials/head') %>
-
-<div class="page-head">
-  <h1>Streitfälle</h1>
-</div>
-
-<p class="muted">
-  Hier stehen alle Wetten, bei denen <strong>Wettersteller und Schiedsrichter unterschiedliche Ergebnisse</strong> eingetragen haben.
-  Solange das so ist, wird nichts ausgezahlt. Deine Stimme als Dev entscheidet – die Wette wird damit sofort geschlossen und abgerechnet.
-  Ohne Entscheidung werden die Einsätze <%= autoVoidDays %> Tage nach dem Auswertungstermin automatisch erstattet.
-</p>
-
+<%# Streitfälle (Moderation → Streitfälle): bets mit mine/myStake aus admin.js disputeList; noteMin/noteMax %>
 <% if (!bets.length) { %>
-  <div class="empty">
-    <p><strong>Keine Streitfälle.</strong></p>
-    <p class="muted">Aktuell sind sich bei allen offenen Wetten beide Seiten einig – oder es wurde noch nicht abgestimmt.</p>
+  <div class="card panel-done">
+    <span class="panel-done-icon" aria-hidden="true">✓</span>
+    <div><strong>Keine Streitfälle.</strong> <span class="muted">Bei allen offenen Wetten sind sich beide Seiten einig.</span></div>
   </div>
 <% } else { %>
   <% bets.forEach((bet) => { %>
@@ -29,9 +18,9 @@
       </p>
       <% if (bet.description) { %><p class="bet-desc"><%= bet.description %></p><% } %>
 
-      <%- include('partials/votes', { bet }) %>
+      <%- include('votes', { bet }) %>
 
-      <%- include('partials/bar', { bet, big: true }) %>
+      <%- include('bar', { bet, big: true }) %>
       <div class="pool">
         <% bet.options.forEach((o) => { %>
           <div class="pool-side <%= optClass(bet, o.key) %>">
@@ -82,5 +71,3 @@
     </div>
   <% }) %>
 <% } %>
-
-<%- include('partials/foot') %>

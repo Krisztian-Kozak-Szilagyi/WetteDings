@@ -19,32 +19,62 @@
   const cardList = (items) => items.length
     ? items.map((c) => `<span class="nowrap">${c.count > 1 ? c.count + '× ' : ''}${c.rare ? '<strong>' + esc(c.label) + '</strong>' : esc(c.label)}</span>`).join(', ')
     : '<span class="muted">–</span>';
+  // Erklärung je Protokoll (hinter dem ?)
+  const LOG_HELP = {
+    handel: 'Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.',
+    packs: 'Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.',
+    verkauf: 'Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.',
+    ihk: 'Jede gestartete IHK-Quest mit eingesetzten Karten, Ergebnis, Lohn und Pack-Fund. Bei laufenden Quests steht das Ergebnis schon fest, wird hier aber erst nach Ablauf gezeigt.',
+    dungeon: 'Jeder Dungeon-Durchlauf mit Gruppe, eingesetzten Karten und Beute je Spieler. Bots sind kursiv, ein gesuchter Spieler ist fett.',
+    wetten: 'Jede Wette mit Ersteller, Schiedsrichter, Topf und wie sie ausgegangen ist – wer sie entschieden hat und mit welcher Begründung. Mit einem Spieler: alle Wetten, die er erstellt, geschiedst oder mitgewettet hat.',
+    einsaetze: 'Jeder Einsatz: wer auf welche Option gesetzt hat, wie viel und was nach der Auswertung ausgezahlt wurde.',
+    broker: 'Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag – bei Verkäufen der Erlös nach Steuer auf den Gewinn.',
+    lotterie: 'Gekaufte Lose und Gewinne aller Lotterien. Losanzahl, Runde und Gewinnlos werden erst seit diesem Update gespeichert.',
+    grading: 'Jeder Grading-Auftrag mit Karte, Kunde, echter und geschätzter Note, Sauberkeit, Versiegelung und Lohn.',
+    konto: 'Jede Buchung auf den Spielgeldkonten – der Kontoauszug aller Spieler: Tagesbonus, Erfolge, Provisionen, Grading-Ausbau, Startguthaben und alles andere. Oben lässt sich die Art der Buchung wählen.',
+    vergaben: 'Jede Vergabe durch Admin oder Devs: Packs, Karten, Gegenstände und entfernte Karten – auch „an alle“. Mit Spieler: was er vergeben oder bekommen hat.',
+    einstellungen: 'Jede Änderung an Preisen, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon – mit altem und neuem Wert. Mit Spieler: seine Änderungen.',
+  };
   const signedEuro = (c) => `<span class="${c < 0 ? 'neg' : 'pos'}">${c > 0 ? '+' : ''}${euro(c)}</span>`;
 %>
-<nav class="stats-subnav" aria-label="Abschnitte">
-  <span class="muted small">Springe zu:</span>
-  <a href="#protokoll">Protokolle</a><a href="#packlog">Vergabe-Log</a><a href="#einstellungen">Einstellungs-Verlauf</a>
-</nav>
-
 <section class="stats-block" id="protokoll">
-  <%- blockHead('Protokolle' + (newSuspicious ? ` <span class="panel-badge panel-badge-inline panel-badge-warn">${newSuspicious} neu</span>` : ''), 'Was auf der Seite passiert ist, neueste Einträge zuerst: Wetten und Einsätze, Broker, Lotterie, alle Kontobuchungen sowie im TCG Handel, geöffnete Packs, Verkäufe, IHK-Quests, Dungeons und Grading. Mit einem Spielernamen siehst du nur dessen Einträge.') %>
-
-  <div class="stats-toolbar log-toolbar">
+  <form method="get" action="/admin#protokoll" class="stats-toolbar log-toolbar" role="search" data-log-form>
+    <input type="hidden" name="bereich" value="protokolle">
     <div class="stats-toolbar-row">
-      <div class="log-pick">
-        <% logGroups.forEach((g) => { %>
-          <div class="stats-toolbar-group">
-            <span class="stats-toolbar-label"><%= g.label %></span>
-            <nav class="stats-range" aria-label="Protokolle: <%= g.label %>">
-              <% logs.filter((l) => l.group === g.key).forEach((l) => { %>
-                <a class="<%= l.key === logKey ? 'active' : '' %>" href="<%= logUrl({}, l.key) %>" <% if (l.key === logKey) { %>aria-current="page"<% } %>><%= l.label %></a>
-              <% }) %>
-            </nav>
-          </div>
-        <% }) %>
-      </div>
-      <% if (data) { %>
-        <div class="stats-toolbar-group stats-toolbar-actions">
+      <label class="log-field">
+        <span class="stats-toolbar-label">Protokoll</span>
+        <select name="log" data-autosubmit>
+          <% logGroups.forEach((g) => { %>
+            <optgroup label="<%= g.label %>">
+              <% logs.filter((l) => l.group === g.key).forEach((l) => { %><option value="<%= l.key %>" <%= l.key === logKey ? 'selected' : '' %>><%= l.label %></option><% }) %>
+            </optgroup>
+          <% }) %>
+        </select>
+      </label>
+      <label class="log-field log-field-grow">
+        <span class="stats-toolbar-label">Spieler</span>
+        <input type="search" name="spieler" list="log-members" autocomplete="off" maxlength="40" placeholder="Alle Spieler" value="<%= playerQ %>">
+      </label>
+      <% if (data && logKey === 'konto') { %>
+        <label class="log-field">
+          <span class="stats-toolbar-label">Buchung</span>
+          <select name="buchung" data-autosubmit>
+            <option value="">Alle Arten</option>
+            <% data.types.forEach((t) => { %><option value="<%= t.key %>" <%= t.key === data.type ? 'selected' : '' %>><%= t.label %></option><% }) %>
+          </select>
+        </label>
+      <% } %>
+      <% if (data && logKey === 'handel') { %>
+        <label class="log-field log-field-grow">
+          <span class="stats-toolbar-label">Suche</span>
+          <input type="search" name="handelsuche" value="<%= data.q %>" maxlength="40" placeholder="Name oder Karte">
+        </label>
+        <label class="check bm-filter log-check"><input type="checkbox" name="verdacht" value="1" <%= data.onlySuspicious ? 'checked' : '' %> data-autosubmit> <span>nur Mehrfach-Konten</span></label>
+      <% } %>
+      <div class="log-actions">
+        <button class="btn btn-primary btn-sm" type="submit">Anzeigen</button>
+        <% if (playerQ || (data && (data.q || data.onlySuspicious || data.type))) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: logKey }) %>">Zurücksetzen</a><% } %>
+        <% if (data) { %>
           <details class="stats-menu" data-dropdown>
             <summary class="btn btn-ghost btn-sm"><%- icon('download') %> Export</summary>
             <div class="stats-menu-panel">
@@ -54,81 +84,27 @@
               </a>
               <a class="stats-menu-item" href="<%= exportLink('json') %>" download>
                 <strong>JSON</strong>
-                <span class="muted small">Rohwerte für eigene Auswertungen (Beträge in Cent)</span>
+                <span class="muted small">Rohwerte (Beträge in Cent)</span>
               </a>
-              <span class="muted small stats-menu-hint">Der Export nimmt Spieler und Suche mit, aber alle Seiten.</span>
             </div>
           </details>
-        </div>
-      <% } %>
+        <% } %>
+      </div>
     </div>
+  </form>
+  <datalist id="log-members"><% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %></datalist>
 
-    <div class="stats-toolbar-row">
-      <div class="stats-toolbar-group">
-        <span class="stats-toolbar-label">Spieler</span>
-      </div>
-      <form method="get" action="/admin#protokoll" class="stats-member-pick" role="search">
-        <input type="hidden" name="bereich" value="protokolle">
-        <input type="hidden" name="log" value="<%= logKey %>">
-        <label class="sr-only" for="log-spieler">Spieler</label>
-        <input id="log-spieler" type="search" name="spieler" list="log-members" autocomplete="off" maxlength="40" placeholder="Alle Spieler – Namen eingeben …" value="<%= playerQ %>">
-        <button class="btn btn-primary btn-sm" type="submit">Anzeigen</button>
-        <% if (playerQ) { %><a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: logKey }) %>">Alle</a><% } %>
-      </form>
-      <datalist id="log-members"><% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %></datalist>
-      <% if (player.user) { %>
-        <div class="stats-toolbar-group stats-toolbar-actions">
-          <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(player.user.username) %>">Profil</a>
-          <a class="btn btn-ghost btn-sm" href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(player.user.username) %>">Statistik</a>
-          <a class="btn btn-ghost btn-sm" href="/admin/pack-log?suche=<%= encodeURIComponent(player.user.username) %>">Vergaben</a>
-        </div>
-      <% } %>
-    </div>
-
-    <% if (data && logKey === 'konto') { %>
-      <div class="stats-toolbar-row">
-        <div class="stats-toolbar-group">
-          <span class="stats-toolbar-label">Buchung</span>
-        </div>
-        <form method="get" action="/admin#protokoll" class="stats-member-pick log-search">
-          <input type="hidden" name="bereich" value="protokolle">
-          <input type="hidden" name="log" value="konto">
-          <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
-          <label class="sr-only" for="konto-art">Art der Buchung</label>
-          <select id="konto-art" name="buchung">
-            <option value="">Alle Arten</option>
-            <% data.types.forEach((t) => { %><option value="<%= t.key %>" <%= t.key === data.type ? 'selected' : '' %>><%= t.label %></option><% }) %>
-          </select>
-          <button class="btn btn-ghost btn-sm" type="submit">Anzeigen</button>
-        </form>
-      </div>
-    <% } %>
-    <% if (data && logKey === 'handel') { %>
-      <div class="stats-toolbar-row">
-        <div class="stats-toolbar-group">
-          <span class="stats-toolbar-label">Suche</span>
-        </div>
-        <form method="get" action="/admin#protokoll" class="stats-member-pick log-search" role="search">
-          <input type="hidden" name="bereich" value="protokolle">
-          <input type="hidden" name="log" value="handel">
-          <% if (playerQ) { %><input type="hidden" name="spieler" value="<%= playerQ %>"><% } %>
-          <label class="sr-only" for="handel-suche">Im Handel-Log suchen</label>
-          <input type="search" id="handel-suche" name="handelsuche" value="<%= data.q %>" maxlength="40" placeholder="Name oder Karte …">
-          <label class="check bm-filter"><input type="checkbox" name="verdacht" value="1" <%= data.onlySuspicious ? 'checked' : '' %>> <span>nur Mehrfach-Konten</span></label>
-          <button class="btn btn-ghost btn-sm" type="submit">Suchen</button>
-          <% if (data.q || data.onlySuspicious) { %><a class="btn btn-ghost btn-sm" href="<%= logUrl() %>">Zurücksetzen</a><% } %>
-        </form>
-      </div>
-    <% } %>
-  </div>
+  <% if (player.user) { %>
+    <p class="log-player muted small">Nur <%- userLink(player.user.username, { realName: false }) %> · <a href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(player.user.username) %>">Statistik</a></p>
+  <% } %>
+  <% if (newSuspicious) { %><p class="panel-warning-line"><span aria-hidden="true">!</span> <%= newSuspicious %> neue Geschäfte zwischen Mehrfach-Konten (rot markiert).</p><% } %>
 
   <div class="card">
     <% if (playerMissing) { %>
       <p class="muted">Es gibt kein Mitglied „<%= playerQ %>“. Bitte einen Namen aus der Liste wählen.</p>
     <% } %>
     <% if (data && logKey === 'handel') { %>
-      <p class="muted small">Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.</p>
-      <p class="muted small"><%= countLine(data, 'Geschäft', 'Geschäfte') %><%= data.onlySuspicious ? ' · nur Mehrfach-Konten' : '' %><%= data.q ? ' · Suche „' + data.q + '“' : '' %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Geschäft', 'Geschäfte') %><%= data.onlySuspicious ? ' · nur Mehrfach-Konten' : '' %><%= data.q ? ' · Suche „' + data.q + '“' : '' %></p>
       <% if (!data.rows.length) { %>
         <p class="muted"><%= data.q || player.user ? 'Nichts gefunden.' : 'Es gibt noch keine abgeschlossenen Geschäfte.' %></p>
       <% } else { %>
@@ -153,8 +129,7 @@
       <%- pager(data, handelLink) %>
 
     <% } else if (data && logKey === 'packs') { %>
-      <p class="muted small">Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.</p>
-      <p class="muted small"><%= countLine(data, 'Pack', 'Packs') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Pack', 'Packs') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine geöffneten Packs.</p>
       <% } else { %>
@@ -178,8 +153,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'verkauf') { %>
-      <p class="muted small">Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.</p>
-      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Buchung', 'Buchungen') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Verkäufe.</p>
       <% } else { %>
@@ -203,8 +177,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'ihk') { %>
-      <p class="muted small">Jede gestartete IHK-Quest mit eingesetzten Karten, Ergebnis, Lohn und Pack-Fund. Bei laufenden Quests steht das Ergebnis schon fest, wird hier aber erst nach Ablauf gezeigt.</p>
-      <p class="muted small"><%= countLine(data, 'Quest', 'Quests') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Quest', 'Quests') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine IHK-Quests.</p>
       <% } else { %>
@@ -232,8 +205,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'dungeon') { %>
-      <p class="muted small">Jeder Dungeon-Durchlauf mit Gruppe, eingesetzten Karten und Beute je Spieler. Bots sind kursiv<%= player.user ? ', der gesuchte Spieler ist fett' : '' %>.</p>
-      <p class="muted small"><%= countLine(data, 'Durchlauf', 'Durchläufe') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Durchlauf', 'Durchläufe') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Dungeon-Durchläufe.</p>
       <% } else { %>
@@ -267,8 +239,7 @@
       <% } %>
       <%- pager(data, logUrl) %>
     <% } else if (data && logKey === 'wetten') { %>
-      <p class="muted small">Jede Wette mit Ersteller, Schiedsrichter, Topf und wie sie ausgegangen ist – wer sie entschieden hat und mit welcher Begründung. Mit einem Spieler: alle Wetten, die er erstellt, geschiedst oder mitgewettet hat.</p>
-      <p class="muted small"><%= countLine(data, 'Wette', 'Wetten') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Wette', 'Wetten') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Wetten.</p>
       <% } else { %>
@@ -296,8 +267,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'einsaetze') { %>
-      <p class="muted small">Jeder Einsatz: wer auf welche Option gesetzt hat, wie viel und was nach der Auswertung ausgezahlt wurde.</p>
-      <p class="muted small"><%= countLine(data, 'Einsatz', 'Einsätze') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Einsatz', 'Einsätze') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Einsätze.</p>
       <% } else { %>
@@ -322,8 +292,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'broker') { %>
-      <p class="muted small">Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag – bei Verkäufen der Erlös nach Steuer auf den Gewinn.</p>
-      <p class="muted small"><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Käufe oder Verkäufe.</p>
       <% } else { %>
@@ -349,8 +318,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'lotterie') { %>
-      <p class="muted small">Gekaufte Lose und Gewinne aller Lotterien. Losanzahl, Runde und Gewinnlos werden erst seit diesem Update gespeichert.</p>
-      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Buchung', 'Buchungen') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Lose gekauft.</p>
       <% } else { %>
@@ -374,8 +342,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'grading') { %>
-      <p class="muted small">Jeder Grading-Auftrag mit Karte, Kunde, echter und geschätzter Note, Sauberkeit, Versiegelung und Lohn.</p>
-      <p class="muted small"><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Auftrag', 'Aufträge') %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Noch keine Grading-Aufträge.</p>
       <% } else { %>
@@ -404,8 +371,7 @@
       <%- pager(data, logUrl) %>
 
     <% } else if (data && logKey === 'konto') { %>
-      <p class="muted small">Jede Buchung auf den Spielgeldkonten – der Kontoauszug aller Spieler: Tagesbonus, Erfolge, Provisionen, Grading-Ausbau, Startguthaben und alles andere. Oben lässt sich die Art der Buchung wählen.</p>
-      <p class="muted small"><%= countLine(data, 'Buchung', 'Buchungen') %><%= data.type ? ' · ' + data.types.find((t) => t.key === data.type).label : '' %></p>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Buchung', 'Buchungen') %><%= data.type ? ' · ' + data.types.find((t) => t.key === data.type).label : '' %></p>
       <% if (!data.rows.length) { %>
         <p class="muted">Keine Buchungen gefunden.</p>
       <% } else { %>
@@ -426,24 +392,55 @@
         </div>
       <% } %>
       <%- pager(data, kontoLink) %>
+    <% } else if (data && logKey === 'vergaben') { %>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Vergabe', 'Vergaben') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Vergaben.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Was</th><th class="num">Anzahl</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((g) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(g.at) %></td>
+                  <td><%- userLink(g.by, { realName: false }) %></td>
+                  <td><% if (g.all) { %><strong><%= g.to %></strong><% } else { %><%- userLink(g.to, { realName: false }) %><% } %></td>
+                  <td><span class="badge <%= g.kind === 'entzug' ? 'badge-streitig' : g.kind === 'pack' ? 'badge-offen' : 'badge-entschieden' %>"><%= g.kindLabel %></span> <%= g.what %></td>
+                  <td class="num"><%= g.count %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'einstellungen') { %>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Änderung', 'Änderungen') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Änderungen.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Von</th><th>Bereich</th><th>Geändert</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((c) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(c.at) %></td>
+                  <td><%= c.by %></td>
+                  <td class="nowrap"><%= c.area %></td>
+                  <td class="small">
+                    <% c.changes.slice(0, 8).forEach((x) => { %><div><code><%= x.path %></code> <span class="muted"><%= x.from %> →</span> <%= x.to %></div><% }) %>
+                    <% if (c.changes.length > 8) { %><div class="muted">… und <%= c.changes.length - 8 %> weitere</div><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
     <% } %>
   </div>
-</section>
-
-<section class="stats-block" id="packlog">
-  <%- blockHead('Vergabe-Log' + (packLogNew ? ` <span class="panel-badge panel-badge-inline">${packLogNew} neu</span>` : ''), 'Jede Vergabe von Booster Packs und Karten durch Admin oder Devs – auch „Bless everyone“: wer, wem, was, wie viele und wann, mit Suche.') %>
-  <a class="card panel-link-card" href="/admin/pack-log<%= player.user ? '?suche=' + encodeURIComponent(player.user.username) : '' %>">
-    <%- icon('list') %>
-    <div><strong>Vergabe-Log öffnen</strong><span class="muted small"><%= packLogNew ? packLogNew + ' neue Vergaben seit deinem letzten Blick' : 'Alle Vergaben, neueste zuerst' %></span></div>
-    <span aria-hidden="true">→</span>
-  </a>
-</section>
-
-<section class="stats-block" id="einstellungen">
-  <%- blockHead('Einstellungs-Verlauf', 'Jede Änderung an Preisen, Chancen, Steuer, Tagesbonus, Grading und IHK – mit altem und neuem Wert und wer sie gemacht hat.') %>
-  <a class="card panel-link-card" href="/admin/statistik?bereich=uebersicht#aenderungen">
-    <%- icon('trend') %>
-    <div><strong>In der Statistik ansehen</strong><span class="muted small">Unter „Änderungen im Zeitraum“ – dort auch als Markierungen in allen Verläufen.</span></div>
-    <span aria-hidden="true">→</span>
-  </a>
 </section>

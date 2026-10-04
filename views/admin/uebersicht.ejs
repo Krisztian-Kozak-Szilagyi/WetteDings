@@ -1,17 +1,17 @@
 <%
   // Offene Aufgaben: was gerade jemand aus dem Team erledigen sollte
   const tasks = [
-    { n: counts.disputes, title: 'Streitfälle', text: 'Wettersteller und Schiedsrichter sind sich uneinig – ein Dev entscheidet.', href: '/admin/streitfaelle', action: 'Entscheiden' },
-    { n: counts.reports, title: 'Gemeldete Beiträge', text: 'Mitglieder haben Forenbeiträge gemeldet, die noch niemand geprüft hat.', href: panelUrl('moderation', 'meldungen'), action: 'Prüfen' },
-    { n: counts.deviceAlerts, title: 'Mehrfach-Konten', text: 'Konten, die sich sicher oder wahrscheinlich ein Gerät teilen.', href: panelUrl('moderation', 'geraete'), action: 'Ansehen' },
-    { n: counts.suspicious, title: 'Handel zwischen Mehrfach-Konten', text: 'Neue Geschäfte zwischen Konten, die dasselbe Gerät benutzen.', href: panelUrl('protokolle', 'handellog', { verdacht: '1' }), action: 'Im Handel-Log' },
-    ...(currentUser.isAdmin ? [{ n: counts.packLogNew, title: 'Neue Vergaben', text: 'Packs und Karten, die Devs seit deinem letzten Blick vergeben oder entfernt haben.', href: '/admin/pack-log', action: 'Vergabe-Log' }] : []),
+    { n: counts.disputes, title: 'Streitfälle', text: 'Ersteller und Schiedsrichter sind sich uneinig.', href: subUrl('moderation', 'streit'), action: 'Entscheiden' },
+    { n: counts.reports, title: 'Gemeldete Beiträge', text: 'Noch nicht geprüfte Meldungen aus dem Forum.', href: subUrl('moderation', 'meldungen'), action: 'Prüfen' },
+    { n: counts.deviceAlerts, title: 'Mehrfach-Konten', text: 'Konten, die sicher oder wahrscheinlich ein Gerät teilen.', href: subUrl('moderation', 'geraete'), action: 'Ansehen' },
+    { n: counts.suspicious, title: 'Handel zwischen Mehrfach-Konten', text: 'Neue Geschäfte zwischen Konten desselben Geräts.', href: panelUrl('protokolle', 'protokoll', { log: 'handel', verdacht: '1' }), action: 'Ansehen' },
+    ...(currentUser.isAdmin ? [{ n: counts.packLogNew, title: 'Neue Vergaben', text: 'Von Devs vergeben oder entfernt seit deinem letzten Blick.', href: panelUrl('vergaben'), action: 'Ansehen' }] : []),
   ];
   const open = tasks.filter((t) => t.n);
 %>
 
 <section class="stats-block" id="aufgaben">
-  <%- blockHead('Offene Aufgaben', open.length ? 'Was gerade auf das Team wartet.' : '') %>
+  <%- blockHead('Offene Aufgaben', '') %>
   <% if (!open.length) { %>
     <div class="card panel-done">
       <span class="panel-done-icon" aria-hidden="true">✓</span>
@@ -36,29 +36,21 @@
     <a class="stats-kpi card" href="/rangliste"><span class="stat-label">Mitglieder</span><span class="stat-value"><%= stats.userCount %></span></a>
     <a class="stats-kpi card" href="/wetten"><span class="stat-label">Offene Wetten</span><span class="stat-value"><%= stats.openBets %></span></a>
     <div class="stats-kpi card"><span class="stat-label">Wetten gesamt</span><span class="stat-value"><%= stats.totalBets %></span></div>
-    <a class="stats-kpi card" href="<%= panelUrl('moderation', 'banliste') %>"><span class="stat-label">Aktive Bans</span><span class="stat-value"><%= counts.bans %></span></a>
+    <a class="stats-kpi card" href="<%= subUrl('moderation', 'bans') %>"><span class="stat-label">Aktive Bans</span><span class="stat-value"><%= counts.bans %></span></a>
   </div>
-  <a class="card panel-link-card" href="/admin/statistik">
-    <%- icon('trend') %>
-    <div><strong>Statistik öffnen</strong><span class="muted small">Wirtschaft, Aktivität, TCG &amp; Handel, Wetten &amp; Spiele und Einzelspieler – mit Verläufen und Export.</span></div>
-    <span aria-hidden="true">→</span>
-  </a>
 </section>
 
 <% if (!currentUser.isAdmin) { %>
-  <section class="stats-block" id="rechte">
-    <%- blockHead('Deine Rechte als Dev', '') %>
-    <div class="card">
-      <ul class="panel-rights">
-        <li><strong>Streitfälle entscheiden</strong> – außer bei Wetten, an denen du selbst als Ersteller oder Schiedsrichter beteiligt bist.</li>
-        <li><strong>Bannen</strong> – für 1 bis 168 Stunden (7 Tage), nicht den Admin und keine anderen Devs. Aufheben kannst du nur Bans, die du selbst vergeben hast; dauerhafte Bans vergibt der Admin.</li>
-        <li><strong>Moderieren</strong> – gemeldete Beiträge prüfen, Hinweise auf Mehrfach-Konten abhaken, im Forum und bei Kommentaren eingreifen.</li>
-        <li><strong>Packs und Karten vergeben, Karten entfernen</strong> – nur für Bugfixes, Tests und Aktionen; alles steht im Vergabe-Log, der Admin bekommt einen Hinweis.</li>
-        <li><strong>Passwort</strong> – jede Aktion in Moderation und Spielwerten bestätigst du mit deinem Passwort.</li>
-        <li><strong>Mitglieder einladen</strong> – Einladungscodes erzeugen (Reiter „Team &amp; Einladungen“) und deine eigenen wieder löschen.</li>
-        <li><strong>Einsehen</strong> – Handel-Log, Vergabe-Log und die Statistik.</li>
-      </ul>
-      <p class="muted small">Preise, Chancen, Steuer, Tagesbonus, IHK und die Rollen (Devs, Mods) stellt der Admin ein.</p>
-    </div>
-  </section>
+  <details class="card panel-rights-box">
+    <summary><strong>Deine Rechte als Dev</strong></summary>
+    <ul class="panel-rights">
+      <li><strong>Streitfälle</strong> entscheiden – nicht bei Wetten, an denen du als Ersteller oder Schiedsrichter beteiligt bist.</li>
+      <li><strong>Bannen</strong> für 1–168 Stunden, nicht den Admin und keine Devs. Aufheben nur eigene Bans.</li>
+      <li><strong>Moderieren:</strong> Meldungen prüfen, Mehrfach-Konten abhaken, im Forum eingreifen.</li>
+      <li><strong>Vergaben</strong> nur für Bugfixes, Tests und Aktionen – alles landet im Protokoll.</li>
+      <li><strong>Einladen:</strong> Codes erzeugen und eigene löschen.</li>
+      <li><strong>Einsehen:</strong> alle Protokolle und die Statistik.</li>
+    </ul>
+    <p class="muted small">Jede Aktion bestätigst du mit deinem Passwort. Spielwerte und Rollen stellt der Admin ein.</p>
+  </details>
 <% } %>

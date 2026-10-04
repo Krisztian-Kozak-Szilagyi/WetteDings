@@ -36,16 +36,39 @@ const router = express.Router();
 // ---------- Reiter des Panels ----------
 // adminOnly: Reiter, in dem Devs nichts tun können, wird für sie ausgeblendet
 const PANEL_SECTIONS = [
-  { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen auf einen Blick.' },
-  { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, gemeldete Beiträge, Bans und Hinweise auf Mehrfach-Konten.' },
-  { key: 'team', label: 'Team & Einladungen', icon: 'users', description: 'Neue Mitglieder per Code einladen und – als Admin – Devs und Mods ernennen.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', description: 'Packs und Karten vergeben (nur für Bugfixes, Tests und Aktionen) und – als Admin – Preise, Chancen, Steuer, Tagesbonus, Grading und IHK einstellen.' },
-  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Wetten, Einsätze, Broker, Lotterie, Kontobuchungen und das TCG (Handel, Packs, Verkäufe, IHK, Dungeons, Grading) – für alle oder einen einzelnen Spieler, mit Export.' },
+  { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen.' },
+  { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans und Mehrfach-Konten.' },
+  { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
+  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes, Devs und Mods.' },
+  { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
 
+// Unterreiter (?teil=…) – je Unterreiter wird nur sein Inhalt geladen und gezeigt
+const SUBTABS = {
+  moderation: [
+    { key: 'streit', label: 'Streitfälle' },
+    { key: 'meldungen', label: 'Meldungen' },
+    { key: 'bans', label: 'Bans' },
+    { key: 'geraete', label: 'Mehrfach-Konten' },
+  ],
+  spielwerte: [
+    { key: 'tcg', label: 'TCG' },
+    { key: 'steuer', label: 'Steuern' },
+    { key: 'bonus', label: 'Tagesbonus' },
+    { key: 'grading', label: 'Grading' },
+    { key: 'folie', label: 'Folie' },
+    { key: 'lotterie', label: 'Lotterie' },
+    { key: 'ihk', label: 'IHK' },
+    { key: 'dungeon', label: 'Dungeon' },
+  ],
+};
+
 /** Adresse im Panel, z. B. panelUrl('moderation', 'ban') -> /admin?bereich=moderation#ban */
 const panelUrl = (bereich, anchor, extra = {}) => `/admin?${new URLSearchParams({ bereich, ...extra })}${anchor ? `#${anchor}` : ''}`;
+/** Adresse eines Unterreiters, z. B. subUrl('spielwerte', 'folie') -> /admin?bereich=spielwerte&teil=folie */
+const subUrl = (bereich, teil, extra = {}) => panelUrl(bereich, null, { teil, ...extra });
 
 /** Mitglieder, die der Handelnde bannen kann: nie den Admin oder sich selbst, Devs zusätzlich keine Devs */
 const bannableFor = (actor, users) =>
@@ -58,6 +81,22 @@ async function openReports() {
   const byId = new Map(posts.map((p) => [String(p._id), p]));
   return reports.map((r) => ({ ...r, postDoc: byId.get(String(r.post)) || null }));
 }
+
+/** Streitfälle mit Hinweis, ob der Dev selbst beteiligt ist oder mitgesetzt hat */
+async function disputeList(user) {
+  const bets = await Bet.find(betService.disputedFilter()).sort({ updatedAt: 1, _id: 1 }).limit(100).lean();
+  // Eigene Einsätze: kein Hinderungsgrund, aber ein Interessenkonflikt, den der Dev sehen soll
+  const staked = await Position.find({ user: user._id, bet: { $in: bets.map((b) => b._id) } }).select('bet side').lean();
+  const myStake = new Map(staked.map((p) => [String(p.bet), p.side]));
+  return bets.map((bet) => ({
+    ...bet,
+    mine: verdictRole(bet, user) !== 'dev', // selbst Ersteller oder Schiedsrichter
+    myStake: myStake.get(String(bet._id)) || null,
+  }));
+}
+
+/** Letzte Vergaben (für den Reiter "Vergaben") */
+const recentGrants = (limit = 15) => PackGrant.find().sort({ createdAt: -1, _id: -1 }).limit(limit).lean();
 
 router.get('/admin', requireStaff, async (req, res) => {
   const me = req.user;
@@ -77,21 +116,32 @@ router.get('/admin', requireStaff, async (req, res) => {
     bans: bans.length,
   };
   counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts;
-  counts.protokolle = counts.suspicious + counts.packLogNew;
+  counts.vergaben = counts.packLogNew;
+  counts.protokolle = counts.suspicious;
+  // Zähler je Unterreiter
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, geraete: counts.deviceAlerts, bans: counts.bans };
 
-  const users = needs('moderation', 'spielwerte', 'team', 'protokolle')
-    ? await User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean()
-    : [];
+  // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
+  const subs = SUBTABS[tab] || null;
+  const sub = subs ? (subs.find((x) => x.key === req.query.teil) || (tab === 'moderation' && subs.find((x) => x.key !== 'bans' && subCounts[x.key])) || subs[0]).key : null;
+  const needsSub = (t, k) => tab === t && sub === k;
+
+  const users =
+    needs('vergaben', 'team', 'protokolle') || needsSub('moderation', 'bans') || needsSub('moderation', 'geraete')
+      ? await User.find({ deletedAt: null }).select('username usernameLower role').sort({ usernameLower: 1 }).lean()
+      : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, reports, deviceMatches, codes, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, codes, grants, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
-    needs('moderation') ? openReports() : [],
-    needs('moderation') ? deviceService.listAlerts() : [],
+    needsSub('moderation', 'streit') ? disputeList(me) : [],
+    needsSub('moderation', 'meldungen') ? openReports() : [],
+    needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needs('team') ? listActiveCodes() : [],
-    // gewählter Log (Handel, Pack-Öffnungen, Verkäufe, IHK, Dungeons); unbekannter Spieler: nichts laden
+    needs('vergaben') ? recentGrants() : [],
+    // gewählter Log; unbekannter Spieler: nichts laden
     needs('protokolle') && !(player.q && !player.user) ? logs.loadLog(req.query, { player: player.user, seenAt: me.suspiciousSeenAt }) : null,
   ]);
   // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
@@ -100,14 +150,27 @@ router.get('/admin', requireStaff, async (req, res) => {
     await User.updateOne({ _id: me._id }, { $set: { suspiciousSeenAt: new Date() } });
     res.locals.tradeAlerts = 0;
   }
+  // Vergaben angesehen (Reiter oder Protokoll): neue Vergaben der Devs gelten für den Admin als gesehen
+  const grantsSeenAt = me.packLogSeenAt || new Date(0);
+  if (isAdmin && counts.packLogNew && (needs('vergaben') || (log && log.key === 'vergaben'))) {
+    await User.updateOne({ _id: me._id }, { $set: { packLogSeenAt: new Date() } });
+    res.locals.packLogNew = 0;
+  }
 
   res.render('admin', {
     title: isAdmin ? 'Admin-Panel' : 'Dev-Panel',
     sections,
     tab,
+    subs,
+    sub,
+    subCounts,
     panelUrl,
+    subUrl,
     counts,
     stats,
+    disputes,
+    noteMin: betService.NOTE_MIN,
+    noteMax: betService.NOTE_MAX,
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
@@ -122,29 +185,31 @@ router.get('/admin', requireStaff, async (req, res) => {
     lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
     ttlMinutes: CODE_TTL_MINUTES,
     now: Date.now(),
-    tcg: needs('spielwerte') && isAdmin
-      ? {
-          packPrice: tcgSettings.getPackPrice(),
-          rarities: tcgCatalog.RARITIES,
-          defaults: tcgCatalog.DEFAULT_SELL,
-          defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
-          totalWeight: tcgCatalog.TOTAL_WEIGHT,
-          expectedPack: Math.round(tcgCatalog.expectedPackValue()),
-          cardsPerPack: tcgCatalog.CARDS_PER_PACK,
-          lastUpdate: await tcgSettings.lastUpdate(),
-        }
-      : null,
+    tcg:
+      needs('spielwerte') && isAdmin
+        ? {
+            packPrice: tcgSettings.getPackPrice(),
+            rarities: tcgCatalog.RARITIES,
+            defaults: tcgCatalog.DEFAULT_SELL,
+            defaultWeights: tcgCatalog.DEFAULT_WEIGHT,
+            totalWeight: tcgCatalog.TOTAL_WEIGHT,
+            expectedPack: Math.round(tcgCatalog.expectedPackValue()),
+            cardsPerPack: tcgCatalog.CARDS_PER_PACK,
+            lastUpdate: await tcgSettings.lastUpdate(),
+          }
+        : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
-    gradingCalc: needs('spielwerte') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
+    gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     taxCategories: taxService.CATEGORIES,
     taxRates: taxService.rates,
     log, // { key, data } des gewählten Protokolls
@@ -178,24 +243,12 @@ router.get('/admin/protokolle/export', requireStaff, async (req, res) => {
 // Hier gibt ein Dev die entscheidende Stimme ab. An einem eigenen Streitfall (als Ersteller oder
 // Schiedsrichter) darf auch ein Dev nicht entscheiden – dafür braucht es einen anderen Dev.
 
-router.get('/admin/streitfaelle', requireStaff, async (req, res) => {
-  const bets = await Bet.find(betService.disputedFilter()).sort({ updatedAt: 1, _id: 1 }).limit(100).lean();
-  // Eigene Einsätze: kein Hinderungsgrund, aber ein Interessenkonflikt, den der Dev sehen soll
-  const staked = await Position.find({ user: req.user._id, bet: { $in: bets.map((b) => b._id) } }).select('bet side').lean();
-  const myStake = new Map(staked.map((p) => [String(p.bet), p.side]));
-  res.render('streitfaelle', {
-    title: 'Streitfälle',
-    bets: bets.map((bet) => ({
-      ...bet,
-      mine: verdictRole(bet, req.user) !== 'dev', // selbst Ersteller oder Schiedsrichter
-      myStake: myStake.get(String(bet._id)) || null,
-    })),
-    noteMin: betService.NOTE_MIN,
-    noteMax: betService.NOTE_MAX,
-  });
-});
+const DISPUTE_URL = subUrl('moderation', 'streit');
 
-router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth('/admin/streitfaelle'), async (req, res) => {
+// Frühere eigene Seite – jetzt ein Unterreiter der Moderation
+router.get('/admin/streitfaelle', requireStaff, (req, res) => res.redirect(DISPUTE_URL));
+
+router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(DISPUTE_URL), async (req, res) => {
   const outcome = str(req.body.outcome);
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw new UserError('Wette nicht gefunden.');
@@ -219,13 +272,13 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth('
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/admin/streitfaelle');
+  res.redirect(DISPUTE_URL);
 });
 
 // ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
 router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
-  res.redirect(panelUrl('moderation', 'geraete'));
+  res.redirect(subUrl('moderation', 'geraete'));
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
@@ -234,12 +287,12 @@ const profilePath = (username) => `/profil/${encodeURIComponent(username)}`;
 
 router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
-  let back = panelUrl('moderation', 'ban');
+  let back = subUrl('moderation', 'bans');
   try {
     if (!mongoose.isValidObjectId(userId)) throw new UserError('Bitte ein Mitglied auswählen.');
     const r = await deviceService.ban({ userId, hours: str(req.body.hours), reason: str(req.body.reason), admin: req.user, adminUsernames: config.adminUsernames });
     req.flash('success', `${r.username} ist gebannt (${isForever(r.until) ? 'dauerhaft' : `bis ${date(r.until)}`}) – samt allen Geräten des Kontos.`);
-    back = req.body.zurueck === 'profil' ? profilePath(r.username) : panelUrl('moderation', 'banliste'); // vom Profil aus gebannt: dorthin zurück
+    back = req.body.zurueck === 'profil' ? profilePath(r.username) : subUrl('moderation', 'bans'); // vom Profil aus gebannt: dorthin zurück
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
@@ -256,7 +309,7 @@ router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?b
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : panelUrl('moderation', 'banliste'));
+  res.redirect(user && req.body.zurueck === 'profil' ? profilePath(user.username) : subUrl('moderation', 'bans'));
 });
 
 // ---------- Steuern: je Bereich ein Satz (Handel: Markt, Privat, Tausch; Broker: Coins, ETFs) ----------
@@ -268,36 +321,43 @@ router.post('/admin/steuer', requireAdmin, requireReauth('/admin?bereich=spielwe
     await taxService.saveSettings({ rates, admin: req.user });
     req.flash('success', 'Steuersätze gespeichert.');
   }
-  res.redirect(panelUrl('spielwerte', 'steuer'));
+  res.redirect(subUrl('spielwerte', 'steuer'));
 });
 
 // ---------- Tagesbonus und Grading-Shop ----------
+// Tagesbonus und Grading-Shop haben je ein eigenes Formular (Unterreiter); teil sagt, welches gespeichert wird
 router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   // "0" / "0,00" ist erlaubt (parseEuro allein lässt 0 auch zu, aber sicher ist sicher)
   const money = (v) => {
     const raw = typeof v === 'string' ? v.trim() : '';
     return /^0+([.,]0*)?$/.test(raw) ? 0 : centsOrNull(raw);
   };
-  const amount = money(req.body.amount);
+  const tooBig = (c) => c === null || c > 10000000;
+  const part = req.body.teil === 'grading' ? 'grading' : 'bonus';
+  if (part === 'bonus') {
+    const amount = money(req.body.amount);
+    if (tooBig(amount)) req.flash('error', 'Bitte einen gültigen Tagesbonus angeben (0 bis 100.000 €).');
+    else {
+      await bonusService.saveSettings({ amount, admin: req.user });
+      req.flash('success', `Gespeichert: Tagesbonus ${euro(amount)}.`);
+    }
+    return res.redirect(subUrl('spielwerte', 'bonus'));
+  }
   const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
   const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
-  const tooBig = (c) => c === null || c > 10000000;
-  if (tooBig(amount)) {
-    req.flash('error', 'Bitte einen gültigen Tagesbonus angeben (0 bis 100.000 €).');
-  } else if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
+  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
   } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
     req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
   } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
     req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
   } else {
-    await bonusService.saveSettings({ amount, admin: req.user });
     await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, pay, costs, premium, admin: req.user });
-    req.flash('success', `Gespeichert: Tagesbonus ${euro(amount)}, Grading-Shop ${jobs} Aufträge pro Tag.`);
+    req.flash('success', `Gespeichert: Grading-Shop ${jobs} Aufträge pro Tag.`);
   }
-  res.redirect(panelUrl('spielwerte', 'bonus'));
+  res.redirect(subUrl('spielwerte', 'grading'));
 });
 
 // ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
@@ -322,7 +382,7 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect(panelUrl('spielwerte', 'dungeon'));
+  res.redirect(subUrl('spielwerte', 'dungeon'));
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
@@ -353,7 +413,7 @@ router.post('/admin/ihk', requireAdmin, requireReauth('/admin?bereich=spielwerte
     await ihk.saveSettings({ open: req.body.open === '1', dailyLimit, durations, rewards, required, packChances, hybrid, admin: req.user });
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
-  res.redirect(panelUrl('spielwerte', 'ihk'));
+  res.redirect(subUrl('spielwerte', 'ihk'));
 });
 
 // ---------- TCG-Preise und Chancen ----------
@@ -392,7 +452,7 @@ router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte
   }
   if (error) {
     req.flash('error', error);
-    return res.redirect(panelUrl('spielwerte', 'tcg'));
+    return res.redirect(subUrl('spielwerte', 'tcg'));
   }
 
   await tcgSettings.save({ packCents, sell, weight, admin: req.user });
@@ -403,7 +463,7 @@ router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte
   } else {
     req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
   }
-  res.redirect(panelUrl('spielwerte', 'tcg'));
+  res.redirect(subUrl('spielwerte', 'tcg'));
 });
 
 // ---------- Folie: Fundchance im Grading-Shop und Wertsteigerung ----------
@@ -424,7 +484,7 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
     await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent });
     req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
   }
-  res.redirect(panelUrl('spielwerte', 'folie'));
+  res.redirect(subUrl('spielwerte', 'folie'));
 });
 
 // Lotterien (täglich, Woche, Monat): Lospreis und Gewinn aus der Bank (gilt sofort, auch für die offene Runde)
@@ -448,14 +508,14 @@ router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spiel
       req.flash('success', `${k.name} gespeichert: Los ${euro(values.ticketPrice)}, Bank-Gewinn ${lotteryService.prizeText({ cash: values.prizeCash, packs: values.prizePacks, foils: values.prizeFoils })}.`);
     }
   }
-  res.redirect(panelUrl('spielwerte', 'lotterie'));
+  res.redirect(subUrl('spielwerte', 'lotterie'));
 });
 
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
-const GRANT_URL = panelUrl('spielwerte', 'vergeben');
+const GRANT_URL = panelUrl('vergaben');
 
 // Gegenstände (Folie) an ein Mitglied oder an alle
-router.post('/admin/items', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+async function grantItemsTo(req) {
   const type = itemService.ITEM_TYPES.find((t) => t.key === str(req.body.type));
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -474,10 +534,13 @@ router.post('/admin/items', requireStaff, requireReauth(GRANT_URL), async (req, 
     await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'item', type: type.key, typeLabel: type.label, count });
     req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.` : `${count}× ${type.label} an ${user.username} vergeben.`);
   }
+}
+router.post('/admin/items', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  await grantItemsTo(req);
   res.redirect(GRANT_URL);
 });
 
-router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+async function grantPacksTo(req) {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
@@ -494,6 +557,9 @@ router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (r
     await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count });
     req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
   }
+}
+router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  await grantPacksTo(req);
   res.redirect(GRANT_URL);
 });
 
@@ -501,7 +567,7 @@ router.post('/admin/tcg/packs', requireStaff, requireReauth(GRANT_URL), async (r
 const allMemberIds = async () => (await User.find({ deletedAt: null }).select('_id').lean()).map((u) => u._id);
 
 // "Bless everyone": jedes Mitglied bekommt count Booster Packs
-router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+async function blessEveryone(req) {
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(str(req.body.count), 10);
   if (!type) {
@@ -514,11 +580,14 @@ router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (r
     await PackGrant.create({ by: req.user._id, byName: req.user.username, to: null, toName: `Alle Mitglieder (${ids.length})`, all: true, recipients: ids.length, kind: 'pack', type: type.key, typeLabel: type.label, count });
     req.flash('success', `Bless everyone: ${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.`);
   }
+}
+router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  await blessEveryone(req);
   res.redirect(GRANT_URL);
 });
 
 // Bestimmte Karte an ein Mitglied oder an alle vergeben
-router.post('/admin/tcg/karte', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+async function grantCardTo(req) {
   const card = tcgCatalog.cardById[str(req.body.card)];
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -548,17 +617,15 @@ router.post('/admin/tcg/karte', requireStaff, requireReauth(GRANT_URL), async (r
     });
     req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${label} bekommen.` : `${count}× ${label} an ${user.username} vergeben.`);
   }
+}
+router.post('/admin/tcg/karte', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  await grantCardTo(req);
   res.redirect(GRANT_URL);
 });
 
-// ---------- Vergabe-Log (Packs und Karten): eigene Seite, 50 Einträge pro Seite, mit Suche ----------
-const LOG_PAGE = 50;
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/** Neue Vergaben anderer seit dem letzten Blick ins Log (Abzeichen für den Admin) */
 // Karte aus der Sammlung eines Mitglieds entfernen (z. B. versehentlich vergeben) – landet wie jede Vergabe im Log
 // und beim Admin als Hinweis am Menüpunkt
-router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+async function revokeCardFrom(req) {
   const card = tcgCatalog.cardById[str(req.body.card)];
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -580,33 +647,60 @@ router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL)
       req.flash('error', err.message);
     }
   }
+}
+router.post('/admin/tcg/karte-entziehen', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  await revokeCardFrom(req);
   res.redirect(GRANT_URL);
 });
 
+// Ein Formular für alle Vergaben (Reiter "Vergaben"): art = pack | karte | item | entzug; user = Mitglied oder "alle".
+// Die Felder heißen je Art anders (pack, card, item) und werden für die einzelnen Vergaben umbenannt.
+// "alle" oder der Vorschlag "Alle Mitglieder (12)" – genau so, damit ein Name wie "Allessandro" nicht passt
+const ALL_MEMBERS = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i;
+
+router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (req, res) => {
+  const art = str(req.body.art);
+  // Empfänger kommt als Name (Eingabefeld mit Vorschlägen): in die ID umwandeln, "Alle Mitglieder" -> "alle"
+  const target = str(req.body.user).trim();
+  let user = target;
+  if (ALL_MEMBERS.test(target)) user = 'alle';
+  else if (target && !mongoose.isValidObjectId(target)) {
+    const found = await User.findOne({ usernameLower: target.toLowerCase(), deletedAt: null }).select('_id').lean();
+    if (!found) {
+      req.flash('error', `Es gibt kein Mitglied „${target.slice(0, 40)}“.`);
+      return res.redirect(GRANT_URL);
+    }
+    user = String(found._id);
+  }
+  const body = { ...req.body, user };
+  if (art === 'pack') {
+    req.body = { ...body, type: str(body.pack) };
+    await (str(body.user) === 'alle' ? blessEveryone(req) : grantPacksTo(req));
+  } else if (art === 'karte') {
+    req.body = { ...body, card: str(body.card) };
+    await grantCardTo(req);
+  } else if (art === 'item') {
+    req.body = { ...body, type: str(body.item) };
+    await grantItemsTo(req);
+  } else if (art === 'entzug') {
+    if (str(body.user) === 'alle') req.flash('error', 'Karten lassen sich nur bei einem einzelnen Mitglied entfernen.');
+    else {
+      req.body = body;
+      await revokeCardFrom(req);
+    }
+  } else {
+    req.flash('error', 'Bitte auswählen, was vergeben werden soll.');
+  }
+  res.redirect(GRANT_URL);
+});
+
+/** Neue Vergaben anderer seit dem letzten Blick (Abzeichen für den Admin) */
 const packLogNewCount = (user) => PackGrant.countDocuments({ by: { $ne: user._id }, createdAt: { $gt: user.packLogSeenAt || new Date(0) } });
 
-router.get('/admin/pack-log', requireStaff, async (req, res) => {
-  const q = (typeof req.query.suche === 'string' ? req.query.suche : '').trim().slice(0, 40);
-  const rx = q ? new RegExp(escapeRegex(q), 'i') : null;
-  const filter = rx ? { $or: [{ byName: rx }, { toName: rx }, { typeLabel: rx }] } : {};
-  const total = await PackGrant.countDocuments(filter);
-  const pages = Math.max(1, Math.ceil(total / LOG_PAGE));
-  const page = Math.min(pages, Math.max(1, Number.parseInt(req.query.seite, 10) || 1));
-  const entries = await PackGrant.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * LOG_PAGE).limit(LOG_PAGE).lean();
-  const seen = req.user.packLogSeenAt || new Date(0);
-  if (req.user.isAdmin) {
-    // Besuch merken: das Abzeichen am Menüpunkt verschwindet
-    await User.updateOne({ _id: req.user._id }, { $set: { packLogSeenAt: new Date() } });
-    res.locals.packLogNew = 0;
-  }
-  res.render('pack-log', {
-    title: 'Vergabe-Log',
-    q,
-    total,
-    page,
-    pages,
-    entries: entries.map((e) => ({ ...e, isNew: req.user.isAdmin && e.createdAt > seen && !e.by.equals(req.user._id) })),
-  });
+// Frühere eigene Seite – jetzt ein Protokoll im Reiter "Protokolle" (Suche nach Namen -> Spieler-Filter)
+router.get('/admin/pack-log', requireStaff, (req, res) => {
+  const q = str(req.query.suche).trim().slice(0, 40);
+  res.redirect(panelUrl('protokolle', 'protokoll', { log: 'vergaben', ...(q ? { spieler: q } : {}) }));
 });
 
 // ---------- Rollen vergeben / entziehen: Devs und Mods (nur Admin) ----------
