@@ -33,7 +33,6 @@
         <% if (bm.open) { %><span class="bm-state bm-state-open"><span class="bm-dot"></span>Geöffnet · noch <%= left %> von <%= bm.offers.length %></span>
         <% } else { %><span class="bm-state">Geschlossen</span><% } %>
       </div>
-      <span class="bm-sub">Täglich <%= bm.openTime %>–<%= bm.closeTime %> Uhr · seltene Karten (Gold bis Glitch), jede nur einmal<% if (bm.open) { %> · Preis <%= bm.percent %> % des Kartenwerts<% } %>.</span>
     </div>
     <div class="bm-cd">
       <span><%= bm.open ? 'Schließt in' : 'Öffnet in' %></span>
