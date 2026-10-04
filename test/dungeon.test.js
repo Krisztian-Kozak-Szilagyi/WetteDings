@@ -33,10 +33,11 @@ test('Anmeldung kurz vor dem Start gilt schon für den übernächsten Termin', (
   assert.equal(d.isLockedIn(new Date(slot), slot - 5000), true);
 });
 
-test('Der Dungeon wechselt mit jedem Termin', () => {
+test('Dungeons: jeder Termin hat einen Dungeon, alle gleich aufgebaut', () => {
   const a = d.slotAfter(Date.UTC(2026, 0, 15, 10, 0), 2);
   const b = d.slotAfter(a.getTime(), 2);
-  assert.notEqual(dungeonForSlot(a, 2).key, dungeonForSlot(b, 2).key);
+  assert.ok(dungeonForSlot(a, 2) && dungeonForSlot(b, 2));
+  if (DUNGEONS.length > 1) assert.notEqual(dungeonForSlot(a, 2).key, dungeonForSlot(b, 2).key);
   for (const dg of DUNGEONS) {
     // gleiche Reihenfolge der Fachrichtungen in allen Dungeons – die Ziel-Punkte gelten für alle (Balancing)
     assert.deepEqual(dg.fights.map((f) => f.stat), ['bwl', 'fia', 'fis']);

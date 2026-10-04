@@ -62,7 +62,7 @@ router.get('/dungeon', async (req, res) => {
   const running = run && run.status === 'laeuft' ? run : null;
   const slot = party ? party.slot : dungeon.registrationSlot(now);
   const next = dungeonForSlot(slot, dungeon.settings.intervalHours);
-  const runDungeon = run ? dungeonByKey[run.dungeon] : null;
+  const runDungeon = run ? dungeonByKey[run.dungeon] || DUNGEONS[0] : null; // alte Läufe: Dungeon gibt es nicht mehr
 
   let phase = 'frei';
   if (running) phase = 'laeuft';

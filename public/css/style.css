@@ -4155,3 +4155,16 @@ button.dg-boost-card:hover, button.dg-boost-card:focus-visible { outline: 0; tra
 .dg-story { max-width: 760px; }
 .dg-story p { margin: 0 0 12px; font-size: 16px; line-height: 1.65; text-wrap: pretty; }
 .dg-story p:last-child { margin-bottom: 0; font-weight: 600; }
+/* „Dungeon“ über dem Titel: rötliches Glas (Liquid-Glass-Stil) – Unschärfe, heller Rand oben, Lichtkante, leichter Glanz */
+.dg-hero-text .kicker {
+  position: relative; align-self: flex-start; overflow: hidden; padding: 5px 13px 4px; border-radius: 999px;
+  color: #fff1f1; font-weight: 600; text-shadow: 0 1px 2px rgba(60, 0, 0, .45);
+  background: linear-gradient(180deg, rgba(255, 120, 120, .30), rgba(190, 30, 45, .18) 55%, rgba(120, 10, 25, .28));
+  -webkit-backdrop-filter: blur(14px) saturate(180%); backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid rgba(255, 190, 190, .35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(255, 90, 90, .25), inset 0 0 12px rgba(255, 80, 80, .18), 0 4px 14px rgba(120, 0, 15, .35);
+}
+.dg-hero-text .kicker::before {
+  content: ""; position: absolute; inset: 0 0 50% 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0));
+}

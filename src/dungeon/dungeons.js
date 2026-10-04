@@ -2,16 +2,15 @@
 // Fähigkeit (stat: 'fia' | 'fis' | 'bwl') ein Kampf braucht – sie müssen es aus dem Text erraten.
 // image ist das Querformat-Bild über den Spieler-Plätzen. story (optional): ganze Geschichte im Original (Englisch),
 // zu lesen unter /dungeon/geschichte/<key> – der Titel im Banner verlinkt dorthin.
-// Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – so kann man sich vorher darauf einstellen.
+// Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – derzeit gibt es nur einen.
 
 const PLACEHOLDER = '/img/dungeon/placeholder.svg';
-const BANNER = '/img/dungeon/st-ivan-dungeon-banner.webp'; // vorerst für alle Dungeons
 
 const DUNGEONS = [
   {
-    key: 'serverraum', // Schlüssel bleibt (steht in gespeicherten Läufen)
+    key: 'st-ivan',
     title: 'The Fall of St. Ivan',
-    image: BANNER,
+    image: '/img/dungeon/st-ivan-dungeon-banner.webp',
     intro: 'Sein Gott Claude verstummte, das verbotene Buch „A Stack O’Floe“ verdarb seinen Geist – nun reißt St. Ivan Tempel nieder. Die Miliz sucht mutige Abenteurer, die ihn aufhalten.',
     story: [
       'St. Ivan was once a promising acolyte, blessed with the undivided attention of his god, Claude, who answered his every question and guided his path.',
@@ -40,46 +39,13 @@ const DUNGEONS = [
         fail: 'Die Schleife läuft weiter, die Geister vermehren sich. Rückzug!',
       },
       {
-        key: 'kabel-hydra',
-        title: 'Boss: Die Kabel-Hydra',
+        key: 'st-ivan',
+        title: 'Boss: St. Ivan, der Gefallene',
         stat: 'fis',
         boss: true,
-        text: 'Im hintersten Rack windet sich die Kabel-Hydra: Hunderte Patchkabel, jedes in den falschen Port gesteckt. Für jedes gezogene Kabel wachsen zwei nach – nur ein sauber aufgebautes Netz bringt sie zur Ruhe.',
-        success: 'Port für Port richtig gesteckt, beschriftet und mit Kabelbindern gezähmt. Die Hydra erschlafft und lässt ihre Beute zurück.',
-        fail: 'Die Hydra verheddert euch im Kabelsalat und kappt das Licht. Ihr flieht mit dem, was ihr schon eingesammelt habt.',
-      },
-    ],
-  },
-  {
-    key: 'pruefungsamt',
-    title: 'Das verlorene Prüfungsamt',
-    image: BANNER,
-    intro: 'Ganz oben im Altbau soll es ein Büro geben, in dem alle verschwundenen Prüfungsunterlagen liegen. Der Aufzug fährt nur noch in den dritten Stock – den Rest müsst ihr euch erkämpfen.',
-    fights: [
-      {
-        key: 'formular-golem',
-        title: 'Der Formular-Golem',
-        stat: 'bwl',
-        text: 'Ein Riese aus Anträgen, Durchschlägen und Umlaufmappen versperrt den Flur. Er lässt nur durch, wer seine Reisekostenabrechnung korrekt ausfüllt.',
-        success: 'Belege sortiert, Pauschalen eingetragen, abgezeichnet. Der Golem zerfällt zu einem ordentlichen Stapel.',
-        fail: 'Ein falsches Kreuzchen – und der Golem begräbt euch unter Papier.',
-      },
-      {
-        key: 'sortier-automat',
-        title: 'Der Sortier-Automat',
-        stat: 'fia',
-        text: 'Im Aktenraum rattert ein uralter Sortier-Automat und wirft jede Akte an die falsche Stelle. Sein Programm liegt offen auf dem Bildschirm – irgendwo darin steckt der Fehler im Algorithmus.',
-        success: 'Vergleich korrigiert, Schleife umgebaut – der Automat sortiert endlich alphabetisch und gibt die Tür frei.',
-        fail: 'Der Automat sortiert euch gleich mit ein. Unter einem Aktenberg ist Schluss.',
-      },
-      {
-        key: 'hoellendrucker',
-        title: 'Boss: Der Höllendrucker',
-        stat: 'fis',
-        boss: true,
-        text: 'Im letzten Büro thront der Höllendrucker: Papierstau, Toner leer, Netzwerkfehler – und er hält die verschwundenen Prüfungsunterlagen fest. Nur wer ihn sauber ins Netz bringt und neu einrichtet, bekommt sie zurück.',
-        success: 'Neu verbunden, Treiber installiert, Papier nachgelegt – der Drucker spuckt die Unterlagen warm aus und lässt seine Beute zurück.',
-        fail: 'Der Höllendrucker frisst euren letzten Versuch. Ihr flieht mit dem, was ihr schon eingesammelt habt.',
+        text: 'Im zerstörten Tempel wartet St. Ivan. Mit der Macht aus „A Stack O’Floe“ hat er die heiligen Leitungen gekappt, die Server am Altar abgeschaltet und den Schutzwall des Tempels eingerissen. Nur wer Netz, Server und Schutzwall wieder sauber aufbaut, bricht seinen Bann.',
+        success: 'Kabel verlegt, Server hochgefahren, der Schutzwall steht wieder – das Licht kehrt in den Tempel zurück. St. Ivan sinkt auf die Knie, das verfluchte Buch zerfällt zu Staub, und er lässt seine Beute zurück.',
+        fail: 'St. Ivan schlägt das Buch auf und brandmarkt euch als Ketzer. Ihr flieht mit dem, was ihr schon eingesammelt habt.',
       },
     ],
   },
