@@ -4360,3 +4360,21 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
   .coin-list-events { contain: size; min-height: 230px; overflow: hidden; }
 }
 .coin-list .event[hidden] { display: none; }
+
+/* ---------- Album: Sektionen je Season (views/tcg-album.ejs) ---------- */
+.album-season { display: flex; flex-direction: column; gap: 14px; }
+.album-season[hidden] { display: none; }
+.album-season-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.album-season-head h2 { margin: 0; font-size: 1.15rem; }
+.album-season-head .tcg-progress-num { font-size: 13px; }
+
+/* ---------- Kartenrückseiten je Season (Klasse "season-<key>", src/tcg/seasons.js) ----------
+   Pre-Season = die bisherigen Rückseiten (ohne eigene Regel). Season 1 = Platzhalter, bis die Grafik fertig ist;
+   dann hier --gr-back auf url('/img/tcg-backs/season-1.webp') center / cover umstellen. */
+.season-season-1 {
+  --gr-back: url('/img/bfw-holdings-logo-dark-bg.svg') center / 62% no-repeat,
+    repeating-linear-gradient(45deg, rgba(255, 214, 140, .05) 0 6px, transparent 6px 12px),
+    radial-gradient(circle at 50% 38%, #7c1622, #2a0507 72%);
+}
+.tcg-back.season-season-1 { border-color: #b8873a; background: var(--gr-back); }
+.tcg-back.season-season-1 .tcg-back-logo { display: none; }

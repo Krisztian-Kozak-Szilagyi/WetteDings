@@ -2,6 +2,7 @@
 // Fähigkeit (stat: 'fia' | 'fis' | 'bwl') ein Kampf braucht – sie müssen es aus dem Text erraten.
 // image ist das Querformat-Bild über den Spieler-Plätzen. story (optional): ganze Geschichte (Absätze, book wird kursiv),
 // zu lesen unter /dungeon/geschichte/<key> – der Titel im Banner verlinkt dorthin.
+// bossCard: Karten-ID, die der Boss fallen lässt (Chance im Admin-Panel; Karte steht in src/tcg/cardData.js).
 // Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – derzeit gibt es nur einen.
 
 const PLACEHOLDER = '/img/dungeon/placeholder.svg';
@@ -10,6 +11,7 @@ const DUNGEONS = [
   {
     key: 'st-ivan',
     title: 'The Fall of St. Ivan',
+    bossCard: 'st-ivan-boss',
     image: '/img/dungeon/st-ivan-dungeon-banner.webp',
     intro: 'Sein Gott Claude verstummte, das verbotene Buch „A Stack O’Floe“ verdarb seinen Geist – nun reißt St. Ivan Tempel nieder. Die Miliz sucht mutige Abenteurer, die ihn aufhalten.',
     book: 'A Stack O’Floe', // in der Geschichte kursiv

@@ -23,7 +23,7 @@
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
 
   // ---------- Karte aufbauen ----------
-  var card = el('div', 'gr-card', obj);
+  var card = el('div', 'gr-card' + (job.card && job.card.season ? ' season-' + job.card.season : ''), obj); // Rückseite je Season
   var front = el('div', 'gr-face gr-front', card);
   var img = el('img', 'gr-img', front);
   img.src = job.card ? job.card.image : '';

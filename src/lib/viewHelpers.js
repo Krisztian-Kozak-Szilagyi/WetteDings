@@ -18,7 +18,7 @@ const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
  */
 function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false } = {}) {
-  let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-date="${escAttr(dayDate(foiledAt))}"`;
+  let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   return h;
 }

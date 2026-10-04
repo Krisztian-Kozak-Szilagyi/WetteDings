@@ -226,6 +226,12 @@ function playDungeon(dungeon, members, rand = random, opts = settings) {
 /** Wiedergabedauer in Sekunden: Einleitung, Kämpfe mit Pausen dazwischen, kurzer Abschluss */
 const runSeconds = (fights) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * PAUSE_SECONDS + END_SECONDS;
 
+/** Karte, die der Boss dieses Dungeons fallen lässt (Katalogkarte), oder null */
+function bossCardOf(dungeonKey) {
+  const d = dungeonByKey[dungeonKey];
+  return (d && d.bossCard && catalog.cardById[d.bossCard]) || null;
+}
+
 /** Lohn und Beute pro Spieler (Bots bekommen nichts) */
 function rewardsFor(fights, isBot, rand = random, opts = settings) {
   const money = fights.filter((f) => f.success).reduce((s, f) => s + f.reward, 0);
@@ -478,13 +484,21 @@ async function finishDue({ now = Date.now() } = {}) {
           }
         }
         const foils = r.members.filter((x) => x.user && x.foil).map((x) => x.user);
+        // Boss-Karte: ein neues Exemplar je Gewinner, gilt danach als „schon besessen“ (Album)
+        const card = bossCardOf(r.dungeon);
+        const winners = card ? r.members.filter((x) => x.user && x.bossCard).map((x) => x.user) : [];
+        if (winners.length) {
+          await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
+          await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id } }, { session });
+        }
         if (foils.length) await grantItems({ userIds: foils, type: 'folie', source: 'dungeon', session });
         return r;
       });
       if (!run) continue;
       const d = dungeonByKey[run.dungeon];
+      const card = bossCardOf(run.dungeon);
       for (const m of run.members.filter((x) => x.user)) {
-        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard ? 'die Boss-Karte' : null].filter(Boolean);
+        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
         const head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
         await notify([m.user], { area: 'Dungeon', href: '/dungeon', text: loot.length ? `${head} Beute: ${loot.join(', ')}.` : `${head} Diesmal ohne Beute.` });
       }
@@ -535,6 +549,7 @@ async function chatFor(userId) {
 
 module.exports = {
   TEAM_SIZE,
+  bossCardOf,
   LOCK_SECONDS,
   INTRO_SECONDS,
   FIGHT_SECONDS,

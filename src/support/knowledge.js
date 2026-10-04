@@ -21,8 +21,8 @@ function systemPrompt() {
   const bonus = euro(require('../services/bonusService').settings.amount);
   const grading = require('../grading/gradingService');
   const gradingLevels = grading.LEVELS.map((x) => grading.levelInfo(x.level)).map((l) => `Stufe ${l.level} „${l.name}“${l.cost ? ` (Ausbau ${euro(l.cost)})` : ''}: ${l.perk}${l.factor > 1 ? ` (+${Math.round((l.factor - 1) * 100)} %)` : ''}`).join('; ');
-  const rarities = catalog.visibleRarities().map((r) => `${r.label} ${pct(r.weight)} (Wert ${euro(r.sell)})`).join(', ');
-  const names = [...new Set(catalog.CARDS.filter((c) => !catalog.rarityByKey[c.rarity].hidden).map((c) => c.name))].join(', ');
+  const rarities = catalog.visibleRarities().filter((r) => !r.dropOnly).map((r) => `${r.label} ${pct(r.weight)} (Wert ${euro(r.sell)})`).join(', ');
+  const names = [...new Set(catalog.CARDS.filter((c) => !catalog.rarityByKey[c.rarity].hidden && !catalog.rarityByKey[c.rarity].dropOnly).map((c) => c.name))].join(', ');
   const fee = config.creatorFeePercent;
   const ihkSettings = require('../ihk/ihkService').settings;
   const ihkRewards = DIFFICULTIES.map((d, i) => `${d.label} ${euro(ihkSettings.rewards[i])}`).join(', ') + ' (Hybrid-Quests können abweichen)';

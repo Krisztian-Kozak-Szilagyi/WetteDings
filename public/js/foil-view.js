@@ -23,7 +23,7 @@
 
   /** Große Karte: vorne Bild + Grading-Etikett (Name, Seltenheit, Note 10), hinten BfW-Rückseite + Zertifikat mit Foliendatum */
   function build(d, foiling) {
-    var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : ''));
+    var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : '') + (d.season ? ' season-' + d.season : '')); // Rückseite je Season
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', d.name + ' – ziehen zum Drehen, antippen zum Umdrehen');

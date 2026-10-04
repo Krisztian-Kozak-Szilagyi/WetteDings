@@ -22,7 +22,25 @@
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
-  <%- include('partials/tcg-grid', { mode: 'album' }) %>
+  <%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
+  <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key) })).filter((s) => s.list.length); %>
+  <% if (seasonList.length > 1) { %>
+    <div class="tcg-filter album-season-filter" role="tablist" aria-label="Nach Season filtern">
+      <button type="button" class="chip active" data-album-season="all" role="tab" aria-selected="true">Alle Seasons</button>
+      <% seasonList.forEach((s) => { %>
+        <button type="button" class="chip" data-album-season="<%= s.key %>" role="tab" aria-selected="false"><%= s.label %></button>
+      <% }) %>
+    </div>
+  <% } %>
+  <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
+    <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
+      <div class="album-season-head">
+        <h2 id="season-<%= s.key %>"><%= s.label %></h2>
+        <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
+      </div>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list }) %>
+    </section>
+  <% }) %>
 </div>
 
 <!-- Karte vergrößern -->

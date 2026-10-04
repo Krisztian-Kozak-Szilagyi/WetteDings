@@ -19,8 +19,9 @@ test('Gewichte ergeben 100 % und werden seltener', () => {
   assert.equal(catalog.chance('sith'), 0.0001);
   assert.equal(sell('icon'), 400000);
   assert.equal(sell('sith'), 1000000);
-  // Die geheime Seltenheit erscheint nicht in den Drop-Raten
-  assert.deepEqual(catalog.visibleRarities().map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon']);
+  // Die geheime Seltenheit erscheint nicht in den Drop-Raten; Boss (nur Beute) steht im Album-Filter, nicht in den Drop-Raten
+  assert.deepEqual(catalog.visibleRarities().map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon', 'boss']);
+  assert.deepEqual(catalog.visibleRarities().filter((r) => !r.dropOnly).map((r) => r.key), ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch', 'icon']);
   assert.equal(catalog.chance('bockhaber'), 0.003);
 });
 
@@ -51,13 +52,16 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 90);
+  assert.equal(catalog.CARDS.length, 91);
+  assert.equal(catalog.cardsBySeason['pre-season'].length, 90);
   assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
   assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
   assert.equal(catalog.cardById['sigrist-3-glitch'].name, 'Sigrist');
   assert.equal(catalog.cardById['oliver-the-sigrist-sith'].name, 'Oliver the Sigrist');
   assert.equal(catalog.cardById['oliver-the-sigrist-sith'].rarity, 'sith');
-  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Sammlung
+  const pre = catalog.cardsBySeason['pre-season'];
+  assert.equal(pre[pre.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Pre-Season
+  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'st-ivan-boss'); // Boss-Karten stehen ganz hinten
   assert.deepEqual(catalog.cardsByRarity.sith.map((c) => c.id), ['oliver-the-sigrist-sith']);
   assert.equal(catalog.cardById['aleks-5-bockhaber'].name, 'Aleks');
   assert.equal(catalog.cardById['seven-3-gold'].name, '7');

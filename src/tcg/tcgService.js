@@ -163,6 +163,8 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
   return inTransaction(async (session) => {
     const all = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity foiledAt').session(session).lean();
     if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
+    // Boss-Karten (noBank) kauft die Bank nicht – nur Handel
+    if (all.some((c) => (catalog.rarityByKey[c.rarity] || {}).noBank)) throw new UserError('Diese Karte kauft die Bank nicht. Du kannst sie im Handel anbieten.');
     // Folierte Exemplare kauft die Bank nicht (nur Handel); sie zählen auch nicht als Duplikate
     const owned = all.filter((c) => !c.foiledAt);
     if (!owned.length) throw new UserError('Folierte Karten kauft die Bank nicht. Biete sie im Handel an oder zieh vorher die Folie ab.');
@@ -208,6 +210,7 @@ async function sellAllDuplicates({ user }) {
     const toSell = [];
     for (const [cardId, list] of byCard) {
       if (keep.has(cardId)) continue;
+      if ((catalog.rarityByKey[list[0].rarity] || {}).noBank) continue; // Boss-Karten kauft die Bank nicht
       const free = list.filter((c) => !isLocked(locked, c));
       toSell.push(...(free.length === list.length ? free.slice(0, -1) : free));
     }

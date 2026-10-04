@@ -17,7 +17,7 @@ const wantsJson = (req) => (req.get('Accept') || '').includes('application/json'
 /** Karte für den Client (Pack-Animation) */
 function cardView(card) {
   const r = catalog.rarityByKey[card.rarity];
-  return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, sell: euro(r.sell) };
+  return { id: card.id, name: card.name, rarity: card.rarity, rarityLabel: r.label, rank: r.rank, image: card.image, season: card.season, sell: euro(r.sell) };
 }
 
 router.get('/tcg', async (req, res) => {
@@ -58,6 +58,7 @@ router.get('/tcg/album', async (req, res) => {
     title: 'Album',
     ...coll,
     cards: catalog.CARDS,
+    seasons: catalog.SEASONS,
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
     favoriteIds: new Set(req.user.tcgFavorites || []),

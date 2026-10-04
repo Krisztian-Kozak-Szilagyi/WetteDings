@@ -83,7 +83,7 @@ router.get('/dungeon', async (req, res) => {
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
   const loot = unseen
-    ? { id: String(unseen._id), success: unseen.success, players: unseen.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
+    ? { id: String(unseen._id), success: unseen.success, bossCard: dungeon.bossCardOf(unseen.dungeon), players: unseen.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
     : null;
 
   res.render('dungeon', {

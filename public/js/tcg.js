@@ -42,6 +42,20 @@
     });
   });
 
+  // ---------- Season-Filter im Album: blendet ganze Season-Sektionen aus ----------
+  $all('[data-album-season]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.getAttribute('data-album-season');
+      $all('[data-album-season]').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+      });
+      $all('[data-album-season-section]').forEach(function (sec) {
+        sec.hidden = key !== 'all' && sec.getAttribute('data-album-season-section') !== key;
+      });
+    });
+  });
+
   // ---------- Anzahl Packs im Shop ----------
   var qty = $('[data-tcg-qty]');
   if (qty) {
@@ -106,6 +120,7 @@
       var count = parseInt(d.count, 10) || 0;
       var rank = parseInt(d.rank, 10) || 0;
       var sell = parseInt(d.sell, 10) || 0;
+      var noBank = d.noBank === '1'; // Boss-Karten: die Bank kauft sie nicht, Schutz vor dem Duplikat-Verkauf ist überflüssig
 
       var former = d.former === '1';
       tilt.className = 'tcg-zoom r-' + d.rarity + (former ? ' is-former' : '');
@@ -125,7 +140,7 @@
         return;
       }
 
-      sellOne.hidden = count < 1; // nur folierte Exemplare: die Bank kauft sie nicht
+      sellOne.hidden = count < 1 || noBank; // nur folierte Exemplare: die Bank kauft sie nicht
       sellOne.querySelector('input[name="card"]').value = d.tcgCard;
       $('[data-tcg-sell-text]', sellOne).textContent = d.sellText;
       if (rank >= RARE_RANK) {
@@ -138,12 +153,13 @@
       var isProtected = d.protected === '1';
       protectForm.querySelector('input[name="card"]').value = d.tcgCard;
       protectForm.querySelector('button').textContent = isProtected ? 'Schutz aufheben' : 'Schützen (Schloss)';
-      protectNote.hidden = !isProtected;
+      protectNote.hidden = !isProtected || noBank;
+      protectForm.hidden = noBank;
       favoriteForm.querySelector('input[name="card"]').value = d.tcgCard;
       favoriteForm.querySelector('button').textContent = d.favorite === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
 
-      sellDupes.hidden = count < 2 || isProtected;
-      if (count > 1 && !isProtected) {
+      sellDupes.hidden = count < 2 || isProtected || noBank;
+      if (count > 1 && !isProtected && !noBank) {
         var total = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(((count - 1) * sell) / 100);
         sellDupes.querySelector('input[name="card"]').value = d.tcgCard;
         sellDupes.querySelector('button').textContent = 'Duplikate verkaufen (' + (count - 1) + '×) · ' + total;
@@ -259,7 +275,7 @@
       btn.innerHTML =
         '<span class="tcg-aura" aria-hidden="true"></span>' +
         '<span class="tcg-flip-inner">' +
-          '<span class="tcg-face tcg-back"><span class="tcg-back-logo"><span>BfW</span></span></span>' +
+          '<span class="tcg-face tcg-back season-' + (c.season || 'pre-season') + '"><span class="tcg-back-logo"><span>BfW</span></span></span>' + // Rückseite je Season
           '<span class="tcg-face tcg-front"><img alt="" width="720" height="1008"><span class="tcg-shine"></span></span>' +
         '</span>' +
         '<span class="tcg-flip-label"><span class="tcg-dot"></span><span></span></span>';

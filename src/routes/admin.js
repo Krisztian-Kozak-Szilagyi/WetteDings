@@ -177,7 +177,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     foilSettings: foil.settings,
     lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
-    grantCards: tcgCatalog.RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     packLogNew: counts.packLogNew,
     codes,
     formatCode,

@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const STATS = require('./stats');
+const CARD_DATA = require('./cardData');
+const FRAMES = require('./frames');
+const { SEASONS, DEFAULT_SEASON, seasonByKey } = require('./seasons');
 
 const IMAGE_DIR = path.join(__dirname, '..', '..', 'public', 'img', 'tcg');
 const IMAGE_URL = '/img/tcg';
@@ -43,17 +46,24 @@ const RARITIES = [
   { key: 'sith', label: 'Sith', weight: 1, sell: 1000000, hidden: true },
 ];
 const TOTAL_WEIGHT = RARITIES.reduce((s, r) => s + r.weight, 0);
+/**
+ * Seltenheiten, die nie aus Packs kommen, sondern nur als Beute (z. B. Boss-Karte aus dem Dungeon).
+ * Sie stehen nicht in RARITIES (Pack-Chancen, Admin-Chancen, Bots, Grading bleiben unberührt), sind aber über
+ * rarityByKey, cardsByRarity und visibleRarities() überall bekannt. noBank = die Bank kauft sie nicht an.
+ */
+const DROP_RARITIES = [{ key: 'boss', label: 'Boss', weight: 0, sell: 0, dropOnly: true, noBank: true }];
+const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES];
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
 // Die Chancen ergeben dabei immer zusammen TOTAL_WEIGHT (= 100 %).
 const DEFAULT_SELL = Object.fromEntries(RARITIES.map((r) => [r.key, r.sell]));
 const DEFAULT_WEIGHT = Object.fromEntries(RARITIES.map((r) => [r.key, r.weight]));
-RARITIES.forEach((r, i) => {
+ALL_RARITIES.forEach((r, i) => {
   r.rank = i;
 });
 // Gleiche Objekte wie in RARITIES, damit Preisänderungen überall sofort gelten
-const rarityByKey = Object.fromEntries(RARITIES.map((r) => [r.key, r]));
+const rarityByKey = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, r]));
 /** Seltenheiten, die Mitglieder sehen dürfen (ohne die geheimen) */
-const visibleRarities = () => RARITIES.filter((r) => !r.hidden);
+const visibleRarities = () => ALL_RARITIES.filter((r) => !r.hidden);
 
 // Namen, die sich nicht automatisch aus dem Dateinamen ergeben (so wie sie auf der Karte stehen)
 const NAME_OVERRIDES = {
@@ -82,7 +92,7 @@ function prettyName(slug) {
  * Optional mit Werten (Speed-FIA-FIS-BWL): "anna-3-gold_36-39-21-12.webp" – die Karten-ID bleibt "anna-3-gold".
  */
 function loadCards(dir = IMAGE_DIR) {
-  const pattern = new RegExp(`^(.+?)(?:-\\d+)?-(${RARITIES.map((r) => r.key).join('|')})(?:_(\\d+)-(\\d+)-(\\d+)-(\\d+))?\\.(png|jpe?g|webp)$`, 'i');
+  const pattern = new RegExp(`^(.+?)(?:-\\d+)?-(${ALL_RARITIES.map((r) => r.key).join('|')})(?:_(\\d+)-(\\d+)-(\\d+)-(\\d+))?\\.(png|jpe?g|webp)$`, 'i');
   let files = [];
   try {
     files = fs.readdirSync(dir);
@@ -95,17 +105,26 @@ function loadCards(dir = IMAGE_DIR) {
       if (!m) return null;
       const rarity = m[2].toLowerCase();
       const id = file.replace(/(_\d+-\d+-\d+-\d+)?\.[^.]+$/, '').toLowerCase();
-      const raw = m[3] ? [m[3], m[4], m[5], m[6]].map(Number) : STATS[id];
+      // Karten mit gezeichnetem Rahmen: Werte und Text aus cardData.js, Bild als SVG mit eingesetzten Werten
+      const data = Object.prototype.hasOwnProperty.call(CARD_DATA, id) ? CARD_DATA[id] : null;
+      const framed = !!(data && FRAMES[data.frame]);
+      const raw = framed ? data.stats : m[3] ? [m[3], m[4], m[5], m[6]].map(Number) : STATS[id];
       const stats = raw ? { speed: raw[0], fia: raw[1], fis: raw[2], bwl: raw[3] } : null;
-      return {
+      const card = {
         id,
-        name: prettyName(m[1].toLowerCase()),
+        name: (data && data.name) || prettyName(m[1].toLowerCase()),
         rarity,
+        season: data && seasonByKey[data.season] ? data.season : DEFAULT_SEASON,
         image: imageUrl(file),
         stats,
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
+      if (framed) {
+        Object.assign(card, { frame: data.frame, ability: data.ability || '', artFile: path.join(dir, file) });
+        card.image = cardImage(card);
+      }
+      return card;
     })
     .filter(Boolean)
     .sort((a, b) => rarityByKey[a.rarity].rank - rarityByKey[b.rarity].rank || a.name.localeCompare(b.name, 'de'));
@@ -113,7 +132,24 @@ function loadCards(dir = IMAGE_DIR) {
 
 const CARDS = loadCards();
 const cardById = Object.fromEntries(CARDS.map((c) => [c.id, c]));
-const cardsByRarity = Object.fromEntries(RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
+const cardsByRarity = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
+const cardsBySeason = Object.fromEntries(SEASONS.map((s) => [s.key, CARDS.filter((c) => c.season === s.key)]));
+
+/**
+ * Bild-URL einer Rahmen-Karte (SVG, src/tcg/cardSvg.js). values: abweichende Werte, z. B. { fia: 110 } bei einem Boost –
+ * sie erscheinen farbig auf der Karte. v = Version aus Werten, Text und Bild: Änderungen umgehen den Browser-Cache.
+ */
+function cardImage(card, values = {}) {
+  let mtime = 0;
+  try {
+    mtime = Math.floor(fs.statSync(card.artFile).mtimeMs);
+  } catch {
+    // Datei fehlt – ohne Bildversion
+  }
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.ability, mtime])).digest('hex').slice(0, 10);
+  const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
+  return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
+}
 
 /** Seltenheit würfeln: roll ist eine Zahl 0 … TOTAL_WEIGHT−1 */
 function rarityForRoll(roll) {
@@ -155,6 +191,12 @@ module.exports = {
   DEFAULT_PACK,
   packTypeByKey,
   RARITIES,
+  DROP_RARITIES,
+  ALL_RARITIES,
+  SEASONS,
+  seasonByKey,
+  cardsBySeason,
+  cardImage,
   DEFAULT_SELL,
   DEFAULT_WEIGHT,
   TOTAL_WEIGHT,

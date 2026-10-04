@@ -37,9 +37,9 @@ async function collection(user) {
   // Freie Exemplare je Karte (nicht auf Quest, nicht im Handel, nicht foliert)
   const free = Object.fromEntries(owned.map((o) => [o._id, o.n - (lockedByCard[o._id] ? lockedByCard[o._id].n : 0)]));
   const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
-  // Geschützte Karten zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft, folierte Exemplare auch nicht
+  // Geschützte Karten und Boss-Karten (die Bank kauft sie nicht) zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft, folierte Exemplare auch nicht
   const protectedIds = new Set(user.tcgProtected || []);
-  const dups = owned.filter((o) => !protectedIds.has(o._id)).map((o) => ({ ...o, n: o.n - (o.foiled || 0) })).filter((o) => o.n > 1);
+  const dups = owned.filter((o) => !protectedIds.has(o._id) && !(catalog.rarityByKey[o.rarity] || {}).noBank).map((o) => ({ ...o, n: o.n - (o.foiled || 0) })).filter((o) => o.n > 1);
   return {
     counts,
     free,

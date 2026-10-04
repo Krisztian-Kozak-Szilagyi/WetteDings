@@ -46,7 +46,7 @@
       <% bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; %>
         <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
           <button type="button" class="bm-card r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
-            data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= coll.counts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+            data-sell-text="<%= r.noBank ? '–' : euro(r.sell || 0) %>" data-owned="<%= coll.counts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
             <img src="<%= c.image %>" alt="" width="720" height="1008">
             <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
           </button>

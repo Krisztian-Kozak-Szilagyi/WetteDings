@@ -42,6 +42,7 @@ function createApp() {
   );
   app.use(compression());
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
+  app.use(require('./routes/cardImage')); // Rahmen-Karten als SVG, ebenfalls ohne Session
   app.use(express.urlencoded({ extended: false, limit: '20kb' }));
 
   app.use(

@@ -39,7 +39,7 @@
         <h1>BfW Holdings<br>Booster Pack</h1>
         <p class="tcg-hero-sub"><%= cardsPerPack %> zufällige Karten – von Crumpled bis Icon.</p>
         <button type="button" class="tcg-drops-btn" data-dialog-open="drop-raten">
-          <span class="tcg-drops-gems" aria-hidden="true"><% rarities.forEach((r) => { %><span class="tcg-dot r-<%= r.key %>"></span><% }) %></span>
+          <span class="tcg-drops-gems" aria-hidden="true"><% rarities.filter((r) => !r.dropOnly).forEach((r) => { %><span class="tcg-dot r-<%= r.key %>"></span><% }) %></span>
           Drop-Raten
         </button>
         <div class="tcg-buy">
@@ -152,7 +152,7 @@
   <table class="table tcg-odds">
     <thead><tr><th>Seltenheit</th><th class="num">Chance</th><th class="num">Packs</th><th class="num">Wert</th></tr></thead>
     <tbody>
-      <% rarities.forEach((r) => { %>
+      <% rarities.filter((r) => !r.dropOnly).forEach((r) => { %>
         <tr class="r-<%= r.key %>">
           <td><span class="tcg-dot"></span><%= r.label %></td>
           <td class="num"><%= pct(r.weight) %></td>
