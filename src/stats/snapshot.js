@@ -55,8 +55,8 @@ const countBy = (rows) => Object.fromEntries(rows.map((r) => [r._id, r.n]));
 
 /** Aktuellen Stand erfassen (ohne zu speichern) */
 async function collect(now = new Date()) {
-  const [players, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed, grading] = await Promise.all([
-    ranking(),
+  const [everyone, users, banned, cardsByRarity, packsUnopened, coins, offers, openBets, disputed, grading] = await Promise.all([
+    ranking({ team: true }),
     User.countDocuments({ deletedAt: null }),
     User.countDocuments({ deletedAt: null, bannedUntil: { $gt: now } }),
     TcgCard.aggregate([{ $group: { _id: '$rarity', n: { $sum: 1 } } }]),
@@ -68,6 +68,8 @@ async function collect(now = new Date()) {
     GradingShop.countDocuments({ active: true }),
   ]);
   const byRarity = countBy(cardsByRarity);
+  // Vermögen und Verteilung ohne das Team (Admin, Devs); die Kurven je Mitglied (players) behalten es
+  const players = everyone.filter((p) => !p.team);
   return {
     at: now,
     users: { total: users, banned },
@@ -95,7 +97,7 @@ async function collect(now = new Date()) {
     cards: { total: Object.values(byRarity).reduce((s, n) => s + n, 0), byRarity, packsUnopened, packPrice: tcgSettings.getPackPrice() },
     market: countBy(offers),
     bets: { open: openBets, disputed },
-    players: players.map((p) => ({ user: p._id, balance: p.balance, inPlay: p.inPlay, coinValue: p.coinValue, cardValue: p.cardValue, total: p.total })),
+    players: everyone.map((p) => ({ user: p._id, balance: p.balance, inPlay: p.inPlay, coinValue: p.coinValue, cardValue: p.cardValue, total: p.total })),
   };
 }
 

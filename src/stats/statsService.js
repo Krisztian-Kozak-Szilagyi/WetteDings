@@ -20,7 +20,7 @@ const catalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const ihk = require('../ihk/ihkService');
 const { DIFFICULTIES, questById } = require('../ihk/quests');
-const { ranking } = require('../services/rankService');
+const { ranking, teamIds } = require('../services/rankService');
 const bonusService = require('../services/bonusService');
 const { parseZonedLocal } = require('../lib/time');
 const { ledgerLabels } = require('../lib/viewHelpers');
@@ -261,13 +261,15 @@ async function markers(p) {
 // ---------- Wirtschaft ----------
 
 async function economy(p) {
+  // Das Team (Admin, Devs) zählt nicht zur Wirtschaft: seine Buchungen, Konten und Aktivität bleiben draußen
+  const noTeam = { user: { $nin: await teamIds() } };
   const [flows, before, snapshots, players, typeTotals, activeDays] = await Promise.all([
-    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
-    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since } } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
+    Ledger.aggregate([{ $match: { ...inP(p), ...noTeam } }, { $group: { _id: { d: dayOf('$createdAt'), t: '$type' }, s: { $sum: '$amount' } } }]),
+    Ledger.aggregate([{ $match: { createdAt: { $lt: p.since }, ...noTeam } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     StatDaily.find({ _id: { $gte: p.from, $lte: p.to } }).select('_id wealth').sort({ _id: 1 }).lean(),
     ranking(),
-    Ledger.aggregate([{ $match: inP(p) }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
-    UserActivity.countDocuments({ day: { $gte: p.from, $lte: p.to } }),
+    Ledger.aggregate([{ $match: { ...inP(p), ...noTeam } }, { $group: { _id: '$type', s: { $sum: '$amount' }, n: { $sum: 1 } } }]),
+    UserActivity.countDocuments({ day: { $gte: p.from, $lte: p.to }, ...noTeam }),
   ]);
 
   // Netto je Bereich und Tag, dazu die Geldmenge (alle Buchungen bis Tagesende)
@@ -296,7 +298,7 @@ async function economy(p) {
     {
       id: 'geldmenge',
       title: 'Geldmenge & Geldfluss',
-      question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es?',
+      question: 'Wächst oder schrumpft das Spielgeld – und wo entsteht bzw. verschwindet es? Ohne Admin und Devs (ihre Konten entstehen durch Tests und Vergaben).',
       kpis: [
         { id: 'guthaben', label: 'Guthaben gesamt', value: balanceSum, unit: 'euro', hint: 'Summe aller Kontostände (jetzt)' },
         { id: 'zufluss', label: 'Netto-Geldzufluss', value: periodNet, unit: 'euro', signed: true, compare: true, hint: 'Neu entstandenes minus verschwundenes Geld im Zeitraum' },
@@ -349,7 +351,7 @@ async function economy(p) {
     {
       id: 'verteilung',
       title: 'Vermögensverteilung',
-      question: 'Wie ungleich ist das Vermögen verteilt – auch im Vergleich zu echten Ländern?',
+      question: 'Wie ungleich ist das Vermögen verteilt – auch im Vergleich zu echten Ländern? Ohne Admin und Devs.',
       giniCompare,
       kpis: [
         { id: 'vermoegen', label: 'Gesamtvermögen', value: dist.sum, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },

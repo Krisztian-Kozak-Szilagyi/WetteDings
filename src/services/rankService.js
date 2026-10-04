@@ -3,21 +3,33 @@ const User = require('../models/User');
 const markets = require('../coin/markets');
 const tcgSettings = require('../tcg/settings');
 const { sellValueExpr } = require('../tcg/tcgService');
+const config = require('../config');
 
 const TICK_MS = 60 * 1000; // so oft wird Platz 1 geprüft
 const MAX_GAP_MS = 5 * 60 * 1000; // längere Pausen (Neustart, Ausfall) zählen nicht als Zeit auf Platz 1
 
+// ---------- Team (Admin und Devs) ----------
+// Das Team spielt mit, zählt aber nicht in der Rangliste und nicht in der Wirtschaft (Statistik): Seine Konten
+// entstehen durch Tests und Vergaben und würden Platzierungen, Geldmenge und Verteilung verfälschen.
+
+/** Gehört das Konto zum Team? (braucht role und usernameLower) */
+const isTeam = (user) => !!user && (user.role === 'dev' || config.adminUsernames.includes(user.usernameLower));
+/** Filter für Konten außerhalb des Teams */
+const notTeam = () => ({ role: { $ne: 'dev' }, usernameLower: { $nin: config.adminUsernames } });
+/** IDs aller Team-Konten (auch gelöschte) – zum Ausschließen ihrer Buchungen */
+const teamIds = () => User.distinct('_id', { $or: [{ role: 'dev' }, { usernameLower: { $in: config.adminUsernames } }] });
+
 /**
- * Alle Mitglieder nach Gesamtvermögen, bestes zuerst. Gesamtvermögen = Kontostand + offene Einsätze + Wert der
+ * Alle Mitglieder nach Gesamtvermögen, bestes zuerst – ohne das Team; mit team: true auch das Team (Feld team). Gesamtvermögen = Kontostand + offene Einsätze + Wert der
  * Broker-Bestände (Coins, ETF) zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis).
  */
-function ranking({ limit = 0 } = {}) {
+function ranking({ limit = 0, team = false } = {}) {
   // Cent je Einheit (1e-8) für jeden laufenden Broker-Wert
   const prices = markets.prices();
   const branches = Object.entries(prices).map(([sym, p]) => ({ case: { $eq: ['$$h.coin', sym] }, then: (p * 100) / 1e8 }));
   const centsPerUnit = branches.length ? { $switch: { branches, default: 0 } } : 0;
   const pipeline = [
-    { $match: { deletedAt: null } }, // gelöschte Konten erscheinen nicht
+    { $match: { deletedAt: null, ...(team ? {} : notTeam()) } }, // gelöschte Konten erscheinen nicht, das Team nur auf Wunsch
     {
       $lookup: {
         from: 'positions',
@@ -59,7 +71,7 @@ function ranking({ limit = 0 } = {}) {
     },
     { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue'] } } },
     { $sort: { total: -1, createdAt: 1 } },
-    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, total: 1 } },
+    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, total: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
   ];
   if (limit) pipeline.push({ $limit: limit });
   return User.aggregate(pipeline);
@@ -95,4 +107,4 @@ function top1Text(seconds) {
   return parts.join(' ');
 }
 
-module.exports = { ranking, trackTop1, top1Text, TICK_MS };
+module.exports = { ranking, isTeam, notTeam, teamIds, trackTop1, top1Text, TICK_MS };

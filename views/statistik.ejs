@@ -136,9 +136,9 @@
         <table class="table">
           <thead><tr><th class="num">#</th><th>Mitglied</th><th class="num">Gesamtvermögen</th><th class="num hide-sm">Guthaben</th><th class="num hide-sm">Karten & Packs</th></tr></thead>
           <tbody>
-            <% members.forEach((m, i) => { %>
+            <% let place = 0; members.forEach((m) => { if (!m.team) place++; %>
               <tr>
-                <td class="num"><%= i + 1 %></td>
+                <td class="num"><%= m.team ? 'Team' : place %></td>
                 <td><a href="/admin/statistik?<%= new URLSearchParams({ bereich: 'mitglied', tage: String(curRange), spieler: m.username }) %>"><%= m.username %></a></td>
                 <td class="num"><%= fmt({ value: m.total, unit: 'euro' }) %></td>
                 <td class="num hide-sm"><%= fmt({ value: m.balance, unit: 'euro' }) %></td>

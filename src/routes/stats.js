@@ -93,7 +93,7 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
   // Reiter "Mitglied": ohne (gültiges) Mitglied erst die Auswahl zeigen
   let members = [];
   if (key === 'mitglied') {
-    members = await ranking(); // Auswahl und Namensvorschläge
+    members = await ranking({ team: true }); // Auswahl und Namensvorschläge – auch das Team (ohne Platz)
     if (name && !member) res.locals.flash = { type: 'error', message: `Das Mitglied „${name}“ gibt es nicht.` };
   }
   // Reiterleiste des Panels (die Statistik ist ein Reiter im Panel)
