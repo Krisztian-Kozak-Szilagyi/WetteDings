@@ -156,3 +156,17 @@ test('Namen als Profil-Links: maskiert, verschachtelt als span, gelöschte Konte
   assert.equal(userLink('geloescht-ab12cd34'), 'geloescht-ab12cd34');
   assert.equal(userLink(''), '');
 });
+
+test('Boss-Karte: 5.000 € Wert, Folie steigert ihn, die Bank kauft sie nicht', () => {
+  const catalog = require('../src/tcg/catalog');
+  const foil = require('../src/items/foil');
+  const { sellValueExpr } = require('../src/tcg/tcgService');
+  const boss = catalog.rarityByKey.boss;
+  assert.strictEqual(boss.sell, 500000);
+  assert.strictEqual(boss.noBank, true);
+  // Ranglisten-/Profilwert kennt die Boss-Seltenheit
+  const branches = sellValueExpr().$floor.$add[0].$multiply[0].$switch.branches;
+  assert.ok(branches.some((b) => b.case.$eq[1] === 'boss' && b.then === 500000));
+  // foliert ist sie mehr wert als ohne Folie
+  assert.ok(foil.cardValue(boss.sell, new Date(Date.now() - 3 * 86400000)) > boss.sell);
+});

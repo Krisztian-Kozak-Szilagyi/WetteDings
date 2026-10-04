@@ -118,7 +118,7 @@
             <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
             <strong><%= f.card.name %> <span class="tcg-badge r-<%= f.card.rarity %>"><%= f.rarity.label %></span></strong>
             <span>Wert <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
-            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · Bankwert ohne Folie <%= euro(f.sell) %></span>
+            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · <%= f.rarity.noBank ? 'Grundwert ' + euro(f.sell) + ' · die Bank kauft sie nicht' : 'Bankwert ohne Folie ' + euro(f.sell) %></span>
             <% if (f.lock === 'handel') { %>
               <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
             <% } else { %>
