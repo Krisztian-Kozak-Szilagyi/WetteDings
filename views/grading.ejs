@@ -206,8 +206,6 @@
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen für <%= euro(next.cost) %></button>
           </form>
-        <% } else { %>
-          <p class="gr-note">Voll ausgebaut.</p>
         <% } %>
       </section>
 
