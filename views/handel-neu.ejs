@@ -10,7 +10,7 @@
   // eigene folierte Exemplare der Vorauswahl – gehen beim Wechsel des Ziels mit
   const presetCopies = [...give.copies].map((id) => 'f:' + id);
   const poolSize = (pool) => (pool ? pool.cards.length + pool.foiled.length + pool.goods.length : 0);
-  const showTheirs = !fixedGets; // auf dem Markt: Wunschkarten aus allen Karten
+  const showTheirs = !isMarket && !fixedGets; // Sammlung des Mitglieds als Reiter; auf dem Markt: Wunschkarten über die Suche im Fenster
   const showMine = !fixedGives;
   const swapIcon = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>';
 %>
@@ -88,7 +88,16 @@
             <span class="sr-only">Preis</span>
             <input type="text" name="geld_will" inputmode="decimal" placeholder="Preis" value="<%= money(receive) %>" data-hb-money="will"><span class="hb-money-unit">€</span>
           </label>
-          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Oder statt Geld: Wunschkarten unten im Reiter „Wunschkarten“ – dann wird getauscht.</li></ul>
+          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Oder statt Geld: Wunschkarten – dann wird getauscht.</li></ul>
+          <%# Wunschkarte suchen: Vorschläge aus allen Karten, fehlende zuerst (public/js/handel-neu.js) %>
+          <div class="hb-wish" data-hb-wish>
+            <label class="hb-wish-field">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
+              <span class="sr-only">Wunschkarte suchen</span>
+              <input type="search" placeholder="Wunschkarte hinzufügen …" autocomplete="off" maxlength="40" role="combobox" aria-expanded="false" aria-controls="hb-wish-list" aria-autocomplete="list" data-hb-wish-input>
+            </label>
+            <ul class="hb-wish-list" id="hb-wish-list" role="listbox" aria-label="Vorschläge" data-hb-wish-list hidden></ul>
+          </div>
           <p class="hb-price-note muted small">Jeder kann sofort annehmen oder dir ein Gegenangebot machen.</p>
         <% } else { %>
           <button type="button" class="hb-side-head" data-hb-open="will" <%= showTheirs ? '' : 'disabled' %>>
@@ -142,10 +151,16 @@
       <% } %>
       <% if (showTheirs) { %>
         <div class="hb-pane" data-hb-pane="will" role="tabpanel">
-          <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, wish: isMarket, partnerName: partner ? partner.username : '' }) %>
+          <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, partnerName: partner.username }) %>
         </div>
       <% } %>
     </section>
+    <% if (isMarket && theirs) { %>
+      <%# Wunschkarten als Formularfelder – unsichtbar, ausgewählt wird über die Suche im Fenster %>
+      <div class="hb-wish-store" data-hb-pane="will" data-hb-store hidden>
+        <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, wish: true, partnerName: '' }) %>
+      </div>
+    <% } %>
 
   </form>
 </div>

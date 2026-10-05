@@ -40,15 +40,18 @@
       t.classList.toggle('active', on);
       t.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    $all('[data-hb-pane]', root).forEach(function (p) { p.hidden = p.getAttribute('data-hb-pane') !== side; });
+    $all('[data-hb-pane]:not([data-hb-store])', root).forEach(function (p) { p.hidden = p.getAttribute('data-hb-pane') !== side; });
   }
   tabs.forEach(function (t) { t.addEventListener('click', function () { showPane(t.getAttribute('data-hb-tab')); }); });
   // Klick auf eine Seite im Handelsfenster öffnet die passende Sammlung
   $all('[data-hb-open]', root).forEach(function (btn) {
     btn.addEventListener('click', function () {
       var side = btn.getAttribute('data-hb-open');
+      // Markt: Wunschkarten kommen aus der Suche im Fenster
+      var wishField = side === 'will' && $('[data-hb-wish-input]', root);
+      if (wishField) return wishField.focus();
       showPane(side);
-      var pane = $('[data-hb-pane="' + side + '"]', root);
+      var pane = $('[data-hb-pane="' + side + '"]:not([data-hb-store])', root);
       if (pane) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
@@ -302,6 +305,107 @@
     if (submit) submit.disabled = nothing || problems.length > 0;
   }
   update();
+
+  // ---------- Wunschkarten (Markt): Suche mit Vorschlägen direkt im Fenster ----------
+  // Fehlende Karten zuerst, dann seltene vor häufigen. Ausgewählt wird der unsichtbare Platz der Karte,
+  // so laufen Ablage, Zähler und Formular wie bei allen anderen Karten.
+  var wish = $('[data-hb-wish]', root);
+  if (wish) {
+    var wishInput = $('[data-hb-wish-input]', wish);
+    var wishList = $('[data-hb-wish-list]', wish);
+    var store = $all('[data-hb-store] [data-hb-slot]', root);
+    var wishActive = -1;
+    var shown = [];
+    var owned = function (slot) { return parseInt(slot.getAttribute('data-owned'), 10) || 0; };
+    var rank = function (slot) { return parseInt(slot.getAttribute('data-rank'), 10) || 0; };
+    var closeWish = function () {
+      wishList.hidden = true;
+      wishInput.setAttribute('aria-expanded', 'false');
+      wishActive = -1;
+    };
+    var mark = function (i) {
+      wishActive = i;
+      $all('.hb-wish-opt', wishList).forEach(function (li, k) {
+        li.classList.toggle('is-active', k === i);
+        li.setAttribute('aria-selected', k === i ? 'true' : 'false');
+        if (k === i) li.scrollIntoView({ block: 'nearest' });
+      });
+    };
+    var pick = function (slot) {
+      if (!canPick(slot)) return;
+      addOne(slot);
+      wishInput.value = '';
+      fill();
+      wishInput.focus();
+      var w = $('[data-hb-window]', root);
+      if (w) {
+        w.classList.remove('is-bumped');
+        void w.offsetWidth;
+        w.classList.add('is-bumped');
+      }
+    };
+    var canPick = function (slot) { return !slot.classList.contains('is-full'); };
+    var fill = function () {
+      var q = wishInput.value.trim().toLowerCase();
+      shown = store
+        .filter(function (s) { return !q || s.getAttribute('data-name').indexOf(q) !== -1; })
+        .sort(function (a, b) { return (owned(a) > 0) - (owned(b) > 0) || rank(b) - rank(a) || a.getAttribute('data-label').localeCompare(b.getAttribute('data-label'), 'de'); })
+        .slice(0, 8);
+      wishList.textContent = '';
+      if (!shown.length) {
+        var none = document.createElement('li');
+        none.className = 'hb-wish-none';
+        none.textContent = 'Keine Karte gefunden.';
+        wishList.appendChild(none);
+      }
+      shown.forEach(function (slot, i) {
+        var li = document.createElement('li');
+        var m = /(?:^|\s)(r-[a-z]+)/.exec(slot.className);
+        li.className = 'hb-wish-opt ' + (m ? m[1] : '') + (canPick(slot) ? '' : ' is-full');
+        li.setAttribute('role', 'option');
+        li.id = 'hb-wish-' + i;
+        var img = document.createElement('img');
+        img.src = slot.getAttribute('data-image');
+        img.alt = '';
+        var name = document.createElement('span');
+        name.className = 'hb-wish-name';
+        name.textContent = slot.getAttribute('data-label').replace(/ \([^)]*\)$/, '');
+        var meta = document.createElement('span');
+        meta.className = 'hb-wish-meta';
+        meta.innerHTML = '<span class="tcg-dot"></span>';
+        meta.appendChild(document.createTextNode(slot.getAttribute('data-rarity-label') + ' · ' + euro(parseInt(slot.getAttribute('data-value'), 10) || 0)));
+        var tag = document.createElement('span');
+        var n = owned(slot);
+        tag.className = 'hb-wish-tag' + (n ? '' : ' is-missing');
+        tag.textContent = qty(slot) ? '×' + qty(slot) + ' gewählt' : n ? 'du hast ' + n : 'fehlt dir';
+        li.appendChild(img);
+        li.appendChild(name);
+        li.appendChild(meta);
+        li.appendChild(tag);
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); }); // Fokus bleibt im Feld
+        li.addEventListener('click', function () { pick(slot); });
+        wishList.appendChild(li);
+      });
+      wishList.hidden = false;
+      wishInput.setAttribute('aria-expanded', 'true');
+      mark(shown.length ? 0 : -1);
+    };
+    wishInput.addEventListener('focus', fill);
+    wishInput.addEventListener('input', fill);
+    wishInput.addEventListener('blur', function () { setTimeout(closeWish, 120); });
+    wishInput.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (wishList.hidden) fill();
+        if (shown.length) mark((wishActive + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault(); // kein Absenden des Formulars
+        if (shown[wishActive]) pick(shown[wishActive]);
+      } else if (e.key === 'Escape') {
+        closeWish();
+      }
+    });
+  }
 
   // ---------- Drag & Drop: Karten ins Fenster ziehen, Mini-Karten wieder herausziehen ----------
   // Nur mit Maus o. Ä. – auf Touch-Geräten bleibt es beim Antippen.
