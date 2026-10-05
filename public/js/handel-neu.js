@@ -125,10 +125,23 @@
   // ---------- Geld fließt nur in eine Richtung ----------
   var moneyGive = $('[data-hb-money="gib"]', root);
   var moneyGet = $('[data-hb-money="will"]', root);
+  // Gegenangebot: Abstand zum verlangten bzw. bisherigen Betrag ("5,00 € weniger")
+  var deltas = function () {
+    [moneyGive, moneyGet].forEach(function (input) {
+      if (!input) return;
+      var box = $('[data-hb-ref="' + input.getAttribute('data-hb-money') + '"] [data-hb-delta]', root);
+      if (!box) return;
+      var ref = parseInt(input.getAttribute('data-ref'), 10) || 0;
+      var d = cents(input.value) - ref;
+      box.textContent = !ref && !d ? '' : !d ? '· gleich' : '· ' + euro(Math.abs(d)) + (d < 0 ? ' weniger' : ' mehr');
+      box.className = 'hb-ref-delta' + (d < 0 ? ' is-less' : d > 0 ? ' is-more' : '');
+    });
+  };
   [[moneyGive, moneyGet], [moneyGet, moneyGive]].forEach(function (pair) {
     if (!pair[0]) return;
     pair[0].addEventListener('input', function () {
       if (pair[1] && cents(pair[0].value) > 0) pair[1].value = '';
+      deltas();
       update();
     });
   });
@@ -305,6 +318,7 @@
     if (submit) submit.disabled = nothing || problems.length > 0;
   }
   update();
+  deltas();
 
   // ---------- Wunschkarten (Markt): Suche mit Vorschlägen direkt im Fenster ----------
   // Alle passenden Karten, fehlende zuerst, dann von häufig nach selten; Chips filtern nach Seltenheit.

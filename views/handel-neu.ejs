@@ -12,6 +12,13 @@
   const poolSize = (pool) => (pool ? pool.cards.length + pool.foiled.length + pool.goods.length : 0);
   const showTheirs = !isMarket && !fixedGets; // Sammlung des Mitglieds als Reiter; auf dem Markt: Wunschkarten über die Suche im Fenster
   const showMine = !fixedGives;
+  // Geldfeld: beim Gegenangebot mit Bezug ("verlangt 25,00 €" bzw. "bisher …") – der Betrag ist immer der ganze, kein Aufschlag
+  const moneyField = (side, aria, value) => {
+    const ref = reference ? (side === 'gib' ? reference.pay : reference.receive) : 0;
+    const word = reference ? (side === 'gib' ? 'Du zahlst' : 'Du bekommst') : '+ Geld';
+    return `<label class="hb-money${reference ? ' has-ref' : ''}"><span>${word}</span><input type="text" name="geld_${side}" inputmode="decimal" placeholder="0,00" value="${money(value)}" data-hb-money="${side}" data-ref="${ref}" aria-label="${aria}"><span class="hb-money-unit">€</span></label>`
+      + (reference && ref ? `<span class="hb-ref" data-hb-ref="${side}"><span class="hb-ref-base">${reference.label} ${euro(ref)}</span> <span class="hb-ref-delta" data-hb-delta></span></span>` : '');
+  };
   const swapIcon = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>';
 %>
 
@@ -23,7 +30,7 @@
     <h1><%= title %><% if (partner && mode !== 'neu') { %> <span class="hb-top-partner">an <%= partner.username %></span><% } %></h1>
     <p class="muted">
       <% if (mode === 'neu') { %>Verkaufen, tauschen oder Karten suchen – auf dem Markt für alle oder direkt mit einem Mitglied, auch mehrere Karten auf einmal.<% } %>
-      <% if (mode === 'markt') { %>Zum Markt-Angebot von <%= partner.username %> (<%= euro(listing.price) %>): anderer Preis, eigene Karten oder beides.<% } %>
+      <% if (mode === 'markt') { %>Zum Markt-Angebot von <%= partner.username %><%= listing.price ? ' (' + euro(listing.price) + ')' : '' %>: Trag ein, was du insgesamt zahlen willst – auch weniger als verlangt – oder biete Karten an.<% } %>
       <% if (mode === 'gegen') { %>Ändere, was beide Seiten geben. Danach ist <%= partner.username %> am Zug.<% } %>
     </p>
   </header>
@@ -70,7 +77,7 @@
         <% } else { %>
           <ul class="hb-tray" data-hb-tray="gib" aria-live="polite"><li class="hb-tray-empty">Tippe unten Karten aus deiner Sammlung an.</li></ul>
         <% } %>
-        <label class="hb-money"><span>+ Geld</span><input type="text" name="geld_gib" inputmode="decimal" placeholder="0,00" value="<%= money(pay) %>" data-hb-money="gib" aria-label="Geld, das du zahlst"><span class="hb-money-unit">€</span></label>
+        <div class="hb-money-row"><%- moneyField('gib', 'Geld, das du zahlst', pay) %></div>
       </div>
 
       <div class="hb-swap">
@@ -115,7 +122,7 @@
           <% } else { %>
             <ul class="hb-tray" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Wähle unten Karten aus der Sammlung von <%= partner.username %>.</li></ul>
           <% } %>
-          <label class="hb-money"><span>+ Geld</span><input type="text" name="geld_will" inputmode="decimal" placeholder="0,00" value="<%= money(receive) %>" data-hb-money="will" aria-label="Geld, das <%= partner.username %> zahlt"><span class="hb-money-unit">€</span></label>
+          <div class="hb-money-row"><%- moneyField('will', 'Geld, das ' + partner.username + ' zahlt', receive) %></div>
         <% } %>
       </div>
       <%# Abschluss direkt im Fenster: bleibt mit ihm oben stehen (Handy: feste Leiste unten) %>

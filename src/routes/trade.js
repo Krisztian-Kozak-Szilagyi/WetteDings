@@ -170,7 +170,7 @@ router.post('/handel/black-market', async (req, res) => {
  * Handelsfenster rendern. mode: 'neu' (Markt oder Mitglied), 'markt' (Gegenangebot auf ein Markt-Angebot),
  * 'gegen' (Gegenangebot in einer laufenden Verhandlung). fixedGets: Karten der anderen Seite, die feststehen.
  */
-async function renderBuilder(req, res, { mode, partner = null, listing = null, offer = null, preset, keep = [], fixedGets = null, fixedGives = null }) {
+async function renderBuilder(req, res, { mode, partner = null, listing = null, offer = null, preset, keep = [], fixedGets = null, fixedGives = null, reference = null }) {
   const [mine, partnerPool, users] = await Promise.all([
     pickable(req.user, { own: true, keep }),
     partner && !fixedGets ? pickable(partner, { own: false }) : null,
@@ -190,6 +190,8 @@ async function renderBuilder(req, res, { mode, partner = null, listing = null, o
     users,
     fixedGets,
     fixedGives,
+    // Bezug fürs Geld beim Gegenangebot: was verlangt wird bzw. bisher stand ({ pay, receive, label })
+    reference,
     give: presetOf(preset.gives),
     get: presetOf(preset.gets),
     pay: preset.iPay ? preset.price : 0,
@@ -224,7 +226,8 @@ router.get('/handel/neu', async (req, res) => {
     const fresh = !preset.gives.length && !preset.price;
     const listingPayer = listing.price ? listing.extraFrom || 'to' : null;
     const start = fresh ? { gives: listing.want.map((l) => ({ card: l.card })), gets: [], price: listing.price, iPay: listingPayer === 'to' } : { ...preset, gets: [] };
-    return renderBuilder(req, res, { mode: 'markt', partner: { _id: listing.seller, username: listing.sellerName }, listing, preset: start, fixedGets: listing.give });
+    const ask = lines.perspective(listing, 'to'); // aus Sicht des Interessenten
+    return renderBuilder(req, res, { mode: 'markt', partner: { _id: listing.seller, username: listing.sellerName }, listing, preset: start, fixedGets: listing.give, reference: { pay: ask.pay, receive: ask.receive, label: 'verlangt' } });
   }
   const name = str(req.query.an).trim();
   let partner = null;
@@ -347,6 +350,7 @@ router.get('/handel/angebot/:id/gegenangebot', async (req, res) => {
   // Beim Gegenangebot auf dem Markt stehen die Karten des Verkäufers fest
   const fixed = t.listing ? t.give : null;
   return renderBuilder(req, res, {
+    reference: { pay: p.pay, receive: p.receive, label: 'bisher' },
     mode: 'gegen',
     partner,
     offer: t,
