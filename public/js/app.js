@@ -248,7 +248,8 @@
 
   // Neue Wette: Art umschalten, Optionen hinzufügen/entfernen
   var newBet = document.querySelector('.new-bet-form');
-  if (newBet) {
+  // Nur die Wett-Form hat Optionen – das Duell-Formular nutzt dieselbe Optik ohne sie
+  if (newBet && newBet.querySelector('.option-inputs')) {
     var panels = newBet.querySelectorAll('[data-type-panel]');
     var list = newBet.querySelector('.option-inputs');
     var addBtn = newBet.querySelector('[data-add-option]');
@@ -333,8 +334,14 @@
       }
       var deadline = field('deadline');
       var resultAt = field('resultAt');
-      if (step.contains(resultAt) && deadline.value && resultAt.value && resultAt.value < deadline.value) {
+      if (deadline && resultAt && step.contains(resultAt) && deadline.value && resultAt.value && resultAt.value < deadline.value) {
         return { el: resultAt, msg: 'Das Ergebnis kann nicht vor dem Einsatzschluss feststehen.' };
+      }
+      // Duell: Geld, Karte oder beides
+      var stake = field('stake');
+      var card = field('card');
+      if (stake && card && step.contains(stake) && !Number(stake.value) && !card.value) {
+        return { el: stake, msg: 'Setze Geld, eine Karte oder beides.' };
       }
       return null;
     }
@@ -356,7 +363,19 @@
       return true;
     }
 
+    // Zusammenfassung aus [data-sum]-Feldern (z. B. Duell): Beschriftung, Wert, Schritt zum Ändern
+    function genericRows() {
+      return Array.prototype.map.call(wizard.querySelectorAll('[data-sum]'), function (el) {
+        var v = el.tagName === 'SELECT' ? (el.value ? selectedText(el) : '') : el.value.trim();
+        if (v && el.hasAttribute('data-sum-date')) v = fmtDate(v);
+        if (v && el.name === 'stake') v = Number(v) ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(v)) : '';
+        var step = steps.findIndex(function (s) { return s.contains(el); });
+        return [el.getAttribute('data-sum'), v || el.getAttribute('data-sum-empty') || '–', step];
+      });
+    }
+
     function fillSummary() {
+      if (wizard.hasAttribute('data-generic-summary')) return renderSummary(genericRows());
       var type = wizard.querySelector('input[name="type"]:checked');
       var answers = type && type.value === 'optionen'
         ? Array.prototype.map.call(wizard.querySelectorAll('input[name="options"]'), function (i) { return i.value.trim(); }).filter(Boolean).join(' · ')
@@ -369,8 +388,14 @@
       ];
       if (field('group')) rows.push(['Sichtbar für', selectedText(field('group')) || 'Alle Mitglieder']);
       rows.push(['Einsätze bis', fmtDate(field('deadline').value)], ['Ergebnis am', fmtDate(field('resultAt').value)]);
+      // Zeile → Schritt: Frage 0, Antworten 1, Details 2, Schiedsrichter/Gruppe 3, Termine 4
+      var targets = [0, 1, 2, 3, field('group') ? 3 : 4, 4, 4];
+      renderSummary(rows.map(function (r, i) { return [r[0], r[1], targets[i]]; }));
+    }
+
+    function renderSummary(rows) {
       summary.textContent = '';
-      rows.forEach(function (r, i) {
+      rows.forEach(function (r) {
         var dt = document.createElement('dt');
         var dd = document.createElement('dd');
         var edit = document.createElement('button');
@@ -379,9 +404,7 @@
         edit.type = 'button';
         edit.className = 'wizard-edit';
         edit.textContent = 'Ändern';
-        // Zeile → Schritt: Frage 0, Antworten 1, Details 2, Schiedsrichter/Gruppe 3, Termine 4
-        var target = [0, 1, 2, 3, field('group') ? 3 : 4, 4, 4][i];
-        edit.addEventListener('click', function () { show(target); });
+        edit.addEventListener('click', function () { show(r[2]); });
         dd.appendChild(edit);
         summary.appendChild(dt);
         summary.appendChild(dd);

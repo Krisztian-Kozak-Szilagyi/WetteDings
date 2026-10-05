@@ -1,16 +1,37 @@
 <%
-  // Duell-Kasten auf der Wett-Seite: wer gegen wen, Einsatz, Zusagen – und für die Beteiligten Annehmen/Ablehnen
+  // Duell-Kasten auf der Wett-Seite: wer gegen wen, Einsatz (Geld und/oder Karten), Zusagen – für die Beteiligten
+  // Annehmen/Ablehnen, für alle den Topf der Zuschauer (#67). dv = duelView aus routes/bets.js
   const d = bet.duel;
+  const dv = locals.duelView || { cards: [], spect: { o1: 0, o2: 0 }, spectTotal: 0, spectCount: 0, quote: { o1: '–', o2: '–' } };
   const pending = d.state === 'angefragt' && bet.status === 'offen';
   const mustAnswer = pending && ((duelRole === 'opponent' && !d.opponentAcceptedAt) || (duelRole === 'referee' && !d.refereeAcceptedAt));
+  const cardOf = (side) => dv.cards.find((c) => c.side === side) || null;
+  const stakeLine = [d.stake > 0 ? euro(d.stake) + ' pro Person' : null, dv.cardRarity ? 'je eine ' + dv.cardRarity.label + '-Karte' : null].filter(Boolean).join(' + ');
+  const settled = bet.status !== 'offen';
+  const winnerName = bet.outcome === 'o1' ? bet.creatorName : bet.outcome === 'o2' ? d.opponentName : null;
 %>
 <div class="duel-box" id="duell">
   <div class="duel-vs">
-    <span class="duel-name"><%- userLink(bet.creatorName) %></span>
-    <span class="duel-sep">VS</span>
-    <span class="duel-name"><%- userLink(d.opponentName) %></span>
+    <% [['o1', bet.creatorName], ['o2', d.opponentName]].forEach(([k, name], i) => { const c = cardOf(k); %>
+      <% if (i === 1) { %><span class="duel-sep">VS</span><% } %>
+      <div class="duel-side <%= optClass(bet, k) %><%= bet.outcome === k ? ' is-winner' : '' %>">
+        <span class="duel-name"><%- userLink(name) %><% if (bet.outcome === k) { %> ✓<% } %></span>
+        <% if (c && c.info) { %>
+          <span class="duel-card r-<%= c.rarity %>"><img src="<%= c.info.image %>" alt="Karte von <%= name %>: <%= c.info.name %>" width="720" height="1008" loading="lazy"></span>
+          <span class="muted small"><%= c.info.name %> · <%= c.rarityInfo ? c.rarityInfo.label : c.rarity %></span>
+        <% } else if (dv.cardRarity && k === 'o2' && pending) { %>
+          <span class="duel-card duel-card-empty r-<%= d.cardRarity %>" aria-hidden="true">?</span>
+          <span class="muted small">Setzt eine <%= dv.cardRarity.label %>-Karte</span>
+        <% } %>
+      </div>
+    <% }) %>
   </div>
-  <p class="duel-line">Einsatz: <strong><%= euro(d.stake) %></strong> pro Person · Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong></p>
+  <p class="duel-line">Einsatz: <strong><%= stakeLine %></strong> · Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong></p>
+  <% if (dv.cards.length && !settled) { %><p class="muted small duel-line">Der Gewinner bekommt beide Karten. Bis dahin sind sie gesperrt.</p><% } %>
+  <% if (settled && bet.status === 'entschieden' && dv.cards.length && winnerName) { %>
+    <p class="duel-line"><strong><%= winnerName %></strong> hat beide Karten gewonnen.</p>
+  <% } %>
+
   <% if (pending) { %>
     <ul class="duel-steps">
       <li class="<%= d.opponentAcceptedAt ? 'is-done' : '' %>"><%= d.opponentName %>: <%= d.opponentAcceptedAt ? 'angenommen ✓' : 'Antwort steht aus' %></li>
@@ -18,10 +39,21 @@
     </ul>
     <p class="muted small">Annehmen bis <%= date(d.expiresAt) %> – sonst bekommt <%= bet.creatorName %> den Einsatz zurück. Bis dahin sehen nur die drei Beteiligten dieses Duell.</p>
     <% if (mustAnswer) { %>
+      <% const needCard = duelRole === 'opponent' && !!d.cardRarity; const myCards = dv.myCards || []; %>
       <div class="duel-actions">
-        <form method="post" action="/wetten/<%= bet._id %>/duell/annehmen" data-confirm="<%= duelRole === 'opponent' ? 'Herausforderung annehmen? Dein Einsatz von ' + euro(d.stake) + ' wird sofort abgebucht.' : 'Als Schiedsrichter zusagen? Du entscheidest dann allein, wer gewinnt.' %>">
+        <form method="post" action="/wetten/<%= bet._id %>/duell/annehmen" class="duel-accept" data-confirm="<%= duelRole === 'opponent' ? 'Herausforderung annehmen? Dein Einsatz' + (d.stake > 0 ? ' von ' + euro(d.stake) : '') + (needCard ? ' und die gewählte Karte' : '') + ' wird sofort gesetzt.' : 'Als Schiedsrichter zusagen? Du entscheidest dann allein, wer gewinnt.' %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button class="btn btn-primary" type="submit" <%= duelRole === 'opponent' && currentUser.balance < d.stake ? 'disabled' : '' %>><%= duelRole === 'opponent' ? 'Annehmen (' + euro(d.stake) + ')' : 'Als Schiedsrichter zusagen' %></button>
+          <% if (needCard) { %>
+            <label class="field">
+              <span>Deine Karte (<%= dv.cardRarity.label %>)</span>
+              <select name="card" required <%= myCards.length ? '' : 'disabled' %>>
+                <option value="">Karte wählen …</option>
+                <% myCards.forEach((c) => { %><option value="<%= c.card.id %>"><%= c.card.name %><%= c.free > 1 ? ' ×' + c.free : '' %></option><% }) %>
+              </select>
+              <% if (!myCards.length) { %><small class="neg">Du hast keine freie <%= dv.cardRarity.label %>-Karte – ohne sie kannst du nicht annehmen.</small><% } %>
+            </label>
+          <% } %>
+          <button class="btn btn-primary" type="submit" <%= duelRole === 'opponent' && (currentUser.balance < d.stake || (needCard && !myCards.length)) ? 'disabled' : '' %>><%= duelRole === 'opponent' ? 'Annehmen' + (d.stake > 0 ? ' (' + euro(d.stake) + ')' : '') : 'Als Schiedsrichter zusagen' %></button>
         </form>
         <form method="post" action="/wetten/<%= bet._id %>/duell/absagen" data-confirm="Wirklich ablehnen? Das Duell findet dann nicht statt.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -35,19 +67,24 @@
       </form>
     <% } %>
   <% } %>
+
   <% if (d.state === 'aktiv') { %>
-    <div class="duel-tip-area">
-      <p class="duel-tip-head">Tipps der Zuschauer <span class="muted small">(ohne Einsatz)</span></p>
-      <%- include('duel-tips', { bet, big: true }) %>
-      <% if (locals.canTip) { %>
-        <form method="post" action="/wetten/<%= bet._id %>/duell/tipp" class="duel-tip-form">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <% [['o1', bet.creatorName], ['o2', d.opponentName]].forEach(([k, name]) => { %>
-            <button class="btn btn-sm btn-opt <%= optClass(bet, k) %><%= locals.myTip === k ? ' is-picked' : '' %>" type="submit" name="side" value="<%= k %>" <%= locals.myTip === k ? 'disabled' : '' %>><%= locals.myTip === k ? 'Dein Tipp: ' : 'Ich tippe auf ' %><%= name %></button>
-          <% }) %>
-        </form>
-      <% } else if (locals.myTip) { %>
-        <p class="muted small">Dein Tipp: <%= locals.myTip === 'o1' ? bet.creatorName : d.opponentName %></p>
+    <%# Zuschauer-Topf: getrennt vom Einsatz der beiden Beteiligten %>
+    <div class="duel-spect">
+      <p class="duel-tip-head">Zuschauer-Wetten <span class="muted small">· eigener Topf, <%= dv.spectCount %> <%= dv.spectCount === 1 ? 'Einsatz' : 'Einsätze' %></span></p>
+      <div class="pool duel-pool">
+        <% [['o1', bet.creatorName], ['o2', d.opponentName]].forEach(([k, name]) => { %>
+          <div class="pool-side <%= optClass(bet, k) %> <%= bet.outcome === k ? 'winner' : '' %>">
+            <span class="pool-label">auf <%= name %></span>
+            <span class="pool-amount"><%= euro(dv.spect[k] || 0) %></span>
+            <span class="pool-quote">Quote <%= dv.quote[k] %></span>
+          </div>
+        <% }) %>
+      </div>
+      <% if (!settled && !duelRole && bet.deadline > new Date()) { %>
+        <p class="muted small">Setz bis <%= date(bet.deadline) %> auf einen der beiden. Ihr Zuschauer spielt nur untereinander – die Einsätze von <%= bet.creatorName %> und <%= d.opponentName %> bleiben bei den beiden.</p>
+      <% } else if (!settled && duelRole) { %>
+        <p class="muted small">Zuschauer wetten in einem eigenen Topf – um eure Einsätze geht es dabei nicht.</p>
       <% } %>
     </div>
   <% } %>

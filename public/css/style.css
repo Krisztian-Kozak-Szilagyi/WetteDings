@@ -665,15 +665,27 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .duel-invites { margin-bottom: 16px; }
 .duel-invite-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .duel-invite-list li { display: flex; flex-direction: column; gap: 2px; }
-/* Duell: Zuschauer-Tipps – Balken, darunter klein links/rechts der Anteil */
-.duel-tips .bar-empty { background: var(--surface-2); }
-.duel-tips-pct { display: flex; justify-content: space-between; margin-top: 3px; font-size: .72rem; font-weight: 700; line-height: 1; }
-.duel-tip-area { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, .3); }
+/* Duell: je Seite Name und eingesetzte Karte (#67) */
+.duel-vs { align-items: flex-start; }
+.duel-vs .duel-sep { align-self: center; }
+.duel-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+.duel-side.is-winner .duel-name { color: var(--ja, #22c55e); }
+.duel-card { display: grid; place-items: center; width: 96px; aspect-ratio: 720 / 1008; border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 1px var(--rar, rgba(249, 115, 22, .5)), 0 8px 20px rgba(0, 0, 0, .45); }
+.duel-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.duel-card-empty { border: 2px dashed var(--rar, rgba(249, 115, 22, .6)); box-shadow: none; color: var(--rar, #fb923c); font-size: 1.6rem; font-weight: 900; }
+.duel-side .muted.small { font-weight: 400; font-size: .78rem; }
+.duel-accept { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.duel-accept .field { margin: 0; min-width: 200px; }
+/* Duell: Topf der Zuschauer */
+.duel-spect { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, .3); }
 .duel-tip-head { margin: 0 0 6px; font-weight: 700; font-size: .9rem; }
-.duel-tip-form { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 20px; }
+.duel-pool { margin: 6px 0 8px; }
+/* Duell in der Wett-Liste hervorgehoben */
+.bet-card.is-duel { box-shadow: 0 0 0 1px rgba(249, 115, 22, .55), 0 0 22px rgba(249, 115, 22, .12); background: linear-gradient(135deg, rgba(249, 115, 22, .09), transparent 55%), var(--color-surface); }
+.bet-card.is-duel:hover { box-shadow: 0 0 0 1px #f97316, 0 10px 30px rgba(0, 0, 0, .5), 0 0 26px rgba(249, 115, 22, .2); }
+.page-head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Duell: Hinweis "Das Duell läuft" als zweite Kachel neben der Auswertung */
 .dates .date-side { margin-top: 0; justify-content: center; }
-.duel-tip-form .btn-opt.is-picked { opacity: 1; box-shadow: 0 0 0 2px var(--opt); }
 /* Profil: Knopf "Herausfordern" neben "Moderation" */
 .profil-head-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* Admin: Handel-Log */

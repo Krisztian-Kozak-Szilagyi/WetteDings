@@ -14,6 +14,8 @@ const { euro } = require('../lib/viewHelpers');
 const svc = require('../services/betService');
 const groups = require('../services/groupService');
 const duels = require('../services/duelService');
+const catalog = require('../tcg/catalog');
+const { quote: rawQuote } = require('../lib/payout');
 
 const router = express.Router();
 const PER_PAGE = 24;
@@ -369,9 +371,29 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
   const duelActive = !!bet.duel && bet.duel.state === 'aktiv';
   const canDecide = bet.duel ? (duelRole === 'referee' && duelActive) || (!duelRole && role === 'dev' && duelActive) : !!role;
   const decidesAlone = role === 'dev' || (role === 'creator' && !bet.referee) || (!!bet.duel && canDecide);
-  // Zuschauer-Tipp (ohne Einsatz): nur Unbeteiligte, solange das Duell läuft und die Auswertung noch aussteht
-  const canTip = !!bet.duel && duelActive && isOpen && !duelRole && (!bet.resultAt || bet.resultAt > now);
-  const myTip = bet.duel && !duelRole ? await duels.myTip(bet._id, me._id) : null;
+  // Duell (#67): Zuschauer haben einen eigenen Topf – Summen und Quoten nur aus ihren Einsätzen
+  let duelView = null;
+  if (bet.duel) {
+    const party = [String(bet.creator), String(bet.duel.opponent)];
+    const spect = { o1: 0, o2: 0 };
+    positions.filter((p) => !party.includes(String(p.user))).forEach((p) => { spect[p.side] = (spect[p.side] || 0) + p.amount; });
+    const spectTotal = spect.o1 + spect.o2;
+    const fee = bet.creatorFeePercent || 0;
+    const q = (k) => {
+      const v = rawQuote(spect[k], spectTotal - spect[k], fee);
+      return v === null ? '–' : `${v.toFixed(2).replace('.', ',')}×`;
+    };
+    duelView = {
+      spect,
+      spectTotal,
+      spectCount: positions.filter((p) => !party.includes(String(p.user))).length,
+      quote: { o1: q('o1'), o2: q('o2') },
+      cards: (bet.duel.cards || []).map((c) => ({ ...c, info: catalog.cardById[c.card] || null, rarityInfo: catalog.rarityByKey[c.rarity] || null })),
+      cardRarity: bet.duel.cardRarity ? catalog.rarityByKey[bet.duel.cardRarity] : null,
+      // Herausgeforderter vor dem Annehmen: passende eigene Karten
+      myCards: duelRole === 'opponent' && bet.duel.state === 'angefragt' && !bet.duel.opponentAcceptedAt && bet.duel.cardRarity ? await duels.eligibleCards(me._id, bet.duel.cardRarity) : null,
+    };
+  }
   const myVote = (bet.votes || []).find((v) => v.role === role) || null;
 
   res.render('bet', {
@@ -392,12 +414,12 @@ router.get('/wetten/:id', validId, requireLogin, async (req, res, next) => {
     noteMin: svc.NOTE_MIN,
     noteMax: svc.NOTE_MAX,
     duelRole,
-    canTip,
-    myTip,
+    duelView,
     duelFeePercent: duels.DUEL_FEE_PERCENT,
     perms: {
-      // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen; im Duell setzt niemand nach
-      stake: !!me && accepting && !isOwner && !isReferee && !bet.duel,
+      // Wettersteller und Schiedsrichter dürfen an dieser Wette nicht teilnehmen; im Duell setzen Zuschauer,
+      // sobald es läuft – die beiden Beteiligten nicht
+      stake: !!me && accepting && !isOwner && !isReferee && (!bet.duel || (duelActive && !duelRole)),
       // Ersteller und Schiedsrichter dürfen jederzeit eine Stimme abgeben (Duell: siehe canDecide);
       // ein unbeteiligter Dev legt ein Ergebnis nur im Streitfall oder nach dem Auswertungstermin fest
       resolve: isOpen && canDecide && (role !== 'dev' || devMayDecide(bet, null, now)),
@@ -469,21 +491,25 @@ router.post('/wetten/:id/annullieren', validId, requireLogin, (req, res) =>
 
 // ---------- Duelle (Head-to-Head) ----------
 
-/** Formular "Herausfordern": Gegner aus dem Profil, Schiedsrichter frei wählbar (nicht die beiden Beteiligten) */
-async function duelForm(req, res, { errors = [], values = {} } = {}, status = 200) {
-  const name = values.opponent || str(req.query.gegen).trim();
-  const opponent = name ? await User.findOne({ usernameLower: name.toLowerCase(), deletedAt: null }).select('username').lean() : null;
-  if (!opponent || opponent._id.equals(req.user._id)) {
-    req.flash('error', opponent ? 'Du kannst dich nicht selbst herausfordern.' : 'Dieses Mitglied gibt es nicht.');
-    return res.redirect('/rangliste');
-  }
-  const candidates = (await refereeCandidates(req.user._id)).filter((u) => !u._id.equals(opponent._id));
+/**
+ * Formular "Herausfordern" (Assistent wie bei "Neue Wette", #93): Gegner wählbar – vorausgewählt, wenn man vom
+ * Profil kommt (?gegen=Name). Schiedsrichter: jedes andere Mitglied außer den beiden Beteiligten (prüft der Server).
+ * Einsatz: Geld und/oder eine eigene Karte ab Gold (#67).
+ */
+async function duelForm(req, res, { errors = [], errorStep = 0, values = {} } = {}, status = 200) {
+  const preset = values.opponent !== undefined ? values.opponent : str(req.query.gegen).trim();
+  const [members, cards] = await Promise.all([refereeCandidates(req.user._id), duels.eligibleCards(req.user._id)]);
+  const opponent = preset ? members.find((u) => u.username.toLowerCase() === preset.toLowerCase()) || null : null;
   res.status(status).render('duell-neu', {
-    title: `${opponent.username} herausfordern`,
+    title: opponent ? `${opponent.username} herausfordern` : 'Neues Duell',
     opponent,
-    candidates,
+    members,
+    candidates: members,
+    cards,
+    minCardRarity: catalog.rarityByKey[duels.MIN_CARD_RARITY],
     errors,
-    values: { title: '', description: '', stake: '', referee: '', resultAt: '', ...values },
+    errorStep,
+    values: { title: '', description: '', stake: '', card: '', referee: '', resultAt: '', ...values, opponent: opponent ? opponent.username : values.opponent || '' },
     feePercent: duels.DUEL_FEE_PERCENT,
     inviteHours: duels.INVITE_HOURS,
     minDeadline: toZonedLocalInput(new Date(Date.now() + 10 * 60 * 1000), config.timezone),
@@ -498,53 +524,52 @@ router.post('/duell', requireLogin, async (req, res) => {
     title: str(req.body.title).trim().replace(/\s+/g, ' '),
     description: str(req.body.description).trim().replace(/\r\n/g, '\n'),
     stake: str(req.body.stake).trim(),
+    card: str(req.body.card).trim(),
     referee: str(req.body.referee),
     resultAt: str(req.body.resultAt),
   };
+  // Fehler mit dem Schritt des Assistenten, auf dem das Feld steht
   const errors = [];
-  if (values.title.length < 5 || values.title.length > 140) errors.push('Die Behauptung muss 5–140 Zeichen lang sein.');
-  if (values.description.length > 2000) errors.push('Die Beschreibung darf höchstens 2000 Zeichen lang sein.');
-  const stake = parseEuro(values.stake);
-  if (stake === null || stake < config.minStake) errors.push(`Der Einsatz muss mindestens ${euro(config.minStake)} betragen.`);
-  else if (stake > req.user.balance) errors.push('Dein Guthaben reicht für diesen Einsatz nicht aus.');
-  const resultAt = parseZonedLocal(values.resultAt, config.timezone);
-  if (!resultAt) errors.push('Bitte gib den Termin der Auswertung an (Datum und Uhrzeit).');
-  const opponent = await User.findOne({ usernameLower: values.opponent.toLowerCase(), deletedAt: null }).select('username').lean();
+  let errorStep = null;
+  const fail = (step, msg) => { errors.push(msg); if (errorStep === null) errorStep = step; };
+  const opponent = values.opponent ? await User.findOne({ usernameLower: values.opponent.toLowerCase(), deletedAt: null }).select('username').lean() : null;
+  if (!opponent) fail(0, 'Bitte wähle aus, wen du herausfordern möchtest.');
+  else if (opponent._id.equals(req.user._id)) fail(0, 'Du kannst dich nicht selbst herausfordern.');
+  if (values.title.length < 5 || values.title.length > 140) fail(1, 'Die Behauptung muss 5–140 Zeichen lang sein.');
+  if (values.description.length > 2000) fail(1, 'Die Beschreibung darf höchstens 2000 Zeichen lang sein.');
+  const stake = values.stake === '' ? 0 : parseEuro(values.stake);
+  const cardId = values.card || null;
+  if (stake === null) fail(2, 'Bitte gib einen gültigen Betrag an.');
+  else if (stake === 0 && !cardId) fail(2, 'Setze Geld, eine Karte oder beides.');
+  else if (stake > 0 && stake < config.minStake) fail(2, `Der Geldeinsatz muss mindestens ${euro(config.minStake)} betragen (oder 0 € mit einer Karte).`);
+  else if (stake > req.user.balance) fail(2, 'Dein Guthaben reicht für diesen Einsatz nicht aus.');
   const referee = mongoose.isValidObjectId(values.referee) ? await User.findOne({ _id: values.referee, deletedAt: null }).select('username').lean() : null;
-  if (!referee) errors.push('Bitte wähle einen Schiedsrichter aus.');
+  if (!referee) fail(3, 'Bitte wähle einen Schiedsrichter aus.');
+  const resultAt = parseZonedLocal(values.resultAt, config.timezone);
+  if (!resultAt) fail(4, 'Bitte gib den Termin der Auswertung an (Datum und Uhrzeit).');
   if (!errors.length) {
     try {
-      const bet = await duels.create({ user: req.user, opponent, referee, title: values.title, description: values.description, stake, resultAt });
-      req.flash('success', `Herausforderung verschickt! Sobald ${opponent.username} und Schiedsrichter ${referee.username} angenommen haben, gilt das Duell. Bis dahin ist dein Einsatz von ${euro(stake)} reserviert.`);
+      const bet = await duels.create({ user: req.user, opponent, referee, title: values.title, description: values.description, stake, cardId, resultAt });
+      const what = duels.stakeText(stake, bet.duel.cards[0]);
+      req.flash('success', `Herausforderung verschickt! Sobald ${opponent.username} und Schiedsrichter ${referee.username} angenommen haben, gilt das Duell. Bis dahin ist dein Einsatz (${what}) reserviert.`);
       return res.redirect(`/wetten/${bet._id}`);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;
-      errors.push(err.message);
+      fail(2, err.message);
     }
   }
-  duelForm(req, res, { errors, values }, 400);
+  duelForm(req, res, { errors, errorStep: errorStep || 0, values }, 400);
 });
 
 router.post('/wetten/:id/duell/annehmen', validId, requireLogin, (req, res) =>
   action(req, res, async () => {
-    const r = await duels.accept({ user: req.user, betId: req.params.id });
-    if (r.started) return 'Das Duell läuft! Der Schiedsrichter entscheidet zum Termin der Auswertung.';
+    const r = await duels.accept({ user: req.user, betId: req.params.id, cardId: str(req.body.card) || null });
+    if (r.started) return 'Das Duell läuft! Zuschauer können jetzt mitwetten; der Schiedsrichter entscheidet zum Termin der Auswertung.';
+    const mine = r.bet.duel.cards.find((c) => c.side === 'o2');
     return r.role === 'opponent'
-      ? `Herausforderung angenommen – dein Einsatz von ${euro(r.bet.duel.stake)} ist gesetzt. Jetzt fehlt noch die Zusage des Schiedsrichters.`
+      ? `Herausforderung angenommen – dein Einsatz (${duels.stakeText(r.bet.duel.stake, mine)}) ist gesetzt. Jetzt fehlt noch die Zusage des Schiedsrichters.`
       : 'Du hast als Schiedsrichter zugesagt. Jetzt fehlt noch die Zusage des Herausgeforderten.';
   })
-);
-
-router.post('/wetten/:id/duell/tipp', validId, requireLogin, (req, res) =>
-  action(
-    req,
-    res,
-    async () => {
-      const r = await duels.tip({ user: req.user, betId: req.params.id, side: str(req.body.side) });
-      return r.changed ? (r.switched ? 'Dein Tipp wurde geändert.' : 'Dein Tipp ist gespeichert – ganz ohne Einsatz.') : null;
-    },
-    '#duell'
-  )
 );
 
 router.post('/wetten/:id/duell/absagen', validId, requireLogin, (req, res) =>
