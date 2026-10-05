@@ -7,7 +7,7 @@ const positionSchema = new Schema(
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     username: { type: String, required: true },
     side: { type: String, required: true, maxlength: 10 }, // key der gewählten Option
-    amount: { type: Number, required: true, min: 1 }, // Cent
+    amount: { type: Number, required: true, min: 0 }, // Cent (0 nur bei Duell-Beteiligten, die allein um Karten spielen)
     payout: { type: Number, default: null }, // Cent, null = noch nicht abgerechnet
     settledAt: { type: Date, default: null },
   },

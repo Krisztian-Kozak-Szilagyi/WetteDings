@@ -179,7 +179,7 @@ async function packInventory(userId) {
  */
 function pickDuplicates(list, locked) {
   const free = list.filter((c) => !isLocked(locked, c));
-  const returns = list.some((c) => isLocked(locked, c) && locked.reasons.get(String(c._id)) !== 'handel');
+  const returns = list.some((c) => isLocked(locked, c) && !['handel', 'duell'].includes(locked.reasons.get(String(c._id))));
   return returns ? free : free.slice(0, -1);
 }
 
@@ -203,7 +203,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
 
     const n = keepOne ? pickDuplicates(owned, locked).length : count;
     if (!Number.isInteger(n) || n < 1) throw new UserError('Du hast keine Duplikate dieser Karte.');
-    if (!sellable.length) throw new UserError('Diese Karte ist gerade auf einer IHK-Quest oder im Handel und kann nicht verkauft werden.');
+    if (!sellable.length) throw new UserError('Diese Karte ist gerade auf einer IHK-Quest, im Handel oder im Duell und kann nicht verkauft werden.');
     if (n > sellable.length) throw new UserError(`Du kannst nur ${sellable.length} Stück dieser Karte verkaufen.`);
 
     const toSell = sellable.slice(0, n);

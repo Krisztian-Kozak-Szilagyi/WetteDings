@@ -23,6 +23,13 @@
   const otherVote = role === 'creator' ? refereeVote : role === 'referee' ? creatorVote : null;
   const otherName = role === 'creator' ? bet.refereeName : bet.creatorName;
   const fees = feeSplit(bet);
+  // Duell (#67): Zuschauer setzen in einem eigenen Topf – Summen und Quoten fürs Einsatz-Formular nur daraus
+  const dv = bet.duel ? duelView : null;
+  const party = bet.duel ? [String(bet.creator), String(bet.duel.opponent)] : [];
+  const stakeTotals = dv ? dv.spect : totals;
+  const stakePool = dv ? dv.spectTotal : total;
+  const stakeQuote = (o) => (dv ? dv.quote[o.key] : quote(bet, o));
+  const listPositions = bet.duel ? positions.filter((p) => !party.includes(String(p.user))) : positions;
 %>
 
 <div hidden data-live-root data-live-url="/wetten/<%= bet._id %>/stand" data-live-version="<%= liveVersion %>"
@@ -67,7 +74,7 @@
         <p class="bet-desc"><%= bet.description %></p>
         <% if (descEdited) { %><p class="muted small edited-hint">Beschreibung nachträglich bearbeitet – siehe Änderungsverlauf.</p><% } %>
       <% } %>
-      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole, canTip, myTip }) %><% } %>
+      <% if (bet.duel) { %><%- include('partials/duel-box', { bet, duelRole, duelView }) %><% } %>
 
       <div class="bet-facts">
       <div class="dates">
@@ -213,14 +220,14 @@
       <% } %>
     </div>
 
-    <% if (!bet.duel) { %>
+    <% if (!bet.duel || bet.duel.state === 'aktiv') { %>
     <div class="bet-section-box" data-live="participants">
-      <h2>Teilnehmende</h2>
-      <% if (!positions.length) { %>
-        <p class="muted">Noch hat niemand gesetzt.</p>
+      <h2><%= bet.duel ? 'Zuschauer-Wetten' : 'Teilnehmende' %></h2>
+      <% if (!listPositions.length) { %>
+        <p class="muted"><%= bet.duel ? 'Noch hat kein Zuschauer gesetzt.' : 'Noch hat niemand gesetzt.' %></p>
       <% } else { %>
       <ul class="bet-people">
-        <% positions.forEach((p) => { const optTotal = totals[p.side] || 0; const me = myPosition && String(p._id) === String(myPosition._id); %>
+        <% listPositions.forEach((p) => { const optTotal = stakeTotals[p.side] || 0; const me = myPosition && String(p._id) === String(myPosition._id); %>
           <li class="<%= me ? 'me' : '' %>">
             <span class="bet-people-name"><%- userLink(p.username) %><% if (String(p.user) === String(bet.creator)) { %> <span class="tag">Ersteller</span><% } %></span>
             <span class="bet-people-opt <%= optClass(bet, p.side) %>"><span class="opt-dot"></span><%= optionLabel(bet, p.side) %></span>
@@ -332,12 +339,14 @@
         <% if (settled) { %>
           <p>Auszahlung: <strong class="<%= myPosition.payout > myPosition.amount ? 'pos' : (myPosition.payout === 0 ? 'neg' : '') %>"><%= euro(myPosition.payout) %></strong>
             (<%= myPosition.payout - myPosition.amount >= 0 ? '+' : '' %><%= euro(myPosition.payout - myPosition.amount) %>)</p>
+        <% } else if (bet.duel && duelRole) { %>
+          <p class="muted">Du spielst nur um die Einsätze zwischen dir und deinem Gegner – siehe oben.</p>
         <% } else {
-             const mine = totals[myPosition.side] || 0;
-             const other = total - mine;
+             const mine = stakeTotals[myPosition.side] || 0;
+             const other = stakePool - mine;
              // Provision höchstens so hoch wie die Einsätze der anderen Optionen -> nie weniger als der Einsatz
-             const estFee = Math.min(total * feePct / 100, other);
-             const est = other > 0 && mine > 0 ? Math.floor(myPosition.amount * (total - estFee) / mine) : myPosition.amount; %>
+             const estFee = Math.min(stakePool * feePct / 100, other);
+             const est = other > 0 && mine > 0 ? Math.floor(myPosition.amount * (stakePool - estFee) / mine) : myPosition.amount; %>
           <p class="muted">Wenn „<%= optionLabel(bet, myPosition.side) %>“ eintritt, bekämst du nach aktuellem Stand <strong><%= euro(est) %></strong>.
             <% if (!other) { %>Noch hat niemand anders gesetzt – ohne Gegenseite gibt es nur den Einsatz zurück.<% } %></p>
         <% } %>
@@ -348,7 +357,7 @@
       <div class="card stake-card">
         <div class="stake-head"><span class="kicker"><%= myPosition ? 'Einsatz erhöhen' : 'Einsatz setzen' %></span><span>Schluss <%= relTime(bet.deadline) %></span></div>
         <form method="post" action="/wetten/<%= bet._id %>/setzen" class="stake-form" data-live-attrs="stake-form"
-              data-totals="<%= JSON.stringify(totals) %>" data-fee="<%= feePct %>"
+              data-totals="<%= JSON.stringify(stakeTotals) %>" data-fee="<%= feePct %>"
               data-my-side="<%= myPosition ? myPosition.side : '' %>" data-my-amount="<%= myPosition ? myPosition.amount : 0 %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <div data-stake-step="form">
@@ -363,7 +372,7 @@
                   <input type="radio" name="side" value="<%= o.key %>" data-label="<%= o.label %>" <%= checked ? 'checked' : '' %> <%= locked ? 'disabled' : '' %> required>
                   <span class="side-option-ring" aria-hidden="true"></span>
                   <span class="side-option-title"><%= o.label %><% if (sub) { %> <span class="side-option-sub"><%= sub %></span><% } %></span>
-                  <span class="side-option-quote" data-live="quote-<%= o.key %>"><%= quote(bet, o) %></span>
+                  <span class="side-option-quote" data-live="quote-<%= o.key %>"><%= stakeQuote(o) %></span>
                 </label>
               <% }) %>
             </fieldset>

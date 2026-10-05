@@ -88,6 +88,30 @@ function splitFee(fee, hasReferee, { duel = false } = {}) {
   return { creator: total - referee, referee };
 }
 
+/**
+ * Duell: zwei getrennte Töpfe (#67). Die beiden Beteiligten (partyIds) spielen nur um ihre eigenen Einsätze,
+ * die Zuschauer nur um die Einsätze der Zuschauer. Jeder Topf wird für sich nach computePayouts abgerechnet
+ * (eigene Erstattung, wenn eine Seite leer ist); die Provision des Schiedsrichters kommt aus beiden Töpfen.
+ * Gibt zusätzlich refundedIds zurück: Positionen, deren Topf erstattet wurde.
+ */
+function computeDuelPayouts(positions, outcome, feePercent, partyIds) {
+  const party = new Set(partyIds.map(String));
+  const isParty = (p) => party.has(String(p.user));
+  const pools = [positions.filter(isParty), positions.filter((p) => !isParty(p))];
+  const payouts = new Map();
+  const refundedIds = new Set();
+  let fee = 0;
+  const refunded = [];
+  for (const pool of pools) {
+    const r = computePayouts(pool, outcome, feePercent);
+    r.payouts.forEach((v, k) => payouts.set(k, v));
+    if (r.refunded) pool.forEach((p) => refundedIds.add(p.id));
+    fee += r.fee;
+    refunded.push(r.refunded);
+  }
+  return { payouts, fee, refundedIds, partyRefunded: refunded[0], spectatorsRefunded: refunded[1], refunded: refunded[0] && refunded[1] };
+}
+
 /** Aktuelle Quote einer Option (Auszahlung pro 1 € Einsatz, nach Provision), oder null. Nie unter 1,00. */
 function quote(sideTotal, otherTotal, feePercent = 0) {
   if (!sideTotal) return null;
@@ -96,4 +120,4 @@ function quote(sideTotal, otherTotal, feePercent = 0) {
   return payable / sideTotal;
 }
 
-module.exports = { computePayouts, quote, feeFor, splitFee };
+module.exports = { computePayouts, computeDuelPayouts, quote, feeFor, splitFee };

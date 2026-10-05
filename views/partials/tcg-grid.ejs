@@ -28,7 +28,7 @@
   <% cards.forEach((c, idx) => { const r = rarityByKey[c.rarity]; %>
     <% const foiledN = foiledBy[c.id] || (foiledCopies[c.id] || []).length; const n = Math.max(0, (counts[c.id] || 0) - foiledN); %>
     <% if (!n && !showMissing && !(foiledCopies[c.id] || []).length) return; %>
-    <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : 'Auf Quest'; %>
+    <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : lk && lk.reason === 'duell' ? 'Im Duell' : 'Auf Quest'; %>
     <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>

@@ -1,15 +1,17 @@
-// Gesperrte Karten-Exemplare: auf einer laufenden IHK-Quest, im Dungeon, in einem offenen Handelsangebot oder foliert.
+// Gesperrte Karten-Exemplare: auf einer laufenden IHK-Quest, im Dungeon, in einem offenen Handelsangebot, als Einsatz
+// in einem offenen Duell oder foliert.
 // Gesperrte Exemplare können nicht verkauft, gehandelt oder auf eine Quest (oder einen künftigen Dungeon)
 // geschickt werden. Ausnahme: Folierte Karten lassen sich gezielt im Handel anbieten (tradeService.create).
 const { IhkRun } = require('../models/Ihk');
 const { Trade, openFilter } = require('../models/Trade');
 const { TcgCard } = require('../models/Tcg');
 const { DungeonParty, DungeonRun } = require('../models/Dungeon');
+const Bet = require('../models/Bet');
 const { UserError } = require('../lib/util');
 
-/** { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'folie'> } – Quest, Dungeon und Handel haben Vorrang vor 'folie' */
+/** { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'duell'|'folie'> } – alle haben Vorrang vor 'folie' */
 async function lockedDocs(userId, session) {
-  const [foiled, run, trades, party, dungeon] = await Promise.all([
+  const [foiled, run, trades, party, dungeon, duels] = await Promise.all([
     TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id').session(session || null).lean(),
     IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
@@ -17,6 +19,8 @@ async function lockedDocs(userId, session) {
     // Dungeon: angemeldet (bis zum Start) oder gerade im Durchlauf
     DungeonParty.findOne({ 'members.user': userId }).select('members').session(session || null).lean(),
     DungeonRun.findOne({ 'members.user': userId, status: 'laeuft' }).select('members').session(session || null).lean(),
+    // Duell: eingesetzte Karte, solange das Duell offen ist (angefragt oder laufend)
+    Bet.find({ status: 'offen', 'duel.cards.user': userId }).select('duel.cards').session(session || null).lean(),
   ]);
   const reasons = new Map();
   foiled.forEach((d) => reasons.set(String(d._id), 'folie'));
@@ -25,6 +29,7 @@ async function lockedDocs(userId, session) {
     d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
   );
   trades.forEach((t) => reasons.set(String(t.cardDoc), 'handel'));
+  duels.forEach((b) => b.duel.cards.filter((c) => String(c.user) === String(userId)).forEach((c) => reasons.set(String(c.doc), 'duell')));
   return { docs: [...reasons.keys()], reasons };
 }
 
