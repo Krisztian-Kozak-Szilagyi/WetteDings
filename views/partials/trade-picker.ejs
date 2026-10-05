@@ -33,7 +33,7 @@
     </div>
     <div class="tcg-grid hb-grid">
       <% pool.goods.forEach((g) => { const n = Math.min(preset.counts[g.card.id] || 0, g.max); %>
-        <div class="tcg-slot hb-card is-item" data-hb-slot data-rarity="item" data-rank="-1" data-owned="<%= pool.counts[g.card.id] || 0 %>" data-rarity-label="Gegenstand" data-name="<%= g.card.name.toLowerCase() %>" data-label="<%= g.card.name %>" data-image="<%= g.card.image %>" data-value="<%= g.card.sell %>">
+        <div class="tcg-slot hb-card is-item" data-hb-slot data-rarity="item" data-rank="99" data-owned="<%= pool.counts[g.card.id] || 0 %>" data-rarity-label="Gegenstand" data-name="<%= g.card.name.toLowerCase() %>" data-label="<%= g.card.name %>" data-image="<%= g.card.image %>" data-value="<%= g.card.sell %>">
           <span class="hb-art" role="button" tabindex="0" data-hb-step="1" aria-label="<%= g.card.name %> hinzufügen">
             <img src="<%= g.card.image %>" alt="" width="64" height="64">
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>

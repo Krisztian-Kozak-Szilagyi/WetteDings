@@ -307,19 +307,23 @@
   update();
 
   // ---------- Wunschkarten (Markt): Suche mit Vorschlägen direkt im Fenster ----------
-  // Fehlende Karten zuerst, dann seltene vor häufigen. Ausgewählt wird der unsichtbare Platz der Karte,
+  // Alle passenden Karten, fehlende zuerst, dann von häufig nach selten; Chips filtern nach Seltenheit.
+  // Ausgewählt wird der unsichtbare Platz der Karte,
   // so laufen Ablage, Zähler und Formular wie bei allen anderen Karten.
   var wish = $('[data-hb-wish]', root);
   if (wish) {
     var wishInput = $('[data-hb-wish-input]', wish);
     var wishList = $('[data-hb-wish-list]', wish);
+    var wishPop = $('[data-hb-wish-pop]', wish);
+    var wishChips = $('[data-hb-wish-chips]', wish);
+    var wishRarity = 'all';
     var store = $all('[data-hb-store] [data-hb-slot]', root);
     var wishActive = -1;
     var shown = [];
     var owned = function (slot) { return parseInt(slot.getAttribute('data-owned'), 10) || 0; };
     var rank = function (slot) { return parseInt(slot.getAttribute('data-rank'), 10) || 0; };
     var closeWish = function () {
-      wishList.hidden = true;
+      wishPop.hidden = true;
       wishInput.setAttribute('aria-expanded', 'false');
       wishActive = -1;
     };
@@ -349,8 +353,8 @@
       var q = wishInput.value.trim().toLowerCase();
       shown = store
         .filter(function (s) { return !q || s.getAttribute('data-name').indexOf(q) !== -1; })
-        .sort(function (a, b) { return (owned(a) > 0) - (owned(b) > 0) || rank(b) - rank(a) || a.getAttribute('data-label').localeCompare(b.getAttribute('data-label'), 'de'); })
-        .slice(0, 8);
+        .filter(function (s) { return wishRarity === 'all' || s.getAttribute('data-rarity') === wishRarity; })
+        .sort(function (a, b) { return (owned(a) > 0) - (owned(b) > 0) || rank(a) - rank(b) || a.getAttribute('data-label').localeCompare(b.getAttribute('data-label'), 'de'); });
       wishList.textContent = '';
       if (!shown.length) {
         var none = document.createElement('li');
@@ -386,17 +390,42 @@
         li.addEventListener('click', function () { pick(slot); });
         wishList.appendChild(li);
       });
-      wishList.hidden = false;
+      wishPop.hidden = false;
       wishInput.setAttribute('aria-expanded', 'true');
       mark(shown.length ? 0 : -1);
     };
+    var rarities = [];
+    store.forEach(function (s) {
+      var key = s.getAttribute('data-rarity');
+      if (!rarities.some(function (r) { return r.key === key; })) rarities.push({ key: key, label: s.getAttribute('data-rarity-label'), rank: rank(s) });
+    });
+    rarities.sort(function (a, b) { return a.rank - b.rank; });
+    [{ key: 'all', label: 'Alle' }].concat(rarities).forEach(function (r) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'hb-wish-chip' + (r.key === 'all' ? ' active' : ' r-' + r.key);
+      chip.setAttribute('aria-pressed', r.key === 'all' ? 'true' : 'false');
+      chip.innerHTML = r.key === 'all' ? '' : '<span class="tcg-dot"></span>';
+      chip.appendChild(document.createTextNode(r.label));
+      chip.addEventListener('mousedown', function (e) { e.preventDefault(); }); // Fokus bleibt im Feld
+      chip.addEventListener('click', function () {
+        wishRarity = r.key;
+        $all('.hb-wish-chip', wishChips).forEach(function (c) {
+          c.classList.toggle('active', c === chip);
+          c.setAttribute('aria-pressed', c === chip ? 'true' : 'false');
+        });
+        fill();
+        wishInput.focus();
+      });
+      wishChips.appendChild(chip);
+    });
     wishInput.addEventListener('focus', fill);
     wishInput.addEventListener('input', fill);
     wishInput.addEventListener('blur', function () { setTimeout(closeWish, 120); });
     wishInput.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        if (wishList.hidden) fill();
+        if (wishPop.hidden) fill();
         if (shown.length) mark((wishActive + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length);
       } else if (e.key === 'Enter') {
         e.preventDefault(); // kein Absenden des Formulars

@@ -96,7 +96,10 @@
               <span class="sr-only">Wunschkarte suchen</span>
               <input type="search" placeholder="Wunschkarte hinzufügen …" autocomplete="off" maxlength="40" role="combobox" aria-expanded="false" aria-controls="hb-wish-list" aria-autocomplete="list" data-hb-wish-input>
             </label>
-            <ul class="hb-wish-list" id="hb-wish-list" role="listbox" aria-label="Vorschläge" data-hb-wish-list hidden></ul>
+            <div class="hb-wish-pop" data-hb-wish-pop hidden>
+              <div class="hb-wish-chips" role="group" aria-label="Nach Seltenheit filtern" data-hb-wish-chips></div>
+              <ul class="hb-wish-list" id="hb-wish-list" role="listbox" aria-label="Vorschläge" data-hb-wish-list></ul>
+            </div>
           </div>
           <p class="hb-price-note muted small">Jeder kann sofort annehmen oder dir ein Gegenangebot machen.</p>
         <% } else { %>
