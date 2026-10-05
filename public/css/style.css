@@ -589,7 +589,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .admin-ihk-sub { margin: 18px 0 8px; font-size: 1rem; }
 .stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
 .stats-3 .card { margin: 0; }
-.admin-generate { margin: 0 0 18px; }
+.admin-generate { margin: 0 0 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.admin-generate-ttl { display: flex; align-items: center; gap: 8px; }
+.admin-generate-ttl select { width: auto; }
 .code-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .code-item {
   display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;

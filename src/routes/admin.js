@@ -31,7 +31,7 @@ const deviceService = require('../device/deviceService');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
-const { CODE_TTL_MINUTES, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
+const { CODE_TTL_OPTIONS, ttlText, remainingText, parseTtl, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
 
@@ -191,7 +191,9 @@ router.get('/admin', requireStaff, async (req, res) => {
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
-    ttlMinutes: CODE_TTL_MINUTES,
+    ttlOptions: CODE_TTL_OPTIONS,
+    ttlText,
+    remainingText,
     now: Date.now(),
     tcg:
       needs('spielwerte') && isAdmin
@@ -812,8 +814,9 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
 
 // ---------- Einladungen: Registrierungscodes (Admin und Devs) ----------
 router.post('/admin/codes', requireStaff, async (req, res) => {
-  const code = await createCode(req.user);
-  req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${CODE_TTL_MINUTES} Minuten und eine Person.`);
+  const ttl = parseTtl(req.body.ttl);
+  const code = await createCode(req.user, ttl);
+  req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${ttlText(ttl)} und eine Person.`);
   res.redirect(panelUrl('team', 'codes'));
 });
 
