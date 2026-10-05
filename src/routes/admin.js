@@ -712,6 +712,8 @@ async function grantMoneyTo(req) {
 // Lotterielose (Wochen- oder Monats-Lotterie) an ein Mitglied oder an alle – kostenlos, der Topf wächst nicht
 const TICKETS_MAX = { one: 50, all: 10 };
 async function grantTicketsTo(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const kind = lotteryService.GRANT_KINDS.find((k) => k === str(req.body.lotterie));
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -724,8 +726,10 @@ async function grantTicketsTo(req) {
   try {
     const r = await lotteryService.grantTickets({ userIds: toAll ? await allMemberIds() : [user._id], count, kind });
     const lose = count === 1 ? '1 Los' : `${count} Lose`;
-    await notify(r.recipients, { area: 'Lotterie', href: r.kind.path, text: `Das Team hat dir ${lose} für die ${r.kind.name} #${r.round} geschenkt.` });
-    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${r.recipients.length})` : user.username, all: toAll, recipients: r.recipients.length, kind: 'los', type: kind, typeLabel: `${r.kind.name} #${r.round}`, count });
+    const label = `${r.kind.name} #${r.round}`;
+    await notify(r.recipients, { area: 'Lotterie', href: r.kind.path, text: `Das Team hat dir ${lose} für die ${label} geschenkt.` });
+    await giftService.record({ userIds: r.recipients, kind: 'los', key: kind, label: `Los – ${label}`, count, reason, byName: req.user.username });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${r.recipients.length})` : user.username, all: toAll, recipients: r.recipients.length, kind: 'los', type: kind, typeLabel: label, count, reason });
     req.flash('success', toAll ? `${r.recipients.length} Mitglieder haben je ${lose} für die ${r.kind.name} bekommen.` : `${lose} für die ${r.kind.name} an ${user.username} vergeben.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;

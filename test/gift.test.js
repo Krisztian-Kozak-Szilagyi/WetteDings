@@ -45,3 +45,12 @@ test('Geschenk: echte Bilder aus Katalog und Gegenständen', () => {
   assert.equal(popup({ ...g, kind: 'item', key: 'folie' }).image, '/img/items/folie.svg');
   assert.equal(popup({ ...g, kind: 'karte', key: 'gibt-es-nicht' }).image, null);
 });
+
+test('Geschenk-Fenster: Lotterielose', () => {
+  const { popupJson } = require('../src/services/giftService');
+  const g = popupJson({ _id: 'x', kind: 'los', key: 'woche', label: 'Los – Wochen-Lotterie #3', count: 3, reason: 'Aktion zum Wochenende', byName: 'admin' }, { euro: (c) => `${c / 100} €` });
+  assert.equal(g.title, '3× Los – Wochen-Lotterie #3');
+  assert.equal(g.chip, '+3');
+  assert.equal(g.rowName, 'Nimmt an der Ziehung teil');
+  assert.equal(g.image, null);
+});
