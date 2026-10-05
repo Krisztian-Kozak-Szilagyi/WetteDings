@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="256" height="256" role="img" aria-label="51101 Coin (BOJE)"><title>51101 Coin (BOJE)</title>
+<defs><linearGradient id="bj-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe8d1"/><stop offset=".45" stop-color="#e3975a"/><stop offset="1" stop-color="#8a4519"/></linearGradient>
+<radialGradient id="bj-face" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#2b86c9"/><stop offset="1" stop-color="#081a33"/></radialGradient>
+<linearGradient id="bj-hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe45c"/><stop offset="1" stop-color="#f39a1e"/></linearGradient>
+<radialGradient id="bj-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff6b0" stop-opacity=".85"/><stop offset="1" stop-color="#fff6b0" stop-opacity="0"/></radialGradient>
+<clipPath id="bj-sea"><circle cx="200" cy="200" r="144"/></clipPath></defs>
+<circle cx="200" cy="200" r="194" fill="url(#bj-rim)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="200" r="150" fill="url(#bj-face)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="112" r="50" fill="url(#bj-glow)"/>
+<path d="M164,226 L188,132 M236,226 L212,132 M172,196 H228 M180,164 H220" fill="none" stroke="#1a161c" stroke-width="10" stroke-linecap="round"/>
+<path d="M200,104 V80 M174,80 H226" fill="none" stroke="#1a161c" stroke-width="8" stroke-linecap="round"/>
+<circle cx="172" cy="80" r="9" fill="#e9eef5" stroke="#1a161c" stroke-width="6"/>
+<circle cx="228" cy="80" r="9" fill="#e9eef5" stroke="#1a161c" stroke-width="6"/>
+<rect x="182" y="104" width="36" height="32" rx="8" fill="#fff3a6" stroke="#1a161c" stroke-width="10"/>
+<path d="M104,222 H296 C294,256 262,276 200,276 C138,276 106,256 104,222 Z" fill="url(#bj-hull)" stroke="#1a161c" stroke-width="12" stroke-linejoin="round"/>
+<text x="200" y="257" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="900" fill="#1a161c" letter-spacing="1">51101</text>
+<g clip-path="url(#bj-sea)">
+<path d="M30,272 C62,256 94,256 126,272 C158,288 190,288 222,272 C254,256 286,256 318,272 C350,288 382,288 414,272 V380 H30 Z" fill="#6cc3f2" stroke="#1a161c" stroke-width="10" stroke-linejoin="round"/>
+<path d="M10,312 C42,298 74,298 106,312 C138,326 170,326 202,312 C234,298 266,298 298,312 C330,326 362,326 394,312 V380 H10 Z" fill="#2f86cf" stroke="#1a161c" stroke-width="10" stroke-linejoin="round"/>
+</g>
+<circle cx="200" cy="200" r="150" fill="none" stroke="#1a161c" stroke-width="12"/>
+<path d="M88,176 C92,136 120,104 160,92" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity=".4"/>
+</svg>

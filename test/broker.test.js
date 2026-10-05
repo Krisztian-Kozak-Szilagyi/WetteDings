@@ -7,9 +7,10 @@ const { step, rollSurge, upChanceOf, initialState, mulberry32, COW_PARAMS, ETF_P
 const etf = require('../src/coin/etfTrend');
 const markets = require('../src/coin/markets');
 
-test('Broker: drei Werte, Symbole nur aus der festen Liste', () => {
-  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BTCG']);
+test('Broker: vier Werte, Symbole nur aus der festen Liste', () => {
+  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BOJE', 'BTCG']);
   assert.equal(markets.get('COW').NAME, 'Coinye West');
+  assert.equal(markets.get('BOJE').NAME, '51101 Coin');
   assert.equal(markets.get('BTCG').kind, 'etf');
   assert.equal(markets.get('constructor'), null);
   assert.equal(markets.get('cow'), null); // Groß-/Kleinschreibung regelt die Route

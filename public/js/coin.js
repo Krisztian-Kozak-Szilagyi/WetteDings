@@ -185,6 +185,9 @@
     fetch('/broker/api/kurs?wert=' + encodeURIComponent(SYMBOL), { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (s) {
+        // Split (51101 Coin): Bestand und Kursverlauf sind umgerechnet – Seite neu laden
+        if (String(s.splits) !== String(chartEl.getAttribute('data-splits'))) { location.reload(); return; }
+        updateBuoy(s.weather);
         var priceEl = document.querySelector('[data-live-price]');
         if (lastPrice !== null && s.price !== lastPrice) flash(priceEl, s.price > lastPrice);
         lastPrice = s.price;
@@ -201,9 +204,20 @@
         updateDepot(s.price);
         updateMinBuy(s.price);
         addLivePoint(s.at, s.price);
-        document.title = fmtPrice(s.price) + ' · SAM · BfW Holdings';
+        document.title = fmtPrice(s.price) + ' · ' + SYMBOL + ' · BfW Holdings';
       })
       .catch(function () {});
+  }
+
+  // 51101 Coin: letzte Messung der Boje
+  function updateBuoy(w) {
+    var el = document.querySelector('[data-buoy]');
+    if (!el || !w) return;
+    el.classList.toggle('is-storm', !!w.storm);
+    if (w.offline) { el.textContent = 'Boje 51101 meldet gerade nichts'; return; }
+    var n = function (x) { return x.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+    el.innerHTML = 'Boje 51101: Wind <strong>' + n(w.w) + ' m/s</strong> · Böen <strong>' + n(w.g) + ' m/s</strong> · <strong>' + n(w.p) + ' hPa</strong>' +
+      (w.storm ? ' · <strong>Sturm!</strong>' : '');
   }
 
   // Mindestbetrag beim Kauf: 10 % des aktuellen Kurses (mindestens der allgemeine Mindestbetrag)

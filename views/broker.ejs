@@ -2,7 +2,11 @@
 <%
   const up = snap.change24h >= 0;
   const pl = value - holding.costCents;
-  const eventLabels = { anstieg: 'Kurssprung', einbruch: 'Kurseinbruch', pump: 'Pump', crash: 'Crash' };
+  const eventLabels = { anstieg: 'Kurssprung', einbruch: 'Kurseinbruch', pump: 'Pump', crash: 'Crash', zusammenlegung: 'Split', aufteilung: 'Split' };
+  // Split: change = Kursfaktor − 1 (zusammenlegen: Kurs × 10, aufteilen: Kurs ÷ 10)
+  const splitText = (e) => e.change > 0 ? `${Math.round(e.change + 1)} alte = 1 neuer` : `1 alter = ${Math.round(1 / (e.change + 1))} neue`;
+  const wx = snap.weather;
+  const num1 = (x) => x.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const sym = snap.symbol;
   const mood = snap.sentiment === null ? null
     : snap.sentiment > 0.5 ? { cls: 'pos', label: 'Stark bullisch' } : snap.sentiment > 0.15 ? { cls: 'pos', label: 'Bullisch' }
@@ -32,6 +36,11 @@
       <h1><%= snap.name %> <span class="muted coin-symbol"><%= sym %></span></h1>
       <span class="live"><span class="live-dot"></span> Live</span>
       <% if (mood) { %><span class="etf-mood <%= mood.cls %>" title="Je aktiver die Seite, desto besser die Stimmung">Marktstimmung: <strong><%= mood.label %></strong></span><% } %>
+      <% if (wx) { %>
+        <span class="buoy-report<%= wx.storm ? ' is-storm' : '' %>" data-buoy title="Messwerte der NOAA-Boje 51101 im Pazifik, nordwestlich von Hawaii">
+          <% if (wx.offline) { %>Boje 51101 meldet gerade nichts<% } else { %>Boje 51101: Wind <strong><%= num1(wx.w) %> m/s</strong> · Böen <strong><%= num1(wx.g) %> m/s</strong> · <strong><%= num1(wx.p) %> hPa</strong><% if (wx.storm) { %> · <strong>Sturm!</strong><% } %><% } %>
+        </span>
+      <% } %>
     </div>
   </div>
   <div class="coin-price-box">
@@ -49,7 +58,7 @@
         <% }) %>
         <span class="chart-range-change muted small" data-range-change></span>
       </div>
-      <div class="chart" id="coin-chart" data-range="24h" data-symbol="<%= sym %>">
+      <div class="chart" id="coin-chart" data-range="24h" data-symbol="<%= sym %>" data-splits="<%= snap.splits %>">
         <svg class="chart-svg" aria-label="Kursverlauf" role="img"></svg>
         <div class="chart-tip" hidden></div>
         <p class="chart-loading muted small">Kursverlauf wird geladen …</p>
@@ -73,7 +82,11 @@
           <% events.forEach((e) => { %>
             <li class="event event-<%= e.type %>">
               <span class="event-type"><%= eventLabels[e.type] || e.type %></span>
-              <span class="<%= e.change >= 0 ? 'pos' : 'neg' %>"><%= signedPercent(e.change) %></span>
+              <% if (e.type === 'zusammenlegung' || e.type === 'aufteilung') { %>
+                <span><%= splitText(e) %></span>
+              <% } else { %>
+                <span class="<%= e.change >= 0 ? 'pos' : 'neg' %>"><%= signedPercent(e.change) %></span>
+              <% } %>
               <span class="muted small">auf <%= coinPrice(e.price) %> · <%= relTime(e.at) %></span>
             </li>
           <% }) %>

@@ -1,5 +1,5 @@
 <%
   // Zeichen eines Broker-Werts: eigenes Logo (Coins), sonst die Kürzel-Plakette.
   // sym = Symbol aus der festen Liste (src/coin/markets.js), px = Bildgröße, imgClass/markClass = Zusatzklassen
-  const assetLogo = [['SAM', '/img/sam-coin.svg'], ['COW', '/img/cow-coin.svg']].find(([k]) => k === sym);
+  const assetLogo = [['SAM', '/img/sam-coin.svg'], ['COW', '/img/cow-coin.svg'], ['BOJE', '/img/boje-coin.svg']].find(([k]) => k === sym);
 %><% if (assetLogo) { %><img class="<%= imgClass %>" src="<%= assetLogo[1] %>?v=<%= assetVersion %>" alt="" width="<%= px %>" height="<%= px %>"><% } else { %><span class="asset-mark<%= markClass ? ' ' + markClass : '' %> asset-mark-<%= sym.toLowerCase() %>" aria-hidden="true"><%= sym === 'BTCG' ? 'B·TCG' : sym %></span><% } %>

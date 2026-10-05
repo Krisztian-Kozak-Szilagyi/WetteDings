@@ -30,29 +30,32 @@ const unitsText = (units) => (Math.floor(((units || 0) / UNITS) * 100 + 1e-9) / 
 async function buy({ user, symbol = 'SAM', cents }) {
   const engine = engineOf(symbol);
   if (!Number.isInteger(cents) || cents < MIN_TRADE_CENTS) throw new UserError('Der Mindestbetrag ist 1,00 €.');
-  return inTransaction(async (session) => {
-    const price = engine.getPrice();
-    const min = minBuyCents(price);
-    if (cents < min) throw new UserError(`Du musst mindestens 10 % des aktuellen Kurses investieren – derzeit ${euroText(min)} €.`);
-    const units = Math.floor((cents / 100 / price) * UNITS);
-    if (units <= 0) throw new UserError('Der Betrag ist zu klein.');
+  // exclusive: wartet, falls gerade ein Split läuft (51101 Coin)
+  return engine.exclusive(() =>
+    inTransaction(async (session) => {
+      const price = engine.getPrice();
+      const min = minBuyCents(price);
+      if (cents < min) throw new UserError(`Du musst mindestens 10 % des aktuellen Kurses investieren – derzeit ${euroText(min)} €.`);
+      const units = Math.floor((cents / 100 / price) * UNITS);
+      if (units <= 0) throw new UserError('Der Betrag ist zu klein.');
 
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: user._id, balance: { $gte: cents } },
-      { $inc: { balance: -cents } },
-      { new: true, session }
-    );
-    if (!updatedUser) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: user._id, balance: { $gte: cents } },
+        { $inc: { balance: -cents } },
+        { new: true, session }
+      );
+      if (!updatedUser) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
 
-    await CoinHolding.updateOne(
-      { user: user._id, coin: symbol },
-      { $inc: { units, costCents: cents } },
-      { upsert: true, session }
-    );
-    await CoinTrade.create([{ user: user._id, coin: symbol, side: 'kauf', units, price, cents }], { session });
-    await Ledger.create([{ user: user._id, type: 'coin_kauf', amount: -cents, betTitle: engine.NAME }], { session });
-    return { units, price, cents };
-  });
+      await CoinHolding.updateOne(
+        { user: user._id, coin: symbol },
+        { $inc: { units, costCents: cents } },
+        { upsert: true, session }
+      );
+      await CoinTrade.create([{ user: user._id, coin: symbol, side: 'kauf', units, price, cents }], { session });
+      await Ledger.create([{ user: user._id, type: 'coin_kauf', amount: -cents, betTitle: engine.NAME }], { session });
+      return { units, price, cents };
+    })
+  );
 }
 
 /**
@@ -62,34 +65,37 @@ async function buy({ user, symbol = 'SAM', cents }) {
 async function sell({ user, symbol = 'SAM', cents, all = false }) {
   const engine = engineOf(symbol);
   if (!all && (!Number.isInteger(cents) || cents < MIN_TRADE_CENTS)) throw new UserError('Der Mindestbetrag ist 1,00 €.');
-  return inTransaction(async (session) => {
-    const price = engine.getPrice();
-    const holding = await CoinHolding.findOne({ user: user._id, coin: symbol }).session(session);
-    if (!holding || holding.units <= 0) throw new UserError(`Du besitzt keine Anteile von ${engine.NAME}.`);
+  // exclusive: wartet, falls gerade ein Split läuft (51101 Coin)
+  return engine.exclusive(() =>
+    inTransaction(async (session) => {
+      const price = engine.getPrice();
+      const holding = await CoinHolding.findOne({ user: user._id, coin: symbol }).session(session);
+      if (!holding || holding.units <= 0) throw new UserError(`Du besitzt keine Anteile von ${engine.NAME}.`);
 
-    let units = all ? holding.units : Math.ceil((cents / 100 / price) * UNITS);
-    if (units > holding.units) {
-      throw new UserError(`Du besitzt nur Anteile im Wert von ${(valueCents(holding.units, price) / 100).toFixed(2).replace('.', ',')} €.`);
-    }
-    const proceeds = valueCents(units, price);
-    if (proceeds <= 0) throw new UserError('Der Wert ist zu klein, um ihn zu verkaufen.');
+      let units = all ? holding.units : Math.ceil((cents / 100 / price) * UNITS);
+      if (units > holding.units) {
+        throw new UserError(`Du besitzt nur Anteile im Wert von ${(valueCents(holding.units, price) / 100).toFixed(2).replace('.', ',')} €.`);
+      }
+      const proceeds = valueCents(units, price);
+      if (proceeds <= 0) throw new UserError('Der Wert ist zu klein, um ihn zu verkaufen.');
 
-    const costReduce = units === holding.units ? holding.costCents : Math.round((holding.costCents * units) / holding.units);
-    const res = await CoinHolding.updateOne(
-      { _id: holding._id, units: { $gte: units } },
-      { $inc: { units: -units, costCents: -costReduce } },
-      { session }
-    );
-    if (res.modifiedCount !== 1) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
+      const costReduce = units === holding.units ? holding.costCents : Math.round((holding.costCents * units) / holding.units);
+      const res = await CoinHolding.updateOne(
+        { _id: holding._id, units: { $gte: units } },
+        { $inc: { units: -units, costCents: -costReduce } },
+        { session }
+      );
+      if (res.modifiedCount !== 1) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 
-    // Steuer nur auf den Gewinn (Erlös − anteiliger Einstand), Satz je Kategorie (Coins, ETFs)
-    const tax = taxService.gainTax(proceeds, costReduce, taxService.rate(engine.kind));
-    const net = proceeds - tax;
-    await User.updateOne({ _id: user._id }, { $inc: { balance: net } }, { session });
-    await CoinTrade.create([{ user: user._id, coin: symbol, side: 'verkauf', units, price, cents: net, tax }], { session });
-    await Ledger.create([{ user: user._id, type: 'coin_verkauf', amount: net, betTitle: engine.NAME }], { session });
-    return { units, price, cents: net, tax, profit: net - costReduce };
-  });
+      // Steuer nur auf den Gewinn (Erlös − anteiliger Einstand), Satz je Kategorie (Coins, ETFs)
+      const tax = taxService.gainTax(proceeds, costReduce, taxService.rate(engine.kind));
+      const net = proceeds - tax;
+      await User.updateOne({ _id: user._id }, { $inc: { balance: net } }, { session });
+      await CoinTrade.create([{ user: user._id, coin: symbol, side: 'verkauf', units, price, cents: net, tax }], { session });
+      await Ledger.create([{ user: user._id, type: 'coin_verkauf', amount: net, betTitle: engine.NAME }], { session });
+      return { units, price, cents: net, tax, profit: net - costReduce };
+    })
+  );
 }
 
 async function getHolding(userId, symbol = 'SAM') {
