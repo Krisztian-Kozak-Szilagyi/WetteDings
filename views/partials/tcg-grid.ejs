@@ -3,7 +3,8 @@
   // mode: 'album' – Zoom-Dialog mit Verkaufen/Schützen/Favorit (public/js/tcg.js)
   //       'trade' – Handelsdialog auf /handel (public/js/handel.js)
   //       'view'  – nur ansehen; mit linkFor(cardId) öffnet ein Klick die Großansicht mit "Tausch vorschlagen"
-  //       'pick'  – Auswahl per Radio-Button (pickName, picked), funktioniert ohne JS
+  //       'pick'  – Auswahl per Radio-Button (pickName, picked), funktioniert ohne JS;
+  //                 mit pickCounts ({ cardId: Anzahl }) Mehrfachauswahl per Checkbox und Anzahl (Tausch, #76)
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
   // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
   // seenIds: schon einmal besessene Karten – fehlen sie, werden sie grau statt als "?" gezeigt
@@ -69,6 +70,19 @@
           aria-label="<%= c.name %>, <%= r.label %>, <%= freeN %> frei – handeln">
           <% inner() %>
         </button>
+      <% } else if (mode === 'pick' && locals.pickCounts) { %>
+        <% const chosen = pickCounts[c.id] || 0; const maxN = Math.min(freeN, locals.pickMax || 5); %>
+        <div class="tcg-pick-multi">
+          <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>">
+            <input type="checkbox" name="<%= pickName %>" value="<%= c.id %>" <%= chosen ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>">
+            <% inner() %>
+          </label>
+          <% if (maxN > 1) { %>
+            <select class="tcg-pick-count" name="<%= pickName %>-anzahl-<%= c.id %>" aria-label="Anzahl <%= c.name %>">
+              <% for (let i = 1; i <= maxN; i++) { %><option value="<%= i %>" <%= i === Math.max(1, chosen) ? 'selected' : '' %>><%= i %>×</option><% } %>
+            </select>
+          <% } %>
+        </div>
       <% } else if (mode === 'pick') { %>
         <% const checked = picked === c.id; %>
         <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>">

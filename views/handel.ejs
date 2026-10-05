@@ -13,6 +13,10 @@
     const iPay = (String(t.seller) === me) === (t.extraFrom === 'seller');
     return { iPay, text: iPay ? 'du zahlst ' + euro(t.price) + ' drauf' : 'du bekommst ' + euro(t.price - taxFor(t.price, 'tausch')) + ' drauf' + (taxFor(t.price, 'tausch') ? ' (nach Steuer)' : '') };
   };
+  // Tausch (#76): Karten beider Seiten; hat der Empfänger seine Karten gerade frei?
+  const sidesOf = (t) => swapSides(t);
+  const freeFor = (lines) => { const need = {}; lines.filter((l) => !l.copy && !l.doc).forEach((l) => { need[l.card] = (need[l.card] || 0) + 1; }); return Object.entries(need).every(([k, n]) => (coll.free[k] || 0) >= n); };
+  const moreTag = (lines) => { if (lines.length > 1) { %> <span class="own-tag">+<%= lines.length - 1 %> weitere</span><% } };
   // Hinweis, ob ich die Karte schon besitze
   const ownTag = (id) => { if (String(id).startsWith('item:')) return; const n = coll.counts[id] || 0; %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' + (n > 1 ? ' ×' + n : '') : 'Fehlt dir noch' %></span><% };
   // Stand einer Tausch-Verhandlung aus meiner Sicht: am Zug / wartet, dazu "Neu" bei ungelesener Aktivität
@@ -83,8 +87,8 @@
           <% newDeals.forEach((t) => { const c = line(t.card).c; const iSold = String(t.seller) === me; const partner = iSold ? t.buyerName : t.sellerName; %>
             <li class="<%= t.isNew ? 'is-new' : '' %>">
               <span class="trade-news-dot"></span>
-              <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; %>
-                <span><%- userLink(partner) %> hat deinen Tausch angenommen: <strong><%= iSold ? c.name : w.name %></strong> gegen <strong><%= iSold ? w.name : c.name %></strong>.</span>
+              <% if (t.kind === 'tausch') { const sd = sidesOf(t); %>
+                <span><%- userLink(partner) %> hat deinen Tausch angenommen: <strong><%= sideText(iSold ? sd.give : sd.take) %></strong> gegen <strong><%= sideText(iSold ? sd.take : sd.give) %></strong>.</span>
               <% } else { %>
                 <span><%- userLink(partner) %> hat deine Karte <strong><%= c.name %></strong> für <strong><%= euro(t.price) %></strong> gekauft<% if (t.tax) { %> (du erhältst <%= euro(t.price - t.tax) %>)<% } %>.</span>
               <% } %>
@@ -100,15 +104,20 @@
       <h4>Angebote an dich <span class="nav-badge nav-badge-inline"><%= incoming.length %></span></h4>
         <ul class="trade-list trade-incoming">
           <% incoming.forEach((t) => { const { c, r } = line(t.card); %>
-            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const hasIt = !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0; const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
+            <% if (t.kind === 'tausch') { const w = line(t.wantCard); const x = extra(t); const sd = sidesOf(t); const hasIt = freeFor(sd.take); const blocked = !hasIt || (x.iPay && t.price > bal); const myTurn = canAccept(t, 'to'); %>
               <li class="trade-item trade-swap">
                 <%- include('partials/trade-thumbs', { a: c, b: w.c, aFoil: t.foiledAt, bFoil: t.wantFoiledAt, aGrade: t.grade, bGrade: t.wantGrade }) %>
                 <div class="trade-info">
                   <span class="trade-kind">Tausch · von <%= t.sellerName %></span>
+                  <% if (sd.give.length > 1 || sd.take.length > 1) { %>
+                    <span class="trade-title">Du bekommst <strong><%= sideText(sd.give) %></strong></span>
+                    <span class="trade-title">Du gibst <strong><%= sideText(sd.take) %></strong></span>
+                  <% } else { %>
                   <span class="trade-title">Du bekommst <strong><%= c.name %></strong> <span class="tcg-badge r-<%= c.rarity %>"><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
                   <span class="trade-title">Du gibst <strong><%= w.c.name %></strong> <span class="tcg-badge r-<%= w.c.rarity %>"><%= w.r.label %></span><% foilTag(t.wantFoiledAt) %></span>
+                  <% } %>
                   <span class="trade-meta"><%= x.text %> · läuft ab <%= relTime(t.expiresAt) %> · <% swapState(t, 'to') %></span>
-                  <% if (!hasIt) { %><span class="neg small">Du hast <%= w.c.name %> gerade nicht frei (Quest, Handel oder foliert).</span><% } %>
+                  <% if (!hasIt) { %><span class="neg small">Du hast <%= sd.take.length > 1 ? 'nicht alle deine Karten' : w.c.name %> gerade frei (Quest, Handel oder foliert).</span><% } %>
                 </div>
                 <div class="trade-actions">
                   <form method="post" action="/handel/<%= t._id %>/ablehnen">
@@ -117,7 +126,7 @@
                   </form>
                   <a class="btn btn-ghost btn-sm" href="/handel/verhandlung/<%= t._id %>">Verhandeln</a>
                   <% if (myTurn) { %>
-                    <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= w.c.name %> gegen <%= c.name %> tauschen<%= t.price ? ' (' + x.text + ')' : '' %>?">
+                    <form method="post" action="/handel/<%= t._id %>/tauschen" data-confirm="<%= sideText(sd.take) %> gegen <%= sideText(sd.give) %> tauschen<%= t.price ? ' (' + x.text + ')' : '' %>?">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                       <input type="hidden" name="version" value="<%= t.termsVersion || 0 %>">
                       <button class="btn btn-primary btn-sm" type="submit" <%= blocked ? 'disabled' : '' %>>Annehmen</button>
@@ -223,7 +232,7 @@
           <li><strong>Markt:</strong> jeder kann kaufen, <%= marketDays %> Tage gültig. Mit „Verhandeln“ handelst du mit dem Anbieter einen eigenen Preis aus, der nur für dich gilt.</li>
           <li><strong>Privat:</strong> Verkauf an ein Mitglied, <%= privateHours %> Std. gültig – beide Seiten können schreiben und einen anderen Preis vorschlagen.</li>
           <li><strong>Tausch:</strong> deine Karte gegen eine aus der Sammlung eines Mitglieds, optional mit Aufpreis, <%= privateHours %> Std. gültig.</li>
-          <li>Angebotene Karten sind bis dahin gesperrt. <% if (taxSame && !taxRates.markt) { %>Aktuell fällt keine Steuer an.<% } else if (taxSame) { %>Auf Geld fallen <%= pctText(taxRates.markt) %> Steuer an.<% } else { %>Steuer auf Geld: Markt <%= pctText(taxRates.markt) %>, Privat <%= pctText(taxRates.privat) %>, Tausch <%= pctText(taxRates.tausch) %> (auf den Aufpreis).<% } %></li>
+          <li>Auf dem Markt und privat angebotene Karten sind bis dahin gesperrt; beim Tausch (je Seite 1–5 Karten) wird erst beim Annehmen geprüft, ob alle frei sind. <% if (taxSame && !taxRates.markt) { %>Aktuell fällt keine Steuer an.<% } else if (taxSame) { %>Auf Geld fallen <%= pctText(taxRates.markt) %> Steuer an.<% } else { %>Steuer auf Geld: Markt <%= pctText(taxRates.markt) %>, Privat <%= pctText(taxRates.privat) %>, Tausch <%= pctText(taxRates.tausch) %> (auf den Aufpreis).<% } %></li>
         </ul>
       </details>
     </div>
@@ -238,7 +247,7 @@
             <li class="my-offer">
               <%- include('partials/trade-thumbs', { a: c, b: w && w.c, aFoil: t.foiledAt, bFoil: t.wantFoiledAt, aGrade: t.grade, bGrade: t.wantGrade }) %>
               <div class="my-offer-info">
-                <strong><%= w ? c.name + ' ⇄ ' + w.c.name : c.name %></strong><% foilTag(t.foiledAt) %><% foilTag(t.wantFoiledAt) %>
+                <strong><%= w ? sideText(sidesOf(t).give) + ' ⇄ ' + sideText(sidesOf(t).take) : c.name %></strong><% foilTag(t.foiledAt) %><% foilTag(t.wantFoiledAt) %>
                 <span><%= w ? 'Tausch mit ' + t.toName : t.kind === 'privat' ? 'Privat an ' + t.toName : 'Markt' %> · läuft ab <%= relTime(t.expiresAt) %></span>
                 <% if (w) { %>
                   <span><%= extra(t).text %></span>
@@ -274,8 +283,8 @@
         <ul class="deal-log">
           <% history.forEach((t) => { const { c } = line(t.card); const sold = String(t.seller) === me; const partner = sold ? t.buyerName : t.sellerName; %>
             <li>
-              <% if (t.kind === 'tausch') { const w = line(t.wantCard).c; const x = extra(t); const got = sold ? w : c; const gave = sold ? c : w; %>
-                <div><span>Getauscht: <strong><%= gave.name %></strong> ⇄ <strong><%= got.name %></strong></span><span class="deal-sub">mit <%- userLink(partner) %> · <%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></div>
+              <% if (t.kind === 'tausch') { const x = extra(t); const sd = sidesOf(t); const gave = sideText(sold ? sd.give : sd.take); const got = sideText(sold ? sd.take : sd.give); %>
+                <div><span>Getauscht: <strong><%= gave %></strong> ⇄ <strong><%= got %></strong></span><span class="deal-sub">mit <%- userLink(partner) %> · <%= date(t.closedAt) %><% if (t.isNew) { %> · <span class="badge badge-offen">Neu</span><% } %></span></div>
                 <% if (t.price) { %>
                   <span class="<%= x.iPay ? 'neg' : 'pos' %> nowrap"><%= x.iPay ? '−' + euro(t.price) : '+' + euro(t.price - t.tax) %></span>
                 <% } else { %>

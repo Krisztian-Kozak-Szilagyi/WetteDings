@@ -156,3 +156,37 @@ test('Neue Geschäfte: nur von der anderen Seite abgeschlossene, seit dem letzte
   assert.deepEqual(f.closedBy, { $nin: [null, 'u1'] }); // eigene Käufe und alte Geschäfte ohne Angabe zählen nicht
   assert.equal(f.closedAt.$gt, seen);
 });
+
+test('#76: Mehrfach-Tausch – Karten je Seite prüfen', () => {
+  const [a, b, c] = catalog.CARDS.map((x) => x.id);
+  const L = (...ids) => ids.map((card) => ({ card }));
+  assert.doesNotThrow(() => trade.validateSwap(L(a, b, c), L(c))); // drei gegen eine
+  assert.doesNotThrow(() => trade.validateSwap(L(a, a, a), L(b)));
+  assert.doesNotThrow(() => trade.validateSwap(L(a, b), L(a))); // eine Karte gleich, Seiten verschieden
+  assert.throws(() => trade.validateSwap(L(a, b), L(b, a)), /dieselbe Karte/);
+  assert.throws(() => trade.validateSwap([], L(a)), /wähle eine Karte/);
+  assert.throws(() => trade.validateSwap(L(a), []), /haben möchtest/);
+  assert.throws(() => trade.validateSwap(L(a, a, a, a, a, a), L(b)), /Höchstens 5/);
+  assert.throws(() => trade.validateSwap(L(a), L('gibt-es-nicht')), /haben möchtest/);
+  assert.throws(() => trade.validateSwap(L(a, 'item:folie'), L(b)), /Gegenstände/);
+  assert.throws(() => trade.validateSwap([{ card: a, copy: 'x1' }, { card: a, copy: 'x1' }], L(b)), /nur einmal/);
+  assert.equal(trade.MAX_SWAP_CARDS, 5);
+  // validateOffer mit give/take
+  assert.deepEqual(trade.validateOffer({ kind: 'tausch', price: 0, give: L(a, b), take: L(c) }), { extraFrom: null });
+});
+
+test('#76: Seiten eines Tauschs – neue und alte Angebote, als Text', () => {
+  const [a, b] = catalog.CARDS.map((x) => x.id);
+  const name = (id) => catalog.cardById[id].name;
+  const v2 = { kind: 'tausch', give: [{ card: a }, { card: a }, { card: b, copy: 'f1', foiledAt: new Date() }], take: [{ card: b }] };
+  assert.equal(trade.swapSides(v2).give.length, 3);
+  assert.equal(trade.sideText(v2.give), `2× ${name(a)}, ${name(b)} (foliert)`);
+  assert.equal(trade.swapText(v2), `2× ${name(a)}, ${name(b)} (foliert) gegen ${name(b)}`);
+  // altes Angebot: je eine Karte, das gesperrte Exemplar steht als doc dabei
+  const old = { kind: 'tausch', card: a, cardDoc: 'd1', foiledAt: null, wantCard: b, wantCopy: null };
+  const s = trade.swapSides(old);
+  assert.deepEqual(s.give.map((l) => [l.card, l.doc, l.copy]), [[a, 'd1', null]]);
+  assert.deepEqual(s.take.map((l) => [l.card, l.copy]), [[b, null]]);
+  const oldFoil = { ...old, foiledAt: new Date() };
+  assert.equal(trade.swapSides(oldFoil).give[0].copy, 'd1'); // folierte Karte: genau dieses Exemplar
+});

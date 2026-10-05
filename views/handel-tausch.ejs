@@ -1,39 +1,46 @@
 <%- include('partials/head') %>
 <% const canOffer = mine.cardCount > 0 && theirs.cardCount > 0; %>
+<%
+  // Mehrfach-Tausch (#76): je Seite 1–maxCards Karten; counter = Gegenvorschlag in einer laufenden Verhandlung
+  const foilPick = (f, name, sel) => { %>
+    <label class="tcg-slot tcg-pick r-<%= f.card.rarity %>" data-rarity="<%= f.card.rarity %>" title="Foliert am <%= dayDate(f.foiledAt) %> · Wert <%= euro(f.value) %>">
+      <input type="checkbox" name="<%= name %>" value="f:<%= f.id %>" <%= sel.foils.has('f:' + f.id) ? 'checked' : '' %> aria-label="<%= f.card.name %>, <%= f.rarity.label %>, foliert am <%= dayDate(f.foiledAt) %>">
+      <span class="tcg-art"><img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span></span>
+      <span class="tcg-slot-label"><span class="foil-tag">Foliert · <%= dayDate(f.foiledAt) %></span></span>
+    </label>
+<% }; %>
 
-<p><a class="btn btn-ghost btn-sm" href="<%= backUrl %>">← <%= pickCard ? 'Anderes Mitglied wählen' : 'Zurück zum Profil' %></a></p>
+<p><a class="btn btn-ghost btn-sm" href="<%= backUrl %>">← <%= counter ? 'Zurück zur Verhandlung' : pickCard ? 'Anderes Mitglied wählen' : 'Zurück zum Profil' %></a></p>
 
 <div class="page-head">
   <div class="ihk-title">
-    <h1>Tausch mit <%= partner.username %></h1>
+    <h1><%= counter ? 'Gegenvorschlag an' : 'Tausch mit' %> <%= partner.username %></h1>
   </div>
-  <span class="muted">Wähle deine Karte und die Karte, die du von <%= partner.username %> haben möchtest.</span>
+  <span class="muted">Wähle je Seite 1 bis <%= maxCards %> Karten – z. B. drei Karten gegen eine.</span>
 </div>
 
-<form method="post" action="/handel/tausch" class="trade-swap-form">
+<form method="post" action="<%= counter ? '/handel/verhandlung/' + counter.id + '/karten' : '/handel/tausch' %>" class="trade-swap-form">
   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-  <input type="hidden" name="to" value="<%= partner.username %>">
+  <% if (counter) { %>
+    <input type="hidden" name="version" value="<%= counter.version %>">
+  <% } else { %>
+    <input type="hidden" name="to" value="<%= partner.username %>">
+  <% } %>
 
   <div class="trade-swap-grids">
     <div class="card">
       <div class="tcg-coll-head">
-        <h2>1. Deine Karte</h2>
+        <h2>1. Deine Karten</h2>
         <%- include('partials/tcg-filter', { counts: mine.counts }) %>
       </div>
       <% if (!mine.cardCount) { %>
         <p class="muted">Du hast noch keine Karten zum Tauschen.</p>
       <% } else { %>
-        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'card', picked: pickCard, showMissing: false, counts: mine.counts, lockedByCard: mine.lockedByCard, foiledByCard: mine.foiledByCard }) %>
+        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'card', pickCounts: mySel.counts, pickMax: maxCards, showMissing: false, counts: mine.counts, lockedByCard: mine.lockedByCard, foiledByCard: mine.foiledByCard }) %>
       <% if (myFoiled.length) { %>
         <h3 class="trade-foil-head">Folierte Karten</h3>
         <div class="tcg-grid tcg-pick-grid">
-          <% myFoiled.forEach((f) => { %>
-            <label class="tcg-slot tcg-pick r-<%= f.card.rarity %>" data-rarity="<%= f.card.rarity %>" title="Foliert am <%= dayDate(f.foiledAt) %> · Wert <%= euro(f.value) %>">
-              <input type="radio" name="card" value="f:<%= f.id %>" required <%= pickCard === 'f:' + f.id ? 'checked' : '' %> aria-label="<%= f.card.name %>, <%= f.rarity.label %>, foliert am <%= dayDate(f.foiledAt) %>">
-              <span class="tcg-art"><img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span></span>
-              <span class="tcg-slot-label"><span class="foil-tag">Foliert · <%= dayDate(f.foiledAt) %></span></span>
-            </label>
-          <% }) %>
+          <% myFoiled.forEach((f) => { foilPick(f, 'card', mySel); }) %>
         </div>
       <% } %>
       <% } %>
@@ -41,24 +48,18 @@
 
     <div class="card">
       <div class="tcg-coll-head">
-        <h2>2. Karte von <%= partner.username %></h2>
+        <h2>2. Karten von <%= partner.username %></h2>
         <%- include('partials/tcg-filter', { counts: theirs.counts }) %>
       </div>
       <% if (!theirs.cardCount) { %>
         <p class="muted"><%= partner.username %> hat noch keine Karten.</p>
       <% } else { %>
-        <p class="muted small">Gesperrte Karten kannst du trotzdem wählen. <%= partner.username %> kann erst annehmen, wenn die Karte wieder frei ist.</p>
-        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'want', picked: pickWant, showMissing: false, counts: Object.fromEntries(Object.entries(theirs.counts).map(([k, n]) => [k, n - (theirs.foiledByCard[k] || 0)])), lockedByCard: {} }) %>
+        <p class="muted small">Gesperrte Karten kannst du trotzdem wählen. Angenommen werden kann erst, wenn alle Karten frei sind.</p>
+        <%- include('partials/tcg-grid', { mode: 'pick', pickName: 'want', pickCounts: theirSel.counts, pickMax: maxCards, showMissing: false, counts: Object.fromEntries(Object.entries(theirs.counts).map(([k, n]) => [k, n - (theirs.foiledByCard[k] || 0)])), lockedByCard: {} }) %>
       <% if (theirFoiled.length) { %>
         <h3 class="trade-foil-head">Folierte Karten von <%= partner.username %></h3>
         <div class="tcg-grid tcg-pick-grid">
-          <% theirFoiled.forEach((f) => { %>
-            <label class="tcg-slot tcg-pick r-<%= f.card.rarity %>" data-rarity="<%= f.card.rarity %>" title="Foliert am <%= dayDate(f.foiledAt) %> · Wert <%= euro(f.value) %>">
-              <input type="radio" name="want" value="f:<%= f.id %>" required <%= pickWant === 'f:' + f.id ? 'checked' : '' %> aria-label="<%= f.card.name %>, <%= f.rarity.label %>, foliert am <%= dayDate(f.foiledAt) %>">
-              <span class="tcg-art"><img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span></span>
-              <span class="tcg-slot-label"><span class="foil-tag">Foliert · <%= dayDate(f.foiledAt) %></span></span>
-            </label>
-          <% }) %>
+          <% theirFoiled.forEach((f) => { foilPick(f, 'want', theirSel); }) %>
         </div>
       <% } %>
       <% } %>
@@ -74,16 +75,18 @@
       </label>
       <fieldset class="field trade-extra-from">
         <legend>Wer zahlt den Aufpreis?</legend>
-        <label><input type="radio" name="extra" value="seller" <%= pickFrom !== 'to' ? 'checked' : '' %>> Ich lege drauf</label>
-        <label><input type="radio" name="extra" value="to" <%= pickFrom === 'to' ? 'checked' : '' %>> <%= partner.username %> legt drauf</label>
+        <label><input type="radio" name="extra" value="ich" <%= pickFrom !== 'partner' ? 'checked' : '' %>> Ich lege drauf</label>
+        <label><input type="radio" name="extra" value="partner" <%= pickFrom === 'partner' ? 'checked' : '' %>> <%= partner.username %> legt drauf</label>
       </fieldset>
     </div>
-    <label class="field trade-swap-message">
-      <span>Nachricht an <%= partner.username %> (optional)</span>
-      <textarea name="message" rows="2" maxlength="500" placeholder="z. B. warum der Tausch für beide passt"></textarea>
-    </label>
-    <p class="muted small">Nach dem Senden könnt ihr auf der Verhandlungsseite schreiben und den Aufpreis per Gegenvorschlag anpassen, bis eine Seite annimmt. Ohne Aufpreis tauscht ihr nur die Karten. Das Angebot gilt <%= privateHours %> Std., deine Karte ist bis dahin gesperrt. <% if (taxPercent > 0) { %>Auf den Aufpreis fallen <%= String(taxPercent).replace('.', ',') %> % Steuer an, die der Empfänger des Geldes trägt.<% } %></p>
-    <button class="btn btn-primary" type="submit" <%= canOffer ? '' : 'disabled' %>>Tauschangebot senden</button>
+    <% if (!counter) { %>
+      <label class="field trade-swap-message">
+        <span>Nachricht an <%= partner.username %> (optional)</span>
+        <textarea name="message" rows="2" maxlength="500" placeholder="z. B. warum der Tausch für beide passt"></textarea>
+      </label>
+    <% } %>
+    <p class="muted small"><%= counter ? 'Danach ist ' + partner.username + ' am Zug und kann annehmen oder wieder einen Vorschlag machen. Das Angebot läuft dann wieder ' + privateHours + ' Std.' : 'Nach dem Senden könnt ihr auf der Verhandlungsseite schreiben und Karten oder Aufpreis per Gegenvorschlag ändern, bis eine Seite annimmt. Das Angebot gilt ' + privateHours + ' Std.' %> Die Karten werden erst beim Annehmen geprüft – dann müssen alle frei sein. <% if (taxPercent > 0) { %>Auf den Aufpreis fallen <%= String(taxPercent).replace('.', ',') %> % Steuer an, die der Empfänger des Geldes trägt.<% } %></p>
+    <button class="btn btn-primary" type="submit" <%= canOffer ? '' : 'disabled' %>><%= counter ? 'Vorschlag senden' : 'Tauschangebot senden' %></button>
   </div>
 </form>
 

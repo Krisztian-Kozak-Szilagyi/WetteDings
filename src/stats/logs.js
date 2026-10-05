@@ -80,6 +80,11 @@ function cardLabel(id) {
   const r = tcgCatalog.rarityByKey[c.rarity];
   return r ? `${c.name} (${r.label})` : c.name;
 }
+/** Karten einer Tausch-Seite ("give" = Anbieter, "take" = Empfänger), auch alte Angebote mit je einer Karte (#76) */
+const swapLabel = (t, side) => {
+  const lines = t.give && t.give.length ? t[side] || [] : [{ card: side === 'give' ? t.card : t.wantCard }];
+  return lines.map((l) => cardLabel(l.card)).join(', ');
+};
 
 /** Gezogene Karten zusammenfassen, seltenste zuerst: [{ label, rarity, count }] */
 function cardSummary(cards) {
@@ -135,9 +140,9 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
     const rx = new RegExp(escapeRegex(q), 'i');
     // Karten über ihren angezeigten Namen finden (z. B. "St. Ivan") – gespeichert ist nur die Karten-ID
     const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
-    and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }] });
+    and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }, { 'give.card': { $in: cardIds } }, { 'take.card': { $in: cardIds } }] });
   }
-  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt', all);
+  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName card wantCard give take price extraFrom tax closedAt', all);
   const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
@@ -148,12 +153,12 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
       const to = t.kind === 'tausch' ? t.toName : t.buyerName;
       let back = euro(t.price); // Gegenleistung
       if (t.kind === 'tausch') {
-        back = cardLabel(t.wantCard);
+        back = swapLabel(t, 'take');
         if (t.price > 0) back += ` + ${euro(t.price)} von ${t.extraFrom === 'to' ? to : t.sellerName}`;
       }
       const flagged = pairs.has(deviceService.tradePairKey(t));
       const isNew = flagged && new Date(t.closedAt).getTime() > seen;
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: cardLabel(t.card), back, tax: t.tax, flagged, isNew };
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: t.kind === 'tausch' ? swapLabel(t, 'give') : cardLabel(t.card), back, tax: t.tax, flagged, isNew };
     }),
   };
 }
@@ -567,13 +572,13 @@ const GESAMT_SOURCES = [
     log: 'handel',
     Model: Trade,
     time: 'closedAt',
-    select: 'kind sellerName buyerName toName card wantCard price closedAt',
+    select: 'kind sellerName buyerName toName card wantCard give take price closedAt',
     filter: async (p) => ({ status: 'verkauft', ...(p ? { $or: [{ seller: p._id }, { buyer: p._id }, { to: p._id }] } : {}) }),
     rows: async (docs) =>
       docs.map((t) => {
         const to = t.kind === 'tausch' ? t.toName : t.buyerName;
-        const back = t.kind === 'tausch' ? cardLabel(t.wantCard) + (t.price > 0 ? ` + ${euro(t.price)}` : '') : euro(t.price);
-        return { at: t.closedAt, player: t.sellerName, text: `${KIND_LABEL[t.kind] || t.kind}: ${cardLabel(t.card)} an ${to || '–'} gegen ${back}`, amount: null };
+        const back = t.kind === 'tausch' ? swapLabel(t, 'take') + (t.price > 0 ? ` + ${euro(t.price)}` : '') : euro(t.price);
+        return { at: t.closedAt, player: t.sellerName, text: `${KIND_LABEL[t.kind] || t.kind}: ${t.kind === 'tausch' ? swapLabel(t, 'give') : cardLabel(t.card)} an ${to || '–'} gegen ${back}`, amount: null };
       }),
   },
   {

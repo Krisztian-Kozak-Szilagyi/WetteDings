@@ -11,8 +11,20 @@ const messageSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+// Eine Karte in einem Tausch (#76): card = Karten-ID; copy = ein bestimmtes foliertes Exemplar (sonst irgendein
+// freies, unfoliertes Exemplar beim Annehmen); foiledAt/grade nur zur Anzeige
+const swapLineSchema = new Schema(
+  {
+    card: { type: String, required: true },
+    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+    foiledAt: { type: Date, default: null },
+    grade: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
 // Handel: eine Karte gegen Spielgeld (privat an eine Person oder öffentlich auf dem Markt)
-// oder ein Tausch Karte gegen Karte an eine Person, optional mit Aufpreis
+// oder ein Tausch Karten gegen Karten an eine Person (je Seite 1–5, #76), optional mit Aufpreis
 const tradeSchema = new Schema(
   {
     kind: { type: String, enum: ['privat', 'markt', 'tausch'], required: true },
@@ -21,7 +33,9 @@ const tradeSchema = new Schema(
     to: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // nur bei privat und tausch
     toName: { type: String, default: null },
     card: { type: String, required: true }, // Karten-ID
-    cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // gesperrtes Exemplar
+    // gesperrtes Exemplar. Beim Tausch mit give/take (#76) steht hier die eigene _id als Platzhalter: getauschte
+    // Karten werden erst beim Annehmen geprüft und bewegt, vorher ist nichts gesperrt
+    cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true },
     foiledAt: { type: Date, default: null }, // angebotenes Exemplar ist foliert (seit)
     grade: { type: Number, default: null }, // dessen Note auf der Folie (#73) – nur bei folierten Exemplaren
     // Gegenstände (z. B. Folie): card = "item:<Art>", cardDoc = das Item-Dokument (src/items/itemService.js)
@@ -30,6 +44,13 @@ const tradeSchema = new Schema(
     wantGrade: { type: Number, default: null }, // dessen Note auf der Folie (#73)
     wantCard: { type: String, default: null }, // nur bei tausch: gewünschte Karte des Empfängers
     wantCardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // erst beim Annehmen gesetzt
+    // Tausch mit mehreren Karten (#76): give = Karten des Anbieters, take = Karten des Empfängers. card/wantCard &
+    // Co. spiegeln jeweils die erste Karte (für Listen, Protokolle und ältere Auswertungen). Alte Tauschangebote
+    // haben give/take nicht – tradeService.swapSides liest beide Formen.
+    give: { type: [swapLineSchema], default: undefined },
+    take: { type: [swapLineSchema], default: undefined },
+    giveDocs: { type: [Schema.Types.ObjectId], default: undefined }, // beim Annehmen bewegte Exemplare
+    takeDocs: { type: [Schema.Types.ObjectId], default: undefined },
     extraFrom: { type: String, enum: ['seller', 'to', null], default: null }, // nur bei tausch: wer den Aufpreis zahlt
     price: { type: Number, required: true }, // Cent (bei tausch: Aufpreis, 0 erlaubt)
     // Verhandlung (tausch und privat, #82): wer die aktuellen Bedingungen zuletzt gesetzt hat – annehmen darf nur die andere Seite
