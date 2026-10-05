@@ -11,6 +11,7 @@ const { inventory, favoriteList } = require('../tcg/tcgService');
 const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 const achievementService = require('../achievements/achievementService');
+const giftService = require('../services/giftService');
 const achievementLogic = require('../achievements/logic');
 const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
@@ -129,6 +130,15 @@ router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   // app.js schickt im Hintergrund und zeigt gleich den nächsten Erfolg; ohne JavaScript zurück auf die Seite
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), req.app.locals.assetVersion) });
+  }
+  res.redirect(safeRedirect(str(req.body.zurueck), '/'));
+});
+
+// Fenster "Geschenk vom Team" mit Weiter bestätigt
+router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
+  await giftService.markSeen(req.user._id, str(req.body.id));
+  if (req.accepts(['html', 'json']) === 'json') {
+    return res.json({ next: giftService.popup(await giftService.nextUnseen(req.user._id)) });
   }
   res.redirect(safeRedirect(str(req.body.zurueck), '/'));
 });

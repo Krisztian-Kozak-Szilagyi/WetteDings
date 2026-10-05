@@ -20,6 +20,7 @@ const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
+const giftService = require('../services/giftService');
 const foil = require('../items/foil');
 const lotteryService = require('../services/lotteryService');
 const taxService = require('../services/taxService');
@@ -188,6 +189,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
+    reasonMin: giftService.REASON_MIN,
+    reasonMax: giftService.REASON_MAX,
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
@@ -518,8 +521,14 @@ router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spiel
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
 const GRANT_URL = panelUrl('vergaben');
 
+/** Grund der Vergabe (Pflicht): steht im Protokoll und im Fenster "Geschenk vom Team" beim Mitglied */
+const grantReason = (req) => giftService.cleanReason(req.body.grund);
+const REASON_ERROR = `Bitte einen Grund angeben (mindestens ${giftService.REASON_MIN} Zeichen) – das Mitglied sieht ihn im Geschenk-Fenster.`;
+
 // Gegenstände (Folie) an ein Mitglied oder an alle
 async function grantItemsTo(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const type = itemService.ITEM_TYPES.find((t) => t.key === str(req.body.type));
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -535,7 +544,8 @@ async function grantItemsTo(req) {
     const ids = toAll ? await allMemberIds() : [user._id];
     await itemService.grantItems({ userIds: ids, type: type.key, count, source: 'admin' });
     await itemService.notifyGift(ids, type, count);
-    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'item', type: type.key, typeLabel: type.label, count });
+    await giftService.record({ userIds: ids, kind: 'item', key: type.key, label: type.label, count, reason, byName: req.user.username });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'item', type: type.key, typeLabel: type.label, count, reason });
     req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.` : `${count}× ${type.label} an ${user.username} vergeben.`);
   }
 }
@@ -545,6 +555,8 @@ router.post('/admin/items', requireStaff, requireReauth(GRANT_URL), async (req, 
 });
 
 async function grantPacksTo(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(typeof req.body.count === 'string' ? req.body.count : '', 10);
@@ -557,8 +569,9 @@ async function grantPacksTo(req) {
     req.flash('error', 'Die Anzahl muss zwischen 1 und 50 liegen.');
   } else {
     await tcgService.grantPacks({ userId: user._id, type: type.key, count, source: 'admin' });
-    // Protokoll: wer, wem, was, wann
-    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count });
+    await giftService.record({ userIds: [user._id], kind: 'pack', key: type.key, label: type.label, count, reason, byName: req.user.username });
+    // Protokoll: wer, wem, was, wann, warum
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, type: type.key, typeLabel: type.label, count, reason });
     req.flash('success', `${count}× ${type.label} an ${user.username} vergeben.`);
   }
 }
@@ -572,6 +585,8 @@ const allMemberIds = async () => (await User.find({ deletedAt: null }).select('_
 
 // "Bless everyone": jedes Mitglied bekommt count Booster Packs
 async function blessEveryone(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const type = tcgCatalog.packTypeByKey[req.body.type];
   const count = Number.parseInt(str(req.body.count), 10);
   if (!type) {
@@ -581,7 +596,8 @@ async function blessEveryone(req) {
   } else {
     const ids = await allMemberIds();
     await tcgService.grantPacksToMany({ userIds: ids, type: type.key, count });
-    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: null, toName: `Alle Mitglieder (${ids.length})`, all: true, recipients: ids.length, kind: 'pack', type: type.key, typeLabel: type.label, count });
+    await giftService.record({ userIds: ids, kind: 'pack', key: type.key, label: type.label, count, reason, byName: req.user.username });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: null, toName: `Alle Mitglieder (${ids.length})`, all: true, recipients: ids.length, kind: 'pack', type: type.key, typeLabel: type.label, count, reason });
     req.flash('success', `Bless everyone: ${ids.length} Mitglieder haben je ${count}× ${type.label} bekommen.`);
   }
 }
@@ -592,6 +608,8 @@ router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (r
 
 // Bestimmte Karte an ein Mitglied oder an alle vergeben
 async function grantCardTo(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const card = tcgCatalog.cardById[str(req.body.card)];
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
@@ -607,6 +625,7 @@ async function grantCardTo(req) {
     const ids = toAll ? await allMemberIds() : [user._id];
     await tcgService.grantCards({ userIds: ids, cardId: card.id, count });
     const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
+    await giftService.record({ userIds: ids, kind: 'karte', key: card.id, label, count, reason, byName: req.user.username });
     await PackGrant.create({
       by: req.user._id,
       byName: req.user.username,
@@ -618,6 +637,7 @@ async function grantCardTo(req) {
       type: card.id,
       typeLabel: label,
       count,
+      reason,
     });
     req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${count}× ${label} bekommen.` : `${count}× ${label} an ${user.username} vergeben.`);
   }
@@ -669,6 +689,8 @@ function moneyAmount(value) {
 }
 
 async function grantMoneyTo(req) {
+  const reason = grantReason(req);
+  if (!reason) return req.flash('error', REASON_ERROR);
   const cents = moneyAmount(req.body.amount);
   const target = str(req.body.user);
   const toAll = target === 'alle';
@@ -681,7 +703,8 @@ async function grantMoneyTo(req) {
     await Ledger.insertMany(ids.map((id) => ({ user: id, type: 'team_gutschrift', amount: cents, betTitle: `vom Team (${req.user.username})` })), { session });
   });
   await notify(ids, { area: 'Konto', href: '/konto/auszug', text: `Das Team hat dir ${euro(cents)} gutgeschrieben.` });
-  await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'geld', type: 'geld', typeLabel: euro(cents), count: cents });
+  await giftService.record({ userIds: ids, kind: 'geld', label: 'Spielgeld', count: cents, reason, byName: req.user.username });
+  await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${ids.length})` : user.username, all: toAll, recipients: ids.length, kind: 'geld', type: 'geld', typeLabel: euro(cents), count: cents, reason });
   req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${euro(cents)} bekommen.` : `${euro(cents)} an ${user.username} gutgeschrieben.`);
 }
 

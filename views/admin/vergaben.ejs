@@ -56,6 +56,9 @@
       </label>
       <label class="field grant-count" data-for="geld"><span>Betrag in €</span><input type="text" name="amount" inputmode="decimal" placeholder="z. B. 250,00"></label>
       <label class="field grant-count" data-for="pack karte item"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      <label class="field grant-reason" data-aktion="vergeben"><span>Grund <small class="muted">(sieht das Mitglied im Geschenk-Fenster)</small></span>
+        <textarea name="grund" rows="2" minlength="<%= reasonMin %>" maxlength="<%= reasonMax %>" placeholder="z. B. Ausgleich für den Fehler beim Packöffnen am 3. Oktober" required></textarea>
+      </label>
     </div>
     <div class="grant-submit"><button class="btn btn-primary" type="submit" data-grant-submit>Vergeben</button></div>
   </form>
@@ -69,7 +72,7 @@
     <% } else { %>
       <div class="table-wrap">
         <table class="table trade-log">
-          <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Was</th><th class="num">Anzahl</th></tr></thead>
+          <thead><tr><th>Zeitpunkt</th><th>Von</th><th>An</th><th>Was</th><th class="num">Anzahl</th><th>Grund</th></tr></thead>
           <tbody>
             <% grants.forEach((g) => { const k = KIND[g.kind || 'pack'] || KIND.pack; %>
               <tr class="<%= g.isNew ? 'me' : '' %>">
@@ -78,6 +81,7 @@
                 <td><% if (g.all) { %><strong><%= g.toName %></strong><% } else { %><%- userLink(g.toName, { realName: false }) %><% } %></td>
                 <td><span class="badge <%= k[1] %>"><%= k[0] %></span> <%= g.typeLabel %></td>
                 <td class="num"><%= g.count %></td>
+                <td class="grant-log-reason"><%= g.reason || '–' %></td>
               </tr>
             <% }) %>
           </tbody>

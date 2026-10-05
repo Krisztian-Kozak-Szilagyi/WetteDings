@@ -39,6 +39,7 @@ const packGrantSchema = new Schema(
     type: { type: String, required: true }, // Pack-Art bzw. Karten-ID
     typeLabel: { type: String, required: true },
     count: { type: Number, required: true }, // je Mitglied
+    reason: { type: String, default: null }, // Grund der Vergabe (Pflicht beim Vergeben, steht auch im Geschenk-Fenster)
   },
   { timestamps: true }
 );

@@ -784,6 +784,76 @@
     document.addEventListener('click', function (e) { if (e.target.closest('button') && !pop.contains(e.target)) soon(); });
   });
 
+  // Geschenk vom Team (Vergabe im Admin-Panel): Fenster wie bei Erfolgen, mit Inhalt und Grund. Erscheint nie gleichzeitig
+  // mit einem anderen Fenster – ist gerade eines offen (z. B. ein Erfolg), kommt das Geschenk danach.
+  onReady(function () {
+    var pop = document.querySelector('[data-gift-pop]');
+    if (!pop || !pop.showModal) return;
+    var form = pop.querySelector('[data-gift-form]');
+    var q = function (sel) { return pop.querySelector(sel); };
+    pop.addEventListener('cancel', function (e) { e.preventDefault(); });
+    var otherOpen = function () { return !!document.querySelector('dialog[open]:not([data-gift-pop])'); };
+
+    var fill = function (d) {
+      q('[data-gift-id]').value = d.id;
+      var img = q('[data-gift-image]');
+      img.hidden = !d.image;
+      if (d.image) img.setAttribute('src', d.image);
+      q('[data-gift-title]').textContent = d.title;
+      q('[data-gift-row]').textContent = d.rowName;
+      var chip = q('[data-gift-chip]');
+      chip.textContent = d.chip;
+      chip.className = 'dg-loot-chip ' + d.chipClass;
+      q('[data-gift-reason]').textContent = d.reason;
+      q('[data-gift-by]').textContent = d.byName;
+      var more = q('[data-gift-more]');
+      var left = (d.left || 1) - 1;
+      more.hidden = left < 1;
+      more.textContent = left === 1 ? 'Noch 1 weiteres Geschenk wartet.' : 'Noch ' + left + ' weitere Geschenke warten.';
+      pop.classList.remove('is-fresh');
+      void pop.offsetWidth;
+      pop.classList.add('is-fresh');
+    };
+    var pending = null;
+    var open = function (d) {
+      if (otherOpen()) { pending = d || pending; return; }
+      if (d) fill(d);
+      if (!pop.open) pop.showModal();
+    };
+    var initial = pop.hasAttribute('data-open');
+    // Ein anderes Fenster (Erfolg) wird geschlossen -> wartendes Geschenk zeigen
+    document.querySelectorAll('dialog:not([data-gift-pop])').forEach(function (dlg) {
+      dlg.addEventListener('close', function () {
+        if (initial && !pop.open) { initial = false; open(null); return; }
+        if (pending) { var d = pending; pending = null; open(d); }
+      });
+    });
+    if (initial) setTimeout(function () { if (!otherOpen()) { initial = false; open(null); } }, 0);
+
+    var busy = false;
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: new URLSearchParams(new FormData(form)) })
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (res) { if (res.next) fill(res.next); else pop.close(); })
+        .catch(function () { form.submit(); })
+        .then(function () { busy = false; });
+    });
+
+    var poll = function () {
+      if (pop.open || document.hidden) return;
+      fetch('/geschenke/neu', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) { if (res && res.popup) open(res.popup); })
+        .catch(function () {});
+    };
+    setInterval(poll, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  });
+
   // Zeichenzähler für Textfelder: data-count="<id des Zählers>" (Emojis zählen als ein Zeichen)
   document.addEventListener('input', function (e) {
     var el = e.target;
@@ -901,6 +971,12 @@
         var on = f.getAttribute('data-for').split(' ').indexOf(was) >= 0;
         f.hidden = !on;
         f.querySelectorAll('select, input').forEach(function (i) { i.disabled = !on; i.required = on; });
+      });
+      // Grund nur beim Vergeben (Pflicht) – beim Entfernen ausgeblendet
+      grant.querySelectorAll('[data-aktion]').forEach(function (f) {
+        var on = f.getAttribute('data-aktion') === aktion;
+        f.hidden = !on;
+        f.querySelectorAll('select, input, textarea').forEach(function (i) { i.disabled = !on; i.required = on; });
       });
       // "Alle Mitglieder" nur beim Vergeben (Vorschlag aus der Liste nehmen bzw. wieder einsetzen)
       var toAll = /^alle(\s+mitglieder(\s*\(\d+\))?)?$/i.test(user.value.trim()); // wie ALL_MEMBERS in routes/admin.js

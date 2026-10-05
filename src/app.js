@@ -20,6 +20,7 @@ const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
 const notifyService = require('./services/notifyService');
 const achievementService = require('./achievements/achievementService');
+const giftService = require('./services/giftService');
 const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -135,6 +136,12 @@ function createApp() {
     if (!req.user) return res.status(401).json({ popup: null });
     res.json({ popup: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), app.locals.assetVersion) });
   });
+  // Geschenk vom Team? Gleiches Prinzip wie bei den Erfolgen (app.js fragt nach)
+  app.get('/geschenke/neu', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return res.status(401).json({ popup: null });
+    res.json({ popup: giftService.popup(await giftService.nextUnseen(req.user._id)) });
+  });
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
   app.use(require('./coin/etfTrend').trackPulse); // Aktionen der Mitglieder bewegen den BfW-TCG ETF
   // Nach jeder erfolgreichen Aktion (POST) kurz darauf prüfen, ob jemand einen neuen Erfolg erreicht hat
@@ -147,7 +154,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell, achPopup] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell, achPopup, giftPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -164,6 +171,7 @@ function createApp() {
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
+        giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
@@ -184,6 +192,7 @@ function createApp() {
         bellUnread: bell.unread,
         achPopup,
         achPopupBack: req.originalUrl,
+        giftPopup,
       });
     }
     next();

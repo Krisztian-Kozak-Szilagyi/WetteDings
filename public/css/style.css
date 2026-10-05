@@ -4710,6 +4710,19 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 .ach-pop form { margin: 0; }
 .ach-pop-ok { min-width: 160px; }
 .ach-pop-more { margin: 12px 0 0; }
+/* Fenster "Geschenk vom Team" (Grundform wie das Erfolgs-Fenster) */
+.gift-pop-image { display: block; max-width: 132px; max-height: 170px; width: auto; height: auto; margin: 0 auto 12px; border-radius: 10px; filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .55)); animation: ach-float 3.2s ease-in-out infinite; }
+.gift-pop-reason {
+  margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; text-align: left; display: flex; flex-direction: column; gap: 4px;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent); box-shadow: inset 0 0 0 1px var(--color-accent-700);
+  color: var(--color-neutral-300); line-height: 1.5; overflow-wrap: anywhere;
+}
+.gift-pop-reason-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-accent-300); }
+.gift-pop-by { align-self: flex-end; font-size: 13px; color: var(--color-neutral-500); }
+.grant-reason { grid-column: 1 / -1; }
+.grant-reason textarea { width: 100%; resize: vertical; }
+.grant-log-reason { min-width: 180px; max-width: 360px; overflow-wrap: anywhere; color: var(--color-neutral-300); }
+@media (prefers-reduced-motion: reduce) { .gift-pop-image { animation: none; } }
 @keyframes ach-pop-in { from { opacity: 0; transform: scale(.85) translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes ach-spin { to { transform: rotate(360deg); } }
 @keyframes ach-float { 50% { transform: translateY(-6px); } }

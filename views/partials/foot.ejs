@@ -25,6 +25,33 @@
       <p class="muted small ach-pop-more" data-ach-more<%= ap && ap.left > 1 ? '' : ' hidden' %>><%= ap && ap.left > 1 ? 'Noch ' + (ap.left - 1) + (ap.left - 1 === 1 ? ' weiterer Erfolg wartet.' : ' weitere Erfolge warten.') : '' %></p>
     </dialog>
   <% } %>
+  <%# Geschenk vom Team (Vergabe im Admin-Panel): Inhalt und Grund. app.js zeigt es nach einem offenen Erfolg. %>
+  <% if (currentUser) { const gp = typeof giftPopup !== 'undefined' && giftPopup ? giftPopup : null; %>
+    <dialog class="dg-loot ach-pop gift-pop" data-gift-pop<%= gp ? ' data-open' : '' %> aria-labelledby="gift-pop-title">
+      <span class="ach-pop-rays" aria-hidden="true"></span>
+      <span class="kicker">Geschenk vom Team</span>
+      <img class="gift-pop-image" data-gift-image<% if (gp && gp.image) { %> src="<%= gp.image %>"<% } else { %> hidden<% } %> alt="">
+      <h2 id="gift-pop-title" data-gift-title><%= gp ? gp.title : '' %></h2>
+      <ul class="dg-loot-list">
+        <li class="dg-loot-row is-shown is-me">
+          <span class="dg-loot-name" data-gift-row><%= gp ? gp.rowName : '' %></span>
+          <span class="dg-loot-chip <%= gp ? gp.chipClass : '' %>" data-gift-chip><%= gp ? gp.chip : '' %></span>
+        </li>
+      </ul>
+      <blockquote class="gift-pop-reason">
+        <span class="gift-pop-reason-label">Grund</span>
+        <span data-gift-reason><%= gp ? gp.reason : '' %></span>
+        <span class="gift-pop-by">– <span data-gift-by><%= gp ? gp.byName : '' %></span></span>
+      </blockquote>
+      <form method="post" action="/geschenke/gesehen" data-gift-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" value="<%= gp ? gp.id : '' %>" data-gift-id>
+        <input type="hidden" name="zurueck" value="<%= typeof achPopupBack !== 'undefined' ? achPopupBack : '/' %>">
+        <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
+      </form>
+      <p class="muted small ach-pop-more" data-gift-more<%= gp && gp.left > 1 ? '' : ' hidden' %>><%= gp && gp.left > 1 ? 'Noch ' + (gp.left - 1) + (gp.left - 1 === 1 ? ' weiteres Geschenk wartet.' : ' weitere Geschenke warten.') : '' %></p>
+    </dialog>
+  <% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>
