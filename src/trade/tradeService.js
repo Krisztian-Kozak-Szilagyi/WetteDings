@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
 const { Item } = require('../models/Item');
-const { itemByCardId, freeItems, claimItems } = require('../items/itemService');
+const { itemByCardId, freeItems, claimItems, logItems } = require('../items/itemService');
 const { Trade, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
@@ -317,6 +317,10 @@ async function buy({ user, tradeId }) {
     const moved = await Model.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
     if (moved.modifiedCount !== 1) throw new UserError(item ? 'Der Gegenstand ist nicht mehr verfügbar.' : 'Die Karte ist nicht mehr verfügbar.');
     if (!item) await markSeen(user._id, [trade.card], session);
+    else {
+      const meta = { trade: trade._id };
+      await logItems([{ user: trade.seller, type: item.key, delta: -1, source: 'handel', meta }, { user: user._id, type: item.key, delta: 1, source: 'handel', meta }], session);
+    }
 
     Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
     await trade.save({ session });
