@@ -1,16 +1,19 @@
 (function () {
   'use strict';
 
-  // Handelsfenster (/handel/neu und Gegenangebote): Mengen per Knopf, Ablage der gewählten Karten,
-  // Geld nur in eine Richtung, Zusammenfassung mit Kartenwert und Steuer. Ohne JS gehen die Zahlenfelder direkt.
+  // Handelsfenster (/handel/neu und Gegenangebote): Karten antippen legt sie in die Ablage oben, "−" nimmt eine weg.
+  // Geld fließt nur in eine Richtung; Zusammenfassung mit Kartenwert, Wertvergleich und Steuer.
+  // Ohne JS gehen die Zahlenfelder unter den Karten direkt.
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
   var root = $('[data-hb]');
   if (!root) return;
+  root.classList.add('hb-js');
   var isMarket = root.getAttribute('data-market') === '1';
   var isListing = root.getAttribute('data-listing') === '1';
   var maxLines = parseInt(root.getAttribute('data-max-lines'), 10) || 10;
+  var balance = parseInt(root.getAttribute('data-balance'), 10) || 0;
   var tax = {
     markt: parseFloat(root.getAttribute('data-tax-markt')) || 0,
     privat: parseFloat(root.getAttribute('data-tax-privat')) || 0,
@@ -27,42 +30,69 @@
   };
   var cardsWord = function (n) { return n + (n === 1 ? ' Karte' : ' Karten'); };
 
+  // ---------- Reiter: eine Sammlung zur Zeit ----------
+  var tabs = $all('[data-hb-tab]', root);
+  function showPane(side) {
+    if (!tabs.length) return;
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-hb-tab') === side;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $all('[data-hb-pane]', root).forEach(function (p) { p.hidden = p.getAttribute('data-hb-pane') !== side; });
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { showPane(t.getAttribute('data-hb-tab')); }); });
+  // Klick auf eine Seite im Handelsfenster öffnet die passende Sammlung
+  $all('[data-hb-open]', root).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var side = btn.getAttribute('data-hb-open');
+      showPane(side);
+      var pane = $('[data-hb-pane="' + side + '"]', root);
+      if (pane) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  showPane('gib');
+
   // ---------- Mengen ----------
   var qtyInput = function (slot) { return $('input[type="number"]', slot); };
+  var qty = function (slot) {
+    var input = qtyInput(slot);
+    var box = $('input[type="checkbox"]', slot);
+    return input ? parseInt(input.value, 10) || 0 : box && box.checked ? 1 : 0;
+  };
+  var refresh = function (slot) {
+    var n = qty(slot);
+    var input = qtyInput(slot);
+    var badge = $('[data-hb-badge]', slot);
+    if (badge) {
+      badge.hidden = !n;
+      badge.textContent = '×' + n;
+    }
+    slot.classList.toggle('is-picked', n > 0);
+    slot.classList.toggle('is-full', !!input && n >= (parseInt(input.max, 10) || 0));
+  };
   var setQty = function (slot, n) {
     var input = qtyInput(slot);
-    if (!input) return;
-    var max = parseInt(input.max, 10) || 0;
-    input.value = String(Math.max(0, Math.min(max, n)));
-    var badge = $('[data-hb-badge]', slot);
-    var v = parseInt(input.value, 10) || 0;
-    if (badge) {
-      badge.hidden = !v;
-      badge.textContent = '×' + v;
-    }
-    slot.classList.toggle('is-picked', v > 0);
+    if (input) input.value = String(Math.max(0, Math.min(parseInt(input.max, 10) || 0, n)));
+    refresh(slot);
   };
-  $all('[data-hb-slot]', root).forEach(function (slot) {
+  var slots = $all('[data-hb-slot]', root);
+  slots.forEach(function (slot) {
+    refresh(slot);
     var input = qtyInput(slot);
-    if (input) {
-      setQty(slot, parseInt(input.value, 10) || 0);
-      input.addEventListener('input', function () { setQty(slot, parseInt(input.value, 10) || 0); update(); });
-    }
+    if (input) input.addEventListener('input', function () { refresh(slot); update(); });
     $all('[data-hb-step]', slot).forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
-        setQty(slot, (parseInt(qtyInput(slot).value, 10) || 0) + parseInt(btn.getAttribute('data-hb-step'), 10));
+        setQty(slot, qty(slot) + parseInt(btn.getAttribute('data-hb-step'), 10));
         update();
       });
     });
     var box = $('input[type="checkbox"]', slot);
-    if (box) {
-      slot.classList.toggle('is-picked', box.checked);
-      box.addEventListener('change', function () { slot.classList.toggle('is-picked', box.checked); update(); });
-    }
+    if (box) box.addEventListener('change', function () { refresh(slot); update(); });
   });
 
-  // ---------- Suche je Seite (die Seltenheit filtert public/js/tcg.js über hidden) ----------
+  // ---------- Suche je Sammlung (die Seltenheit filtert public/js/tcg.js über hidden) ----------
   $all('[data-hb-search]', root).forEach(function (input) {
     var picker = input.closest('.hb-picker');
     input.addEventListener('input', function () {
@@ -89,77 +119,77 @@
     });
   });
 
-  // ---------- Auswahl einer Seite lesen ----------
+  // ---------- Auswahl einer Seite ----------
   function picked(side) {
-    var col = $('[data-hb-side="' + side + '"]', root);
     var out = { items: [], count: 0, value: 0 };
-    if (!col) return out;
-    $all('[data-hb-slot]', col).forEach(function (slot) {
-      var input = qtyInput(slot);
-      var box = $('input[type="checkbox"]', slot);
-      var n = input ? parseInt(input.value, 10) || 0 : box && box.checked ? 1 : 0;
-      if (!n) return;
-      var value = parseInt(slot.getAttribute('data-value'), 10) || 0;
-      out.items.push({ slot: slot, n: n, label: slot.getAttribute('data-label'), image: slot.getAttribute('data-image'), foil: slot.hasAttribute('data-foil') });
-      out.count += n;
-      out.value += value * n;
-    });
-    var fixed = $('[data-hb-fixed-value]', col);
+    var pane = $('[data-hb-pane="' + side + '"]', root);
+    if (pane) {
+      $all('[data-hb-slot]', pane).forEach(function (slot) {
+        var n = qty(slot);
+        if (!n) return;
+        out.items.push({ slot: slot, n: n, label: slot.getAttribute('data-label'), image: slot.getAttribute('data-image'), foil: slot.hasAttribute('data-foil'), item: slot.classList.contains('is-item') });
+        out.count += n;
+        out.value += (parseInt(slot.getAttribute('data-value'), 10) || 0) * n;
+      });
+    }
+    var fixed = $('[data-hb-fixed="' + side + '"]', root);
     if (fixed) {
-      out.count += parseInt(fixed.getAttribute('data-hb-fixed-count'), 10) || 0;
-      out.value += parseInt(fixed.getAttribute('data-hb-fixed-value'), 10) || 0;
-      out.fixed = true;
+      out.count += parseInt(fixed.getAttribute('data-count'), 10) || 0;
+      out.value += parseInt(fixed.getAttribute('data-value'), 10) || 0;
     }
     return out;
   }
 
-  // ---------- Ablage: gewählte Karten oben in der Spalte ----------
+  // ---------- Ablage: gewählte Karten als Mini-Karten im Handelsfenster ----------
   function renderTray(side, sel) {
     var tray = $('[data-hb-tray="' + side + '"]', root);
     if (!tray) return;
-    var empty = $('.hb-tray-empty', tray);
-    $all('.hb-chip', tray).forEach(function (li) { li.remove(); });
+    $all('.hb-mini', tray).forEach(function (li) { li.remove(); });
     sel.items.forEach(function (it) {
       var li = document.createElement('li');
-      li.className = 'hb-chip' + (it.foil ? ' is-foil' : '');
+      li.className = 'hb-mini' + (it.foil ? ' is-foil' : '') + (it.item ? ' is-item' : '');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = it.label + ' – antippen zum Entfernen';
+      btn.setAttribute('aria-label', (it.n > 1 ? it.n + '× ' : '') + it.label + ' entfernen');
       var img = document.createElement('img');
       img.src = it.image;
       img.alt = '';
-      img.width = 36;
-      img.height = 50;
-      var label = document.createElement('span');
-      label.textContent = (it.n > 1 ? it.n + '× ' : '') + it.label;
-      var x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'hb-chip-x';
-      x.setAttribute('aria-label', it.label + ' entfernen');
+      btn.appendChild(img);
+      if (it.n > 1) {
+        var n = document.createElement('span');
+        n.className = 'hb-mini-n';
+        n.textContent = '×' + it.n;
+        btn.appendChild(n);
+      }
+      var x = document.createElement('span');
+      x.className = 'hb-mini-x';
       x.textContent = '×';
-      x.addEventListener('click', function () {
+      btn.appendChild(x);
+      btn.addEventListener('click', function () {
         var box = $('input[type="checkbox"]', it.slot);
-        if (box) box.checked = false;
-        else setQty(it.slot, (parseInt(qtyInput(it.slot).value, 10) || 0) - 1);
-        it.slot.classList.toggle('is-picked', box ? false : (parseInt(qtyInput(it.slot).value, 10) || 0) > 0);
+        if (box) {
+          box.checked = false;
+          refresh(it.slot);
+        } else setQty(it.slot, qty(it.slot) - 1);
         update();
       });
-      li.appendChild(img);
-      li.appendChild(label);
-      li.appendChild(x);
+      li.appendChild(btn);
       tray.appendChild(li);
     });
-    if (empty) empty.hidden = sel.items.length > 0;
+    tray.classList.toggle('is-empty', !sel.items.length);
   }
 
   // ---------- Zusammenfassung ----------
   var summary = $('[data-hb-summary]', root);
   var note = $('[data-hb-note]', root);
   var submit = $('[data-hb-submit]', root);
-  var sumGive = $('[data-hb-sum="gib"]', root);
-  var sumGet = $('[data-hb-sum="will"]', root);
+  var balanceBox = $('[data-hb-balance]', root);
   var baseNote = note ? note.textContent.trim() : '';
 
   function sideText(sel, money) {
     var parts = [];
-    if (sel.count) parts.push(cardsWord(sel.count) + ' (Wert ' + euro(sel.value) + ')');
+    if (sel.count) parts.push(cardsWord(sel.count));
     if (money) parts.push(euro(money));
     return parts.join(' + ') || 'nichts';
   }
@@ -171,35 +201,45 @@
     var receive = moneyGet ? cents(moneyGet.value) : 0;
     renderTray('gib', give);
     renderTray('will', get);
-    if (sumGive) sumGive.textContent = give.count || pay ? sideText(give, pay) : '';
-    if (sumGet) sumGet.textContent = get.count || receive ? sideText(get, receive) : '';
+    $all('[data-hb-sum]', root).forEach(function (el) {
+      var side = el.getAttribute('data-hb-sum');
+      var sel = side === 'gib' ? give : get;
+      el.textContent = sel.count ? 'Wert ' + euro(sel.value) : '';
+    });
+    // Wertvergleich: was ich bekomme minus was ich gebe (Kartenwert + Geld)
+    if (balanceBox) {
+      var diff = get.value + receive - give.value - pay;
+      var any = give.count || get.count;
+      balanceBox.hidden = !any || isMarket;
+      balanceBox.textContent = !diff ? 'gleicher Wert' : (diff > 0 ? '+' : '−') + euro(Math.abs(diff));
+      balanceBox.className = 'hb-balance' + (diff > 0 ? ' is-pos' : diff < 0 ? ' is-neg' : '');
+      balanceBox.title = diff > 0 ? 'Du bekommst mehr Kartenwert, als du gibst' : diff < 0 ? 'Du gibst mehr Kartenwert, als du bekommst' : '';
+    }
 
     var kind = give.count && get.count ? 'tausch' : isMarket || isListing ? 'markt' : 'privat';
     var problems = [];
-    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle mindestens eine Karte.' : 'Wähle mindestens eine Karte – auf einer der beiden Seiten.');
+    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle unten Karten aus deiner Sammlung.' : 'Wähle Karten – auf einer der beiden Seiten.');
     if (give.count > maxLines || get.count > maxLines) problems.push('Höchstens ' + maxLines + ' Karten je Seite.');
     if (isMarket && give.count && !receive) problems.push('Gib einen Preis an.');
     if (!isMarket && give.count && !get.count && !receive) problems.push('Ohne Karten zurück: Gib an, wie viel du dafür bekommst.');
     if (!isMarket && !give.count && get.count && !pay) problems.push('Ohne eigene Karten: Gib an, wie viel du dafür zahlst.');
     if (!isMarket && !give.count && receive) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du gibst“ ein.');
     if (!isMarket && !get.count && pay && give.count) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du bekommst“ ein.');
-    var balance = parseInt(root.getAttribute('data-balance'), 10) || 0;
-    if (pay > balance) problems.push('Dein Guthaben reicht dafür gerade nicht (' + euro(balance) + ').');
+    if (pay > balance) problems.push('Dein Guthaben reicht dafür nicht (' + euro(balance) + ').');
 
-    // Noch nichts gewählt: nur der Hinweis oben; sonst oben das Angebot, darunter Probleme (rot) oder Steuer und Laufzeit
     var nothing = !give.count && !get.count;
     if (summary) {
-      summary.textContent = nothing ? problems[0] : 'Du gibst ' + sideText(give, pay) + ' · Du bekommst ' + sideText(get, receive);
-      summary.classList.toggle('is-problem', nothing);
+      summary.textContent = nothing ? problems[0] : 'Du gibst ' + sideText(give, pay) + ' · du bekommst ' + sideText(get, receive);
+      summary.classList.toggle('is-empty', nothing);
     }
     if (note) {
       var rate = tax[kind];
       var t = receive && rate ? Math.floor(receive * rate / 100) : 0;
       var shown = nothing ? [] : problems;
       note.textContent = shown.length ? shown.join(' ') : [t ? 'Nach ' + String(rate).replace('.', ',') + ' % Steuer erhältst du ' + euro(receive - t) + '.' : '', baseNote].filter(Boolean).join(' ');
-      note.classList.toggle('neg', shown.length > 0);
+      note.classList.toggle('is-problem', shown.length > 0);
     }
-    if (submit) submit.disabled = !give.count && !get.count;
+    if (submit) submit.disabled = nothing || problems.length > 0;
   }
   update();
 
