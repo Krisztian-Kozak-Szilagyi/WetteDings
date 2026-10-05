@@ -168,30 +168,7 @@
       <div class="handel-block-head">
         <h4>Markt</h4>
         <% if (market.length) { %>
-          <%# Suchen und Filtern in einem Knopf: Hälfte antippen/überfahren → sie klappt auf (public/js/handel.js filtert) %>
-          <div class="mkt-bar" data-mkt-bar>
-            <div class="mkt-bar-search">
-              <label class="mkt-bar-label" for="mkt-search">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg>
-                Suchen
-              </label>
-              <input id="mkt-search" type="search" class="mkt-bar-input" data-market-search maxlength="40" placeholder="Karte suchen …" aria-label="Markt nach Kartenname durchsuchen">
-              <span class="mkt-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg></span>
-            </div>
-            <div class="mkt-bar-filter">
-              <button type="button" class="mkt-bar-toggle" aria-haspopup="listbox" aria-label="Markt nach Seltenheit filtern">
-                <span class="mkt-bar-word">Filter</span>
-                <span class="mkt-bar-current"><span class="muted">Filtern nach:</span> <strong data-mkt-current>Alle</strong></span>
-                <svg class="mkt-bar-arrow" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 8h16l-8 9Z"/></svg>
-              </button>
-              <div class="mkt-bar-menu" role="listbox" aria-label="Seltenheit">
-                <button type="button" class="mkt-opt active" data-market-rarity="all" role="option" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle</button>
-                <% rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).forEach((r) => { %>
-                  <button type="button" class="mkt-opt r-<%= r.key %>" data-market-rarity="<%= r.key %>" role="option" aria-selected="false"><span class="tcg-dot"></span><%= r.label %></button>
-                <% }) %>
-              </div>
-            </div>
-          </div>
+          <%- include('partials/mkt-bar', { name: 'market', placeholder: 'Karte suchen …', opts: rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).map((r) => ({ key: r.key, label: r.label })) }) %>
         <% } %>
       </div>
       <% if (!market.length) { %>
@@ -227,14 +204,18 @@
       <% } %>
     </div>
 
-    <div class="handel-block" id="sammlung" data-filter-scope>
+    <div class="handel-block" id="sammlung" data-coll>
+      <% const collVisible = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || coll.counts[c.id]); const collOwned = (list) => list.filter((c) => coll.counts[c.id]).length; %>
       <div class="handel-block-head">
         <h4>Deine Sammlung</h4>
+        <% if (coll.cardCount) { %>
+          <%- include('partials/mkt-bar', { name: 'coll', placeholder: 'In deiner Sammlung suchen …', allCount: collOwned(collVisible) + '/' + collVisible.length, opts: rarities.map((r) => { const list = cards.filter((c) => c.rarity === r.key); return { key: r.key, label: r.label, count: collOwned(list) + '/' + list.length }; }) }) %>
+        <% } %>
       </div>
       <% if (!coll.cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Öffne ein Booster Pack im <a href="/tcg">TCG</a>.</p>
       <% } else { %>
-        <%- include('partials/tcg-filter', { counts: coll.counts }) %>
+        <p class="muted" data-coll-empty hidden>Keine deiner Karten passt zu deiner Auswahl.</p>
         <%- include('partials/tcg-grid', { mode: 'trade', showMissing: false, counts: coll.counts, lockedByCard: coll.lockedByCard, foiledCopies: coll.foiledCopies, foiledByCard: coll.foiledByCard }) %>
       <% } %>
     </div>

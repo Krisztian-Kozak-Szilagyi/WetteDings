@@ -5232,3 +5232,4 @@ a.dash-meta:hover { color: var(--color-accent-400); }
   .mkt-bar *, .mkt-bar > div { transition-duration: 0s !important; transition-delay: 0s !important; }
   .mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { animation: none; clip-path: none; }
 }
+.mkt-opt-count { margin-left: auto; padding-left: 8px; color: var(--color-neutral-500); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }

@@ -33,7 +33,7 @@
     <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>
-      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
+      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
           <span class="tcg-exam-badge"><%= lockLabel %></span>
@@ -134,7 +134,7 @@
     <% }) } %>
     <% if (mode === 'trade') { (foiledCopies[c.id] || []).forEach((f) => { %>
       <% if (f.lock) { %>
-        <div class="tcg-slot foil-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese folierte Karte ist gerade gesperrt (<%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %>)">
+        <div class="tcg-slot foil-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese folierte Karte ist gerade gesperrt (<%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %>)">
           <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %><span class="tcg-exam-badge"><%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %></span></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
         </div>

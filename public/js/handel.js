@@ -71,18 +71,53 @@
           b.classList.toggle('active', b === btn);
           b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
         });
-        // Such-/Filterknopf: gewählte Seltenheit anzeigen und das Menü wieder zuklappen
-        var bar = $('[data-mkt-bar]', marketBox);
-        if (bar) {
-          var current = $('[data-mkt-current]', bar);
-          if (current) current.textContent = btn.textContent.trim();
-          bar.classList.toggle('is-filtered', marketRarity !== 'all');
-          btn.blur();
-        }
         filterMarket();
       });
     });
     marketSearch.addEventListener('input', filterMarket);
+  }
+
+  // ---------- Such-/Filterknopf (partials/mkt-bar): gewählte Seltenheit anzeigen, Menü zuklappen ----------
+  $all('[data-mkt-bar]').forEach(function (bar) {
+    $all('.mkt-opt', bar).forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        var current = $('[data-mkt-current]', bar);
+        if (current) current.textContent = opt.getAttribute('data-label') || opt.textContent.trim();
+        var key = opt.getAttribute('data-market-rarity') || opt.getAttribute('data-coll-rarity');
+        bar.classList.toggle('is-filtered', key !== 'all');
+        opt.blur();
+      });
+    });
+  });
+
+  // ---------- Deine Sammlung: nach Seltenheit und Kartenname filtern ----------
+  var collBox = $('[data-coll]');
+  if (collBox && $('[data-coll-search]', collBox)) {
+    var collSearch = $('[data-coll-search]', collBox);
+    var collEmpty = $('[data-coll-empty]', collBox);
+    var collRarity = 'all';
+    var filterColl = function () {
+      var q = (collSearch.value || '').trim().toLowerCase();
+      var shown = 0;
+      $all('.tcg-grid .tcg-slot', collBox).forEach(function (slot) {
+        var name = (slot.getAttribute('data-name') || '').toLowerCase();
+        var ok = (collRarity === 'all' || slot.getAttribute('data-rarity') === collRarity) && (!q || name.indexOf(q) !== -1);
+        slot.hidden = !ok;
+        if (ok) shown++;
+      });
+      if (collEmpty) collEmpty.hidden = shown > 0;
+    };
+    $all('[data-coll-rarity]', collBox).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        collRarity = btn.getAttribute('data-coll-rarity');
+        $all('[data-coll-rarity]', collBox).forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+        });
+        filterColl();
+      });
+    });
+    collSearch.addEventListener('input', filterColl);
   }
 
   // ---------- Verhandlung: Nachrichten live nachladen ----------
