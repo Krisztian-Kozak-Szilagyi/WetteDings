@@ -5179,3 +5179,56 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .nego-lines { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .tcg-pick-multi:has(> .tcg-slot[hidden]) { display: none; } /* Seltenheitsfilter blendet die Karte aus – die Anzahl mit */
 .nego-line { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 140px; text-align: center; font-size: 13px; }
+
+/* Markt: Suchen und Filtern in einem Knopf (nach „Mobile Search/Filter Button“, Dribbble) – in unseren Farben.
+   Eine Hälfte überfahren oder antippen (Fokus) → sie klappt über die ganze Breite auf. */
+.mkt-bar { --mkt-h: 40px; --mkt-ease: cubic-bezier(0, 0, .1, 1); --mkt-soft: cubic-bezier(0, 0, .5, 1); position: relative; flex: 0 1 380px; min-width: min(100%, 260px); height: var(--mkt-h); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.mkt-bar > div { position: absolute; top: 0; height: 100%; width: 50%; border-radius: inherit; background: var(--color-surface); transition: width .45s var(--mkt-ease), left .45s var(--mkt-ease), background-color .2s ease; }
+.mkt-bar-search { left: 0; overflow: hidden; z-index: 1; transition-delay: .1s; }
+.mkt-bar-filter { left: 50%; z-index: 1; transition-delay: .25s; }
+.mkt-bar > div:hover { background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface)); }
+/* Trennstrich zwischen den Hälften */
+.mkt-bar-search::after { content: ""; position: absolute; right: 0; top: 22%; width: 1px; height: 56%; background: var(--color-neutral-700); transition: opacity .2s ease; }
+.mkt-bar-label, .mkt-bar-toggle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 0; border: 0; background: none; color: var(--color-neutral-300); font: inherit; font-size: 14px; letter-spacing: .02em; cursor: pointer; }
+.mkt-bar-label { transition: opacity .3s var(--mkt-soft) .35s; }
+.mkt-bar-toggle:focus-visible, .mkt-opt:focus-visible { outline: 2px solid var(--color-accent-300); outline-offset: -2px; border-radius: var(--radius-md); }
+
+/* Suchen: Feld wächst als Kreis von links auf, die Lupe kommt von unten */
+.mkt-bar-input[type="search"] { position: absolute; left: 6px; top: 5px; width: calc(100% - 52px); height: calc(100% - 10px); min-height: 0; margin: 0; padding: 0 14px; border: 0; border-radius: 999px; background: var(--color-bg); color: var(--text); font-size: 14px; clip-path: circle(0 at 18px 50%); transition: clip-path .45s var(--mkt-ease) .05s; }
+.mkt-bar-input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--color-accent-500); }
+.mkt-bar-icon { position: absolute; right: 0; top: 0; display: grid; place-items: center; width: 46px; height: 100%; color: var(--color-accent-300); transform: translateY(100%); opacity: 0; transition: transform .35s var(--mkt-ease), opacity .2s ease; pointer-events: none; }
+.mkt-bar-search:is(:hover, :focus-within), .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-search { width: 100%; z-index: 3; transition-delay: 0s; }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-label, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-label { opacity: 0; pointer-events: none; transition-delay: 0s; }
+.mkt-bar-search:is(:hover, :focus-within)::after, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-search::after { opacity: 0; }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-input, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-input { clip-path: circle(150% at 18px 50%); transition-delay: .1s; }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-icon, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-icon { transform: translateY(0); opacity: 1; transition-delay: .3s; }
+
+/* Filtern: Feld mit der Auswahl schiebt sich auf, der Pfeil dreht sich, darunter klappt die Liste auf */
+.mkt-bar-word { transition: opacity .3s var(--mkt-soft) .35s; }
+.mkt-bar-current { position: absolute; left: 6px; top: 5px; bottom: 5px; display: flex; align-items: center; gap: 6px; width: 0; padding: 0; overflow: hidden; white-space: nowrap; border-radius: 999px; background: var(--color-bg); font-size: 13px; transition: width .45s var(--mkt-ease) .2s, padding .45s var(--mkt-ease) .2s; }
+.mkt-bar-current > * { opacity: 0; transition: opacity .25s ease; }
+.mkt-bar-current strong { color: var(--color-neutral-100); font-weight: 600; }
+.mkt-bar-arrow { position: absolute; right: 16px; top: 50%; margin-top: -7px; color: var(--color-neutral-400); transition: transform .45s var(--mkt-soft) .1s, color .2s ease; }
+.mkt-bar-filter:is(:hover, :focus-within) { left: 0; width: 100%; z-index: 3; transition-delay: 0s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-word { opacity: 0; transition-delay: 0s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-current { width: calc(100% - 52px); padding: 0 14px; transition-delay: .15s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-current > * { opacity: 1; transition-delay: .4s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-arrow { transform: rotate(180deg); color: var(--color-accent-300); transition-delay: .35s; }
+.mkt-bar.is-filtered .mkt-bar-word, .mkt-bar.is-filtered .mkt-bar-arrow { color: var(--color-accent-300); }
+.mkt-bar.is-filtered .mkt-bar-word::after { content: " •"; }
+
+.mkt-bar-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 2px; padding: 6px; border-top: 2px solid var(--color-accent-500); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 14px 34px rgba(0, 0, 0, .5), inset 0 0 0 1px var(--color-neutral-800); visibility: hidden; clip-path: inset(0 100% calc(100% - 2px) 0); transition: visibility 0s linear .3s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { visibility: visible; animation: mkt-drop .55s var(--mkt-soft) .45s both; transition-delay: 0s; }
+@keyframes mkt-drop {
+  0% { clip-path: inset(0 100% calc(100% - 2px) 0); }
+  45% { clip-path: inset(0 0 calc(100% - 2px) 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+.mkt-opt { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--color-neutral-200); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.mkt-opt:hover { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.mkt-opt.active { background: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent-200); font-weight: 600; }
+@media (max-width: 640px) { .mkt-bar { flex-basis: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .mkt-bar *, .mkt-bar > div { transition-duration: 0s !important; transition-delay: 0s !important; }
+  .mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { animation: none; clip-path: none; }
+}

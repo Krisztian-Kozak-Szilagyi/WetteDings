@@ -71,6 +71,14 @@
           b.classList.toggle('active', b === btn);
           b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
         });
+        // Such-/Filterknopf: gewählte Seltenheit anzeigen und das Menü wieder zuklappen
+        var bar = $('[data-mkt-bar]', marketBox);
+        if (bar) {
+          var current = $('[data-mkt-current]', bar);
+          if (current) current.textContent = btn.textContent.trim();
+          bar.classList.toggle('is-filtered', marketRarity !== 'all');
+          btn.blur();
+        }
         filterMarket();
       });
     });

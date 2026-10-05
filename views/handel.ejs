@@ -168,18 +168,35 @@
       <div class="handel-block-head">
         <h4>Markt</h4>
         <% if (market.length) { %>
-          <input type="search" class="market-search" data-market-search maxlength="40" placeholder="Karte suchen …" aria-label="Markt nach Kartenname durchsuchen">
+          <%# Suchen und Filtern in einem Knopf: Hälfte antippen/überfahren → sie klappt auf (public/js/handel.js filtert) %>
+          <div class="mkt-bar" data-mkt-bar>
+            <div class="mkt-bar-search">
+              <label class="mkt-bar-label" for="mkt-search">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg>
+                Suchen
+              </label>
+              <input id="mkt-search" type="search" class="mkt-bar-input" data-market-search maxlength="40" placeholder="Karte suchen …" aria-label="Markt nach Kartenname durchsuchen">
+              <span class="mkt-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg></span>
+            </div>
+            <div class="mkt-bar-filter">
+              <button type="button" class="mkt-bar-toggle" aria-haspopup="listbox" aria-label="Markt nach Seltenheit filtern">
+                <span class="mkt-bar-word">Filter</span>
+                <span class="mkt-bar-current"><span class="muted">Filtern nach:</span> <strong data-mkt-current>Alle</strong></span>
+                <svg class="mkt-bar-arrow" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 8h16l-8 9Z"/></svg>
+              </button>
+              <div class="mkt-bar-menu" role="listbox" aria-label="Seltenheit">
+                <button type="button" class="mkt-opt active" data-market-rarity="all" role="option" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle</button>
+                <% rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).forEach((r) => { %>
+                  <button type="button" class="mkt-opt r-<%= r.key %>" data-market-rarity="<%= r.key %>" role="option" aria-selected="false"><span class="tcg-dot"></span><%= r.label %></button>
+                <% }) %>
+              </div>
+            </div>
+          </div>
         <% } %>
       </div>
       <% if (!market.length) { %>
         <p class="muted">Auf dem Markt ist gerade nichts im Angebot.</p>
       <% } else { %>
-        <div class="tcg-filter market-filter" role="tablist" aria-label="Markt nach Seltenheit filtern">
-          <button type="button" class="chip active" data-market-rarity="all" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle</button>
-          <% rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).forEach((r) => { %>
-            <button type="button" class="chip r-<%= r.key %>" data-market-rarity="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %></button>
-          <% }) %>
-        </div>
         <p class="muted" data-market-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
         <ul class="trade-list trade-market">
           <% market.forEach((t) => { const { c, r } = line(t.card); const lacks = t.price - bal; %>
