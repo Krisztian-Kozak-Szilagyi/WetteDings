@@ -1654,14 +1654,32 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
 .tcg-coll-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .tcg-coll-head h2 { margin: 0; }
-.tcg-filter { display: flex; flex-wrap: wrap; gap: 8px; }
-.tcg-filter .chip {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px; border-radius: 999px;
-  background: transparent; border: 1px solid var(--color-divider); color: var(--color-neutral-400); font-size: 13px; font-weight: 400;
+/* Seltenheits-Filter als Segment-Leiste (wie Statistik-Zeitraum und Vergaben): aktive Wahl als Fläche mit
+   Schatten und einem Strich in der Farbe der Seltenheit */
+.tcg-filter {
+  display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; width: fit-content; max-width: 100%;
+  border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
 }
-.tcg-filter .chip:hover { border-color: var(--color-neutral-600); color: var(--text); }
-.tcg-filter .chip.active { background: var(--color-surface); border-color: var(--color-accent-600); color: var(--text); }
+.tcg-filter .chip {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 11px; border-radius: 8px;
+  background: transparent; border: 0; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
+}
+.tcg-filter .chip:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.tcg-filter .chip.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.tcg-filter .chip.active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--rar, var(--color-accent)); }
+.tcg-filter .chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .tcg-filter .tcg-dot { width: 7px; height: 7px; }
+.tcg-filter .chip-count { font-weight: 500; font-size: 12px; }
+/* Handy: eine Zeile zum Wischen statt mehrerer umgebrochener Zeilen */
+@media (max-width: 640px) {
+  .tcg-filter {
+    flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); /* rechts geht es weiter */
+  }
+  .tcg-filter::-webkit-scrollbar { display: none; }
+  .tcg-filter .chip { flex: none; }
+}
 .tcg-dot-all { --rar: var(--color-accent); }
 .chip-count { color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
 
