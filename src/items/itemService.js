@@ -13,6 +13,7 @@ const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const foil = require('./foil');
+const { centerShift } = require('../grading/condition');
 
 // Gegenstands-Arten. Später kommen weitere dazu (eigener Schlüssel, Name, Bild, Beschreibung).
 // sell = Ankaufspreis der Bank in Cent.
@@ -140,6 +141,7 @@ async function foiledCards(userId, now = Date.now()) {
         rarity: r,
         foiledAt: d.foiledAt,
         grade: d.condition ? d.condition.grade : null,
+        center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null, // sichtbarer Versatz (Zentrierung)
         days: foil.foilDays(d.foiledAt, now),
         percent: foil.foilPercent(d.foiledAt, now),
         sell: r.sell,

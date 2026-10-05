@@ -91,6 +91,20 @@ function rollCondition(profile = 'frisch') {
   return { v: CONDITION_VERSION, grade: gradeFor(defects), defects };
 }
 
+/**
+ * Sichtbarer Versatz einer folierten Karte aus ihrer Zentrierung: { x, y } von −1 bis 1 (0 = mittig).
+ * Gespeichert ist nur, wie schief (z. B. 62/38) – in welche Richtung, ergibt sich fest aus der Exemplar-ID,
+ * damit dasselbe Exemplar immer gleich aussieht. Ohne Zentrierung: null.
+ */
+function centerShift(centering, id) {
+  if (!centering) return null;
+  const bits = Number.parseInt(String(id || '').slice(-2), 16) || 0;
+  const sx = bits & 1 ? -1 : 1;
+  const sy = bits & 2 ? -1 : 1;
+  const r = (v) => Math.round(v * 1000) / 1000;
+  return { x: r((sx * ((centering.lr || 50) - 50)) / 50), y: r((sy * ((centering.tb || 50) - 50)) / 50) };
+}
+
 // Bezeichnungen der Noten (wie auf echten Grading-Etiketten)
 const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
 const gradeWord = (grade) => GRADE_NAMES[grade] || '';
@@ -109,4 +123,4 @@ function gradeStats(grades) {
   return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
-module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats };
+module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift };

@@ -4026,6 +4026,13 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 .foil-face { position: absolute; inset: 0; display: block; overflow: hidden; border-radius: 9px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   padding: 23cqw 4cqw 4cqw; background: linear-gradient(160deg, #e9f6ff26, #ffffff0d 40%, #c4b5fd26); box-shadow: inset 0 0 0 1px #ffffff40, 0 0 0 1px var(--rar, #ffffff30), 0 6px 18px rgba(0, 0, 0, .35); }
 .foil-face img { display: block; width: 100%; height: auto; border-radius: 5px; }
+/* Zentrierung (#73): Rand in der Farbe der Seltenheit, 3 % der Kartenbreite pro Seite bei perfekter Zentrierung,
+   ungleich verteilt nach --cx/--cy (−1 … 1, gesetzt nur bei folierten Karten mit bekanntem Zustand) */
+.foil-front img {
+  box-sizing: border-box; border-style: solid; border-color: var(--rar, #c9c9d6); border-radius: 6px;
+  border-left-width: calc(3cqw * (1 + var(--cx, 0))); border-right-width: calc(3cqw * (1 - var(--cx, 0)));
+  border-top-width: calc(3cqw * (1 - var(--cy, 0))); border-bottom-width: calc(3cqw * (1 + var(--cy, 0)));
+}
 .foil-front { position: relative; transform: rotateY(0deg); }
 /* Firefox: jede Seite eigene Ebene – sonst „plättet“ der Glanz (mix-blend-mode) die 3D-Karte: keine Rückseite, Vorderseite gespiegelt (#46) */
 .foil-face { isolation: isolate; }

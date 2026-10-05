@@ -19,10 +19,12 @@ const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
  * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
  * grade: Note des Exemplars (geheimer Zustand, #73) – steht auf dem Etikett der Folie
+ * center: sichtbarer Versatz { x, y } aus der Zentrierung (grading/condition.centerShift)
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, center = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
   if (grade) h += ` data-grade="${escAttr(grade)}" data-grade-word="${escAttr(gradeWord(grade))}"`;
+  if (center) h += ` data-cx="${escAttr(center.x)}" data-cy="${escAttr(center.y)}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
   return h;

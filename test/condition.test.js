@@ -87,6 +87,21 @@ test('Gegradete Karten: beste Note, wie oft, Schnitt – ohne Folie gibt es nich
   assert.deepEqual([one.count, one.best, one.bestCount, one.avg, one.dist[6]], [1, 6, 1, 6, 1]);
 });
 
+test('Versatz auf der Folie: Stärke aus der Zentrierung, Richtung fest aus dem Exemplar', () => {
+  const { centerShift } = condition;
+  assert.equal(centerShift(undefined, 'abc'), null);
+  assert.deepEqual(centerShift({ lr: 50, tb: 50 }, '6abf00'), { x: 0, y: 0 });
+  const a = centerShift({ lr: 80, tb: 60 }, '6abf00'); // Bits 00: beide positiv
+  assert.deepEqual(a, { x: 0.6, y: 0.2 });
+  const b = centerShift({ lr: 80, tb: 60 }, '6abf03'); // Bits 11: beide negativ
+  assert.deepEqual(b, { x: -0.6, y: -0.2 });
+  assert.deepEqual(centerShift({ lr: 80, tb: 60 }, '6abf00'), a); // dasselbe Exemplar sieht immer gleich aus
+  for (let i = 0; i < 200; i++) {
+    const s = centerShift(rollCondition().defects.centering, i.toString(16));
+    assert.ok(Math.abs(s.x) <= 0.6 && Math.abs(s.y) <= 0.6); // höchstens 80/20
+  }
+});
+
 test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start bei 4', () => {
   const { centeringCap } = condition;
   const none = { scratches: [], corners: [], edges: [], crease: false };

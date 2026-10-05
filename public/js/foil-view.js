@@ -30,6 +30,9 @@
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', d.name + ' – ziehen zum Drehen, antippen zum Umdrehen');
     var inner = el('span', 'foil-inner', card);
+    // Versatz aus der Zentrierung (data-cx/-cy): der Rand um das Kartenbild ist ungleich breit
+    if (d.cx) inner.style.setProperty('--cx', d.cx);
+    if (d.cy) inner.style.setProperty('--cy', d.cy);
     var front = el('span', 'foil-face foil-front', inner);
     var img = el('img', '', front);
     img.src = d.image;
