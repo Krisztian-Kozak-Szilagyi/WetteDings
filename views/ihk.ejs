@@ -169,9 +169,15 @@
         <span class="ihk-start-arrow" aria-hidden="true">→</span>
       </button>
     </div>
+    <%# Suchen + Seltenheit (partials/mkt-bar) für Charakter- und Boost-Karten (public/js/ihk.js) %>
+    <% const ihkAll = cards.concat(items); const ihkRars = Object.values(rarityByKey).filter((r) => ihkAll.some((c) => c.rarity === r.key)).sort((a, b) => a.rank - b.rank); %>
+    <div class="ihk-pick-tools">
+      <%- include('partials/mkt-bar', { name: 'ihk', placeholder: 'Karte suchen …', searchAttr: 'ihk-search', groups: [{ attr: 'ihk-rar', allCount: ihkAll.length, opts: ihkRars.map((r) => ({ key: r.key, label: r.label, count: ihkAll.filter((c) => c.rarity === r.key).length })) }] }) %>
+    </div>
+    <p class="muted" data-ihk-empty hidden>Keine Karte gefunden.</p>
     <div class="ihk-pick-grid">
       <% cards.forEach((c) => { %>
-        <div class="ihk-pick-card r-<%= c.rarity %>" tabindex="0" data-drag="card" data-value="<%= c.id %>" data-image="<%= c.image %>"<%- canBoost(c) ? ' data-boostable="1"' : '' %>
+        <div class="ihk-pick-card r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>" tabindex="0" data-drag="card" data-value="<%= c.id %>" data-image="<%= c.image %>"<%- canBoost(c) ? ' data-boostable="1"' : '' %>
           data-zoom="<%= c.image %>" data-zoom-title="<%= c.name %> (<%= rarityByKey[c.rarity].label %>)" aria-label="<%= c.name %>, <%= rarityByKey[c.rarity].label %>">
           <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008" draggable="false">
           <span class="ihk-pick-stats">
@@ -181,10 +187,10 @@
       <% }) %>
     </div>
     <% if (items.length) { %>
-      <h3 class="ihk-pick-sub">Boost-Karten</h3>
+      <h3 class="ihk-pick-sub" data-ihk-boost-head>Boost-Karten</h3>
       <div class="ihk-pick-grid">
         <% items.forEach((c) => { %>
-          <div class="ihk-pick-card r-<%= c.rarity %>" tabindex="0" data-drag="boost" data-value="<%= c.id %>" data-image="<%= c.image %>"
+          <div class="ihk-pick-card r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>" tabindex="0" data-drag="boost" data-value="<%= c.id %>" data-image="<%= c.image %>"
             data-zoom="<%= c.image %>" data-zoom-title="<%= c.name %> (<%= rarityByKey[c.rarity].label %>)" aria-label="<%= c.name %>, <%= rarityByKey[c.rarity].label %>">
             <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008" draggable="false">
           </div>
