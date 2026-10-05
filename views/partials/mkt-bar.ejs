@@ -1,7 +1,7 @@
 <%#
   Suchen und Filtern in einem Knopf (Handel: Markt und Sammlung). Eine Hälfte überfahren oder antippen → sie klappt
   auf; gefiltert wird in public/js/handel.js. name = Präfix der Daten-Attribute ("market" | "coll"),
-  opts = [{ key, label, count? }] (ohne "Alle"), placeholder = Beschreibung fürs Suchfeld (Screenreader; sichtbar steht nur „Suchen“), allCount = Zahl bei "Alle".
+  opts = [{ key, label, count? }] (ohne "Alle"), missing = Anzahl für „Fehlt mir noch“ (nur Markt; ganz oben), placeholder = Beschreibung fürs Suchfeld (Screenreader; sichtbar steht nur „Suchen“), allCount = Zahl bei "Alle".
 %>
 <div class="mkt-bar" data-mkt-bar>
   <div class="mkt-bar-search">
@@ -21,6 +21,9 @@
     <%# .mkt-bar-drop: unsichtbare Brücke zwischen Knopf und Liste, damit die Maus auf dem Weg nach unten nicht "rausfällt" %>
     <div class="mkt-bar-drop">
     <div class="mkt-bar-menu" role="listbox" aria-label="Seltenheit">
+      <% if (locals.missing !== undefined) { %>
+        <button type="button" class="mkt-opt" data-<%= name %>-rarity="missing" data-label="Fehlt mir noch" role="option" aria-selected="false"><span class="tcg-dot tcg-dot-missing"></span>Fehlt mir noch<span class="mkt-opt-count"><%= missing %></span></button>
+      <% } %>
       <button type="button" class="mkt-opt active" data-<%= name %>-rarity="all" data-label="Alle" role="option" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<% if (locals.allCount) { %><span class="mkt-opt-count"><%= allCount %></span><% } %></button>
       <% opts.forEach((o) => { %>
         <button type="button" class="mkt-opt r-<%= o.key %>" data-<%= name %>-rarity="<%= o.key %>" data-label="<%= o.label %>" role="option" aria-selected="false"><span class="tcg-dot"></span><%= o.label %><% if (o.count) { %><span class="mkt-opt-count"><%= o.count %></span><% } %></button>
