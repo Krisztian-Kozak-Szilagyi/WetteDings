@@ -1,62 +1,101 @@
 <%- include('partials/head') %>
-
-<div class="narrow">
-  <div class="card">
-    <h1><%= opponent.username %> herausfordern</h1>
-    <p class="muted">Ein Duell ist eine Wette nur zwischen euch beiden: Du stellst eine Behauptung auf, <strong><%= opponent.username %></strong> hält dagegen. Ihr setzt beide denselben Betrag, wer recht hat, bekommt den Topf.</p>
-
-    <div class="info-box">
-      <strong>Ein Schiedsrichter entscheidet.</strong>
-      <span>Du wählst ein drittes Mitglied als Schiedsrichter. Es trägt zum Termin der Auswertung ein, wer gewonnen hat, und bekommt dafür <strong><%= feePercent %> % vom Topf</strong>. Ihr beiden stimmt nicht mit ab.</span>
+<%
+  // Herausfordern – Assistent in Schritten wie bei "Neue Wette" (#93, public/js/app.js [data-wizard]).
+  // data-sum: Zeile in der Zusammenfassung des letzten Schritts. Ohne JS stehen alle Schritte untereinander.
+  const STEPS = ['Gegner', 'Behauptung', 'Einsatz', 'Schiedsrichter', 'Termin', 'Prüfen'];
+%>
+<div class="new-bet">
+  <div class="new-bet-head">
+    <h1><%= opponent ? opponent.username + ' herausfordern' : 'Neues Duell' %></h1>
+    <div class="wizard-progress" data-wizard-progress hidden>
+      <span class="muted small" data-wizard-label></span>
+      <span class="wizard-bar"><span data-wizard-bar></span></span>
     </div>
+  </div>
 
-    <div class="info-box">
-      <strong>Es gilt erst, wenn beide zusagen.</strong>
-      <span>Dein Einsatz wird sofort reserviert. <%= opponent.username %> und der Schiedsrichter haben <strong><%= inviteHours %> Stunden</strong> Zeit zum Annehmen. Lehnt einer ab oder läuft die Frist ab, bekommst du deinen Einsatz zurück. Bis dahin sehen nur ihr drei das Duell, danach alle – mitwetten können andere aber nicht.</span>
-    </div>
+  <% if (errors.length) { %>
+    <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
+  <% } %>
 
-    <% if (errors.length) { %>
-      <div class="form-errors" role="alert"><ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul></div>
-    <% } %>
+  <form method="post" action="/duell" class="form new-bet-form" data-wizard data-generic-summary data-start-step="<%= errorStep %>" data-steps="<%= STEPS.join('|') %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-    <form method="post" action="/duell" class="form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <input type="hidden" name="opponent" value="<%= opponent.username %>">
-
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Deine Behauptung</span>
-        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Ich laufe am Samstag die 5 km unter 25 Minuten">
-        <small class="muted">Du gewinnst, wenn sie eintritt – sonst gewinnt <%= opponent.username %>.</small>
+        <span class="wizard-q">Wen forderst du heraus?</span>
+        <select name="opponent" required data-sum="Gegner">
+          <option value="">Mitglied wählen …</option>
+          <% members.forEach((u) => { %><option value="<%= u.username %>" <%= values.opponent.toLowerCase() === u.username.toLowerCase() ? 'selected' : '' %>><%= u.username %></option><% }) %>
+        </select>
+        <small class="muted">Ein Duell ist eine Wette nur zwischen euch beiden: Du stellst eine Behauptung auf, dein Gegner hält dagegen. Läuft es, können alle anderen auf einen von euch setzen.</small>
       </label>
+    </section>
 
+    <section class="wizard-step" data-step>
+      <label class="field">
+        <span class="wizard-q">Was behauptest du?</span>
+        <input type="text" name="title" value="<%= values.title %>" minlength="5" maxlength="140" required placeholder="z. B. Ich laufe am Samstag die 5 km unter 25 Minuten" data-sum="Behauptung">
+        <small class="muted">Du gewinnst, wenn sie eintritt – sonst gewinnt dein Gegner.</small>
+      </label>
       <label class="field">
         <span>Details &amp; Regeln <em class="muted">(optional)</em></span>
-        <textarea name="description" rows="3" maxlength="2000" placeholder="Wie wird entschieden? Was gilt, wenn …?"><%= values.description %></textarea>
+        <textarea name="description" rows="4" maxlength="2000" placeholder="Wie wird entschieden? Was gilt, wenn …?" data-sum="Details"><%= values.description %></textarea>
       </label>
+    </section>
 
-      <label class="field">
-        <span>Einsatz pro Person in €</span>
-        <input type="number" name="stake" inputmode="decimal" min="<%= minStake / 100 %>" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= values.stake %>" required>
-        <small class="muted">Beide setzen genau diesen Betrag. Verfügbar: <%= euro(currentUser.balance) %>.</small>
-      </label>
+    <section class="wizard-step" data-step>
+      <p class="wizard-q">Was setzt ihr ein?</p>
+      <div class="new-bet-grid">
+        <label class="field">
+          <span>Geld pro Person in €</span>
+          <input type="number" name="stake" inputmode="decimal" min="0" max="<%= currentUser.balance / 100 %>" step="0.01" value="<%= values.stake %>" placeholder="z. B. 50" data-sum="Geld pro Person" data-sum-empty="kein Geld">
+          <small class="muted">Beide setzen genau diesen Betrag (mindestens <%= euro(minStake) %>, oder leer lassen, wenn ihr nur um Karten spielt). Verfügbar: <%= euro(currentUser.balance) %>.</small>
+        </label>
+        <label class="field">
+          <span>Karte <em class="muted">(optional, ab <%= minCardRarity.label %>)</em></span>
+          <select name="card" data-sum="Deine Karte" data-sum-empty="keine Karte">
+            <option value="">Keine Karte</option>
+            <% cards.forEach((c) => { %><option value="<%= c.card.id %>" <%= values.card === c.card.id ? 'selected' : '' %>><%= c.card.name %> (<%= c.rarity.label %>)<%= c.free > 1 ? ' ×' + c.free : '' %></option><% }) %>
+          </select>
+          <small class="muted"><% if (cards.length) { %>Dein Gegner muss eine Karte derselben Seltenheit setzen. Der Gewinner bekommt beide Karten.<% } else { %>Du hast keine freie Karte ab <%= minCardRarity.label %>.<% } %></small>
+        </label>
+      </div>
+    </section>
 
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Schiedsrichter</span>
-        <select name="referee" required>
-          <option value="">– auswählen –</option>
+        <span class="wizard-q">Wer entscheidet?</span>
+        <select name="referee" required data-sum="Schiedsrichter">
+          <option value="">Schiedsrichter wählen …</option>
           <% candidates.forEach((u) => { %><option value="<%= u._id %>" <%= values.referee === String(u._id) ? 'selected' : '' %>><%= u.username %></option><% }) %>
         </select>
+        <small class="muted">Ein drittes Mitglied (nicht dein Gegner) trägt zum Termin ein, wer gewonnen hat, und bekommt dafür <%= feePercent %> % vom Geld. Ihr beiden stimmt nicht mit ab.</small>
       </label>
+    </section>
 
+    <section class="wizard-step" data-step>
       <label class="field">
-        <span>Termin der Auswertung</span>
-        <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required>
-        <small class="muted">Ab dann trägt der Schiedsrichter das Ergebnis ein.</small>
+        <span class="wizard-q">Wann wird ausgewertet?</span>
+        <input type="datetime-local" name="resultAt" value="<%= values.resultAt %>" min="<%= minDeadline %>" required data-sum="Auswertung" data-sum-date>
+        <small class="muted">Bis dahin können Zuschauer auf einen von euch setzen; ab dann trägt der Schiedsrichter das Ergebnis ein.</small>
       </label>
+    </section>
 
-      <button class="btn btn-primary btn-block btn-lg" type="submit">Herausforderung senden</button>
-    </form>
-  </div>
+    <section class="wizard-step" data-step>
+      <p class="wizard-q" data-wizard-only hidden>Alles richtig?</p>
+      <dl class="wizard-summary" data-wizard-summary hidden></dl>
+      <p class="muted small">Dein Einsatz wird sofort reserviert. Dein Gegner und der Schiedsrichter haben <%= inviteHours %> Stunden Zeit zum Annehmen – sonst bekommst du alles zurück. Bis dahin sehen nur ihr drei das Duell. Zuschauer wetten in einem eigenen Topf: Ihr beiden spielt nur um eure eigenen Einsätze.</p>
+      <div class="new-bet-submit">
+        <p>Mit dem Absenden bestätigst du die <a href="/regeln" target="_blank">Regeln</a>.</p>
+        <button class="btn btn-primary btn-lg" type="submit">Herausforderung senden</button>
+      </div>
+    </section>
+
+    <div class="wizard-nav" data-wizard-nav hidden>
+      <button type="button" class="btn btn-ghost" data-wizard-back>Zurück</button>
+      <button type="button" class="btn btn-primary" data-wizard-next>Weiter</button>
+    </div>
+  </form>
 </div>
 
 <%- include('partials/foot') %>

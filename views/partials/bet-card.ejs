@@ -5,11 +5,11 @@
   let shown = bet.options.slice(0, 3);
   if (pick && !shown.some((o) => o.key === pick.side)) shown = [...bet.options.slice(0, 2), findOption(bet, pick.side)].filter(Boolean);
 %>
-<a class="bet-card <%= pick ? 'has-pick ' + optClass(bet, pick.side) : '' %>" href="/wetten/<%= bet._id %>">
+<a class="bet-card <%= pick ? 'has-pick ' + optClass(bet, pick.side) : '' %><%= bet.duel ? ' is-duel' : '' %>" href="/wetten/<%= bet._id %>">
   <div class="bet-card-top">
     <span class="bet-card-tags">
       <span class="badge badge-<%= st.key %>"><%= st.label %></span>
-      <% if (bet.duel) { %><span class="tag tag-duel" title="Duell: nur die beiden setzen, der Schiedsrichter entscheidet">Duell</span><% } %>
+      <% if (bet.duel) { %><span class="tag tag-duel" title="Duell: zwei treten gegeneinander an, der Schiedsrichter entscheidet – Zuschauer setzen auf einen der beiden">⚔ Duell</span><% } %>
       <% if (bet.groupName) { %><span class="tag tag-group" title="Nur für Mitglieder dieser Gruppe sichtbar"><%= bet.groupName %></span><% } %>
     </span>
     <span class="bet-card-when">
@@ -20,7 +20,7 @@
   </div>
   <h3 class="bet-card-title"><%= bet.title %></h3>
   <% if (bet.duel) { %>
-    <p class="bet-card-sub"><%- userLink(bet.creatorName, { nested: true }) %> vs. <%- userLink(bet.duel.opponentName, { nested: true }) %> · <%= euro(bet.duel.stake) %> pro Person</p>
+    <p class="bet-card-sub"><%- userLink(bet.creatorName, { nested: true }) %> vs. <%- userLink(bet.duel.opponentName, { nested: true }) %> · <%= duelStakeText(bet) %></p>
   <% } %>
   <div class="bet-chips">
     <% shown.forEach((o) => { %>

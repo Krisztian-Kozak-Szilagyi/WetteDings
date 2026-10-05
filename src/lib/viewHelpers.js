@@ -57,6 +57,13 @@ function quote(bet, opt) {
   return q === null ? '–' : `${q.toFixed(2).replace('.', ',')}×`;
 }
 
+/** Duell-Einsatz für Listen, z. B. "50,00 € pro Person + je eine Holo-Karte" (#67) */
+function duelStakeText(bet) {
+  if (!bet || !bet.duel) return '';
+  const r = bet.duel.cardRarity ? require('../tcg/catalog').rarityByKey[bet.duel.cardRarity] : null;
+  return [bet.duel.stake > 0 ? `${euro(bet.duel.stake)} pro Person` : null, r ? `je eine ${r.label}-Karte` : null].filter(Boolean).join(' + ');
+}
+
 /** Anteil einer Option am Topf in Prozent */
 function share(bet, opt) {
   const total = pool(bet);
@@ -156,6 +163,7 @@ module.exports = {
   relTime,
   pool,
   quote,
+  duelStakeText,
   share,
   feeEstimate,
   feeSplit,

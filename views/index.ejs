@@ -2,7 +2,10 @@
 
 <div class="page-head">
   <h1>Wetten</h1>
-  <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
+  <div class="page-head-actions">
+    <a class="btn btn-ghost" href="/duell/neu">⚔ Duell</a>
+    <a class="btn btn-primary" href="/wetten/neu">+ Neue Wette</a>
+  </div>
 </div>
 
 <div class="bet-toolbar-row">
@@ -27,7 +30,7 @@
       <% duelInvites.forEach((b) => { const asRef = String(b.referee) === String(currentUser._id); %>
         <li>
           <a href="/wetten/<%= b._id %>#duell"><strong><%= b.title %></strong></a>
-          <span class="muted small"><%= asRef ? b.creatorName + ' vs. ' + b.duel.opponentName + ' – du sollst Schiedsrichter sein' : b.creatorName + ' fordert dich heraus · ' + euro(b.duel.stake) + ' Einsatz' %> · bis <%= date(b.duel.expiresAt) %></span>
+          <span class="muted small"><%= asRef ? b.creatorName + ' vs. ' + b.duel.opponentName + ' – du sollst Schiedsrichter sein' : b.creatorName + ' fordert dich heraus · ' + duelStakeText(b) %> · bis <%= date(b.duel.expiresAt) %></span>
         </li>
       <% }) %>
     </ul>

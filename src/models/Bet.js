@@ -30,14 +30,29 @@ const voteSchema = new Schema(
   { _id: false }
 );
 
-// Duell (Head-to-Head): ein Mitglied fordert ein anderes heraus. Beide setzen denselben Betrag, nur sie dürfen
-// setzen, und allein der Schiedsrichter entscheidet (er bekommt die Provision). Gilt erst, wenn der Herausgeforderte
-// UND der Schiedsrichter angenommen haben – bis dahin ist die Wette nur für die drei sichtbar (state 'angefragt').
+// Duell (Head-to-Head): ein Mitglied fordert ein anderes heraus. Beide setzen denselben Betrag und/oder je eine
+// Karte derselben Seltenheit (mindestens Gold); allein der Schiedsrichter entscheidet (er bekommt die Provision).
+// Gilt erst, wenn der Herausgeforderte UND der Schiedsrichter angenommen haben – bis dahin ist die Wette nur für
+// die drei sichtbar (state 'angefragt'). Danach können Zuschauer auf einen der beiden setzen – in einem eigenen
+// Topf, getrennt vom Einsatz der Beteiligten (siehe lib/payout → computeDuelPayouts).
+// Eingesetzte Karte: bleibt beim Besitzer, ist aber gesperrt (tcg/locks); der Gewinner bekommt beide.
+const duelCardSchema = new Schema(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    side: { type: String, enum: ['o1', 'o2'], required: true },
+    doc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // das eingesetzte Exemplar
+    card: { type: String, required: true }, // Karten-ID aus dem Katalog
+    rarity: { type: String, required: true },
+  },
+  { _id: false }
+);
 const duelSchema = new Schema(
   {
     opponent: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     opponentName: { type: String, required: true },
-    stake: { type: Number, required: true }, // Cent, für beide gleich
+    stake: { type: Number, required: true }, // Cent, für beide gleich (0 = nur Karten)
+    cardRarity: { type: String, default: null }, // Seltenheit der Karten (null = ohne Karten)
+    cards: { type: [duelCardSchema], default: [] },
     state: { type: String, enum: ['angefragt', 'aktiv'], default: 'angefragt' },
     opponentAcceptedAt: { type: Date, default: null },
     refereeAcceptedAt: { type: Date, default: null },
@@ -126,6 +141,7 @@ betSchema.index({ group: 1, status: 1 });
 betSchema.index({ status: 1, resolvedAt: -1 });
 betSchema.index({ createdAt: -1 });
 betSchema.index({ 'duel.state': 1, 'duel.expiresAt': 1 }); // offene Duell-Anfragen
+betSchema.index({ 'duel.cards.user': 1, status: 1 }); // im Duell gesperrte Karten (tcg/locks)
 betSchema.index({ updatedAt: -1 }); // für die Live-Aktualisierung der Übersicht
 
 module.exports = model('Bet', betSchema);

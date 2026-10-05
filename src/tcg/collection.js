@@ -28,7 +28,7 @@ async function collection(user) {
   const tradingByCard = {}; // unfolierte Exemplare in einem Handelsangebot – gehen weg, zählen nicht als Duplikat
   for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card foiledAt').lean()) {
     const reason = locked.reasons.get(String(d._id));
-    if (reason === 'handel' && !d.foiledAt) tradingByCard[d.card] = (tradingByCard[d.card] || 0) + 1;
+    if ((reason === 'handel' || reason === 'duell') && !d.foiledAt) tradingByCard[d.card] = (tradingByCard[d.card] || 0) + 1;
     const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason });
     if (e.reason === 'folie' && reason !== 'folie') e.reason = reason; // Quest/Handel sind wichtiger als die Folie
     e.n += 1;

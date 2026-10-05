@@ -5,7 +5,9 @@ const User = require('../models/User');
 const Bet = require('../models/Bet');
 const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
-const { computePayouts, splitFee } = require('../lib/payout');
+const { computePayouts, computeDuelPayouts, splitFee } = require('../lib/payout');
+const { TcgCard } = require('../models/Tcg');
+const catalog = require('../tcg/catalog');
 const { verdictRole, devMayDecide, evaluateVotes } = require('../lib/verdict');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
@@ -109,8 +111,14 @@ async function placeStake({ user, betId, side, amount }) {
   return inTransaction(async (session) => {
     const current = await Bet.findById(betId).session(session);
     if (!current) throw new UserError('Wette nicht gefunden.');
-    // Duell: nur die beiden Herausforderer setzen – und zwar beim Herausfordern bzw. Annehmen
-    if (current.duel) throw new UserError('Bei einem Duell setzen nur die beiden Beteiligten – mitwetten ist nicht möglich.');
+    // Duell: die beiden Beteiligten setzen beim Herausfordern bzw. Annehmen; Zuschauer setzen, sobald das Duell
+    // läuft, auf einen der beiden – in einem eigenen Topf (siehe payOut)
+    if (current.duel) {
+      if (String(current.creator) === String(user._id) || String(current.duel.opponent) === String(user._id)) {
+        throw new UserError('Du bist an diesem Duell beteiligt – dein Einsatz steht schon fest.');
+      }
+      if (current.duel.state !== 'aktiv') throw new UserError('Mitwetten geht erst, wenn das Duell begonnen hat.');
+    }
     // Neue Regel: Wettersteller dürfen an ihrer eigenen Wette nicht teilnehmen
     if (isOwnerOf(current, user)) {
       throw new UserError('Als Wettersteller kannst du nicht auf deine eigene Wette setzen – du erhältst dafür eine Provision vom Topf.');
@@ -204,11 +212,14 @@ async function editBet({ actor, betId, title, description }) {
 async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
   const winner = bet.options.find((o) => o.key === outcome) || null;
   const positions = await Position.find({ bet: bet._id }).sort({ createdAt: 1, _id: 1 }).session(session).lean();
-  const { payouts, refunded, fee } = computePayouts(
-    positions.map((p) => ({ id: String(p._id), side: p.side, amount: p.amount })),
-    outcome,
-    bet.creatorFeePercent || 0
-  );
+  const rows = positions.map((p) => ({ id: String(p._id), user: p.user, side: p.side, amount: p.amount }));
+  // Duell: Beteiligte und Zuschauer haben getrennte Töpfe (#67); sonst ein gemeinsamer Topf
+  const duelPay = bet.duel ? computeDuelPayouts(rows, outcome, bet.creatorFeePercent || 0, [bet.creator, bet.duel.opponent]) : null;
+  const { payouts, fee, refunded: baseRefunded } = duelPay || computePayouts(rows, outcome, bet.creatorFeePercent || 0);
+  // Duell: Karten wechseln nur bei einem echten Ergebnis den Besitzer – dann gilt es nicht als "alles erstattet"
+  const cardsMove = !!bet.duel && outcome !== 'annulliert' && !!winner && (bet.duel.cards || []).length > 0;
+  const refunded = duelPay ? duelPay.refunded && !cardsMove : baseRefunded;
+  const refundedIds = duelPay ? duelPay.refundedIds : refunded ? new Set(rows.map((r) => r.id)) : new Set();
 
   // Provision tragen Wettersteller und Schiedsrichter gemeinsam – je die Hälfte
   const feeShare = splitFee(fee, !!bet.referee, { duel: !!bet.duel });
@@ -263,7 +274,7 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
       userOps.push({ updateOne: { filter: { _id: p.user }, update: { $inc: { balance: payout } } } });
       ledgerDocs.push({
         user: p.user,
-        type: refunded ? 'erstattung' : 'auszahlung',
+        type: refundedIds.has(String(p._id)) ? 'erstattung' : 'auszahlung', // Duell: je Topf
         amount: payout,
         bet: bet._id,
         betTitle: bet.title,
@@ -285,7 +296,23 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
   }
 
   if (positionOps.length) await Position.bulkWrite(positionOps, { session });
-  const notes = resultNotes({ bet, positions, payouts, refunded, outcome, label: winner ? winner.label : null, note, actor, feeShare, isGone });
+
+  // Duell mit Karten: Die Karte des Verlierers geht an den Gewinner (beide waren bis jetzt gesperrt).
+  // Bei Annullierung bleibt jede Karte, wo sie ist – die Sperre endet mit dem Abschluss.
+  let cardsWon = null;
+  if (cardsMove) {
+    const winnerId = outcome === 'o1' ? bet.creator : bet.duel.opponent;
+    const lost = bet.duel.cards.filter((c) => c.side !== outcome);
+    if (!isGone(winnerId)) {
+      for (const c of lost) {
+        const moved = await TcgCard.updateOne({ _id: c.doc, user: c.user }, { $set: { user: winnerId } }, { session });
+        if (moved.modifiedCount !== 1) throw new UserError('Eine der eingesetzten Karten ist nicht mehr da. Bitte wende dich an einen Admin.');
+      }
+      await User.updateOne({ _id: winnerId }, { $addToSet: { tcgSeen: { $each: lost.map((c) => c.card) } } }, { session });
+    }
+    cardsWon = { winner: winnerId, cards: bet.duel.cards };
+  }
+  const notes = resultNotes({ bet, positions, payouts, refunded, refundedIds, outcome, label: winner ? winner.label : null, note, actor, feeShare, isGone, cardsWon });
   if (userOps.length) await User.bulkWrite(userOps, { session });
   if (ledgerDocs.length) await Ledger.insertMany(ledgerDocs, { session });
 
@@ -309,26 +336,45 @@ async function payOut({ session, bet, outcome, note, actor, votes, via, now }) {
  * Benachrichtigungen zum Ergebnis: jeder Mitwettende (Gewinn, Verlust oder Erstattung), dazu Wettersteller und
  * Schiedsrichter ohne eigenen Einsatz. Wer entschieden hat und gelöschte Konten bekommen nichts.
  */
-function resultNotes({ bet, positions, payouts, refunded, outcome, label, note, actor, feeShare, isGone }) {
+function resultNotes({ bet, positions, payouts, refunded, refundedIds = new Set(), outcome, label, note, actor, feeShare, isGone, cardsWon = null }) {
   const title = notifyService.short(bet.title);
   const actorId = actor && !actor.system ? String(actor._id) : null;
   const skip = (id) => !id || String(id) === actorId || isGone(id);
   const per = new Map(); // je Mitglied: Einsatz und Auszahlung (man kann mehrfach setzen)
   for (const p of positions) {
-    const e = per.get(String(p.user)) || { user: p.user, stake: 0, payout: 0 };
+    const e = per.get(String(p.user)) || { user: p.user, stake: 0, payout: 0, refunded: true };
     e.stake += p.amount;
     e.payout += payouts.get(String(p._id)) || 0;
+    if (!refundedIds.has(String(p._id))) e.refunded = false;
     per.set(String(p.user), e);
   }
+  // Duell mit Karten: welche Karten jemand gewinnt bzw. verliert
+  const cardNames = (list) => list.map((c) => `„${(catalog.cardById[c.card] || { name: c.card }).name}“`).join(' und ');
+  const cardText = (userId) => {
+    if (!cardsWon) return '';
+    const mine = cardsWon.cards.filter((c) => String(c.user) === String(userId));
+    if (String(cardsWon.winner) === String(userId)) return ` Dazu bekommst du die Karte ${cardNames(cardsWon.cards.filter((c) => String(c.user) !== String(userId)))}.`;
+    return mine.length ? ` Deine Karte ${cardNames(mine)} geht an den Gewinner.` : '';
+  };
   const notes = [];
   for (const e of per.values()) {
     if (skip(e.user)) continue;
     let text;
+    const isParty = !!bet.duel && [String(bet.creator), String(bet.duel.opponent)].includes(String(e.user));
+    if (isParty && cardsWon && outcome !== 'annulliert') {
+      // Beteiligte im Kartenduell: Ergebnis mit Karten (Geld kann 0 sein)
+      const won = String(cardsWon.winner) === String(e.user);
+      text = won
+        ? `Gewonnen! „${title}“ endete mit „${label}“${e.payout > 0 ? ` – du bekommst ${euro(e.payout)}` : ''}.${cardText(e.user)}`
+        : `Verloren: „${title}“ endete mit „${label}“${e.stake > 0 ? ` (Einsatz ${euro(e.stake)})` : ''}.${cardText(e.user)}`;
+      notes.push({ user: e.user, text });
+      continue;
+    }
     if (outcome === 'annulliert') {
       text = bet.duel
         ? `Duell „${title}“: ${note} Dein Einsatz von ${euro(e.stake)} wurde erstattet.`
         : `Die Wette „${title}“ wurde annulliert – dein Einsatz von ${euro(e.stake)} wurde erstattet.`;
-    } else if (refunded) {
+    } else if (refunded || (bet.duel && e.refunded)) {
       text = `„${title}“ endete mit „${label}“, aber ohne Gegenseite – dein Einsatz von ${euro(e.stake)} wurde erstattet.`;
     } else if (e.payout > 0) {
       text = `Gewonnen! „${title}“ endete mit „${label}“ – du bekommst ${euro(e.payout)}.`;
