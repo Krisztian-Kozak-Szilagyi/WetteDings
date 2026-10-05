@@ -42,7 +42,7 @@ function popupJson(g, { euro, images = {} } = {}) {
     image: image || null,
     chip: money ? `+${euro(g.count)}` : `+${g.count}`,
     chipClass: money ? 'is-money' : g.kind === 'karte' ? 'is-card' : g.kind === 'item' ? 'is-foil' : 'is-money',
-    rowName: money ? 'Gutgeschrieben' : g.kind === 'pack' ? 'Liegt in deinem Inventar' : g.kind === 'karte' ? 'In deiner Sammlung' : 'In deinem Inventar',
+    rowName: money ? 'Gutgeschrieben' : g.kind === 'pack' ? 'Liegt in deinem Inventar' : g.kind === 'karte' ? 'In deiner Sammlung' : g.kind === 'los' ? 'Nimmt an der Ziehung teil' : 'In deinem Inventar',
     reason: g.reason,
     byName: g.byName,
     left: g.left || 1,

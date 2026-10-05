@@ -263,6 +263,12 @@ dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-bg) 70%, tr
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-neutral-800);
 }
 .bell-panel { width: min(380px, calc(100vw - 32px)); }
+/* Handy: Die Glocke steht nicht ganz rechts (daneben Konto/Menü) – rechtsbündig an ihr ragte das Fenster links aus dem
+   Bildschirm (#88). Deshalb über die ganze Breite direkt unter der (oben klebenden) Kopfzeile. */
+@media (max-width: 640px) {
+  .bell-panel { position: fixed; left: 12px; right: 12px; top: 68px; width: auto; } /* 60px Kopfzeile + Abstand */
+  .bell-list { max-height: calc(100dvh - 160px); }
+}
 .bell-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--color-divider); font-size: 14px; font-weight: 500; }
 .bell-list { max-height: min(440px, 70vh); overflow: auto; display: flex; flex-direction: column; }
 .bell-empty { margin: 0; padding: 18px 16px; font-size: 13px; color: var(--muted); }
@@ -4568,6 +4574,20 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .pf-main, .pf-side { min-width: 0; }
 .pf-main > .stats { margin-bottom: 20px; }
+/* Eigene Statistik auf dem Profil: eine schmale Zeile mit vier Kennzahlen, Bereiche aufklappbar */
+.pf-mystats { padding-top: 14px; padding-bottom: 12px; scroll-margin-top: 90px; } /* nach dem Umschalten (#statistik) nicht unter der Kopfleiste */
+.pf-mystats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.pf-mystats-head h2 { margin: 0; font-size: 1rem; }
+.pf-mystats-since { font-weight: 400; }
+.pf-mystats-share { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pf-mystats-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.pf-mystats-tiles dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.pf-mystats-tiles dd { margin: 0; font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 520px) { .pf-mystats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pf-mystats-more { margin-top: 10px; }
+.pf-mystats-more summary { cursor: var(--cur-pointer); }
+.pf-mystats-table { margin-top: 6px; }
+.pf-mystats-table td, .pf-mystats-table th { padding-top: 6px; padding-bottom: 6px; }
 .pf-side .card h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: var(--color-neutral-300); letter-spacing: .02em; }
 
 /* Abzeichen mit der Zahl der Erfolge: Sechseck mit Metallkante, Farbe nach Stufe */

@@ -7,16 +7,17 @@
     { key: 'karte', label: 'Karte' },
     { key: 'item', label: 'Gegenstand' },
     { key: 'geld', label: 'Geld' },
+    { key: 'los', label: 'Lotterielos', grantOnly: true },
   ];
   const KIND = {
-    pack: ['Pack', 'badge-offen'], karte: ['Karte', 'badge-entschieden'], item: ['Gegenstand', 'badge-entschieden'], geld: ['Geld', 'badge-entschieden'],
+    pack: ['Pack', 'badge-offen'], karte: ['Karte', 'badge-entschieden'], item: ['Gegenstand', 'badge-entschieden'], geld: ['Geld', 'badge-entschieden'], los: ['Lotterielos', 'badge-entschieden'],
     packentzug: ['Pack entfernt', 'badge-streitig'], entzug: ['Karte entfernt', 'badge-streitig'], itementzug: ['Gegenstand entfernt', 'badge-streitig'], geldabzug: ['Geld abgezogen', 'badge-streitig'],
   };
   const cardOptions = () => grantCards.map((g) => `<optgroup label="${g.rarity.label}${g.rarity.hidden ? ' (geheim)' : ''}">${g.cards.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}</optgroup>`).join('');
 %>
 
 <section class="stats-block" id="vergeben">
-  <%- blockHead('Vergeben', 'Vergaben greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe steht mit deinem Namen im Protokoll und muss mit deinem Passwort bestätigt werden.<br><br><strong>Vergeben an alle:</strong> Packs 1–10, Karten 1–5, Gegenstände 1–5 je Mitglied.<br><strong>Entfernen</strong> geht nur bei einem Mitglied: Packs (neueste zuerst), Karten und Gegenstände – gesperrte Exemplare (Quest, Handelsangebot) bleiben. Geld wird nie unter 0 € abgezogen und erscheint im Kontoauszug als „Gutschrift vom Team“ bzw. „Abzug durch das Team“.') %>
+  <%- blockHead('Vergeben', 'Vergaben greifen direkt in die Spielwirtschaft ein. Nutze sie nur, um Fehler auszugleichen, Funktionen zu testen oder für angekündigte Aktionen – nicht, um einzelne Mitglieder zu bevorzugen. Jede Vergabe steht mit deinem Namen im Protokoll und muss mit deinem Passwort bestätigt werden.<br><br><strong>Vergeben an alle:</strong> Packs 1–10, Karten 1–5, Gegenstände 1–5, Lotterielose 1–10 je Mitglied.<br><strong>Lotterielose</strong> gelten für die laufende Runde der Wochen- oder Monats-Lotterie. Sie sind kostenlos, der Topf wächst dadurch nicht, und sie lassen sich nicht wieder entfernen.<br><strong>Entfernen</strong> geht nur bei einem Mitglied: Packs (neueste zuerst), Karten und Gegenstände – gesperrte Exemplare (Quest, Handelsangebot) bleiben. Geld wird nie unter 0 € abgezogen und erscheint im Kontoauszug als „Gutschrift vom Team“ bzw. „Abzug durch das Team“.') %>
   <p class="panel-warning-line"><span aria-hidden="true">!</span> Nur für Bugfixes, Tests und Aktionen – alles steht im Protokoll.</p>
   <form method="post" data-reauth action="/admin/vergeben" class="card form grant-form" data-grant-form data-confirm="Diese Vergabe wirklich ausführen?">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -32,7 +33,7 @@
         <legend>Was</legend>
         <div class="stats-range grant-arts" role="radiogroup">
           <% WHAT.forEach((w, i) => { %>
-            <label class="grant-art"><input type="radio" name="was" value="<%= w.key %>" <%= i === 0 ? 'checked' : '' %>><span><%= w.label %></span></label>
+            <label class="grant-art"<%- w.grantOnly ? ' data-grant-only' : '' %>><input type="radio" name="was" value="<%= w.key %>" <%= i === 0 ? 'checked' : '' %>><span><%= w.label %></span></label>
           <% }) %>
         </div>
       </fieldset>
@@ -47,6 +48,9 @@
       <label class="field" data-for="item"><span>Gegenstand</span>
         <select name="item"><% itemTypes.forEach((t) => { %><option value="<%= t.key %>"><%= t.label %></option><% }) %></select>
       </label>
+      <label class="field" data-for="los"><span>Lotterie</span>
+        <select name="lotterie"><% lotteryGrantKinds.forEach((k) => { %><option value="<%= k.key %>"><%= k.name %></option><% }) %></select>
+      </label>
       <label class="field"><span>An</span>
         <input type="text" name="user" list="grant-members" autocomplete="off" maxlength="40" placeholder="Name tippen oder auswählen" required>
         <datalist id="grant-members">
@@ -55,7 +59,7 @@
         </datalist>
       </label>
       <label class="field grant-count" data-for="geld"><span>Betrag in €</span><input type="text" name="amount" inputmode="decimal" placeholder="z. B. 250,00"></label>
-      <label class="field grant-count" data-for="pack karte item"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
+      <label class="field grant-count" data-for="pack karte item los"><span>Anzahl</span><input type="number" name="count" min="1" max="50" step="1" value="1" required></label>
       <label class="field grant-reason" data-aktion="vergeben"><span>Grund <small class="muted">(sieht das Mitglied im Geschenk-Fenster)</small></span>
         <textarea name="grund" rows="2" minlength="<%= reasonMin %>" maxlength="<%= reasonMax %>" placeholder="z. B. Ausgleich für den Fehler beim Packöffnen am 3. Oktober" required></textarea>
       </label>

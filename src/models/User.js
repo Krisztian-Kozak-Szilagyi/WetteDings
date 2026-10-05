@@ -31,6 +31,10 @@ const userSchema = new Schema(
     supportConsentAt: { type: Date, default: null },
     // Echter Name (freiwillig) – erscheint in Klammern neben dem Benutzernamen
     realName: { type: String, default: null },
+    // Registrierung: benutzter Einladungscode und wer ihn erzeugt hat (für das Registrierungs-Protokoll).
+    // Ältere Konten haben beides nicht – die Codes selbst löscht MongoDB nach Ablauf.
+    registrationCode: { type: String, default: null },
+    invitedByName: { type: String, default: null },
     // Rolle: 'dev' oder 'mod' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
     role: { type: String, enum: ['dev', 'mod', null], default: null },
     // Profil: selbst geschriebener Text (höchstens 300 Zeichen, siehe achievements/logic.cleanBio) und bis zu
@@ -39,6 +43,8 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
+    // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
+    statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
     forumSeenAt: { type: Date, default: null },
     // Admin/Dev: bis wann Geschäfte zwischen Mehrfach-Konten gesehen wurden (Abzeichen am Menüpunkt)

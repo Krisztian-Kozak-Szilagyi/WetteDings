@@ -86,6 +86,46 @@
       </div>
     </div>
 
+    <% if (myStats) { const signed = (c) => `<span class="${c < 0 ? 'neg' : c > 0 ? 'pos' : ''}">${c > 0 ? '+' : ''}${euro(c)}</span>`; %>
+      <%# Statistik (src/stats/profileStats.js) – auf dem eigenen Profil immer, auf fremden nur, wenn veröffentlicht %>
+      <div class="card pf-mystats" id="statistik">
+        <div class="pf-mystats-head">
+          <h2><%= isMe ? 'Deine Statistik' : 'Statistik' %> <span class="muted small pf-mystats-since">seit Beginn</span></h2>
+          <% if (isMe) { %>
+            <form method="post" action="/profil/statistik" class="pf-mystats-share">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="oeffentlich" value="<%= profile.statsPublic ? '0' : '1' %>">
+              <span class="muted small"><%= profile.statsPublic ? 'für alle Mitglieder sichtbar' : 'nur für dich sichtbar' %></span>
+              <button class="btn btn-ghost btn-sm" type="submit"><%= profile.statsPublic ? 'Nur für mich' : 'Veröffentlichen' %></button>
+            </form>
+          <% } else { %>
+            <span class="muted small">von <%= profile.username %> veröffentlicht</span>
+          <% } %>
+        </div>
+        <dl class="pf-mystats-tiles">
+          <div title="Wie in der Rangliste: Guthaben, offene Einsätze, Coins, Karten und Packs"><dt>Vermögen</dt><dd><%= euro(myStats.total) %></dd></div>
+          <div title="Vermögen ohne Startguthaben und Geld vom Team – was du selbst erspielt hast"><dt>Gewinn</dt><dd><%- signed(myStats.profit) %></dd></div>
+          <div title="Alles, was du eingesetzt, gehandelt oder gekauft hast"><dt>Umsatz</dt><dd><%= euro(myStats.turnover) %></dd></div>
+          <div title="Für <%= euro(myStats.packSpend) %> Packs gekauft"><dt>Packs geöffnet</dt><dd><%= myStats.packsOpened %></dd></div>
+        </dl>
+        <details class="pf-mystats-more">
+          <summary class="muted small">Nach Bereichen</summary>
+          <table class="table pf-mystats-table">
+            <thead><tr><th>Bereich</th><th class="num">Umsatz</th><th class="num">Ergebnis</th></tr></thead>
+            <tbody>
+              <% myStats.areas.forEach((a) => { %>
+                <tr title="<%= a.hint %>">
+                  <td><%= a.label %></td>
+                  <td class="num nowrap"><%- a.turnover === null ? '<span class="muted">–</span>' : euro(a.turnover) %></td>
+                  <td class="num nowrap"><%- signed(a.result) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </details>
+      </div>
+    <% } %>
+
     <div class="card">
       <div class="tcg-coll-head">
         <h2>Favoriten</h2>

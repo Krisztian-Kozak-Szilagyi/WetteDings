@@ -5,7 +5,7 @@ const { Schema, model } = require('mongoose');
 const giftSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    kind: { type: String, enum: ['pack', 'karte', 'item', 'geld'], required: true },
+    kind: { type: String, enum: ['pack', 'karte', 'item', 'geld', 'los'], required: true },
     key: { type: String, default: null }, // Pack-Art, Karten-ID oder Gegenstand (für das Bild)
     label: { type: String, required: true }, // z. B. "BfW Holdings Booster Pack", "Krisz (Glitch)"
     count: { type: Number, default: 1 }, // Stück; bei Geld der Betrag in Cent
