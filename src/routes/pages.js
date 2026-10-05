@@ -141,7 +141,7 @@ router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), req.app.locals.assetVersion) });
   }
-  res.redirect(safeRedirect(str(req.body.zurueck), '/'));
+  res.redirect(safeRedirect(req.session.popupBack, '/')); // Ziel aus der Sitzung (src/app.js)
 });
 
 // Fenster "Geschenk vom Team" mit Weiter bestätigt
@@ -150,7 +150,7 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: giftService.popup(await giftService.nextUnseen(req.user._id)) });
   }
-  res.redirect(safeRedirect(str(req.body.zurueck), '/'));
+  res.redirect(safeRedirect(req.session.popupBack, '/')); // Ziel aus der Sitzung (src/app.js)
 });
 
 // Sammlung eines Mitglieds (nur ansehen); ein Klick vergrößert die Karte, bei fremden Sammlungen lässt sich dort ein Tausch vorschlagen

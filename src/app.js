@@ -191,9 +191,11 @@ function createApp() {
         bellNotes: bell.list,
         bellUnread: bell.unread,
         achPopup,
-        achPopupBack: req.originalUrl,
         giftPopup,
       });
+      // Ohne JavaScript führt "Weiter" im Erfolgs-/Geschenk-Fenster auf diese Seite zurück. Das Ziel steht in der
+      // Sitzung statt in einem Formularfeld, damit niemand eine fremde Adresse unterschieben kann (CodeQL #74).
+      if ((achPopup || giftPopup) && req.method === 'GET') req.session.popupBack = req.originalUrl;
     }
     next();
   });
