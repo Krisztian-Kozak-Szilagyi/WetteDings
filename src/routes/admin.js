@@ -187,6 +187,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     foilSettings: foil.settings,
     lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
+    lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
     grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     reasonMin: giftService.REASON_MIN,
@@ -708,6 +709,30 @@ async function grantMoneyTo(req) {
   req.flash('success', toAll ? `${ids.length} Mitglieder haben je ${euro(cents)} bekommen.` : `${euro(cents)} an ${user.username} gutgeschrieben.`);
 }
 
+// Lotterielose (Wochen- oder Monats-Lotterie) an ein Mitglied oder an alle – kostenlos, der Topf wächst nicht
+const TICKETS_MAX = { one: 50, all: 10 };
+async function grantTicketsTo(req) {
+  const kind = lotteryService.GRANT_KINDS.find((k) => k === str(req.body.lotterie));
+  const target = str(req.body.user);
+  const count = Number.parseInt(str(req.body.count), 10);
+  const toAll = target === 'alle';
+  const user = !toAll && mongoose.isValidObjectId(target) ? await User.findOne({ _id: target, deletedAt: null }).select('username').lean() : null;
+  const max = toAll ? TICKETS_MAX.all : TICKETS_MAX.one;
+  if (!kind) return req.flash('error', 'Bitte die Wochen- oder Monats-Lotterie auswählen.');
+  if (!toAll && !user) return req.flash('error', 'Bitte ein Mitglied oder „Alle Mitglieder“ auswählen.');
+  if (!Number.isInteger(count) || count < 1 || count > max) return req.flash('error', `Die Anzahl muss zwischen 1 und ${max} liegen.`);
+  try {
+    const r = await lotteryService.grantTickets({ userIds: toAll ? await allMemberIds() : [user._id], count, kind });
+    const lose = count === 1 ? '1 Los' : `${count} Lose`;
+    await notify(r.recipients, { area: 'Lotterie', href: r.kind.path, text: `Das Team hat dir ${lose} für die ${r.kind.name} #${r.round} geschenkt.` });
+    await PackGrant.create({ by: req.user._id, byName: req.user.username, to: toAll ? null : user._id, toName: toAll ? `Alle Mitglieder (${r.recipients.length})` : user.username, all: toAll, recipients: r.recipients.length, kind: 'los', type: kind, typeLabel: `${r.kind.name} #${r.round}`, count });
+    req.flash('success', toAll ? `${r.recipients.length} Mitglieder haben je ${lose} für die ${r.kind.name} bekommen.` : `${lose} für die ${r.kind.name} an ${user.username} vergeben.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+}
+
 async function revokeMoneyFrom(req) {
   const cents = moneyAmount(req.body.amount);
   const target = str(req.body.user);
@@ -736,6 +761,7 @@ const GRANT_ART = {
   'vergeben:karte': 'karte',
   'vergeben:item': 'item',
   'vergeben:geld': 'geld',
+  'vergeben:los': 'los',
   'entfernen:pack': 'packentzug',
   'entfernen:karte': 'entzug',
   'entfernen:item': 'itementzug',
@@ -774,6 +800,9 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
   } else if (art === 'geld') {
     req.body = body;
     await grantMoneyTo(req);
+  } else if (art === 'los') {
+    req.body = body;
+    await grantTicketsTo(req);
   } else if (art === 'geldabzug') {
     req.body = body;
     await revokeMoneyFrom(req);
@@ -783,6 +812,8 @@ router.post('/admin/vergeben', requireStaff, requireReauth(GRANT_URL), async (re
   } else if (art === 'packentzug' || art === 'itementzug') {
     req.body = body;
     await revokeInventory(req, art);
+  } else if (str(req.body.was) === 'los') {
+    req.flash('error', 'Vergebene Lotterielose lassen sich nicht entfernen.');
   } else {
     req.flash('error', 'Bitte auswählen, was vergeben werden soll.');
   }
