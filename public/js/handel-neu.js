@@ -169,46 +169,75 @@
     update();
   }
 
-  // ---------- Ablage: gewählte Karten als Mini-Karten im Handelsfenster ----------
+  // ---------- Ablage: gewählte Karten als aufgefächerte Hand im Handelsfenster ----------
+  // Jede Karte behält ihr Element (nur neue fliegen herein); gleiche Karten liegen als Stapel mit Zähler.
+  var rarityOf = function (slot) { var m = /(?:^|\s)(r-[a-z]+)/.exec(slot.className); return m ? m[1] : ''; };
+  function miniFor(it) {
+    var li = document.createElement('li');
+    li.className = 'hb-mini is-new ' + rarityOf(it.slot) + (it.foil ? ' is-foil' : '') + (it.item ? ' is-item' : '');
+    li.setAttribute('data-hb-key', it.slot.getAttribute('data-hb-id'));
+    var card = document.createElement('span');
+    card.className = 'hb-mini-card';
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.draggable = true;
+    card.setAttribute('data-hb-out', it.slot.getAttribute('data-hb-id'));
+    var img = document.createElement('img');
+    img.src = it.image;
+    img.alt = '';
+    img.draggable = false;
+    card.appendChild(img);
+    if (it.foil) {
+      var sheen = document.createElement('span');
+      sheen.className = 'hb-mini-sheen';
+      card.appendChild(sheen);
+    }
+    var x = document.createElement('span');
+    x.className = 'hb-mini-x';
+    x.setAttribute('aria-hidden', 'true');
+    x.textContent = '×';
+    card.appendChild(x);
+    var n = document.createElement('span');
+    n.className = 'hb-mini-n';
+    card.appendChild(n);
+    var tip = document.createElement('span');
+    tip.className = 'hb-mini-tip';
+    tip.setAttribute('aria-hidden', 'true');
+    li.appendChild(card);
+    li.appendChild(tip);
+    card.addEventListener('click', function () { removeOne(it.slot); });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        removeOne(it.slot);
+      }
+    });
+    li.addEventListener('animationend', function () { li.classList.remove('is-new'); });
+    return li;
+  }
   function renderTray(side, sel) {
     var tray = $('[data-hb-tray="' + side + '"]', root);
     if (!tray) return;
-    $all('.hb-mini', tray).forEach(function (li) { li.remove(); });
-    sel.items.forEach(function (it) {
-      var li = document.createElement('li');
-      li.className = 'hb-mini' + (it.foil ? ' is-foil' : '') + (it.item ? ' is-item' : '');
-      var btn = document.createElement('span');
-      btn.className = 'hb-mini-card';
-      btn.setAttribute('role', 'button');
-      btn.tabIndex = 0;
-      btn.setAttribute('data-hb-out', it.slot.getAttribute('data-hb-id'));
-      btn.title = it.label + ' – antippen oder herausziehen zum Entfernen';
-      btn.setAttribute('aria-label', (it.n > 1 ? it.n + '× ' : '') + it.label + ' entfernen');
-      var img = document.createElement('img');
-      img.src = it.image;
-      img.alt = '';
-      btn.appendChild(img);
-      if (it.n > 1) {
-        var n = document.createElement('span');
-        n.className = 'hb-mini-n';
-        n.textContent = '×' + it.n;
-        btn.appendChild(n);
-      }
-      var x = document.createElement('span');
-      x.className = 'hb-mini-x';
-      x.textContent = '×';
-      btn.appendChild(x);
-      btn.addEventListener('click', function () { removeOne(it.slot); });
-      btn.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
-          e.preventDefault();
-          removeOne(it.slot);
-        }
-      });
-      btn.draggable = true;
-      li.appendChild(btn);
-      tray.appendChild(li);
+    var have = {};
+    $all('.hb-mini', tray).forEach(function (li) { have[li.getAttribute('data-hb-key')] = li; });
+    var keep = {};
+    sel.items.forEach(function (it, i) {
+      var key = it.slot.getAttribute('data-hb-id');
+      var li = have[key] || miniFor(it);
+      keep[key] = true;
+      tray.appendChild(li); // Reihenfolge wie in der Sammlung
+      li.style.setProperty('--i', String(i));
+      li.classList.toggle('is-stack', it.n > 1);
+      li.classList.toggle('is-stack-3', it.n > 2);
+      $('.hb-mini-n', li).textContent = it.n > 1 ? '×' + it.n : '';
+      var value = (parseInt(it.slot.getAttribute('data-value'), 10) || 0) * it.n;
+      $('.hb-mini-tip', li).textContent = (it.n > 1 ? it.n + '× ' : '') + it.label + ' · ' + euro(value);
+      var card = $('.hb-mini-card', li);
+      card.title = it.label + ' – antippen oder herausziehen zum Entfernen';
+      card.setAttribute('aria-label', (it.n > 1 ? it.n + '× ' : '') + it.label + ' entfernen');
     });
+    Object.keys(have).forEach(function (key) { if (!keep[key]) have[key].remove(); });
+    tray.style.setProperty('--n', String(Math.max(1, sel.items.length)));
     tray.classList.toggle('is-empty', !sel.items.length);
   }
 
