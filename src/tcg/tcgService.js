@@ -173,6 +173,17 @@ async function packInventory(userId) {
 }
 
 /**
+ * Welche unfolierten Exemplare einer Karte sind Duplikate (Liste nach Alter sortiert, älteste zuerst)?
+ * Es bleibt immer eins: ein Exemplar auf Quest oder im Dungeon (kommt zurück) oder sonst das neueste freie.
+ * Exemplare im Handelsangebot werden weder verkauft noch als das verbleibende gezählt – sie gehen ja weg (#72).
+ */
+function pickDuplicates(list, locked) {
+  const free = list.filter((c) => !isLocked(locked, c));
+  const returns = list.some((c) => isLocked(locked, c) && locked.reasons.get(String(c._id)) !== 'handel');
+  return returns ? free : free.slice(0, -1);
+}
+
+/**
  * Karten verkaufen: count Stück der Karte cardId (die ältesten zuerst).
  * keepOne = true verkauft alle Duplikate und behält genau eine.
  */
@@ -190,7 +201,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
     const locked = await lockedDocs(user._id, session);
     const sellable = owned.filter((c) => !isLocked(locked, c));
 
-    const n = keepOne ? owned.length - 1 : count;
+    const n = keepOne ? pickDuplicates(owned, locked).length : count;
     if (!Number.isInteger(n) || n < 1) throw new UserError('Du hast keine Duplikate dieser Karte.');
     if (!sellable.length) throw new UserError('Diese Karte ist gerade auf einer IHK-Quest oder im Handel und kann nicht verkauft werden.');
     if (n > sellable.length) throw new UserError(`Du kannst nur ${sellable.length} Stück dieser Karte verkaufen.`);
@@ -222,15 +233,14 @@ async function sellAllDuplicates({ user }) {
       if (!byCard.has(c.card)) byCard.set(c.card, []);
       byCard.get(c.card).push(c);
     }
-    // Gesperrte Exemplare (Quest/Handel) bleiben; gibt es keins, bleibt das neueste
+    // Gesperrte Exemplare bleiben; von jeder Karte bleibt eins (siehe pickDuplicates)
     const locked = await lockedDocs(user._id, session);
     const keep = new Set(user.tcgProtected || []);
     const toSell = [];
     for (const [cardId, list] of byCard) {
       if (keep.has(cardId)) continue;
       if ((catalog.rarityByKey[list[0].rarity] || {}).noBank) continue; // Boss-Karten kauft die Bank nicht
-      const free = list.filter((c) => !isLocked(locked, c));
-      toSell.push(...(free.length === list.length ? free.slice(0, -1) : free));
+      toSell.push(...pickDuplicates(list, locked));
     }
     if (!toSell.length) throw new UserError('Du hast keine doppelten Karten, die verkauft werden können.');
 
@@ -368,4 +378,4 @@ async function cardValueCents(userId) {
 }
 
 module.exports = {
-  revokePacks, soldMeta, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
