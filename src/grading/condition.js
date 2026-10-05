@@ -21,13 +21,41 @@ function weighted(weights) {
   return 0;
 }
 
-// Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit.
-// kunde: gebrauchte Karten der Kunden im Grading-Shop (Note 10 ≈ 11 %)
-// frisch: Karten aus dem Pack, dem Black Market oder vom Team (Note 10 ≈ 30 %, meist 8–10)
+// Zentrierung je Achse (links/rechts, oben/unten) als Anteil der breiteren Seite, z. B. 58 = 58/42.
+// Bereiche, aus denen gewürfelt wird, und die Höchstnote je Bereich (wie bei PSA: Zentrierung begrenzt die Note)
+const CENTERING = [
+  { max: 55, cap: 10 },
+  { max: 60, cap: 9 },
+  { max: 65, cap: 8 },
+  { max: 70, cap: 7 },
+  { max: 80, cap: 6 },
+];
+// Ein Knick begrenzt die Note auf höchstens … (wie bei echtem Grading)
+const CREASE_CAP = 4;
+
+// Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
+// centering: Gewichte je Achse für die Bereiche in CENTERING (null = immer perfekt zentriert).
+// kunde: gebrauchte Karten der Kunden im Grading-Shop – ohne Zentrierung, die stellt der Shop (noch) nicht dar
+// frisch: Karten aus dem Pack, dem Black Market oder vom Team
 const PROFILES = {
-  kunde: { scratches: [40, 35, 18, 7], corner: 0.15, edges: [60, 30, 10], crease: 0.08 },
-  frisch: { scratches: [55, 30, 12, 3], corner: 0.08, edges: [80, 17, 3], crease: 0.02 },
+  kunde: { scratches: [40, 35, 18, 7], corner: 0.15, edges: [60, 30, 10], crease: 0.08, centering: null },
+  frisch: { scratches: [55, 30, 12, 3], corner: 0.08, edges: [80, 17, 3], crease: 0.02, centering: [80, 13, 4, 2, 1] },
 };
+
+/** Zentrierung einer Achse: Bereich nach Gewichten, darin ein ganzzahliger Wert (50 = perfekt) */
+function rollAxis(weights) {
+  const i = weighted(weights);
+  const min = i === 0 ? 50 : CENTERING[i - 1].max + 1;
+  return min + crypto.randomInt(CENTERING[i].max - min + 1);
+}
+
+/** Höchstnote durch die Zentrierung (schlechtere Achse zählt); ohne Angabe 10 */
+function centeringCap(centering) {
+  if (!centering) return 10;
+  const worst = Math.max(centering.lr || 50, centering.tb || 50);
+  const range = CENTERING.find((c) => worst <= c.max) || CENTERING[CENTERING.length - 1];
+  return range.cap;
+}
 
 /** Mängel der Vorderseite (Positionen in % der Kartenfläche) – Form wie GradingJob.defects */
 function rollDefects(profile = 'kunde') {
@@ -41,13 +69,19 @@ function rollDefects(profile = 'kunde') {
   const corners = [0, 1, 2, 3].filter(() => chance(p.corner));
   const edges = Array.from({ length: weighted(p.edges) }, () => ({ side: crypto.randomInt(4), pos: Math.round(rnd(20, 80)) }));
   const crease = chance(p.crease);
-  return { scratches, corners, edges, crease };
+  const defects = { scratches, corners, edges, crease };
+  if (p.centering) defects.centering = { lr: rollAxis(p.centering), tb: rollAxis(p.centering) };
+  return defects;
 }
 
-/** Note aus den Mängeln: Kratzer, Ecke, Kantenmacke je −1, Knick −3 */
+/**
+ * Note aus den Mängeln: Start 10 (mit Knick: Start CREASE_CAP), Kratzer, Ecke, Kantenmacke je −1.
+ * Die Zentrierung begrenzt die Note nach oben (siehe CENTERING). Mindestens 1.
+ */
 function gradeFor(defects) {
-  const minus = defects.scratches.length + defects.corners.length + defects.edges.length + (defects.crease ? 3 : 0);
-  return Math.max(1, 10 - minus);
+  const minus = defects.scratches.length + defects.corners.length + defects.edges.length;
+  const start = defects.crease ? CREASE_CAP : 10;
+  return Math.max(1, Math.min(start - minus, centeringCap(defects.centering)));
 }
 
 /** Zustand einer Karte im Besitz eines Mitglieds: { v, grade, defects } */
@@ -60,4 +94,4 @@ function rollCondition(profile = 'frisch') {
 const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
 const gradeWord = (grade) => GRADE_NAMES[grade] || '';
 
-module.exports = { CONDITION_VERSION, PROFILES, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord };
+module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord };
