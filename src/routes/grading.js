@@ -2,7 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const grading = require('../grading/gradingService');
 const catalog = require('../tcg/catalog');
-const { centerShift, centeringCap } = require('../grading/condition');
+const { centerShift, centeringCap, CENTERING } = require('../grading/condition');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -31,6 +31,8 @@ router.get('/grading', async (req, res) => {
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
     // Für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server
+    // Zentrierung → Höchstnote für die Regeln beim Benoten, z. B. "55/45" → 10, …, "schlechter" → 6
+    centeringScale: CENTERING.map((c, i) => ({ label: i === CENTERING.length - 1 ? 'schlechter' : `${c.max}/${100 - c.max}`, cap: c.cap })),
     jobData: job
       ? {
           steps: grading.levelInfo(job.level).steps,

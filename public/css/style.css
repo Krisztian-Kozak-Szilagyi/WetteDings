@@ -3460,6 +3460,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-steps li {
   display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; border-radius: 0; background: none;
   font-size: 12px; font-weight: 500; color: var(--color-neutral-500);
+  min-width: 0; overflow-wrap: anywhere; /* alte Regel oben setzt 110 px – auf schmalen Handys lief „Zurückschicken“ über */
 }
 .gr-steps li::before { content: ""; height: 3px; border-radius: 3px; background: var(--color-neutral-800); }
 .gr-steps li.is-active { color: var(--color-text); background: none; }
@@ -3473,6 +3474,18 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .gr-text { margin: 0; max-width: 520px; font-size: 14px; line-height: 1.55; color: var(--color-neutral-300); }
 .gr-text b { font-weight: 500; color: var(--color-text); }
+/* Benoten: Regeln als zwei kompakte Kästen statt langer Textzeilen */
+.gr-rules { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; }
+@media (max-width: 640px) { .gr-rules { grid-template-columns: 1fr; } }
+.gr-rule-box { padding: 10px 12px; border-radius: 10px; background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-divider); }
+.gr-rule-title { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-300); }
+.gr-rule-title small { font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-neutral-500); }
+.gr-rule-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.gr-rule-list li, .gr-center-scale li { display: flex; justify-content: space-between; gap: 8px; color: var(--color-neutral-400); }
+.gr-rule-list b { font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gr-center-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.gr-center-scale li { flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 6px; background: color-mix(in srgb, var(--color-divider) 45%, transparent); font-size: 11px; font-variant-numeric: tabular-nums; }
+.gr-center-scale b { font-size: 15px; font-weight: 600; color: var(--color-text); }
 .gr-grades { margin: 0; }
 .gr-grade {
   height: 44px; border-radius: var(--radius-md); border: 0; font: 500 16px var(--font); color: var(--color-neutral-200);
