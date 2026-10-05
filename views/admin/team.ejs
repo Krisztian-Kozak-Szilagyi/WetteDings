@@ -1,8 +1,14 @@
 <section class="stats-block" id="codes">
-  <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt <strong>${ttlMinutes} Minuten</strong> und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
+  <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt so lange wie beim Erzeugen gewählt (<strong>${ttlText(ttlOptions[0])}</strong> bis <strong>${ttlText(ttlOptions[ttlOptions.length - 1])}</strong>) und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
   <div class="card">
     <form method="post" action="/admin/codes" class="admin-generate">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="admin-generate-ttl">
+        <span>Gültig für</span>
+        <select name="ttl">
+          <% ttlOptions.forEach((m) => { %><option value="<%= m %>"><%= ttlText(m) %></option><% }) %>
+        </select>
+      </label>
       <button class="btn btn-primary" type="submit">+ Einladungscode erzeugen</button>
     </form>
     <% if (!codes.length) { %>
@@ -10,7 +16,6 @@
     <% } else { %>
       <ul class="code-list">
         <% codes.forEach((c) => {
-             const minutesLeft = Math.max(0, Math.ceil((new Date(c.expiresAt).getTime() - now) / 60000));
              const used = !!c.usedAt; %>
           <li class="code-item <%= used ? 'is-used' : '' %>">
             <div class="code-main">
@@ -18,7 +23,7 @@
               <% if (used) { %>
                 <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
               <% } else { %>
-                <span class="badge badge-offen">Gültig · noch <%= minutesLeft %> Min.</span>
+                <span class="badge badge-offen">Gültig · <%= remainingText(c.expiresAt, now) %></span>
               <% } %>
             </div>
             <div class="code-meta muted small">
