@@ -11,9 +11,9 @@ async function ownedCounts(userId) {
   return Object.fromEntries((await inventory(userId)).map((o) => [o._id, o.n]));
 }
 
-/** Kampfkarten, die der Spieler besitzt, mit Anzahl und Deck-Grenze */
+/** Karten, die der Spieler besitzt, mit Anzahl und Deck-Grenze */
 function poolFor(owned) {
-  return catalog.CARDS.filter((c) => rules.isBattleCard(c) && owned[c.id]).map((c) => ({
+  return catalog.CARDS.filter((c) => owned[c.id]).map((c) => ({
     id: c.id,
     name: c.name,
     rarity: c.rarity,
@@ -31,7 +31,7 @@ const deckView = (d, owned) => ({
   updatedAt: d.updatedAt,
 });
 
-/** Alles für den Deckbau: Regeln, eigene Kampfkarten, Decks mit Prüfung */
+/** Alles für den Deckbau: Regeln, eigene Karten, Decks mit Prüfung */
 async function overview(userId) {
   const [owned, decks] = await Promise.all([ownedCounts(userId), Deck.find({ user: userId }).sort({ createdAt: 1 }).lean()]);
   return { rules: rules.RULES, pool: poolFor(owned), decks: decks.map((d) => deckView(d, owned)) };

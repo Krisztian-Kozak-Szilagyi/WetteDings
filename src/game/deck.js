@@ -2,7 +2,7 @@
 // eigenständigen Spiel (Steam) unverändert laufen. Speichern und Sammlung: src/game/deckService.js.
 //
 // Regeln (Krisztian, 2026-10-05): genau 30 Karten, höchstens 2 gleiche, Boss-Karten nur 1-mal,
-// nur Karten mit Kampfwerten (Block `kampf` in src/tcg/cardData.js) und nur aus eigenen Exemplaren.
+// alle Karten erlaubt, aber nur aus eigenen Exemplaren.
 // Eigene Exemplare werden NICHT gesperrt: Wer eine Karte verkauft, hat danach ein unvollständiges Deck.
 
 const DECK_SIZE = 30;
@@ -14,9 +14,6 @@ const MAX_DECKS = 1;
 const NAME_MAX = 30;
 
 const RULES = { deckSize: DECK_SIZE, maxCopies: MAX_COPIES, singleRarities: SINGLE_RARITIES, maxDecks: MAX_DECKS, nameMax: NAME_MAX };
-
-/** Kampfkarte = hat einen Kampfwerte-Block (alte Karten mit Dateinamen-Werten sind nur Sammelkarten) */
-const isBattleCard = (card) => !!(card && card.kampf);
 
 /** Wie oft darf diese Karte ins Deck? */
 const copyLimit = (card) => (card && SINGLE_RARITIES.includes(card.rarity) ? 1 : MAX_COPIES);
@@ -43,7 +40,7 @@ function cleanName(name, fallback = 'Mein Deck') {
  *   cards:  { id: Karte } (catalog.cardById)
  *   owned:  { id: Anzahl eigener Exemplare }
  * Ergebnis: { size, complete, playable, errors: [{ code, card?, n?, max? }] }
- *   errors  = Verstöße, die das Speichern verhindern (unbekannt, keine Kampfkarte, zu viele gleiche, mehr als 30)
+ *   errors  = Verstöße, die das Speichern verhindern (unbekannt, zu viele gleiche, mehr als 30)
  *   missing = Karten, die (nicht mehr) in der Sammlung sind – Deck bleibt gespeichert, ist aber nicht spielbereit
  */
 function validateDeck(ids, cards, owned = {}) {
@@ -57,7 +54,6 @@ function validateDeck(ids, cards, owned = {}) {
       errors.push({ code: 'unbekannt', card: id });
       continue;
     }
-    if (!isBattleCard(card)) errors.push({ code: 'keineKampfkarte', card: id });
     const max = copyLimit(card);
     if (n > max) errors.push({ code: 'zuViele', card: id, n, max });
     const have = owned[id] || 0;
@@ -68,4 +64,4 @@ function validateDeck(ids, cards, owned = {}) {
   return { size, complete, errors, missing, playable: complete && !errors.length && !missing.length };
 }
 
-module.exports = { RULES, DECK_SIZE, MAX_COPIES, SINGLE_RARITIES, MAX_DECKS, NAME_MAX, isBattleCard, copyLimit, countCards, expand, cleanName, validateDeck };
+module.exports = { RULES, DECK_SIZE, MAX_COPIES, SINGLE_RARITIES, MAX_DECKS, NAME_MAX, copyLimit, countCards, expand, cleanName, validateDeck };
