@@ -1604,7 +1604,16 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .gv-bar.has b { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .gv-sheen { animation: none; opacity: 0; } }
 @media (max-width: 520px) { .gv-slab { flex: 1 1 100%; } .gv-dist { flex: 1; } }
-.grade-stats-empty { margin: 0; }
+/* Noch nichts gegradet: dieselbe Vitrine ausgegraut */
+.grade-vitrine.is-empty .gv-slab { background: linear-gradient(180deg, #4a4a5c, #3a3a4b); color: #b9b9cc; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+.grade-vitrine.is-empty .gv-slab-head, .grade-vitrine.is-empty .gv-slab-word { color: #a3a3ba; }
+.grade-vitrine.is-empty .gv-slab-word { font-size: 11px; }
+.grade-vitrine.is-empty .gv-slab-word small { color: #8c8ca3; }
+.grade-vitrine.is-empty .gv-slab-word a { color: var(--color-accent-300); text-decoration: none; }
+.grade-vitrine.is-empty .gv-slab-word a:hover, .grade-vitrine.is-empty .gv-slab-word a:focus-visible { text-decoration: underline; }
+.grade-vitrine.is-empty .gv-slab-grade { color: #6e6e85; }
+.grade-vitrine.is-empty .gv-ring strong, .grade-vitrine.is-empty .gv-dist small { color: var(--muted); }
+.grade-vitrine.is-empty .gv-avg, .grade-vitrine.is-empty .gv-dist { opacity: .75; }
 .sammlung-head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 @media (max-width: 640px) { .sammlung-head-side { align-items: flex-start; } }
 
