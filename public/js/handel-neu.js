@@ -242,6 +242,24 @@
   }
   update();
 
+  // ---------- Handelsfenster klebt oben: dann kompakter ----------
+  var win = $('[data-hb-window]', root);
+  var sentinel = $('[data-hb-sentinel]', root);
+  if (win && sentinel && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      win.classList.toggle('is-stuck', !entries[0].isIntersecting);
+    }, { rootMargin: '-72px 0px 0px 0px' }).observe(sentinel);
+  }
+  // Nach dem Antippen einer Karte ist das Fenster sichtbar – auf dem Handy kurz anstupsen, dass sich oben etwas getan hat
+  if (win) {
+    root.addEventListener('click', function (e) {
+      if (!e.target.closest('[data-hb-pane] [data-hb-step]')) return;
+      win.classList.remove('is-bumped');
+      void win.offsetWidth;
+      win.classList.add('is-bumped');
+    });
+  }
+
   // ---------- Ziel wechseln: eigene Auswahl mitnehmen ----------
   var target = $('[data-hb-target]');
   if (target) {

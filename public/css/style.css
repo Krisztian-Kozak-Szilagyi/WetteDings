@@ -3291,7 +3291,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .deal-money { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---------- Handelsfenster (views/handel-neu.ejs) ---------- */
-.hb { display: flex; flex-direction: column; gap: 20px; padding-bottom: 110px; }
+.hb { display: flex; flex-direction: column; gap: 20px; padding-bottom: 24px; }
 .hb-top { display: flex; flex-direction: column; gap: 6px; }
 .hb-top h1 { margin: 0; }
 .hb-top p { margin: 0; font-size: 14px; }
@@ -3411,20 +3411,34 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .hb-foil:has(input:focus-visible) .foil-card { outline: 2px solid var(--text); outline-offset: 3px; }
 .hb-foil.is-picked::after { content: "✓"; position: absolute; top: 6px; right: 6px; z-index: 3; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-accent-300); color: var(--color-bg); font-weight: 800; font-size: 13px; }
 
-/* Leiste unten: Zusammenfassung, Nachricht, Absenden */
-.hb-bar {
-  position: sticky; bottom: 12px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 10px 10px 18px;
-  border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px);
-  box-shadow: 0 0 0 1px var(--color-accent-700), 0 12px 36px rgba(0, 0, 0, .55);
-}
-.hb-bar-summary { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Abschluss im Fenster: Zusammenfassung, Nachricht, Absenden */
+.hb-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 20px 16px; border-top: 1px solid var(--color-divider); }
+.hb-act { flex: 1 1 420px; display: flex; align-items: center; gap: 10px 16px; min-width: 0; }
+.hb-bar-summary { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hb-bar-line { font-weight: 600; overflow-wrap: anywhere; }
 .hb-bar-line.is-empty { color: var(--color-neutral-300); font-weight: 500; }
 .hb-bar-note { font-size: 12px; color: var(--color-neutral-500); }
 .hb-bar-note.is-problem { color: var(--warn); }
-.hb-message { flex: 1 1 220px; margin: 0; }
-.hb-message input { width: 100%; height: 42px; min-height: 0; }
-.hb-submit { height: 44px; padding: 0 22px; }
+.hb-message { flex: 1 1 240px; margin: 0; }
+.hb-message input { width: 100%; height: 40px; min-height: 0; }
+.hb-submit { flex: none; height: 44px; padding: 0 22px; }
+/* Desktop: Fenster bleibt unter dem Seitenkopf stehen; beim Kleben kompakter */
+.hb-sentinel { display: block; height: 1px; margin-bottom: -1px; }
+@media (min-width: 761px) {
+  .hb-window { position: sticky; top: 72px; z-index: 6; }
+  .hb-window.is-stuck { box-shadow: 0 0 0 1px var(--color-accent-700), 0 18px 40px rgba(0, 0, 0, .6); }
+  .hb-window.is-stuck .hb-side { gap: 8px; padding-top: 12px; padding-bottom: 10px; }
+  .hb-window.is-stuck .hb-tray, .hb-window.is-stuck .hb-fixed { min-height: 58px; padding: 6px; }
+  .hb-window.is-stuck .hb-mini button { width: 36px; }
+  .hb-window.is-stuck .hb-tray-empty { font-size: 12px; }
+  .hb-window.is-stuck .hb-price { height: 44px; }
+  .hb-window.is-stuck .hb-price input { font-size: 20px; }
+  .hb-window.is-stuck .hb-price-note { display: none; }
+  .hb-window.is-stuck .hb-foot { padding-top: 8px; padding-bottom: 10px; }
+  .hb-window.is-stuck .hb-message { display: none; }
+}
+.hb-window.is-bumped { animation: hb-bump .35s ease; }
+@keyframes hb-bump { 40% { box-shadow: 0 0 0 2px var(--color-accent-300), 0 18px 40px rgba(0, 0, 0, .5); } }
 @media (max-width: 760px) {
   .hb-seg { grid-template-columns: 1fr; width: 100%; }
   .hb-window { grid-template-columns: 1fr; }
@@ -3434,8 +3448,14 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .hb-side { padding: 14px 16px; }
   .hb-picker-tools .mkt-bar { flex-basis: 100%; width: 100%; }
 }
-@media (max-width: 560px) {
-  .hb-bar { bottom: 6px; padding: 10px; }
+@media (max-width: 760px) {
+  .hb { padding-bottom: 120px; }
+  .hb-foot { padding: 12px 16px 14px; }
+  .hb-act {
+    position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 40; flex-wrap: wrap; padding: 10px 12px;
+    border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px);
+    box-shadow: 0 0 0 1px var(--color-accent-700), 0 12px 36px rgba(0, 0, 0, .6);
+  }
   .hb-submit { width: 100%; }
   .hb-mini button { width: 48px; }
 }

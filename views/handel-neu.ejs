@@ -54,8 +54,9 @@
     <% if (mode === 'markt') { %><input type="hidden" name="markt" value="<%= listing._id %>"><% } %>
     <% if (mode === 'gegen') { %><input type="hidden" name="version" value="<%= offer.termsVersion || 0 %>"><% } %>
 
-    <%# ---------- Das Handelsfenster: beide Seiten im Überblick ---------- %>
-    <section class="hb-window" aria-label="Dein Angebot">
+    <%# ---------- Das Handelsfenster: beide Seiten im Überblick, bleibt beim Scrollen oben stehen ---------- %>
+    <span class="hb-sentinel" data-hb-sentinel aria-hidden="true"></span>
+    <section class="hb-window" aria-label="Dein Angebot" data-hb-window>
       <div class="hb-side" data-hb-side-box="gib">
         <button type="button" class="hb-side-head" data-hb-open="gib" <%= showMine ? '' : 'disabled' %>>
           <span class="hb-side-label">Du gibst</span>
@@ -105,6 +106,23 @@
           <label class="hb-money"><span>+ Geld</span><input type="text" name="geld_will" inputmode="decimal" placeholder="0,00" value="<%= money(receive) %>" data-hb-money="will" aria-label="Geld, das <%= partner.username %> zahlt"><span class="hb-money-unit">€</span></label>
         <% } %>
       </div>
+      <%# Abschluss direkt im Fenster: bleibt mit ihm oben stehen (Handy: feste Leiste unten) %>
+      <div class="hb-foot">
+        <% if (!isMarket && mode !== 'gegen') { %>
+          <label class="hb-message"><span class="sr-only">Nachricht an <%= partner.username %></span>
+            <input type="text" name="nachricht" maxlength="500" placeholder="Nachricht an <%= partner.username %> (optional)" autocomplete="off">
+          </label>
+        <% } %>
+        <div class="hb-act" data-hb-bar>
+          <div class="hb-bar-summary">
+            <span class="hb-bar-line" data-hb-summary><%= isMarket ? 'Wähle Karten und einen Preis.' : 'Wähle aus, was beide Seiten geben.' %></span>
+            <span class="hb-bar-note" data-hb-note>
+              <% if (isMarket) { %><%= marketDays %> Tage gültig · deine Karten sind bis dahin gesperrt.<% } else { %><%= privateHours %> Std. gültig · deine Karten sind bis dahin gesperrt.<% } %>
+            </span>
+          </div>
+          <button class="btn btn-primary hb-submit" type="submit" data-hb-submit><%= isMarket ? 'Auf den Markt stellen' : mode === 'gegen' ? 'Gegenangebot senden' : 'Angebot senden' %></button>
+        </div>
+      </div>
     </section>
 
     <%# ---------- Sammlungen: eine zur Zeit ---------- %>
@@ -129,21 +147,6 @@
       <% } %>
     </section>
 
-    <%# ---------- Zusammenfassung und Absenden ---------- %>
-    <div class="hb-bar" data-hb-bar>
-      <div class="hb-bar-summary">
-        <span class="hb-bar-line" data-hb-summary><%= isMarket ? 'Wähle Karten und einen Preis.' : 'Wähle aus, was beide Seiten geben.' %></span>
-        <span class="hb-bar-note" data-hb-note>
-          <% if (isMarket) { %><%= marketDays %> Tage gültig · deine Karten sind bis dahin gesperrt.<% } else { %><%= privateHours %> Std. gültig · deine Karten sind bis dahin gesperrt.<% } %>
-        </span>
-      </div>
-      <% if (!isMarket && mode !== 'gegen') { %>
-        <label class="hb-message"><span class="sr-only">Nachricht an <%= partner.username %></span>
-          <input type="text" name="nachricht" maxlength="500" placeholder="Nachricht an <%= partner.username %> (optional)" autocomplete="off">
-        </label>
-      <% } %>
-      <button class="btn btn-primary hb-submit" type="submit" data-hb-submit><%= isMarket ? 'Auf den Markt stellen' : mode === 'gegen' ? 'Gegenangebot senden' : 'Angebot senden' %></button>
-    </div>
   </form>
 </div>
 
