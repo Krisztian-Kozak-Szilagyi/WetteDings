@@ -5,7 +5,7 @@
 <%
   const role = roleOf(t, me);
   const listingRow = !t.to;
-  const p = listingRow ? { gives: t.give, gets: [], pay: 0, receive: t.price } : perspective(t, role);
+  const p = perspective(t, listingRow ? 'seller' : role);
   const partnerName = role === 'seller' ? t.toName : t.sellerName;
   const myTurn = !listingRow && canAccept(t, role);
   const unread = !listingRow && isUnread(t, role);

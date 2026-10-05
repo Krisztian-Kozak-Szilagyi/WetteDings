@@ -210,7 +210,7 @@
     if (balanceBox) {
       var diff = get.value + receive - give.value - pay;
       var any = give.count || get.count;
-      balanceBox.hidden = !any || isMarket;
+      balanceBox.hidden = !any;
       balanceBox.textContent = !diff ? 'gleicher Wert' : (diff > 0 ? '+' : '−') + euro(Math.abs(diff));
       balanceBox.className = 'hb-balance' + (diff > 0 ? ' is-pos' : diff < 0 ? ' is-neg' : '');
       balanceBox.title = diff > 0 ? 'Du bekommst mehr Kartenwert, als du gibst' : diff < 0 ? 'Du gibst mehr Kartenwert, als du bekommst' : '';
@@ -218,13 +218,12 @@
 
     var kind = give.count && get.count ? 'tausch' : isMarket || isListing ? 'markt' : 'privat';
     var problems = [];
-    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle unten Karten aus deiner Sammlung.' : 'Wähle Karten – auf einer der beiden Seiten.');
+    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle unten Karten aus deiner Sammlung – oder Wunschkarten für ein Gesuch.' : 'Wähle Karten – auf einer der beiden Seiten.');
     if (give.count > maxLines || get.count > maxLines) problems.push('Höchstens ' + maxLines + ' Karten je Seite.');
-    if (isMarket && give.count && !receive) problems.push('Gib einen Preis an.');
-    if (!isMarket && give.count && !get.count && !receive) problems.push('Ohne Karten zurück: Gib an, wie viel du dafür bekommst.');
-    if (!isMarket && !give.count && get.count && !pay) problems.push('Ohne eigene Karten: Gib an, wie viel du dafür zahlst.');
-    if (!isMarket && !give.count && receive) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du gibst“ ein.');
-    if (!isMarket && !get.count && pay && give.count) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du bekommst“ ein.');
+    if (give.count && !get.count && !receive) problems.push(isMarket ? 'Gib einen Preis an – oder wähle Wunschkarten, dann wird getauscht.' : 'Ohne Karten zurück: Gib an, wie viel du dafür bekommst.');
+    if (!give.count && get.count && !pay) problems.push('Ohne eigene Karten: Gib an, wie viel du dafür zahlst.');
+    if (!give.count && receive) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du gibst“ ein.');
+    if (!get.count && pay && give.count) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du bekommst“ ein.');
     if (pay > balance) problems.push('Dein Guthaben reicht dafür nicht (' + euro(balance) + ').');
 
     var nothing = !give.count && !get.count;

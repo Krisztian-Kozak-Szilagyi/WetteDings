@@ -115,6 +115,20 @@ async function pickable(member, { own, keep = [] } = {}) {
   return { cards, foiled, goods, counts: coll.counts };
 }
 
+/**
+ * Wunschkarten für ein Markt-Angebot: alle sichtbaren Karten und Gegenstände (je bis zu MAX_LINES Stück).
+ * counts = eigene Sammlung (Anzeige "du hast …").
+ */
+function wishPool(counts) {
+  const visible = new Set(catalog.visibleRarities().map((r) => r.key));
+  return {
+    cards: catalog.CARDS.filter((c) => visible.has(c.rarity)).map((c) => ({ card: c, max: trade.MAX_LINES, owned: counts[c.id] || 0 })),
+    foiled: [],
+    goods: items.ITEM_TYPES.map((t) => ({ card: items.itemCard(t), max: trade.MAX_LINES })),
+    counts,
+  };
+}
+
 // ---------- Handelsseite ----------
 router.get('/handel', async (req, res) => {
   const [data, market, coll] = await Promise.all([
@@ -157,11 +171,13 @@ router.post('/handel/black-market', async (req, res) => {
  * 'gegen' (Gegenangebot in einer laufenden Verhandlung). fixedGets: Karten der anderen Seite, die feststehen.
  */
 async function renderBuilder(req, res, { mode, partner = null, listing = null, offer = null, preset, keep = [], fixedGets = null, fixedGives = null }) {
-  const [mine, theirs, users] = await Promise.all([
+  const [mine, partnerPool, users] = await Promise.all([
     pickable(req.user, { own: true, keep }),
     partner && !fixedGets ? pickable(partner, { own: false }) : null,
     mode === 'neu' ? User.find({ _id: { $ne: req.user._id }, deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean() : [],
   ]);
+  // Eigenes Markt-Angebot: Wunschkarten aus allen Karten
+  const theirs = partnerPool || (mode === 'neu' && !partner ? wishPool(mine.counts) : null);
   res.render('handel-neu', {
     title: mode === 'neu' ? 'Neuer Handel' : 'Gegenangebot',
     ...viewHelpers(),
@@ -204,7 +220,11 @@ router.get('/handel/neu', async (req, res) => {
     }
     const mineOpen = await Trade.findOne({ ...openFilter(), listing: listing._id, to: req.user._id }).select('_id').lean();
     if (mineOpen) return res.redirect(`/handel/angebot/${mineOpen._id}`);
-    return renderBuilder(req, res, { mode: 'markt', partner: { _id: listing.seller, username: listing.sellerName }, listing, preset: { ...preset, gets: [] }, fixedGets: listing.give });
+    // Ohne eigene Vorauswahl: vorbelegt mit den Wunschkarten und dem Preis des Markt-Angebots – zum Anpassen
+    const fresh = !preset.gives.length && !preset.price;
+    const listingPayer = listing.price ? listing.extraFrom || 'to' : null;
+    const start = fresh ? { gives: listing.want.map((l) => ({ card: l.card })), gets: [], price: listing.price, iPay: listingPayer === 'to' } : { ...preset, gets: [] };
+    return renderBuilder(req, res, { mode: 'markt', partner: { _id: listing.seller, username: listing.sellerName }, listing, preset: start, fixedGets: listing.give });
   }
   const name = str(req.query.an).trim();
   let partner = null;
@@ -215,7 +235,8 @@ router.get('/handel/neu', async (req, res) => {
       return res.redirect(builderUrl({ gives: preset.gives }));
     }
   }
-  return renderBuilder(req, res, { mode: 'neu', partner, preset: partner ? preset : { ...preset, gets: [] } });
+  // Markt: Wunschkarten nur als Karten, kein bestimmtes Exemplar
+  return renderBuilder(req, res, { mode: 'neu', partner, preset: partner ? preset : { ...preset, gets: preset.gets.filter((l) => !l.copy) } });
 });
 
 // Alte Tausch-Adresse (Profil, Inventar, alte Links): ins Handelsfenster
@@ -252,7 +273,7 @@ router.post('/handel/angebot', (req, res) => {
       form = trade.parseOfferForm(req.body);
       const t = await trade.create({ user: req.user, toName: toName || null, listingId: listingId || null, ...form, message: str(req.body.nachricht) });
       const message = !t.to
-        ? `${lines.lineLabel(t.give)} steht jetzt für ${euro(t.price)} auf dem Markt.`
+        ? `Dein Angebot steht jetzt auf dem Markt: ${lines.termsText(t).replace(/^[^ ]+ gibt /, 'du gibst ')}.`
         : t.listing
           ? `Gegenangebot an ${t.sellerName} gesendet.`
           : `Angebot an ${t.toName} gesendet.`;
@@ -352,7 +373,8 @@ router.post('/handel/angebot/:id/gegenangebot', (req, res) => {
 router.post('/handel/angebot/:id/kaufen', (req, res) =>
   handle(req, res, async () => {
     const r = await trade.buy({ user: req.user, tradeId: req.params.id });
-    return `Gekauft: ${lines.lineLabel(r.trade.give)} für ${euro(r.trade.price)}. Die Karten sind jetzt in deiner Sammlung.`;
+    const p = lines.perspective(r.trade, 'to');
+    return `Abgeschlossen: Du bekommst ${lines.sideText(p.gets, p.receive)} und gibst ${lines.sideText(p.gives, p.pay)}.`;
   }, '/handel', '/handel?reiter=verlauf')
 );
 

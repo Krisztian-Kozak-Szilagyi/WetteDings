@@ -37,8 +37,8 @@ const isCard = (id) => !!catalog.cardById[id] || !!itemByCardId(id);
 // ---------- Reine Regeln (ohne Datenbank, getestet) ----------
 /**
  * Prüft die Bedingungen eines Angebots: give/want = Positionen ({ card, copy?, doc? }), Geld price von extraFrom.
- * Markt-Angebot (listing): nur Karten gegen Geld. Sonst: Wer keine Karte gibt, muss zahlen – verschenkt wird nichts.
- * Gibt das bereinigte extraFrom zurück (null ohne Geld).
+ * Wer keine Karte gibt, muss zahlen – verschenkt wird nichts. Markt-Angebot (listing): Wunschkarten nur als
+ * Karten, kein bestimmtes Exemplar – jeder, der sie hat, kann tauschen. Gibt das bereinigte extraFrom zurück (null ohne Geld).
  */
 function validateOffer({ give = [], want = [], price, extraFrom = null, listing = false }) {
   for (const l of [...give, ...want]) if (!isCard(l.card)) throw new UserError('Diese Karte gibt es nicht.');
@@ -47,12 +47,8 @@ function validateOffer({ give = [], want = [], price, extraFrom = null, listing 
   const copies = [...give, ...want].map((l) => l.copy || l.doc).filter(Boolean).map(String);
   if (new Set(copies).size !== copies.length) throw new UserError('Ein Exemplar kann nur einmal im Angebot stehen.');
   if (!Number.isInteger(price) || price < 0 || price > MAX_PRICE) throw new UserError('Bitte gib einen gültigen Betrag an.');
-  if (listing) {
-    if (want.length) throw new UserError('Auf dem Markt verkaufst du gegen Geld. Karten kannst du dir nur von einem bestimmten Mitglied wünschen.');
-    if (!give.length) throw new UserError('Bitte wähle aus, was du auf den Markt stellen möchtest.');
-    if (price < 1) throw new UserError('Bitte gib einen Preis an.');
-    return { extraFrom: 'to' };
-  }
+  if (listing && want.some((l) => l.copy)) throw new UserError('Auf dem Markt kannst du dir nur Karten wünschen, kein bestimmtes foliertes Exemplar.');
+  if (listing && !want.length && price < 1) throw new UserError('Bitte gib einen Preis an.');
   if (!price) {
     if (!give.length || !want.length) throw new UserError('Wer keine Karte gibt, muss etwas zahlen – bitte gib einen Betrag an.');
     return { extraFrom: null };
@@ -185,8 +181,8 @@ const newDealsCount = (user) => Trade.countDocuments(newDealsFilter(user));
 /** Offene Markt-Angebote anderer, die seit dem letzten Besuch der Handelsseite eingestellt wurden */
 const marketNewFilter = (user) => ({
   ...openFilter(),
-  kind: 'markt',
-  to: null,
+  to: null, // auch Tausch-Angebote und Gesuche auf dem Markt
+  listing: null,
   seller: { $ne: user._id },
   createdAt: { $gt: user.marketSeenAt || user.createdAt },
 });
@@ -374,8 +370,9 @@ async function create({ user, toName = null, listingId = null, gives = [], gets 
   const other = listing ? { _id: listing.seller, username: listing.sellerName } : to;
   const mine = await prepareLines(gives, user._id);
   // Beim Gegenangebot auf dem Markt stehen die Karten des Verkäufers fest
-  const theirs = listing ? listing.give.map((l) => l.toObject()) : other ? await prepareLines(gets, other._id, other.username) : [];
-  if (!other && gets.length) throw new UserError('Karten kannst du dir nur von einem bestimmten Mitglied wünschen.');
+  // Markt-Angebot: Wunschkarten aus allen Karten, belegt beim Tauschen von dem, der annimmt
+  const wished = () => gets.map((l) => ({ card: l.card, copy: l.copy || null, doc: null, foiledAt: null, grade: null }));
+  const theirs = listing ? listing.give.map((l) => l.toObject()) : other ? await prepareLines(gets, other._id, other.username) : wished();
   const [give, want] = role === 'seller' ? [mine, theirs] : [theirs, mine];
   const extraFrom = price > 0 ? (iPay ? role : otherRole(role)) : null;
   const valid = validateOffer({ give, want, price, extraFrom, listing: !other });
@@ -423,7 +420,7 @@ async function create({ user, toName = null, listingId = null, gives = [], gets 
       return trade;
     });
     if (listing) {
-      await notify(listing.seller, { area: 'Handel', href: offerHref(created), text: `${user.username} macht ein Gegenangebot zu deinem Markt-Angebot „${lineLabel(listing.give)}“.` });
+      await notify(listing.seller, { area: 'Handel', href: offerHref(created), text: `${user.username} macht ein Gegenangebot zu deinem Markt-Angebot „${lineLabel(listing.give) || lineLabel(listing.want)}“.` });
     } else if (to) {
       await notify(to._id, { area: 'Handel', href: offerHref(created), text: `${user.username} macht dir ein Angebot: ${termsText(created)}.` });
     }
@@ -452,27 +449,50 @@ async function transfer(money, { title, payerType, payeeType, payerMsg }, sessio
 const ledgerTypes = (trade) => (trade.kind === 'tausch' ? { payerType: 'handel_tausch_zahlung', payeeType: 'handel_tausch_erhalt' } : { payerType: 'handel_kauf', payeeType: 'handel_verkauf' });
 const dealTitle = (trade) => [lineLabel(trade.give), lineLabel(trade.want)].filter(Boolean).join(' gegen ');
 
-/** Markt-Angebot sofort zum Preis kaufen: Käufer zahlt, Verkäufer bekommt Preis − Steuer, die Karten wechseln den Besitzer */
+/**
+ * Markt-Angebot sofort annehmen – kaufen (Karten gegen Geld), tauschen (Karten gegen die Wunschkarten) oder abgeben
+ * (Gesuch: Wunschkarten gegen Geld). Wer annimmt, wird zum Empfänger: seine Wunschkarten werden jetzt belegt,
+ * Geld fließt mit Steuer, alle Karten wechseln in einer Transaktion den Besitzer.
+ */
 async function buy({ user, tradeId }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
   const result = await inTransaction(async (session) => {
     const trade = await openListing(tradeId, session);
     if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
-    if (trade.seller.equals(user._id)) throw new UserError('Du kannst dein eigenes Angebot nicht kaufen.');
+    if (trade.seller.equals(user._id)) throw new UserError('Das ist dein eigenes Angebot.');
 
+    const want = await resolveLines(user._id, trade.want.map((l) => l.toObject()), session);
+    await claimLines(want, user._id, session);
     const money = settlement(trade, { buyer: user._id });
-    await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: 'Dein Guthaben reicht dafür nicht aus.' }, session);
+    if (money) {
+      const iPay = money.payer.equals(user._id);
+      await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: iPay ? 'Dein Guthaben reicht dafür nicht aus.' : `${trade.sellerName} hat nicht mehr genug Guthaben.` }, session);
+    }
     await moveLines(trade.give, trade.seller, user._id, session);
+    await moveLines(want, user._id, trade.seller, session);
 
-    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
+    Object.assign(trade, {
+      want,
+      to: user._id, // wer angenommen hat, ist jetzt die Gegenseite
+      toName: user.username,
+      status: 'verkauft',
+      buyer: user._id,
+      buyerName: user.username,
+      closedBy: user._id,
+      taxPercent: taxService.rate(trade.kind),
+      tax: money ? money.tax : 0,
+      closedAt: new Date(),
+    });
     await trade.save({ session });
-    const closed = await closeCounters(trade, `${user.username} hat das Markt-Angebot gekauft – dieses Gegenangebot ist damit erledigt.`, session);
-    return { trade, tax: money.tax, closed };
+    const closed = await closeCounters(trade, `${user.username} hat das Markt-Angebot angenommen – dieses Gegenangebot ist damit erledigt.`, session);
+    return { trade, tax: money ? money.tax : 0, closed };
   });
   const { trade, closed } = result;
-  await notify(trade.seller, { area: 'Handel', href: '/handel?reiter=verlauf', text: `${user.username} hat „${lineLabel(trade.give)}“ für ${euro(trade.price)} gekauft.` });
+  const what = !trade.want.length ? `„${lineLabel(trade.give)}“ für ${euro(trade.price)} gekauft` : !trade.give.length ? `dir „${lineLabel(trade.want)}“ für ${euro(trade.price)} gegeben` : `dein Tauschangebot angenommen: ${termsText(trade)}`;
+  await notify(trade.seller, { area: 'Handel', href: '/handel?reiter=verlauf', text: `${user.username} hat ${what}.` });
+  const label = lineLabel(trade.give) || lineLabel(trade.want);
   for (const c of closed) {
-    if (!c.to.equals(user._id)) await notify(c.to, { area: 'Handel', href: offerHref(c), text: `„${lineLabel(trade.give)}“ wurde an jemand anderen verkauft – dein Gegenangebot ist erledigt.` });
+    if (!c.to.equals(user._id)) await notify(c.to, { area: 'Handel', href: offerHref(c), text: `„${label}“ ging an jemand anderen – dein Gegenangebot ist erledigt.` });
   }
   return result;
 }

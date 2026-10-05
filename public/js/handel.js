@@ -83,7 +83,7 @@
     var sort = $('[data-mk-sort]', tools);
     var empty = $('[data-mk-empty]');
     var rarity = 'all'; // Seltenheit oder "missing" (Fehlt mir noch)
-    var show = 'all'; // foil | bundle | afford
+    var show = 'all'; // foil | bundle | swap | wanted | afford
     var tiles = $all('[data-mk]', grid);
     var num = function (el, key) { return parseFloat(el.getAttribute('data-' + key)) || 0; };
     var sorters = {

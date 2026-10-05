@@ -3239,6 +3239,13 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 }
 .mk-bundle { position: absolute; top: 10px; left: 10px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--text); background: color-mix(in srgb, var(--color-bg) 70%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
 .mk-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px; flex: 1; }
+.mk-kind { position: absolute; top: 10px; left: 10px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--color-bg); background: var(--color-accent-300); }
+.mk-wanted .mk-kind { background: var(--warn); }
+.mk-wants { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); background: var(--surface-2); min-width: 0; }
+.mk-wants .tstack { --w: 30px; }
+.mk-wants-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.mk-wants-text { min-width: 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.mk-price-sub { margin-top: 0; }
 .mk-name { font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .mk-rarity { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; font-size: 12px; color: var(--color-neutral-400); }
 .mk-price { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
@@ -3326,6 +3333,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .hb-tray { list-style: none; margin: 0; padding: 8px; min-height: 96px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-bg) 55%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
 .hb-tray.is-empty { align-content: center; justify-content: center; box-shadow: none; border: 1px dashed var(--color-neutral-700); }
 .hb-tray-empty { padding: 0 8px; font-size: 13px; color: var(--color-neutral-500); text-align: center; }
+.hb-tray-wish { min-height: 64px; }
 .hb-tray:not(.is-empty) .hb-tray-empty { display: none; }
 .hb-mini button { position: relative; display: block; width: 56px; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: var(--color-bg); cursor: var(--cur-pointer); box-shadow: 0 4px 12px rgba(0, 0, 0, .4); animation: hb-in .2s ease; }
 .hb-mini img { display: block; width: 100%; aspect-ratio: 720 / 1008; object-fit: cover; }

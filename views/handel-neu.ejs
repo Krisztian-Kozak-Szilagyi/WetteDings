@@ -10,7 +10,7 @@
   // eigene folierte Exemplare der Vorauswahl – gehen beim Wechsel des Ziels mit
   const presetCopies = [...give.copies].map((id) => 'f:' + id);
   const poolSize = (pool) => (pool ? pool.cards.length + pool.foiled.length + pool.goods.length : 0);
-  const showTheirs = !isMarket && !fixedGets;
+  const showTheirs = !fixedGets; // auf dem Markt: Wunschkarten aus allen Karten
   const showMine = !fixedGives;
   const swapIcon = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>';
 %>
@@ -22,7 +22,7 @@
     <a class="hb-back" href="<%= backUrl %>">← <%= mode === 'gegen' ? 'Zur Verhandlung' : 'Handel' %></a>
     <h1><%= title %><% if (partner && mode !== 'neu') { %> <span class="hb-top-partner">an <%= partner.username %></span><% } %></h1>
     <p class="muted">
-      <% if (mode === 'neu') { %>Verkaufen, um Karten bitten oder tauschen – auch mehrere Karten auf einmal.<% } %>
+      <% if (mode === 'neu') { %>Verkaufen, tauschen oder Karten suchen – auf dem Markt für alle oder direkt mit einem Mitglied, auch mehrere Karten auf einmal.<% } %>
       <% if (mode === 'markt') { %>Zum Markt-Angebot von <%= partner.username %> (<%= euro(listing.price) %>): anderer Preis, eigene Karten oder beides.<% } %>
       <% if (mode === 'gegen') { %>Ändere, was beide Seiten geben. Danach ist <%= partner.username %> am Zug.<% } %>
     </p>
@@ -69,9 +69,7 @@
         <% } else { %>
           <ul class="hb-tray" data-hb-tray="gib" aria-live="polite"><li class="hb-tray-empty">Tippe unten Karten aus deiner Sammlung an.</li></ul>
         <% } %>
-        <% if (!isMarket) { %>
-          <label class="hb-money"><span>+ Geld</span><input type="text" name="geld_gib" inputmode="decimal" placeholder="0,00" value="<%= money(pay) %>" data-hb-money="gib" aria-label="Geld, das du zahlst"><span class="hb-money-unit">€</span></label>
-        <% } %>
+        <label class="hb-money"><span>+ Geld</span><input type="text" name="geld_gib" inputmode="decimal" placeholder="0,00" value="<%= money(pay) %>" data-hb-money="gib" aria-label="Geld, das du zahlst"><span class="hb-money-unit">€</span></label>
       </div>
 
       <div class="hb-swap">
@@ -81,12 +79,16 @@
 
       <div class="hb-side hb-side-get" data-hb-side-box="will">
         <% if (isMarket) { %>
-          <div class="hb-side-head is-static"><span class="hb-side-label">Du bekommst</span></div>
+          <button type="button" class="hb-side-head" data-hb-open="will">
+            <span class="hb-side-label">Du bekommst<span class="hb-side-from"> von wem auch immer</span></span>
+            <span class="hb-side-value" data-hb-sum="will"></span>
+          </button>
           <label class="hb-price">
             <span class="sr-only">Preis</span>
-            <input type="text" name="geld_will" inputmode="decimal" placeholder="Preis" value="<%= money(receive) %>" required data-hb-money="will"><span class="hb-money-unit">€</span>
+            <input type="text" name="geld_will" inputmode="decimal" placeholder="Preis" value="<%= money(receive) %>" data-hb-money="will"><span class="hb-money-unit">€</span>
           </label>
-          <p class="hb-price-note muted small">Jeder kann sofort kaufen oder dir ein Gegenangebot machen.</p>
+          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Oder statt Geld: Wunschkarten unten im Reiter „Wunschkarten“ – dann wird getauscht.</li></ul>
+          <p class="hb-price-note muted small">Jeder kann sofort annehmen oder dir ein Gegenangebot machen.</p>
         <% } else { %>
           <button type="button" class="hb-side-head" data-hb-open="will" <%= showTheirs ? '' : 'disabled' %>>
             <span class="hb-side-label">Du bekommst<span class="hb-side-from"> von <%= partner.username %></span></span>
@@ -110,7 +112,7 @@
       <% if (showMine && showTheirs) { %>
         <div class="hb-tabs" role="tablist" aria-label="Sammlung">
           <button type="button" class="hb-tab active" role="tab" aria-selected="true" data-hb-tab="gib">Deine Sammlung <span class="hb-tab-count"><%= poolSize(mine) %></span></button>
-          <button type="button" class="hb-tab" role="tab" aria-selected="false" data-hb-tab="will">Sammlung von <%= partner.username %> <span class="hb-tab-count"><%= poolSize(theirs) %></span></button>
+          <button type="button" class="hb-tab" role="tab" aria-selected="false" data-hb-tab="will"><%= isMarket ? 'Wunschkarten' : 'Sammlung von ' + partner.username %> <span class="hb-tab-count"><%= isMarket ? 'alle' : poolSize(theirs) %></span></button>
         </div>
       <% } else { %>
         <h2 class="hb-browser-title"><%= showMine ? 'Deine Sammlung' : 'Sammlung von ' + partner.username %></h2>
@@ -122,7 +124,7 @@
       <% } %>
       <% if (showTheirs) { %>
         <div class="hb-pane" data-hb-pane="will" role="tabpanel">
-          <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, partnerName: partner.username }) %>
+          <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, wish: isMarket, partnerName: partner ? partner.username : '' }) %>
         </div>
       <% } %>
     </section>
@@ -132,7 +134,7 @@
       <div class="hb-bar-summary">
         <span class="hb-bar-line" data-hb-summary><%= isMarket ? 'Wähle Karten und einen Preis.' : 'Wähle aus, was beide Seiten geben.' %></span>
         <span class="hb-bar-note" data-hb-note>
-          <% if (isMarket) { %><%= marketDays %> Tage gültig<%= taxRates.markt > 0 ? ' · ' + pctText(taxRates.markt) + ' Steuer auf den Erlös' : '' %>.<% } else { %><%= privateHours %> Std. gültig · deine Karten sind bis dahin gesperrt.<% } %>
+          <% if (isMarket) { %><%= marketDays %> Tage gültig · deine Karten sind bis dahin gesperrt.<% } else { %><%= privateHours %> Std. gültig · deine Karten sind bis dahin gesperrt.<% } %>
         </span>
       </div>
       <% if (!isMarket && mode !== 'gegen') { %>

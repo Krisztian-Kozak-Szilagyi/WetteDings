@@ -24,8 +24,8 @@ test('Markt-Abzeichen: nur fremde, offene Markt-Angebote seit dem letzten Besuch
   const seen = new Date('2026-02-01');
   const user = { _id: 'u1', createdAt: created, marketSeenAt: null };
   const f = trade.marketNewFilter(user);
-  assert.equal(f.kind, 'markt');
-  assert.equal(f.to, null); // nur Markt-Angebote, keine Gegenangebote darauf
+  assert.equal(f.to, null); // nur Markt-Angebote (auch Tausch und Gesuch) …
+  assert.equal(f.listing, null); // … keine Gegenangebote darauf
   assert.equal(f.status, 'offen');
   assert.deepEqual(f.seller, { $ne: 'u1' });
   assert.equal(f.createdAt.$gt, created); // noch nie besucht -> seit Registrierung
@@ -94,14 +94,20 @@ test('Verhandlung: ungelesen, Nachrichten prüfen, Bedingungen als Text', () => 
 
 const L = (...ids) => ids.map((card) => ({ card }));
 
-test('Angebot prüfen: Markt-Angebot nur Karten gegen Geld', () => {
-  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A), price: 1 }), { extraFrom: 'to' });
-  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A, A, B), price: trade.MAX_PRICE }), { extraFrom: 'to' });
+test('Angebot prüfen: Markt-Angebot – Verkauf, Tausch gegen Wunschkarten und Gesuch', () => {
+  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A), price: 1, extraFrom: 'to' }), { extraFrom: 'to' });
+  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A, A, B), price: trade.MAX_PRICE, extraFrom: 'to' }), { extraFrom: 'to' });
   rejects(() => trade.validateOffer({ listing: true, give: L(A), price: 0 }), /Preis/);
   rejects(() => trade.validateOffer({ listing: true, give: L(A), price: 1.5 }), /Betrag/);
   rejects(() => trade.validateOffer({ listing: true, give: L(A), price: trade.MAX_PRICE + 1 }), /Betrag/);
-  rejects(() => trade.validateOffer({ listing: true, give: L(A), want: L(B), price: 100 }), /bestimmten Mitglied/);
   rejects(() => trade.validateOffer({ listing: true, give: L('gibt-es-nicht'), price: 100 }), /gibt es nicht/);
+  // Tausch auf dem Markt: Wunschkarten, Geld optional in beide Richtungen
+  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A), want: L(B), price: 0 }), { extraFrom: null });
+  assert.deepEqual(trade.validateOffer({ listing: true, give: L(A), want: L(B, B), price: 300, extraFrom: 'seller' }), { extraFrom: 'seller' });
+  rejects(() => trade.validateOffer({ listing: true, give: L(A), want: [{ card: B, copy: 'x' }], price: 0 }), /kein bestimmtes/);
+  // Gesuch: Geld für Wunschkarten – zahlen muss, wer keine Karte gibt
+  assert.deepEqual(trade.validateOffer({ listing: true, want: L(B), price: 900, extraFrom: 'seller' }), { extraFrom: 'seller' });
+  rejects(() => trade.validateOffer({ listing: true, want: L(B), price: 900, extraFrom: 'to' }), /keine Karte gibt/);
 });
 
 test('Angebot prüfen: Verkauf, Kaufanfrage, Tausch und Bündel', () => {

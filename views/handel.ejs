@@ -97,7 +97,9 @@
   <% } else { %>
     <%
       // Such-/Filterknopf (partials/mkt-bar): Seltenheit der seltensten Karte, „Fehlt mir noch“ und welche Angebote
-      const marketRarity = (t) => { const top = topLine(t.give); return top ? cardInfo(top.card).rarity : ''; };
+      // Kachel zeigt, was angeboten wird – beim Gesuch die gesuchten Karten
+      const shown = (t) => (t.give.length ? t.give : t.want);
+      const marketRarity = (t) => { const top = topLine(shown(t)); return top ? cardInfo(top.card).rarity : ''; };
       const lacks = (t) => t.give.some((l) => !String(l.card).startsWith('item:') && !(coll.counts[l.card] || 0));
       const mkGroups = [
         { attr: 'mk-rarity', title: 'Seltenheit', missing: market.filter(lacks).length, allCount: market.length,
@@ -105,7 +107,9 @@
         { attr: 'mk-show', title: 'Angebote', allLabel: 'Alle Angebote', dots: false, opts: [
           { key: 'foil', label: 'Mit folierten Karten', count: market.filter((t) => t.give.some((l) => l.foiledAt)).length },
           { key: 'bundle', label: 'Bündel', count: market.filter((t) => t.give.length > 1).length },
-          { key: 'afford', label: 'Kann ich mir leisten', count: market.filter((t) => t.price <= bal).length },
+          { key: 'swap', label: 'Tauschangebote', count: market.filter((t) => t.give.length && t.want.length).length },
+          { key: 'wanted', label: 'Gesuche', count: market.filter((t) => !t.give.length).length },
+          { key: 'afford', label: 'Kann ich annehmen', count: market.filter((t) => perspective(t, 'to').pay <= bal).length },
         ].filter((o) => o.count) },
       ];
     %>
@@ -124,36 +128,59 @@
     <p class="muted hx-none" data-mk-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
     <ul class="mk-grid" data-mk-grid>
       <% market.forEach((t) => {
-        const top = topLine(t.give); const c = cardInfo(top.card); const r = rarityByKey[c.rarity] || { label: '', rank: -1 };
-        const single = t.give.length === 1;
+        // Sicht dessen, der annimmt ('to'): was er gibt (Wunschkarten, Geld) und was er bekommt
+        const p = perspective(t, 'to');
+        const kindKey = t.give.length && t.want.length ? 'swap' : t.give.length ? 'sale' : 'wanted';
+        const list = shown(t); const top = topLine(list); const c = cardInfo(top.card); const r = rarityByKey[c.rarity] || { label: '', rank: -1 };
+        const single = list.length === 1;
         const missing = t.give.filter((l) => !String(l.card).startsWith('item:') && !(coll.counts[l.card] || 0)).length;
         const foiled = t.give.some((l) => l.foiledAt);
         const value = linesValue(t.give);
-        const names = t.give.map((l) => cardInfo(l.card).name).join(' ').toLowerCase() + ' ' + t.sellerName.toLowerCase(); %>
-        <li class="mk-tile r-<%= c.rarity %>" data-mk data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= names %>" data-price="<%= t.price %>"
-          data-created="<%= new Date(t.createdAt).getTime() %>" data-expires="<%= new Date(t.expiresAt).getTime() %>" data-missing="<%= missing ? 1 : 0 %>" data-foil="<%= foiled ? 1 : 0 %>" data-bundle="<%= single ? 0 : 1 %>">
+        // Habe ich die Wunschkarten frei? (Gegenstände prüft erst der Abschluss)
+        const need = {};
+        t.want.filter((l) => !String(l.card).startsWith('item:')).forEach((l) => { need[l.card] = (need[l.card] || 0) + 1; });
+        const lacking = Object.entries(need).filter(([id, n]) => (coll.free[id] || 0) < n).map(([id]) => cardInfo(id).name);
+        const blocked = p.pay > bal ? 'Dein Guthaben reicht nicht' : lacking.length ? 'Dir fehlt frei: ' + lacking.join(', ') : '';
+        const action = { sale: 'Kaufen', swap: 'Tauschen', wanted: 'Abgeben' }[kindKey];
+        const sideText = (l, cents) => [lineLabel(l), cents > 0 ? euro(cents) : ''].filter(Boolean).join(' + ') || 'nichts';
+        const names = [...t.give, ...t.want].map((l) => cardInfo(l.card).name).join(' ').toLowerCase() + ' ' + t.sellerName.toLowerCase(); %>
+        <li class="mk-tile mk-<%= kindKey %> r-<%= c.rarity %>" data-mk data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= names %>" data-price="<%= t.price %>"
+          data-created="<%= new Date(t.createdAt).getTime() %>" data-expires="<%= new Date(t.expiresAt).getTime() %>" data-missing="<%= missing ? 1 : 0 %>" data-foil="<%= foiled ? 1 : 0 %>"
+          data-bundle="<%= t.give.length > 1 ? 1 : 0 %>" data-swap="<%= kindKey === 'swap' ? 1 : 0 %>" data-wanted="<%= kindKey === 'wanted' ? 1 : 0 %>">
           <div class="mk-art">
-            <%- include('partials/trade-stack', { list: t.give, size: 'md' }) %>
-            <% if (!single) { %><span class="mk-bundle"><%= countText(t.give) %></span><% } %>
+            <%- include('partials/trade-stack', { list, size: 'md' }) %>
+            <% if (kindKey !== 'sale') { %><span class="mk-kind"><%= kindKey === 'swap' ? 'Tausch' : 'Gesucht' %></span><% } else if (!single) { %><span class="mk-bundle"><%= countText(list) %></span><% } %>
           </div>
           <div class="mk-body">
-            <span class="mk-name" title="<%= lineLabel(t.give) %>"><%= single ? c.name : lineLabel(t.give) %></span>
+            <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
             <span class="mk-rarity">
               <span class="tcg-dot r-<%= c.rarity %>"></span><%= single ? r.label : 'bis ' + r.label %>
               <% if (single && top.foiledAt) { %><span class="foil-tag" title="Foliert am <%= dayDate(top.foiledAt) %>">Foliert<%= top.grade ? ' · Note ' + top.grade : '' %></span><% } %>
-              <% if (!c.isItem) { %>
+              <% if (kindKey !== 'wanted' && !c.isItem) { %>
                 <span class="own-tag<%= missing ? ' own-new' : '' %>"><%= single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz' %></span>
               <% } %>
+              <% if (kindKey === 'wanted' && !lacking.length) { %><span class="own-tag own-new">Hast du frei</span><% } %>
             </span>
-            <span class="mk-price">
-              <strong><%= euro(t.price) %></strong>
-              <span class="<%= t.price < value ? 'pos' : '' %>">Wert <%= euro(value) %></span>
-            </span>
+            <% if (kindKey === 'swap') { %>
+              <span class="mk-wants">
+                <span class="mk-wants-label">gegen</span>
+                <%- include('partials/trade-stack', { list: t.want, size: 'sm', max: 3 }) %>
+                <span class="mk-wants-text"><%= sideText(t.want, p.pay) %><% if (p.receive) { %> <span class="pos">+ <%= euro(p.receive) %> für dich</span><% } %></span>
+              </span>
+              <span class="mk-price mk-price-sub"><span>Wert <%= euro(value) %> gegen <%= euro(linesValue(t.want)) %></span></span>
+            <% } else if (kindKey === 'wanted') { %>
+              <span class="mk-price"><strong><%= euro(t.price) %></strong><span>zahlt <%= t.sellerName %></span></span>
+            <% } else { %>
+              <span class="mk-price">
+                <strong><%= euro(t.price) %></strong>
+                <span class="<%= t.price < value ? 'pos' : '' %>">Wert <%= euro(value) %></span>
+              </span>
+            <% } %>
             <span class="mk-seller">von <%- userLink(t.sellerName) %> · endet <%= relTime(t.expiresAt) %></span>
             <div class="mk-actions">
-              <form method="post" action="/handel/angebot/<%= t._id %>/kaufen" data-confirm="<%= lineLabel(t.give) %> für <%= euro(t.price) %> kaufen?">
+              <form method="post" action="/handel/angebot/<%= t._id %>/kaufen" data-confirm="<%= action %>? Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button class="btn btn-primary btn-sm" type="submit" <%= t.price > bal ? 'disabled title="Dein Guthaben reicht nicht"' : '' %>>Kaufen</button>
+                <button class="btn btn-primary btn-sm" type="submit" <%= blocked ? 'disabled title="' + blocked + '"' : '' %>><%= action %></button>
               </form>
               <% if (t.myOffer) { %>
                 <a class="btn btn-ghost btn-sm" href="/handel/angebot/<%= t.myOffer %>">Dein Angebot</a>
@@ -226,7 +253,7 @@
 <details class="hx-how">
   <summary>So funktioniert der Handel</summary>
   <ul>
-    <li><strong>Markt:</strong> Du stellst Karten für einen Festpreis ein, <%= marketDays %> Tage lang. Jeder kann sofort kaufen oder ein Gegenangebot machen – mit anderem Preis oder eigenen Karten.</li>
+    <li><strong>Markt:</strong> Für alle, <%= marketDays %> Tage lang – Karten für einen Festpreis verkaufen, gegen Wunschkarten tauschen oder ein Gesuch einstellen (Geld für Karten, die dir fehlen). Jeder, der passt, kann sofort annehmen oder ein Gegenangebot machen.</li>
     <li><strong>An ein Mitglied:</strong> Verkaufen, um eine Karte bitten (Kaufanfrage) oder tauschen – auf beiden Seiten bis zu <%= maxLines %> Karten, dazu Geld in eine Richtung. <%= privateHours %> Std. gültig.</li>
     <li><strong>Verhandeln:</strong> In jedem Angebot könnt ihr schreiben und Gegenangebote machen, bis eine Seite annimmt. Annehmen kann immer die Seite, die den letzten Vorschlag nicht gemacht hat.</li>
     <li>Deine angebotenen Karten sind bis dahin gesperrt. Was du dir von anderen wünschst, wird erst beim Annehmen geprüft. <% if (taxSame && !taxRates.markt) { %>Aktuell fällt keine Steuer an.<% } else if (taxSame) { %>Auf Geld fallen <%= pctText(taxRates.markt) %> Steuer an.<% } else { %>Steuer auf Geld: Markt <%= pctText(taxRates.markt) %>, Privat <%= pctText(taxRates.privat) %>, Tausch <%= pctText(taxRates.tausch) %>.<% } %></li>

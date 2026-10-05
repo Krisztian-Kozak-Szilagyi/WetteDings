@@ -26,12 +26,15 @@
       <span class="muted small"><%= isOpen ? 'läuft ab ' + relTime(t.expiresAt) : statusText %></span>
     </div>
   </div>
+  <% const lp = perspective(t, 'seller'); %>
   <div class="ng-listing card">
-    <%- include('partials/trade-stack', { list: t.give, size: 'lg' }) %>
+    <%- include('partials/trade-stack', { list: lp.gives.length ? lp.gives : lp.gets, size: 'lg' }) %>
     <div class="ng-listing-info">
-      <strong class="ng-listing-name"><%= lineLabel(t.give) %></strong>
-      <span class="ng-price"><%= euro(t.price) %></span>
-      <span class="muted small">Kartenwert <%= euro(linesValue(t.give)) %><% if (taxFor(t.price, 'markt')) { %> · du erhältst <%= euro(t.price - taxFor(t.price, 'markt')) %> nach Steuer<% } %></span>
+      <span class="ng-side-label"><%= lp.gives.length && lp.gets.length ? 'Tausch' : lp.gives.length ? 'Verkauf' : 'Gesuch' %></span>
+      <strong class="ng-listing-name">Du gibst <%= sideText(lp.gives, lp.pay) %></strong>
+      <strong class="ng-listing-name">und bekommst <%= sideText(lp.gets, lp.receive) %></strong>
+      <% if (lp.receive && !lp.gets.length) { %><span class="ng-price"><%= euro(lp.receive) %></span><% } %>
+      <span class="muted small">Kartenwert <%= euro(linesValue(lp.gives)) %> gegen <%= euro(linesValue(lp.gets)) %><% if (lp.receive && taxFor(lp.receive, t.kind)) { %> · vom Geld bleiben dir <%= euro(lp.receive - taxFor(lp.receive, t.kind)) %> nach Steuer<% } %></span>
       <% if (isOpen) { %>
         <form method="post" action="/handel/angebot/<%= t._id %>/beenden" data-confirm="Markt-Angebot zurückziehen?<%= open.length ? ' Alle Gegenangebote darauf werden damit abgelehnt.' : '' %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">

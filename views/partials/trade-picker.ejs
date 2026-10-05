@@ -2,10 +2,13 @@
   Kartenauswahl im Handelsfenster (public/js/handel-neu.js): Karte antippen = eine mehr, "−" = eine weniger.
   Ohne JS stehen die Zahlenfelder unter den Karten. side = 'gib' | 'will' (Feldnamen "gib:<Karte>" = Anzahl,
   "gib" = "f:<Exemplar>" für folierte Karten), pool = { cards: [{ card, max }], foiled: [...], goods: [{ card, max }], counts },
-  preset = { counts, copies }, own = eigene Sammlung, partnerName = Name des Mitglieds.
+  preset = { counts, copies }, own = eigene Sammlung, partnerName = Name des Mitglieds,
+  wish = Wunschkarten eines Markt-Angebots (alle Karten; "du hast …" statt Bestand).
 %>
 <%
   const pickRar = (c) => rarityByKey[c.rarity] || { label: '', sell: 0 };
+  const wish = !!locals.wish;
+  const holds = (x) => (wish ? (x.owned ? 'du hast ' + x.owned : 'fehlt dir') : x.max + (own ? ' frei' : ' im Besitz'));
   const total = pool.cards.length + pool.foiled.length + pool.goods.length;
   const present = rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key));
   const inRarity = (key) => pool.cards.filter((x) => x.card.rarity === key).length + pool.foiled.filter((f) => f.card.rarity === key).length;
@@ -23,10 +26,10 @@
   <% } else { %>
     <div class="hb-picker-tools">
       <%# Such-/Filterknopf (partials/mkt-bar): Seltenheit filtert public/js/tcg.js über data-tcg-filter, die Suche public/js/handel-neu.js %>
-      <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
+      <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : wish ? 'Wunschkarte suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
         { attr: 'tcg-filter', title: 'Seltenheit', allCount: total, opts: present.map((r) => ({ key: r.key, label: r.label, count: inRarity(r.key) })) },
       ] }) %>
-      <span class="hb-picker-hint muted small"><%= own ? 'Antippen zum Hinzufügen' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
+      <span class="hb-picker-hint muted small"><%= own ? 'Antippen zum Hinzufügen' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
     </div>
     <div class="tcg-grid hb-grid">
       <% pool.goods.forEach((g) => { const n = Math.min(preset.counts[g.card.id] || 0, g.max); %>
@@ -36,7 +39,7 @@
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
           </button>
           <span class="hb-card-name"><%= g.card.name %></span>
-          <span class="hb-card-sub"><%= g.max %> <%= own ? 'frei' : 'im Besitz' %> · <%= euro(g.card.sell) %></span>
+          <span class="hb-card-sub"><%= wish ? 'Gegenstand' : g.max + (own ? ' frei' : ' im Besitz') %> · <%= euro(g.card.sell) %></span>
           <% step(side + ':' + g.card.id, g.card.name, g.max, n) %>
         </div>
       <% }) %>
@@ -47,7 +50,7 @@
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
           </button>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub"><%= x.max %> <%= own ? 'frei' : 'im Besitz' %> · <%= euro(r.sell || 0) %></span>
+          <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
           <% step(side + ':' + c.id, c.name, x.max, n) %>
         </div>
       <% }) %>
