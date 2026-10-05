@@ -5,11 +5,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { LEVELS, PAY, settings, levelInfo, rollSpots, rollDefects, gradeFor, payFor } = require('../src/grading/gradingService');
 
-test('Note: 10 minus Mängel, Knick −3, mindestens 1', () => {
+test('Note: 10 minus Mängel, mit Knick Start bei 4, mindestens 1', () => {
   const none = { scratches: [], corners: [], edges: [], crease: false };
   assert.equal(gradeFor(none), 10);
   assert.equal(gradeFor({ ...none, scratches: [{}, {}], corners: [1] }), 7);
-  assert.equal(gradeFor({ ...none, edges: [{}], crease: true }), 6);
+  assert.equal(gradeFor({ ...none, crease: true }), 4); // Knick: Start bei 4
+  assert.equal(gradeFor({ ...none, edges: [{}], crease: true }), 3);
   assert.equal(gradeFor({ scratches: [{}, {}, {}], corners: [0, 1, 2, 3], edges: [{}, {}], crease: true }), 1);
 });
 

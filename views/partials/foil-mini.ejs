@@ -1,8 +1,9 @@
-<%# Kleine folierte Karte (Vorderseite mit Grading-Etikett, immer Note 10): card, rarityLabel %>
-<span class="foil-inner">
+<%# Kleine folierte Karte (Vorderseite mit Grading-Etikett): card, rarityLabel, grade (Note des Exemplars, #73), center (Versatz) %>
+<% const g = locals.grade || null; const ctr = locals.center || null; %>
+<span class="foil-inner"<%- ctr ? ` style="--cx: ${ctr.x}; --cy: ${ctr.y}"` : '' %>>
   <span class="foil-face foil-front">
     <img src="<%= card.image %>" alt="" loading="lazy" width="720" height="1008">
     <span class="foil-sheen" aria-hidden="true"></span>
-    <span class="foil-ticket"><span class="gr-slab-info"><strong>BfW GRADING</strong><span><%= card.name %> · <%= rarityLabel %></span><span class="gr-slab-word">GEM MINT</span></span><span class="gr-slab-grade">10</span></span>
+    <span class="foil-ticket"><span class="gr-slab-info"><strong>BfW GRADING</strong><span><%= card.name %> · <%= rarityLabel %></span><span class="gr-slab-word"><%= g ? gradeWord(g) : '' %></span></span><span class="gr-slab-grade"><%= g || '–' %></span></span>
   </span>
 </span>

@@ -6,6 +6,7 @@ const { Trade } = require('./models/Trade');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
 const { LotteryRound } = require('./models/Lottery');
+const { rollCondition } = require('./grading/condition');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -98,6 +99,33 @@ async function migrate() {
     if (done.modifiedCount) await Ledger.create({ user: u._id, type: 'konto_geloescht', amount: -u.balance });
   }
   if (shells.length) console.log(`Migration: Guthaben von ${shells.length} gelöschten Konto/Konten verfallen lassen.`);
+
+  // #73: Karten von vor dem geheimen Zustand bekommen ihn nachträglich (Verteilung "frisch", wie neue Karten)
+  const conditioned = await rollMissingConditions();
+  if (conditioned) console.log(`Migration: Zustand für ${conditioned} Karte(n) ausgewürfelt.`);
+
+  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum am Angebot vermerken (Anzeige im Handel)
+  const trades = await Trade.find({ status: 'offen', $or: [{ foiledAt: { $ne: null }, grade: null }, { wantFoiledAt: { $ne: null }, wantGrade: null }] }).select('cardDoc wantCopy foiledAt wantFoiledAt').lean();
+  if (trades.length) {
+    const ids = trades.flatMap((t) => [t.foiledAt && t.cardDoc, t.wantFoiledAt && t.wantCopy].filter(Boolean));
+    const grades = new Map((await TcgCard.find({ _id: { $in: ids } }).select('condition.grade').lean()).map((d) => [String(d._id), d.condition && d.condition.grade]));
+    const gradeOf = (id) => grades.get(String(id)) || null;
+    await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { grade: t.foiledAt ? gradeOf(t.cardDoc) : null, wantGrade: t.wantFoiledAt ? gradeOf(t.wantCopy) : null } } } })));
+    console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
+  }
+}
+
+/** Zustand für alle Karten ohne condition auswürfeln, in Blöcken. Gibt die Zahl der ergänzten Karten zurück. */
+async function rollMissingConditions(batch = 1000) {
+  let done = 0;
+  for (;;) {
+    const ids = await TcgCard.find({ condition: { $exists: false } }).select('_id').limit(batch).lean();
+    if (!ids.length) return done;
+    // Filter auch auf das fehlende Feld: läuft die Migration doppelt, bleibt ein schon gewürfelter Zustand stehen
+    const res = await TcgCard.bulkWrite(ids.map(({ _id }) => ({ updateOne: { filter: { _id, condition: { $exists: false } }, update: { $set: { condition: rollCondition() } } } })));
+    done += res.modifiedCount;
+    if (ids.length < batch) return done;
+  }
 }
 
 module.exports = { migrate };

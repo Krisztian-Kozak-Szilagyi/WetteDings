@@ -23,9 +23,11 @@ const tradeSchema = new Schema(
     card: { type: String, required: true }, // Karten-ID
     cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // gesperrtes Exemplar
     foiledAt: { type: Date, default: null }, // angebotenes Exemplar ist foliert (seit)
+    grade: { type: Number, default: null }, // dessen Note auf der Folie (#73) – nur bei folierten Exemplaren
     // Gegenstände (z. B. Folie): card = "item:<Art>", cardDoc = das Item-Dokument (src/items/itemService.js)
     wantCopy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // nur bei tausch: ein bestimmtes foliertes Exemplar des Empfängers
     wantFoiledAt: { type: Date, default: null }, // dessen Foliendatum (zur Anzeige)
+    wantGrade: { type: Number, default: null }, // dessen Note auf der Folie (#73)
     wantCard: { type: String, default: null }, // nur bei tausch: gewünschte Karte des Empfängers
     wantCardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // erst beim Annehmen gesetzt
     extraFrom: { type: String, enum: ['seller', 'to', null], default: null }, // nur bei tausch: wer den Aufpreis zahlt

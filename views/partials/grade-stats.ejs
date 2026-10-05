@@ -1,0 +1,53 @@
+<%#
+  Grading-Vitrine einer Sammlung (#73): beste Note als Mini-Slab, Ø Note als Ring, Notenspiegel 1–10.
+  Nur folierte Karten (Note sichtbar) – die Noten aller anderen bleiben geheim.
+  graded: { count, best, bestCount, avg, dist } aus collection() oder null (dann ausgegrauter Platzhalter);
+  own: eigenes Album (Platzhalter mit Link zum Folieren)
+%>
+<% if (graded) {
+     const avgText = graded.avg.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+     const most = Math.max(...graded.dist.slice(1)); %>
+  <div class="grade-vitrine" aria-label="Gegradete Karten: beste Note <%= graded.best %>, Durchschnitt <%= avgText %>, <%= graded.count %> gegradet" title="Nur folierte Karten zählen – ihre Note steht auf der Folie. Alle anderen Noten bleiben geheim.">
+    <div class="gv-slab<%= graded.best === 10 ? ' is-gem' : '' %>">
+      <span class="gv-slab-head">BfW GRADING</span>
+      <span class="gv-slab-main">
+        <span class="gv-slab-word"><%= gradeWord(graded.best) %><small>Beste Note<%= graded.bestCount > 1 ? ' · ' + graded.bestCount + '×' : '' %></small></span>
+        <span class="gv-slab-grade"><%= graded.best %></span>
+      </span>
+      <span class="gv-sheen" aria-hidden="true"></span>
+    </div>
+    <div class="gv-avg" style="--p: <%= (graded.avg / 10).toFixed(3) %>">
+      <span class="gv-ring"><strong><%= avgText %></strong></span>
+      <small>Ø Note</small>
+    </div>
+    <div class="gv-dist">
+      <small><%= graded.count %> gegradet</small>
+      <div class="gv-bars" aria-hidden="true">
+        <% for (let g = 1; g <= 10; g++) { const n = graded.dist[g]; %>
+          <span class="gv-bar<%= n ? ' has' : '' %><%= g === graded.best ? ' is-best' : '' %><%= g === 10 && n ? ' is-gem' : '' %>" style="--h: <%= n ? Math.max(0.18, n / most).toFixed(3) : 0 %>" title="Note <%= g %>: <%= n %>×"><i></i><b><%= g %></b></span>
+        <% } %>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+  <%# Noch keine gegradete Karte: dieselbe Vitrine ausgegraut (eigenes Album mit Weg zum Folieren) %>
+  <div class="grade-vitrine is-empty" title="<%= locals.own ? 'Foliere eine Karte – dann steht ihre Note auf der Folie und hier.' : 'Noch keine folierte Karte – ihre Noten sind noch geheim.' %>">
+    <div class="gv-slab">
+      <span class="gv-slab-head">BfW GRADING</span>
+      <span class="gv-slab-main">
+        <span class="gv-slab-word">NOCH NICHT GEGRADET<small><% if (locals.own) { %><a href="/inventar#gegenstaende">Karte folieren →</a><% } else { %>Keine folierte Karte<% } %></small></span>
+        <span class="gv-slab-grade">?</span>
+      </span>
+    </div>
+    <div class="gv-avg" style="--p: 0">
+      <span class="gv-ring"><strong>–</strong></span>
+      <small>Ø Note</small>
+    </div>
+    <div class="gv-dist">
+      <small>0 gegradet</small>
+      <div class="gv-bars" aria-hidden="true">
+        <% for (let g = 1; g <= 10; g++) { %><span class="gv-bar" style="--h: 0"><i></i><b><%= g %></b></span><% } %>
+      </div>
+    </div>
+  </div>
+<% } %>

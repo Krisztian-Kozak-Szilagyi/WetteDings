@@ -99,8 +99,40 @@
 
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
-            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer siehst du nur, wenn du die Karte schräg ins Licht drehst; zum Heranzoomen Mausrad oder <b>+</b>.
-              <span class="gr-note">Start 10 · Kratzer −1 · bestoßene Ecke −1 · Kante −1 · Knick −3</span></p>
+            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>.</p>
+            <%# Bewertung in drei Stufen (src/grading/condition.js: gradeCap, gradeFor) – erst die Obergrenze, dann abziehen %>
+            <ol class="gr-flow">
+              <li class="gr-flow-step is-cap">
+                <span class="gr-flow-num">1</span>
+                <div class="gr-flow-body">
+                  <span class="gr-flow-title">Obergrenze <small>der niedrigste Wert zählt</small></span>
+                  <div class="gr-cap-row">
+                    <span class="gr-cap-crease"><span>Knick</span><b>4</b></span>
+                    <div class="gr-cap-center">
+                      <small>Zentrierung <span>– Rand ungleich breit</span></small>
+                      <ol class="gr-center-scale">
+                        <% centeringScale.forEach((c) => { %><li><span><%= c.label %></span><b><%= c.cap %></b></li><% }) %>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              <li class="gr-flow-step">
+                <span class="gr-flow-num">2</span>
+                <div class="gr-flow-body">
+                  <span class="gr-flow-title">Davon abziehen <small>je Mangel</small></span>
+                  <ul class="gr-minus-list">
+                    <li>Kratzer <b>−1</b></li>
+                    <li>Bestoßene Ecke <b>−1</b></li>
+                    <li>Kantenmacke <b>−1</b></li>
+                  </ul>
+                </div>
+              </li>
+              <li class="gr-flow-step is-result">
+                <span class="gr-flow-num">3</span>
+                <div class="gr-flow-body"><span class="gr-flow-title">= Note <small>mindestens 1</small></span></div>
+              </li>
+            </ol>
             <div class="gr-grades" data-gr-grades>
               <% for (let g = 1; g <= 10; g++) { %><button type="button" class="gr-grade" data-grade="<%= g %>"><%= g %></button><% } %>
             </div>
