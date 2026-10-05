@@ -4371,7 +4371,8 @@ a.dg-start-tile:hover { color: var(--text); }
 .leaderboard tr.top-2 td:first-child { box-shadow: inset 3px 0 0 #cfd3e5, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-3 td:first-child { box-shadow: inset 3px 0 0 #c99067, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-1 td { box-shadow: inset 0 -1px 0 rgba(242, 193, 78, .35); }
-.leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, 0 0 18px rgba(242, 193, 78, .35), inset 0 -1px 0 rgba(242, 193, 78, .35); }
+/* Leuchten nach innen: ein äußerer Schatten an der Zelle wurde von den Nachbarzellen überdeckt und sah wie ein eigener Kasten aus */
+.leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 14px 0 16px -12px rgba(242, 193, 78, .45), inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td a { color: #fff4cf; }
 @keyframes rank-gold { 0%, 100% { background-position: 100% 0, 0 0; } 50% { background-position: 0 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .leaderboard tr.top-1 { animation: none; } }
