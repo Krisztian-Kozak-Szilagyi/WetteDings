@@ -1,0 +1,38 @@
+<%- include('partials/head') %>
+<link rel="stylesheet" href="/css/deck.css?v=<%= assetVersion %>">
+<%# Deckbau – nur der Rahmen; Karten, Deck und Speichern kommen per JSON (public/js/deck.js, /api/deck) %>
+<div class="dk-page" data-deck-app>
+  <header class="page-head">
+    <h1>Deckbau</h1>
+    <p class="muted">Stell dein Deck für den kommenden Kampfmodus zusammen.</p>
+  </header>
+
+  <form class="dk-form" action="/api/deck" method="post" data-deck-form>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="id" value="">
+    <input type="hidden" name="karten" value="">
+  </form>
+
+  <div class="dk-grid">
+    <section class="card dk-pool">
+      <h2>Deine Kampfkarten</h2>
+      <p class="muted dk-empty" data-deck-empty hidden>Du hast noch keine Kampfkarten.</p>
+      <ul class="dk-pool-list" data-deck-pool></ul>
+    </section>
+
+    <section class="card dk-deck">
+      <div class="dk-deck-head">
+        <input class="dk-name" type="text" maxlength="30" placeholder="Mein Deck" aria-label="Deckname" data-deck-name>
+        <span class="dk-count" data-deck-count>0 / 30</span>
+      </div>
+      <ul class="dk-deck-list" data-deck-list></ul>
+      <p class="dk-error" data-deck-error hidden></p>
+      <div class="dk-actions">
+        <button type="button" class="btn btn-primary" data-deck-save disabled>Speichern</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/js/deck.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

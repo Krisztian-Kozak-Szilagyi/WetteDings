@@ -156,6 +156,7 @@ async function deleteAccount({ user, password }) {
       IhkState.deleteOne({ _id: id }, opt),
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),
+      require('../models/Deck').deleteMany({ user: id }, opt),
       // offene Handelsangebote verschwinden; abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),
       Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),

@@ -120,6 +120,8 @@ function loadCards(dir = IMAGE_DIR) {
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
+      // Kampfwerte (eigener Block, nur neue Karten) – macht die Karte deckfähig (src/game/deck.js)
+      if (data && data.kampf) card.kampf = data.kampf;
       if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
