@@ -19,7 +19,6 @@
       <form method="post" action="/erfolge/gesehen" data-ach-form>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="id" value="<%= ap ? ap.id : '' %>" data-ach-id>
-        <input type="hidden" name="zurueck" value="<%= typeof achPopupBack !== 'undefined' ? achPopupBack : '/' %>">
         <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
       </form>
       <p class="muted small ach-pop-more" data-ach-more<%= ap && ap.left > 1 ? '' : ' hidden' %>><%= ap && ap.left > 1 ? 'Noch ' + (ap.left - 1) + (ap.left - 1 === 1 ? ' weiterer Erfolg wartet.' : ' weitere Erfolge warten.') : '' %></p>
@@ -46,7 +45,6 @@
       <form method="post" action="/geschenke/gesehen" data-gift-form>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="id" value="<%= gp ? gp.id : '' %>" data-gift-id>
-        <input type="hidden" name="zurueck" value="<%= typeof achPopupBack !== 'undefined' ? achPopupBack : '/' %>">
         <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
       </form>
       <p class="muted small ach-pop-more" data-gift-more<%= gp && gp.left > 1 ? '' : ' hidden' %>><%= gp && gp.left > 1 ? 'Noch ' + (gp.left - 1) + (gp.left - 1 === 1 ? ' weiteres Geschenk wartet.' : ' weitere Geschenke warten.') : '' %></p>
