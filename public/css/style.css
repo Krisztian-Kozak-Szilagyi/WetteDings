@@ -5197,7 +5197,9 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 /* Suchen: Feld wächst als Kreis von links auf, die Lupe kommt von unten */
 /* Feld füllt die Hälfte ganz aus (kein eigener Rahmen), rechts bleibt Platz für die Lupe */
 .mkt-bar-input[type="search"] { position: absolute; left: 0; top: 0; width: calc(100% - 46px); height: 100%; min-height: 0; margin: 0; padding: 0 14px; border: 0; border-radius: var(--radius-md) 0 0 var(--radius-md); background: var(--color-bg); color: var(--text); font-size: 14px; clip-path: circle(0 at 18px 50%); transition: clip-path .45s var(--mkt-ease) .05s; }
-.mkt-bar-input:focus { outline: none; box-shadow: none; }
+/* 1px-Rahmen wie im Vorbild – sonst verschwimmt das Feld mit dem Seitenhintergrund */
+.mkt-bar-input[type="search"] { box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.mkt-bar-input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--color-neutral-600); }
 .mkt-bar-icon { position: absolute; right: 0; top: 0; display: grid; place-items: center; width: 46px; height: 100%; color: var(--color-accent-300); transform: translateY(100%); opacity: 0; transition: transform .35s var(--mkt-ease), opacity .2s ease; pointer-events: none; }
 .mkt-bar-search:is(:hover, :focus-within), .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-search { width: 100%; z-index: 3; transition-delay: 0s; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
 .mkt-bar-search:is(:hover, :focus-within) .mkt-bar-label, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-label { opacity: 0; pointer-events: none; transition-delay: 0s; }
