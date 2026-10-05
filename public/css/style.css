@@ -1181,10 +1181,17 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 @media (min-width: 960px) { .trade-swap-grids { grid-template-columns: 1fr 1fr; align-items: start; } }
 .trade-swap-grids .tcg-grid { grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); max-height: 70vh; overflow-y: auto; padding: 6px 4px; }
 .tcg-pick input { position: absolute; opacity: 0; pointer-events: none; }
-.tcg-pick img { outline: 3px solid transparent; outline-offset: 2px; }
-.tcg-pick:has(input:checked) img { outline-color: var(--primary); }
-.tcg-pick:has(input:focus-visible) img { outline-color: var(--text); }
-.tcg-pick:has(input:checked) .tcg-slot-label { color: var(--text); }
+.tcg-pick:has(input:focus-visible) .tcg-art { outline: 2px solid var(--text); outline-offset: 3px; }
+/* Gewählte Karte: heller Rahmen, Leuchten und Haken auf dem Kartenrahmen (das Bild selbst wird von .tcg-art abgeschnitten) */
+.tcg-pick:has(input:checked) .tcg-art { transform: translateY(-4px); box-shadow: 0 0 0 3px var(--color-accent-300), 0 0 0 6px color-mix(in srgb, var(--color-accent) 45%, transparent), 0 0 26px color-mix(in srgb, var(--color-accent) 60%, transparent); }
+.tcg-pick:has(input:checked)::after {
+  content: "✓"; position: absolute; top: -6px; right: -6px; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--color-accent-300); color: var(--color-bg); font-weight: 800; font-size: 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+}
+.tcg-pick:has(input:checked) .tcg-slot-label { color: var(--color-accent-300); font-weight: 600; }
+/* Ist eine Karte gewählt, treten die anderen im selben Block zurück */
+.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)) .tcg-art { opacity: .45; filter: saturate(.6); transition: opacity .15s ease, filter .15s ease; }
+.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)):hover .tcg-art { opacity: 1; filter: none; }
 .trade-swap-extra { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
 .trade-swap-extra .field { margin: 0; }
 .trade-extra-from { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
@@ -4366,7 +4373,8 @@ a.dg-start-tile:hover { color: var(--text); }
 .leaderboard tr.top-2 td:first-child { box-shadow: inset 3px 0 0 #cfd3e5, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-3 td:first-child { box-shadow: inset 3px 0 0 #c99067, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-1 td { box-shadow: inset 0 -1px 0 rgba(242, 193, 78, .35); }
-.leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, 0 0 18px rgba(242, 193, 78, .35), inset 0 -1px 0 rgba(242, 193, 78, .35); }
+/* Leuchten nach innen: ein äußerer Schatten an der Zelle wurde von den Nachbarzellen überdeckt und sah wie ein eigener Kasten aus */
+.leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 14px 0 16px -12px rgba(242, 193, 78, .45), inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td a { color: #fff4cf; }
 @keyframes rank-gold { 0%, 100% { background-position: 100% 0, 0 0; } 50% { background-position: 0 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .leaderboard tr.top-1 { animation: none; } }
