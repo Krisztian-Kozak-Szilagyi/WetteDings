@@ -89,30 +89,31 @@
     <% if (myStats) { const signed = (c) => `<span class="${c < 0 ? 'neg' : c > 0 ? 'pos' : ''}">${c > 0 ? '+' : ''}${euro(c)}</span>`; %>
       <%# Eigene Statistik (src/stats/profileStats.js) – nur auf dem eigenen Profil %>
       <div class="card pf-mystats" id="statistik">
-        <div class="tcg-coll-head">
+        <div class="pf-mystats-head">
           <h2>Deine Statistik</h2>
-          <span class="muted small">Seit Beginn · nur für dich sichtbar</span>
+          <span class="muted small">seit Beginn · nur für dich</span>
         </div>
-        <div class="pf-mystats-tiles">
-          <div class="stat"><span class="stat-label">Gesamtvermögen</span><span class="stat-value"><%= euro(myStats.total) %></span><span class="muted small">wie in der Rangliste</span></div>
-          <div class="stat"><span class="stat-label">Gewinn seit Start</span><span class="stat-value"><%- signed(myStats.profit) %></span><span class="muted small">ohne Startguthaben und Geld vom Team</span></div>
-          <div class="stat"><span class="stat-label">Umsatz</span><span class="stat-value"><%= euro(myStats.turnover) %></span><span class="muted small">eingesetzt, gehandelt, gekauft</span></div>
-          <div class="stat"><span class="stat-label">Packs geöffnet</span><span class="stat-value"><%= myStats.packsOpened %></span><span class="muted small">für <%= euro(myStats.packSpend) %> gekauft</span></div>
-        </div>
-        <div class="table-wrap">
+        <dl class="pf-mystats-tiles">
+          <div title="Wie in der Rangliste: Guthaben, offene Einsätze, Coins, Karten und Packs"><dt>Vermögen</dt><dd><%= euro(myStats.total) %></dd></div>
+          <div title="Vermögen ohne Startguthaben und Geld vom Team – was du selbst erspielt hast"><dt>Gewinn</dt><dd><%- signed(myStats.profit) %></dd></div>
+          <div title="Alles, was du eingesetzt, gehandelt oder gekauft hast"><dt>Umsatz</dt><dd><%= euro(myStats.turnover) %></dd></div>
+          <div title="Für <%= euro(myStats.packSpend) %> Packs gekauft"><dt>Packs geöffnet</dt><dd><%= myStats.packsOpened %></dd></div>
+        </dl>
+        <details class="pf-mystats-more">
+          <summary class="muted small">Nach Bereichen</summary>
           <table class="table pf-mystats-table">
             <thead><tr><th>Bereich</th><th class="num">Umsatz</th><th class="num">Ergebnis</th></tr></thead>
             <tbody>
               <% myStats.areas.forEach((a) => { %>
-                <tr>
-                  <td><%= a.label %><span class="muted small pf-mystats-hint"><%= a.hint %></span></td>
+                <tr title="<%= a.hint %>">
+                  <td><%= a.label %></td>
                   <td class="num nowrap"><%- a.turnover === null ? '<span class="muted">–</span>' : euro(a.turnover) %></td>
                   <td class="num nowrap"><%- signed(a.result) %></td>
                 </tr>
               <% }) %>
             </tbody>
           </table>
-        </div>
+        </details>
       </div>
     <% } %>
 

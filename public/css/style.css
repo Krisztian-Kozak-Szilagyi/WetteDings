@@ -4568,12 +4568,18 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .pf-main, .pf-side { min-width: 0; }
 .pf-main > .stats { margin-bottom: 20px; }
-/* Eigene Statistik auf dem Profil: vier Kennzahlen, darunter Umsatz und Ergebnis je Bereich */
-.pf-mystats-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
-@media (max-width: 860px) { .pf-mystats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.pf-mystats-tiles .stat-value { font-size: 1.15rem; }
-.pf-mystats-table td { vertical-align: top; }
-.pf-mystats-hint { display: block; margin-top: 2px; }
+/* Eigene Statistik auf dem Profil: eine schmale Zeile mit vier Kennzahlen, Bereiche aufklappbar */
+.pf-mystats { padding-top: 14px; padding-bottom: 12px; }
+.pf-mystats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.pf-mystats-head h2 { margin: 0; font-size: 1rem; }
+.pf-mystats-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.pf-mystats-tiles dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.pf-mystats-tiles dd { margin: 0; font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 520px) { .pf-mystats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pf-mystats-more { margin-top: 10px; }
+.pf-mystats-more summary { cursor: var(--cur-pointer); }
+.pf-mystats-table { margin-top: 6px; }
+.pf-mystats-table td, .pf-mystats-table th { padding-top: 6px; padding-bottom: 6px; }
 .pf-side .card h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: var(--color-neutral-300); letter-spacing: .02em; }
 
 /* Abzeichen mit der Zahl der Erfolge: Sechseck mit Metallkante, Farbe nach Stufe */
