@@ -39,6 +39,8 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
+    // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
+    statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
     forumSeenAt: { type: Date, default: null },
     // Admin/Dev: bis wann Geschäfte zwischen Mehrfach-Konten gesehen wurden (Abzeichen am Menüpunkt)

@@ -35,7 +35,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements profileAsset').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements profileAsset statsPublic').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const assetEngine = profile.profileAsset ? markets.get(profile.profileAsset) : null; // nur Werte aus der festen Liste
   const isMe = profile._id.equals(req.user._id);
@@ -50,7 +50,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     achievementService.shares(),
     achievementService.playmates(profile._id),
     assetEngine ? trade.getHolding(profile._id, assetEngine.SYMBOL) : null,
-    isMe ? profileStats(profile._id) : null, // eigene Statistik – nur für einen selbst sichtbar
+    isMe || profile.statsPublic ? profileStats(profile._id) : null, // Statistik: für einen selbst, für andere nur, wenn veröffentlicht
   ]);
   // Erfolge: Liste (freigeschaltete zuerst), angeheftete oben rechts – ohne eigene Auswahl die zwei neuesten
   const achievements = achievementLogic.profileList(achievementService.ACHIEVEMENTS, earned, shares.counts, shares.members);
@@ -108,6 +108,12 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
 router.post('/profil/text', requireLogin, async (req, res) => {
   await User.updateOne({ _id: req.user._id }, { $set: { bio: achievementLogic.cleanBio(req.body.text) } });
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
+});
+
+// Profil-Statistik für alle Mitglieder veröffentlichen oder wieder nur für sich behalten
+router.post('/profil/statistik', requireLogin, async (req, res) => {
+  await User.updateOne({ _id: req.user._id }, { $set: { statsPublic: str(req.body.oeffentlich) === '1' } });
+  res.redirect(`/profil/${encodeURIComponent(req.user.username)}#statistik`);
 });
 
 // Broker-Wert für die Profil-Seitenleiste wählen (leer = keinen zeigen)
