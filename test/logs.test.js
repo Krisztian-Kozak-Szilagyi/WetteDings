@@ -198,10 +198,19 @@ test('Protokolle-Export: jeder Log hat eine CSV-Spalte je Wert', () => {
     lotterie: logs.lottoRow({ type: 'lotto_los', amount: -1, createdAt: at }, 'a'),
     konto: logs.ledgerRow({ type: 'bonus', amount: 1, createdAt: at }, 'a'),
     grading: logs.gradingRow({ level: 1, card: crumpled.id, customer: 'K', grade: 5, status: 'offen', pay: 0, createdAt: at }, 'a'),
+    registrierungen: logs.registrationRow({ username: 'a', realName: 'Anna A.', registrationCode: 'ABCD2345', invitedByName: 'admin', createdAt: at }),
   };
   for (const [key, row] of Object.entries(samples)) {
     const lines = logs.toCsv(key, { total: 1, rows: [row] }).slice(1).split('\r\n').filter(Boolean);
     assert.equal(lines[1].split(';').length, lines[0].split(';').length, key);
   }
   assert.equal(logs.LOGS.length, logs.LOGS.filter((l) => logs.LOG_GROUPS.some((g) => g.key === l.group)).length);
+});
+
+test('Registrierungen: Code formatiert, ältere Konten ohne Code und Einladenden', () => {
+  const at = new Date('2026-01-01T12:00:00Z');
+  const row = logs.registrationRow({ username: 'anna', realName: 'Anna A.', registrationCode: 'ABCD2345', invitedByName: 'admin', createdAt: at });
+  assert.deepEqual(row, { at, name: 'anna', realName: 'Anna A.', code: 'ABCD-2345', invitedBy: 'admin', deleted: false });
+  const old = logs.registrationRow({ username: 'ben', createdAt: at, deletedAt: at });
+  assert.deepEqual([old.realName, old.code, old.invitedBy, old.deleted], [null, null, null, true]);
 });

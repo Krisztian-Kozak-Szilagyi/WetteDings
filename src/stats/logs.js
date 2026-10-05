@@ -47,6 +47,7 @@ const LOGS = [
   { key: 'dungeon', label: 'Dungeons', page: 'dungeonseite', group: 'tcg' },
   { key: 'grading', label: 'Grading', page: 'gradingseite', group: 'tcg' },
   { key: 'vergaben', label: 'Vergaben', page: 'vergabeseite', group: 'team' },
+  { key: 'registrierungen', label: 'Registrierungen', page: 'registrierungsseite', group: 'team' },
   { key: 'einstellungen', label: 'Einstellungen', page: 'einstellungsseite', group: 'team' },
 ];
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
@@ -446,6 +447,20 @@ async function grantLog(query, { player = null, all = false } = {}) {
   return { ...pg, rows: docs.map(grantRow) };
 }
 
+// ---------- Registrierungen: wer sich wann mit welchem Code registriert hat ----------
+
+const codeText = (code) => (code && code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code || null);
+
+function registrationRow(u) {
+  return { at: u.createdAt, name: u.username, realName: u.realName || null, code: codeText(u.registrationCode), invitedBy: u.invitedByName || null, deleted: !!u.deletedAt };
+}
+
+async function registrationLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { _id: player._id } : {};
+  const { docs, ...pg } = await paged(User, filter, { createdAt: -1, _id: -1 }, query.registrierungsseite, 'username realName registrationCode invitedByName deletedAt createdAt', all);
+  return { ...pg, rows: docs.map(registrationRow) };
+}
+
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
 const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', dungeon: 'Dungeon', lotterie: 'Lotterie', config: 'Serverstart (.env)' };
@@ -478,6 +493,10 @@ const CSV = {
   vergaben: {
     head: ['Zeitpunkt', 'Von', 'An', 'Art', 'Was', 'Anzahl je Mitglied', 'Empfänger'],
     rows: (g) => [[csvDate(g.at), g.by, g.to, g.kindLabel, g.what, g.count, g.recipients]],
+  },
+  registrierungen: {
+    head: ['Zeitpunkt', 'Benutzername', 'Klarname', 'Code', 'Eingeladen von', 'Konto gelöscht'],
+    rows: (r) => [[csvDate(r.at), r.name, r.realName || '', r.code || '', r.invitedBy || '', yesNo(r.deleted)]],
   },
   einstellungen: {
     head: ['Zeitpunkt', 'Von', 'Bereich', 'Wert', 'Vorher', 'Nachher'],
@@ -561,7 +580,7 @@ function exportFileName(key, playerName, ext, now = new Date()) {
   return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
-const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, einstellungen: settingsLog };
+const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, registrierungen: registrationLog, einstellungen: settingsLog };
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
@@ -598,6 +617,7 @@ module.exports = {
   lottoRow,
   gradingRow,
   ledgerRow,
+  registrationRow,
   grantRow,
   settingsRow,
 };

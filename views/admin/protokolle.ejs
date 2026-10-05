@@ -33,6 +33,7 @@
     grading: 'Jeder Grading-Auftrag mit Karte, Kunde, echter und geschätzter Note, Sauberkeit, Versiegelung und Lohn.',
     konto: 'Jede Buchung auf den Spielgeldkonten – der Kontoauszug aller Spieler: Tagesbonus, Erfolge, Provisionen, Grading-Ausbau, Startguthaben und alles andere. Oben lässt sich die Art der Buchung wählen.',
     vergaben: 'Jede Vergabe durch Admin oder Devs: Packs, Karten, Gegenstände und entfernte Karten – auch „an alle“. Mit Spieler: was er vergeben oder bekommen hat.',
+    registrierungen: 'Jede Registrierung: Zeitpunkt, Benutzername, Klarname (falls angegeben), benutzter Einladungscode und wer ihn erzeugt hat. Code und Einladender werden erst seit diesem Update gespeichert – bei älteren Konten steht dort „–“.',
     einstellungen: 'Jede Änderung an Preisen, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon – mit altem und neuem Wert. Mit Spieler: seine Änderungen.',
   };
   const signedEuro = (c) => `<span class="${c < 0 ? 'neg' : 'pos'}">${c > 0 ? '+' : ''}${euro(c)}</span>`;
@@ -408,6 +409,30 @@
                   <td><% if (g.all) { %><strong><%= g.to %></strong><% } else { %><%- userLink(g.to, { realName: false }) %><% } %></td>
                   <td><span class="badge <%= /entzug|abzug/.test(g.kind) ? 'badge-streitig' : g.kind === 'pack' ? 'badge-offen' : 'badge-entschieden' %>"><%= g.kindLabel %></span> <%= g.what %></td>
                   <td class="num"><%= g.count %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'registrierungen') { %>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Registrierung', 'Registrierungen') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Registrierungen.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Benutzername</th><th>Klarname</th><th>Code</th><th>Eingeladen von</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((r) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(r.at) %></td>
+                  <td><% if (r.deleted) { %><span class="muted"><%= r.name %></span> <span class="badge badge-streitig">gelöscht</span><% } else { %><%- userLink(r.name, { realName: false }) %><% } %></td>
+                  <td><%= r.realName || '–' %></td>
+                  <td class="nowrap"><% if (r.code) { %><code><%= r.code %></code><% } else { %><span class="muted">–</span><% } %></td>
+                  <td><% if (r.invitedBy) { %><%- userLink(r.invitedBy, { realName: false }) %><% } else { %><span class="muted">–</span><% } %></td>
                 </tr>
               <% }) %>
             </tbody>
