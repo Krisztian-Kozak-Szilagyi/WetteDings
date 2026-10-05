@@ -1208,8 +1208,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 }
 .tcg-pick:has(input:checked) .tcg-slot-label { color: var(--color-accent-300); font-weight: 600; }
 /* Ist eine Karte gewählt, treten die anderen im selben Block zurück */
-.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)) .tcg-art { opacity: .45; filter: saturate(.6); transition: opacity .15s ease, filter .15s ease; }
-.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)):hover .tcg-art { opacity: 1; filter: none; }
+.trade-swap-grids .card:has(.tcg-pick input[type="radio"]:checked) .tcg-pick:not(:has(input:checked)) .tcg-art { opacity: .45; filter: saturate(.6); transition: opacity .15s ease, filter .15s ease; }
+.trade-swap-grids .card:has(.tcg-pick input[type="radio"]:checked) .tcg-pick:not(:has(input:checked)):hover .tcg-art { opacity: 1; filter: none; }
 .trade-swap-extra { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
 .trade-swap-extra .field { margin: 0; }
 .trade-extra-from { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
@@ -5169,3 +5169,10 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .panel-hero .stats-icon { width: 14px; height: 14px; vertical-align: -2px; }
 @media (max-width: 900px) { .stats-kpis-core { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stats-kpi.is-core .stat-value { font-size: 1.4rem; } }
 
+/* Mehrfach-Tausch (#76): Karte ankreuzen, darunter die Anzahl */
+.tcg-pick-multi { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tcg-pick-multi .tcg-pick-count { align-self: center; padding: 2px 6px; border-radius: 6px; font-size: 13px; background: var(--color-bg); color: var(--text); border: 1px solid var(--border, rgba(255,255,255,.15)); }
+.tcg-pick-multi:not(:has(input:checked)) .tcg-pick-count { opacity: .45; }
+.nego-lines { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.tcg-pick-multi:has(> .tcg-slot[hidden]) { display: none; } /* Seltenheitsfilter blendet die Karte aus – die Anzahl mit */
+.nego-line { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 140px; text-align: center; font-size: 13px; }
