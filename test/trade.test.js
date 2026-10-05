@@ -31,17 +31,49 @@ test('Markt-Abzeichen: nur fremde, offene Markt-Angebote seit dem letzten Besuch
   assert.equal(trade.marketNewFilter({ ...user, marketSeenAt: seen }).createdAt.$gt, seen);
 });
 
-test('Abzeichen: private Angebote an mich und Tausch-Verhandlungen, bei denen ich dran bin oder Neues steht', () => {
+test('Abzeichen: private Angebote und Tausch-Verhandlungen, bei denen ich dran bin oder Neues steht', () => {
   const f = trade.incomingFilter('u1');
   assert.equal(f.status, 'offen');
   assert.ok(f.expiresAt.$gt instanceof Date);
-  const [privat, alsEmpfaenger, alsAnbieter] = f.$or;
-  assert.deepEqual(privat, { to: 'u1', kind: 'privat' });
+  const [alsEmpfaenger, alsAnbieter] = f.$or;
   assert.equal(alsEmpfaenger.to, 'u1');
-  assert.equal(alsEmpfaenger.kind, 'tausch');
+  assert.deepEqual(alsEmpfaenger.kind, { $in: ['privat', 'tausch'] });
   assert.deepEqual(alsEmpfaenger.$or[0], { lastChangeBy: { $ne: 'to' } }); // auch alte Angebote ohne Feld
   assert.equal(alsAnbieter.seller, 'u1');
+  assert.deepEqual(alsAnbieter.kind, { $in: ['privat', 'tausch'] }); // #82: auch privat
   assert.deepEqual(alsAnbieter.$or[0], { lastChangeBy: 'to' }); // Gegenvorschlag des Empfängers
+});
+
+test('#82: Abzeichen für Markt-Gespräche', () => {
+  const f = trade.talkAttentionFilter('u1');
+  assert.equal(f.status, 'offen');
+  assert.ok(f.expiresAt.$gt instanceof Date); // Gespräche über abgelaufene Angebote zählen nicht
+  const [alsAnbieter, alsInteressent] = f.$or;
+  assert.equal(alsAnbieter.seller, 'u1');
+  assert.deepEqual(alsAnbieter.$or[0], { lastChangeBy: 'to' }); // Preisvorschlag des Interessenten
+  assert.equal(alsInteressent.to, 'u1');
+  // der Marktpreis am Anfang ist kein Gegenvorschlag – erst eine Änderung des Anbieters zählt
+  assert.deepEqual(alsInteressent.$or[0], { lastChangeBy: 'seller', termsVersion: { $gt: 0 } });
+});
+
+test('#82: Verhandeln beim Verkauf – wer annehmen darf, Preis als Text', () => {
+  const p = { kind: 'privat', seller: 's', to: 't', lastChangeBy: 'seller', price: 1500 };
+  assert.equal(trade.negotiable(p), true);
+  assert.equal(trade.canAccept(p, 'to'), true); // Empfänger kauft zum Preis des Anbieters
+  assert.equal(trade.canAccept(p, 'seller'), false);
+  assert.equal(trade.canAccept({ ...p, lastChangeBy: 'to' }, 'seller'), true); // Anbieter nimmt den Gegenvorschlag an
+  assert.equal(trade.canAccept({ ...p, lastChangeBy: 'to' }, 'to'), false);
+  const { euro } = require('../src/lib/viewHelpers');
+  assert.equal(trade.termsText(p), euro(1500));
+  assert.equal(trade.termsText(p, { price: 900 }), euro(900));
+  // Gespräch über ein Markt-Angebot: gleiche Regeln
+  const talk = { kind: 'markt', talk: true, seller: 's', to: 'k', lastChangeBy: 'seller', price: 2000 };
+  assert.equal(trade.canAccept(talk, 'to'), true);
+  assert.equal(trade.canAccept({ ...talk, lastChangeBy: 'to' }, 'seller'), true);
+  assert.equal(trade.canAccept({ ...talk, lastChangeBy: 'to' }, 'to'), false);
+  assert.equal(trade.canAccept(talk, null), false);
+  // ein Markt-Angebot ohne Gespräch: kein Verhandeln
+  assert.equal(trade.negotiable({ kind: 'markt' }), false);
 });
 
 test('Verhandlung: Rollen und wer annehmen darf', () => {

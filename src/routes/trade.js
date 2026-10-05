@@ -154,34 +154,122 @@ router.post('/handel/tausch', (req, res) => {
   );
 });
 
-// ---------- Verhandlung eines Tauschs ----------
+// ---------- Verhandlung: Tausch, privater Verkauf und Gespräch über ein Markt-Angebot (#82) ----------
 const negotiationUrl = (id) => `/handel/verhandlung/${id}`;
+const talkUrl = (id) => `/handel/gespraech/${id}`;
 const messageView = (m) => ({ from: m.from, text: m.text, at: m.createdAt });
+const versionOf = (req) => (/^\d+$/.test(str(req.body.version)) ? Number(req.body.version) : undefined);
+const notFound = (res) => res.status(404).render('error', { title: 'Verhandlung', status: 404, message: 'Diese Verhandlung gibt es nicht oder du bist nicht beteiligt.' });
 
-router.get('/handel/verhandlung/:id', async (req, res) => {
-  const n = await trade.negotiation({ user: req.user, tradeId: req.params.id });
-  if (!n) return res.status(404).render('error', { title: 'Verhandlung', status: 404, message: 'Diese Verhandlung gibt es nicht oder du bist nicht beteiligt.' });
-  const t = n.trade;
-  const isOpen = t.status === 'offen' && new Date(t.expiresAt) > new Date();
-  const coll = isOpen ? await collection(req.user) : null;
+/** Seite einer Verhandlung; base = URL-Anfang für Nachrichten/Vorschläge, acceptUrl/closeUrl = Formulare */
+async function renderNegotiation(req, res, { t, role, isOpen, base, acceptUrl, closeUrl, closeLabel, closeConfirm }) {
+  const coll = isOpen && t.kind === 'tausch' ? await collection(req.user) : null;
   res.render('handel-verhandlung', {
     title: 'Verhandlung',
     t,
-    role: n.role,
+    role,
     isOpen,
-    canAccept: isOpen && trade.canAccept(t, n.role),
+    canAccept: isOpen && trade.canAccept(t, role),
     // Hat der Empfänger die Wunschkarte gerade frei? (nur für den Hinweis; geprüft wird beim Annehmen)
-    wantFree: !coll || n.role !== 'to' || !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0,
-    ownedCounts: coll ? coll.counts : {},
+    wantFree: !coll || role !== 'to' || !!t.wantCopy || (coll.free[t.wantCard] || 0) > 0,
+    base,
+    acceptUrl,
+    closeUrl,
+    closeLabel,
+    closeConfirm,
     cardInfo,
     rarityByKey: tradeRarities(),
     termsText: trade.termsText,
-    settlement: trade.settlement,
-    taxFor: (price) => trade.taxOf(price, 'tausch'),
-    taxPercent: trade.taxRates().tausch,
+    taxFor: (price) => trade.taxOf(price, t.kind),
+    taxPercent: trade.taxRates()[t.kind],
+    privateHours: trade.PRIVATE_HOURS,
     messageMax: trade.MESSAGE_MAX,
   });
+}
+
+router.get('/handel/verhandlung/:id', async (req, res) => {
+  const n = await trade.negotiation({ user: req.user, tradeId: req.params.id });
+  if (!n) return notFound(res);
+  const t = n.trade;
+  const id = String(t._id);
+  const reject = n.role === 'to';
+  await renderNegotiation(req, res, {
+    t,
+    role: n.role,
+    isOpen: t.status === 'offen' && new Date(t.expiresAt) > new Date(),
+    base: negotiationUrl(id),
+    acceptUrl: `/handel/${id}/${t.kind === 'tausch' ? 'tauschen' : 'kaufen'}`,
+    closeUrl: `/handel/${id}/${reject ? 'ablehnen' : 'zurueckziehen'}`,
+    closeLabel: reject ? 'Ablehnen' : 'Zurückziehen',
+    closeConfirm: `${t.kind === 'tausch' ? 'Tauschangebot' : 'Angebot'} ${reject ? 'ablehnen' : 'zurückziehen'}?`,
+  });
 });
+
+// Gespräch über ein Markt-Angebot beginnen (oder das bestehende öffnen)
+router.post('/handel/:id/verhandeln', async (req, res) => {
+  try {
+    const talk = await trade.startTalk({ user: req.user, tradeId: req.params.id });
+    return res.redirect(talkUrl(talk._id));
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+    return res.redirect('/handel#markt');
+  }
+});
+
+router.get('/handel/gespraech/:id', async (req, res) => {
+  const n = await trade.talkFor({ user: req.user, talkId: req.params.id });
+  if (!n) return notFound(res);
+  const id = String(n.talk._id);
+  await renderNegotiation(req, res, {
+    t: n.talk,
+    role: n.role,
+    isOpen: n.isOpen,
+    base: talkUrl(id),
+    acceptUrl: talkUrl(id) + '/annehmen',
+    closeUrl: talkUrl(id) + '/beenden',
+    closeLabel: 'Verhandlung beenden',
+    closeConfirm: n.role === 'seller' ? 'Verhandlung beenden? Dein Angebot bleibt auf dem Markt.' : 'Verhandlung beenden? Kaufen kannst du weiter zum Marktpreis.',
+  });
+});
+
+router.get('/handel/gespraech/:id/stand', async (req, res) => {
+  const n = await trade.talkFor({ user: req.user, talkId: req.params.id });
+  if (!n) return res.status(404).json({ error: 'nicht gefunden' });
+  const since = new Date(str(req.query.seit));
+  const fresh = (n.talk.messages || []).filter((m) => Number.isNaN(since.getTime()) || new Date(m.createdAt) > since);
+  res.json({ version: n.talk.termsVersion || 0, status: n.isOpen ? 'offen' : 'beendet', messages: fresh.map(messageView) });
+});
+
+router.post('/handel/gespraech/:id/nachricht', (req, res) => {
+  const url = talkUrl(req.params.id) + '#chat';
+  return handle(req, res, async () => {
+    await trade.sendTalkMessage({ user: req.user, talkId: req.params.id, text: str(req.body.text) });
+    return null;
+  }, url, url);
+});
+
+router.post('/handel/gespraech/:id/bedingungen', (req, res) => {
+  const url = talkUrl(req.params.id);
+  return handle(req, res, async () => {
+    await trade.changeTalkTerms({ user: req.user, talkId: req.params.id, price: parseEuro(str(req.body.price)), version: versionOf(req) });
+    return null;
+  }, url, url);
+});
+
+router.post('/handel/gespraech/:id/annehmen', (req, res) =>
+  handle(req, res, async () => {
+    await trade.acceptTalk({ user: req.user, talkId: req.params.id, version: versionOf(req) });
+    return null;
+  }, talkUrl(req.params.id))
+);
+
+router.post('/handel/gespraech/:id/beenden', (req, res) =>
+  handle(req, res, async () => {
+    await trade.endTalk({ user: req.user, talkId: req.params.id });
+    return null;
+  }, talkUrl(req.params.id))
+);
 
 // Live-Aktualisierung: neue Nachrichten seit "seit" und der aktuelle Stand der Bedingungen
 router.get('/handel/verhandlung/:id/stand', async (req, res) => {
@@ -213,17 +301,17 @@ router.post('/handel/verhandlung/:id/bedingungen', (req, res) => {
       tradeId: req.params.id,
       price: raw ? parseEuro(raw) : 0,
       extraFrom: str(req.body.extra) || null,
-      version: /^\d+$/.test(str(req.body.version)) ? Number(req.body.version) : undefined,
+      version: versionOf(req),
     });
-    return 'Gegenvorschlag gesendet – jetzt ist die andere Seite am Zug.';
+    return null;
   }, url, url);
 });
 
 router.post('/handel/:id/kaufen', (req, res) =>
   handle(req, res, async () => {
-    const r = await trade.buy({ user: req.user, tradeId: req.params.id });
-    return `Gekauft: ${cardInfo(r.trade.card).name} für ${euro(r.trade.price)}. Die Karte ist jetzt in deiner Sammlung.`;
-  })
+    await trade.buy({ user: req.user, tradeId: req.params.id, version: versionOf(req) });
+    return null;
+  }, str(req.body.zurueck) === 'verhandlung' ? negotiationUrl(req.params.id) : '/handel')
 );
 
 router.post('/handel/:id/tauschen', (req, res) =>

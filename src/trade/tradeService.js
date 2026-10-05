@@ -4,7 +4,7 @@ const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
 const { Item } = require('../models/Item');
 const { itemByCardId, freeItems, claimItems, logItems } = require('../items/itemService');
-const { Trade, openFilter } = require('../models/Trade');
+const { Trade, TradeTalk, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -19,6 +19,7 @@ const PRIVATE_HOURS = 48; // private Angebote und Tauschangebote laufen nach 48 
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
 const MAX_PRICE = 100000000; // 1 Mio. €
 const MAX_OPEN = 20; // offene Angebote pro Person
+const MAX_TALKS = 30; // offene Gespräche über Markt-Angebote pro Interessent
 const KINDS = ['markt', 'privat', 'tausch'];
 
 // ---------- Steuer (Sätze je Angebotsart im Admin-Panel, siehe services/taxService) ----------
@@ -34,6 +35,7 @@ const cardName = (id) => {
   return item ? item.label : catalog.cardById[id] ? catalog.cardById[id].name : id;
 };
 const swapHref = (trade) => `/handel/verhandlung/${trade._id}`;
+const talkHref = (talk) => `/handel/gespraech/${talk._id}`;
 
 // ---------- Reine Regeln (ohne Datenbank, getestet) ----------
 /**
@@ -72,7 +74,8 @@ function settlement(trade, { buyer, taxPercent = taxService.rate(trade.kind) } =
   return { payer, payee, amount: trade.price, tax: taxFor(trade.price, taxPercent) };
 }
 
-// ---------- Verhandlung beim Tausch (reine Regeln) ----------
+// ---------- Verhandlung (reine Regeln) ----------
+// Verhandelt wird beim Tausch, beim privaten Verkauf und in Gesprächen über Markt-Angebote (talk: true, #82).
 const MESSAGE_MAX = 500; // Zeichen pro Nachricht
 const MAX_MESSAGES = 200; // ältere Nachrichten fallen weg
 const MESSAGES_PER_MINUTE = 8;
@@ -81,8 +84,10 @@ const MESSAGES_PER_MINUTE = 8;
 const roleOf = (trade, userId) => (String(trade.seller) === String(userId) ? 'seller' : trade.to && String(trade.to) === String(userId) ? 'to' : null);
 const otherRole = (role) => (role === 'seller' ? 'to' : 'seller');
 
-/** Darf diese Rolle annehmen? Beim Tausch nur, wer die aktuellen Bedingungen nicht selbst gesetzt hat. */
-const canAccept = (trade, role) => (trade.kind === 'tausch' ? role !== null && role !== (trade.lastChangeBy || 'seller') : role === 'to');
+/** Wird über dieses Angebot (oder Gespräch) verhandelt? */
+const negotiable = (trade) => trade.kind === 'tausch' || trade.kind === 'privat' || !!trade.talk;
+/** Darf diese Rolle annehmen? In einer Verhandlung nur, wer die aktuellen Bedingungen nicht selbst gesetzt hat. */
+const canAccept = (trade, role) => (negotiable(trade) ? !!role && role !== (trade.lastChangeBy || 'seller') : role === 'to');
 
 /** Ungelesene Aktivität (Nachricht oder Gegenvorschlag) für diese Rolle? */
 const isUnread = (trade, role) => {
@@ -98,8 +103,9 @@ function cleanMessage(input) {
   return text;
 }
 
-/** Bedingungen als Satz, z. B. "anna legt 5,00 € drauf" oder "ohne Aufpreis" */
+/** Bedingungen als Satz, z. B. "anna legt 5,00 € drauf" oder "ohne Aufpreis"; beim Verkauf nur der Preis */
 function termsText(trade, { price = trade.price, extraFrom = trade.extraFrom } = {}) {
+  if (trade.kind && trade.kind !== 'tausch') return euro(price);
   if (!price) return 'ohne Aufpreis';
   return `${extraFrom === 'seller' ? trade.sellerName : trade.toName} legt ${euro(price)} drauf`;
 }
@@ -112,12 +118,26 @@ function termsText(trade, { price = trade.price, extraFrom = trade.extraFrom } =
 const incomingFilter = (userId) => ({
   ...openFilter(),
   $or: [
-    { to: userId, kind: 'privat' },
-    { to: userId, kind: 'tausch', $or: [{ lastChangeBy: { $ne: 'to' } }, { $expr: { $gt: ['$activityAt', '$toSeenAt'] } }] },
-    { seller: userId, kind: 'tausch', $or: [{ lastChangeBy: 'to' }, { $expr: { $gt: ['$activityAt', '$sellerSeenAt'] } }] },
+    { to: userId, kind: { $in: ['privat', 'tausch'] }, $or: [{ lastChangeBy: { $ne: 'to' } }, { $expr: { $gt: ['$activityAt', '$toSeenAt'] } }] },
+    { seller: userId, kind: { $in: ['privat', 'tausch'] }, $or: [{ lastChangeBy: 'to' }, { $expr: { $gt: ['$activityAt', '$sellerSeenAt'] } }] },
   ],
 });
-const incomingCount = (userId) => Trade.countDocuments(incomingFilter(userId));
+/**
+ * Gespräche über Markt-Angebote, um die ich mich kümmern sollte: als Anbieter, wenn der Interessent etwas
+ * vorgeschlagen oder geschrieben hat; als Interessent, wenn der Anbieter einen Gegenvorschlag gemacht oder geschrieben hat.
+ */
+const talkAttentionFilter = (userId) => ({
+  status: 'offen',
+  expiresAt: { $gt: new Date() },
+  $or: [
+    { seller: userId, $or: [{ lastChangeBy: 'to' }, { $expr: { $gt: ['$activityAt', '$sellerSeenAt'] } }] },
+    { to: userId, $or: [{ lastChangeBy: 'seller', termsVersion: { $gt: 0 } }, { $expr: { $gt: ['$activityAt', '$toSeenAt'] } }] },
+  ],
+});
+const incomingCount = async (userId) => {
+  const [offers, talks] = await Promise.all([Trade.countDocuments(incomingFilter(userId)), TradeTalk.countDocuments(talkAttentionFilter(userId))]);
+  return offers + talks;
+};
 
 /**
  * Abgeschlossene Geschäfte, über die ein Mitglied noch nicht Bescheid weiß: Jemand anderes hat seine
@@ -144,19 +164,26 @@ const marketNewCount = (user) => Trade.countDocuments(marketNewFilter(user));
 async function overview(user) {
   const me = user._id;
   const open = openFilter();
-  const [incoming, market, mine, history, coll, users] = await Promise.all([
+  const talkOpen = { status: 'offen', expiresAt: { $gt: new Date() } };
+  const [incoming, market, mine, history, coll, users, myTalks, talksOnMine] = await Promise.all([
     Trade.find({ ...open, to: me }).select('-messages').sort({ createdAt: -1 }).lean(),
     Trade.find({ ...open, kind: 'markt', seller: { $ne: me } }).sort({ createdAt: -1 }).limit(200).lean(),
     Trade.find({ ...open, seller: me }).select('-messages').sort({ createdAt: -1 }).lean(),
     Trade.find({ status: 'verkauft', $or: [{ seller: me }, { buyer: me }] }).select('-messages').sort({ closedAt: -1 }).limit(15).lean(),
     collection(user),
     User.find({ _id: { $ne: me }, deletedAt: null }).select('username').sort({ usernameLower: 1 }).lean(),
+    TradeTalk.find({ ...talkOpen, to: me }).select('-messages').lean(), // meine Gespräche als Interessent
+    TradeTalk.find({ ...talkOpen, seller: me }).select('-messages').sort({ activityAt: -1 }).lean(), // Gespräche über meine Markt-Angebote
   ]);
   // neu für dieses Mitglied: von der anderen Seite abgeschlossen, seit dem letzten Besuch
   const seen = user.dealsSeenAt || user.createdAt;
   const isNewDeal = (t) => !!t.closedBy && String(t.closedBy) !== String(me) && t.closedAt > seen;
   const deals = history.map((t) => ({ ...t, isNew: isNewDeal(t) }));
-  return { incoming, market, mine, history: deals, newDeals: deals.filter((t) => t.isNew), coll, users };
+  // Gespräche je Angebot: mein eigenes (Interessent) und alle über meine Angebote (Anbieter)
+  const myTalkByTrade = Object.fromEntries(myTalks.map((t) => [String(t.trade), { ...t, talk: true, kind: 'markt' }]));
+  const talksByTrade = {};
+  for (const t of talksOnMine) (talksByTrade[String(t.trade)] = talksByTrade[String(t.trade)] || []).push({ ...t, talk: true, kind: 'markt' });
+  return { incoming, market, mine, history: deals, newDeals: deals.filter((t) => t.isNew), coll, users, myTalkByTrade, talksByTrade };
 }
 
 // ---------- Aktionen ----------
@@ -301,35 +328,76 @@ async function transfer(money, { title, payerType, payeeType, payerMsg }, sessio
   );
 }
 
-/** Kaufen/Annehmen (Markt und privat): Käufer zahlt den Preis, Verkäufer bekommt Preis − Steuer, die Karte wechselt den Besitzer */
-async function buy({ user, tradeId }) {
+/**
+ * Verkauf abschließen (in einer Transaktion): Käufer zahlt price, Verkäufer bekommt price − Steuer, Karte bzw.
+ * Gegenstand wechselt den Besitzer. Alle Gespräche über das Angebot enden. payerMsg = Meldung bei zu wenig Guthaben.
+ */
+async function completeSale(trade, { buyerId, buyerName, price, closedBy, payerMsg }, session) {
+  const money = settlement({ ...trade.toObject(), price }, { buyer: buyerId });
+  await transfer(money, { title: cardName(trade.card), payerType: 'handel_kauf', payeeType: 'handel_verkauf', payerMsg }, session);
+
+  const item = itemByCardId(trade.card);
+  const Model = item ? Item : TcgCard;
+  const moved = await Model.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: buyerId } }, { session });
+  if (moved.modifiedCount !== 1) throw new UserError(item ? 'Der Gegenstand ist nicht mehr verfügbar.' : 'Die Karte ist nicht mehr verfügbar.');
+  if (!item) await markSeen(buyerId, [trade.card], session);
+  else {
+    const meta = { trade: trade._id };
+    await logItems([{ user: trade.seller, type: item.key, delta: -1, source: 'handel', meta }, { user: buyerId, type: item.key, delta: 1, source: 'handel', meta }], session);
+  }
+
+  // price = tatsächlich bezahlter Preis (nach einer Verhandlung kann er vom Angebot abweichen)
+  Object.assign(trade, { status: 'verkauft', price, buyer: buyerId, buyerName, closedBy, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
+  await trade.save({ session });
+  // offene Gespräche über das Angebot enden – ihre Interessenten werden nach der Transaktion benachrichtigt
+  const talks = await TradeTalk.find({ trade: trade._id, status: 'offen' }).select('to').session(session).lean();
+  if (talks.length) await TradeTalk.updateMany({ trade: trade._id, status: 'offen' }, { $set: { status: 'beendet' } }, { session });
+  return { ...money, talkUsers: talks.map((t) => t.to) };
+}
+
+/** Interessenten benachrichtigen, deren Gespräch endet, weil die Karte weg ist (außer except) */
+async function notifyTalksEnded(users, except, card, text = `„${cardName(card)}“ ist nicht mehr zu haben – die Verhandlung ist beendet.`) {
+  const ids = users.filter((u) => !except || String(u) !== String(except));
+  if (ids.length) await notify(ids, { area: 'Handel', href: '/handel', text });
+}
+
+/**
+ * Kaufen/Annehmen beim Verkauf. Markt: jeder außer dem Anbieter, zum Marktpreis. Privat: wer die aktuellen
+ * Bedingungen nicht selbst gesetzt hat – der Empfänger kauft, der Anbieter nimmt einen Gegenvorschlag an (#82).
+ * version = Stand der Bedingungen, den der Annehmende gesehen hat.
+ */
+async function buy({ user, tradeId, version }) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
   const result = await inTransaction(async (session) => {
     const trade = await Trade.findOne({ _id: tradeId, ...openFilter() }).session(session);
     if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
     if (trade.kind === 'tausch') throw new UserError('Ein Tauschangebot kann man nicht kaufen.');
-    if (trade.seller.equals(user._id)) throw new UserError('Du kannst dein eigenes Angebot nicht kaufen.');
-    if (trade.kind === 'privat' && !trade.to.equals(user._id)) throw new UserError('Dieses Angebot ist nicht für dich.');
-
-    const money = settlement(trade, { buyer: user._id });
-    await transfer(money, { title: cardName(trade.card), payerType: 'handel_kauf', payeeType: 'handel_verkauf', payerMsg: 'Dein Guthaben reicht dafür nicht aus.' }, session);
-
-    const item = itemByCardId(trade.card);
-    const Model = item ? Item : TcgCard;
-    const moved = await Model.updateOne({ _id: trade.cardDoc, user: trade.seller }, { $set: { user: user._id } }, { session });
-    if (moved.modifiedCount !== 1) throw new UserError(item ? 'Der Gegenstand ist nicht mehr verfügbar.' : 'Die Karte ist nicht mehr verfügbar.');
-    if (!item) await markSeen(user._id, [trade.card], session);
-    else {
-      const meta = { trade: trade._id };
-      await logItems([{ user: trade.seller, type: item.key, delta: -1, source: 'handel', meta }, { user: user._id, type: item.key, delta: 1, source: 'handel', meta }], session);
+    let role = 'to';
+    if (trade.kind === 'privat') {
+      role = roleOf(trade, user._id);
+      if (!role) throw new UserError('Dieses Angebot ist nicht für dich.');
+      if (!canAccept(trade, role)) throw new UserError('Das ist dein eigener Vorschlag – jetzt ist die andere Seite am Zug.');
+      if (Number.isInteger(version) && version !== (trade.termsVersion || 0)) throw new UserError('Der Preis wurde gerade geändert. Bitte schau ihn dir noch einmal an.');
+    } else if (trade.seller.equals(user._id)) {
+      throw new UserError('Du kannst dein eigenes Angebot nicht kaufen.');
     }
-
-    Object.assign(trade, { status: 'verkauft', buyer: user._id, buyerName: user.username, closedBy: user._id, taxPercent: taxService.rate(trade.kind), tax: money.tax, closedAt: new Date() });
-    await trade.save({ session });
-    return { trade, tax: money.tax };
+    const [buyerId, buyerName] = trade.kind === 'privat' ? [trade.to, trade.toName] : [user._id, user.username];
+    const money = await completeSale(trade, {
+      buyerId,
+      buyerName,
+      price: trade.price,
+      closedBy: user._id,
+      payerMsg: role === 'seller' ? `${trade.toName} hat nicht mehr genug Guthaben.` : 'Dein Guthaben reicht dafür nicht aus.',
+    }, session);
+    return { trade, tax: money.tax, role, talkUsers: money.talkUsers };
   });
-  const { trade } = result;
-  await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat ${itemByCardId(trade.card) ? 'deine' : 'deine Karte'} „${cardName(trade.card)}“ für ${euro(trade.price)} gekauft.` });
+  const { trade, role } = result;
+  if (role === 'seller') {
+    await notify(trade.to, { area: 'Handel', href: '/handel', text: `${user.username} hat deinen Preis angenommen: „${cardName(trade.card)}“ gehört jetzt dir (${euro(trade.price)}).` });
+  } else {
+    await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat ${itemByCardId(trade.card) ? 'deine' : 'deine Karte'} „${cardName(trade.card)}“ für ${euro(trade.price)} gekauft.` });
+  }
+  await notifyTalksEnded(result.talkUsers, user._id, trade.card);
   return result;
 }
 
@@ -405,59 +473,66 @@ async function acceptSwap({ user, tradeId, version }) {
   return result;
 }
 
-// ---------- Verhandlung beim Tausch ----------
+// ---------- Verhandlung: Tausch und privater Verkauf ----------
 const seenField = (role) => (role === 'seller' ? 'sellerSeenAt' : 'toSeenAt');
+const NEGOTIABLE_KINDS = ['tausch', 'privat'];
 
 /** Verhandlung öffnen (nur die beiden Beteiligten); markiert sie als gelesen */
 async function negotiation({ user, tradeId }) {
   if (!mongoose.isValidObjectId(tradeId)) return null;
-  const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch' }).lean();
+  const trade = await Trade.findOne({ _id: tradeId, kind: { $in: NEGOTIABLE_KINDS } }).lean();
   const role = trade && roleOf(trade, user._id);
   if (!role) return null;
   await Trade.updateOne({ _id: trade._id }, { $set: { [seenField(role)]: new Date() } });
   return { trade, role };
 }
 
-/** Offenes Tauschangebot laden, an dem der Nutzer beteiligt ist */
+/** Offenes Tausch- oder Privatangebot laden, an dem der Nutzer beteiligt ist */
 async function openSwapFor(user, tradeId) {
   if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
-  const trade = await Trade.findOne({ _id: tradeId, kind: 'tausch', ...openFilter() }).select('-messages.text').lean();
+  const trade = await Trade.findOne({ _id: tradeId, kind: { $in: NEGOTIABLE_KINDS }, ...openFilter() }).select('-messages.text').lean();
   const role = trade && roleOf(trade, user._id);
   if (!role) throw new UserError('Dieses Angebot ist nicht mehr offen.');
   return { trade, role };
 }
 
-/** Nachricht in der Verhandlung schreiben */
-async function sendMessage({ user, tradeId, text }) {
+/** Nachricht speichern (Trade oder TradeTalk) und die andere Seite benachrichtigen */
+async function postMessage({ Model, doc, filter, role, user, text, href }) {
   const clean = cleanMessage(text);
-  const { trade, role } = await openSwapFor(user, tradeId);
   const since = Date.now() - 60000;
-  if ((trade.messages || []).filter((m) => m.from === role && new Date(m.createdAt) > since).length >= MESSAGES_PER_MINUTE) {
+  if ((doc.messages || []).filter((m) => m.from === role && new Date(m.createdAt) > since).length >= MESSAGES_PER_MINUTE) {
     throw new UserError('Du schreibst gerade sehr schnell – bitte warte einen Moment.');
   }
   const now = new Date();
-  const res = await Trade.updateOne(
-    { _id: trade._id, ...openFilter() },
+  const res = await Model.updateOne(
+    { _id: doc._id, ...filter },
     { $push: { messages: { $each: [{ from: role, text: clean }], $slice: -MAX_MESSAGES } }, $set: { activityAt: now, [seenField(role)]: now } }
   );
   if (res.modifiedCount !== 1) throw new UserError('Dieses Angebot ist nicht mehr offen.');
-  const card = cardName(trade.card);
-  await notify(role === 'seller' ? trade.to : trade.seller, {
+  const card = cardName(doc.card);
+  await notify(role === 'seller' ? doc.to : doc.seller, {
     area: 'Handel',
-    href: swapHref(trade),
-    key: `handel:${trade._id}:nachricht`,
+    href,
+    key: `handel:${doc._id}:nachricht`,
     text: `${user.username} hat dir in der Verhandlung um „${card}“ geschrieben.`,
     many: (n) => `${n} neue Nachrichten in der Verhandlung um „${card}“.`,
   });
 }
 
+/** Nachricht in der Verhandlung schreiben (Tausch oder privat) */
+async function sendMessage({ user, tradeId, text }) {
+  cleanMessage(text);
+  const { trade, role } = await openSwapFor(user, tradeId);
+  await postMessage({ Model: Trade, doc: trade, filter: openFilter(), role, user, text, href: swapHref(trade) });
+}
+
 /**
- * Gegenvorschlag: Aufpreis und wer ihn zahlt ändern. Danach ist die andere Seite am Zug, das Angebot
- * läuft wieder volle PRIVATE_HOURS. version = Stand, den der Ändernde gesehen hat (sonst Konflikt).
+ * Gegenvorschlag: beim Tausch Aufpreis und wer ihn zahlt, beim privaten Verkauf der Preis. Danach ist die andere
+ * Seite am Zug, das Angebot läuft wieder volle PRIVATE_HOURS. version = Stand, den der Ändernde gesehen hat.
  */
 async function changeTerms({ user, tradeId, price, extraFrom, version }) {
   const { trade, role } = await openSwapFor(user, tradeId);
-  const valid = validateOffer({ kind: 'tausch', price, cardId: trade.card, wantCardId: trade.wantCard, extraFrom });
+  const valid = validateOffer({ kind: trade.kind, price, cardId: trade.card, wantCardId: trade.wantCard, extraFrom });
   if (price === trade.price && valid.extraFrom === (trade.price ? trade.extraFrom : null)) {
     throw new UserError('Das sind schon die aktuellen Bedingungen.');
   }
@@ -484,7 +559,144 @@ async function changeTerms({ user, tradeId, price, extraFrom, version }) {
   await notify(role === 'seller' ? trade.to : trade.seller, {
     area: 'Handel',
     href: swapHref(trade),
-    text: `${actor} macht einen Gegenvorschlag zum Tausch um „${cardName(trade.card)}“: ${termsText(trade, { price, extraFrom: valid.extraFrom })}.`,
+    text: `${actor} macht einen Gegenvorschlag ${trade.kind === 'tausch' ? 'zum Tausch' : 'zum Verkauf'} um „${cardName(trade.card)}“: ${termsText(trade, { price, extraFrom: valid.extraFrom })}.`,
+  });
+}
+
+// ---------- Gespräche über Markt-Angebote (#82) ----------
+/** Gespräch für die Ansicht: wie ein Angebot (talk: true) */
+const talkView = (talk, trade) => ({ ...talk, talk: true, kind: 'markt', foiledAt: trade ? trade.foiledAt : null, grade: trade ? trade.grade : null, listPrice: trade ? trade.price : null });
+
+/** Gespräch über ein Markt-Angebot beginnen (oder das bestehende öffnen). Gibt das Gespräch zurück. */
+async function startTalk({ user, tradeId }) {
+  if (!mongoose.isValidObjectId(tradeId)) throw new UserError('Angebot nicht gefunden.');
+  const trade = await Trade.findOne({ _id: tradeId, kind: 'markt', ...openFilter() }).select('seller sellerName card price expiresAt').lean();
+  if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  if (trade.seller.equals(user._id)) throw new UserError('Über dein eigenes Angebot kannst du nicht verhandeln.');
+  const existing = await TradeTalk.findOne({ trade: trade._id, to: user._id }).select('_id status').lean();
+  if (existing) {
+    if (existing.status !== 'offen') throw new UserError('Diese Verhandlung ist beendet.');
+    return existing;
+  }
+  if ((await TradeTalk.countDocuments({ to: user._id, status: 'offen', expiresAt: { $gt: new Date() } })) >= MAX_TALKS) {
+    throw new UserError(`Du verhandelst schon über ${MAX_TALKS} Angebote.`);
+  }
+  const now = new Date();
+  try {
+    const [talk] = await TradeTalk.create([
+      {
+        trade: trade._id,
+        seller: trade.seller,
+        sellerName: trade.sellerName,
+        to: user._id,
+        toName: user.username,
+        card: trade.card,
+        price: trade.price,
+        lastChangeBy: 'seller', // am Anfang gilt der Marktpreis des Anbieters
+        toSeenAt: now, // activityAt erst bei der ersten Nachricht oder dem ersten Vorschlag – vorher kein Abzeichen
+        expiresAt: trade.expiresAt,
+      },
+    ]);
+    return talk;
+  } catch (err) {
+    if (err.code === 11000) return TradeTalk.findOne({ trade: trade._id, to: user._id }).select('_id status').lean();
+    throw err;
+  }
+}
+
+/** Gespräch öffnen (nur die beiden Beteiligten); markiert es als gelesen. { talk (Ansicht), role, isOpen } oder null */
+async function talkFor({ user, talkId }) {
+  if (!mongoose.isValidObjectId(talkId)) return null;
+  const talk = await TradeTalk.findById(talkId).lean();
+  const role = talk && roleOf(talk, user._id);
+  if (!role) return null;
+  const trade = await Trade.findById(talk.trade).select('status expiresAt foiledAt grade price').lean();
+  await TradeTalk.updateOne({ _id: talk._id }, { $set: { [seenField(role)]: new Date() } });
+  const isOpen = talk.status === 'offen' && !!trade && trade.status === 'offen' && new Date(trade.expiresAt) > new Date();
+  return { talk: talkView(talk, trade), role, isOpen };
+}
+
+const talkOpenFilter = () => ({ status: 'offen', expiresAt: { $gt: new Date() } });
+
+/** Offenes Gespräch laden, an dem der Nutzer beteiligt ist */
+async function openTalkFor(user, talkId) {
+  if (!mongoose.isValidObjectId(talkId)) throw new UserError('Verhandlung nicht gefunden.');
+  const talk = await TradeTalk.findOne({ _id: talkId, ...talkOpenFilter() }).select('-messages.text').lean();
+  const role = talk && roleOf(talk, user._id);
+  if (!role) throw new UserError('Diese Verhandlung ist beendet.');
+  return { talk, role };
+}
+
+/** Nachricht im Gespräch */
+async function sendTalkMessage({ user, talkId, text }) {
+  cleanMessage(text);
+  const { talk, role } = await openTalkFor(user, talkId);
+  await postMessage({ Model: TradeTalk, doc: talk, filter: talkOpenFilter(), role, user, text, href: talkHref(talk) });
+}
+
+/** Preisvorschlag im Gespräch – gilt nur zwischen diesen beiden */
+async function changeTalkTerms({ user, talkId, price, version }) {
+  const { talk, role } = await openTalkFor(user, talkId);
+  validateOffer({ kind: 'markt', price, cardId: talk.card });
+  if (price === talk.price) throw new UserError('Das ist schon der aktuelle Preis.');
+  const now = new Date();
+  const actor = role === 'seller' ? talk.sellerName : talk.toName;
+  const seen = Number.isInteger(version) ? version : talk.termsVersion || 0;
+  const res = await TradeTalk.updateOne(
+    { _id: talk._id, ...talkOpenFilter(), termsVersion: seen },
+    {
+      $set: { price, lastChangeBy: role, activityAt: now, [seenField(role)]: now },
+      $inc: { termsVersion: 1 },
+      $push: { messages: { $each: [{ from: 'system', text: `${actor} schlägt ${euro(price)} vor.` }], $slice: -MAX_MESSAGES } },
+    }
+  );
+  if (res.modifiedCount !== 1) throw new UserError('Der Preis wurde gerade geändert. Bitte schau ihn dir noch einmal an.');
+  await notify(role === 'seller' ? talk.to : talk.seller, {
+    area: 'Handel',
+    href: talkHref(talk),
+    text: `${actor} schlägt für „${cardName(talk.card)}“ ${euro(price)} vor.`,
+  });
+}
+
+/** Vorschlag im Gespräch annehmen: der Interessent kauft zum ausgehandelten Preis */
+async function acceptTalk({ user, talkId, version }) {
+  if (!mongoose.isValidObjectId(talkId)) throw new UserError('Verhandlung nicht gefunden.');
+  const result = await inTransaction(async (session) => {
+    const talk = await TradeTalk.findOne({ _id: talkId, ...talkOpenFilter() }).session(session);
+    const role = talk && roleOf(talk, user._id);
+    if (!role) throw new UserError('Diese Verhandlung ist beendet.');
+    if (!canAccept({ talk: true, lastChangeBy: talk.lastChangeBy }, role)) throw new UserError('Das ist dein eigener Vorschlag – jetzt ist die andere Seite am Zug.');
+    if (Number.isInteger(version) && version !== talk.termsVersion) throw new UserError('Der Preis wurde gerade geändert. Bitte schau ihn dir noch einmal an.');
+    const trade = await Trade.findOne({ _id: talk.trade, kind: 'markt', ...openFilter() }).session(session);
+    if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+    const money = await completeSale(trade, {
+      buyerId: talk.to,
+      buyerName: talk.toName,
+      price: talk.price,
+      closedBy: user._id,
+      payerMsg: role === 'seller' ? `${talk.toName} hat nicht mehr genug Guthaben.` : 'Dein Guthaben reicht dafür nicht aus.',
+    }, session);
+    await TradeTalk.updateOne({ _id: talk._id }, { $set: { status: 'verkauft' } }, { session });
+    return { trade, talk, role, talkUsers: money.talkUsers };
+  });
+  const { trade, talk, role } = result;
+  const text = role === 'seller'
+    ? `${user.username} hat deinen Preis angenommen: „${cardName(trade.card)}“ gehört jetzt dir (${euro(talk.price)}).`
+    : `${user.username} hat „${cardName(trade.card)}“ für ${euro(talk.price)} gekauft (ausgehandelter Preis).`;
+  await notify(role === 'seller' ? talk.to : talk.seller, { area: 'Handel', href: '/handel', text });
+  await notifyTalksEnded(result.talkUsers, talk.to, trade.card);
+  return result;
+}
+
+/** Gespräch beenden (eine Seite) – das Markt-Angebot selbst bleibt */
+async function endTalk({ user, talkId }) {
+  const { talk, role } = await openTalkFor(user, talkId);
+  const res = await TradeTalk.updateOne({ _id: talk._id, status: 'offen' }, { $set: { status: 'beendet' } });
+  if (res.modifiedCount !== 1) throw new UserError('Diese Verhandlung ist beendet.');
+  await notify(role === 'seller' ? talk.to : talk.seller, {
+    area: 'Handel',
+    href: '/handel',
+    text: `${user.username} hat die Verhandlung um „${cardName(talk.card)}“ beendet.`,
   });
 }
 
@@ -495,6 +707,13 @@ async function close({ user, tradeId, action }) {
   const status = action === 'ablehnen' ? 'abgelehnt' : 'zurueckgezogen';
   const trade = await Trade.findOneAndUpdate({ _id: tradeId, status: 'offen', ...who }, { $set: { status, closedAt: new Date() } }).select('kind seller to card expiresAt').lean();
   if (!trade) throw new UserError('Dieses Angebot gibt es nicht mehr.');
+  if (trade.kind === 'markt') {
+    const talks = await TradeTalk.find({ trade: trade._id, status: 'offen' }).select('to').lean();
+    await TradeTalk.updateMany({ trade: trade._id, status: 'offen' }, { $set: { status: 'beendet' } });
+    if (trade.expiresAt > new Date()) {
+      await notifyTalksEnded(talks.map((t) => t.to), null, trade.card, `${user.username} hat „${cardName(trade.card)}“ vom Markt genommen – die Verhandlung ist beendet.`);
+    }
+  }
   if (action === 'ablehnen') {
     await notify(trade.seller, { area: 'Handel', href: '/handel', text: `${user.username} hat dein Angebot „${cardName(trade.card)}“ abgelehnt.` });
   } else if (trade.to && trade.expiresAt > new Date()) {
@@ -516,11 +735,14 @@ module.exports = {
   roleOf,
   otherRole,
   canAccept,
+  negotiable,
   isUnread,
   cleanMessage,
   termsText,
   incomingFilter,
   incomingCount,
+  talkAttentionFilter,
+  MAX_TALKS,
   newDealsFilter,
   newDealsCount,
   marketNewFilter,
@@ -532,5 +754,11 @@ module.exports = {
   negotiation,
   sendMessage,
   changeTerms,
+  startTalk,
+  talkFor,
+  sendTalkMessage,
+  changeTalkTerms,
+  acceptTalk,
+  endTalk,
   close,
 };
