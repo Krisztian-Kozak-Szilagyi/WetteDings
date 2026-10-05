@@ -1654,32 +1654,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
 .tcg-coll-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .tcg-coll-head h2 { margin: 0; }
-/* Seltenheits-Filter als Segment-Leiste (wie Statistik-Zeitraum und Vergaben): aktive Wahl als Fläche mit
-   Schatten und einem Strich in der Farbe der Seltenheit */
-.tcg-filter {
-  display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; width: fit-content; max-width: 100%;
-  border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
-}
-.tcg-filter .chip {
-  position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 11px; border-radius: 8px;
-  background: transparent; border: 0; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap;
-  transition: background .15s ease, color .15s ease;
-}
-.tcg-filter .chip:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
-.tcg-filter .chip.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
-.tcg-filter .chip.active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--rar, var(--color-accent)); }
-.tcg-filter .chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.tcg-filter .tcg-dot { width: 7px; height: 7px; }
-.tcg-filter .chip-count { font-weight: 500; font-size: 12px; }
-/* Handy: eine Zeile zum Wischen statt mehrerer umgebrochener Zeilen */
-@media (max-width: 640px) {
-  .tcg-filter {
-    flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; overscroll-behavior-x: contain;
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); /* rechts geht es weiter */
-  }
-  .tcg-filter::-webkit-scrollbar { display: none; }
-  .tcg-filter .chip { flex: none; }
-}
 .tcg-dot-all { --rar: var(--color-accent); }
 .chip-count { color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
 
@@ -4547,8 +4521,6 @@ a.dg-start-tile:hover { color: var(--text); }
 .bx-head h1 { margin: 0; font-size: clamp(28px, 1.3rem + 1.4vw, 36px); }
 .bx-head .live { font-size: 12px; color: var(--color-neutral-400); }
 .bx-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-.bx-filters .chip { height: 32px; min-height: 0; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
-.bx-filters .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-accent-700); }
 .bx-table { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
 .bx-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(100px, .8fr) minmax(110px, 1fr) 130px 130px minmax(150px, 1.1fr) minmax(150px, 1.1fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
 .bx-row:last-of-type { border-bottom: 0; }
@@ -5241,4 +5213,12 @@ a.dash-meta:hover { color: var(--color-accent-400); }
   .mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { animation: none; clip-path: none; }
 }
 .mkt-opt-count { margin-left: auto; padding-left: 8px; color: var(--color-neutral-500); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+/* Mehrere Gruppen in einem Menü (Album: Seltenheit + Season) */
+.mkt-group { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.mkt-group + .mkt-group { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--color-neutral-800); }
+.mkt-group-title { padding: 4px 10px 2px; color: var(--color-neutral-500); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.mkt-bar-menu { max-height: min(70vh, 540px); overflow-y: auto; }
+.mkt-bar-current strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.album-filter-row { display: flex; margin-bottom: 14px; }
+.ihk-pick-tools { display: flex; margin-bottom: 12px; }
 .tcg-dot-missing { --rar: transparent; box-shadow: inset 0 0 0 1.5px var(--color-accent-300); } /* "Fehlt mir noch" im Filter */

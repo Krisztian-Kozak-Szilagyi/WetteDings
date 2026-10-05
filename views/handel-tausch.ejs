@@ -3,7 +3,7 @@
 <%
   // Mehrfach-Tausch (#76): je Seite 1–maxCards Karten; counter = Gegenvorschlag in einer laufenden Verhandlung
   const foilPick = (f, name, sel) => { %>
-    <label class="tcg-slot tcg-pick r-<%= f.card.rarity %>" data-rarity="<%= f.card.rarity %>" title="Foliert am <%= dayDate(f.foiledAt) %> · Wert <%= euro(f.value) %>">
+    <label class="tcg-slot tcg-pick r-<%= f.card.rarity %>" data-rarity="<%= f.card.rarity %>" data-name="<%= f.card.name %>" title="Foliert am <%= dayDate(f.foiledAt) %> · Wert <%= euro(f.value) %>">
       <input type="checkbox" name="<%= name %>" value="f:<%= f.id %>" <%= sel.foils.has('f:' + f.id) ? 'checked' : '' %> aria-label="<%= f.card.name %>, <%= f.rarity.label %>, foliert am <%= dayDate(f.foiledAt) %>">
       <span class="tcg-art"><img src="<%= f.card.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span></span>
       <span class="tcg-slot-label"><span class="foil-tag">Foliert · <%= dayDate(f.foiledAt) %></span></span>
@@ -31,7 +31,7 @@
     <div class="card">
       <div class="tcg-coll-head">
         <h2>1. Deine Karten</h2>
-        <%- include('partials/tcg-filter', { counts: mine.counts }) %>
+        <%- include('partials/tcg-filter', { counts: mine.counts, barName: 'tausch-mine' }) %>
       </div>
       <% if (!mine.cardCount) { %>
         <p class="muted">Du hast noch keine Karten zum Tauschen.</p>
@@ -49,7 +49,7 @@
     <div class="card">
       <div class="tcg-coll-head">
         <h2>2. Karten von <%= partner.username %></h2>
-        <%- include('partials/tcg-filter', { counts: theirs.counts }) %>
+        <%- include('partials/tcg-filter', { counts: theirs.counts, barName: 'tausch-theirs' }) %>
       </div>
       <% if (!theirs.cardCount) { %>
         <p class="muted"><%= partner.username %> hat noch keine Karten.</p>

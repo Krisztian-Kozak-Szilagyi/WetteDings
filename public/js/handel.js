@@ -79,19 +79,6 @@
     marketSearch.addEventListener('input', filterMarket);
   }
 
-  // ---------- Such-/Filterknopf (partials/mkt-bar): gewählte Seltenheit anzeigen, Menü zuklappen ----------
-  $all('[data-mkt-bar]').forEach(function (bar) {
-    $all('.mkt-opt', bar).forEach(function (opt) {
-      opt.addEventListener('click', function () {
-        var current = $('[data-mkt-current]', bar);
-        if (current) current.textContent = opt.getAttribute('data-label') || opt.textContent.trim();
-        var key = opt.getAttribute('data-market-rarity') || opt.getAttribute('data-coll-rarity');
-        bar.classList.toggle('is-filtered', key !== 'all');
-        opt.blur();
-      });
-    });
-  });
-
   // ---------- Deine Sammlung: nach Seltenheit und Kartenname filtern ----------
   var collBox = $('[data-coll]');
   if (collBox && $('[data-coll-search]', collBox)) {

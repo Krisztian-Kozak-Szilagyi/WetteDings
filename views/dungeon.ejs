@@ -130,26 +130,16 @@
 
 <%# Kartenauswahl (Anmeldung, Beitritt, Tauschen). sel = schon gewählte Karten.
     Je Liste: Suche, Seltenheits-Filter und Seiten mit höchstens 20 Karten (public/js/dungeon.js) %>
+<% let dgBarNo = 0; %>
 <% const pickList = (kind, list, sel) => { const rars = [...new Set(list.map((c) => c.rarity))].sort((a, b) => rarityByKey[a].rank - rarityByKey[b].rank); %>
   <div class="dg-picklist" data-dg-picklist>
     <div class="dg-pick-head">
       <h3 class="dg-pick-sub"><%= kind === 'card' ? 'Charakter' : 'Boost' %></h3>
       <% if (list.length) { %>
-        <label class="dg-search">
-          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
-          <input type="search" data-dg-search placeholder="Karte suchen …" aria-label="<%= kind === 'card' ? 'Charakter' : 'Boost-Karte' %> suchen" autocomplete="off">
-        </label>
+        <%# Suchen + Seltenheit (partials/mkt-bar); Zahl = wählbare Karten dieser Seltenheit %>
+        <%- include('partials/mkt-bar', { name: 'dg-' + kind + '-' + (++dgBarNo), placeholder: (kind === 'card' ? 'Charakter' : 'Boost-Karte') + ' suchen', searchAttr: 'dg-search', groups: [{ attr: 'dg-rar', all: '', allCount: list.length, opts: Object.values(rarityByKey).filter((r) => !r.hidden || rars.includes(r.key)).sort((a, b) => a.rank - b.rank).map((r) => ({ key: r.key, label: r.label, count: list.filter((c) => c.rarity === r.key).length })) }] }) %>
       <% } %>
     </div>
-    <% if (list.length) { %>
-      <%# Seltenheits-Filter wie im Album; Zahl = wählbare Karten dieser Seltenheit %>
-      <div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
-        <button type="button" class="chip active" data-dg-rar="" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<span class="chip-count"><%= list.length %></span></button>
-        <% Object.values(rarityByKey).filter((r) => !r.hidden || rars.includes(r.key)).sort((a, b) => a.rank - b.rank).forEach((r) => { %>
-          <button type="button" class="chip r-<%= r.key %>" data-dg-rar="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %><span class="chip-count"><%= list.filter((c) => c.rarity === r.key).length %></span></button>
-        <% }) %>
-      </div>
-    <% } %>
     <div class="dg-pick-pager">
       <button type="button" class="dg-page-btn" data-dg-prev aria-label="Vorherige Seite" hidden>‹</button>
       <div class="dg-pick-grid">

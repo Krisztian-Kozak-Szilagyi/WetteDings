@@ -73,7 +73,7 @@
       <% } else if (mode === 'pick' && locals.pickCounts) { %>
         <% const chosen = pickCounts[c.id] || 0; const maxN = Math.min(freeN, locals.pickMax || 5); %>
         <div class="tcg-pick-multi">
-          <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>">
+          <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>">
             <input type="checkbox" name="<%= pickName %>" value="<%= c.id %>" <%= chosen ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>">
             <% inner() %>
           </label>
@@ -85,7 +85,7 @@
         </div>
       <% } else if (mode === 'pick') { %>
         <% const checked = picked === c.id; %>
-        <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>">
+        <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>">
           <input type="radio" name="<%= pickName %>" value="<%= c.id %>" required <%= checked ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>">
           <% inner() %>
         </label>
@@ -98,7 +98,7 @@
           <% inner() %>
         </button>
       <% } else { %>
-        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %>">
+        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %>">
           <% inner() %>
         </div>
       <% } %>
@@ -112,7 +112,7 @@
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </button>
       <% } else { %>
-        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen">
+        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %> – früher besessen">
           <span class="tcg-art"><img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – früher besessen" loading="lazy" width="720" height="1008"></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </div>
