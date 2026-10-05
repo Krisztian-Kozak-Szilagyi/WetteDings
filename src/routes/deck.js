@@ -1,5 +1,5 @@
 // Deckbau (Vorbereitung Kampfmodus): EJS ist nur der Rahmen, Daten und Speichern laufen über JSON (public/js/deck.js).
-// Vorerst nur für Admins, bis es genug Kampfkarten gibt.
+// Vorerst nur für Admins.
 const express = require('express');
 const { requireAdmin } = require('../middleware');
 const deckService = require('../game/deckService');
