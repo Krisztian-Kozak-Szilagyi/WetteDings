@@ -53,7 +53,11 @@
       <div class="bet-meta">
         <span class="badge badge-<%= st.key %>"><%= st.label %></span>
         <span aria-hidden="true">·</span>
-        <span>von <strong><%- userLink(bet.creatorName) %></strong></span>
+        <span>Wettersteller <strong><%- userLink(bet.creatorName) %></strong></span>
+        <% if (bet.referee) { %>
+          <span aria-hidden="true">·</span>
+          <span>Schiedsrichter <strong><%- userLink(bet.refereeName) %></strong></span>
+        <% } %>
         <span aria-hidden="true">·</span>
         <span><%= date(bet.createdAt) %></span>
         <% if (bet.groupName) { %><span class="tag tag-group" title="Diese Wette sehen nur die Mitglieder der Gruppe.">Gruppe: <%= bet.groupName %></span><% } %>
