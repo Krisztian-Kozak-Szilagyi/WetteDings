@@ -18,11 +18,14 @@
       <span class="mkt-bar-current"><span class="muted">Filtern nach:</span> <strong data-mkt-current>Alle</strong></span>
       <svg class="mkt-bar-arrow" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 8h16l-8 9Z"/></svg>
     </button>
+    <%# .mkt-bar-drop: unsichtbare Brücke zwischen Knopf und Liste, damit die Maus auf dem Weg nach unten nicht "rausfällt" %>
+    <div class="mkt-bar-drop">
     <div class="mkt-bar-menu" role="listbox" aria-label="Seltenheit">
       <button type="button" class="mkt-opt active" data-<%= name %>-rarity="all" data-label="Alle" role="option" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<% if (locals.allCount) { %><span class="mkt-opt-count"><%= allCount %></span><% } %></button>
       <% opts.forEach((o) => { %>
         <button type="button" class="mkt-opt r-<%= o.key %>" data-<%= name %>-rarity="<%= o.key %>" data-label="<%= o.label %>" role="option" aria-selected="false"><span class="tcg-dot"></span><%= o.label %><% if (o.count) { %><span class="mkt-opt-count"><%= o.count %></span><% } %></button>
       <% }) %>
+    </div>
     </div>
   </div>
 </div>
