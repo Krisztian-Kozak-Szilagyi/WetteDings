@@ -90,16 +90,16 @@
       <%# Statistik (src/stats/profileStats.js) – auf dem eigenen Profil immer, auf fremden nur, wenn veröffentlicht %>
       <div class="card pf-mystats" id="statistik">
         <div class="pf-mystats-head">
-          <h2><%= isMe ? 'Deine Statistik' : 'Statistik' %></h2>
+          <h2><%= isMe ? 'Deine Statistik' : 'Statistik' %> <span class="muted small pf-mystats-since">seit Beginn</span></h2>
           <% if (isMe) { %>
             <form method="post" action="/profil/statistik" class="pf-mystats-share">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="oeffentlich" value="<%= profile.statsPublic ? '0' : '1' %>">
-              <span class="muted small"><%= profile.statsPublic ? 'seit Beginn · für alle Mitglieder sichtbar' : 'seit Beginn · nur für dich sichtbar' %></span>
+              <span class="muted small"><%= profile.statsPublic ? 'für alle Mitglieder sichtbar' : 'nur für dich sichtbar' %></span>
               <button class="btn btn-ghost btn-sm" type="submit"><%= profile.statsPublic ? 'Nur für mich' : 'Veröffentlichen' %></button>
             </form>
           <% } else { %>
-            <span class="muted small">seit Beginn · von <%= profile.username %> veröffentlicht</span>
+            <span class="muted small">von <%= profile.username %> veröffentlicht</span>
           <% } %>
         </div>
         <dl class="pf-mystats-tiles">
