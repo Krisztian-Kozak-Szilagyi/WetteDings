@@ -4502,14 +4502,15 @@ a.dg-start-tile:hover { color: var(--text); }
 .tcg-buy-dest:hover span, .tcg-buy-dest:focus-visible span { border-bottom-color: #c4b5fd; }
 /* Rangliste: eigene Zeilen-Hintergründe für die ersten drei – Platz 1 golden mit wanderndem Glanz */
 .leaderboard tr.top-1, .leaderboard tr.top-2, .leaderboard tr.top-3 { position: relative; }
-.leaderboard tr.top-1 {
+/* tbody im Selektor: so stark wie die Hover-Regel von .table (die sonst die Platz-Farben ersetzt) und weiter unten */
+.leaderboard tbody tr.top-1 {
   /* Glanz: warmer Bernstein-/Kupfer-Streifen über dem ruhigen Gold – passt zum Gold, hebt sich aber ab */
   background: linear-gradient(100deg, transparent 40%, rgba(255, 140, 50, .14) 46%, rgba(255, 120, 40, .28) 50%, rgba(255, 140, 50, .14) 54%, transparent 60%) 100% 0 / 300% 100% no-repeat,
     linear-gradient(100deg, rgba(242, 193, 78, .26), rgba(242, 193, 78, .10) 45%, rgba(242, 193, 78, .03));
   animation: rank-gold 7s ease-in-out infinite;
 }
-.leaderboard tr.top-2 { background: linear-gradient(100deg, rgba(207, 211, 229, .18), rgba(207, 211, 229, .06) 45%, rgba(207, 211, 229, .02)); }
-.leaderboard tr.top-3 { background: linear-gradient(100deg, rgba(201, 144, 103, .18), rgba(201, 144, 103, .06) 45%, rgba(201, 144, 103, .02)); }
+.leaderboard tbody tr.top-2 { background: linear-gradient(100deg, rgba(207, 211, 229, .18), rgba(207, 211, 229, .06) 45%, rgba(207, 211, 229, .02)); }
+.leaderboard tbody tr.top-3 { background: linear-gradient(100deg, rgba(201, 144, 103, .18), rgba(201, 144, 103, .06) 45%, rgba(201, 144, 103, .02)); }
 .leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-2 td:first-child { box-shadow: inset 3px 0 0 #cfd3e5, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-3 td:first-child { box-shadow: inset 3px 0 0 #c99067, inset 0 -1px 0 var(--color-divider); }
@@ -4517,6 +4518,8 @@ a.dg-start-tile:hover { color: var(--text); }
 /* Leuchten nach innen: ein äußerer Schatten an der Zelle wurde von den Nachbarzellen überdeckt und sah wie ein eigener Kasten aus */
 .leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 14px 0 16px -12px rgba(242, 193, 78, .45), inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td a { color: #fff4cf; }
+/* Hover: die Zeile hellt nur leicht auf, die Platz-Farbe bleibt */
+.leaderboard tbody tr:is(.top-1, .top-2, .top-3):hover td { background: color-mix(in srgb, var(--text) 4%, transparent); }
 @keyframes rank-gold { 0%, 100% { background-position: 100% 0, 0 0; } 50% { background-position: 0 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .leaderboard tr.top-1 { animation: none; } }
 
