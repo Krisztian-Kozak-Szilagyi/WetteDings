@@ -4568,6 +4568,12 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .pf-main, .pf-side { min-width: 0; }
 .pf-main > .stats { margin-bottom: 20px; }
+/* Eigene Statistik auf dem Profil: vier Kennzahlen, darunter Umsatz und Ergebnis je Bereich */
+.pf-mystats-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 860px) { .pf-mystats-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pf-mystats-tiles .stat-value { font-size: 1.15rem; }
+.pf-mystats-table td { vertical-align: top; }
+.pf-mystats-hint { display: block; margin-top: 2px; }
 .pf-side .card h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: var(--color-neutral-300); letter-spacing: .02em; }
 
 /* Abzeichen mit der Zahl der Erfolge: Sechseck mit Metallkante, Farbe nach Stufe */

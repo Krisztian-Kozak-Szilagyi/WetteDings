@@ -23,13 +23,14 @@ const teamIds = () => User.distinct('_id', { $or: [{ role: 'dev' }, { usernameLo
  * Alle Mitglieder nach Gesamtvermögen, bestes zuerst – ohne das Team; mit team: true auch das Team (Feld team). Gesamtvermögen = Kontostand + offene Einsätze + Wert der
  * Broker-Bestände (Coins, ETF) zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis).
  */
-function ranking({ limit = 0, team = false } = {}) {
+function ranking({ limit = 0, team = false, userId = null } = {}) {
   // Cent je Einheit (1e-8) für jeden laufenden Broker-Wert
   const prices = markets.prices();
   const branches = Object.entries(prices).map(([sym, p]) => ({ case: { $eq: ['$$h.coin', sym] }, then: (p * 100) / 1e8 }));
   const centsPerUnit = branches.length ? { $switch: { branches, default: 0 } } : 0;
   const pipeline = [
-    { $match: { deletedAt: null, ...(team ? {} : notTeam()) } }, // gelöschte Konten erscheinen nicht, das Team nur auf Wunsch
+    // gelöschte Konten erscheinen nicht, das Team nur auf Wunsch; mit userId nur dieses Mitglied (Profil-Statistik)
+    { $match: { deletedAt: null, ...(team ? {} : notTeam()), ...(userId ? { _id: userId } : {}) } },
     {
       $lookup: {
         from: 'positions',
