@@ -1,7 +1,7 @@
 const { Schema, model } = require('mongoose');
 
 /**
- * Einmaliger Registrierungscode. Gilt 30 Minuten und für genau eine Registrierung.
+ * Einmaliger Registrierungscode. Gilt die beim Erzeugen gewählte Zeit (30 Minuten bis 7 Tage) und für genau eine Registrierung.
  * Über den TTL-Index löscht MongoDB abgelaufene Codes automatisch (innerhalb ~1 Minute);
  * zusätzlich wird beim Einlösen immer auf expiresAt geprüft.
  */
