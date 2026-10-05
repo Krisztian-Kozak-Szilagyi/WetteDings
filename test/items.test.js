@@ -50,7 +50,7 @@ test('Erfolgsmeldungen nur bei Admin- und Moderationsaktionen', () => {
   assert.equal(keepsFlash('info', '/login'), true);
 });
 
-test('Gegenstände im Handel: "item:folie", nur gegen Geld, nicht im Tausch', () => {
+test('Gegenstände im Handel: "item:folie" – wie Karten, auch im Tausch', () => {
   const { itemByCardId, itemCardId, itemCard } = require('../src/items/itemService');
   const { validateOffer } = require('../src/trade/tradeService');
   const catalog = require('../src/tcg/catalog');
@@ -60,9 +60,9 @@ test('Gegenstände im Handel: "item:folie", nur gegen Geld, nicht im Tausch', ()
   const c = itemCard(itemByCardId('item:folie'));
   assert.equal(c.isItem, true);
   assert.equal(c.sell, 1000); // die Bank zahlt 10 € pro Folie
-  assert.deepEqual(validateOffer({ kind: 'markt', price: 500, cardId: 'item:folie' }), { extraFrom: null });
-  assert.throws(() => validateOffer({ kind: 'markt', price: 500, cardId: 'item:gibtsnicht' }), /Karte/);
+  assert.deepEqual(validateOffer({ listing: true, give: [{ card: 'item:folie' }], price: 500 }), { extraFrom: 'to' });
+  assert.throws(() => validateOffer({ listing: true, give: [{ card: 'item:gibtsnicht' }], price: 500 }), /gibt es nicht/);
   const card = catalog.CARDS[0].id;
-  assert.throws(() => validateOffer({ kind: 'tausch', price: 0, cardId: 'item:folie', wantCardId: card }), /nicht tauschen/);
-  assert.throws(() => validateOffer({ kind: 'tausch', price: 0, cardId: card, wantCardId: 'item:folie' }), /nicht tauschen/);
+  assert.deepEqual(validateOffer({ give: [{ card: 'item:folie' }, { card: 'item:folie' }], want: [{ card }], price: 0 }), { extraFrom: null });
 });
+

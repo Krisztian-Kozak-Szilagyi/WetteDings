@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { Item } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
 const { Trade, openFilter } = require('../models/Trade');
+const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { lockedDocs, claim } = require('../tcg/locks');
@@ -31,8 +32,7 @@ const itemTypeByKey = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
 const MAX_GRANT = 50;
 const MAX_SELL = 100;
 
-// Im Handel steht ein Gegenstand wie eine Karte: Trade.card = "item:<Art>", Trade.cardDoc = das Item-Dokument
-const ITEM_PREFIX = 'item:';
+// Im Handel steht ein Gegenstand wie eine Karte: Position card = "item:<Art>", doc = das Item-Dokument (trade/lines.js)
 const itemCardId = (key) => ITEM_PREFIX + key;
 /** Gegenstands-Art zu einer Handels-"Karten"-ID – oder null, wenn es eine echte Karte ist */
 const itemByCardId = (id) => (typeof id === 'string' && id.startsWith(ITEM_PREFIX) ? ITEM_TYPES.find((t) => itemCardId(t.key) === id) || null : null);
@@ -43,8 +43,8 @@ const ITEM_RARITY = { key: 'item', label: 'Gegenstand', rank: -1, sell: ITEM_TYP
 
 /** Item-IDs eines Nutzers, die gerade in einem offenen Handelsangebot stehen */
 async function lockedItemIds(userId, session) {
-  const trades = await Trade.find({ ...openFilter(), seller: userId, card: { $regex: '^item:' } }).select('cardDoc').session(session || null).lean();
-  return new Set(trades.map((t) => String(t.cardDoc)));
+  const trades = await Trade.find({ ...openFilter(), $or: [{ seller: userId }, { to: userId }], lockDocs: { $exists: true } }).select('seller to give want lockDocs').session(session || null).lean();
+  return new Set(trades.flatMap((t) => lockedFor(t, userId)).map(String));
 }
 
 /** Freie Gegenstände einer Art (nicht im Handel), älteste zuerst */

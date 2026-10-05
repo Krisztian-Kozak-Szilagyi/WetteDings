@@ -71,8 +71,8 @@ async function flaggedPairs() {
   return new Set(alerts.map((a) => a.key));
 }
 
-/** Die beiden Seiten eines abgeschlossenen Geschäfts: Anbieter und Käufer bzw. Tauschpartner */
-const tradePartner = (t) => (t.kind === 'tausch' ? t.to : t.buyer);
+/** Die beiden Seiten eines abgeschlossenen Geschäfts: Anbieter und Gegenseite (buyer = Käufer bzw. Empfänger) */
+const tradePartner = (t) => t.buyer || t.to;
 const tradePairKey = (t) => logic.pairKey(t.seller, tradePartner(t));
 
 /** Mongo-Filter: Geschäfte zwischen den Konten eines der Paare */
@@ -81,7 +81,7 @@ function tradeFilterForPairs(pairs) {
   for (const key of pairs) {
     const [a, b] = key.split(':');
     for (const [x, y] of [[a, b], [b, a]]) {
-      or.push({ seller: x, kind: { $ne: 'tausch' }, buyer: y }, { seller: x, kind: 'tausch', to: y });
+      or.push({ seller: x, buyer: y });
     }
   }
   return or.length ? { $or: or } : { _id: null }; // ohne Paare: nichts

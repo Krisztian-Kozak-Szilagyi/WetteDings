@@ -54,7 +54,7 @@ const LOGS = [
 ];
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
-const KIND_LABEL = { markt: 'Markt', privat: 'Privatverkauf', tausch: 'Tausch' };
+const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
 const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie' };
 const SELL_TYPES = ['tcg_verkauf', 'item_verkauf', 'black_market'];
 const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft' };
@@ -80,6 +80,16 @@ function cardLabel(id) {
   const r = tcgCatalog.rarityByKey[c.rarity];
   return r ? `${c.name} (${r.label})` : c.name;
 }
+
+/** Positionen eines Handels als Text, gleiche zusammengefasst: "2× Aleks (Gold), Luca (Holo)" */
+function linesLabel(lines) {
+  const groups = new Map();
+  for (const l of lines || []) groups.set(l.card, (groups.get(l.card) || 0) + 1);
+  return [...groups].map(([card, n]) => (n > 1 ? `${n}× ` : '') + cardLabel(card)).join(', ');
+}
+
+/** Eine Seite eines Handels mit Geld: "Aleks (Gold) + 5,00 €", "25,00 €" */
+const tradeSide = (lines, cents) => [linesLabel(lines), cents > 0 ? euro(cents) : ''].filter(Boolean).join(' + ') || '–';
 
 /** Gezogene Karten zusammenfassen, seltenste zuerst: [{ label, rarity, count }] */
 function cardSummary(cards) {
@@ -135,25 +145,21 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
     const rx = new RegExp(escapeRegex(q), 'i');
     // Karten über ihren angezeigten Namen finden (z. B. "St. Ivan") – gespeichert ist nur die Karten-ID
     const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
-    and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { card: { $in: cardIds } }, { wantCard: { $in: cardIds } }] });
+    and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { 'give.card': { $in: cardIds } }, { 'want.card': { $in: cardIds } }] });
   }
-  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName card wantCard price extraFrom tax closedAt', all);
+  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName give.card want.card price extraFrom tax closedAt', all);
   const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
     onlySuspicious,
     ...pg,
     rows: docs.map((t) => {
-      // "An" ist beim Verkauf der Käufer, beim Tausch der Empfänger des Angebots
-      const to = t.kind === 'tausch' ? t.toName : t.buyerName;
-      let back = euro(t.price); // Gegenleistung
-      if (t.kind === 'tausch') {
-        back = cardLabel(t.wantCard);
-        if (t.price > 0) back += ` + ${euro(t.price)} von ${t.extraFrom === 'to' ? to : t.sellerName}`;
-      }
+      // "An" ist die Gegenseite (Käufer bzw. Empfänger des Angebots); Geld steht bei der Seite, die es zahlt
+      const to = t.buyerName || t.toName;
+      const sellerPays = t.extraFrom === 'seller';
       const flagged = pairs.has(deviceService.tradePairKey(t));
       const isNew = flagged && new Date(t.closedAt).getTime() > seen;
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: cardLabel(t.card), back, tax: t.tax, flagged, isNew };
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: tradeSide(t.give, sellerPays ? t.price : 0), back: tradeSide(t.want, sellerPays ? 0 : t.price), tax: t.tax, flagged, isNew };
     }),
   };
 }
@@ -567,13 +573,13 @@ const GESAMT_SOURCES = [
     log: 'handel',
     Model: Trade,
     time: 'closedAt',
-    select: 'kind sellerName buyerName toName card wantCard price closedAt',
+    select: 'kind sellerName buyerName toName give.card want.card price extraFrom closedAt',
     filter: async (p) => ({ status: 'verkauft', ...(p ? { $or: [{ seller: p._id }, { buyer: p._id }, { to: p._id }] } : {}) }),
     rows: async (docs) =>
       docs.map((t) => {
-        const to = t.kind === 'tausch' ? t.toName : t.buyerName;
-        const back = t.kind === 'tausch' ? cardLabel(t.wantCard) + (t.price > 0 ? ` + ${euro(t.price)}` : '') : euro(t.price);
-        return { at: t.closedAt, player: t.sellerName, text: `${KIND_LABEL[t.kind] || t.kind}: ${cardLabel(t.card)} an ${to || '–'} gegen ${back}`, amount: null };
+        const to = t.buyerName || t.toName;
+        const sellerPays = t.extraFrom === 'seller';
+        return { at: t.closedAt, player: t.sellerName, text: `${KIND_LABEL[t.kind] || t.kind}: ${tradeSide(t.give, sellerPays ? t.price : 0)} an ${to || '–'} gegen ${tradeSide(t.want, sellerPays ? 0 : t.price)}`, amount: null };
       }),
   },
   {
