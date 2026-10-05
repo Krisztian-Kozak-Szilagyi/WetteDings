@@ -2,7 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
-const { str, safeRedirect } = require('../lib/util');
+const { str } = require('../lib/util');
 const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
@@ -134,6 +134,16 @@ router.post('/profil/anheften', requireLogin, async (req, res) => {
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}#erfolge`);
 });
 
+// Rücksprung nach "Weiter" im Erfolg-/Geschenk-Fenster (nur ohne JavaScript): nur auf einen dieser Bereiche,
+// nie auf eine frei übergebene Adresse (CodeQL #74–#76). Das Ziel kommt aus der Liste, nicht aus der Anfrage.
+const BACK_PAGES = ['/', '/wetten', '/duell', '/rangliste', '/broker', '/lotterie', '/tcg', '/inventar', '/handel', '/ihk', '/dungeon', '/grading', '/forum', '/patchnotes', '/benachrichtigungen', '/konto', '/regeln', '/support', '/admin'];
+/** Bereich der Seite, auf der das Fenster erschien (erster Pfadteil), sonst das Dashboard; Profile → eigenes Profil */
+function popupBack(req) {
+  const first = '/' + (str(req.session.popupBack).split(/[?#]/)[0].split('/')[1] || '');
+  if (first === '/profil') return `/profil/${encodeURIComponent(req.user.username)}`;
+  return BACK_PAGES.find((p) => p === first) || '/';
+}
+
 // Fenster "Erfolg freigeschaltet" mit OK bestätigt – zurück auf die Seite, auf der es erschien
 router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   await achievementService.markSeen(req.user._id, str(req.body.id));
@@ -141,7 +151,7 @@ router.post('/erfolge/gesehen', requireLogin, async (req, res) => {
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: achievementService.popupJson(await achievementService.nextUnseen(req.user._id), req.app.locals.assetVersion) });
   }
-  res.redirect(safeRedirect(req.session.popupBack, '/')); // Ziel aus der Sitzung (src/app.js)
+  res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
 });
 
 // Fenster "Geschenk vom Team" mit Weiter bestätigt
@@ -150,7 +160,7 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: giftService.popup(await giftService.nextUnseen(req.user._id)) });
   }
-  res.redirect(safeRedirect(req.session.popupBack, '/')); // Ziel aus der Sitzung (src/app.js)
+  res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
 });
 
 // Sammlung eines Mitglieds (nur ansehen); ein Klick vergrößert die Karte, bei fremden Sammlungen lässt sich dort ein Tausch vorschlagen
