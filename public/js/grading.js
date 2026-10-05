@@ -24,7 +24,12 @@
 
   // ---------- Karte aufbauen ----------
   var card = el('div', 'gr-card' + (job.card && job.card.season ? ' season-' + job.card.season : ''), obj); // Rückseite je Season
-  var front = el('div', 'gr-face gr-front', card);
+  var front = el('div', 'gr-face gr-front' + (job.card ? ' r-' + job.card.rarity : ''), card);
+  // Zentrierung: Kartenbild sitzt im Rand (Farbe der Seltenheit) ungleich weit von den Kanten weg
+  if (job.center) {
+    front.style.setProperty('--cx', job.center.x);
+    front.style.setProperty('--cy', job.center.y);
+  }
   var img = el('img', 'gr-img', front);
   img.src = job.card ? job.card.image : '';
   img.alt = job.card ? job.card.name : '';
@@ -364,6 +369,12 @@
     if ((d.corners || []).length) found.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
     if ((d.edges || []).length) found.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
     if (d.crease) found.push('ein Knick');
+    var c = d.centering;
+    var worst = c ? Math.max(c.lr || 50, c.tb || 50) : 50;
+    if (worst > 55) {
+      found.push('Zentrierung ' + worst + '/' + (100 - worst) + ' (höchstens ' + job.centerCap + ')');
+      card.classList.add('is-offcenter');
+    }
     verdict.className = 'gr-verdict ' + (diff === 0 ? 'is-right' : diff === 1 ? 'is-close' : 'is-wrong');
     verdict.innerHTML = '';
     el('strong', '', verdict).textContent = diff === 0 ? 'Exakt! Note ' + grade + '.' : diff === 1 ? 'Knapp daneben – richtig ist ' + grade + ' (halber Bonus).' : 'Daneben – richtig ist ' + grade + '.';

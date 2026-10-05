@@ -44,7 +44,8 @@ test('Zustand: frisch aus dem Pack – Note 8 am häufigsten, im Schnitt besser 
   assert.ok(frisch.share(8) > frisch.share(9) && frisch.share(9) > frisch.share(10), 'Note 8 am häufigsten, dann 9, dann 10');
   assert.ok(frisch.share(10) > 0.06 && frisch.share(10) < 0.13, `frisch 10: ${frisch.share(10)}`);
   assert.ok(frisch.avg > kunde.avg, `Ø frisch ${frisch.avg} > kunde ${kunde.avg}`);
-  assert.ok(kunde.share(10) > 0.07 && kunde.share(10) < 0.15, `kunde 10: ${kunde.share(10)}`);
+  assert.ok(kunde.share(10) > 0.03 && kunde.share(10) < 0.09, `kunde 10: ${kunde.share(10)}`); // exakt ≈ 5,6 %
+  assert.ok(kunde.share(8) > kunde.share(9), 'auch bei Kundenkarten ist die 8 häufiger als die 9');
   // Kundenaufträge im Grading-Shop würfeln unverändert mit dem Profil "kunde"
   assert.equal(grading.rollDefects, rollDefects);
   assert.equal(grading.gradeFor, gradeFor);
@@ -105,7 +106,7 @@ test('Versatz auf der Folie: Stärke aus der Zentrierung, Richtung fest aus dem 
 test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start bei 4', () => {
   const { centeringCap } = condition;
   const none = { scratches: [], corners: [], edges: [], crease: false };
-  assert.equal(centeringCap(undefined), 10); // Kundenkarten ohne Zentrierung
+  assert.equal(centeringCap(undefined), 10); // alte Aufträge ohne Zentrierung
   assert.equal(centeringCap({ lr: 55, tb: 50 }), 10);
   assert.equal(centeringCap({ lr: 52, tb: 58 }), 9);
   assert.equal(centeringCap({ lr: 65, tb: 50 }), 8);

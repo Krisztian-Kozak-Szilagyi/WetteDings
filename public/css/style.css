@@ -2662,6 +2662,15 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-card:not(.show-back) .gr-back, .gr-card.show-back .gr-front { pointer-events: none; }
 .gr-back .gr-spot { filter: brightness(2.3) saturate(.8); }
 .gr-img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+/* Zentrierung (#73): Kartenbild im Rand in Seltenheitsfarbe – 3 % der Breite pro Seite (oben/unten im
+   Kartenformat 720 × 1008 entsprechend 2,14 % der Höhe), ungleich verteilt nach --cx/--cy */
+.gr-front { background: var(--rar, #111); }
+.gr-front .gr-img {
+  /* Bilder lassen sich nicht über left/right stauchen: Größe fest (Ränder zusammen immer 6 % bzw. 4,28 %), nur der Startpunkt wandert */
+  position: absolute; width: 94%; height: 95.72%; border-radius: 2%;
+  left: calc(3% * (1 + var(--cx, 0))); top: calc(2.14% * (1 - var(--cy, 0)));
+}
+.gr-card.is-revealed.is-offcenter .gr-front { box-shadow: inset 0 0 0 3px #ef4444, 0 0 0 1px rgba(0, 0, 0, .3), 0 18px 40px rgba(0, 0, 0, .35); }
 .gr-glare {
   position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light;
   background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .85), rgba(255, 255, 255, 0) 48%);

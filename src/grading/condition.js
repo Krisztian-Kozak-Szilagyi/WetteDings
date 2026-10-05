@@ -34,12 +34,12 @@ const CENTERING = [
 const CREASE_CAP = 4;
 
 // Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
-// centering: Gewichte je Achse für die Bereiche in CENTERING (null = immer perfekt zentriert).
-// kunde: gebrauchte Karten der Kunden im Grading-Shop – ohne Zentrierung, die stellt der Shop (noch) nicht dar
+// centering: Gewichte je Achse für die Bereiche in CENTERING (null = immer perfekt zentriert, z. B. alte Aufträge).
+// kunde: gebrauchte Karten der Kunden im Grading-Shop – Note 8 am häufigsten (≈ 28 %), 10 ≈ 6 %, Ø 7,3
 // frisch: Karten aus dem Pack, dem Black Market oder vom Team – Note 8 am häufigsten (≈ 30 %), 9 ≈ 27 %,
 // 10 ≈ 9 %, Ø 7,9 (exakt nachrechenbar; test/condition.test.js prüft die Form)
 const PROFILES = {
-  kunde: { scratches: [40, 35, 18, 7], corner: 0.15, edges: [60, 30, 10], crease: 0.08, centering: null },
+  kunde: { scratches: [40, 35, 18, 7], corner: 0.15, edges: [60, 30, 10], crease: 0.08, centering: [70, 16, 8, 4, 2] },
   frisch: { scratches: [34, 38, 21, 7], corner: 0.12, edges: [72, 22, 6], crease: 0.02, centering: [80, 12, 5, 2, 1] },
 };
 

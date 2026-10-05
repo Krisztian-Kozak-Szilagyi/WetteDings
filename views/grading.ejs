@@ -100,7 +100,8 @@
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
             <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer siehst du nur, wenn du die Karte schräg ins Licht drehst; zum Heranzoomen Mausrad oder <b>+</b>.
-              <span class="gr-note">Start 10 · Kratzer −1 · bestoßene Ecke −1 · Kante −1 · mit Knick Start bei 4</span></p>
+              <span class="gr-note">Start 10 · Kratzer −1 · bestoßene Ecke −1 · Kante −1 · mit Knick Start bei 4</span>
+              <span class="gr-note">Zentrierung (Rand ungleich breit) begrenzt die Note: ab 56/44 höchstens 9 · ab 61/39 höchstens 8 · ab 66/34 höchstens 7 · schlechter höchstens 6</span></p>
             <div class="gr-grades" data-gr-grades>
               <% for (let g = 1; g <= 10; g++) { %><button type="button" class="gr-grade" data-grade="<%= g %>"><%= g %></button><% } %>
             </div>
