@@ -1416,6 +1416,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .r-bfwler { --rar: var(--r-bfwler); }
 .r-gold { --rar: var(--r-gold); }
 .r-holo { --rar: var(--r-holo); }
+/* Holo-Kartenbilder sind sehr hell (Pastell) – überall etwas abdunkeln, damit sie nicht blenden. Spätere Regeln
+   (z. B. grau für gesperrte/frühere Karten) haben Vorrang. Die Rückseite beim Packöffnen ist ein Hintergrund (kein img) und bleibt unverändert. */
+.r-holo img { filter: brightness(.82) contrast(1.05); }
 .r-bockhaber { --rar: var(--r-bockhaber); }
 .r-glitch { --rar: var(--r-glitch); }
 .r-icon { --rar: var(--r-icon); }
