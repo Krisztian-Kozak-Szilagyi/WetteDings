@@ -1,5 +1,6 @@
 const config = require('../config');
 const { quote: rawQuote, splitFee } = require('./payout');
+const { gradeWord } = require('../grading/condition');
 
 const euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 const dateFmt = new Intl.DateTimeFormat('de-DE', {
@@ -17,9 +18,11 @@ const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace
  * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
  * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
+ * grade: Note des Exemplars (geheimer Zustand, #73) – steht auf dem Etikett der Folie
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
+  if (grade) h += ` data-grade="${escAttr(grade)}" data-grade-word="${escAttr(gradeWord(grade))}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
   return h;
@@ -159,6 +162,7 @@ module.exports = {
   date,
   dayDate,
   foilViewAttrs,
+  gradeWord,
   dateSec,
   relTime,
   pool,

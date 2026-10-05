@@ -125,7 +125,7 @@ async function grantItems({ userIds, type, count = 1, source, session }) {
 /** Folierte Karten eines Nutzers, neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
 async function foiledCards(userId, now = Date.now()) {
   const [docs, locked] = await Promise.all([
-    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).sort({ foiledAt: -1 }).lean(),
+    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('+condition').sort({ foiledAt: -1 }).lean(), // folierte Karten zeigen ihre Note
     lockedDocs(userId),
   ]);
   return docs
@@ -139,6 +139,7 @@ async function foiledCards(userId, now = Date.now()) {
         card,
         rarity: r,
         foiledAt: d.foiledAt,
+        grade: d.condition ? d.condition.grade : null,
         days: foil.foilDays(d.foiledAt, now),
         percent: foil.foilPercent(d.foiledAt, now),
         sell: r.sell,
@@ -163,13 +164,16 @@ async function foilableCards(userId) {
     .sort((a, b) => b.rarity.rank - a.rarity.rank || a.card.name.localeCompare(b.card.name, 'de'));
 }
 
-/** Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar. Gibt die Exemplar-ID zurück. */
+/**
+ * Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar.
+ * Gibt { copyId, grade } zurück – mit der Folie wird die Note des Exemplars sichtbar (#73).
+ */
 async function foilCard({ user, cardId }) {
   const card = catalog.cardById[cardId];
   if (!card) throw new UserError('Bitte wähle eine Karte aus.');
   return inTransaction(async (session) => {
     const locked = await lockedDocs(user._id, session);
-    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id').session(session).lean();
+    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id condition.grade').session(session).lean();
     const doc = docs.find((d) => !locked.reasons.has(String(d._id)));
     if (!doc) throw new UserError(docs.length ? 'Alle unfolierten Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Du hast kein unfoliertes Exemplar dieser Karte.');
     // eine freie Folie (nicht im Handel) verbrauchen
@@ -179,7 +183,7 @@ async function foilCard({ user, cardId }) {
     await Item.deleteOne({ _id: used._id, user: user._id }, { session });
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: new Date() } }, { session });
-    return String(doc._id);
+    return { copyId: String(doc._id), grade: doc.condition ? doc.condition.grade : null };
   });
 }
 

@@ -401,6 +401,7 @@
   }
 
   // Versiegeln: Zeiger pendelt, Klick stoppt ihn
+  // gleiche Bezeichnungen wie GRADE_NAMES in src/grading/condition.js (Etikett der Folien)
   var GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
   var needle = bench.querySelector('[data-gr-needle]');
   var sealBtn = bench.querySelector('[data-gr-seal]');

@@ -111,8 +111,8 @@
     <div class="foil-grid">
       <% foiled.forEach((f) => { %>
         <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
-          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt) %> aria-label="<%= f.card.name %> groß ansehen">
-            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label }) %>
+          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt, { grade: f.grade }) %> aria-label="<%= f.card.name %> groß ansehen">
+            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label, grade: f.grade }) %>
           </button>
           <div class="foil-info">
             <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>

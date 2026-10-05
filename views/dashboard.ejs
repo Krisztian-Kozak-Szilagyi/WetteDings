@@ -112,7 +112,7 @@
         <% d.favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; %>
           <% if (fv.foiledAt) { %>
             <a class="tcg-slot foil-slot r-<%= c.rarity %>" href="/inventar" aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %>">
-              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade }) %></span>
             </a>
           <% } else { %>
             <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">

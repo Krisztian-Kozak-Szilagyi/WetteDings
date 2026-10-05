@@ -9,7 +9,7 @@ async function collection(user) {
   const [owned, locked, foiledDocs] = await Promise.all([
     inventory(user._id),
     lockedDocs(user._id),
-    TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt').sort({ foiledAt: 1 }).lean(),
+    TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt condition.grade').sort({ foiledAt: 1 }).lean(),
   ]);
   // Folierte Exemplare je Karte – im Album und in fremden Sammlungen eigene Plätze: { cardId: [{ id, foiledAt }] }
   const foiledCopies = {};
@@ -19,6 +19,7 @@ async function collection(user) {
     (foiledCopies[d.card] = foiledCopies[d.card] || []).push({
       id: String(d._id),
       foiledAt: d.foiledAt,
+      grade: d.condition ? d.condition.grade : null, // Note auf der Folie (#73)
       value: foil.cardValue(r ? r.sell : 0, d.foiledAt),
       lock: lock && lock !== 'folie' ? lock : null, // 'handel' | 'quest'
     });

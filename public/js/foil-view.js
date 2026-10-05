@@ -36,13 +36,13 @@
     img.alt = '';
     img.draggable = false;
     el('span', 'foil-sheen', front);
-    // Etikett wie beim Grading-Slab: folierte Karten haben immer Note 10
+    // Etikett wie beim Grading-Slab: Note des Exemplars (data-grade, geheimer Zustand – erst mit der Folie sichtbar)
     var t = el('span', 'foil-ticket', front);
     var info = el('span', 'gr-slab-info', t);
     el('strong', '', info, 'BfW GRADING');
     el('span', '', info, d.name + ' · ' + d.rarityLabel);
-    el('span', 'gr-slab-word', info, 'GEM MINT');
-    el('span', 'gr-slab-grade', t, '10');
+    el('span', 'gr-slab-word', info, d.gradeWord || '');
+    el('span', 'gr-slab-grade', t, d.grade || '–');
     var back = el('span', 'foil-face foil-back', inner);
     el('span', 'foil-back-art', back);
     el('span', 'foil-sheen', back);
@@ -51,7 +51,7 @@
     var cert = el('span', 'gr-slab-cert', tb);
     el('strong', '', cert, 'BfW GRADING');
     el('span', '', cert, 'Foliert am ' + d.date);
-    el('span', '', cert, 'Note 10 · GEM MINT');
+    el('span', '', cert, d.grade ? 'Note ' + d.grade + ' · ' + d.gradeWord : 'Note –');
     el('span', 'gr-slab-barcode', tb);
     return card;
   }

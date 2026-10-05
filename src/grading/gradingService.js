@@ -11,6 +11,7 @@ const catalog = require('../tcg/catalog');
 const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
 const foil = require('../items/foil');
 const estimate = require('./estimate');
+const { rnd, chance, pick, weighted, rollDefects, gradeFor } = require('./condition');
 const { notify } = require('../services/notifyService');
 
 // ---------- Spielregeln (Demo-Werte) ----------
@@ -78,18 +79,7 @@ async function saveSettings({ admin, ...values }) {
 }
 
 // ---------- Auftrag auswürfeln ----------
-const rnd = (min, max) => min + (crypto.randomInt(1000000) / 1000000) * (max - min);
-const chance = (p) => crypto.randomInt(1000000) < p * 1000000;
-const pick = (list) => list[crypto.randomInt(list.length)];
-/** Index nach Gewichten, z. B. [40, 35, 18, 7] */
-function weighted(weights) {
-  let roll = crypto.randomInt(weights.reduce((s, w) => s + w, 0));
-  for (let i = 0; i < weights.length; i++) {
-    if (roll < weights[i]) return i;
-    roll -= weights[i];
-  }
-  return 0;
-}
+// Würfel-Hilfen, Mängel und Note teilen sich Kundenaufträge und Karten der Mitglieder (src/grading/condition.js)
 
 /** Karte des Kunden: Seltenheit nach CUSTOMER_RARITIES (nur Seltenheiten, zu denen es Karten gibt) */
 function rollCard() {
@@ -112,26 +102,6 @@ function rollSpots() {
     });
   }
   return spots;
-}
-
-/** Mängel der Vorderseite und die daraus folgende Note (10 minus Abzüge, mindestens 1) */
-function rollDefects() {
-  const scratches = Array.from({ length: weighted([40, 35, 18, 7]) }, () => ({
-    x: Math.round(rnd(20, 80)),
-    y: Math.round(rnd(18, 82)),
-    len: Math.round(rnd(14, 30)),
-    angle: Math.round(rnd(-70, 70)),
-  }));
-  const corners = [0, 1, 2, 3].filter(() => chance(0.15));
-  const edges = Array.from({ length: weighted([60, 30, 10]) }, () => ({ side: crypto.randomInt(4), pos: Math.round(rnd(20, 80)) }));
-  const crease = chance(0.08);
-  return { scratches, corners, edges, crease };
-}
-
-/** Note aus den Mängeln: Kratzer, Ecke, Kantenmacke je −1, Knick −3 */
-function gradeFor(defects) {
-  const minus = defects.scratches.length + defects.corners.length + defects.edges.length + (defects.crease ? 3 : 0);
-  return Math.max(1, 10 - minus);
 }
 
 /** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %) */

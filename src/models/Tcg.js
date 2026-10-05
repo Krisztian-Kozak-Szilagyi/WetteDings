@@ -1,4 +1,6 @@
 const { Schema, model } = require('mongoose');
+const { conditionSchema } = require('./condition');
+const { rollCondition } = require('../grading/condition');
 
 // Eine Karte im Besitz eines Nutzers (jede gezogene Karte ist ein eigenes Dokument)
 const cardSchema = new Schema(
@@ -8,6 +10,10 @@ const cardSchema = new Schema(
     rarity: { type: String, required: true },
     opening: { type: Schema.Types.ObjectId, ref: 'TcgOpening', default: null },
     foiledAt: { type: Date, default: null }, // foliert seit (null = ohne Folie) – siehe src/items
+    // Geheimer Zustand dieses Exemplars (#73): Mängel und Note, beim Entstehen ausgewürfelt und für immer daran
+    // gebunden. Sichtbar nur auf der Folie. select: false – wird nur geladen, wenn ausdrücklich angefordert
+    // (z. B. .select('condition.grade')), damit er nie versehentlich in Seiten oder JSON landet.
+    condition: { type: conditionSchema, select: false, default: () => rollCondition() },
     lastClaimedAt: { type: Date }, // zuletzt für Quest/Handel beansprucht – nur Schreibzugriff gegen gleichzeitige Verkäufe, nicht die Sperre selbst (siehe tcg/locks)
   },
   { timestamps: true }

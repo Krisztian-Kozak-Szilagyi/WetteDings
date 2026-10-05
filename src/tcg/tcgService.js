@@ -265,7 +265,7 @@ const foilFavDoc = (id) => (isFoilFav(id) && mongoose.isValidObjectId(id.slice(F
 async function ownedFoilFavs(userId, ids) {
   const docIds = ids.map(foilFavDoc).filter(Boolean);
   if (!docIds.length) return new Map();
-  const docs = await TcgCard.find({ _id: { $in: docIds }, user: userId, foiledAt: { $ne: null } }).select('card foiledAt').lean();
+  const docs = await TcgCard.find({ _id: { $in: docIds }, user: userId, foiledAt: { $ne: null } }).select('card foiledAt condition.grade').lean();
   return new Map(docs.map((d) => [String(d._id), d]));
 }
 
@@ -324,7 +324,7 @@ async function toggleFavorite({ user, cardId }) {
 }
 
 /**
- * Favoriten eines Mitglieds zum Anzeigen: [{ key, card, foiledAt }] – foiledAt nur bei folierten Exemplaren.
+ * Favoriten eines Mitglieds zum Anzeigen: [{ key, card, foiledAt, grade }] – foiledAt und grade (Note auf der Folie) nur bei folierten Exemplaren.
  * counts = { cardId: Anzahl } des Mitglieds; Karten, die es nicht mehr besitzt, fallen weg.
  */
 async function favoriteList(owner, counts) {
@@ -334,10 +334,10 @@ async function favoriteList(owner, counts) {
     .map((id) => {
       if (isFoilFav(id)) {
         const d = foils.get(id.slice(FOIL_FAV.length));
-        return d && catalog.cardById[d.card] ? { key: id, card: catalog.cardById[d.card], foiledAt: d.foiledAt } : null;
+        return d && catalog.cardById[d.card] ? { key: id, card: catalog.cardById[d.card], foiledAt: d.foiledAt, grade: d.condition ? d.condition.grade : null } : null;
       }
       const card = catalog.cardById[id];
-      return card && counts[id] ? { key: id, card, foiledAt: null } : null;
+      return card && counts[id] ? { key: id, card, foiledAt: null, grade: null } : null;
     })
     .filter(Boolean);
 }

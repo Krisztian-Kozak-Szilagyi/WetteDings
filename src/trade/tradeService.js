@@ -178,7 +178,7 @@ async function wantedFoiledCopy(trade, session) {
 /** Ein bestimmtes foliertes Exemplar (aus dem Inventar), sofern es nicht schon im Handel ist */
 async function foiledCopy(userId, cardId, copyId, session) {
   if (!mongoose.isValidObjectId(copyId)) throw new UserError('Diese folierte Karte gibt es nicht.');
-  const doc = await TcgCard.findOne({ _id: copyId, user: userId, card: cardId, foiledAt: { $ne: null } }).select('_id foiledAt').session(session).lean();
+  const doc = await TcgCard.findOne({ _id: copyId, user: userId, card: cardId, foiledAt: { $ne: null } }).select('_id foiledAt condition.grade').session(session).lean();
   if (!doc) throw new UserError('Diese folierte Karte besitzt du nicht (mehr).');
   if ((await lockedDocs(userId, session)).reasons.get(String(doc._id)) !== 'folie') throw new UserError('Diese Karte ist schon im Handel.');
   return { doc, owned: 1 };
@@ -201,7 +201,7 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
   let wantDoc = null;
   if (wantCopy) {
     if (kind !== 'tausch' || !mongoose.isValidObjectId(wantCopy)) throw new UserError('Diese folierte Karte gibt es nicht.');
-    wantDoc = await TcgCard.findOne({ _id: wantCopy, foiledAt: { $ne: null } }).select('user card foiledAt').lean();
+    wantDoc = await TcgCard.findOne({ _id: wantCopy, foiledAt: { $ne: null } }).select('user card foiledAt condition.grade').lean();
     if (!wantDoc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
     wantCardId = wantDoc.card;
   }
@@ -255,9 +255,11 @@ async function create({ user, kind, cardId, price, toName, wantCardId = null, ex
             card: cardId,
             cardDoc: doc._id,
             foiledAt: doc.foiledAt || null,
+            grade: doc.foiledAt && doc.condition ? doc.condition.grade : null, // Note nur bei folierten Exemplaren
             wantCard: kind === 'tausch' ? wantCardId : null,
             wantCopy: wantDoc ? wantDoc._id : null,
             wantFoiledAt: wantDoc ? wantDoc.foiledAt : null,
+            wantGrade: wantDoc && wantDoc.condition ? wantDoc.condition.grade : null,
             extraFrom: valid.extraFrom,
             price,
             expiresAt: new Date(Date.now() + hours * 3600000),
