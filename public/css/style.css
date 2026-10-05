@@ -3440,6 +3440,10 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 }
 .hb-window.is-bumped { animation: hb-bump .35s ease; }
 /* Drag & Drop: passende Seite leuchtet als Ablage, Karten lassen sich greifen */
+.hb-ghost { position: fixed; top: -400px; left: -400px; width: 84px; aspect-ratio: 720 / 1008; border-radius: 7px; overflow: hidden; background: var(--color-bg); box-shadow: 0 0 0 2px var(--color-accent-300), 0 10px 24px rgba(0, 0, 0, .5); pointer-events: none; }
+.hb-ghost img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hb-ghost.is-item { display: grid; place-items: center; background: var(--surface-2); }
+.hb-ghost.is-item img { width: 50%; height: auto; }
 .hb-card[draggable="true"] .hb-art, .hb-card[draggable="true"].hb-foil { cursor: var(--cur-grab); }
 .hb-card[draggable="true"]:active .hb-art { cursor: var(--cur-grabbing); }
 .hb-mini-card[draggable="true"] { cursor: var(--cur-grab); }

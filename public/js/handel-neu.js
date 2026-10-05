@@ -294,9 +294,20 @@
       root.classList.remove('hb-dragging', 'hb-dragging-out');
       $all('.is-target, .is-over, .is-source', root).forEach(function (el) { el.classList.remove('is-target', 'is-over', 'is-source'); });
     };
+    // Vorschau beim Ziehen: kleine Karte statt des Bildes selbst – ein <img> würde der Browser in voller
+    // Auflösung (720 × 1008) zeigen. Das Element muss kurz im Dokument stehen, damit es gezeichnet wird.
     var image = function (e, el) {
       var img = $('img', el);
-      if (img && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, img.offsetWidth / 2, img.offsetHeight / 2);
+      if (!img || !e.dataTransfer.setDragImage) return;
+      var ghost = document.createElement('div');
+      ghost.className = 'hb-ghost' + (el.closest('.is-item') ? ' is-item' : '');
+      var pic = document.createElement('img');
+      pic.src = img.currentSrc || img.src;
+      pic.alt = '';
+      ghost.appendChild(pic);
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 42, 59);
+      setTimeout(function () { ghost.remove(); }, 0);
     };
 
     // Karte aus der Sammlung aufnehmen
