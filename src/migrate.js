@@ -113,6 +113,9 @@ async function migrate() {
     await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { grade: t.foiledAt ? gradeOf(t.cardDoc) : null, wantGrade: t.wantFoiledAt ? gradeOf(t.wantCopy) : null } } } })));
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
+
+  // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN)
+  await require('./device/deviceService').recomputeAlerts();
 }
 
 /** Zustand für alle Karten ohne condition auswürfeln, in Blöcken. Gibt die Zahl der ergänzten Karten zurück. */
