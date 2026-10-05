@@ -1,7 +1,7 @@
 <%#
   Suchen und Filtern in einem Knopf (Handel: Markt und Sammlung). Eine Hälfte überfahren oder antippen → sie klappt
   auf; gefiltert wird in public/js/handel.js. name = Präfix der Daten-Attribute ("market" | "coll"),
-  opts = [{ key, label, count? }] (ohne "Alle"), placeholder = Text im Suchfeld, allCount = Zahl bei "Alle".
+  opts = [{ key, label, count? }] (ohne "Alle"), placeholder = Beschreibung fürs Suchfeld (Screenreader; sichtbar steht nur „Suchen“), allCount = Zahl bei "Alle".
 %>
 <div class="mkt-bar" data-mkt-bar>
   <div class="mkt-bar-search">
@@ -9,7 +9,7 @@
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg>
       Suchen
     </label>
-    <input id="<%= name %>-search" type="search" class="mkt-bar-input" data-<%= name %>-search maxlength="40" placeholder="<%= placeholder %>" aria-label="<%= placeholder %>">
+    <input id="<%= name %>-search" type="search" class="mkt-bar-input" data-<%= name %>-search maxlength="40" placeholder="Suchen" aria-label="<%= placeholder %>">
     <span class="mkt-bar-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm4.8 11.3L20 20"/></svg></span>
   </div>
   <div class="mkt-bar-filter">
