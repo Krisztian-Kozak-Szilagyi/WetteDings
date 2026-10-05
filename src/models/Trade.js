@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 
-// Nachricht in der Verhandlung eines Tauschs. from = Rolle im Angebot ('seller' | 'to') oder 'system'
+// Nachricht in einer Verhandlung (Tausch, privat, Markt-Gespräch). from = Rolle ('seller' | 'to') oder 'system'
 // (Bedingungen geändert). Namen werden beim Anzeigen aus sellerName/toName genommen – so bleiben sie
 // nach einer Umbenennung aktuell.
 const messageSchema = new Schema(
@@ -32,7 +32,7 @@ const tradeSchema = new Schema(
     wantCardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // erst beim Annehmen gesetzt
     extraFrom: { type: String, enum: ['seller', 'to', null], default: null }, // nur bei tausch: wer den Aufpreis zahlt
     price: { type: Number, required: true }, // Cent (bei tausch: Aufpreis, 0 erlaubt)
-    // Verhandlung (nur bei tausch): wer die aktuellen Bedingungen zuletzt gesetzt hat – annehmen darf nur die andere Seite
+    // Verhandlung (tausch und privat, #82): wer die aktuellen Bedingungen zuletzt gesetzt hat – annehmen darf nur die andere Seite
     lastChangeBy: { type: String, enum: ['seller', 'to'], default: 'seller' },
     termsVersion: { type: Number, default: 0 }, // steigt bei jeder Änderung; Annehmen veralteter Bedingungen wird abgelehnt
     messages: { type: [messageSchema], default: [] },
@@ -60,11 +60,39 @@ tradeSchema.index({ cardDoc: 1 }, { unique: true, partialFilterExpression: { sta
 // Admin-Einstellungen: _id "steuer" = Steuersätze je Bereich (services/taxService); "handel" = alte einheitliche Handelssteuer
 const settingsSchema = new Schema({ _id: { type: String, default: 'handel' }, taxPercent: Number, rates: { markt: Number, privat: Number, tausch: Number, coin: Number, etf: Number }, updatedByName: String }, { timestamps: true });
 
+// Verhandlung über ein Markt-Angebot (#82): jeder Interessent führt ein eigenes Gespräch mit dem Anbieter.
+// Einigen sie sich, gilt der Preis nur für ihn – das Angebot bleibt für alle anderen zum Marktpreis stehen.
+// Felder wie beim Trade (seller/to/price/lastChangeBy …), damit Regeln und Ansicht dieselben sind; to = Interessent.
+const talkSchema = new Schema(
+  {
+    trade: { type: Schema.Types.ObjectId, ref: 'Trade', required: true },
+    seller: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    sellerName: { type: String, required: true },
+    to: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    toName: { type: String, required: true },
+    card: { type: String, required: true }, // wie Trade.card (zur Anzeige und für die Benachrichtigungen)
+    price: { type: Number, required: true }, // aktueller Vorschlag in Cent (am Anfang der Marktpreis)
+    lastChangeBy: { type: String, enum: ['seller', 'to'], default: 'seller' },
+    termsVersion: { type: Number, default: 0 },
+    messages: { type: [messageSchema], default: [] },
+    activityAt: { type: Date, default: null },
+    sellerSeenAt: { type: Date, default: null },
+    toSeenAt: { type: Date, default: null },
+    status: { type: String, enum: ['offen', 'verkauft', 'beendet'], default: 'offen' },
+    expiresAt: { type: Date, required: true }, // = Ablauf des Markt-Angebots
+  },
+  { timestamps: true }
+);
+talkSchema.index({ trade: 1, to: 1 }, { unique: true });
+talkSchema.index({ seller: 1, status: 1 });
+talkSchema.index({ to: 1, status: 1 });
+
 /** Offene Angebote: Status "offen" und nicht abgelaufen (abgelaufene bleiben "offen", gelten aber nicht mehr) */
 const openFilter = () => ({ status: 'offen', expiresAt: { $gt: new Date() } });
 
 module.exports = {
   openFilter,
   Trade: model('Trade', tradeSchema),
+  TradeTalk: model('TradeTalk', talkSchema),
   TradeSettings: model('TradeSettings', settingsSchema),
 };
