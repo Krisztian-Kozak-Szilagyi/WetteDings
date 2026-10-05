@@ -1615,7 +1615,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .tcg-slot:hover .tcg-art, .tcg-slot:focus-visible .tcg-art { transform: translateY(-4px); box-shadow: 0 0 0 1px var(--rar), 0 14px 30px rgba(0, 0, 0, .5), 0 0 22px color-mix(in srgb, var(--rar) 30%, transparent); }
 .tcg-fx { position: absolute; inset: 0; pointer-events: none; }
 .tcg-fx-shine { background: linear-gradient(110deg, transparent 42%, rgba(255, 255, 255, .22) 50%, transparent 58%); background-size: 250% 100%; mix-blend-mode: overlay; animation: tcgShine 4s ease-in-out infinite; }
-.tcg-fx-holo { background: linear-gradient(115deg, transparent 20%, #ff9ad5 35%, #9ae6ff 45%, #b9ff9a 55%, #ffe59a 65%, transparent 80%); background-size: 200% 200%; mix-blend-mode: soft-light; opacity: .7; animation: holoSheen 4.5s linear infinite; }
+/* Holo: ruhiger, sanftere Farben – viele Holos auf einer Seite sollen nicht blenden (#90); beim Darüberfahren etwas stärker */
+.tcg-fx-holo { background: linear-gradient(115deg, transparent 22%, #f5b3dc 36%, #b3e4f5 46%, #c9f0b8 56%, #f5e2b3 66%, transparent 80%); background-size: 200% 200%; mix-blend-mode: soft-light; opacity: .35; animation: holoSheen 8s linear infinite; transition: opacity .25s ease; }
+.tcg-slot:hover .tcg-fx-holo, .tcg-slot:focus-visible .tcg-fx-holo { opacity: .55; }
 .tcg-fx-bock { background: linear-gradient(115deg, transparent 25%, #d8b4fe 40%, #a5f3fc 52%, #fde68a 62%, transparent 78%); background-size: 200% 200%; mix-blend-mode: soft-light; opacity: .4; animation: holoSheen 7s linear infinite; }
 .tcg-fx-glitch { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); }
 .tcg-slot .tcg-art img.tcg-glitch-a { filter: hue-rotate(90deg) saturate(2); mix-blend-mode: screen; animation: glitchSlice 3.4s steps(1) infinite; clip-path: inset(0 0 100% 0); }
@@ -1733,7 +1735,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 }
 .tcg-zoom.tilting .tcg-shine { opacity: 1; }
 .tcg-zoom.r-holo .tcg-shine, .tcg-zoom.r-bockhaber .tcg-shine {
-  opacity: .35;
+  opacity: .2;
   background:
     radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .3), transparent 55%),
     linear-gradient(115deg, transparent 20%, rgba(255, 157, 230, .7) 36%, rgba(157, 243, 255, .7) 50%, rgba(255, 245, 157, .7) 62%, transparent 80%);
@@ -1746,6 +1748,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   background-size: 250% 250%; background-position: var(--mx, 50%) var(--my, 50%);
 }
 .tcg-zoom.tilting.r-holo .tcg-shine, .tcg-zoom.tilting.r-bockhaber .tcg-shine, .tcg-zoom.tilting.r-gold .tcg-shine, .tcg-zoom.tilting.r-icon .tcg-shine { opacity: 1; }
+.tcg-zoom.tilting.r-holo .tcg-shine { opacity: .6; } /* Holo blendet beim Neigen sonst (#90) */
 .tcg-zoom.is-former .tcg-card-3d { box-shadow: 0 20px 60px rgba(0, 0, 0, .55); }
 .tcg-zoom.is-former .tcg-card-3d img { filter: grayscale(1) brightness(.5) contrast(.9); }
 .tcg-zoom.is-former .tcg-shine { opacity: 0 !important; }
@@ -2578,7 +2581,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .85), rgba(255, 255, 255, 0) 48%);
 }
 .gr-holo {
-  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: calc(var(--holo, 0) * .5);
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: calc(var(--holo, 0) * .2); /* schwach, damit Kratzer sichtbar bleiben (#90) */
   background: linear-gradient(115deg, #ff0080, #ffd700, #00ffa3, #00cfff, #a259ff, #ff0080, #ffd700);
   background-size: 400% 400%; background-position: var(--gx, 50%) var(--gy, 50%);
 }
@@ -2592,9 +2595,10 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 /* Mängel (nur Vorderseite) */
 .gr-defects { position: absolute; inset: 0; pointer-events: none; }
 .gr-scratch {
-  position: absolute; height: 2px; transform-origin: 0 50%; opacity: var(--scr, 0); mix-blend-mode: screen;
+  position: absolute; height: 2px; transform-origin: 0 50%; opacity: var(--scr, 0);
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .95) 18%, rgba(220, 235, 255, .8) 75%, transparent);
-  box-shadow: 0 0 4px rgba(255, 255, 255, .9);
+  /* hauchdünner, halbdurchsichtiger dunkler Rand: auf hellem Holo sichtbar, aber nicht schwarz (#90) */
+  box-shadow: 0 0 0 .5px rgba(0, 0, 0, .28), 0 0 3px rgba(255, 255, 255, .7);
 }
 .gr-corner { position: absolute; width: 8%; aspect-ratio: 1; background: radial-gradient(circle at var(--cx) var(--cy), rgba(255, 255, 255, .95) 0 24%, rgba(255, 255, 255, .5) 38%, transparent 62%); }
 .gr-corner-0 { top: 0; left: 0; --cx: 0%; --cy: 0%; }

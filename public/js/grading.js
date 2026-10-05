@@ -108,8 +108,10 @@
     card.classList.toggle('show-back', !facingFront);
     var tilt = Math.sqrt(rx * rx + fy * fy);
     // Kratzer zeigen sich erst, wenn Licht schräg darauf fällt
-    obj.style.setProperty('--scr', clamp((tilt - 12) / 18, 0, 1).toFixed(3));
-    obj.style.setProperty('--holo', clamp(tilt / 35, 0, 1).toFixed(3));
+    var scr = clamp((tilt - 12) / 18, 0, 1);
+    obj.style.setProperty('--scr', scr.toFixed(3));
+    // Holo schimmert schon bei leichter Neigung und tritt zurück, wo die Kratzer erscheinen (#90)
+    obj.style.setProperty('--holo', (clamp(tilt / 12, 0, 1) * (1 - 0.6 * scr)).toFixed(3));
     obj.style.setProperty('--gx', (50 + fy * 1.6).toFixed(1) + '%');
     obj.style.setProperty('--gy', (50 + rx * 1.6).toFixed(1) + '%');
     shadow.style.transform = 'translateX(-50%) scaleX(' + (0.35 + 0.65 * Math.abs(Math.cos((ny * Math.PI) / 180))).toFixed(3) + ')';
