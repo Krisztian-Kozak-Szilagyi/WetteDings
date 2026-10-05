@@ -119,6 +119,25 @@ function payFor({ level, clean = 100, grade, guess, seal, rarity }) {
 
 // ---------- Ablauf ----------
 
+/**
+ * Heute verbrauchte Aufträge: nur die auf der aktuellen Stufe – wer ausbaut, bekommt am selben Tag ein neues
+ * volles Kontingent (#96). Der offene Auftrag zählt mit, wenn er heute auf dieser Stufe angenommen wurde.
+ */
+function usedToday({ done, open, level, day }) {
+  return done.filter((j) => j.level === level).length + (open && open.day === day && open.level === level ? 1 : 0);
+}
+
+// Wert des Shops im Gesamtvermögen (Rangliste, Profil, Dashboard): die Hälfte der bezahlten Ausbaukosten
+// (Krisztian, 2026-10-05) – mit den aktuellen Kosten aus den Einstellungen.
+const SHOP_VALUE_PERCENT = 50;
+/** Wert eines Shops dieser Stufe in Cent (Stufe 1 = 0) */
+function shopValue(level, costs = settings.costs) {
+  const paid = costs.slice(0, Math.max(0, Math.min(LEVELS.length, level || 1) - 1)).reduce((s, c) => s + c, 0);
+  return Math.floor((paid * SHOP_VALUE_PERCENT) / 100);
+}
+/** Wert je Stufe [Stufe 1, 2, 3, 4] – für die Ranglisten-Aggregation */
+const shopValues = () => LEVELS.map((l) => shopValue(l.level));
+
 /** Shop, offener Auftrag und heutige Aufträge */
 async function getState(userId) {
   const day = today();
@@ -128,7 +147,7 @@ async function getState(userId) {
     GradingJob.find({ user: userId, day, status: 'fertig' }).sort({ doneAt: -1 }).lean(),
   ]);
   const info = levelInfo(shop ? shop.level : 1);
-  return { shop, info, next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null, open, done, limit: info.jobs, used: done.length + (open && open.day === day ? 1 : 0) };
+  return { shop, info, next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null, open, done, limit: info.jobs, used: usedToday({ done, open, level: info.level, day }) };
 }
 
 /** Job annehmen: Vertrag über CONTRACT_DAYS Tage, ab jetzt kein Tagesbonus */
@@ -266,4 +285,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

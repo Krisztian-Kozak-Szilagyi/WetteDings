@@ -51,7 +51,7 @@
 .dx-chart figcaption { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-neutral-600); }
 .dx-split { display: flex; gap: 2px; height: 6px; border-radius: 6px; overflow: hidden; }
 .dx-split span { background: var(--dx-c); box-shadow: 0 0 8px var(--dx-c); }
-.dx-c-cash { --dx-c: var(--dx-cash); } .dx-c-bets { --dx-c: var(--dx-bets); } .dx-c-coins { --dx-c: var(--dx-coins); } .dx-c-cards { --dx-c: var(--dx-cards); }
+.dx-c-cash { --dx-c: var(--dx-cash); } .dx-c-bets { --dx-c: var(--dx-bets); } .dx-c-coins { --dx-c: var(--dx-coins); } .dx-c-cards { --dx-c: var(--dx-cards); } .dx-c-shop { --dx-c: var(--dx-gold); }
 .dx-parts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; margin: 0; }
 .dx-parts dt { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-neutral-500); }
 .dx-parts dt i { width: 7px; height: 7px; transform: rotate(45deg); border-radius: 1px; background: var(--dx-c); }

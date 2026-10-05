@@ -236,6 +236,7 @@
           <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen für <%= euro(next.cost) %></button>
+            <p class="muted small">Danach heute noch einmal <%= next.jobs %> Aufträge.</p>
           </form>
         <% } %>
       </section>
