@@ -11,10 +11,15 @@
   <% if (!total) { %>
     <p class="muted small"><%= own ? 'Du hast gerade keine freien Karten oder Gegenstände.' : (partnerName + ' hat noch keine Karten.') %></p>
   <% } else { %>
+    <%
+      // Such-/Filterknopf (partials/mkt-bar): Seltenheit filtert public/js/tcg.js über data-tcg-filter, die Suche public/js/handel-neu.js
+      const present = rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key));
+      const inRarity = (key) => pool.cards.filter((x) => x.card.rarity === key).length + pool.foiled.filter((f) => f.card.rarity === key).length;
+    %>
     <div class="hb-picker-tools">
-      <input type="search" class="hb-search" data-hb-search maxlength="40" placeholder="Suchen …" aria-label="Karten suchen">
-      <%# nur Seltenheiten, die hier auch vorkommen %>
-      <%- include('tcg-filter', { counts: pool.counts, rarities: rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key)) }) %>
+      <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
+        { attr: 'tcg-filter', title: 'Seltenheit', allCount: pool.cards.length + pool.foiled.length, opts: present.map((r) => ({ key: r.key, label: r.label, count: inRarity(r.key) })) },
+      ] }) %>
     </div>
     <% if (!own) { %><p class="muted small hb-hint">Gesperrte Karten kannst du trotzdem wählen – <%= partnerName %> kann erst annehmen, wenn sie wieder frei sind.</p><% } %>
     <% if (pool.goods.length) { %>

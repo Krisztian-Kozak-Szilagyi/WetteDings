@@ -75,17 +75,15 @@
     if (legacy[window.location.hash]) showPane(legacy[window.location.hash], true);
   }
 
-  // ---------- Markt: suchen, nach Seltenheit filtern, sortieren ----------
+  // ---------- Markt: suchen, filtern (Such-/Filterknopf, partials/mkt-bar), sortieren ----------
   var grid = $('[data-mk-grid]');
   if (grid) {
     var tools = $('[data-mk-tools]');
     var search = $('[data-mk-search]', tools);
     var sort = $('[data-mk-sort]', tools);
-    var missing = $('[data-mk-missing]', tools);
-    var foiled = $('[data-mk-foil]', tools);
-    var afford = $('[data-mk-afford]', tools);
     var empty = $('[data-mk-empty]');
-    var rarity = 'all';
+    var rarity = 'all'; // Seltenheit oder "missing" (Fehlt mir noch)
+    var show = 'all'; // foil | bundle | afford
     var tiles = $all('[data-mk]', grid);
     var num = function (el, key) { return parseFloat(el.getAttribute('data-' + key)) || 0; };
     var sorters = {
@@ -95,38 +93,30 @@
       selten: function (a, b) { return num(b, 'rank') - num(a, 'rank') || num(a, 'price') - num(b, 'price'); },
       ablauf: function (a, b) { return num(a, 'expires') - num(b, 'expires'); },
     };
-    var buyBtn = function (li) { return $('form button[type="submit"]', li); };
+    var affordable = function (li) { var btn = $('form button[type="submit"]', li); return btn && !btn.disabled; };
     var apply = function () {
       var q = (search.value || '').trim().toLowerCase();
       var shown = 0;
       tiles.forEach(function (li) {
-        var btn = buyBtn(li);
-        var ok = (rarity === 'all' || li.getAttribute('data-rarity') === rarity) &&
+        var ok = (rarity === 'all' || (rarity === 'missing' ? li.getAttribute('data-missing') === '1' : li.getAttribute('data-rarity') === rarity)) &&
           (!q || li.getAttribute('data-name').indexOf(q) !== -1) &&
-          (!missing.checked || li.getAttribute('data-missing') === '1') &&
-          (!foiled.checked || li.getAttribute('data-foil') === '1') &&
-          (!afford.checked || (btn && !btn.disabled));
+          (show === 'all' || (show === 'afford' ? affordable(li) : li.getAttribute('data-' + show) === '1'));
         li.hidden = !ok;
         if (ok) shown++;
       });
       empty.hidden = shown > 0;
     };
-    var reorder = function () {
-      tiles.slice().sort(sorters[sort.value] || sorters.neu).forEach(function (li) { grid.appendChild(li); });
-    };
-    $all('[data-mk-rarity]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        rarity = btn.getAttribute('data-mk-rarity');
-        $all('[data-mk-rarity]').forEach(function (b) {
-          b.classList.toggle('active', b === btn);
-          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
-        });
-        apply();
-      });
+    // Auswahl markieren und „Filtern nach“ anzeigen erledigt public/js/app.js
+    $all('[data-mk-rarity]', tools).forEach(function (btn) {
+      btn.addEventListener('click', function () { rarity = btn.getAttribute('data-mk-rarity'); apply(); });
+    });
+    $all('[data-mk-show]', tools).forEach(function (btn) {
+      btn.addEventListener('click', function () { show = btn.getAttribute('data-mk-show'); apply(); });
     });
     search.addEventListener('input', apply);
-    [missing, foiled, afford].forEach(function (c) { c.addEventListener('change', apply); });
-    sort.addEventListener('change', reorder);
+    sort.addEventListener('change', function () {
+      tiles.slice().sort(sorters[sort.value] || sorters.neu).forEach(function (li) { grid.appendChild(li); });
+    });
   }
 
   // ---------- Verhandlung: Nachrichten live nachladen ----------

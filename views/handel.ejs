@@ -95,8 +95,22 @@
       <a class="btn btn-ghost btn-sm" href="/handel/neu">Selbst etwas anbieten</a>
     </div>
   <% } else { %>
+    <%
+      // Such-/Filterknopf (partials/mkt-bar): Seltenheit der seltensten Karte, „Fehlt mir noch“ und welche Angebote
+      const marketRarity = (t) => { const top = topLine(t.give); return top ? cardInfo(top.card).rarity : ''; };
+      const lacks = (t) => t.give.some((l) => !String(l.card).startsWith('item:') && !(coll.counts[l.card] || 0));
+      const mkGroups = [
+        { attr: 'mk-rarity', title: 'Seltenheit', missing: market.filter(lacks).length, allCount: market.length,
+          opts: [...rarities, rarityByKey.item].map((r) => ({ key: r.key, label: r.label, count: market.filter((t) => marketRarity(t) === r.key).length })).filter((o) => o.count) },
+        { attr: 'mk-show', title: 'Angebote', allLabel: 'Alle Angebote', dots: false, opts: [
+          { key: 'foil', label: 'Mit folierten Karten', count: market.filter((t) => t.give.some((l) => l.foiledAt)).length },
+          { key: 'bundle', label: 'Bündel', count: market.filter((t) => t.give.length > 1).length },
+          { key: 'afford', label: 'Kann ich mir leisten', count: market.filter((t) => t.price <= bal).length },
+        ].filter((o) => o.count) },
+      ];
+    %>
     <div class="mk-tools" data-mk-tools>
-      <input type="search" class="mk-search" data-mk-search maxlength="40" placeholder="Karte oder Verkäufer suchen …" aria-label="Markt durchsuchen">
+      <%- include('partials/mkt-bar', { name: 'mk', placeholder: 'Karte oder Verkäufer suchen', searchAttr: 'mk-search', label: 'Markt filtern', groups: mkGroups }) %>
       <label class="mk-sort"><span class="sr-only">Sortieren</span>
         <select data-mk-sort aria-label="Sortieren">
           <option value="neu">Neueste zuerst</option>
@@ -106,16 +120,6 @@
           <option value="ablauf">Läuft bald ab</option>
         </select>
       </label>
-      <label class="mk-toggle"><input type="checkbox" data-mk-missing> Fehlt mir</label>
-      <label class="mk-toggle"><input type="checkbox" data-mk-foil> Foliert</label>
-      <label class="mk-toggle"><input type="checkbox" data-mk-afford> Kann ich mir leisten</label>
-    </div>
-    <div class="tcg-filter mk-rarity" role="tablist" aria-label="Markt nach Seltenheit filtern">
-      <button type="button" class="chip active" data-mk-rarity="all" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<span class="chip-count"><%= market.length %></span></button>
-      <% const marketRarity = (t) => { const top = topLine(t.give); return top ? cardInfo(top.card).rarity : ''; }; %>
-      <% [...rarities, rarityByKey.item].forEach((r) => { const n = market.filter((t) => marketRarity(t) === r.key).length; if (!n) return; %>
-        <button type="button" class="chip r-<%= r.key %>" data-mk-rarity="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %><span class="chip-count"><%= n %></span></button>
-      <% }) %>
     </div>
     <p class="muted hx-none" data-mk-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
     <ul class="mk-grid" data-mk-grid>
@@ -127,7 +131,7 @@
         const value = linesValue(t.give);
         const names = t.give.map((l) => cardInfo(l.card).name).join(' ').toLowerCase() + ' ' + t.sellerName.toLowerCase(); %>
         <li class="mk-tile r-<%= c.rarity %>" data-mk data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= names %>" data-price="<%= t.price %>"
-          data-created="<%= new Date(t.createdAt).getTime() %>" data-expires="<%= new Date(t.expiresAt).getTime() %>" data-missing="<%= missing ? 1 : 0 %>" data-foil="<%= foiled ? 1 : 0 %>">
+          data-created="<%= new Date(t.createdAt).getTime() %>" data-expires="<%= new Date(t.expiresAt).getTime() %>" data-missing="<%= missing ? 1 : 0 %>" data-foil="<%= foiled ? 1 : 0 %>" data-bundle="<%= single ? 0 : 1 %>">
           <div class="mk-art">
             <%- include('partials/trade-stack', { list: t.give, size: 'md' }) %>
             <% if (!single) { %><span class="mk-bundle"><%= countText(t.give) %></span><% } %>
