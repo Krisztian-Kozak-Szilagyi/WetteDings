@@ -25,8 +25,10 @@ async function collection(user) {
   }
   // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
   const lockedByCard = {};
-  for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card').lean()) {
+  const tradingByCard = {}; // unfolierte Exemplare in einem Handelsangebot – gehen weg, zählen nicht als Duplikat
+  for (const d of await TcgCard.find({ _id: { $in: locked.docs } }).select('card foiledAt').lean()) {
     const reason = locked.reasons.get(String(d._id));
+    if (reason === 'handel' && !d.foiledAt) tradingByCard[d.card] = (tradingByCard[d.card] || 0) + 1;
     const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason });
     if (e.reason === 'folie' && reason !== 'folie') e.reason = reason; // Quest/Handel sind wichtiger als die Folie
     e.n += 1;
@@ -37,9 +39,9 @@ async function collection(user) {
   // Freie Exemplare je Karte (nicht auf Quest, nicht im Handel, nicht foliert)
   const free = Object.fromEntries(owned.map((o) => [o._id, o.n - (lockedByCard[o._id] ? lockedByCard[o._id].n : 0)]));
   const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
-  // Geschützte Karten und Boss-Karten (die Bank kauft sie nicht) zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft, folierte Exemplare auch nicht
+  // Geschützte Karten und Boss-Karten (die Bank kauft sie nicht) zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft, folierte Exemplare und solche im Handel auch nicht
   const protectedIds = new Set(user.tcgProtected || []);
-  const dups = owned.filter((o) => !protectedIds.has(o._id) && !(catalog.rarityByKey[o.rarity] || {}).noBank).map((o) => ({ ...o, n: o.n - (o.foiled || 0) })).filter((o) => o.n > 1);
+  const dups = owned.filter((o) => !protectedIds.has(o._id) && !(catalog.rarityByKey[o.rarity] || {}).noBank).map((o) => ({ ...o, n: o.n - (o.foiled || 0) - (tradingByCard[o._id] || 0) })).filter((o) => o.n > 1);
   return {
     counts,
     free,

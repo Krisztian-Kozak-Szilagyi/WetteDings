@@ -170,3 +170,20 @@ test('Boss-Karte: 5.000 € Wert, Folie steigert ihn, die Bank kauft sie nicht',
   // foliert ist sie mehr wert als ohne Folie
   assert.ok(foil.cardValue(boss.sell, new Date(Date.now() - 3 * 86400000)) > boss.sell);
 });
+
+test('Duplikate: Exemplar im Handelsangebot zählt nicht als das verbleibende (#72)', () => {
+  const { pickDuplicates } = require('../src/tcg/tcgService');
+  const ids = (list) => list.map((c) => c._id);
+  const locked = (entries) => ({ reasons: new Map(entries) });
+  const list = [{ _id: 'a' }, { _id: 'b' }, { _id: 'c' }]; // älteste zuerst
+  // nichts gesperrt: das neueste bleibt
+  assert.deepEqual(ids(pickDuplicates(list, locked([]))), ['a', 'b']);
+  // eins auf Quest/im Dungeon: kommt zurück, alle freien sind Duplikate
+  assert.deepEqual(ids(pickDuplicates(list, locked([['a', 'quest']]))), ['b', 'c']);
+  assert.deepEqual(ids(pickDuplicates(list, locked([['c', 'dungeon']]))), ['a', 'b']);
+  // eins im Handel: geht weg, von den freien bleibt das neueste
+  assert.deepEqual(ids(pickDuplicates(list, locked([['a', 'handel']]))), ['b']);
+  assert.deepEqual(ids(pickDuplicates(list.slice(0, 2), locked([['a', 'handel']]))), []);
+  // Handel und Quest zusammen: das Quest-Exemplar bleibt
+  assert.deepEqual(ids(pickDuplicates(list, locked([['a', 'handel'], ['b', 'quest']]))), ['c']);
+});
