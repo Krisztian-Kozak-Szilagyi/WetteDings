@@ -82,8 +82,9 @@ test('Gegradete Karten: beste Note, wie oft, Schnitt – ohne Folie gibt es nich
   const { gradeStats } = condition;
   assert.equal(gradeStats([]), null);
   assert.equal(gradeStats([undefined, null]), null); // ohne Note (z. B. vor der Migration) zählt nicht
-  assert.deepEqual(gradeStats([8, 10, 7, 10]), { count: 4, best: 10, bestCount: 2, avg: 8.75 });
-  assert.deepEqual(gradeStats([6, undefined]), { count: 1, best: 6, bestCount: 1, avg: 6 });
+  assert.deepEqual(gradeStats([8, 10, 7, 10]), { count: 4, best: 10, bestCount: 2, avg: 8.75, dist: [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 2] });
+  const one = gradeStats([6, undefined]);
+  assert.deepEqual([one.count, one.best, one.bestCount, one.avg, one.dist[6]], [1, 6, 1, 6, 1]);
 });
 
 test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start bei 4', () => {

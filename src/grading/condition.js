@@ -96,14 +96,17 @@ const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 
 const gradeWord = (grade) => GRADE_NAMES[grade] || '';
 
 /**
- * Kennzahlen der gegradeten (= folierten, Note sichtbar) Karten einer Sammlung: { count, best, bestCount, avg }
+ * Kennzahlen der gegradeten (= folierten, Note sichtbar) Karten einer Sammlung: { count, best, bestCount, avg, dist }
+ * (dist[g] = Anzahl mit Note g, Index 1–10)
  * oder null, wenn keine dabei ist. Unfolierte Karten zählen nie mit – ihr Zustand bleibt geheim.
  */
 function gradeStats(grades) {
   const list = grades.filter((g) => Number.isInteger(g) && g >= 1 && g <= 10);
   if (!list.length) return null;
   const best = Math.max(...list);
-  return { count: list.length, best, bestCount: list.filter((g) => g === best).length, avg: list.reduce((s, g) => s + g, 0) / list.length };
+  const dist = Array(11).fill(0);
+  list.forEach((g) => (dist[g] += 1));
+  return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
 module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats };

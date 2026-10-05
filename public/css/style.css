@@ -1563,16 +1563,47 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .album-dupes strong { font-weight: 500; }
 .album-body { display: flex; flex-direction: column; gap: 32px; }
 @media (max-width: 640px) { .album-progress { width: 140px; } .album-dupes { width: 100%; justify-content: space-between; } }
-/* Gegradete Karten (Album, fremde Sammlung): beste Note als kleines Etikett, daneben Schnitt und Anzahl */
-.grade-stats { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
-.grade-stats-best, .grade-stats-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: var(--radius-md); box-shadow: 0 0 0 1px var(--color-divider); }
-.grade-stats small { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-.grade-stats strong { font-weight: 600; font-variant-numeric: tabular-nums; }
-.grade-stats-item { flex-direction: column; align-items: flex-start; gap: 0; }
-.grade-stats-text { display: flex; flex-direction: column; line-height: 1.2; }
-.grade-stats-num { font-size: 1.6rem; font-weight: 800; line-height: 1; min-width: 1.4em; text-align: center; color: var(--color-accent-300); }
-.grade-stats-best.is-gem { box-shadow: 0 0 0 1px #f2c14e, 0 0 16px rgba(242, 193, 78, .25); }
-.grade-stats-best.is-gem .grade-stats-num, .grade-stats-best.is-gem strong { color: #f2c14e; }
+/* Grading-Vitrine (Album, fremde Sammlung, #73): beste Note als Mini-Slab im Stil der Folien-Etiketten,
+   Ø Note als Ring, Notenspiegel 1–10. Eine 10 als bestes Ergebnis: goldenes Etikett mit Schimmer. */
+.grade-vitrine { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+.grade-vitrine small { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.gv-slab {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 2px;
+  min-width: 168px; padding: 7px 12px 8px; border-radius: 8px;
+  background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826;
+  box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 6px 18px rgba(0, 0, 0, .35);
+}
+.gv-slab-head { font-size: 9px; font-weight: 700; letter-spacing: .22em; color: #5b4fc4; }
+.gv-slab-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.gv-slab-word { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #5b4fc4; line-height: 1.15; }
+.gv-slab-word small { margin-top: 2px; color: #5a5a70; font-size: 9px; letter-spacing: .08em; font-weight: 600; }
+.gv-slab-grade { font-size: 34px; font-weight: 700; line-height: .9; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+/* Folien-Glanz, der langsam über das Etikett wandert */
+.gv-sheen { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .7) 47%, rgba(190, 230, 255, .45) 52%, transparent 64%) -150% 0 / 250% 100% no-repeat; animation: gv-sheen 4.5s ease-in-out infinite; mix-blend-mode: soft-light; }
+@keyframes gv-sheen { 0%, 55% { background-position: 150% 0; } 100% { background-position: -150% 0; } }
+.gv-slab.is-gem { background: linear-gradient(135deg, #fff4cf, #f2c14e 45%, #fff1c2 60%, #d9a634); box-shadow: inset 0 0 0 1px rgba(146, 102, 10, .45), 0 0 22px rgba(242, 193, 78, .45), 0 6px 18px rgba(0, 0, 0, .35); }
+.gv-slab.is-gem .gv-slab-head, .gv-slab.is-gem .gv-slab-word { color: #7a4e00; }
+.gv-slab.is-gem .gv-slab-word small { color: #8a6a2a; }
+.gv-slab.is-gem .gv-sheen { animation-duration: 2.6s; mix-blend-mode: overlay; }
+/* Ø Note als Ring, gefüllt nach Schnitt / 10 */
+.gv-avg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 12px; border-radius: 8px; box-shadow: 0 0 0 1px var(--color-divider); }
+.gv-ring {
+  display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(closest-side, var(--color-bg) 76%, transparent 78% 100%), conic-gradient(var(--color-accent-300) calc(var(--p) * 1turn), var(--color-divider) 0);
+}
+.gv-ring strong { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Notenspiegel: Säule je Note, Höhe nach Anzahl */
+.gv-dist { display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 6px 12px 4px; border-radius: 8px; box-shadow: 0 0 0 1px var(--color-divider); }
+.gv-bars { display: grid; grid-template-columns: repeat(10, 12px); gap: 3px; align-items: end; height: 46px; }
+.gv-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
+.gv-bar i { display: block; width: 100%; height: calc(var(--h) * 32px); min-height: 2px; border-radius: 2px 2px 0 0; background: var(--color-divider); transition: height .4s ease; }
+.gv-bar.has i { background: color-mix(in srgb, var(--color-accent-300) 55%, transparent); }
+.gv-bar.is-best i { background: var(--color-accent-300); box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent-300) 60%, transparent); }
+.gv-bar.is-gem i { background: #f2c14e; box-shadow: 0 0 8px rgba(242, 193, 78, .6); }
+.gv-bar b { font-size: 9px; font-weight: 500; color: var(--muted); line-height: 1; }
+.gv-bar.has b { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .gv-sheen { animation: none; opacity: 0; } }
+@media (max-width: 520px) { .gv-slab { flex: 1 1 100%; } .gv-dist { flex: 1; } }
 .grade-stats-empty { margin: 0; }
 .sammlung-head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 @media (max-width: 640px) { .sammlung-head-side { align-items: flex-start; } }
