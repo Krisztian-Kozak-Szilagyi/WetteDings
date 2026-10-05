@@ -7,6 +7,12 @@
   <meta name="description" content="<%= appName %> – Wetten unter Freunden mit Spielgeld. Stelle eigene Wetten mit Ja/Nein oder eigenen Optionen auf und wette mit.">
   <meta name="theme-color" content="#161826">
   <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
+  <%# Als App installierbar (manifest + public/sw.js); Knopf „App herunterladen“ im Profil-Menü, Logik am Ende von app.js %>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/img/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="<%= appName %>">
   <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
@@ -169,6 +175,7 @@
               <a role="menuitem" href="/konto/auszug">Kontoauszug</a>
               <a role="menuitem" href="/konto/gruppen">Wett-Gruppen</a>
               <a role="menuitem" href="/konto/einstellungen">Konto-Einstellungen</a>
+              <button role="menuitem" type="button" class="app-install" data-app-install hidden>App herunterladen</button>
               <form method="post" action="/abmelden">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button role="menuitem" type="submit">Abmelden</button>

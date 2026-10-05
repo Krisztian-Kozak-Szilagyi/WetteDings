@@ -5222,3 +5222,7 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .album-filter-row { display: flex; margin-bottom: 14px; }
 .ihk-pick-tools { display: flex; margin-bottom: 12px; }
 .tcg-dot-missing { --rar: transparent; box-shadow: inset 0 0 0 1.5px var(--color-accent-300); } /* "Fehlt mir noch" im Filter */
+
+/* App herunterladen (Profil-Menü): wie die anderen Menüpunkte; bleibt versteckt, bis der Browser die Installation anbietet */
+.user-menu-list button.app-install { color: var(--text); }
+.user-menu-list button.app-install[hidden] { display: none; }
