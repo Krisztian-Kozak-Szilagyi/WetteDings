@@ -4,6 +4,7 @@ const { lockedDocs } = require('./locks');
 const catalog = require('./catalog');
 const foil = require('../items/foil');
 const { inventory } = require('./tcgService');
+const { gradeStats } = require('../grading/condition');
 
 async function collection(user) {
   const [owned, locked, foiledDocs] = await Promise.all([
@@ -49,6 +50,7 @@ async function collection(user) {
     lockedByCard,
     foiledByCard,
     foiledCopies,
+    graded: gradeStats(foiledDocs.map((d) => d.condition && d.condition.grade)), // beste Note und Schnitt der folierten Karten
     protectedIds,
     uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
     cardCount: owned.reduce((s, o) => s + o.n, 0),

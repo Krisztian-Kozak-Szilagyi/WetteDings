@@ -78,6 +78,14 @@ test('Folie: Note nur auf dem Etikett, wenn sie mitgegeben wird', () => {
   assert.match(withGrade, /data-grade-word="NM-MT"/);
 });
 
+test('Gegradete Karten: beste Note, wie oft, Schnitt – ohne Folie gibt es nichts zu zeigen', () => {
+  const { gradeStats } = condition;
+  assert.equal(gradeStats([]), null);
+  assert.equal(gradeStats([undefined, null]), null); // ohne Note (z. B. vor der Migration) zählt nicht
+  assert.deepEqual(gradeStats([8, 10, 7, 10]), { count: 4, best: 10, bestCount: 2, avg: 8.75 });
+  assert.deepEqual(gradeStats([6, undefined]), { count: 1, best: 6, bestCount: 1, avg: 6 });
+});
+
 test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start bei 4', () => {
   const { centeringCap } = condition;
   const none = { scratches: [], corners: [], edges: [], crease: false };

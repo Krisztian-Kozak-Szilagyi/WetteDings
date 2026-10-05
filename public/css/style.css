@@ -1563,6 +1563,19 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .album-dupes strong { font-weight: 500; }
 .album-body { display: flex; flex-direction: column; gap: 32px; }
 @media (max-width: 640px) { .album-progress { width: 140px; } .album-dupes { width: 100%; justify-content: space-between; } }
+/* Gegradete Karten (Album, fremde Sammlung): beste Note als kleines Etikett, daneben Schnitt und Anzahl */
+.grade-stats { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.grade-stats-best, .grade-stats-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: var(--radius-md); box-shadow: 0 0 0 1px var(--color-divider); }
+.grade-stats small { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.grade-stats strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.grade-stats-item { flex-direction: column; align-items: flex-start; gap: 0; }
+.grade-stats-text { display: flex; flex-direction: column; line-height: 1.2; }
+.grade-stats-num { font-size: 1.6rem; font-weight: 800; line-height: 1; min-width: 1.4em; text-align: center; color: var(--color-accent-300); }
+.grade-stats-best.is-gem { box-shadow: 0 0 0 1px #f2c14e, 0 0 16px rgba(242, 193, 78, .25); }
+.grade-stats-best.is-gem .grade-stats-num, .grade-stats-best.is-gem strong { color: #f2c14e; }
+.grade-stats-empty { margin: 0; }
+.sammlung-head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+@media (max-width: 640px) { .sammlung-head-side { align-items: flex-start; } }
 
 /* Favoriten, Album, Marken */
 .tcg-grid.tcg-favs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }

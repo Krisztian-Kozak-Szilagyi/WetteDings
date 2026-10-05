@@ -95,4 +95,15 @@ function rollCondition(profile = 'frisch') {
 const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
 const gradeWord = (grade) => GRADE_NAMES[grade] || '';
 
-module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord };
+/**
+ * Kennzahlen der gegradeten (= folierten, Note sichtbar) Karten einer Sammlung: { count, best, bestCount, avg }
+ * oder null, wenn keine dabei ist. Unfolierte Karten zählen nie mit – ihr Zustand bleibt geheim.
+ */
+function gradeStats(grades) {
+  const list = grades.filter((g) => Number.isInteger(g) && g >= 1 && g <= 10);
+  if (!list.length) return null;
+  const best = Math.max(...list);
+  return { count: list.length, best, bestCount: list.filter((g) => g === best).length, avg: list.reduce((s, g) => s + g, 0) / list.length };
+}
+
+module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats };

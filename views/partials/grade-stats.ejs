@@ -1,0 +1,16 @@
+<%#
+  Gegradete Karten einer Sammlung (#73): beste Note und Schnitt – nur folierte Karten, deren Note sichtbar ist.
+  graded: { count, best, bestCount, avg } aus collection() oder null; own: eigenes Album (dann Hinweis ohne Folien)
+%>
+<% if (graded) { %>
+  <div class="grade-stats" title="Nur folierte Karten zählen – ihre Note steht auf der Folie. Alle anderen Noten bleiben geheim.">
+    <span class="grade-stats-best<%= graded.best === 10 ? ' is-gem' : '' %>">
+      <span class="grade-stats-num"><%= graded.best %></span>
+      <span class="grade-stats-text"><small>Beste Note</small><strong><%= gradeWord(graded.best) %></strong><% if (graded.bestCount > 1) { %><small><%= graded.bestCount %>×</small><% } %></span>
+    </span>
+    <span class="grade-stats-item"><small>Ø Note</small><strong><%= graded.avg.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) %></strong></span>
+    <span class="grade-stats-item"><small>Gegradet</small><strong><%= graded.count %></strong></span>
+  </div>
+<% } else if (locals.own) { %>
+  <p class="muted small grade-stats-empty">Noch keine gegradete Karte – foliere eine Karte, dann steht ihre Note auf der Folie.</p>
+<% } %>
