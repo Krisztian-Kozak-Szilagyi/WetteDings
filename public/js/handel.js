@@ -58,7 +58,9 @@
       var q = (marketSearch.value || '').trim().toLowerCase();
       var shown = 0;
       $all('[data-market-item]', marketBox).forEach(function (li) {
-        var ok = (marketRarity === 'all' || li.getAttribute('data-rarity') === marketRarity) && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
+        // "missing" = nur Karten, die ich noch nicht besitze
+        var rarityOk = marketRarity === 'all' || (marketRarity === 'missing' ? li.hasAttribute('data-missing') : li.getAttribute('data-rarity') === marketRarity);
+        var ok = rarityOk && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
         li.hidden = !ok;
         if (ok) shown++;
       });

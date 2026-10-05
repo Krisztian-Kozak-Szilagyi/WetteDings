@@ -168,7 +168,7 @@
       <div class="handel-block-head">
         <h4>Markt</h4>
         <% if (market.length) { %>
-          <%- include('partials/mkt-bar', { name: 'market', placeholder: 'Karte suchen …', opts: rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).map((r) => ({ key: r.key, label: r.label })) }) %>
+          <%- include('partials/mkt-bar', { name: 'market', placeholder: 'Karte suchen …', missing: market.filter((t) => !String(t.card).startsWith('item:') && !coll.counts[t.card]).length, opts: rarities.filter((r) => market.some((t) => line(t.card).c.rarity === r.key)).map((r) => ({ key: r.key, label: r.label })) }) %>
         <% } %>
       </div>
       <% if (!market.length) { %>
@@ -177,7 +177,7 @@
         <p class="muted" data-market-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
         <ul class="trade-list trade-market">
           <% market.forEach((t) => { const { c, r } = line(t.card); const lacks = t.price - bal; %>
-            <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>">
+            <li class="trade-item r-<%= c.rarity %>" data-market-item data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %>"<%= !c.isItem && !coll.counts[t.card] ? ' data-missing' : '' %>>
               <%- include('partials/trade-thumbs', { a: c, aFoil: t.foiledAt, aGrade: t.grade }) %>
               <div class="trade-info">
                 <span class="trade-title"><strong><%= c.name %></strong> <span class="trade-rarity"><span class="tcg-dot r-<%= c.rarity %>"></span><%= r.label %></span> <% ownTag(t.card) %><% foilTag(t.foiledAt) %></span>
