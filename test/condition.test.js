@@ -26,13 +26,25 @@ test('Zustand: Mängel im Format der Grading-Aufträge, Note folgt aus den Mäng
   }
 });
 
-test('Zustand: frisch aus dem Pack deutlich besser als gebrauchte Kundenkarten', () => {
-  const N = 10000;
-  const share10 = (roll) => Array.from({ length: N }, roll).filter((g) => g === 10).length / N;
-  const frisch = share10(() => rollCondition().grade);
-  const kunde = share10(() => gradeFor(rollDefects('kunde')));
-  assert.ok(frisch > 0.16 && frisch < 0.24, `frisch: ${frisch}`); // exakt ≈ 19,8 % (Zentrierung begrenzt)
-  assert.ok(kunde > 0.07 && kunde < 0.15, `kunde: ${kunde}`);
+test('Zustand: frisch aus dem Pack – Note 8 am häufigsten, im Schnitt besser als gebrauchte Kundenkarten', () => {
+  const N = 20000;
+  const roll = (fn) => {
+    const count = {};
+    let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const g = fn();
+      count[g] = (count[g] || 0) + 1;
+      sum += g;
+    }
+    return { share: (g) => (count[g] || 0) / N, avg: sum / N };
+  };
+  const frisch = roll(() => rollCondition().grade);
+  const kunde = roll(() => gradeFor(rollDefects('kunde')));
+  // exakt: 10 ≈ 9,2 %, 9 ≈ 26,9 %, 8 ≈ 30,2 %, Ø ≈ 7,88
+  assert.ok(frisch.share(8) > frisch.share(9) && frisch.share(9) > frisch.share(10), 'Note 8 am häufigsten, dann 9, dann 10');
+  assert.ok(frisch.share(10) > 0.06 && frisch.share(10) < 0.13, `frisch 10: ${frisch.share(10)}`);
+  assert.ok(frisch.avg > kunde.avg, `Ø frisch ${frisch.avg} > kunde ${kunde.avg}`);
+  assert.ok(kunde.share(10) > 0.07 && kunde.share(10) < 0.15, `kunde 10: ${kunde.share(10)}`);
   // Kundenaufträge im Grading-Shop würfeln unverändert mit dem Profil "kunde"
   assert.equal(grading.rollDefects, rollDefects);
   assert.equal(grading.gradeFor, gradeFor);
