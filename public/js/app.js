@@ -949,9 +949,9 @@
   // Vergaben: Aktion (vergeben/entfernen) und Was wählen – nur die passenden Felder zeigen, Höchstzahl und Knopf anpassen
   var grant = document.querySelector('[data-grant-form]');
   if (grant) {
-    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], geld: [1, 1] }; // vergeben: [ein Mitglied, alle]; Geld: Betrag statt Anzahl
+    var MAX = { pack: [50, 10], karte: [5, 5], item: [50, 5], geld: [1, 1], los: [50, 10] }; // vergeben: [ein Mitglied, alle]; Geld: Betrag statt Anzahl
     var BUTTON = {
-      vergeben: { pack: 'Packs vergeben', karte: 'Karte vergeben', item: 'Gegenstand vergeben', geld: 'Geld gutschreiben' },
+      vergeben: { pack: 'Packs vergeben', karte: 'Karte vergeben', item: 'Gegenstand vergeben', geld: 'Geld gutschreiben', los: 'Lose vergeben' },
       entfernen: { pack: 'Packs entfernen', karte: 'Karte entfernen', item: 'Gegenstand entfernen', geld: 'Geld abziehen' },
     };
     var user = grant.querySelector('[name="user"]');
@@ -965,8 +965,15 @@
     };
     var update = function () {
       var aktion = picked('aktion', 'vergeben');
-      var was = picked('was', 'pack');
       var remove = aktion === 'entfernen';
+      // Lotterielose lassen sich nur vergeben: beim Entfernen ausblenden (und ggf. auf Pack zurückspringen)
+      grant.querySelectorAll('[data-grant-only]').forEach(function (l) {
+        var input = l.querySelector('input');
+        l.hidden = remove;
+        input.disabled = remove;
+        if (remove && input.checked) grant.querySelector('[name="was"][value="pack"]').checked = true;
+      });
+      var was = picked('was', 'pack');
       grant.querySelectorAll('[data-for]').forEach(function (f) {
         var on = f.getAttribute('data-for').split(' ').indexOf(was) >= 0;
         f.hidden = !on;

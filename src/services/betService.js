@@ -72,6 +72,7 @@ async function registerUser({ username, email, password, code }) {
     if (!redeemed) {
       throw new UserError('Der Registrierungscode ist ungültig, abgelaufen oder wurde bereits verwendet.');
     }
+    await User.updateOne({ _id: user._id }, { $set: { registrationCode: redeemed.code, invitedByName: redeemed.createdByName } }, { session });
     await Ledger.create([{ user: user._id, type: 'startguthaben', amount: config.startBalance }], { session });
     return user;
   });

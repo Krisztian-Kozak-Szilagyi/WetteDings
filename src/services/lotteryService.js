@@ -215,6 +215,48 @@ async function buyTickets({ user, count, kind = 'taeglich' }) {
   });
 }
 
+/** Lotterien, für die das Team Lose vergeben kann (Vergaben im Panel) */
+const GRANT_KINDS = ['woche', 'monat'];
+
+/**
+ * Lose vom Team (Vergaben): jedes Mitglied in userIds bekommt count kostenlose Lose der offenen Wochen- bzw.
+ * Monats-Runde. Der Topf wächst dadurch nicht (es wurde nichts bezahlt), keine Buchung im Kontoauszug.
+ */
+async function grantTickets({ userIds, count, kind }) {
+  const k = GRANT_KINDS.includes(kind) ? kindByKey(kind) : null;
+  if (!k) throw new UserError('Lose lassen sich nur für die Wochen- oder Monats-Lotterie vergeben.');
+  if (!Number.isInteger(count) || count < 1) throw new UserError('Bitte eine gültige Anzahl Lose angeben.');
+  if (!userIds.length) throw new UserError('Es gibt niemanden, der Lose bekommen könnte.');
+  const users = await User.find({ _id: { $in: userIds }, deletedAt: null }).select('_id username').lean();
+  return inTransaction(async (session) => {
+    const now = new Date();
+    const current = await LotteryRound.findOne({ ...k.filter, status: 'offen' }).session(session);
+    if (!current || current.startsAt > now || current.drawAt <= now) throw new UserError(`Für die ${k.name} läuft gerade kein Losverkauf – bitte nach der Ziehung noch einmal versuchen.`);
+    const round = await LotteryRound.findOneAndUpdate(
+      { _id: current._id, status: 'offen', drawAt: { $gt: now } },
+      { $inc: { tickets: count * users.length } },
+      { new: true, session }
+    );
+    if (!round) throw new UserError(`Der Losverkauf der ${k.name} ist gerade beendet.`);
+    // Losnummern direkt im Anschluss an die bisher vergebenen, der Reihe nach je Mitglied
+    let next = round.tickets - count * users.length + 1;
+    const existing = new Set((await LotteryEntry.find({ round: round._id, user: { $in: users.map((u) => u._id) } }).select('user').session(session).lean()).map((e) => String(e.user)));
+    let newcomers = 0;
+    for (const u of users) {
+      const range = { from: next, to: next + count - 1 };
+      next += count;
+      if (existing.has(String(u._id))) {
+        await LotteryEntry.updateOne({ round: round._id, user: u._id }, { $inc: { tickets: count }, $push: { ranges: range } }, { session });
+      } else {
+        await LotteryEntry.create([{ round: round._id, user: u._id, username: u.username, tickets: count, ranges: [range] }], { session });
+        newcomers += 1;
+      }
+    }
+    if (newcomers) await LotteryRound.updateOne({ _id: round._id }, { $inc: { participants: newcomers } }, { session });
+    return { kind: k, round: round.number, recipients: users.map((u) => u._id), count };
+  });
+}
+
 /** Losnummer des k-ten Loses (1-basiert) über die Losnummern-Bereiche mehrerer Einträge, der Reihe nach */
 function ticketAt(entries, k) {
   let left = k;
@@ -328,6 +370,8 @@ async function runLottery() {
 
 module.exports = {
   KINDS,
+  GRANT_KINDS,
+  grantTickets,
   kindByKey,
   kindOfRound,
   settings,

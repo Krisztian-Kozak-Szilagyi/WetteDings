@@ -198,10 +198,33 @@ test('Protokolle-Export: jeder Log hat eine CSV-Spalte je Wert', () => {
     lotterie: logs.lottoRow({ type: 'lotto_los', amount: -1, createdAt: at }, 'a'),
     konto: logs.ledgerRow({ type: 'bonus', amount: 1, createdAt: at }, 'a'),
     grading: logs.gradingRow({ level: 1, card: crumpled.id, customer: 'K', grade: 5, status: 'offen', pay: 0, createdAt: at }, 'a'),
+    registrierungen: logs.registrationRow({ username: 'a', realName: 'Anna A.', registrationCode: 'ABCD2345', invitedByName: 'admin', createdAt: at }),
   };
   for (const [key, row] of Object.entries(samples)) {
     const lines = logs.toCsv(key, { total: 1, rows: [row] }).slice(1).split('\r\n').filter(Boolean);
     assert.equal(lines[1].split(';').length, lines[0].split(';').length, key);
   }
   assert.equal(logs.LOGS.length, logs.LOGS.filter((l) => logs.LOG_GROUPS.some((g) => g.key === l.group)).length);
+});
+
+test('Registrierungen: Code formatiert, ältere Konten ohne Code und Einladenden', () => {
+  const at = new Date('2026-01-01T12:00:00Z');
+  const row = logs.registrationRow({ username: 'anna', realName: 'Anna A.', registrationCode: 'ABCD2345', invitedByName: 'admin', createdAt: at });
+  assert.deepEqual(row, { at, name: 'anna', realName: 'Anna A.', code: 'ABCD-2345', invitedBy: 'admin', deleted: false });
+  const old = logs.registrationRow({ username: 'ben', createdAt: at, deletedAt: at });
+  assert.deepEqual([old.realName, old.code, old.invitedBy, old.deleted], [null, null, null, true]);
+});
+
+test('Gesamt: deckt jedes Protokoll ab, Buchungen ohne Doppelte, neueste zuerst', () => {
+  const covered = new Set(logs.GESAMT_SOURCES.map((s) => s.log));
+  for (const l of logs.LOGS) if (l.key !== 'gesamt') assert.ok(covered.has(l.key), l.key);
+  // Buchungsarten, die schon ein eigenes Protokoll haben, dürfen im Gesamtprotokoll nicht noch einmal als Buchung auftauchen
+  for (const t of ['lotto_los', 'lotto_gewinn', 'tcg_verkauf', 'item_verkauf', 'black_market', 'einsatz', 'coin_kauf', 'coin_verkauf', 'startguthaben', 'team_gutschrift', 'team_abzug']) {
+    assert.ok(!logs.GESAMT_LEDGER_TYPES.includes(t), t);
+  }
+  const d = (s) => new Date(`2026-01-0${s}T12:00:00Z`);
+  const merged = logs.mergeRows([[{ at: d(3), text: 'a3' }, { at: d(1), text: 'a1' }], [{ at: d(2), text: 'b2' }, { at: d(3), text: 'b3' }]]);
+  assert.deepEqual(merged.map((r) => r.text), ['a3', 'b3', 'b2', 'a1']);
+  const csv = logs.toCsv('gesamt', { total: 1, rows: [{ at: d(1), logLabel: 'Wetten', player: 'anna', text: 'Wette', amount: -150 }] }).slice(1).split('\r\n');
+  assert.equal(csv[1], '01.01.2026 13:00:00;Wetten;anna;Wette;-1,5'); // Euro wie in den anderen Protokollen (num)
 });
