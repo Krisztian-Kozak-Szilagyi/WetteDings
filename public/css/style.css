@@ -3335,13 +3335,14 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .hb-tray-empty { padding: 0 8px; font-size: 13px; color: var(--color-neutral-500); text-align: center; }
 .hb-tray-wish { min-height: 64px; }
 .hb-tray:not(.is-empty) .hb-tray-empty { display: none; }
-.hb-mini button { position: relative; display: block; width: 56px; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: var(--color-bg); cursor: var(--cur-pointer); box-shadow: 0 4px 12px rgba(0, 0, 0, .4); animation: hb-in .2s ease; }
+.hb-mini-card { position: relative; display: block; width: 56px; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: var(--color-bg); cursor: var(--cur-pointer); box-shadow: 0 4px 12px rgba(0, 0, 0, .4); animation: hb-in .2s ease; }
 .hb-mini img { display: block; width: 100%; aspect-ratio: 720 / 1008; object-fit: cover; }
 .hb-mini.is-item img { object-fit: contain; padding: 10px; }
-.hb-mini.is-foil button { box-shadow: 0 0 0 2px #e9d5ff, 0 4px 12px rgba(0, 0, 0, .4); }
+.hb-mini.is-foil .hb-mini-card { box-shadow: 0 0 0 2px #e9d5ff, 0 4px 12px rgba(0, 0, 0, .4); }
 .hb-mini-n { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 16px; color: var(--color-bg); background: var(--color-accent-300); }
 .hb-mini-x { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; color: #fff; background: rgba(10, 8, 18, .6); opacity: 0; transition: opacity .15s ease; }
-.hb-mini button:hover .hb-mini-x, .hb-mini button:focus-visible .hb-mini-x { opacity: 1; }
+.hb-mini-card:hover .hb-mini-x, .hb-mini-card:focus-visible .hb-mini-x { opacity: 1; }
+.hb-mini-card:focus-visible { outline: 2px solid var(--color-accent-300); outline-offset: 2px; }
 @keyframes hb-in { from { transform: scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 .hb-fixed { display: flex; align-items: center; gap: 14px; min-height: 96px; padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-bg) 55%, transparent); }
 .hb-fixed > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
@@ -3429,7 +3430,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .hb-window.is-stuck { box-shadow: 0 0 0 1px var(--color-accent-700), 0 18px 40px rgba(0, 0, 0, .6); }
   .hb-window.is-stuck .hb-side { gap: 8px; padding-top: 12px; padding-bottom: 10px; }
   .hb-window.is-stuck .hb-tray, .hb-window.is-stuck .hb-fixed { min-height: 58px; padding: 6px; }
-  .hb-window.is-stuck .hb-mini button { width: 36px; }
+  .hb-window.is-stuck .hb-mini-card { width: 36px; }
   .hb-window.is-stuck .hb-tray-empty { font-size: 12px; }
   .hb-window.is-stuck .hb-price { height: 44px; }
   .hb-window.is-stuck .hb-price input { font-size: 20px; }
@@ -3438,6 +3439,18 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   .hb-window.is-stuck .hb-message { display: none; }
 }
 .hb-window.is-bumped { animation: hb-bump .35s ease; }
+/* Drag & Drop: passende Seite leuchtet als Ablage, Karten lassen sich greifen */
+.hb-card[draggable="true"] .hb-art, .hb-card[draggable="true"].hb-foil { cursor: var(--cur-grab); }
+.hb-card[draggable="true"]:active .hb-art { cursor: var(--cur-grabbing); }
+.hb-mini-card[draggable="true"] { cursor: var(--cur-grab); }
+.hb-art:focus-visible { outline: 2px solid var(--color-accent-300); outline-offset: 3px; }
+.hb.hb-dragging .hb-side:not(.is-target) { opacity: .45; transition: opacity .15s ease; }
+.hb-side.is-target .hb-tray { border-color: var(--color-accent-400); border-style: dashed; background: color-mix(in srgb, var(--color-accent) 10%, transparent); box-shadow: none; }
+.hb-side.is-target .hb-tray::after { content: "Hier ablegen"; align-self: center; margin: 0 auto; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--color-accent-200); background: color-mix(in srgb, var(--color-accent) 18%, transparent); pointer-events: none; }
+.hb-side.is-target .hb-tray-empty { display: none; }
+.hb-side.is-over .hb-tray { border-color: var(--color-accent-200); background: color-mix(in srgb, var(--color-accent) 20%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.hb-side.is-source .hb-tray::after { content: "Zum Entfernen außerhalb loslassen"; align-self: center; margin: 0 auto; padding: 4px 10px; border-radius: 999px; font-size: 12px; color: var(--color-neutral-300); background: var(--surface-2); pointer-events: none; }
+.hb.hb-dragging-out .hb-browser { outline: 2px dashed color-mix(in srgb, var(--nein) 50%, transparent); outline-offset: 6px; border-radius: var(--radius-md); }
 @keyframes hb-bump { 40% { box-shadow: 0 0 0 2px var(--color-accent-300), 0 18px 40px rgba(0, 0, 0, .5); } }
 @media (max-width: 760px) {
   .hb-seg { grid-template-columns: 1fr; width: 100%; }
@@ -3457,7 +3470,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
     box-shadow: 0 0 0 1px var(--color-accent-700), 0 12px 36px rgba(0, 0, 0, .6);
   }
   .hb-submit { width: 100%; }
-  .hb-mini button { width: 48px; }
+  .hb-mini-card { width: 48px; }
 }
 
 /* ---------- Verhandlung (views/handel-angebot.ejs) ---------- */

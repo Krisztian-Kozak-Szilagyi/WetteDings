@@ -1,5 +1,5 @@
 <%#
-  Kartenauswahl im Handelsfenster (public/js/handel-neu.js): Karte antippen = eine mehr, "−" = eine weniger.
+  Kartenauswahl im Handelsfenster (public/js/handel-neu.js): Karte antippen oder ins Fenster ziehen = eine mehr, "−" = eine weniger.
   Ohne JS stehen die Zahlenfelder unter den Karten. side = 'gib' | 'will' (Feldnamen "gib:<Karte>" = Anzahl,
   "gib" = "f:<Exemplar>" für folierte Karten), pool = { cards: [{ card, max }], foiled: [...], goods: [{ card, max }], counts },
   preset = { counts, copies }, own = eigene Sammlung, partnerName = Name des Mitglieds,
@@ -29,15 +29,15 @@
       <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : wish ? 'Wunschkarte suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
         { attr: 'tcg-filter', title: 'Seltenheit', allCount: total, opts: present.map((r) => ({ key: r.key, label: r.label, count: inRarity(r.key) })) },
       ] }) %>
-      <span class="hb-picker-hint muted small"><%= own ? 'Antippen zum Hinzufügen' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
+      <span class="hb-picker-hint muted small"><%= own ? 'Antippen oder nach oben ins Fenster ziehen' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
     </div>
     <div class="tcg-grid hb-grid">
       <% pool.goods.forEach((g) => { const n = Math.min(preset.counts[g.card.id] || 0, g.max); %>
         <div class="tcg-slot hb-card is-item" data-hb-slot data-rarity="item" data-name="<%= g.card.name.toLowerCase() %>" data-label="<%= g.card.name %>" data-image="<%= g.card.image %>" data-value="<%= g.card.sell %>">
-          <button type="button" class="hb-art" data-hb-step="1" aria-label="<%= g.card.name %> hinzufügen">
+          <span class="hb-art" role="button" tabindex="0" data-hb-step="1" aria-label="<%= g.card.name %> hinzufügen">
             <img src="<%= g.card.image %>" alt="" width="64" height="64">
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
-          </button>
+          </span>
           <span class="hb-card-name"><%= g.card.name %></span>
           <span class="hb-card-sub"><%= wish ? 'Gegenstand' : g.max + (own ? ' frei' : ' im Besitz') %> · <%= euro(g.card.sell) %></span>
           <% step(side + ':' + g.card.id, g.card.name, g.max, n) %>
@@ -45,10 +45,10 @@
       <% }) %>
       <% pool.cards.forEach((x) => { const c = x.card; const r = pickRar(c); const n = Math.min(preset.counts[c.id] || 0, x.max); %>
         <div class="tcg-slot hb-card r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %> <%= r.label.toLowerCase() %>" data-label="<%= c.name %> (<%= r.label %>)" data-image="<%= c.image %>" data-value="<%= r.sell || 0 %>">
-          <button type="button" class="tcg-art hb-art" data-hb-step="1" aria-label="<%= c.name %>, <%= r.label %> hinzufügen">
+          <span class="tcg-art hb-art" role="button" tabindex="0" data-hb-step="1" aria-label="<%= c.name %>, <%= r.label %> hinzufügen">
             <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
-          </button>
+          </span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
           <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
           <% step(side + ':' + c.id, c.name, x.max, n) %>

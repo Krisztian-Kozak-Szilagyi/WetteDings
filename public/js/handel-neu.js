@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  // Handelsfenster (/handel/neu und Gegenangebote): Karten antippen legt sie in die Ablage oben, "−" nimmt eine weg.
+  // Handelsfenster (/handel/neu und Gegenangebote): Karten antippen oder ins Fenster ziehen legt sie in die Ablage
+  // oben, "−" oder Herausziehen nimmt eine weg.
   // Geld fließt nur in eine Richtung; Zusammenfassung mit Kartenwert, Wertvergleich und Steuer.
   // Ohne JS gehen die Zahlenfelder unter den Karten direkt.
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -77,6 +78,16 @@
     refresh(slot);
   };
   var slots = $all('[data-hb-slot]', root);
+  slots.forEach(function (slot, i) { slot.setAttribute('data-hb-id', String(i)); });
+  // Kartenflächen sind <span role="button"> (ziehbar auch in Firefox): Enter und Leertaste wie ein Klick
+  $all('.hb-art[role="button"]', root).forEach(function (el) {
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  });
   slots.forEach(function (slot) {
     refresh(slot);
     var input = qtyInput(slot);
@@ -140,6 +151,24 @@
     return out;
   }
 
+  // Eine Karte dazu bzw. weg (Antippen, Ziehen, Mini-Karte)
+  function addOne(slot) {
+    var box = $('input[type="checkbox"]', slot);
+    if (box) {
+      box.checked = true;
+      refresh(slot);
+    } else setQty(slot, qty(slot) + 1);
+    update();
+  }
+  function removeOne(slot) {
+    var box = $('input[type="checkbox"]', slot);
+    if (box) {
+      box.checked = false;
+      refresh(slot);
+    } else setQty(slot, qty(slot) - 1);
+    update();
+  }
+
   // ---------- Ablage: gewählte Karten als Mini-Karten im Handelsfenster ----------
   function renderTray(side, sel) {
     var tray = $('[data-hb-tray="' + side + '"]', root);
@@ -148,9 +177,12 @@
     sel.items.forEach(function (it) {
       var li = document.createElement('li');
       li.className = 'hb-mini' + (it.foil ? ' is-foil' : '') + (it.item ? ' is-item' : '');
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.title = it.label + ' – antippen zum Entfernen';
+      var btn = document.createElement('span');
+      btn.className = 'hb-mini-card';
+      btn.setAttribute('role', 'button');
+      btn.tabIndex = 0;
+      btn.setAttribute('data-hb-out', it.slot.getAttribute('data-hb-id'));
+      btn.title = it.label + ' – antippen oder herausziehen zum Entfernen';
       btn.setAttribute('aria-label', (it.n > 1 ? it.n + '× ' : '') + it.label + ' entfernen');
       var img = document.createElement('img');
       img.src = it.image;
@@ -166,14 +198,14 @@
       x.className = 'hb-mini-x';
       x.textContent = '×';
       btn.appendChild(x);
-      btn.addEventListener('click', function () {
-        var box = $('input[type="checkbox"]', it.slot);
-        if (box) {
-          box.checked = false;
-          refresh(it.slot);
-        } else setQty(it.slot, qty(it.slot) - 1);
-        update();
+      btn.addEventListener('click', function () { removeOne(it.slot); });
+      btn.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          removeOne(it.slot);
+        }
       });
+      btn.draggable = true;
       li.appendChild(btn);
       tray.appendChild(li);
     });
@@ -241,6 +273,103 @@
     if (submit) submit.disabled = nothing || problems.length > 0;
   }
   update();
+
+  // ---------- Drag & Drop: Karten ins Fenster ziehen, Mini-Karten wieder herausziehen ----------
+  // Nur mit Maus o. Ä. – auf Touch-Geräten bleibt es beim Antippen.
+  var fine = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (fine) {
+    var drag = null; // { kind: 'in' | 'out', side, slot }
+    var sideBox = function (side) { return $('[data-hb-side-box="' + side + '"]', root); };
+    var paneOf = function (el) { var p = el.closest('[data-hb-pane]'); return p ? p.getAttribute('data-hb-pane') : null; };
+    var slotById = function (id) { return $('[data-hb-id="' + id + '"]', root); };
+    var bump = function () {
+      var w = $('[data-hb-window]', root);
+      if (!w) return;
+      w.classList.remove('is-bumped');
+      void w.offsetWidth;
+      w.classList.add('is-bumped');
+    };
+    var endDrag = function () {
+      drag = null;
+      root.classList.remove('hb-dragging', 'hb-dragging-out');
+      $all('.is-target, .is-over, .is-source', root).forEach(function (el) { el.classList.remove('is-target', 'is-over', 'is-source'); });
+    };
+    var image = function (e, el) {
+      var img = $('img', el);
+      if (img && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, img.offsetWidth / 2, img.offsetHeight / 2);
+    };
+
+    // Karte aus der Sammlung aufnehmen
+    slots.forEach(function (slot) {
+      var side = paneOf(slot);
+      if (!side || !$('[data-hb-tray="' + side + '"]', root)) return;
+      slot.setAttribute('draggable', 'true');
+      slot.addEventListener('dragstart', function (e) {
+        var box = $('input[type="checkbox"]', slot);
+        if ((box && box.checked) || slot.classList.contains('is-full')) {
+          e.preventDefault();
+          return;
+        }
+        drag = { kind: 'in', side: side, slot: slot };
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', slot.getAttribute('data-label') || ''); // Firefox braucht Daten
+        image(e, slot);
+        root.classList.add('hb-dragging');
+        sideBox(side).classList.add('is-target');
+      });
+      slot.addEventListener('dragend', endDrag);
+    });
+
+    // Ablegen auf der passenden Seite des Fensters
+    ['gib', 'will'].forEach(function (side) {
+      var box = sideBox(side);
+      if (!box) return;
+      box.addEventListener('dragover', function (e) {
+        if (!drag || drag.kind !== 'in' || drag.side !== side) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        box.classList.add('is-over');
+      });
+      box.addEventListener('dragleave', function (e) {
+        if (!box.contains(e.relatedTarget)) box.classList.remove('is-over');
+      });
+      box.addEventListener('drop', function (e) {
+        if (!drag || drag.kind !== 'in' || drag.side !== side) return;
+        e.preventDefault();
+        var slot = drag.slot;
+        endDrag();
+        addOne(slot);
+        bump();
+      });
+    });
+
+    // Mini-Karte aus dem Fenster ziehen: irgendwo außerhalb ihrer Seite fallen lassen = eine weniger
+    root.addEventListener('dragstart', function (e) {
+      var mini = e.target.closest && e.target.closest('[data-hb-out]');
+      if (!mini) return;
+      var slot = slotById(mini.getAttribute('data-hb-out'));
+      if (!slot) return;
+      drag = { kind: 'out', side: paneOf(slot), slot: slot };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', slot.getAttribute('data-label') || '');
+      image(e, mini);
+      root.classList.add('hb-dragging-out');
+      sideBox(drag.side).classList.add('is-source');
+    });
+    document.addEventListener('dragover', function (e) {
+      if (!drag || drag.kind !== 'out' || sideBox(drag.side).contains(e.target)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    document.addEventListener('drop', function (e) {
+      if (!drag || drag.kind !== 'out' || sideBox(drag.side).contains(e.target)) return;
+      e.preventDefault();
+      var slot = drag.slot;
+      endDrag();
+      removeOne(slot);
+    });
+    document.addEventListener('dragend', function () { if (drag && drag.kind === 'out') endDrag(); });
+  }
 
   // ---------- Handelsfenster klebt oben: dann kompakter ----------
   var win = $('[data-hb-window]', root);
