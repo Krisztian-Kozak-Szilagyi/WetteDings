@@ -1,0 +1,138 @@
+<%- include('partials/head') %>
+<%
+  // mode: 'neu' (Markt oder Mitglied), 'markt' (Gegenangebot auf ein Markt-Angebot), 'gegen' (Gegenangebot in einer Verhandlung)
+  const isMarket = mode === 'neu' && !partner; // eigenes Markt-Angebot: nur Karten gegen einen Preis
+  const pctText = (p) => String(p).replace('.', ',') + ' %';
+  const money = (c) => (c ? (c / 100).toFixed(2).replace('.', ',') : '');
+  const action = mode === 'gegen' ? '/handel/angebot/' + offer._id + '/gegenangebot' : '/handel/angebot';
+  const backUrl = mode === 'gegen' ? '/handel/angebot/' + offer._id : '/handel' + (mode === 'markt' ? '?reiter=markt' : '');
+  const title = mode === 'gegen' ? 'Gegenangebot an ' + partner.username : mode === 'markt' ? 'Angebot an ' + partner.username : 'Neuer Handel';
+  // eigene folierte Exemplare der Vorauswahl – gehen beim Wechsel des Ziels mit
+  const presetCopies = [...give.copies].map((id) => 'f:' + id);
+%>
+
+<div class="hb" data-hb data-mode="<%= mode %>" data-market="<%= isMarket ? 1 : 0 %>" data-balance="<%= balance %>"
+  data-tax-markt="<%= taxRates.markt %>" data-tax-privat="<%= taxRates.privat %>" data-tax-tausch="<%= taxRates.tausch %>" data-listing="<%= mode === 'markt' || (offer && offer.listing) ? 1 : 0 %>" data-max-lines="<%= maxLines %>">
+  <p class="hb-back"><a class="btn btn-ghost btn-sm" href="<%= backUrl %>">← Zurück</a></p>
+  <div class="page-head hb-head">
+    <div>
+      <h1><%= title %></h1>
+      <span class="muted small">
+        <% if (mode === 'neu') { %>Stell Karten auf den Markt oder mach einem Mitglied ein Angebot: verkaufen, um Karten bitten oder tauschen – auch mehrere Karten auf einmal.<% } %>
+        <% if (mode === 'markt') { %>Dein Gegenangebot zum Markt-Angebot von <%= partner.username %>: anderer Preis, eigene Karten oder beides.<% } %>
+        <% if (mode === 'gegen') { %>Ändere, was beide Seiten geben. Danach ist <%= partner.username %> am Zug.<% } %>
+      </span>
+    </div>
+  </div>
+
+  <% if (mode === 'neu') { %>
+    <%# Wohin geht das Angebot? Ein Wechsel lädt die Seite mit der Sammlung des Mitglieds (die eigene Auswahl bleibt) %>
+    <form method="get" action="/handel/neu" class="hb-target" data-hb-target>
+      <div class="hb-target-switch" role="radiogroup" aria-label="Wohin geht das Angebot?">
+        <a class="hb-target-opt<%= isMarket ? ' active' : '' %>" href="/handel/neu" role="radio" aria-checked="<%= isMarket %>" data-hb-to-market>
+          <strong>Auf den Markt</strong><span>Für alle, gegen einen Festpreis · <%= marketDays %> Tage</span>
+        </a>
+        <label class="hb-target-opt<%= isMarket ? '' : ' active' %>" role="radio" aria-checked="<%= !isMarket %>">
+          <strong>An ein Mitglied</strong>
+          <span class="hb-target-member">
+            <input type="text" name="an" list="hb-users" autocomplete="off" maxlength="30" placeholder="Benutzername" value="<%= partner ? partner.username : '' %>" aria-label="Mitglied">
+            <button class="btn btn-ghost btn-sm" type="submit">Wählen</button>
+          </span>
+        </label>
+      </div>
+      <% Object.entries(give.counts).forEach(([id, n]) => { for (let i = 0; i < n; i++) { %><input type="hidden" name="gib" value="<%= id %>" data-hb-carry><% } }) %>
+      <% presetCopies.forEach((v) => { %><input type="hidden" name="gib" value="<%= v %>" data-hb-carry><% }) %>
+      <datalist id="hb-users"><% users.forEach((u) => { %><option value="<%= u.username %>"><% }) %></datalist>
+    </form>
+  <% } %>
+
+  <form method="post" action="<%= action %>" class="hb-form" data-hb-form>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <% if (mode === 'neu' && partner) { %><input type="hidden" name="to" value="<%= partner.username %>"><% } %>
+    <% if (mode === 'markt') { %><input type="hidden" name="markt" value="<%= listing._id %>"><% } %>
+    <% if (mode === 'gegen') { %><input type="hidden" name="version" value="<%= offer.termsVersion || 0 %>"><% } %>
+
+    <div class="hb-cols">
+      <%# ---------- Du gibst ---------- %>
+      <section class="hb-col card" data-hb-side="gib">
+        <header class="hb-col-head">
+          <h2>Du gibst</h2>
+          <span class="hb-col-sum" data-hb-sum="gib"></span>
+        </header>
+        <% if (fixedGives) { %>
+          <div class="hb-fixed">
+            <%- include('partials/trade-stack', { list: fixedGives, size: 'md', ownedCounts: mine.counts }) %>
+            <div><strong><%= lineLabel(fixedGives) %></strong><span class="muted small">Die Karten deines Markt-Angebots stehen fest.</span></div>
+          </div>
+          <span hidden data-hb-fixed-value="<%= linesValue(fixedGives) %>" data-hb-fixed-count="<%= fixedGives.length %>"></span>
+        <% } else { %>
+          <ul class="hb-tray" data-hb-tray="gib" aria-live="polite"><li class="hb-tray-empty muted small">Noch nichts gewählt – tippe unten Karten an.</li></ul>
+        <% } %>
+        <% if (!isMarket) { %>
+          <label class="field hb-money">
+            <span>Geld dazu, das du zahlst</span>
+            <span class="hb-money-input"><input type="text" name="geld_gib" inputmode="decimal" placeholder="0,00" value="<%= money(pay) %>" data-hb-money="gib"><span>€</span></span>
+          </label>
+        <% } %>
+        <% if (!fixedGives) { %>
+          <%- include('partials/trade-picker', { side: 'gib', pool: mine, preset: give, own: true, partnerName: '' }) %>
+        <% } %>
+      </section>
+
+      <%# ---------- Du bekommst ---------- %>
+      <section class="hb-col card" data-hb-side="will">
+        <header class="hb-col-head">
+          <h2>Du bekommst</h2>
+          <span class="hb-col-sum" data-hb-sum="will"></span>
+        </header>
+        <% if (isMarket) { %>
+          <label class="field hb-money hb-price">
+            <span>Preis</span>
+            <span class="hb-money-input"><input type="text" name="geld_will" inputmode="decimal" placeholder="z. B. 50" value="<%= money(receive) %>" required data-hb-money="will"><span>€</span></span>
+          </label>
+          <p class="muted small">Jeder kann zu diesem Preis sofort kaufen oder dir ein Gegenangebot machen. Möchtest du Karten statt Geld, wähle oben ein Mitglied.</p>
+        <% } else { %>
+          <% if (fixedGets) { %>
+            <div class="hb-fixed">
+              <%- include('partials/trade-stack', { list: fixedGets, size: 'md', ownedCounts: mine.counts }) %>
+              <div><strong><%= lineLabel(fixedGets) %></strong><span class="muted small"><%= listing ? 'Markt-Preis ' + euro(listing.price) + ' · ' : '' %>Die Karten des Markt-Angebots stehen fest.</span></div>
+            </div>
+            <span hidden data-hb-fixed-value="<%= linesValue(fixedGets) %>" data-hb-fixed-count="<%= fixedGets.length %>"></span>
+          <% } else { %>
+            <ul class="hb-tray" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty muted small">Noch nichts gewählt – such dir unten Karten von <%= partner.username %> aus.</li></ul>
+          <% } %>
+          <label class="field hb-money">
+            <span>Geld, das <%= partner.username %> zahlt</span>
+            <span class="hb-money-input"><input type="text" name="geld_will" inputmode="decimal" placeholder="0,00" value="<%= money(receive) %>" data-hb-money="will"><span>€</span></span>
+          </label>
+          <% if (!fixedGets) { %>
+            <%- include('partials/trade-picker', { side: 'will', pool: theirs, preset: get, own: false, partnerName: partner.username }) %>
+          <% } %>
+        <% } %>
+      </section>
+    </div>
+
+    <%# ---------- Zusammenfassung und Absenden ---------- %>
+    <div class="hb-bar" data-hb-bar>
+      <div class="hb-bar-summary">
+        <span class="hb-bar-line" data-hb-summary><%= isMarket ? 'Wähle Karten und einen Preis.' : 'Wähle aus, was beide Seiten geben.' %></span>
+        <span class="muted small" data-hb-note>
+          <% if (isMarket) { %><%= marketDays %> Tage gültig<%= taxRates.markt > 0 ? ' · ' + pctText(taxRates.markt) + ' Steuer auf den Erlös' : '' %>.<% } else { %><%= privateHours %> Std. gültig. Deine Karten sind bis dahin gesperrt.<% } %>
+        </span>
+      </div>
+      <% if (!isMarket && mode !== 'gegen') { %>
+        <label class="hb-message"><span class="sr-only">Nachricht an <%= partner.username %></span>
+          <textarea name="nachricht" rows="1" maxlength="500" placeholder="Nachricht an <%= partner.username %> (optional)"></textarea>
+        </label>
+      <% } %>
+      <button class="btn btn-primary hb-submit" type="submit" data-hb-submit><%= isMarket ? 'Auf den Markt stellen' : mode === 'gegen' ? 'Gegenangebot senden' : 'Angebot senden' %></button>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/card-zoom') %>
+<%- include('partials/foil-modal') %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/handel-neu.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

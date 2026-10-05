@@ -64,16 +64,7 @@
               <input type="hidden" name="count" value="1">
               <button class="btn btn-ghost btn-sm" type="submit">1 verkaufen · <%= euro(it.sell) %></button>
             </form>
-            <details class="foil-trade">
-              <summary>Im Handel anbieten</summary>
-              <form method="post" action="/handel/angebot" class="form">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="item" value="<%= it.key %>">
-                <label class="field"><span>Preis in € (für 1 Stück)</span><input type="text" name="price" inputmode="decimal" value="<%= (it.sell / 100).toFixed(2).replace('.', ',') %>" required></label>
-                <label class="field"><span>An (leer = für alle auf dem Markt)</span><input type="text" name="to" autocomplete="off" maxlength="30"></label>
-                <button class="btn btn-primary btn-sm" type="submit">Anbieten</button>
-              </form>
-            </details>
+            <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=<%= encodeURIComponent('item:' + it.key) %>">Im Handel anbieten</a>
           </div>
         <% } %>
         <% if (it.key === 'folie') { %>
@@ -122,25 +113,7 @@
             <% if (f.lock === 'handel') { %>
               <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
             <% } else { %>
-              <details class="foil-trade">
-                <summary>Tauschen</summary>
-                <form method="get" action="/handel/tausch" class="form">
-                  <input type="hidden" name="karte" value="f:<%= f.id %>">
-                  <label class="field"><span>Mit wem?</span><input type="text" name="an" autocomplete="off" maxlength="30" required></label>
-                  <button class="btn btn-primary btn-sm" type="submit">Weiter zur Kartenwahl</button>
-                </form>
-              </details>
-              <details class="foil-trade">
-                <summary>Verkaufen (Handel)</summary>
-                <form method="post" action="/handel/angebot" class="form">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <input type="hidden" name="card" value="<%= f.card.id %>">
-                  <input type="hidden" name="copy" value="<%= f.id %>">
-                  <label class="field"><span>Preis in €</span><input type="text" name="price" inputmode="decimal" value="<%= (f.value / 100).toFixed(2).replace('.', ',') %>" required></label>
-                  <label class="field"><span>An (leer = für alle auf dem Markt)</span><input type="text" name="to" autocomplete="off" maxlength="30"></label>
-                  <button class="btn btn-primary btn-sm" type="submit">Anbieten</button>
-                </form>
-              </details>
+              <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=f:<%= f.id %>">Handeln · Markt, Verkauf oder Tausch</a>
               <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt, die Wertsteigerung ist weg. Die Karte ist danach wieder eine normale Karte.">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="copy" value="<%= f.id %>">

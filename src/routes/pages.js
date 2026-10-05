@@ -153,7 +153,7 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
   res.redirect(safeRedirect(str(req.body.zurueck), '/'));
 });
 
-// Sammlung eines Mitglieds (nur ansehen); ein Klick vergrößert die Karte, bei fremden Sammlungen lässt sich dort ein Tausch vorschlagen
+// Sammlung eines Mitglieds (nur ansehen); ein Klick vergrößert die Karte, bei fremden Sammlungen lässt sich dort ein Angebot machen
 router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
   const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username').lean();
   if (!profile) return res.status(404).render('error', { title: 'Sammlung', status: 404, message: 'Dieses Mitglied gibt es nicht.' });

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // Handelsseite: Miniaturen in Angeboten vergrößern; Karte in der Sammlung antippen -> Dialog mit Markt / Privat / Tauschen
+  // Handel: Reiter, Markt filtern und sortieren, Karten in Angeboten vergrößern, Nachrichten der Verhandlung live nachladen
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
@@ -48,33 +48,85 @@
     });
   }
 
-  // ---------- Markt: nach Seltenheit und Kartenname filtern ----------
-  var marketBox = $('[data-market]');
-  if (marketBox && $('[data-market-item]', marketBox)) {
-    var marketSearch = $('[data-market-search]', marketBox);
-    var marketEmpty = $('[data-market-empty]', marketBox);
-    var marketRarity = 'all';
-    var filterMarket = function () {
-      var q = (marketSearch.value || '').trim().toLowerCase();
+  // ---------- Reiter: ohne Neuladen umschalten, Adresse mitführen ----------
+  var tabBar = $('[data-hx-tabs]');
+  if (tabBar) {
+    var showPane = function (key, push) {
+      var found = false;
+      $all('[data-hx-tab]', tabBar).forEach(function (a) {
+        var on = a.getAttribute('data-hx-tab') === key;
+        if (on) found = true;
+        a.classList.toggle('active', on);
+        a.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      if (!found) return;
+      $all('[data-hx-pane]').forEach(function (p) { p.hidden = p.getAttribute('data-hx-pane') !== key; });
+      if (push) history.replaceState(null, '', '/handel?reiter=' + key);
+    };
+    $all('[data-hx-tab]', tabBar).forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        showPane(a.getAttribute('data-hx-tab'), true);
+      });
+    });
+    // alte Sprungmarken (#markt, #eingang …) auf die Reiter abbilden
+    var legacy = { '#markt': 'markt', '#eingang': 'an-mich', '#neu': 'verlauf', '#sammlung': 'meine' };
+    if (legacy[window.location.hash]) showPane(legacy[window.location.hash], true);
+  }
+
+  // ---------- Markt: suchen, nach Seltenheit filtern, sortieren ----------
+  var grid = $('[data-mk-grid]');
+  if (grid) {
+    var tools = $('[data-mk-tools]');
+    var search = $('[data-mk-search]', tools);
+    var sort = $('[data-mk-sort]', tools);
+    var missing = $('[data-mk-missing]', tools);
+    var foiled = $('[data-mk-foil]', tools);
+    var afford = $('[data-mk-afford]', tools);
+    var empty = $('[data-mk-empty]');
+    var rarity = 'all';
+    var tiles = $all('[data-mk]', grid);
+    var num = function (el, key) { return parseFloat(el.getAttribute('data-' + key)) || 0; };
+    var sorters = {
+      neu: function (a, b) { return num(b, 'created') - num(a, 'created'); },
+      'preis-auf': function (a, b) { return num(a, 'price') - num(b, 'price'); },
+      'preis-ab': function (a, b) { return num(b, 'price') - num(a, 'price'); },
+      selten: function (a, b) { return num(b, 'rank') - num(a, 'rank') || num(a, 'price') - num(b, 'price'); },
+      ablauf: function (a, b) { return num(a, 'expires') - num(b, 'expires'); },
+    };
+    var buyBtn = function (li) { return $('form button[type="submit"]', li); };
+    var apply = function () {
+      var q = (search.value || '').trim().toLowerCase();
       var shown = 0;
-      $all('[data-market-item]', marketBox).forEach(function (li) {
-        var ok = (marketRarity === 'all' || li.getAttribute('data-rarity') === marketRarity) && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
+      tiles.forEach(function (li) {
+        var btn = buyBtn(li);
+        var ok = (rarity === 'all' || li.getAttribute('data-rarity') === rarity) &&
+          (!q || li.getAttribute('data-name').indexOf(q) !== -1) &&
+          (!missing.checked || li.getAttribute('data-missing') === '1') &&
+          (!foiled.checked || li.getAttribute('data-foil') === '1') &&
+          (!afford.checked || (btn && !btn.disabled));
         li.hidden = !ok;
         if (ok) shown++;
       });
-      marketEmpty.hidden = shown > 0;
+      empty.hidden = shown > 0;
     };
-    $all('[data-market-rarity]', marketBox).forEach(function (btn) {
+    var reorder = function () {
+      tiles.slice().sort(sorters[sort.value] || sorters.neu).forEach(function (li) { grid.appendChild(li); });
+    };
+    $all('[data-mk-rarity]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        marketRarity = btn.getAttribute('data-market-rarity');
-        $all('[data-market-rarity]', marketBox).forEach(function (b) {
+        rarity = btn.getAttribute('data-mk-rarity');
+        $all('[data-mk-rarity]').forEach(function (b) {
           b.classList.toggle('active', b === btn);
           b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
         });
-        filterMarket();
+        apply();
       });
     });
-    marketSearch.addEventListener('input', filterMarket);
+    search.addEventListener('input', apply);
+    [missing, foiled, afford].forEach(function (c) { c.addEventListener('change', apply); });
+    sort.addEventListener('change', reorder);
   }
 
   // ---------- Verhandlung: Nachrichten live nachladen ----------
@@ -153,89 +205,4 @@
       if (window.location.hash === '#chat') textarea.focus();
     }
   }
-
-  // ---------- Karte aus der Sammlung anbieten ----------
-  var modal = $('[data-trade-modal]');
-  if (!modal) return;
-
-  var tabs = $all('[data-trade-tab]', modal);
-  var panes = $all('[data-trade-pane]', modal);
-
-  function showTab(key) {
-    tabs.forEach(function (t) {
-      var on = t.getAttribute('data-trade-tab') === key;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    panes.forEach(function (p) { p.hidden = p.getAttribute('data-trade-pane') !== key; });
-    var first = $('[data-trade-pane="' + key + '"] input:not([type="hidden"])', modal);
-    if (first) first.focus();
-  }
-  tabs.forEach(function (t) {
-    t.addEventListener('click', function () { showTab(t.getAttribute('data-trade-tab')); });
-  });
-
-  function openFor(slot, tab) {
-    var d = slot.dataset;
-    var img = $('[data-trade-img]', modal);
-    img.src = d.image;
-    img.alt = d.name + ' (' + d.rarityLabel + ')';
-    img.className = 'r-' + d.rarity;
-    $('[data-trade-name]', modal).textContent = d.name;
-    var badge = $('[data-trade-rarity]', modal);
-    badge.textContent = d.rarityLabel;
-    badge.className = 'tcg-badge r-' + d.rarity;
-    var copy = d.tradeCopy || '';
-    $('[data-trade-meta]', modal).textContent = copy ? 'Foliert am ' + d.foilDate + ' · Wert ' + d.sellText : d.free + ' frei · Kartenwert ' + d.sellText;
-    $('[data-trade-art]', modal).classList.toggle('is-foiled', !!copy);
-    // Karte in alle drei Formulare eintragen (Tausch nutzt "karte", weil es per GET zur Auswahlseite geht);
-    // ein foliertes Exemplar wird über "copy" bzw. "f:<Exemplar>" genau bestimmt
-    $all('input[name="card"]', modal).forEach(function (input) { input.value = d.tradeCard; });
-    $all('input[name="copy"]', modal).forEach(function (input) { input.value = copy; });
-    $all('input[name="karte"]', modal).forEach(function (input) { input.value = copy ? 'f:' + copy : d.tradeCard; });
-
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else modal.setAttribute('open', '');
-    showTab(tab || 'markt');
-  }
-
-  document.addEventListener('click', function (e) {
-    var slot = e.target.closest('[data-trade-card]');
-    if (slot) openFor(slot);
-  });
-
-  // Weiter zur Tausch-Auswahl: diese Seite so im Verlauf ablegen, dass "Zurück" wieder im Dialog landet
-  var swapForm = $('[data-trade-pane="tausch"]', modal);
-  swapForm.addEventListener('submit', function () {
-    var params = new URLSearchParams({ karte: swapForm.elements.karte.value, reiter: 'tausch', an: swapForm.elements.an.value.trim() });
-    history.replaceState(null, '', '/handel?' + params + '#sammlung');
-  });
-
-  // Rückweg von der Tausch-Auswahl (?karte=…&reiter=tausch&an=…): Dialog derselben Karte wieder öffnen
-  var query = new URLSearchParams(window.location.search);
-  var backCard = query.get('karte');
-  if (backCard) {
-    var backSlot = $all('[data-trade-card]').filter(function (s) {
-      return backCard.indexOf('f:') === 0 ? s.dataset.tradeCopy === backCard.slice(2) : s.dataset.tradeCard === backCard && !s.dataset.tradeCopy;
-    })[0];
-    if (backSlot) {
-      openFor(backSlot, query.get('reiter') || 'markt');
-      if (query.get('an')) {
-        swapForm.elements.an.value = query.get('an');
-        swapForm.elements.an.select();
-      }
-    }
-    // Parameter entfernen, damit ein Neuladen den Dialog nicht erneut öffnet
-    history.replaceState(null, '', '/handel' + window.location.hash);
-  }
-
-  function closeModal() {
-    if (typeof modal.close === 'function') modal.close();
-    else modal.removeAttribute('open');
-  }
-  $('[data-trade-close]', modal).addEventListener('click', closeModal);
-  // Klick auf den Hintergrund schließt
-  modal.addEventListener('click', function (e) {
-    if (e.target === modal) closeModal();
-  });
 })();

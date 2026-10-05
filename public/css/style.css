@@ -1089,70 +1089,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 /* Zweitabzeichen (allgemein Neues): ruhiger als das eigene */
 .nav-badge-market { background: var(--color-neutral-700); color: var(--text); }
 .nav-badge-group { background: var(--color-accent); color: var(--color-bg); }
-.trade-layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
-@media (min-width: 960px) { .trade-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
-.trade-main > .card, .trade-side > .card { margin-bottom: 20px; }
-.trade-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.trade-item { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
-.trade-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.trade-info .tcg-badge { align-self: flex-start; }
-.trade-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
-.trade-actions form { margin: 0; }
-.trade-price { font-weight: 900; font-size: 1.05rem; font-variant-numeric: tabular-nums; margin-right: 4px; }
-.trade-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
-.trade-history li { display: flex; justify-content: space-between; gap: 10px; }
-@media (max-width: 560px) { .trade-item { grid-template-columns: 48px 1fr; } .trade-item .trade-thumb img { width: 48px; } .trade-actions { grid-column: 1 / -1; justify-content: flex-start; } }
-
-/* Miniatur eines Angebots: Knopf, der die Karte groß zeigt */
-.trade-thumb { display: block; padding: 0; border: 0; background: none; border-radius: 6px; cursor: var(--cur-zoom-in); }
-.trade-thumb img { display: block; width: 56px; height: auto; border-radius: 6px; box-shadow: 0 0 0 2px var(--rar, transparent); transition: transform .15s ease; }
-.trade-thumb:hover img, .trade-thumb:focus-visible img { transform: scale(1.06); }
-.trade-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.own-tag { font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
-.own-tag.own-new { border-color: var(--primary); color: var(--primary); }
-
-/* Tausch: zwei Karten mit Pfeil */
-.trade-item.trade-swap { grid-template-columns: 104px 1fr auto; }
-.trade-thumbs { display: flex; align-items: center; gap: 4px; }
-.trade-thumbs .trade-thumb img { width: 44px; }
-.trade-swap-icon { flex: none; color: var(--muted); }
-@media (max-width: 560px) { .trade-item.trade-swap { grid-template-columns: 96px 1fr; } .trade-thumbs .trade-thumb img { width: 40px; } }
-
-/* Deine Angebote: Kopf mit Bild und Titel, darunter Eckdaten und Zurückziehen */
-.trade-offers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.trade-offer { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
-.trade-offer-head { display: flex; align-items: center; gap: 12px; }
-.trade-offer-head > .trade-thumb img { width: 52px; }
-.trade-offer-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.trade-offer-title strong { line-height: 1.25; overflow-wrap: anywhere; }
-.trade-offer-kind { font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.trade-offer-facts { margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: .88rem; }
-.trade-offer-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
-.trade-offer-facts div:last-child { border-bottom: 0; padding-bottom: 0; }
-.trade-offer-facts dt { color: var(--muted); white-space: nowrap; }
-.trade-offer-facts dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.trade-offer form { margin: 0; }
-.trade-offer-actions { display: flex; flex-direction: column; gap: 8px; }
-.trade-offer-actions .btn { width: 100%; }
-.trade-swap-message { margin: 14px 0 0; }
-.trade-swap-message textarea { resize: vertical; }
-
 /* Verhandlung eines Tauschs */
 .nego-turn { font-weight: 700; color: var(--muted); }
 .nego-turn-me { color: var(--primary); }
 .nego-layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
 @media (min-width: 960px) { .nego-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
 .nego-layout > section > .card { margin-bottom: 20px; }
-.nego-cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: start; margin-bottom: 16px; }
-.nego-cards > .nego-swap { align-self: center; }
-.nego-card { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
-.nego-card > span:last-child { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
-.nego-card figcaption { font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-/* Breite am Knopf, nicht am Bild: sonst hängt die Prozentbreite des Bildes am Knopf und umgekehrt – der Knopf wird
-   spaltenbreit und die Karte rutscht nach links (Issue #39) */
-.nego-card .trade-thumb { width: min(160px, 100%); }
-.nego-card .trade-thumb img { width: 100%; border-radius: 9px; }
-.nego-swap { color: var(--muted); }
 .nego-terms { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 14px; }
 .nego-terms-label { font-size: .75rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .nego-terms-value { font-size: 1.15rem; }
@@ -1169,53 +1111,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .nego-changed { font-weight: 700; }
 .nego-send { display: flex; gap: 8px; align-items: flex-end; }
 .nego-send textarea { flex: 1; resize: vertical; min-height: 44px; }
-@media (max-width: 560px) { .nego-cards { gap: 8px; } .nego-msg { max-width: 92%; } }
-.trade-help { margin: 0 0 14px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 560px) { .nego-msg { max-width: 92%; } }
 
-/* Handelsdialog */
-.trade-tabs.trade-tabs-3 { grid-template-columns: repeat(3, 1fr); }
-.trade-dialog {
-  border: 1px solid var(--border); border-radius: 16px; padding: 22px; background: var(--surface); color: var(--text);
-  width: min(620px, 100vw - 24px); max-height: calc(100dvh - 24px); box-shadow: var(--shadow);
-}
-.trade-dialog::backdrop { background: rgba(3, 6, 15, .7); backdrop-filter: blur(3px); }
-.trade-dialog[open] { animation: tcg-pop .25s ease; }
-.trade-dialog-body { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 22px; align-items: start; }
-.trade-dialog-body > img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 2px var(--rar, transparent), 0 8px 24px rgba(0, 0, 0, .25); }
-.trade-dialog h2 { margin: 0 0 6px; padding-right: 36px; }
-.trade-dialog .form { gap: 10px; }
-.trade-dialog-close {
-  position: absolute; top: 10px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: 0;
-  background: var(--surface-2); color: var(--text); font-size: 1.5rem; line-height: 1; cursor: var(--cur-pointer);
-}
-@media (max-width: 560px) {
-  .trade-dialog { padding: 16px; }
-  .trade-dialog-body { grid-template-columns: 1fr; gap: 12px; }
-  .trade-dialog-body > img { width: 120px; justify-self: center; }
-}
-
-/* Tauschseite: Karten per Radio-Button auswählen */
-.trade-swap-grids { display: grid; gap: 20px; grid-template-columns: 1fr; margin-bottom: 20px; }
-@media (min-width: 960px) { .trade-swap-grids { grid-template-columns: 1fr 1fr; align-items: start; } }
-.trade-swap-grids .tcg-grid { grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); max-height: 70vh; overflow-y: auto; padding: 6px 4px; }
-.tcg-pick input { position: absolute; opacity: 0; pointer-events: none; }
-.tcg-pick:has(input:focus-visible) .tcg-art { outline: 2px solid var(--text); outline-offset: 3px; }
-/* Gewählte Karte: heller Rahmen, Leuchten und Haken auf dem Kartenrahmen (das Bild selbst wird von .tcg-art abgeschnitten) */
-.tcg-pick:has(input:checked) .tcg-art { transform: translateY(-4px); box-shadow: 0 0 0 3px var(--color-accent-300), 0 0 0 6px color-mix(in srgb, var(--color-accent) 45%, transparent), 0 0 26px color-mix(in srgb, var(--color-accent) 60%, transparent); }
-.tcg-pick:has(input:checked)::after {
-  content: "✓"; position: absolute; top: -6px; right: -6px; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--color-accent-300); color: var(--color-bg); font-weight: 800; font-size: 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
-}
-.tcg-pick:has(input:checked) .tcg-slot-label { color: var(--color-accent-300); font-weight: 600; }
-/* Ist eine Karte gewählt, treten die anderen im selben Block zurück */
-.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)) .tcg-art { opacity: .45; filter: saturate(.6); transition: opacity .15s ease, filter .15s ease; }
-.trade-swap-grids .card:has(.tcg-pick input:checked) .tcg-pick:not(:has(input:checked)):hover .tcg-art { opacity: 1; filter: none; }
-.trade-swap-extra { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
-.trade-swap-extra .field { margin: 0; }
-.trade-extra-from { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.trade-extra-from legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
-.trade-extra-from label { display: flex; align-items: center; gap: 6px; cursor: var(--cur-pointer); }
-.trade-swap-submit .btn { margin-top: 4px; }
 .profil-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ========== IHK (Mini-Game) ========== */
@@ -2335,12 +2232,6 @@ dialog.tcg-modal { cursor: var(--cur-zoom-out); } /* Klick neben die Karte schli
 .forum-row-last br { display: none; }
 
 /* Handel: Markt-Filter, neue Geschäfte */
-.market-search[type="search"] { width: min(220px, 50vw); height: 36px; min-height: 0; padding: 4px 12px; }
-.market-filter { margin: 10px 0 12px; }
-.trade-item[hidden] { display: none; }
-.trade-news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.trade-news li { display: flex; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; }
-.trade-history li.is-new { box-shadow: inset 3px 0 0 var(--primary); padding-left: 10px; }
 
 /* Wett-Gruppen */
 .tag-group { background: var(--color-accent-800); color: var(--color-accent-200); }
@@ -3283,75 +3174,232 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .bm-arrow { width: 10px; height: 10px; margin-left: 4px; border-right: 2px solid #c084fc; border-bottom: 2px solid #c084fc; transform: rotate(45deg); transition: transform .15s; }
 .bm[open] .bm-arrow { transform: rotate(-135deg); }
 
-.handel-page .trade-layout { gap: 24px; }
-.handel-page .trade-main { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
-.handel-block { display: flex; flex-direction: column; gap: 14px; }
-.handel-block h4 { margin: 0; display: flex; align-items: center; gap: 4px; }
-.handel-block > p { margin: 0; font-size: 14px; }
-.handel-block-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
-.handel-block .market-filter, .handel-block .tcg-filter { margin: 0; }
-.handel-page .market-search[type="search"] { width: min(240px, 60vw); height: 38px; }
-.handel-page .trade-news li { align-items: center; padding: 12px 14px; border-radius: var(--radius-md); font-size: 14px; box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
-.handel-page .trade-news li > span:nth-child(2) { flex: 1; min-width: 200px; }
-.trade-news-dot { width: 7px; height: 7px; border-radius: 50%; background: oklch(0.8 0.14 155); flex: none; }
-.handel-page .trade-list { gap: 8px; }
-.handel-page .trade-item { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 14px; padding: 10px 12px 10px 10px; border: 0; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); transition: box-shadow .15s ease; }
-.handel-page .trade-item:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600); }
-.handel-page .trade-item.trade-swap { grid-template-columns: 140px minmax(0, 1fr) auto; }
-.handel-page .trade-item .trade-thumb img { width: 52px; border-radius: 5px; box-shadow: 0 0 0 1px var(--rar, transparent); }
-.handel-page .trade-swap .trade-thumbs { gap: 10px; }
-.handel-page .trade-swap .trade-thumb img { width: 62px; }
-.handel-page .trade-incoming .trade-item { padding: 16px; border-radius: var(--radius-lg); background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-surface)), var(--color-surface)); box-shadow: 0 0 0 1px var(--color-accent-700); }
-.handel-page .trade-info { gap: 4px; font-size: 14px; }
-.handel-page .trade-title strong { font-weight: 500; }
-.trade-kind { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-300); }
-.trade-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font-size: 12px; color: var(--color-neutral-500); }
-.trade-meta a { color: var(--color-neutral-300); }
-.trade-rarity { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-neutral-400); }
-.handel-page .trade-actions { gap: 8px; }
-.handel-page .trade-actions .btn { height: 34px; min-height: 0; }
-.handel-page .trade-price { margin: 0 4px 0 0; font-size: 16px; font-weight: 500; }
-.handel-page .own-tag { font-size: 11px; font-weight: 400; padding: 1px 8px; border: 0; color: var(--color-neutral-400); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
-.handel-page .own-tag.own-new { color: oklch(0.8 0.14 155); box-shadow: inset 0 0 0 1px color-mix(in srgb, oklch(0.8 0.14 155) 50%, transparent); }
-
-.handel-page .trade-side { display: flex; flex-direction: column; gap: 28px; }
-@media (min-width: 960px) { .handel-page .trade-side { position: sticky; top: 84px; } }
-.trade-help-box {
-  display: flex; flex-direction: column; gap: 14px; padding: 22px; border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--color-surface), var(--color-bg));
-  box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 40px color-mix(in srgb, var(--color-accent) 10%, transparent);
+/* ---------- Handel: Kopf, Reiter, leere Zustände (#76, #82) ---------- */
+.hx { gap: 22px; }
+.hx-head { align-items: center; }
+.hx-head h1 { margin: 0 0 4px; }
+.hx-new { gap: 6px; height: 42px; padding: 0 18px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.hx-tabs {
+  position: sticky; top: 64px; z-index: 5; display: flex; gap: 4px; padding: 4px; overflow-x: auto; scrollbar-width: none;
+  border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 92%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-800); backdrop-filter: blur(6px);
 }
-.trade-help-box .btn-primary { height: 44px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
-.trade-how summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: var(--cur-pointer); font-size: 13px; font-weight: 500; color: var(--color-neutral-300); }
-.trade-how summary::-webkit-details-marker { display: none; }
-.trade-how summary::after { content: '▾'; color: var(--color-neutral-500); transition: transform .15s; }
-.trade-how[open] summary::after { transform: rotate(180deg); }
-.trade-how summary:hover { color: var(--text); }
-.trade-how ul { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--color-neutral-400); }
-.trade-how strong { font-weight: 500; color: var(--text); }
-.side-list { display: flex; flex-direction: column; gap: 10px; padding: 0 6px; }
-.side-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
-.my-offers, .deal-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.my-offer { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--color-divider); }
-.my-offer .trade-thumb img { width: 34px; border-radius: 4px; }
-.my-offer .trade-thumbs .trade-thumb img { width: 30px; }
-.my-offer .trade-swap-icon { width: 12px; height: 12px; }
-.my-offer-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--color-neutral-500); }
-.my-offer-info strong { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
-.my-offer-price { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.my-offer form { margin: 0; }
-.my-offer-x { width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-md); background: none; font-size: 16px; line-height: 1; color: var(--color-neutral-500); cursor: var(--cur-pointer); }
-.my-offer-x:hover { color: var(--text); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.deal-log { gap: 12px; }
-.deal-log li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
-.deal-log li > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.deal-log strong { font-weight: 500; }
-.deal-log .nowrap { font-weight: 500; font-variant-numeric: tabular-nums; }
-.deal-sub { font-size: 11px; color: var(--color-neutral-500); }
+.hx-tabs::-webkit-scrollbar { display: none; }
+.hx-tab {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px;
+  border-radius: 9px; font-weight: 600; font-size: 14px; color: var(--muted); text-decoration: none; white-space: nowrap;
+}
+.hx-tab:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.hx-tab.active { color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
+.hx-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+@media (max-width: 560px) { .hx-tab { padding: 0 10px; } .hx-tab-long { display: none; } }
+.hx-count { min-width: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; color: var(--color-neutral-300); background: var(--color-neutral-800); }
+.hx-pane { display: flex; flex-direction: column; gap: 14px; }
+.hx-pane[hidden] { display: none; }
+.hx-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 44px 16px; border-radius: var(--radius-lg); text-align: center; color: var(--muted); box-shadow: inset 0 0 0 1px dashed var(--color-neutral-800); border: 1px dashed var(--color-neutral-800); }
+.hx-empty p { margin: 0; }
+.hx-none { margin: 0; }
+.hx-how { padding: 14px 18px; border-radius: var(--radius-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.hx-how summary { cursor: var(--cur-pointer); font-size: 14px; font-weight: 600; color: var(--color-neutral-300); }
+.hx-how ul { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.55; color: var(--color-neutral-400); }
+.hx-how strong { color: var(--text); font-weight: 600; }
+.own-tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; color: var(--color-neutral-400); box-shadow: inset 0 0 0 1px var(--color-neutral-700); white-space: nowrap; }
+.own-tag.own-new { color: oklch(0.8 0.14 155); box-shadow: inset 0 0 0 1px color-mix(in srgb, oklch(0.8 0.14 155) 50%, transparent); }
+
+/* ---------- Kartenfächer (views/partials/trade-stack.ejs) ---------- */
+.tstack { --w: 44px; position: relative; display: inline-flex; flex: none; align-items: center; height: calc(var(--w) * 1.4); width: calc(var(--w) + (var(--n) - 1) * var(--w) * .38); }
+.tstack-md { --w: 92px; }
+.tstack-lg { --w: 128px; }
+.tstack-card {
+  position: absolute; top: 0; left: calc(var(--i) * var(--w) * .38); width: var(--w); padding: 0; border: 0; border-radius: calc(var(--w) * .07); overflow: hidden;
+  background: none; cursor: var(--cur-zoom-in); box-shadow: 0 0 0 1px var(--rar, transparent), 0 4px 14px rgba(0, 0, 0, .45);
+  transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 4deg)); transform-origin: 50% 110%; transition: transform .15s ease;
+}
+.tstack-card img { display: block; width: 100%; height: auto; }
+.tstack-card.is-foiled { box-shadow: 0 0 0 2px #e9d5ff, 0 0 12px #c4b5fd88; }
+.tstack-card:hover, .tstack-card:focus-visible { z-index: 2; transform: translateY(-4px) scale(1.05); }
+.tstack:not(.tstack-many) .tstack-card { transform: none; }
+.tstack:not(.tstack-many) .tstack-card:hover { transform: scale(1.05); }
+.tstack-more { position: absolute; right: -6px; bottom: -4px; z-index: 3; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--color-bg); background: var(--color-accent-300); }
+.tstack-money { display: grid; place-items: center; width: var(--w); height: calc(var(--w) * 1.4); border-radius: calc(var(--w) * .07); border: 1px dashed var(--color-neutral-700); color: var(--warn); font-size: calc(var(--w) * .4); font-weight: 700; background: color-mix(in srgb, var(--warn) 6%, transparent); }
+
+/* ---------- Markt: Kachelraster ---------- */
+.mk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mk-search[type="search"] { flex: 1 1 220px; height: 40px; }
+.mk-sort select { height: 40px; }
+.mk-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-neutral-300); cursor: var(--cur-pointer); white-space: nowrap; }
+.mk-rarity { margin: 0; }
+.mk-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); }
+.mk-tile {
+  display: flex; flex-direction: column; border-radius: var(--radius-lg); overflow: hidden; background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-neutral-800); transition: box-shadow .15s ease, transform .15s ease;
+}
+.mk-tile:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar, var(--color-neutral-600)) 60%, var(--color-neutral-800)), 0 10px 28px rgba(0, 0, 0, .35); }
+.mk-tile[hidden] { display: none; }
+.mk-art {
+  position: relative; display: grid; place-items: center; padding: 18px 12px 14px;
+  background: radial-gradient(80% 90% at 50% 30%, color-mix(in srgb, var(--rar, var(--color-accent)) 20%, transparent), transparent 70%), var(--surface-2);
+}
+.mk-bundle { position: absolute; top: 10px; left: 10px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--text); background: color-mix(in srgb, var(--color-bg) 70%, transparent); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.mk-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px; flex: 1; }
+.mk-name { font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.mk-rarity { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; font-size: 12px; color: var(--color-neutral-400); }
+.mk-price { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.mk-price strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mk-price span { font-size: 12px; color: var(--color-neutral-500); }
+.mk-price span.pos { color: oklch(0.8 0.14 155); }
+.mk-seller { font-size: 12px; color: var(--color-neutral-500); }
+.mk-seller a { color: var(--color-neutral-300); }
+.mk-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; padding-top: 6px; }
+.mk-actions form { margin: 0; }
+.mk-actions .btn { width: 100%; height: 34px; min-height: 0; padding: 0 8px; }
+
+/* ---------- Angebote als Zeilen (views/partials/offer-row.ejs) ---------- */
+.offer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.offer-row { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.offer-row.is-turn { background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 9%, var(--color-surface)), var(--color-surface)); box-shadow: inset 0 0 0 1px var(--color-accent-700); }
+.offer-deal { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.offer-side { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 12px; row-gap: 2px; align-items: center; min-width: 0; }
+.offer-side .tstack { grid-row: 1 / span 3; }
+.offer-side-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.offer-side-text { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.offer-side-value { font-size: 12px; color: var(--color-neutral-500); }
+.offer-arrow { color: var(--color-neutral-500); }
+.offer-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-top: 10px; border-top: 1px solid var(--color-divider); }
+.offer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--color-neutral-500); }
+.offer-meta a { color: var(--color-neutral-300); }
+.offer-kind { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-300); }
+.offer-state { padding: 1px 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--color-neutral-700); color: var(--color-neutral-300); }
+.offer-state.is-turn { color: var(--color-accent-200); box-shadow: inset 0 0 0 1px var(--color-accent-600); }
+.offer-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.offer-actions form { margin: 0; }
+.offer-actions .btn { height: 34px; min-height: 0; }
+
+/* ---------- Verlauf ---------- */
+.deal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.deal-row { display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-bottom: 1px solid var(--color-divider); }
+.deal-row.is-new { background: linear-gradient(90deg, color-mix(in srgb, oklch(0.8 0.14 155) 8%, transparent), transparent); }
+.deal-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.deal-title { overflow-wrap: anywhere; }
+.deal-title strong { font-weight: 600; }
+.deal-sub { font-size: 12px; color: var(--color-neutral-500); }
+.deal-sub a { color: var(--color-neutral-300); }
+.deal-money { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- Handelsfenster (views/handel-neu.ejs) ---------- */
+.hb { display: flex; flex-direction: column; gap: 18px; padding-bottom: 120px; }
+.hb-back { margin: 0; }
+.hb-head { margin: 0; }
+.hb-head h1 { margin: 0 0 4px; }
+.hb-target { margin: 0; }
+.hb-target-switch { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.hb-target-opt {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--radius-lg); color: var(--text); text-decoration: none;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--color-neutral-800); cursor: var(--cur-pointer);
+}
+.hb-target-opt > span { font-size: 12px; color: var(--color-neutral-400); }
+.hb-target-opt.active { background: color-mix(in srgb, var(--color-accent) 10%, var(--surface)); box-shadow: inset 0 0 0 1px var(--color-accent-500); }
+.hb-target-member { display: flex; gap: 8px; }
+.hb-target-member input { flex: 1; min-width: 0; height: 36px; }
+.hb-form { display: flex; flex-direction: column; gap: 18px; margin: 0; }
+.hb-cols { display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 980px) { .hb-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.hb-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.hb-col-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.hb-col-head h2 { margin: 0; }
+.hb-col-sum { font-size: 13px; color: var(--color-accent-300); font-variant-numeric: tabular-nums; }
+.hb-tray { list-style: none; margin: 0; padding: 10px; min-height: 66px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; border-radius: var(--radius-md); background: var(--surface-2); border: 1px dashed var(--color-neutral-700); }
+.hb-tray-empty { align-self: center; padding: 0 4px; }
+.hb-tray-empty[hidden] { display: none; }
+.hb-chip { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 3px; border-radius: 8px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--color-neutral-700); font-size: 13px; max-width: 100%; }
+.hb-chip img { width: 30px; height: auto; border-radius: 4px; }
+.hb-chip.is-foil img { box-shadow: 0 0 0 1px #e9d5ff; }
+.hb-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-chip-x { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--color-neutral-400); font-size: 16px; line-height: 1; cursor: var(--cur-pointer); }
+.hb-chip-x:hover { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.hb-fixed { display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: var(--radius-md); background: var(--surface-2); }
+.hb-fixed > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hb-money { margin: 0; }
+.hb-money-input { position: relative; display: flex; align-items: center; max-width: 220px; }
+.hb-money-input input { width: 100%; padding-right: 30px; font-variant-numeric: tabular-nums; }
+.hb-money-input > span { position: absolute; right: 12px; color: var(--muted); pointer-events: none; }
+.hb-price .hb-money-input { max-width: 260px; }
+.hb-price .hb-money-input input { height: 48px; font-size: 20px; font-weight: 600; }
+.hb-picker { display: flex; flex-direction: column; gap: 10px; }
+.hb-picker-tools { display: flex; flex-direction: column; gap: 8px; }
+.hb-picker-tools .tcg-filter { margin: 0; }
+.hb-search[type="search"] { height: 38px; }
+.hb-hint { margin: 0; }
+.hb-goods { display: flex; flex-direction: column; gap: 8px; }
+.hb-good { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.hb-good img { width: 40px; height: 40px; }
+.hb-good-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.hb-grid { grid-template-columns: repeat(auto-fill, minmax(min(30%, 104px), 1fr)); gap: 16px 12px; max-height: min(70vh, 720px); overflow-y: auto; padding: 8px 4px 4px; }
+.hb-slot.is-search-hidden { display: none; }
+.hb-slot { display: flex; flex-direction: column; gap: 4px; }
+.hb-slot.hb-good { flex-direction: row; align-items: center; gap: 12px; }
+.hb-art { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: var(--cur-pointer); }
+.hb-slot.is-picked .tcg-art, .hb-slot.is-picked .foil-card { box-shadow: 0 0 0 3px var(--color-accent-300), 0 0 18px color-mix(in srgb, var(--color-accent) 55%, transparent); transform: translateY(-3px); }
+.hb-slot:not(.is-picked) .tcg-art { opacity: .9; }
+.hb-qty { position: absolute; top: 6px; right: 6px; z-index: 2; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--color-bg); background: var(--color-accent-300); }
+.hb-qty[hidden] { display: none; }
+.hb-meta { font-size: 11px; color: var(--color-neutral-500); }
+.hb-step { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 2px; }
+.hb-step input { height: 28px; padding: 0 2px; text-align: center; font-size: 13px; -moz-appearance: textfield; appearance: textfield; }
+.hb-step input::-webkit-outer-spin-button, .hb-step input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.hb-good .hb-step { width: 104px; }
+.hb-step-btn { height: 28px; padding: 0; border: 0; border-radius: 6px; background: var(--surface); color: var(--text); font-size: 16px; line-height: 1; cursor: var(--cur-pointer); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.hb-step-btn:hover { background: color-mix(in srgb, var(--color-accent) 18%, var(--surface)); }
+.hb-foil { position: relative; cursor: var(--cur-pointer); }
+.hb-foil input { position: absolute; opacity: 0; pointer-events: none; }
+.hb-foil:has(input:focus-visible) .foil-card { outline: 2px solid var(--text); outline-offset: 3px; }
+.hb-foil.is-picked::after { content: "✓"; position: absolute; top: -6px; right: -6px; z-index: 3; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-accent-300); color: var(--color-bg); font-weight: 800; font-size: 14px; }
+.hb-bar {
+  position: sticky; bottom: 12px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 14px;
+  border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--color-accent-700), 0 12px 36px rgba(0, 0, 0, .55);
+}
+.hb-bar-summary { flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hb-bar-line { font-weight: 600; overflow-wrap: anywhere; }
+.hb-bar-line.is-problem { color: var(--color-neutral-300); }
+.hb-message { flex: 1 1 220px; margin: 0; }
+.hb-message textarea { width: 100%; min-height: 40px; resize: vertical; }
+.hb-submit { height: 44px; padding: 0 20px; }
 @media (max-width: 560px) {
-  .handel-page .trade-item, .handel-page .trade-item.trade-swap { grid-template-columns: auto minmax(0, 1fr); }
-  .handel-page .trade-actions { grid-column: 1 / -1; justify-content: flex-end; }
-  .handel-page .trade-swap .trade-thumb img { width: 46px; }
+  .hb-bar { bottom: 6px; padding: 10px; }
+  .hb-submit { width: 100%; }
+}
+
+/* ---------- Verhandlung (views/handel-angebot.ejs) ---------- */
+.ng-sides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 16px; }
+.ng-side { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.ng-side-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.ng-get .ng-side-label { color: var(--color-accent-300); }
+.ng-arrow { align-self: center; color: var(--color-neutral-500); }
+.ng-lines { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.ng-lines li { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px dashed var(--color-divider); }
+.ng-line-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ng-line-value { font-variant-numeric: tabular-nums; color: var(--color-neutral-400); white-space: nowrap; }
+.ng-money .ng-line-name { font-weight: 600; color: var(--warn); }
+.ng-money .ng-line-value { color: var(--text); font-weight: 600; }
+.ng-side-total { font-size: 12px; color: var(--color-neutral-500); }
+.ng-listing { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
+.ng-listing-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ng-listing-info form { margin: 6px 0 0; }
+.ng-listing-name { font-size: 17px; }
+.ng-price { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ng-counters h2 { display: flex; align-items: center; gap: 8px; }
+.ng-done { margin-top: 14px; font-size: 13px; }
+.ng-done ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 560px) {
+  .offer-deal { grid-template-columns: 1fr; }
+  .offer-arrow { transform: rotate(90deg); justify-self: center; }
+  .ng-sides { grid-template-columns: 1fr; }
+  .ng-arrow { transform: rotate(90deg); justify-self: center; }
+  .tstack-lg { --w: 104px; }
+  .mk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tstack-md { --w: 72px; }
+  .mk-body { padding: 10px; }
+  .mk-actions { grid-template-columns: 1fr; }
   .bm-cd { align-items: flex-start; }
   .bm .bm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
 }
@@ -4092,7 +4140,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .tcg-dot.r-item { background: #c4b5fd; }
 .inv-item-actions { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; padding-left: 4px; }
 .inv-item-actions form { margin: 0; }
-.trade-foil-head { margin: 18px 0 8px; font-size: 15px; }
 
 /* Inventar-Kachel im Stil des IHK-Start-Knopfs, aber holografisch (Folie) */
 .inv-tile {
@@ -4159,9 +4206,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 /* Folierte Exemplare als eigene Plätze (Album, Sammlung, Favoriten) und im Handel */
 .tcg-slot.foil-slot { position: relative; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-pointer, pointer); }
 .tcg-slot.foil-slot .tcg-marks { position: absolute; top: 18%; right: 8px; z-index: 2; }
-.trade-thumb-foil { position: relative; overflow: hidden; }
-.trade-thumb-foil img { box-shadow: 0 0 0 2px #e9d5ff, 0 0 10px #c4b5fd88; }
-.trade-thumb-foil .foil-sheen { border-radius: 6px; }
 /* Großansicht: Karte in der Mitte, Favoriten-Knopf darunter */
 .foil-modal[open] { display: flex; flex-direction: column; }
 .foil-modal .foil-modal-stage { flex: 1 1 auto; height: auto; min-height: 0; }
@@ -4183,12 +4227,6 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .tcg-pack-art img { pointer-events: none; -webkit-user-drag: none; }
 .tcg-favs-box .tcg-grid.tcg-favs { margin-top: auto; } /* Favoriten unten bündig mit der Album-Kachel */
 /* Handelsdialog: Kartenbild, bei einem folierten Exemplar mit Folienrand und Glanz */
-.trade-dialog-art { position: relative; display: block; border-radius: 10px; overflow: hidden; }
-.trade-dialog-art img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 2px var(--rar, transparent), 0 8px 24px rgba(0, 0, 0, .25); }
-.trade-dialog-art .foil-sheen { display: none; }
-.trade-dialog-art.is-foiled .foil-sheen { display: block; }
-.trade-dialog-art.is-foiled img { box-shadow: 0 0 0 3px #e9d5ff, 0 0 22px #c4b5fd99; }
-@media (max-width: 560px) { .trade-dialog-art { width: 120px; justify-self: center; } }
 .foil-card.foil-card-slot { position: relative; }
 /* Grading-Vorstellung: versiegelte Schaukarte im Slab (steht still, nur Glanz und Kartenfeffekt bewegen sich) */
 .gr-hero-slab {

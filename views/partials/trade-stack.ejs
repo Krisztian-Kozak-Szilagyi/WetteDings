@@ -1,0 +1,32 @@
+<%#
+  Karten einer Seite eines Angebots als Fächer: list = Positionen ({ card, foiledAt, grade }), money = Cent dazu (optional).
+  size: 'sm' (Zeilen), 'md' (Markt-Kachel), 'lg' (Verhandlung). Gezeigt werden höchstens max Karten, der Rest als "+n".
+  Jede Karte ist ein Knopf: normale Karten öffnen den Zoom (public/js/handel.js), folierte die 3D-Ansicht (public/js/foil-view.js).
+%>
+<%
+  const stackList = locals.list || [];
+  const stackMax = locals.max || 3;
+  const stackSize = locals.size || 'sm';
+  const ownCounts = locals.coll ? coll.counts : locals.ownedCounts || {};
+  const shown = stackList.slice(0, stackMax);
+  const more = stackList.length - shown.length;
+%>
+<span class="tstack tstack-<%= stackSize %><%= shown.length > 1 ? ' tstack-many' : '' %>" style="--n: <%= Math.max(1, shown.length) %>">
+  <% shown.forEach((l, i) => { const c = cardInfo(l.card); const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
+    <% if (l.foiledAt) { %>
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { grade: l.grade }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
+        <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span>
+      </button>
+    <% } else { %>
+      <button type="button" class="tstack-card r-<%= c.rarity %>" style="--i: <%= i %>" data-zoom-card
+        data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
+        data-sell-text="<%= euro(c.isItem ? c.sell : r.sell || 0) %>" data-owned="<%= ownCounts[c.id] || 0 %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+        <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+      </button>
+    <% } %>
+  <% }) %>
+  <% if (!shown.length) { %>
+    <span class="tstack-money" aria-hidden="true"><span>€</span></span>
+  <% } %>
+  <% if (more > 0) { %><span class="tstack-more">+<%= more %></span><% } %>
+</span>
