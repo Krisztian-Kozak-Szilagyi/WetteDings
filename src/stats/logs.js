@@ -30,11 +30,13 @@ const EXPORT_MAX = 20000; // Obergrenze für den Export (alle Seiten auf einmal)
 
 // Die Logs im Reiter "Protokolle" (key = ?log=…, page = eigener Seiten-Parameter, group = Gruppe in der Auswahl)
 const LOG_GROUPS = [
+  { key: 'alle', label: 'Übersicht' },
   { key: 'spiel', label: 'Spiel' },
   { key: 'tcg', label: 'TCG' },
   { key: 'team', label: 'Team' },
 ];
 const LOGS = [
+  { key: 'gesamt', label: 'Gesamt (alle Protokolle)', page: 'gesamtseite', group: 'alle' },
   { key: 'wetten', label: 'Wetten', page: 'wettenseite', group: 'spiel' },
   { key: 'einsaetze', label: 'Einsätze', page: 'einsatzseite', group: 'spiel' },
   { key: 'broker', label: 'Broker', page: 'brokerseite', group: 'spiel' },
@@ -476,6 +478,236 @@ async function settingsLog(query, { player = null, all = false } = {}) {
   return { ...pg, rows: docs.map(settingsRow) };
 }
 
+// ---------- Gesamt: alle Protokolle in einer Liste, neueste zuerst ----------
+
+// Buchungen, die kein anderes Protokoll zeigt (Lose, Verkäufe, Einsätze, Broker, Quests, Handel, Vergaben,
+// Startguthaben usw. stehen schon in ihren eigenen Protokollen und kämen sonst doppelt)
+const GESAMT_LEDGER_TYPES = ['auszahlung', 'erstattung', 'provision', 'provision_schiri', 'bonus', 'erfolg', 'tcg_pack', 'grading_ausbau', 'konto_geloescht'];
+const GESAMT_PAGES = 40; // tiefer blättern lohnt nicht – dafür gibt es die einzelnen Protokolle und den Export
+const GESAMT_EXPORT = 5000;
+const itemsText = (items) => items.map((c) => `${c.count > 1 ? c.count + '× ' : ''}${c.label}`).join(', ') || '–';
+const IHK_STATE_TEXT = { laeuft: 'läuft', geschafft: 'geschafft', gescheitert: 'gescheitert' };
+const withNames = async (docs) => namesOf(docs.map((d) => d.user));
+
+/**
+ * Quellen des Gesamtprotokolls: Modell, Filter (optional für einen Spieler), Zeitfeld zum Sortieren und wie aus
+ * den Dokumenten einheitliche Zeilen werden: { at, player, text, amount } (amount in Cent oder null).
+ * Die Zeilen bauen auf den Zeilen der einzelnen Protokolle auf.
+ */
+const GESAMT_SOURCES = [
+  {
+    log: 'wetten',
+    Model: Bet,
+    time: 'createdAt',
+    select: 'title options creatorName refereeName status outcome disputed refunded createdAt',
+    filter: async (p) => (p ? { $or: [{ creator: p._id }, { referee: p._id }, { 'duel.opponent': p._id }, { _id: { $in: await Position.distinct('bet', { user: p._id }) } }] } : {}),
+    rows: async (docs) =>
+      docs.map((b) => {
+        const r = betRow(b);
+        return { at: r.at, player: r.creator, text: `Wette „${r.title}“ erstellt${r.referee ? ` (Schiedsrichter ${r.referee})` : ''} – ${r.result}`, amount: null };
+      }),
+  },
+  {
+    log: 'einsaetze',
+    Model: Position,
+    time: 'createdAt',
+    filter: async (p) => (p ? { user: p._id } : {}),
+    rows: async (docs) => {
+      const bets = await Bet.find({ _id: { $in: docs.map((d) => d.bet) } }).select('title options').lean();
+      const byId = new Map(bets.map((b) => [String(b._id), b]));
+      return docs.map((d) => {
+        const r = stakeRow(d, byId.get(String(d.bet)));
+        return { at: r.at, player: r.player, text: `Setzt auf „${r.side}“ bei „${r.bet}“`, amount: -r.amount };
+      });
+    },
+  },
+  {
+    log: 'broker',
+    Model: CoinTrade,
+    time: 'createdAt',
+    filter: async (p) => (p ? { user: p._id } : {}),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = coinRow(d, names.get(String(d.user)));
+        return { at: r.at, player: r.player, text: `${r.side}: ${r.unitsText} ${r.asset}`, amount: r.cents };
+      });
+    },
+  },
+  {
+    log: 'lotterie',
+    Model: Ledger,
+    time: 'createdAt',
+    filter: async (p) => ({ type: { $in: ['lotto_los', 'lotto_gewinn'] }, ...(p ? { user: p._id } : {}) }),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = lottoRow(d, names.get(String(d.user)));
+        const lose = r.count ? ` (${r.count} ${r.count === 1 ? 'Los' : 'Lose'})` : '';
+        return { at: r.at, player: r.player, text: `${r.lottery}: ${r.kind}${lose}${r.ticket ? ` mit Los ${r.ticket}` : ''}`, amount: r.amount };
+      });
+    },
+  },
+  {
+    log: 'konto',
+    label: 'Buchung',
+    Model: Ledger,
+    time: 'createdAt',
+    select: 'user type amount betTitle createdAt',
+    filter: async (p) => ({ type: { $in: GESAMT_LEDGER_TYPES }, ...(p ? { user: p._id } : {}) }),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = ledgerRow(d, names.get(String(d.user)));
+        return { at: r.at, player: r.player, text: r.text ? `${r.kind}: ${r.text}` : r.kind, amount: r.amount };
+      });
+    },
+  },
+  {
+    log: 'handel',
+    Model: Trade,
+    time: 'closedAt',
+    select: 'kind sellerName buyerName toName card wantCard price closedAt',
+    filter: async (p) => ({ status: 'verkauft', ...(p ? { $or: [{ seller: p._id }, { buyer: p._id }, { to: p._id }] } : {}) }),
+    rows: async (docs) =>
+      docs.map((t) => {
+        const to = t.kind === 'tausch' ? t.toName : t.buyerName;
+        const back = t.kind === 'tausch' ? cardLabel(t.wantCard) + (t.price > 0 ? ` + ${euro(t.price)}` : '') : euro(t.price);
+        return { at: t.closedAt, player: t.sellerName, text: `${KIND_LABEL[t.kind] || t.kind}: ${cardLabel(t.card)} an ${to || '–'} gegen ${back}`, amount: null };
+      }),
+  },
+  {
+    log: 'packs',
+    Model: TcgOpening,
+    time: 'createdAt',
+    filter: async (p) => (p ? { user: p._id } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = packRow(d);
+        // ältere Öffnungen ohne Pack-Art und Herkunft (siehe Pack-Protokoll)
+        const pack = r.pack === '–' ? 'Booster Pack' : r.pack;
+        return { at: r.at, player: r.player, text: `${pack} geöffnet${r.source === '–' ? '' : ` (${r.source})`}: ${itemsText(r.cards)}`, amount: null };
+      }),
+  },
+  {
+    log: 'verkauf',
+    Model: Ledger,
+    time: 'createdAt',
+    filter: async (p) => ({ type: { $in: SELL_TYPES }, ...(p ? { user: p._id } : {}) }),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = sellRow(d, names.get(String(d.user)));
+        return { at: r.at, player: r.player, text: `${r.kind}: ${itemsText(r.items)}`, amount: r.amount };
+      });
+    },
+  },
+  {
+    log: 'ihk',
+    Model: IhkRun,
+    time: 'createdAt',
+    select: 'user quest difficulty card boost boost2 success reward status endsAt collectedAt pack createdAt',
+    filter: async (p) => (p ? { user: p._id } : {}),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = ihkRow(d, names.get(String(d.user)));
+        // laufende Quests: Ergebnis und Lohn erst nach Ablauf zeigen (wie im IHK-Protokoll)
+        return { at: r.at, player: r.player, text: `IHK-Quest „${r.quest}“ (${r.difficulty}) mit ${r.card} – ${IHK_STATE_TEXT[r.state]}`, amount: r.state === 'laeuft' ? null : r.reward || null };
+      });
+    },
+  },
+  {
+    log: 'dungeon',
+    Model: DungeonRun,
+    time: 'startedAt',
+    select: 'dungeon members success fights.key fights.success startedAt endsAt status',
+    filter: async (p) => (p ? { 'members.user': p._id } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = dungeonRow(d);
+        const players = r.members.filter((m) => !m.bot).map((m) => m.name).join(', ') || '–';
+        return { at: r.startedAt, player: players, text: `Dungeon ${r.dungeon}: ${r.running ? 'läuft' : r.success ? 'Boss besiegt' : 'Rückzug'} (${r.progress} Kämpfe)`, amount: null };
+      }),
+  },
+  {
+    log: 'grading',
+    Model: GradingJob,
+    time: 'createdAt',
+    select: 'user level card customer grade status guess clean seal pay foilFound doneAt createdAt',
+    filter: async (p) => (p ? { user: p._id } : {}),
+    rows: async (docs) => {
+      const names = await withNames(docs);
+      return docs.map((d) => {
+        const r = gradingRow(d, names.get(String(d.user)));
+        return { at: r.startedAt, player: r.player, text: `Grading ${r.shop}: ${r.card} für ${r.customer}${r.done ? ` – Note ${r.grade}` : ' – läuft'}`, amount: r.done ? r.pay || null : null };
+      });
+    },
+  },
+  {
+    log: 'vergaben',
+    Model: PackGrant,
+    time: 'createdAt',
+    filter: async (p) => (p ? { $or: [{ by: p._id }, { to: p._id }] } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = grantRow(d);
+        const what = /geld/.test(r.kind) ? r.what : `${r.count}× ${r.what}`; // Geld: count ist der Betrag
+        return { at: r.at, player: r.by, text: `${r.kindLabel} an ${r.to}: ${what}`, amount: null };
+      }),
+  },
+  {
+    log: 'registrierungen',
+    Model: User,
+    time: 'createdAt',
+    select: 'username realName registrationCode invitedByName deletedAt createdAt',
+    filter: async (p) => (p ? { _id: p._id } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = registrationRow(d);
+        const details = [r.code ? `mit Code ${r.code}` : '', r.invitedBy ? `eingeladen von ${r.invitedBy}` : ''].filter(Boolean).join(', ');
+        const name = r.realName ? ` (${r.realName})` : '';
+        return { at: r.at, player: r.name, text: `Registriert${name}${details ? ' ' + details : ''}${r.deleted ? ' – Konto gelöscht' : ''}`, amount: null };
+      }),
+  },
+  {
+    log: 'einstellungen',
+    Model: SettingsChange,
+    time: 'createdAt',
+    select: 'area changes byName createdAt',
+    filter: async (p) => (p ? { by: p._id } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = settingsRow(d);
+        const shown = r.changes.slice(0, 3).map((x) => `${x.path}: ${x.from} → ${x.to}`).join(', ');
+        const more = r.changes.length > 3 ? ` … (+${r.changes.length - 3})` : '';
+        return { at: r.at, player: r.by, text: `${r.area} geändert${shown ? ': ' + shown : ''}${more}`, amount: null };
+      }),
+  },
+];
+
+/** Zeilen mehrerer Quellen zusammenführen: neueste zuerst (stabil – bei gleicher Zeit bleibt die Reihenfolge der Quellen) */
+const mergeRows = (lists) => lists.flat().sort((a, b) => new Date(b.at) - new Date(a.at));
+
+async function gesamtLog(query, { player = null, all = false } = {}) {
+  const sources = await Promise.all(GESAMT_SOURCES.map(async (s) => ({ ...s, where: await s.filter(player) })));
+  const total = (await Promise.all(sources.map((s) => s.Model.countDocuments(s.where)))).reduce((a, b) => a + b, 0);
+  const { pages, page } = all ? { pages: 1, page: 1 } : pageOf(query.gesamtseite, Math.min(total, GESAMT_PAGES * LOG_PAGE));
+  // Für Seite n reichen von jeder Quelle die neuesten n × LOG_PAGE Einträge – ältere können auf Seite 1 … n nicht vorkommen
+  const take = all ? GESAMT_EXPORT : page * LOG_PAGE;
+  const lists = await Promise.all(
+    sources.map(async (s) => {
+      let q = s.Model.find(s.where).sort({ [s.time]: -1, _id: -1 }).limit(take);
+      if (s.select) q = q.select(s.select);
+      const label = s.label || logByKey[s.log].label;
+      return (await s.rows(await q.lean())).map((r) => ({ ...r, log: s.log, logLabel: label }));
+    })
+  );
+  const merged = mergeRows(lists);
+  const rows = all ? merged.slice(0, GESAMT_EXPORT) : merged.slice((page - 1) * LOG_PAGE, page * LOG_PAGE);
+  return { total, pages, page, capped: !all && total > GESAMT_PAGES * LOG_PAGE, rows };
+}
+
 // ---------- Export: CSV für Excel (wie die Statistik: Semikolon, Dezimalkomma, UTF-8 mit BOM) ----------
 
 const csvDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: config.timezone });
@@ -490,6 +722,10 @@ const IHK_STATE = { laeuft: 'Läuft', geschafft: 'Geschafft', gescheitert: 'Gesc
 
 // Kopfzeile und Zeilen je Log (eine Zeile pro Eintrag; Dungeons: eine Zeile pro Teilnehmer, damit Excel filtern kann)
 const CSV = {
+  gesamt: {
+    head: ['Zeitpunkt', 'Bereich', 'Spieler', 'Was', 'Betrag (€)'],
+    rows: (r) => [[csvDate(r.at), r.logLabel, r.player, r.text, r.amount === null ? '' : csvEuro(r.amount)]],
+  },
   vergaben: {
     head: ['Zeitpunkt', 'Von', 'An', 'Art', 'Was', 'Anzahl je Mitglied', 'Empfänger'],
     rows: (g) => [[csvDate(g.at), g.by, g.to, g.kindLabel, g.what, g.count, g.recipients]],
@@ -580,7 +816,7 @@ function exportFileName(key, playerName, ext, now = new Date()) {
   return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
-const LOADERS = { wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, registrierungen: registrationLog, einstellungen: settingsLog };
+const LOADERS = { gesamt: gesamtLog, wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, registrierungen: registrationLog, einstellungen: settingsLog };
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
@@ -618,6 +854,9 @@ module.exports = {
   gradingRow,
   ledgerRow,
   registrationRow,
+  mergeRows,
+  GESAMT_SOURCES,
+  GESAMT_LEDGER_TYPES,
   grantRow,
   settingsRow,
 };

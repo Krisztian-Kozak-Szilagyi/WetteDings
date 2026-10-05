@@ -21,6 +21,7 @@
     : '<span class="muted">–</span>';
   // Erklärung je Protokoll (hinter dem ?)
   const LOG_HELP = {
+    gesamt: 'Alle Protokolle in einer Liste, neueste zuerst – Wetten, Einsätze, Broker, Lotterie, Handel, Packs, Verkäufe, IHK, Dungeons, Grading, Vergaben, Registrierungen und Einstellungen. Von den Buchungen nur die, die sonst nirgends stehen (Tagesbonus, Provisionen, Auszahlungen, Erfolge, Pack-Käufe …), damit nichts doppelt erscheint. Ein Klick auf den Bereich öffnet das Protokoll mit allen Details. Geblättert werden kann bis Seite 40; der Export enthält die neuesten 5.000 Einträge.',
     handel: 'Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.',
     packs: 'Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.',
     verkauf: 'Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.',
@@ -409,6 +410,30 @@
                   <td><% if (g.all) { %><strong><%= g.to %></strong><% } else { %><%- userLink(g.to, { realName: false }) %><% } %></td>
                   <td><span class="badge <%= /entzug|abzug/.test(g.kind) ? 'badge-streitig' : g.kind === 'pack' ? 'badge-offen' : 'badge-entschieden' %>"><%= g.kindLabel %></span> <%= g.what %></td>
                   <td class="num"><%= g.count %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'gesamt') { %>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Eintrag', 'Einträge') %><%= data.capped ? ' (die ältesten nur in den einzelnen Protokollen)' : '' %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Einträge.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Bereich</th><th>Spieler</th><th>Was</th><th class="num">Betrag</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((r) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(r.at) %></td>
+                  <td class="nowrap"><a class="badge badge-entschieden" href="<%= logUrl({}, r.log) %>"><%= r.logLabel %></a></td>
+                  <td><%= r.player %></td>
+                  <td class="small"><%= r.text %></td>
+                  <td class="num nowrap"><%- r.amount === null ? '<span class="muted">–</span>' : signedEuro(r.amount) %></td>
                 </tr>
               <% }) %>
             </tbody>

@@ -214,3 +214,17 @@ test('Registrierungen: Code formatiert, ältere Konten ohne Code und Einladenden
   const old = logs.registrationRow({ username: 'ben', createdAt: at, deletedAt: at });
   assert.deepEqual([old.realName, old.code, old.invitedBy, old.deleted], [null, null, null, true]);
 });
+
+test('Gesamt: deckt jedes Protokoll ab, Buchungen ohne Doppelte, neueste zuerst', () => {
+  const covered = new Set(logs.GESAMT_SOURCES.map((s) => s.log));
+  for (const l of logs.LOGS) if (l.key !== 'gesamt') assert.ok(covered.has(l.key), l.key);
+  // Buchungsarten, die schon ein eigenes Protokoll haben, dürfen im Gesamtprotokoll nicht noch einmal als Buchung auftauchen
+  for (const t of ['lotto_los', 'lotto_gewinn', 'tcg_verkauf', 'item_verkauf', 'black_market', 'einsatz', 'coin_kauf', 'coin_verkauf', 'startguthaben', 'team_gutschrift', 'team_abzug']) {
+    assert.ok(!logs.GESAMT_LEDGER_TYPES.includes(t), t);
+  }
+  const d = (s) => new Date(`2026-01-0${s}T12:00:00Z`);
+  const merged = logs.mergeRows([[{ at: d(3), text: 'a3' }, { at: d(1), text: 'a1' }], [{ at: d(2), text: 'b2' }, { at: d(3), text: 'b3' }]]);
+  assert.deepEqual(merged.map((r) => r.text), ['a3', 'b3', 'b2', 'a1']);
+  const csv = logs.toCsv('gesamt', { total: 1, rows: [{ at: d(1), logLabel: 'Wetten', player: 'anna', text: 'Wette', amount: -150 }] }).slice(1).split('\r\n');
+  assert.equal(csv[1], '01.01.2026 13:00:00;Wetten;anna;Wette;-1,5'); // Euro wie in den anderen Protokollen (num)
+});
