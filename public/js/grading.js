@@ -364,21 +364,22 @@
     });
     gradeOk.hidden = true;
     var diff = Math.abs(guess - grade);
-    var found = [];
-    if ((d.scratches || []).length) found.push(plural(d.scratches.length, 'Kratzer', 'Kratzer'));
-    if ((d.corners || []).length) found.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
-    if ((d.edges || []).length) found.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
-    if (d.crease) found.push('ein Knick');
+    // Rechenweg wie im Ablauf: 1 Obergrenze (Knick oder Zentrierung) – 2 Mängel abziehen = 3 Note
+    var minus = [];
+    if ((d.scratches || []).length) minus.push(plural(d.scratches.length, 'Kratzer', 'Kratzer'));
+    if ((d.corners || []).length) minus.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
+    if ((d.edges || []).length) minus.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
     var c = d.centering;
     var worst = c ? Math.max(c.lr || 50, c.tb || 50) : 50;
-    if (worst > 55) {
-      found.push('Zentrierung ' + worst + '/' + (100 - worst) + ' (höchstens ' + job.centerCap + ')');
-      card.classList.add('is-offcenter');
-    }
+    if (worst > 55) card.classList.add('is-offcenter');
+    var capBy = d.crease && 4 <= job.centerCap ? 'Knick' : job.centerCap < 10 ? 'Zentrierung ' + worst + '/' + (100 - worst) : '';
+    var cap = d.crease ? Math.min(4, job.centerCap) : job.centerCap;
+    var count = (d.scratches || []).length + (d.corners || []).length + (d.edges || []).length;
+    var calc = 'Obergrenze ' + cap + (capBy ? ' (' + capBy + ')' : '') + (count ? ' − ' + minus.join(', ') : '') + ' = Note ' + grade;
     verdict.className = 'gr-verdict ' + (diff === 0 ? 'is-right' : diff === 1 ? 'is-close' : 'is-wrong');
     verdict.innerHTML = '';
     el('strong', '', verdict).textContent = diff === 0 ? 'Exakt! Note ' + grade + '.' : diff === 1 ? 'Knapp daneben – richtig ist ' + grade + ' (halber Bonus).' : 'Daneben – richtig ist ' + grade + '.';
-    el('span', '', verdict).textContent = found.length ? ' Mängel: ' + found.join(', ') + ' – jetzt rot markiert.' : ' Die Karte war makellos.';
+    el('span', '', verdict).textContent = capBy || count ? ' ' + calc + ' – Mängel jetzt rot markiert.' : ' Die Karte war makellos.';
     verdict.hidden = false;
     gradeNext.hidden = false;
     card.classList.add('is-revealed');

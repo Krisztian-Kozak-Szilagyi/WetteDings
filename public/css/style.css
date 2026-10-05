@@ -3474,18 +3474,30 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .gr-text { margin: 0; max-width: 520px; font-size: 14px; line-height: 1.55; color: var(--color-neutral-300); }
 .gr-text b { font-weight: 500; color: var(--color-text); }
-/* Benoten: Regeln als zwei kompakte Kästen statt langer Textzeilen */
-.gr-rules { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; }
-@media (max-width: 640px) { .gr-rules { grid-template-columns: 1fr; } }
-.gr-rule-box { padding: 10px 12px; border-radius: 10px; background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-divider); }
-.gr-rule-title { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-300); }
-.gr-rule-title small { font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-neutral-500); }
-.gr-rule-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
-.gr-rule-list li, .gr-center-scale li { display: flex; justify-content: space-between; gap: 8px; color: var(--color-neutral-400); }
-.gr-rule-list b { font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Benoten: Ablauf in drei Stufen – 1 Obergrenze (hervorgehoben), 2 Abziehen, 3 Note; eine Linie verbindet die Stufen */
+.gr-flow { position: relative; display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gr-flow::before { content: ""; position: absolute; left: 13px; top: 18px; bottom: 18px; width: 2px; background: var(--color-divider); }
+.gr-flow-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.gr-flow-num { z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 13px; font-weight: 700; background: var(--color-surface); color: var(--color-neutral-400); box-shadow: 0 0 0 2px var(--color-divider); }
+.gr-flow-body { min-width: 0; padding: 4px 0; }
+.gr-flow-title { display: flex; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-300); }
+.gr-flow-title small { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-neutral-500); }
+/* Stufe 1 trägt die Entscheidung: deutlich als Karte abgesetzt, Nummer in Akzentfarbe */
+.gr-flow-step.is-cap .gr-flow-body { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent); }
+.gr-flow-step.is-cap .gr-flow-num { background: var(--color-accent); color: #fff; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 40%, transparent); }
+.gr-flow-step.is-cap .gr-flow-title { color: var(--color-text); font-size: 13px; }
+.gr-cap-row { display: flex; align-items: stretch; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.gr-cap-crease { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 64px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--color-divider) 45%, transparent); font-size: 11px; color: var(--color-neutral-400); }
+.gr-cap-crease b, .gr-center-scale b { font-size: 16px; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.gr-cap-center { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 4px; }
+.gr-cap-center > small { font-size: 11px; color: var(--color-neutral-400); }
+.gr-cap-center > small span { color: var(--color-neutral-500); }
 .gr-center-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
-.gr-center-scale li { flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 6px; background: color-mix(in srgb, var(--color-divider) 45%, transparent); font-size: 11px; font-variant-numeric: tabular-nums; }
-.gr-center-scale b { font-size: 15px; font-weight: 600; color: var(--color-text); }
+.gr-center-scale li { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px; border-radius: 6px; background: color-mix(in srgb, var(--color-divider) 45%, transparent); font-size: 11px; color: var(--color-neutral-400); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .gr-center-scale li { font-size: 10px; padding: 5px 1px; } .gr-cap-center { min-width: 0; } }
+.gr-minus-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--color-neutral-400); }
+.gr-minus-list b { font-weight: 600; color: var(--color-text); }
+.gr-flow-step.is-result .gr-flow-num { background: var(--color-surface); color: var(--color-text); }
 .gr-grades { margin: 0; }
 .gr-grade {
   height: 44px; border-radius: var(--radius-md); border: 0; font: 500 16px var(--font); color: var(--color-neutral-200);

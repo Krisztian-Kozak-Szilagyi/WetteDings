@@ -40,11 +40,11 @@ test('Zustand: frisch aus dem Pack – Note 8 am häufigsten, im Schnitt besser 
   };
   const frisch = roll(() => rollCondition().grade);
   const kunde = roll(() => gradeFor(rollDefects('kunde')));
-  // exakt: 10 ≈ 9,2 %, 9 ≈ 26,9 %, 8 ≈ 30,2 %, Ø ≈ 7,88
+  // exakt: 10 ≈ 10,6 %, 9 ≈ 25,6 %, 8 ≈ 27,6 %, Ø ≈ 7,76
   assert.ok(frisch.share(8) > frisch.share(9) && frisch.share(9) > frisch.share(10), 'Note 8 am häufigsten, dann 9, dann 10');
-  assert.ok(frisch.share(10) > 0.06 && frisch.share(10) < 0.13, `frisch 10: ${frisch.share(10)}`);
+  assert.ok(frisch.share(10) > 0.07 && frisch.share(10) < 0.14, `frisch 10: ${frisch.share(10)}`);
   assert.ok(frisch.avg > kunde.avg, `Ø frisch ${frisch.avg} > kunde ${kunde.avg}`);
-  assert.ok(kunde.share(10) > 0.03 && kunde.share(10) < 0.09, `kunde 10: ${kunde.share(10)}`); // exakt ≈ 5,6 %
+  assert.ok(kunde.share(10) > 0.05 && kunde.share(10) < 0.12, `kunde 10: ${kunde.share(10)}`); // exakt ≈ 8,5 %
   assert.ok(kunde.share(8) > kunde.share(9), 'auch bei Kundenkarten ist die 8 häufiger als die 9');
   // Kundenaufträge im Grading-Shop würfeln unverändert mit dem Profil "kunde"
   assert.equal(grading.rollDefects, rollDefects);
@@ -103,7 +103,7 @@ test('Versatz auf der Folie: Stärke aus der Zentrierung, Richtung fest aus dem 
   }
 });
 
-test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start bei 4', () => {
+test('Erst Obergrenze (Knick, Zentrierung – schlechtere Achse zählt), dann je Mangel −1', () => {
   const { centeringCap } = condition;
   const none = { scratches: [], corners: [], edges: [], crease: false };
   assert.equal(centeringCap(undefined), 10); // alte Aufträge ohne Zentrierung
@@ -113,6 +113,11 @@ test('Zentrierung begrenzt die Note (schlechtere Achse zählt), mit Knick Start 
   assert.equal(centeringCap({ lr: 70, tb: 70 }), 7);
   assert.equal(centeringCap({ lr: 80, tb: 50 }), 6);
   assert.equal(gradeFor({ ...none, centering: { lr: 62, tb: 51 } }), 8); // makellos, aber 62/38
-  assert.equal(gradeFor({ ...none, scratches: [{}, {}, {}], centering: { lr: 62, tb: 51 } }), 7); // Kratzer drücken tiefer als die Grenze
+  assert.equal(gradeFor({ ...none, scratches: [{}, {}, {}], centering: { lr: 62, tb: 51 } }), 5); // erst Obergrenze 8, dann −3
+  assert.equal(gradeFor({ ...none, scratches: [{}], centering: { lr: 64, tb: 50 } }), 7); // 64/36 → 8, −1 Kratzer
+  assert.equal(gradeFor({ ...none, crease: true, centering: { lr: 75, tb: 50 } }), 4); // Knick (4) liegt unter der Zentrierungs-Grenze (6)
+  assert.deepEqual(condition.gradeCap({ ...none, crease: true, centering: { lr: 75, tb: 50 } }), { cap: 4, by: 'knick' });
+  assert.deepEqual(condition.gradeCap({ ...none, centering: { lr: 75, tb: 50 } }), { cap: 6, by: 'zentrierung' });
+  assert.deepEqual(condition.gradeCap(none), { cap: 10, by: null });
   assert.equal(gradeFor({ ...none, crease: true, scratches: [{}], centering: { lr: 50, tb: 50 } }), 3);
 });

@@ -30,17 +30,17 @@ const CENTERING = [
   { max: 70, cap: 7 },
   { max: 80, cap: 6 },
 ];
-// Ein Knick begrenzt die Note auf höchstens … (wie bei echtem Grading)
+// Ein Knick setzt die Obergrenze auf … (wie bei echtem Grading)
 const CREASE_CAP = 4;
 
 // Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
 // centering: Gewichte je Achse für die Bereiche in CENTERING (null = immer perfekt zentriert, z. B. alte Aufträge).
-// kunde: gebrauchte Karten der Kunden im Grading-Shop – Note 8 am häufigsten (≈ 28 %), 10 ≈ 6 %, Ø 7,3
-// frisch: Karten aus dem Pack, dem Black Market oder vom Team – Note 8 am häufigsten (≈ 30 %), 9 ≈ 27 %,
-// 10 ≈ 9 %, Ø 7,9 (exakt nachrechenbar; test/condition.test.js prüft die Form)
+// kunde: gebrauchte Karten der Kunden im Grading-Shop – Note 8 am häufigsten (≈ 23 %), 10 ≈ 9 %, Ø 7,2
+// frisch: Karten aus dem Pack, dem Black Market oder vom Team – Note 8 am häufigsten (≈ 28 %), 9 ≈ 26 %,
+// 10 ≈ 11 %, Ø 7,8 (exakt nachrechenbar; test/condition.test.js prüft die Form)
 const PROFILES = {
-  kunde: { scratches: [40, 35, 18, 7], corner: 0.15, edges: [60, 30, 10], crease: 0.08, centering: [70, 16, 8, 4, 2] },
-  frisch: { scratches: [34, 38, 21, 7], corner: 0.12, edges: [72, 22, 6], crease: 0.02, centering: [80, 12, 5, 2, 1] },
+  kunde: { scratches: [42, 35, 18, 5], corner: 0.13, edges: [62, 30, 8], crease: 0.06, centering: [78, 13, 5, 3, 1] },
+  frisch: { scratches: [30, 44, 21, 5], corner: 0.10, edges: [74, 22, 4], crease: 0.02, centering: [86, 9, 3, 1, 1] },
 };
 
 /** Zentrierung einer Achse: Bereich nach Gewichten, darin ein ganzzahliger Wert (50 = perfekt) */
@@ -76,13 +76,22 @@ function rollDefects(profile = 'kunde') {
 }
 
 /**
- * Note aus den Mängeln: Start 10 (mit Knick: Start CREASE_CAP), Kratzer, Ecke, Kantenmacke je −1.
- * Die Zentrierung begrenzt die Note nach oben (siehe CENTERING). Mindestens 1.
+ * Obergrenze einer Karte: der niedrigste Wert aus Knick (CREASE_CAP) und Zentrierung (CENTERING), sonst 10.
+ * { cap, by: 'knick' | 'zentrierung' | null }
+ */
+function gradeCap(defects) {
+  const center = centeringCap(defects.centering);
+  if (defects.crease && CREASE_CAP <= center) return { cap: CREASE_CAP, by: 'knick' };
+  return { cap: center, by: center < 10 ? 'zentrierung' : null };
+}
+
+/**
+ * Note in zwei Schritten (so steht es auch im Grading-Shop): erst die Obergrenze (Knick, Zentrierung),
+ * dann davon je Kratzer, bestoßene Ecke und Kantenmacke −1. Mindestens 1.
  */
 function gradeFor(defects) {
   const minus = defects.scratches.length + defects.corners.length + defects.edges.length;
-  const start = defects.crease ? CREASE_CAP : 10;
-  return Math.max(1, Math.min(start - minus, centeringCap(defects.centering)));
+  return Math.max(1, gradeCap(defects).cap - minus);
 }
 
 /** Zustand einer Karte im Besitz eines Mitglieds: { v, grade, defects } */
@@ -123,4 +132,4 @@ function gradeStats(grades) {
   return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
-module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift };
+module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap };
