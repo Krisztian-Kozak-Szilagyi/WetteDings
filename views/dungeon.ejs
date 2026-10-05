@@ -290,6 +290,24 @@
     <button class="btn btn-ghost btn-sm" type="submit">Admin: alle Anmeldungen jetzt starten</button>
   </form>
 <% } %>
+
+<%# Seltene Beute aller Spieler (Folie, Boss-Karte) – gleiche Liste wie "Seltene Ziehungen" im TCG %>
+<section class="dg-rare tcg-rare-feed">
+  <span class="kicker kicker-muted">Seltene Beute</span>
+  <% if (!rareLoot.length) { %>
+    <p class="muted small">Noch hat niemand eine Folie oder eine Boss-Karte erbeutet.</p>
+  <% } else { %>
+    <ul class="tcg-feed">
+      <% rareLoot.forEach((l) => { %>
+        <li class="<%= l.card ? 'r-' + l.card.rarity : 'dg-rare-foil' %>">
+          <span class="tcg-dot"></span>
+          <span><strong><%- userLink(l.name) %></strong> erbeutete <%= l.card ? 'die Boss-Karte „' + l.card.name + '“' : '' %><%= l.card && l.foil ? ' und ' : '' %><%= l.foil ? 'eine Folie' : '' %> <span class="muted">(<%= l.dungeon %>)</span></span>
+          <span class="muted small nowrap"><%= relTime(l.at) %></span>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</section>
 </div>
 
 <%# Beute: nach dem Ende einmal als Fenster – Spieler für Spieler aufgedeckt %>

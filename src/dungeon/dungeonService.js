@@ -520,6 +520,40 @@ async function finishDue({ now = Date.now() } = {}) {
   }
 }
 
+/**
+ * Seltene Beute aller Spieler (Folie, Boss-Karte) aus abgeschlossenen Durchläufen, neueste zuerst – für die Liste
+ * unten auf der Dungeon-Seite (wie "Seltene Ziehungen" im TCG, #78). Namen sind die aktuellen (Umbenennungen).
+ */
+function lootEntries(runs, nameById = {}) {
+  const out = [];
+  for (const r of runs) {
+    const d = dungeonByKey[r.dungeon];
+    const card = bossCardOf(r.dungeon);
+    for (const m of r.members) {
+      if (!m.user || !(m.foil || (m.bossCard && card))) continue;
+      out.push({
+        name: nameById[String(m.user)] || m.name,
+        dungeon: d ? d.title : 'Dungeon',
+        foil: !!m.foil,
+        card: m.bossCard && card ? { name: card.name, rarity: card.rarity } : null,
+        at: r.endsAt,
+      });
+    }
+  }
+  return out;
+}
+
+async function rareLoot(limit = 10) {
+  const runs = await DungeonRun.find({ status: 'fertig', members: { $elemMatch: { user: { $ne: null }, $or: [{ foil: true }, { bossCard: true }] } } })
+    .sort({ endsAt: -1 })
+    .limit(limit)
+    .select('dungeon endsAt members.user members.name members.foil members.bossCard')
+    .lean();
+  const ids = [...new Set(runs.flatMap((r) => r.members.filter((m) => m.user).map((m) => String(m.user))))];
+  const users = ids.length ? await User.find({ _id: { $in: ids } }).select('username').lean() : [];
+  return lootEntries(runs, Object.fromEntries(users.map((u) => [String(u._id), u.username]))).slice(0, limit);
+}
+
 /** Hat dieser Spieler einen Durchlauf, dessen Zeit um ist? Dann sofort abschließen (statt auf den Job zu warten). */
 async function finishOwnDue(userId) {
   const due = await DungeonRun.exists({ 'members.user': userId, status: 'laeuft', endsAt: { $lte: new Date() } });
@@ -560,6 +594,8 @@ async function chatFor(userId) {
 }
 
 module.exports = {
+  lootEntries,
+  rareLoot,
   TEAM_SIZE,
   bossCardOf,
   LOCK_SECONDS,

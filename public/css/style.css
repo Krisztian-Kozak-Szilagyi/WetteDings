@@ -1521,6 +1521,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .tcg-rare-feed > * { max-width: 520px; }
 .tcg-rare .inv-tile { flex: 1 1 280px; }
 .tcg-rare .tcg-feed li { font-size: 14px; }
+/* Dungeon: "Seltene Beute" (#78) – wie "Seltene Ziehungen" im TCG */
+.dg-rare .tcg-feed li { font-size: 14px; }
+.dg-rare .tcg-feed strong { font-weight: 500; }
+.dg-rare-foil .tcg-dot { background: linear-gradient(135deg, #a8d8ff, #e9d5ff 50%, #fbcfe8); box-shadow: 0 0 8px rgba(255, 255, 255, .45); }
 .tcg-rare .tcg-feed strong { font-weight: 500; }
 @media (max-width: 640px) {
   .tcg-page { gap: 40px; }

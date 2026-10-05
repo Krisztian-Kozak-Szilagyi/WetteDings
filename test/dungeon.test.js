@@ -135,3 +135,21 @@ test('Gruppen-Boosts (Ömer, Hunde, Mauch) wirken auf alle, persönliche nur auf
   const t3 = [{ card: card('krisz-3-gold'), boost: card('hugo-holo') }, { card: card('adrian-3-gold'), boost: card('hugo-holo') }, { card: card('aleks-3-gold') }];
   assert.equal(d.teamEffects(t3, 2).filter((e) => e.key === 'hund').length, 1);
 });
+
+test('Seltene Beute: nur echte Spieler mit Folie oder Boss-Karte, aktuelle Namen (#78)', () => {
+  const at = new Date('2026-10-05T12:00:00Z');
+  const runs = [{ dungeon: 'st-ivan', endsAt: at, members: [
+    { user: 'u1', name: 'alt', foil: true, bossCard: false },
+    { user: 'u2', name: 'bob', foil: false, bossCard: true },
+    { user: 'u3', name: 'leer', foil: false, bossCard: false },
+    { user: null, name: 'Bot', foil: true, bossCard: true },
+  ] }];
+  const list = d.lootEntries(runs, { u1: 'neu' });
+  assert.equal(list.length, 2);
+  assert.deepEqual(list[0], { name: 'neu', dungeon: DUNGEONS.find((x) => x.key === 'st-ivan').title, foil: true, card: null, at });
+  assert.equal(list[1].name, 'bob');
+  assert.equal(list[1].card.name, card('st-ivan-boss').name);
+  assert.equal(list[1].card.rarity, card('st-ivan-boss').rarity);
+  // unbekannter Dungeon ohne Boss-Karte: nur die Folie zählt
+  assert.deepEqual(d.lootEntries([{ dungeon: 'weg', endsAt: at, members: [{ user: 'u9', name: 'x', foil: false, bossCard: true }] }]), []);
+});

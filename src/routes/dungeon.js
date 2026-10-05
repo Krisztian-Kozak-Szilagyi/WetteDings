@@ -64,7 +64,7 @@ router.get('/dungeon', async (req, res) => {
   const me = req.user._id;
   const now = Date.now();
   await dungeon.finishOwnDue(me);
-  const { party, invitations, run, unseen, rev } = await dungeon.pageState(me);
+  const [{ party, invitations, run, unseen, rev }, rareLoot] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot()]);
   const running = run && run.status === 'laeuft' ? run : null;
   const slot = party ? party.slot : dungeon.registrationSlot(now);
   const next = dungeonForSlot(slot, dungeon.settings.intervalHours);
@@ -113,6 +113,7 @@ router.get('/dungeon', async (req, res) => {
     cards,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
     loot,
+    rareLoot,
     rarityByKey: catalog.rarityByKey,
     settings: dungeon.settings,
     chatMax: dungeon.CHAT_TEXT_MAX,
