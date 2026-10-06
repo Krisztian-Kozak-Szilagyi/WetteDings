@@ -1,0 +1,180 @@
+<%- include('partials/head') %>
+<%
+  const me = String(currentUser._id);
+  const statusText = t.closedVia ? 'Über ein Gegenangebot verkauft' : { verkauft: 'Abgeschlossen', abgelehnt: 'Abgelehnt', zurueckgezogen: 'Zurückgezogen' }[t.status] || 'Abgelaufen';
+  const rar = (c) => rarityByKey[c.rarity] || { label: '' };
+  const sideText = (list, cents) => [lineLabel(list), cents > 0 ? euro(cents) : ''].filter(Boolean).join(' + ') || 'nichts';
+  // Positionen einer Seite als Liste: gleiche Karten zusammengefasst
+  const lineList = (list) => {
+    const groups = [];
+    for (const l of list) {
+      const key = l.card + '|' + (l.copy || l.doc && l.foiledAt ? String(l.copy || l.doc) : '');
+      const g = groups.find((x) => x.key === key);
+      if (g) g.n += 1; else groups.push({ key, l, n: 1 });
+    }
+    return groups;
+  };
+%>
+
+<% if (!t.to) { %>
+  <%# ---------- Eigenes Markt-Angebot mit den Gegenangeboten darauf ---------- %>
+  <% const open = counters.filter((c) => c.status === 'offen' && new Date(c.expiresAt) > new Date()); const done = counters.filter((c) => !open.includes(c)); %>
+  <p><a class="btn btn-ghost btn-sm" href="/handel?reiter=meine">← Meine Angebote</a></p>
+  <div class="page-head">
+    <div>
+      <h1>Dein Markt-Angebot</h1>
+      <span class="muted small"><%= isOpen ? 'läuft ab ' + relTime(t.expiresAt) : statusText %></span>
+    </div>
+  </div>
+  <% const lp = perspective(t, 'seller'); %>
+  <div class="ng-listing card">
+    <%- include('partials/trade-stack', { list: lp.gives.length ? lp.gives : lp.gets, size: 'lg' }) %>
+    <div class="ng-listing-info">
+      <span class="ng-side-label"><%= lp.gives.length && lp.gets.length ? 'Tausch' : lp.gives.length ? 'Verkauf' : 'Gesuch' %></span>
+      <strong class="ng-listing-name">Du gibst <%= sideText(lp.gives, lp.pay) %></strong>
+      <strong class="ng-listing-name">und bekommst <%= sideText(lp.gets, lp.receive) %></strong>
+      <% if (lp.receive && !lp.gets.length) { %><span class="ng-price"><%= euro(lp.receive) %></span><% } %>
+      <span class="muted small">Kartenwert <%= euro(linesValue(lp.gives)) %> gegen <%= euro(linesValue(lp.gets)) %><% if (lp.receive && taxFor(lp.receive, t.kind)) { %> · vom Geld bleiben dir <%= euro(lp.receive - taxFor(lp.receive, t.kind)) %> nach Steuer<% } %></span>
+      <% if (isOpen) { %>
+        <form method="post" action="/handel/angebot/<%= t._id %>/beenden" data-confirm="Markt-Angebot zurückziehen?<%= open.length ? ' Alle Gegenangebote darauf werden damit abgelehnt.' : '' %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Zurückziehen</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+  <section class="ng-counters">
+    <h2>Gegenangebote <% if (open.length) { %><span class="hx-count"><%= open.length %></span><% } %></h2>
+    <% if (!open.length) { %>
+      <p class="muted">Noch kein Gegenangebot. Interessenten können neben „Kaufen“ auch einen eigenen Vorschlag machen.</p>
+    <% } else { %>
+      <ul class="offer-list">
+        <% open.forEach((c) => { %><%- include('partials/offer-row', { t: c, me, balance, reiter: 'meine' }) %><% }) %>
+      </ul>
+    <% } %>
+    <% if (done.length) { %>
+      <details class="ng-done">
+        <summary>Erledigte Gegenangebote (<%= done.length %>)</summary>
+        <ul>
+          <% done.forEach((c) => { %><li><a href="/handel/angebot/<%= c._id %>"><%= c.toName %></a> · <%= sideText(c.want, c.extraFrom === 'to' ? c.price : 0) %> · <span class="muted"><%= { verkauft: 'angenommen', abgelehnt: 'abgelehnt', zurueckgezogen: 'zurückgezogen' }[c.status] || 'abgelaufen' %></span></li><% }) %>
+        </ul>
+      </details>
+    <% } %>
+  </section>
+<% } else { %>
+  <%# ---------- Verhandlung ---------- %>
+  <%
+    const other = role === 'seller' ? t.toName : t.sellerName;
+    const nameOf = (from) => (from === 'seller' ? t.sellerName : t.toName);
+    const p = perspective(t, role);
+    const lastBy = t.lastChangeBy || 'seller';
+    const ver = t.termsVersion || 0;
+    const lastAt = (t.messages || []).length ? t.messages[t.messages.length - 1].createdAt : null;
+    const tax = p.receive ? taxFor(p.receive, t.kind) : 0;
+    // Habe ich, was ich geben soll, gerade frei? (nur als Hinweis; geprüft wird beim Annehmen)
+    const need = {};
+    p.gives.filter((l) => !l.doc && !l.copy && !String(l.card).startsWith('item:')).forEach((l) => { need[l.card] = (need[l.card] || 0) + 1; });
+    const lacking = Object.entries(need).filter(([id, n]) => (coll.free[id] || 0) < n).map(([id]) => cardInfo(id).name);
+    const lacksMoney = p.pay > balance;
+    const backTab = isCreator(t, role) ? 'meine' : 'an-mich';
+  %>
+  <p><a class="btn btn-ghost btn-sm" href="/handel?reiter=<%= backTab %>">← Zurück</a></p>
+  <div class="page-head">
+    <div>
+      <h1><%= offerLabel(t) %> mit <a href="/profil/<%= encodeURIComponent(other) %>"><%= other %></a></h1>
+      <% if (listing) { %><span class="muted small"><%= role === 'seller' ? 'Gegenangebot auf dein' : 'Dein Gegenangebot auf das' %> Markt-Angebot für <%= euro(listing.price) %><%= listing.status !== 'offen' ? ' (nicht mehr offen)' : '' %></span><% } %>
+    </div>
+    <% if (isOpen) { %>
+      <span class="nego-turn <%= mayAccept ? 'nego-turn-me' : '' %>"><%= mayAccept ? 'Du bist am Zug' : 'Warte auf ' + other %> · läuft ab <%= relTime(t.expiresAt) %></span>
+    <% } else { %>
+      <span class="nego-turn"><%= statusText %></span>
+    <% } %>
+  </div>
+
+  <div class="nego-layout">
+    <section>
+      <div class="card ng-deal">
+        <div class="ng-sides">
+          <% [['Du gibst', p.gives, p.pay], ['Du bekommst', p.gets, p.receive]].forEach(([label, list, cents], idx) => { %>
+            <div class="ng-side<%= idx ? ' ng-get' : ' ng-give' %>">
+              <span class="ng-side-label"><%= label %></span>
+              <%- include('partials/trade-stack', { list, size: 'lg', max: 4 }) %>
+              <ul class="ng-lines">
+                <% lineList(list).forEach(({ l, n }) => { const c = cardInfo(l.card); %>
+                  <li>
+                    <span class="tcg-dot r-<%= c.rarity %>"></span>
+                    <span class="ng-line-name"><%= n > 1 ? n + '× ' : '' %><%= c.name %></span>
+                    <% if (l.foiledAt) { %><span class="foil-tag" title="Foliert am <%= dayDate(l.foiledAt) %>">Foliert<%= l.grade ? ' · Note ' + l.grade : '' %></span><% } %>
+                    <span class="ng-line-value"><%= euro(lineValue(l) * n) %></span>
+                  </li>
+                <% }) %>
+                <% if (cents > 0) { %><li class="ng-money"><span class="ng-line-name">Geld</span><span class="ng-line-value"><%= euro(cents) %></span></li><% } %>
+                <% if (!list.length && !cents) { %><li class="muted">nichts</li><% } %>
+              </ul>
+              <span class="ng-side-total">Kartenwert <%= euro(linesValue(list)) %></span>
+            </div>
+            <% if (!idx) { %><svg class="ng-arrow" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg><% } %>
+          <% }) %>
+        </div>
+
+        <div class="nego-terms" data-version="<%= ver %>">
+          <span class="nego-terms-label"><%= isOpen ? 'Aktueller Vorschlag von ' + nameOf(lastBy) : 'Bedingungen' %></span>
+          <strong class="nego-terms-value">Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.</strong>
+          <% if (tax) { %><span class="muted small">Vom Geld bleiben dir <%= euro(p.receive - tax) %> nach <%= String(taxRates[t.kind]).replace('.', ',') %> % Steuer.</span><% } %>
+        </div>
+
+        <% if (isOpen) { %>
+          <% if (mayAccept && lacking.length) { %><p class="neg small">Du hast gerade nicht genug freie Exemplare von <%= lacking.join(', ') %> (Quest, Handel oder foliert).</p><% } %>
+          <% if (mayAccept && lacksMoney) { %><p class="neg small">Dein Guthaben reicht für die <%= euro(p.pay) %> gerade nicht.</p><% } %>
+          <div class="nego-actions">
+            <% if (mayAccept) { %>
+              <form method="post" action="/handel/angebot/<%= t._id %>/annehmen" data-confirm="Annehmen? Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="version" value="<%= ver %>">
+                <button class="btn btn-primary" type="submit" <%= lacking.length || lacksMoney ? 'disabled' : '' %>>Annehmen</button>
+              </form>
+            <% } %>
+            <a class="btn btn-ghost" href="/handel/angebot/<%= t._id %>/gegenangebot"><%= mayAccept ? 'Gegenangebot machen' : 'Angebot ändern' %></a>
+            <form method="post" action="/handel/angebot/<%= t._id %>/beenden" data-confirm="<%= isCreator(t, role) ? 'Angebot zurückziehen?' : 'Angebot ablehnen?' %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost" type="submit"><%= isCreator(t, role) ? 'Zurückziehen' : 'Ablehnen' %></button>
+            </form>
+          </div>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="card nego-chat" id="chat">
+      <h2>Nachrichten</h2>
+      <ol class="nego-messages" data-chat data-url="/handel/angebot/<%= t._id %>/stand" data-since="<%= lastAt ? new Date(lastAt).toISOString() : '' %>"
+        data-version="<%= ver %>" data-open="<%= isOpen ? 1 : 0 %>" data-me="<%= role %>" data-seller-name="<%= t.sellerName %>" data-to-name="<%= t.toName %>">
+        <% (t.messages || []).forEach((m) => { %>
+          <% if (m.from === 'system') { %>
+            <li class="nego-msg nego-msg-system"><span><%= m.text %></span> <time class="muted small"><%= relTime(m.createdAt) %></time></li>
+          <% } else { %>
+            <li class="nego-msg <%= m.from === role ? 'nego-msg-me' : '' %>">
+              <span class="nego-msg-head"><strong><%= nameOf(m.from) %></strong> <time class="muted small"><%= relTime(m.createdAt) %></time></span>
+              <span class="nego-msg-text"><%= m.text %></span>
+            </li>
+          <% } %>
+        <% }) %>
+      </ol>
+      <p class="muted small nego-empty" data-chat-empty <%= (t.messages || []).length ? 'hidden' : '' %>>Noch keine Nachrichten. Schreib <%= other %>, was du dir vorstellst.</p>
+      <p class="nego-changed small" data-chat-changed hidden>Die Bedingungen wurden geändert. <a href="">Neu laden</a></p>
+      <% if (isOpen) { %>
+        <form method="post" action="/handel/angebot/<%= t._id %>/nachricht" class="nego-send">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="sr-only" for="nego-text">Nachricht an <%= other %></label>
+          <textarea id="nego-text" name="text" rows="2" maxlength="<%= messageMax %>" placeholder="Nachricht an <%= other %>" required></textarea>
+          <button class="btn btn-primary" type="submit">Senden</button>
+        </form>
+      <% } %>
+    </section>
+  </div>
+<% } %>
+
+<%- include('partials/card-zoom') %>
+<%- include('partials/foil-modal') %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

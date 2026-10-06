@@ -1,5 +1,5 @@
 <%- include('partials/head') %>
-<% const tradeLink = (id) => '/handel/tausch?' + new URLSearchParams({ an: profile.username, will: id }); %>
+<% const tradeLink = (id) => '/handel/neu?' + new URLSearchParams({ an: profile.username, will: id }); %>
 
 <div class="page-head">
   <div class="ihk-title">
@@ -19,7 +19,7 @@
   <% if (isMe) { %>
     <p class="muted small">So sehen andere deine Sammlung. Verkaufen und Schützen geht im <a href="/tcg/album">Album</a>.</p>
   <% } else { %>
-    <p class="muted small">Tippe eine Karte an, um sie groß anzusehen – dort kannst du <%= profile.username %> einen Tausch vorschlagen.</p>
+    <p class="muted small">Tippe eine Karte an, um sie groß anzusehen – dort kannst du <%= profile.username %> ein Angebot dafür machen.</p>
   <% } %>
   <% if (!cardCount) { %>
     <p class="muted"><%= isMe ? 'Du hast' : profile.username + ' hat' %> noch keine Karten.</p>

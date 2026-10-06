@@ -3,6 +3,7 @@ const Bet = require('./models/Bet');
 const { TcgCard, TcgOpening } = require('./models/Tcg');
 const { IhkRun } = require('./models/Ihk');
 const { Trade } = require('./models/Trade');
+const { migrateTradeDoc } = require('./trade/lines');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
 const { LotteryRound } = require('./models/Lottery');
@@ -12,6 +13,8 @@ const { rollCondition } = require('./grading/condition');
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
  */
 async function migrate() {
+  await migrateTrades();
+
   // Wochen-/Monats-Lotterie: Rundennummer und offene Runde gelten jetzt je Lotterie-Art – alte Indizes entfernen
   const lottoIdx = await LotteryRound.collection.indexes().catch(() => []);
   for (const name of ['number_1', 'status_1']) {
@@ -61,8 +64,9 @@ async function migrate() {
   if (dogs.modifiedCount) console.log(`Migration: ${dogs.modifiedCount}× Good Boy durch Lilly ersetzt.`);
   await IhkRun.updateMany({ card: from }, { $set: { card: to } });
   await IhkRun.updateMany({ boost: from }, { $set: { boost: to } });
-  await Trade.updateMany({ card: from }, { $set: { card: to } });
-  await Trade.updateMany({ wantCard: from }, { $set: { wantCard: to } });
+  for (const side of ['give', 'want']) {
+    await Trade.updateMany({ [`${side}.card`]: from }, { $set: { [`${side}.$[l].card`]: to } }, { arrayFilters: [{ 'l.card': from }] });
+  }
   await TcgOpening.updateMany({ 'cards.card': from }, { $set: { 'cards.$[c].card': to } }, { arrayFilters: [{ 'c.card': from }] });
 
   // "Schon besessen" (tcgSeen) für Altbestand nachtragen: aktuelle Karten, alle geöffneten Packs und
@@ -75,15 +79,13 @@ async function migrate() {
     const [cards, openings, trades] = await Promise.all([
       TcgCard.aggregate([{ $match: { user: { $in: ids } } }, { $group: { _id: { u: '$user', c: '$card' } } }]),
       TcgOpening.find({ user: { $in: ids } }).select('user cards.card').lean(),
-      Trade.find({ status: 'verkauft' }).select('kind seller buyer to card wantCard').lean(),
+      Trade.find({ status: 'verkauft' }).select('seller buyer to give.card want.card').lean(),
     ]);
     for (const c of cards) add(c._id.u, c._id.c);
     for (const o of openings) for (const c of o.cards) add(o.user, c.card);
     for (const t of trades) {
-      if (t.kind === 'tausch') {
-        add(t.to, t.card);
-        add(t.seller, t.wantCard);
-      } else add(t.buyer, t.card);
+      for (const l of t.give || []) add(t.buyer || t.to, l.card);
+      for (const l of t.want || []) add(t.seller, l.card);
     }
     await User.bulkWrite(
       ids.map((id) => ({ updateOne: { filter: { _id: id, tcgSeen: { $exists: false } }, update: { $set: { tcgSeen: [...seen.get(String(id))] } } } }))
@@ -104,18 +106,39 @@ async function migrate() {
   const conditioned = await rollMissingConditions();
   if (conditioned) console.log(`Migration: Zustand für ${conditioned} Karte(n) ausgewürfelt.`);
 
-  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum am Angebot vermerken (Anzeige im Handel)
-  const trades = await Trade.find({ status: 'offen', $or: [{ foiledAt: { $ne: null }, grade: null }, { wantFoiledAt: { $ne: null }, wantGrade: null }] }).select('cardDoc wantCopy foiledAt wantFoiledAt').lean();
+  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel)
+  const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null } };
+  const trades = await Trade.find({ status: 'offen', $or: [{ give: missing }, { want: missing }] }).select('give want').lean();
   if (trades.length) {
-    const ids = trades.flatMap((t) => [t.foiledAt && t.cardDoc, t.wantFoiledAt && t.wantCopy].filter(Boolean));
+    const ids = trades.flatMap((t) => [...t.give, ...t.want].filter((l) => l.foiledAt).map((l) => l.doc || l.copy).filter(Boolean));
     const grades = new Map((await TcgCard.find({ _id: { $in: ids } }).select('condition.grade').lean()).map((d) => [String(d._id), d.condition && d.condition.grade]));
-    const gradeOf = (id) => grades.get(String(id)) || null;
-    await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { grade: t.foiledAt ? gradeOf(t.cardDoc) : null, wantGrade: t.wantFoiledAt ? gradeOf(t.wantCopy) : null } } } })));
+    const withGrade = (l) => (l.foiledAt && l.grade == null ? { ...l, grade: grades.get(String(l.doc || l.copy)) || null } : l);
+    await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
 
   // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN)
   await require('./device/deviceService').recomputeAlerts();
+}
+
+/**
+ * Handel (#76): Angebote mit einer Karte (card, wantCard …) bzw. dem Tausch mit give/take auf Positionen (give/want) umstellen und den alten
+ * eindeutigen Index auf cardDoc durch den auf lockDocs ersetzen. Liest roh, weil das Schema die alten Felder nicht mehr kennt.
+ */
+async function migrateTrades() {
+  const raw = Trade.collection;
+  const old = await raw.find({ card: { $exists: true } }).toArray(); // beide Vorformen (siehe lines.migrateTradeDoc)
+  for (let i = 0; i < old.length; i += 500) {
+    const ops = old.slice(i, i + 500).map((t) => ({ updateOne: { filter: { _id: t._id }, update: migrateTradeDoc(t) } })).filter((op) => op.updateOne.update);
+    if (ops.length) await raw.bulkWrite(ops, { ordered: false });
+  }
+  if (old.length) console.log(`Migration: ${old.length} Handelsangebot(e) auf Positionen umgestellt.`);
+  const idx = await raw.indexes().catch(() => []);
+  if (idx.some((x) => x.name === 'cardDoc_1')) {
+    await raw.dropIndex('cardDoc_1');
+    console.log('Migration: alter Handels-Index cardDoc_1 entfernt.');
+  }
+  await Trade.createIndexes();
 }
 
 /** Zustand für alle Karten ohne condition auswürfeln, in Blöcken. Gibt die Zahl der ergänzten Karten zurück. */

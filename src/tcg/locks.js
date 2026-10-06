@@ -4,6 +4,7 @@
 // geschickt werden. Ausnahme: Folierte Karten lassen sich gezielt im Handel anbieten (tradeService.create).
 const { IhkRun } = require('../models/Ihk');
 const { Trade, openFilter } = require('../models/Trade');
+const { lockedFor } = require('../trade/lines');
 const { TcgCard } = require('../models/Tcg');
 const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
@@ -15,7 +16,7 @@ async function lockedDocs(userId, session) {
     TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id').session(session || null).lean(),
     IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
-    Trade.find({ ...openFilter(), seller: userId }).select('cardDoc').session(session || null).lean(),
+    Trade.find({ ...openFilter(), $or: [{ seller: userId }, { to: userId }], lockDocs: { $exists: true } }).select('seller to give want lockDocs').session(session || null).lean(),
     // Dungeon: angemeldet (bis zum Start) oder gerade im Durchlauf
     DungeonParty.findOne({ 'members.user': userId }).select('members').session(session || null).lean(),
     DungeonRun.findOne({ 'members.user': userId, status: 'laeuft' }).select('members').session(session || null).lean(),
@@ -28,7 +29,7 @@ async function lockedDocs(userId, session) {
   [party, dungeon].filter(Boolean).forEach((d) =>
     d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
   );
-  trades.forEach((t) => reasons.set(String(t.cardDoc), 'handel'));
+  trades.forEach((t) => lockedFor(t, userId).forEach((id) => reasons.set(String(id), 'handel')));
   duels.forEach((b) => b.duel.cards.filter((c) => String(c.user) === String(userId)).forEach((c) => reasons.set(String(c.doc), 'duell')));
   return { docs: [...reasons.keys()], reasons };
 }
