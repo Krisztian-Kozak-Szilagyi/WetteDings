@@ -79,8 +79,8 @@ test('Börsenbericht: Kennzahlen je Mitglied gedeckelt, Aktivität aus den Stund
   assert.deepEqual([history[1].anleger, history[1].aktionen], [1, 4]);
 });
 
-test('Börsenbericht: fällig um 18:30 deutscher Zeit (Sommer- und Winterzeit)', () => {
-  assert.equal(dueOf(new Date('2026-10-06T12:00:00Z')).due.toISOString(), '2026-10-06T16:30:00.000Z');
-  assert.equal(dueOf(new Date('2026-12-06T12:00:00Z')).due.toISOString(), '2026-12-06T17:30:00.000Z');
+test('Börsenbericht: fällig um 18:45 deutscher Zeit (Sommer- und Winterzeit)', () => {
+  assert.equal(dueOf(new Date('2026-10-06T12:00:00Z')).due.toISOString(), '2026-10-06T16:45:00.000Z');
+  assert.equal(dueOf(new Date('2026-12-06T12:00:00Z')).due.toISOString(), '2026-12-06T17:45:00.000Z');
   assert.equal(dueOf(new Date('2026-10-06T22:30:00Z')).day, '2026-10-07'); // nach Mitternacht deutscher Zeit
 });

@@ -1,5 +1,5 @@
 /**
- * Aktivität der Seite für den täglichen Börsenbericht (coin/reportService.js, Sprung des BfW-TCG ETF um 18:30 Uhr).
+ * Aktivität der Seite für den täglichen Börsenbericht (coin/reportService.js, Sprung des BfW-TCG ETF um 18:45 Uhr).
  *
  * Jede echte Aktion eines Mitglieds (wetten, Coins/ETF handeln, Lose und Packs kaufen, Karten öffnen, Handel,
  * IHK, Grading, Dungeon, Forum …) wird stündlich gezählt (models/ActivityPulse). Reine Seitenaufrufe, Menü-Klicks,

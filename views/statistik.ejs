@@ -345,7 +345,7 @@
 <% if (boerse && boerse.length) { const pct = (x) => (x > 0 ? '+' : '') + (x * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %'; %>
   <section class="stats-block" id="boersenbericht">
     <header class="stats-block-head"><div><h2>Börsenbericht (BTCG)</h2></div></header>
-    <p class="muted small">Jeden Tag um 18:30 Uhr: Kennzahlen der letzten 24 Stunden gegen den Schnitt der 7 Vortage; daraus der Sprung des ETF. Nur für den Admin sichtbar.</p>
+    <p class="muted small">Jeden Tag um 18:45 Uhr: Kennzahlen der letzten 24 Stunden gegen den Schnitt der 7 Vortage; daraus der Sprung des ETF. Nur für den Admin sichtbar.</p>
     <% boerse.forEach((r) => { %>
       <details class="card stats-collapsed">
         <summary><strong><%= r._id.split('-').reverse().join('.') %></strong> · Sprung <strong><%= pct(r.change) %></strong> · Stimmung <%= r.sentiment.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %> · Rekorde <%= r.records %><% if (r.thread) { %> · <a href="/forum/t/<%= r.thread %>">Beitrag</a><% } %></summary>

@@ -79,7 +79,7 @@ function startJobs() {
   setTimeout(suspicion, 30 * 1000).unref();
   setInterval(suspicion, 10 * 60 * 1000).unref();
 
-  // Börsenbericht: jede Minute prüfen, ob der Bericht des Tages (18:30 Uhr) fällig ist – danach springt der ETF
+  // Börsenbericht: jede Minute prüfen, ob der Bericht des Tages (18:45 Uhr) fällig ist – danach springt der ETF
   const boerse = () => reportService.runDue().catch((err) => console.error('Börsenbericht-Fehler:', err));
   setTimeout(boerse, 45 * 1000).unref();
   setInterval(boerse, 60 * 1000).unref();

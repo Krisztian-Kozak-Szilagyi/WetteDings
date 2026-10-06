@@ -1,5 +1,5 @@
 /**
- * Börsenbericht: tägliche Auswertung der Aktivität der Seite (18:30 Uhr deutscher Zeit) und daraus der Kurssprung
+ * Börsenbericht: tägliche Auswertung der Aktivität der Seite (18:45 Uhr deutscher Zeit) und daraus der Kurssprung
  * des BfW-TCG ETF. Reine Logik ohne Datenbank – der Zufall kommt als Parameter (rng), gleiche Eingabe → gleiches Ergebnis.
  *
  * Jede Kennzahl wird mit dem Schnitt der 7 Vortage verglichen: m = log2(heute / Schnitt), begrenzt auf −1 … +1
@@ -140,8 +140,8 @@ const RECORD = [
 ];
 const CLOSERS = [
   'Die Börse wünscht einen erfolgreichen Handelsabend.',
-  'Wir melden uns morgen um 18:30 Uhr mit dem nächsten Bericht.',
-  'Wie es weitergeht, entscheidet der Markt. Bis morgen um 18:30 Uhr.',
+  'Wir melden uns morgen um 18:45 Uhr mit dem nächsten Bericht.',
+  'Wie es weitergeht, entscheidet der Markt. Bis morgen um 18:45 Uhr.',
   'Diese Analyse stellt keine Anlageberatung dar. Investieren Sie nur Spielgeld, das Sie zu verlieren bereit sind.',
 ];
 
