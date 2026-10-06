@@ -38,7 +38,7 @@ test('Treffer-Stufen: Cookie sicher, Fingerabdruck+IP wahrscheinlich, nur Finger
   const a = { deviceId: 'd1', fp: 'f1', ips: ['i1', 'i2'] };
   assert.equal(d.matchLevel(a, { deviceId: 'd1', fp: null, ips: [] }), d.LEVEL.sicher);
   assert.equal(d.matchLevel(a, { deviceId: 'd2', fp: 'f1', ips: ['i2'] }), d.LEVEL.wahrscheinlich);
-  assert.equal(d.matchLevel(a, { deviceId: 'd2', fp: 'f1', ips: ['i9'] }), d.LEVEL.moeglich);
+  assert.equal(d.matchLevel(a, { deviceId: 'd2', fp: 'f1', ips: ['i9'] }), 0); // gleicher Fingerabdruck allein zählt nicht (baugleiche Geräte)
   assert.equal(d.matchLevel(a, { deviceId: 'd2', fp: 'f2', ips: ['i1'] }), 0); // gleiche IP allein zählt nicht
   assert.equal(d.matchLevel({ deviceId: 'd1', fp: null, ips: [] }, { deviceId: 'd2', fp: null, ips: [] }), 0);
   assert.equal(d.pairKey('b', 'a'), d.pairKey('a', 'b'));
@@ -145,10 +145,10 @@ test('#89: baugleiche Geräte im selben WLAN sind kein Mehrfach-Konto', () => {
   assert.equal(d.matchLevel(a, c), d.LEVEL.wahrscheinlich);
   // kurze Überschneidung (unter 1 Std.) zählt nicht als parallel
   assert.equal(d.usedInParallel(a, { ...c, ...at(71.5, 90) }), false);
-  // viele Konten mit gleichem Fingerabdruck im selben Netz: auch nacheinander nur möglich
+  // viele Konten mit gleichem Fingerabdruck im selben Netz: auch nacheinander kein Hinweis
   const crowd = d.commonPrints([a, b, c]);
   assert.ok(crowd.has(d.printKey('f1', 'i1')));
-  assert.equal(d.matchLevel(a, c, crowd), d.LEVEL.moeglich);
+  assert.equal(d.matchLevel(a, c, crowd), 0);
   assert.equal(d.commonPrints([a, b]).size, 0); // zwei Konten sind noch keine Menge
   // ein anderes, nicht häufiges Netz zählt weiter
   assert.equal(d.matchLevel({ ...a, ips: ['i1', 'i7'] }, { ...c, ips: ['i7'] }, crowd), d.LEVEL.wahrscheinlich);
@@ -170,7 +170,9 @@ test('Geteiltes Netz (Schulnetz): zwei baugleiche Handys einer Klasse sind kein 
   const klasse = ['u3', 'u4', 'u5'].map((user, i) => ({ user, deviceId: `k${i}`, fp: `fk${i}`, ips: ['schule'] }));
   const common = new Set([...d.commonPrints([a, b, ...klasse]), ...d.crowdedNets([a, b, ...klasse])]);
   assert.ok(common.has(d.netKey('schule')));
-  assert.equal(d.matchLevel(a, b, common), d.LEVEL.moeglich);
+  assert.equal(d.matchLevel(a, b, common), 0);
+  // auch baugleiche Schul-PCs (gleicher Fingerabdruck), die zu Hause in verschiedenen Netzen benutzt werden: kein Hinweis
+  assert.equal(d.matchLevel({ ...a, ips: ['schule', 'heim1'] }, { ...b, ips: ['schule', 'heim2'] }, common), 0);
   // dieselben zwei Geräte in einem Heimnetz mit nur zwei Konten: weiter wahrscheinlich (Cookie gelöscht, neues Konto)
   const home = [{ ...a, ips: ['heim'] }, { ...b, ips: ['heim'] }];
   const homeCommon = new Set([...d.commonPrints(home), ...d.crowdedNets(home)]);
