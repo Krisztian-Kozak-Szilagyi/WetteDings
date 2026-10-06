@@ -59,7 +59,7 @@ const LOGS = [
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
-const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie' };
+const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung' };
 const SELL_TYPES = ['tcg_verkauf', 'item_verkauf', 'black_market'];
 const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft' };
 

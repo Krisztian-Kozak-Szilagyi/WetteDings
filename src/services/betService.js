@@ -11,6 +11,7 @@ const catalog = require('../tcg/catalog');
 const { verdictRole, devMayDecide, evaluateVotes } = require('../lib/verdict');
 const { UserError } = require('../lib/util');
 const { redeemCode } = require('./codeService');
+const inviteService = require('./inviteService');
 const { assertUsernameAllowed } = require('./usernameRules');
 const notifyService = require('./notifyService');
 const { euro } = require('../lib/viewHelpers');
@@ -54,10 +55,11 @@ const isRefereeOf = (bet, actor) => !actor.system && !!bet.referee && String(bet
  * Der Benutzername wird hier verbindlich geprüft (reservierte Namen tragen Rechte, siehe
  * services/usernameRules) – unabhängig davon, was die aufrufende Route schon geprüft hat.
  */
-async function registerUser({ username, email, password, code }) {
+async function registerUser({ username, email, password, code, deviceId = null }) {
   const name = assertUsernameAllowed(username);
   const passwordHash = await bcrypt.hash(password, 12);
-  return inTransaction(async (session) => {
+  let reward = null;
+  const created = await inTransaction(async (session) => {
     const [user] = await User.create(
       [
         {
@@ -76,8 +78,12 @@ async function registerUser({ username, email, password, code }) {
     }
     await User.updateOne({ _id: user._id }, { $set: { registrationCode: redeemed.code, invitedByName: redeemed.createdByName } }, { session });
     await Ledger.create([{ user: user._id, type: 'startguthaben', amount: config.startBalance }], { session });
+    // Einladungslink eines Mitglieds: Provision für den Einlader
+    reward = await inviteService.rewardInviter({ redeemed, user, deviceId, session });
     return user;
   });
+  await inviteService.notifyReward(reward, created);
+  return created;
 }
 
 /**

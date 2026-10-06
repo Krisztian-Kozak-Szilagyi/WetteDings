@@ -14,6 +14,8 @@ const account = require('../services/accountService');
 const { UserError } = require('../lib/util');
 const roles = require('../services/roles');
 const groups = require('../services/groupService');
+const invites = require('../services/inviteService');
+const { formatCode, remainingText } = require('../services/codeService');
 
 const router = express.Router();
 
@@ -26,6 +28,7 @@ const SECTIONS = {
   wetten: { path: '/konto/wetten', label: 'Meine Wetten' },
   auszug: { path: '/konto/auszug', label: 'Kontoauszug' },
   gruppen: { path: '/konto/gruppen', label: 'Wett-Gruppen' },
+  einladungen: { path: '/konto/einladungen', label: 'Einladungen' },
   einstellungen: { path: '/konto/einstellungen', label: 'Konto-Einstellungen' },
 };
 
@@ -91,6 +94,21 @@ router.get('/konto/gruppen', requireLogin, async (req, res) => {
     groups: await groups.overview(req.user._id),
     groupNameMax: groups.NAME_MAX,
     memberChoices: await User.find({ deletedAt: null, _id: { $ne: req.user._id } }).select('username').sort({ usernameLower: 1 }).lean(),
+  });
+});
+
+// Einladungen: Links, die das Team für dieses Mitglied erstellt hat, und geworbene Mitglieder mit Provision
+router.get('/konto/einladungen', requireLogin, async (req, res) => {
+  const [links, invited] = await Promise.all([invites.linksFor(req.user._id), invites.invitedMembers(req.user._id)]);
+  const now = Date.now();
+  const origin = `${req.protocol}://${req.get('host')}`;
+  show(res, 'einladungen', {
+    // Benutzte Links stehen bei den geworbenen Mitgliedern; hier nur die noch offenen
+    openLinks: links
+      .filter((l) => !l.usedAt && new Date(l.expiresAt).getTime() > now)
+      .map((l) => ({ ...l, url: invites.linkUrl(origin, l.code), shown: formatCode(l.code), left: remainingText(l.expiresAt, now), reward: invites.packsText(l.rewardPacks) })),
+    invited,
+    rewardTotal: invited.reduce((s, u) => s + ((u.inviteReward && u.inviteReward.packs) || 0), 0),
   });
 });
 

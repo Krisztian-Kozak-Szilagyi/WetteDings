@@ -18,6 +18,7 @@ const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
+const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const giftService = require('../services/giftService');
@@ -45,7 +46,7 @@ const PANEL_SECTIONS = [
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
-  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes, Devs und Mods.' },
+  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
@@ -206,6 +207,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     ttlOptions: CODE_TTL_OPTIONS,
     ttlText,
     remainingText,
+    inviteMaxPacks: inviteService.MAX_PACKS,
+    packsText: inviteService.packsText,
     now: Date.now(),
     tcg:
       needs('spielwerte') && isAdmin
@@ -919,6 +922,20 @@ router.post('/admin/codes', requireStaff, async (req, res) => {
   const code = await createCode(req.user, ttl);
   req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${ttlText(ttl)} und eine Person.`);
   res.redirect(panelUrl('team', 'codes'));
+});
+
+// Einladungslink für ein Mitglied, das ihn sich gewünscht hat: Gültigkeit und Provision legt der Dev fest
+router.post('/admin/codes/einladungslink', requireStaff, async (req, res) => {
+  const userId = str(req.body.user);
+  const beneficiary = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username').lean() : null;
+  try {
+    const link = await inviteService.createLink({ staff: req.user, beneficiary, ttlMinutes: req.body.ttl, packs: req.body.packs });
+    req.flash('success', `Einladungslink für ${beneficiary.username}: ${formatCode(link.code)} – gültig für ${ttlText(parseTtl(req.body.ttl))}, Provision ${inviteService.packsText(link.rewardPacks)}. ${beneficiary.username} findet ihn unter Mein Konto → Einladungen.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(panelUrl('team', 'einladungslinks'));
 });
 
 // Der Admin löscht jeden Code, Devs nur ihre eigenen
