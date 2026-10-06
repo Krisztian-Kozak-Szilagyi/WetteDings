@@ -595,7 +595,7 @@ async function tcg(p, now = new Date()) {
         { id: 'handelsumsatz', label: 'Handelsumsatz', value: sumBy(trades, 'volume'), unit: 'euro', compare: true, hint: 'Kaufpreise und Aufpreise' },
         { id: 'steuer', label: 'Steuer', value: sumBy(trades, 'tax'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
         { id: 'bm-tage', label: 'Tage mit Angebot', value: bmDays.length, unit: 'count', compare: true },
-        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Karten` },
+        { id: 'bm-quote', label: 'Verkaufsquote', value: pct(bmSold.length, bmOffers.length), unit: 'percent', compare: true, hint: `${bmSold.length} von ${bmOffers.length} Angeboten` },
         { id: 'bm-umsatz', label: 'Black-Market-Umsatz', value: sumBy(bmSold, 'price'), unit: 'euro', compare: true, hint: 'verlässt das Spiel' },
       ],
       hbars: {

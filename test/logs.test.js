@@ -64,7 +64,11 @@ test('Protokolle: Verkäufe aus der Buchung – Bank, Gegenstand, Black Market, 
   const bm = logs.sellRow({ type: 'black_market', amount: -9000, createdAt: at, meta: { card: glitch.id, rarity: 'glitch' } }, 'anna');
   assert.equal(bm.kind, 'Black Market gekauft');
   assert.equal(bm.items[0].rare, true);
-  const old = logs.sellRow({ type: 'tcg_verkauf', amount: 500, createdAt: at, betTitle: 'Alte Buchung' }, undefined);
+  // Gegenstand aus dem Black Market (Folie): als Gegenstand benannt, nicht als Karte
+  const bmItem = logs.sellRow({ type: 'black_market', amount: -100000, createdAt: at, betTitle: 'Folie (Gegenstand)', meta: { item: 'folie', count: 1 } }, 'anna');
+  assert.equal(bmItem.kind, 'Black Market gekauft');
+  assert.deepStrictEqual(bmItem.items.map((i) => [i.label, i.rarity, i.count]), [['Folie (Gegenstand)', 'item', 1]]);
+  const old =logs.sellRow({ type: 'tcg_verkauf', amount: 500, createdAt: at, betTitle: 'Alte Buchung' }, undefined);
   assert.equal(old.player, '–');
   assert.equal(old.items[0].label, 'Alte Buchung');
 });

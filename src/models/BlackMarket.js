@@ -1,12 +1,15 @@
 const { Schema, model } = require('mongoose');
 
-// Black Market: täglich 16:30–19:00 vier Karten (Gold bis Glitch), jede nur einmal zu haben – wer zuerst kauft.
+// Black Market: täglich 16:30–19:00 vier Angebote (Karten von Holo bis Glitch, selten eine Bosskarte oder eine Folie),
+// jedes nur einmal zu haben – wer zuerst kauft. Keine Karte und kein Gegenstand zweimal am selben Tag.
 // Ein Dokument pro Tag, _id = Tag in deutscher Zeit ("2026-10-03"). Siehe src/tcg/blackMarket.js.
 const offerSchema = new Schema(
   {
-    card: { type: String, required: true }, // Karten-ID
-    rarity: { type: String, required: true },
-    price: { type: Number, required: true }, // Cent (170 % des Verkaufspreises beim Öffnen)
+    // 'karte' oder 'gegenstand' – alte Tagesdokumente ohne Feld sind Karten (blackMarket.offerKind)
+    kind: { type: String, enum: ['karte', 'gegenstand'], default: 'karte' },
+    card: { type: String, required: true }, // Karten-ID, bei Gegenständen "item:<Art>" (wie im Handel, z. B. "item:folie")
+    rarity: { type: String, required: true }, // bei Gegenständen "item"
+    price: { type: Number, required: true }, // Cent (170 % des Verkaufspreises beim Öffnen, Gegenstände mindestens 1.000 €)
     buyer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     buyerName: { type: String, default: null },
     soldAt: { type: Date, default: null },

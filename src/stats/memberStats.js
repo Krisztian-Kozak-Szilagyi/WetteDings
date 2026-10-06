@@ -207,7 +207,7 @@ async function member(p, now, { user }) {
         { id: 'm-bank', label: 'An Bank verkauft', value: sumType('tcg_verkauf'), unit: 'euro', compare: true },
         { id: 'm-handel-verkauft', label: 'Handel: verkauft', value: tradesSold, unit: 'count', compare: true, hint: 'Angebote, die angenommen wurden' },
         { id: 'm-handel-gekauft', label: 'Handel: gekauft', value: tradesBought, unit: 'count', compare: true, hint: 'gekauft oder Tausch angenommen' },
-        { id: 'm-blackmarket', label: 'Black Market', value: -sumType('black_market'), unit: 'euro', compare: true, hint: `${countType('black_market')} Karten gekauft` },
+        { id: 'm-blackmarket', label: 'Black Market', value: -sumType('black_market'), unit: 'euro', compare: true, hint: `${countType('black_market')} Käufe (Karten und Gegenstände)` },
       ],
       tables: [
         {

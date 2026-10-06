@@ -79,7 +79,7 @@ test('Gegenstands-Arten: Liste ist gültig, Fehler fallen beim Laden auf', () =>
   assert.throws(() => validateTypes([{ ...ok, sell: 1.5 }]), /Cent/);
   assert.equal(itemType('folie').storage, 'stueck');
   assert.equal(itemType('__proto__'), null);
-  for (const s of ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren']) assert.ok(SOURCES.includes(s));
+  for (const s of ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren', 'blackmarket']) assert.ok(SOURCES.includes(s));
 });
 
 test('Gegenstände: Wegnehmen nur in einer Transaktion, unbekannte Quelle ist ein Programmfehler', async () => {

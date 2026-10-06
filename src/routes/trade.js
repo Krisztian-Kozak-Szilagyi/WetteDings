@@ -134,7 +134,7 @@ function wishPool(counts) {
 router.get('/handel', async (req, res) => {
   const [data, market, coll] = await Promise.all([
     trade.overview(req.user),
-    blackMarket.today(), // Black Market (16:30–19:00): vier Karten, jede nur einmal
+    blackMarket.today(), // Black Market (16:30–19:00): vier Angebote (Karten, selten Bosskarte oder Folie), jedes nur einmal
     collection(req.user),
     // Besuch merken: der Markt gilt ab jetzt als gesehen
     User.updateOne({ _id: req.user._id }, { $set: { marketSeenAt: new Date(), dealsSeenAt: new Date() } }),
@@ -154,11 +154,12 @@ router.get('/handel', async (req, res) => {
   });
 });
 
-// Black Market: eine der vier Karten kaufen
+// Black Market: eines der vier Angebote kaufen (Karte oder Gegenstand)
 router.post('/handel/black-market', async (req, res) => {
   try {
     const r = await blackMarket.buy({ user: req.user, index: str(req.body.index) });
-    req.flash('success', `Gekauft: ${r.card.name} (${catalog.rarityByKey[r.card.rarity].label}) für ${euro(r.price)}. Die Karte liegt in deinem Album.`);
+    if (r.item) req.flash('success', `Gekauft: ${r.item.label} für ${euro(r.price)}. Der Gegenstand liegt in deinem Inventar.`);
+    else req.flash('success', `Gekauft: ${r.card.name} (${catalog.rarityByKey[r.card.rarity].label}) für ${euro(r.price)}. Die Karte liegt in deinem Album.`);
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
