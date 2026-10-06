@@ -20,6 +20,7 @@
           <li class="code-item <%= used ? 'is-used' : '' %>">
             <div class="code-main">
               <code class="code-value"><%= formatCode(c.code) %></code>
+              <% if (c.reward) { %><span class="tag" title="Einladungslink eines Mitglieds – bringt dem Ersteller eine Provision">Mitglieder-Link</span><% } %>
               <% if (used) { %>
                 <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
               <% } else { %>

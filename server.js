@@ -19,6 +19,7 @@ async function main() {
   await require('./src/dungeon/dungeonService').loadSettings(); // Dungeon: Termine, Lohn, Beute, Bot-Karten
   await require('./src/services/taxService').loadSettings(); // Steuersätze: Handel (Markt, Privat, Tausch) und Broker (Coins, ETFs)
   await require('./src/services/bonusService').loadSettings(); // Tagesbonus
+  await require('./src/services/inviteService').loadSettings(); // Einladungslinks: freigegeben? Provision
   await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?
   await require('./src/items/foil').loadSettings(); // Folie: Fundchance und Wertsteigerung
   await require('./src/services/lotteryService').loadSettings(); // Wochen-/Monats-Lotterie: Lospreis und Bank-Gewinn

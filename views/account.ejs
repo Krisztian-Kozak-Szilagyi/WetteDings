@@ -157,6 +157,73 @@
 </div>
 <% } %>
 
+<% if (section === 'einladungen') { %>
+<div class="card" id="einladungen">
+  <h2>Freunde einladen</h2>
+  <% if (!mayInvite) { %>
+    <p class="muted">Einladungslinks gibt es bald. Bis dahin bekommen neue Mitglieder ihren Registrierungscode vom Team.</p>
+  <% } else { %>
+    <p class="muted">
+      Erstelle einen persönlichen Einladungslink und schick ihn der Person, die du einladen möchtest. Jeder Link gilt <%= linkTtlText %> und für genau eine Person.
+      <% if (invitePacks) { %>Registriert sie sich darüber, bekommst du <strong><%= invitePacks === 1 ? 'ein Booster Pack' : invitePacks + ' Booster Packs' %></strong> als Provision ins Inventar.<% } %>
+      Zweitkonten bringen nichts: Kommt das neue Konto von deinem Gerät, gibt es keine Provision.
+    </p>
+    <% if (openLinks.length < maxOpenLinks) { %>
+      <form method="post" action="/konto/einladungen" class="admin-generate">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="btn btn-primary" type="submit">+ Einladungslink erstellen</button>
+      </form>
+    <% } else { %>
+      <p class="muted small">Du hast <%= maxOpenLinks %> offene Links – mehr gehen nicht gleichzeitig.</p>
+    <% } %>
+    <% if (openLinks.length) { %>
+      <ul class="code-list">
+        <% openLinks.forEach((l) => { %>
+          <li class="code-item">
+            <div class="code-main">
+              <code class="code-value"><%= l.shown %></code>
+              <span class="badge badge-offen">Gültig · <%= l.left %></span>
+            </div>
+            <div class="code-meta muted small">erstellt <%= date(l.createdAt) %> · läuft ab <%= date(l.expiresAt) %></div>
+            <div class="code-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.url %>">Link kopieren</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.shown %>">Code kopieren</button>
+              <form method="post" action="/konto/einladungen/<%= l._id %>/loeschen" data-confirm="Diesen Einladungslink löschen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>Geworbene Mitglieder</h2>
+  <% if (!invited.length) { %>
+    <p class="muted">Über deine Links hat sich noch niemand registriert.</p>
+  <% } else { %>
+    <p class="muted"><%= invited.length %> <%= invited.length === 1 ? 'Mitglied' : 'Mitglieder' %> geworben · insgesamt <strong><%= rewardTotal %> Booster Pack<%= rewardTotal === 1 ? '' : 's' %></strong> Provision</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Mitglied</th><th>Registriert</th><th class="num">Provision</th></tr></thead>
+        <tbody>
+          <% invited.forEach((u) => { const r = u.inviteReward || {}; %>
+            <tr>
+              <td><%- u.deletedAt ? '<span class="muted">gelöschtes Konto</span>' : userLink(u.username) %></td>
+              <td class="nowrap"><%= date(u.createdAt) %></td>
+              <td class="num"><%= r.packs ? r.packs + ' Pack' + (r.packs === 1 ? '' : 's') : '' %><% if (!r.packs) { %><span class="muted small"><%= r.withheld ? 'keine (' + r.withheld + ')' : 'keine' %></span><% } %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+<% } %>
+
 <% if (section === 'einstellungen') { %>
 <div class="account-grid">
 <div class="card" id="name">

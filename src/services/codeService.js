@@ -42,8 +42,11 @@ function parseTtl(input) {
   return CODE_TTL_OPTIONS.includes(n) ? n : CODE_TTL_MINUTES;
 }
 
-/** Neuen Code erzeugen – Admin oder Dev lädt damit jemanden ein (einmal nutzbar, gültig für ttlMinutes). */
-async function createCode(admin, ttlMinutes = CODE_TTL_MINUTES) {
+/**
+ * Neuen Code erzeugen – Admin oder Dev lädt damit jemanden ein (einmal nutzbar, gültig für ttlMinutes).
+ * reward: Einladungslink eines Mitglieds mit Provision (services/inviteService).
+ */
+async function createCode(admin, ttlMinutes = CODE_TTL_MINUTES, { reward = false } = {}) {
   const ttl = parseTtl(ttlMinutes);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -52,6 +55,7 @@ async function createCode(admin, ttlMinutes = CODE_TTL_MINUTES) {
         createdBy: admin._id,
         createdByName: admin.username,
         expiresAt: new Date(Date.now() + ttl * 60 * 1000),
+        reward,
       });
     } catch (err) {
       if (err.code !== 11000) throw err; // Kollision: neuen Code würfeln

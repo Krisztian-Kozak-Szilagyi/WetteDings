@@ -51,6 +51,8 @@ module.exports = {
   lotteryTicketPrice: eurosToCents(process.env.LOTTERY_TICKET_EUR, 100),
   lotteryTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.LOTTERY_TIME || '') ? process.env.LOTTERY_TIME : '20:00',
   lotteryMaxTicketsPerPurchase: 10,
+  // Einladungslinks: Booster Packs für den Einlader je neuem Mitglied. Standardwert – im Admin-Panel änderbar.
+  inviteRewardPacks: Math.min(20, Math.max(0, Number.parseInt(process.env.INVITE_REWARD_PACKS, 10) || 1)),
   // TCG: Preis eines Booster Packs (5 Karten)
   tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 90),
   // Support-Bot (Groq API). Ohne Schlüssel ist der Chat ausgeblendet.

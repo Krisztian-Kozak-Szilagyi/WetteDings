@@ -18,6 +18,7 @@ const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
+const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const giftService = require('../services/giftService');
@@ -43,7 +44,7 @@ const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK, Dungeon und Einladungen.' },
   { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes, Devs und Mods.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
@@ -67,6 +68,7 @@ const SUBTABS = {
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
     { key: 'dungeon', label: 'Dungeon' },
+    { key: 'einladung', label: 'Einladungen' },
   ],
 };
 
@@ -219,6 +221,7 @@ router.get('/admin', requireStaff, async (req, res) => {
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
+    invite: { settings: inviteService.settings, defaults: inviteService.DEFAULTS, maxPacks: inviteService.MAX_PACKS, maxOpen: inviteService.MAX_OPEN_LINKS, ttlText: inviteService.linkTtlText },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
@@ -384,6 +387,20 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
     req.flash('success', `Gespeichert: Grading-Shop ${jobs} Aufträge pro Tag.`);
   }
   res.redirect(subUrl('spielwerte', 'grading'));
+});
+
+// ---------- Einladungslinks der Mitglieder: freigeben und Provision ----------
+router.post('/admin/einladung', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const raw = typeof req.body.packs === 'string' ? req.body.packs.trim() : '';
+  const packs = /^d{1,3}$/.test(raw) ? Number(raw) : NaN;
+  try {
+    await inviteService.saveSettings({ open: req.body.open === '1', packs, admin: req.user });
+    req.flash('success', `Gespeichert: Einladungslinks ${inviteService.settings.open ? 'für alle' : 'nur für Admins'}, Provision ${packs} Booster Pack${packs === 1 ? '' : 's'} je neuem Mitglied.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'einladung'));
 });
 
 // ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
