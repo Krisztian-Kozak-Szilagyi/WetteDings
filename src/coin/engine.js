@@ -1,13 +1,17 @@
 /**
- * Kurs-Engine der Broker-Werte (Samantha Coin, Coinye West, BfW-TCG ETF). createEngine() baut eine Engine je Wert,
- * die Liste aller Werte steht in markets.js.
+ * Kurs-Engine der Broker-Werte (Samantha Coin, Coinye West, 51101 Coin, BfW-TCG ETF). createEngine() baut eine Engine
+ * je Wert, die Liste aller Werte steht in markets.js.
  * Läuft im Serverprozess: alle 5 Sekunden ein neuer Kurs (auch wenn niemand online ist).
  * Minuten- und Stundenkerzen werden gesammelt und alle 15 Sekunden in MongoDB gespeichert.
  * War der Server offline, wird die verpasste Zeit beim Start in Minutenschritten nachsimuliert,
  * damit der Kursverlauf lückenlos bleibt.
+ * Split (nur Werte mit cfg.rebase): Verlässt der Kurs den Bereich, werden alle Bestände umgerechnet
+ * (z. B. 10 alte Coins = 1 neuer, Kurs × 10). Der Wert jedes Depots bleibt gleich; Kursverlauf und Ereignisse
+ * werden mit umgerechnet. Käufe und Verkäufe dieses Werts warten währenddessen (exclusive).
  */
+const mongoose = require('mongoose');
 const model = require('./model');
-const { CoinState, CoinMinute, CoinHour, CoinEvent } = require('../models/Coin');
+const { CoinState, CoinMinute, CoinHour, CoinEvent, CoinHolding } = require('../models/Coin');
 
 const TICK_MS = 5000;
 const FLUSH_MS = 15000;
@@ -53,11 +57,18 @@ const RANGES = {
  * @param {number|null} cfg.surgeWindow  Würfelfenster für den großen Sprung in ms (null = kein großer Sprung)
  * @param {{target: () => Promise<{mu: number, sentiment: number}>, tauDays: number}|null} cfg.trend
  *        Trend (ETF): Zielwert aus der Aktivität; der Kurs-Trend folgt ihm gleitend (Zeitkonstante tauDays).
+ * @param {{at: (ms: number) => object|null, params: (c: object|null) => object, storm: (c: object|null) => boolean}|null} cfg.weather
+ *        Wetter (51101 Coin): at() liefert die Wetterlage zum Zeitpunkt, params() das Kursmodell dazu;
+ *        der große Sprung wird nur gewürfelt, solange storm() gilt.
+ * @param {{min: number, max: number, factor: number}|null} cfg.rebase
+ *        Split: unter min € werden je factor Coins zu einem zusammengelegt, über max € wird jeder in factor aufgeteilt.
  */
 function createEngine(cfg) {
   const { symbol: SYMBOL, name: NAME, kind = 'coin', startPrice: START_PRICE, params: PARAMS } = cfg;
   const SURGE_WINDOW = cfg.surgeWindow || null;
   const trend = cfg.trend || null;
+  const weather = cfg.weather || null;
+  const REBASE = cfg.rebase || null;
   const LN_MAX = model.lnMaxOf(PARAMS);
 
   let state = null;
@@ -87,7 +98,8 @@ function createEngine(cfg) {
     if (!SURGE_WINDOW) return null;
     const slot = bucket(atMs, SURGE_WINDOW);
     if (!state.surge || state.surge.slot !== slot) {
-      const roll = model.rollSurge(Math.random, PARAMS.surge);
+      const active = !weather || weather.storm(weather.at(atMs)); // 51101 Coin: nur bei Sturm
+      const roll = active ? model.rollSurge(Math.random, PARAMS.surge) : null;
       state.surge = { slot, at: roll ? atMs + Math.random() * (slot + SURGE_WINDOW - atMs) : null, log: roll ? roll.log : 0 };
     }
     const { at, log } = state.surge;
@@ -98,7 +110,7 @@ function createEngine(cfg) {
 
   function advance(dtDays, atMs) {
     if (trend) state.mu += (state.muTarget - state.mu) * (1 - Math.exp(-dtDays / trend.tauDays));
-    const next = model.step(state, dtDays, Math.random, PARAMS);
+    const next = model.step(state, dtDays, Math.random, weather ? weather.params(weather.at(atMs)) : PARAMS);
     const surge = dueSurge(atMs);
     if (surge) {
       next.price = Math.max(PARAMS.floor, next.price * Math.exp(surge.log));
@@ -119,6 +131,7 @@ function createEngine(cfg) {
     let n = 0;
     for (let t = fromMs + MIN; t <= toMs; t += MIN) {
       advance(1 / 1440, t);
+      if (rebaseFactor() !== 1) await rebase().catch((err) => console.error(`${NAME}: Split fehlgeschlagen:`, err.message));
       if (++n % 3000 === 0) await flush();
     }
   }
@@ -128,6 +141,98 @@ function createEngine(cfg) {
     const dt = (now - state.lastTickAt.getTime()) / DAY;
     if (dt <= 0) return;
     advance(Math.min(dt, 5 / 1440), now);
+    if (rebaseFactor() !== 1 && now >= rebaseRetryAt) {
+      rebase().catch((err) => {
+        rebaseRetryAt = Date.now() + MIN;
+        console.error(`${NAME}: Split fehlgeschlagen:`, err.message);
+      });
+    }
+  }
+
+  // ---------- Split ----------
+
+  let tradeLock = Promise.resolve();
+  let rebasing = null;
+  let rebaseRetryAt = 0;
+
+  /**
+   * Käufe/Verkäufe und Split nacheinander ausführen, damit kein Handel zwischen Kurs und Bestand umgerechnet wird.
+   * Ohne Split (cfg.rebase) läuft fn sofort.
+   */
+  function exclusive(fn) {
+    if (!REBASE) return fn();
+    const run = tradeLock.then(fn);
+    tradeLock = run.catch(() => {});
+    return run;
+  }
+
+  /** Kursfaktor eines fälligen Splits: factor (zusammenlegen), 1/factor (aufteilen) oder 1 (keiner) */
+  function rebaseFactor() {
+    if (!REBASE) return 1;
+    if (state.price < REBASE.min) return REBASE.factor;
+    if (state.price > REBASE.max) return 1 / REBASE.factor;
+    return 1;
+  }
+
+  /** Fälligen Split ausführen (läuft höchstens einmal gleichzeitig) */
+  function rebase() {
+    if (!rebasing) {
+      rebasing = exclusive(() => {
+        const f = rebaseFactor();
+        if (f === 1) return null;
+        flushChain = flushChain.catch(() => {}).then(() => applyRebase(f)); // nie gleichzeitig mit dem Speichern
+        return flushChain;
+      }).finally(() => {
+        rebasing = null;
+      });
+    }
+    return rebasing;
+  }
+
+  /** Split mit Kursfaktor f: Bestände, gespeicherten Kursverlauf und Ereignisse umrechnen, dann den Speicher */
+  async function applyRebase(f) {
+    await doFlush();
+    const mul = (k) => ({ $multiply: [`$${k}`, f] });
+    const candle = [{ $set: { o: mul('o'), h: mul('h'), l: mul('l'), c: mul('c') } }];
+    // zusammenlegen: Einheiten / factor (abgerundet), aufteilen: Einheiten × factor (exakt)
+    const units = f > 1 ? { $floor: { $divide: ['$units', f] } } : { $multiply: ['$units', Math.round(1 / f)] };
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await CoinHolding.updateMany({ coin: SYMBOL }, [{ $set: { units } }], { session });
+        await CoinMinute.updateMany({ coin: SYMBOL }, candle, { session });
+        await CoinHour.updateMany({ coin: SYMBOL }, candle, { session });
+        await CoinEvent.updateMany({ coin: SYMBOL }, [{ $set: { price: mul('price') } }], { session });
+        await CoinState.updateOne(
+          { _id: SYMBOL },
+          { $set: { price: state.price * f, ath: state.ath * f }, $inc: { splits: 1 } },
+          { upsert: true, session }
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    // Ab hier ohne await: Kurs und alles im Speicher auf einen Schlag umrechnen
+    const scale = (c) => {
+      if (!c) return;
+      c.o *= f;
+      c.h *= f;
+      c.l *= f;
+      c.c *= f;
+    };
+    state.price *= f;
+    state.ath *= f;
+    state.splits = (state.splits || 0) + 1;
+    scale(curMin);
+    scale(curHour);
+    pendingMin.forEach(scale);
+    pendingHour.forEach(scale);
+    for (const e of pendingEvents) e.price *= f;
+    for (const k of ['open', 'high', 'low']) if (stats24[k] !== null) stats24[k] *= f;
+    const type = f > 1 ? 'zusammenlegung' : 'aufteilung';
+    pendingEvents.push({ coin: SYMBOL, at: new Date(state.lastTickAt), type, change: f - 1, price: state.price });
+    console.log(`${NAME}: Split (${type}, Kurs × ${f}) – neuer Kurs ${state.price.toFixed(4)} €`);
   }
 
   /** ETF: Zielwert des Trends aus der Aktivität der Seite neu bestimmen */
@@ -221,6 +326,7 @@ function createEngine(cfg) {
         mu: 0,
         muTarget: 0,
         sentiment: 0,
+        splits: 0,
       };
       record(state.price, startMs);
       console.log(`${NAME}: erster Start – simuliere ${BACKFILL_DAYS} Tage Vorgeschichte …`);
@@ -237,6 +343,7 @@ function createEngine(cfg) {
         mu: doc.mu || 0,
         muTarget: doc.muTarget || 0,
         sentiment: doc.sentiment || 0,
+        splits: doc.splits || 0,
       };
       let from = state.lastTickAt.getTime();
       if (now - from > MAX_GAP_DAYS * DAY) from = now - MAX_GAP_DAYS * DAY;
@@ -283,7 +390,15 @@ function createEngine(cfg) {
       athAt: state.athAt.getTime(),
       tickMs: TICK_MS,
       sentiment: trend ? state.sentiment : null, // ETF: Marktstimmung −1 … +1
+      splits: state.splits || 0, // Zahl der Splits – ändert sie sich, lädt die Broker-Seite neu
+      weather: weather ? weatherNow() : null, // 51101 Coin: letzte Messung der Boje
     };
+  }
+
+  /** Letzte Messung der Boje mit Sturm-Kennzeichen ({ offline: true }, wenn sie nichts meldet) */
+  function weatherNow() {
+    const c = weather.at(Date.now());
+    return c ? { t: c.t, w: c.w, g: c.g, p: c.p, storm: weather.storm(c) } : { offline: true };
   }
 
   /** Kursverlauf als [[Zeit ms, Schlusskurs], …] (max. ~400 Punkte) */
@@ -332,6 +447,7 @@ function createEngine(cfg) {
     history,
     recentEvents,
     flush,
+    exclusive,
   };
 }
 

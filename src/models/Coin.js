@@ -20,6 +20,8 @@ const coinStateSchema = new Schema(
     mu: { type: Number, default: 0 },
     muTarget: { type: Number, default: 0 },
     sentiment: { type: Number, default: 0 },
+    // Nur 51101 Coin: Zahl der bisherigen Splits (Bestände zusammengelegt oder aufgeteilt)
+    splits: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
