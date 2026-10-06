@@ -173,35 +173,20 @@
     sync();
   });
 
-  // ---------- Kartenauswahl in der Lobby (#111): Fenster neben dem eigenen Platz, Klick übernimmt sofort ----------
+  // ---------- Kartenauswahl in der Lobby (#111, #114): zentriertes Fenster, Klick übernimmt sofort ----------
   const cardsForm = page.querySelector('[data-dg-cards-form]');
   if (cardsForm) {
     const pickers = [...cardsForm.querySelectorAll('[data-dg-picker]')];
     const close = (dlg) => (typeof dlg.close === 'function' ? dlg.close() : dlg.removeAttribute('open'));
-    // Breite Fenster: neben (sonst unter/über) dem angeklickten Platz; schmale: als Blatt von unten (CSS)
-    function place(dlg, trigger) {
-      dlg.style.left = dlg.style.top = '';
-      dlg.classList.remove('is-anchored');
-      if (window.innerWidth < 720 || !trigger) return;
-      const r = trigger.getBoundingClientRect();
-      const w = dlg.offsetWidth;
-      const h = dlg.offsetHeight;
-      const gap = 14;
-      let left = r.right + gap;
-      if (left + w > window.innerWidth - 8) left = r.left - gap - w; // rechts kein Platz: links daneben
-      if (left < 8) left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
-      const top = Math.min(Math.max(8, r.top + r.height / 2 - h / 2), window.innerHeight - h - 8);
-      dlg.style.left = left + 'px';
-      dlg.style.top = Math.max(8, top) + 'px';
-      dlg.classList.add('is-anchored');
-    }
+    // Karten je Seite erst messen, wenn das Fenster offen ist (Kartenliste weiter unten hört auf dg:fit)
+    const fit = (dlg) => dlg.querySelectorAll('[data-dg-picklist]').forEach((box) => box.dispatchEvent(new Event('dg:fit')));
     page.querySelectorAll('[data-dg-open]').forEach((btn) =>
       btn.addEventListener('click', () => {
         const dlg = cardsForm.querySelector('[data-dg-picker="' + btn.dataset.dgOpen + '"]');
         if (!dlg) return;
         if (typeof dlg.showModal === 'function') dlg.showModal();
         else dlg.setAttribute('open', '');
-        place(dlg, btn.closest('.dg-slot-card, .dg-boost') || btn);
+        fit(dlg);
         const search = dlg.querySelector('[data-dg-search]');
         if (search && window.innerWidth >= 720) search.focus();
       })
@@ -212,7 +197,7 @@
         if (e.target === dlg) close(dlg); // Klick daneben schließt
       });
     });
-    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && dlg.classList.contains('is-anchored') && close(dlg)));
+    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && fit(dlg)));
     // Auswahl sofort speichern, danach neu laden (Scroll-Position bleibt). Fehler stehen im Fenster selbst.
     let saving = false;
     const showError = (dlg, text) => {
@@ -251,41 +236,72 @@
     });
   }
 
-  // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 12 Karten ----------
-  const PER_PAGE = 12;
+  // ---------- Kartenauswahl: Suche, Seltenheit und Seiten – je Seite so viele Karten, wie ins Fenster passen ----------
+  const CARD_RATIO = 1008 / 720;
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
+    const grid = box.querySelector('[data-dg-grid]');
     const items = [...box.querySelectorAll('[data-dg-item]')];
+    const none = box.querySelector('[data-dg-none]'); // "Ohne Boost"
     const search = box.querySelector('[data-dg-search]');
     const chips = [...box.querySelectorAll('[data-dg-rar]')];
     let rarity = '';
+    const pager = box.querySelector('[data-dg-pager]');
     const prev = box.querySelector('[data-dg-prev]');
     const next = box.querySelector('[data-dg-next]');
     const info = box.querySelector('[data-dg-pageinfo]');
     const empty = box.querySelector('[data-dg-empty]');
     let pageNo = 0;
+    let perPage = 12;
+    let fitted = false;
     const matches = () => {
       const q = search ? search.value.trim().toLowerCase() : '';
       const r = rarity;
-      return items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
+      const list = items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
+      return none && !q && !r ? [none, ...list] : list;
     };
     function render() {
       const list = matches();
-      const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+      const pages = Math.max(1, Math.ceil(list.length / perPage));
       pageNo = Math.min(Math.max(0, pageNo), pages - 1);
-      const from = pageNo * PER_PAGE;
-      const visible = new Set(list.slice(from, from + PER_PAGE));
-      items.forEach((it) => {
+      const from = pageNo * perPage;
+      const visible = new Set(list.slice(from, from + perPage));
+      (none ? [none, ...items] : items).forEach((it) => {
         it.hidden = !visible.has(it);
       });
-      prev.hidden = next.hidden = pages <= 1;
+      pager.hidden = false;
+      pager.classList.toggle('is-single', pages <= 1); // Platz bleibt reserviert, sonst passt die Rechnung in fit() nicht
       prev.disabled = pageNo === 0;
       next.disabled = pageNo >= pages - 1;
-      info.textContent = pages > 1 ? 'Seite ' + (pageNo + 1) + ' von ' + pages : '';
+      info.textContent = 'Seite ' + (pageNo + 1) + ' von ' + pages;
       empty.hidden = list.length > 0;
     }
-    // Anfangs die Seite mit der schon gewählten Karte zeigen
-    const checked = items.findIndex((it) => it.querySelector('input:checked'));
-    if (checked > 0) pageNo = Math.floor(checked / PER_PAGE);
+    // Kartenbreite so, dass mindestens zwei Reihen und drei Spalten ins Fenster passen; daraus Spalten × Reihen je Seite
+    function fit() {
+      const cs = getComputedStyle(grid);
+      const h = grid.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const w = grid.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (h <= 0 || w <= 0) return;
+      const gapX = parseFloat(cs.columnGap) || 0;
+      const gapY = parseFloat(cs.rowGap) || 0;
+      // Höhe von Name und Werten unter dem Bild (an einer sichtbaren Karte gemessen)
+      const sample = items.find((it) => !it.hidden);
+      const text = sample ? sample.offsetHeight - sample.querySelector('img').offsetHeight : 48;
+      const cardW = Math.floor(Math.min(150, (w - 2 * gapX) / 3, Math.max(84, ((h - gapY) / 2 - text) / CARD_RATIO)));
+      grid.style.setProperty('--dg-card-w', cardW + 'px');
+      const cols = Math.max(1, Math.floor((w + gapX) / (cardW + gapX)));
+      const rows = Math.max(1, Math.floor((h + gapY) / (cardW * CARD_RATIO + text + gapY)));
+      const first = pageNo * perPage; // erste Karte der aktuellen Seite bleibt sichtbar
+      perPage = cols * rows;
+      if (fitted) pageNo = Math.floor(first / perPage);
+      else {
+        // beim ersten Öffnen: die Seite mit der schon gewählten Karte
+        const checked = matches().findIndex((it) => it.querySelector('input:checked'));
+        pageNo = checked > 0 ? Math.floor(checked / perPage) : 0;
+        fitted = true;
+      }
+      render();
+    }
+    box.addEventListener('dg:fit', fit);
     if (search) search.addEventListener('input', () => { pageNo = 0; render(); });
     chips.forEach((chip) =>
       chip.addEventListener('click', () => {
