@@ -367,6 +367,19 @@ router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?b
 });
 
 // ---------- Steuern: je Bereich ein Satz (Handel: Markt, Privat, Tausch; Broker: Coins, ETFs) ----------
+// Börsenbericht: den heutigen Bericht neu auswerten (der frühere Sprung des ETF wird verrechnet)
+const BOERSE_URL = '/admin/statistik?bereich=spiele#boersenbericht';
+router.post('/admin/boersenbericht/neu', requireAdmin, requireReauth(BOERSE_URL), async (req, res) => {
+  try {
+    await require('../coin/reportService').redoToday();
+    req.flash('success', 'Börsenbericht neu ausgewertet.');
+  } catch (err) {
+    if (err.name !== 'UserError') throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(BOERSE_URL);
+});
+
 router.post('/admin/steuer', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const { rates, error } = taxService.parseRates(req.body);
   if (error) {
