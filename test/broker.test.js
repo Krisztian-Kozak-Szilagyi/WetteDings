@@ -8,7 +8,7 @@ const etf = require('../src/coin/etfTrend');
 const markets = require('../src/coin/markets');
 
 test('Broker: vier Werte, Symbole nur aus der festen Liste', () => {
-  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BOJE', 'BTCG']);
+  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BOJE', 'MIA', 'BTCG']);
   assert.equal(markets.get('COW').NAME, 'Coinye West');
   assert.equal(markets.get('BOJE').NAME, '51101 Coin');
   assert.equal(markets.get('BTCG').kind, 'etf');

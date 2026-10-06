@@ -58,6 +58,8 @@ const RANGES = {
  * @param {{at: (ms: number) => object|null, params: (c: object|null) => object, storm: (c: object|null) => boolean}|null} cfg.weather
  *        Wetter (51101 Coin): at() liefert die Wetterlage zum Zeitpunkt, params() das Kursmodell dazu;
  *        der große Sprung wird nur gewürfelt, solange storm() gilt.
+ * @param {{now: () => {mu: number, sentiment: number}}|null} [cfg.drift]
+ *        Trend aus einer äußeren Datenquelle (MK Coin): mu = Log-Rendite pro Tag, sentiment −1 … +1 für die Anzeige.
  * @param {{min: number, max: number, factor: number}|null} cfg.rebase
  *        Split: unter min € werden je factor Coins zu einem zusammengelegt, über max € wird jeder in factor aufgeteilt.
  */
@@ -66,6 +68,7 @@ function createEngine(cfg) {
   const SURGE_WINDOW = cfg.surgeWindow || null;
   const REPORT = !!cfg.report;
   const weather = cfg.weather || null;
+  const DRIFT = cfg.drift || null;
   const REBASE = cfg.rebase || null;
   const LN_MAX = model.lnMaxOf(PARAMS);
 
@@ -107,6 +110,7 @@ function createEngine(cfg) {
   }
 
   function advance(dtDays, atMs) {
+    if (DRIFT) state.mu = DRIFT.now().mu;
     const next = model.step(state, dtDays, Math.random, weather ? weather.params(weather.at(atMs)) : PARAMS);
     const surge = dueSurge(atMs);
     if (surge) {
@@ -397,7 +401,7 @@ function createEngine(cfg) {
       ath: state.ath,
       athAt: state.athAt.getTime(),
       tickMs: TICK_MS,
-      sentiment: REPORT ? state.sentiment || 0 : null, // ETF: Marktstimmung −1 … +1 (letzter Börsenbericht)
+      sentiment: REPORT ? state.sentiment || 0 : DRIFT ? DRIFT.now().sentiment : null, // Marktstimmung −1 … +1 (ETF: letzter Börsenbericht, MK Coin: Datenquelle)
       splits: state.splits || 0, // Zahl der Splits – ändert sie sich, lädt die Broker-Seite neu
       weather: weather ? weatherNow() : null, // 51101 Coin: letzte Messung der Boje
     };
