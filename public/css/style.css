@@ -5719,3 +5719,5 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 
 /* Falle für Skripte (moderation/requestSignals.js): für Menschen unsichtbar */
 .hp-link { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+/* Rangliste: eigene Liste für das Team (Admin + Devs) */
+.rang-team h2 { margin: 0 0 16px; font-size: 18px; font-weight: 500; }
