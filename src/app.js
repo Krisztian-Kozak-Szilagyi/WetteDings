@@ -18,6 +18,7 @@ const groupService = require('./services/groupService');
 const roles = require('./services/roles');
 const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
+const suspicionService = require('./moderation/suspicionService');
 const notifyService = require('./services/notifyService');
 const achievementService = require('./achievements/achievementService');
 const giftService = require('./services/giftService');
@@ -104,6 +105,7 @@ function createApp() {
     betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
     tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
+    suspicionAlerts: 0, // offene Hinweise der Manipulationserkennung (Admin und Devs)
     bellNotes: [], // Glocke: Benachrichtigungen (ungelesene und die neuesten gelesenen)
     bellUnread: 0,
     deviceProbe: false,
@@ -157,7 +159,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET') {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, bell, achPopup, giftPopup] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, bell, achPopup, giftPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -172,6 +174,7 @@ function createApp() {
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
+        u.isStaff ? suspicionService.openCount() : 0, // Admin und Devs: Verdacht auf Skript oder Wertverschiebung
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
         giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
@@ -191,6 +194,7 @@ function createApp() {
         packLogNew,
         deviceAlerts,
         tradeAlerts,
+        suspicionAlerts,
         bellNotes: bell.list,
         bellUnread: bell.unread,
         achPopup,

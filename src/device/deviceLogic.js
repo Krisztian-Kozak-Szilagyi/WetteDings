@@ -60,6 +60,9 @@ const pairKey = (a, b) => [String(a), String(b)].sort().join(':');
 // Ab so vielen Konten mit demselben Fingerabdruck im selben Netz (gleiche IP) ist das kein Hinweis auf eine Person,
 // sondern auf viele baugleiche Geräte im selben WLAN (#89)
 const CROWD = 3;
+// Ab so vielen Konten an derselben IP ist das ein geteiltes Netz (Schule, Firma, öffentliches WLAN): dort sagt die
+// gemeinsame IP nichts über die Person aus – auch nicht bei zwei baugleichen Handys derselben Klasse
+const NET_CROWD = 5;
 // Kleine Überschneidung zweier Geräte-Einträge (z. B. Cookie gelöscht und gleich neu angemeldet) gilt nicht als gleichzeitig
 const PARALLEL_SLACK_MS = 60 * 60 * 1000;
 
@@ -79,6 +82,20 @@ function commonPrints(devices, min = CROWD) {
   return new Set([...users].filter(([, u]) => u.size >= min).map(([k]) => k));
 }
 
+const netKey = (ip) => `net:${ip}`;
+
+/** IPs, die mindestens min verschiedene Konten benutzt haben, als Set von netKey (devices: [{ user, ips }]) */
+function crowdedNets(devices, min = NET_CROWD) {
+  const users = new Map();
+  for (const d of devices) {
+    for (const ip of d.ips || []) {
+      if (!users.has(ip)) users.set(ip, new Set());
+      users.get(ip).add(String(d.user));
+    }
+  }
+  return new Set([...users].filter(([, u]) => u.size >= min).map(([ip]) => netKey(ip)));
+}
+
 /** Wurden zwei Geräte-Einträge gleichzeitig benutzt (Zeiträume überschneiden sich deutlich)? Ohne Zeiten: nein */
 function usedInParallel(a, b) {
   if (!a.firstAt || !a.lastAt || !b.firstAt || !b.lastAt) return false;
@@ -92,13 +109,14 @@ function usedInParallel(a, b) {
  * Gleiches Cookie = sicher. Gleicher Fingerabdruck und gleiche IP = wahrscheinlich – aber nur, wenn die beiden
  * Einträge nacheinander benutzt wurden (typisch: Cookie gelöscht, neues Konto) und die Kombination nicht von vielen
  * Konten stammt. Laufen beide parallel oder teilen sich viele Konten Fingerabdruck und Netz, sind das baugleiche
- * Geräte im selben WLAN (#89) – dann wie ein gleicher Fingerabdruck ohne gemeinsame IP nur möglich.
- * common = Set aus commonPrints().
+ * Geräte im selben WLAN (#89) – dann wie ein gleicher Fingerabdruck ohne gemeinsame IP nur möglich. Dasselbe gilt für
+ * eine IP, die viele Konten benutzen (Schulnetz): zwei baugleiche Handys einer Klasse sind keine Person.
+ * common = Set aus commonPrints() und crowdedNets().
  */
 function matchLevel(a, b, common = new Set()) {
   if (a.deviceId && a.deviceId === b.deviceId) return LEVEL.sicher;
   if (!a.fp || a.fp !== b.fp) return 0;
-  const shared = (a.ips || []).filter((ip) => (b.ips || []).includes(ip) && !common.has(printKey(a.fp, ip)));
+  const shared = (a.ips || []).filter((ip) => (b.ips || []).includes(ip) && !common.has(printKey(a.fp, ip)) && !common.has(netKey(ip)));
   return shared.length && !usedInParallel(a, b) ? LEVEL.wahrscheinlich : LEVEL.moeglich;
 }
 
@@ -185,4 +203,4 @@ function banTimeline(user, now = Date.now()) {
     .sort((x, y) => new Date(y.at) - new Date(x.at));
 }
 
-module.exports = { CROWD, printKey, commonPrints, usedInParallel, pairLevel, banHistory, closeOpenBans, banDurationText, banTimeline, COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };
+module.exports = { CROWD, NET_CROWD, printKey, netKey, commonPrints, crowdedNets, usedInParallel, pairLevel, banHistory, closeOpenBans, banDurationText, banTimeline, COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };

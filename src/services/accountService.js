@@ -191,6 +191,7 @@ async function deleteAccount({ user, password }) {
   await roles.load();
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
   await deviceService.forgetUser(id); // Geräte und Mehrfach-Konten-Hinweise
+  await require('../moderation/suspicionService').forgetUser(id); // Auffälligkeiten (Manipulationserkennung)
   await require('../models/DuelTip').deleteMany({ user: id }); // Zuschauer-Tipps (die Summen am Duell bleiben anonym)
   await mongoose.connection.collection('sessions').deleteMany({ session: { $regex: `"userId":"${String(id)}"` } });
 }

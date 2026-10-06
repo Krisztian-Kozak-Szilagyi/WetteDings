@@ -7,6 +7,7 @@ const duelService = require('./services/duelService');
 const { takeDailySnapshot } = require('./stats/snapshot');
 const dungeonService = require('./dungeon/dungeonService');
 const achievementService = require('./achievements/achievementService');
+const suspicionService = require('./moderation/suspicionService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -71,6 +72,11 @@ function startJobs() {
   const achievements = () => achievementService.checkAll().catch((err) => console.error('Erfolge-Fehler:', err));
   setTimeout(() => achievementService.grantSpecial().catch((err) => console.error('Erfolge-Fehler:', err)).then(achievements), 40 * 1000).unref();
   setInterval(achievements, 5 * 60 * 1000).unref();
+
+  // Manipulationserkennung: alle 10 Minuten nach Skript-Mustern und Wertverschiebung suchen (Hinweise im Dev-Panel)
+  const suspicion = () => suspicionService.scan().catch((err) => console.error('Manipulationserkennung-Fehler:', err));
+  setTimeout(suspicion, 30 * 1000).unref();
+  setInterval(suspicion, 10 * 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };
