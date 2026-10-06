@@ -131,7 +131,7 @@
         <h2>Favoriten</h2>
         <div class="profil-actions">
           <a class="btn btn-ghost btn-sm" href="/profil/<%= encodeURIComponent(profile.username) %>/sammlung">Sammlung ansehen</a>
-          <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/handel/tausch?an=<%= encodeURIComponent(profile.username) %>">Tausch vorschlagen</a><% } %>
+          <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/handel/neu?an=<%= encodeURIComponent(profile.username) %>">Handel vorschlagen</a><% } %>
         </div>
       </div>
       <% if (!favorites.length) { %>

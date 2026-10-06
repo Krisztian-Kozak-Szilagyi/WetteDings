@@ -1,0 +1,65 @@
+<%#
+  Ein offenes Angebot als Zeile (Reiter "An mich" und "Meine Angebote" auf /handel): t = Angebot, me = meine ID.
+  Links, was ich bekomme, rechts, was ich gebe – jeweils mit Geld und Kartenwert. reiter = Rückweg nach Aktionen.
+%>
+<%
+  const role = roleOf(t, me);
+  const listingRow = !t.to;
+  const p = perspective(t, listingRow ? 'seller' : role);
+  const partnerName = role === 'seller' ? t.toName : t.sellerName;
+  const myTurn = !listingRow && canAccept(t, role);
+  const unread = !listingRow && isUnread(t, role);
+  const sideText = (list, cents) => [lineLabel(list), cents > 0 ? euro(cents) : ''].filter(Boolean).join(' + ') || 'nichts';
+  const lacksMoney = myTurn && p.pay > balance;
+%>
+<li class="offer-row<%= myTurn ? ' is-turn' : '' %><%= unread ? ' is-unread' : '' %>">
+  <a class="offer-deal" href="/handel/angebot/<%= t._id %>">
+    <span class="offer-side">
+      <span class="offer-side-label">Du bekommst</span>
+      <%- include('trade-stack', { list: p.gets, size: 'sm' }) %>
+      <span class="offer-side-text"><%= sideText(p.gets, p.receive) %></span>
+      <% if (p.gets.length) { %><span class="offer-side-value">Kartenwert <%= euro(linesValue(p.gets)) %></span><% } %>
+    </span>
+    <svg class="offer-arrow" viewBox="0 0 24 24" width="18" height="18" aria-label="gegen"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
+    <span class="offer-side">
+      <span class="offer-side-label">Du gibst</span>
+      <%- include('trade-stack', { list: p.gives, size: 'sm' }) %>
+      <span class="offer-side-text"><%= sideText(p.gives, p.pay) %></span>
+      <% if (p.gives.length) { %><span class="offer-side-value">Kartenwert <%= euro(linesValue(p.gives)) %></span><% } %>
+    </span>
+  </a>
+  <div class="offer-foot">
+    <span class="offer-meta">
+      <span class="offer-kind"><%= offerLabel(t) %></span>
+      <% if (listingRow) { %>
+        <span><%= t.counters ? t.counters + (t.counters === 1 ? ' Gegenangebot' : ' Gegenangebote') : 'noch kein Gegenangebot' %></span>
+      <% } else { %>
+        <span>mit <%- userLink(partnerName) %></span>
+      <% } %>
+      <span>läuft ab <%= relTime(t.expiresAt) %></span>
+      <% if (!listingRow) { %>
+        <span class="offer-state<%= myTurn ? ' is-turn' : '' %>"><%= myTurn ? 'Du bist am Zug' : 'Wartet auf ' + partnerName %></span>
+        <% if (unread) { %><span class="nav-badge nav-badge-inline" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } %>
+      <% } %>
+    </span>
+    <span class="offer-actions">
+      <% if (myTurn) { %>
+        <form method="post" action="/handel/angebot/<%= t._id %>/annehmen" data-confirm="Annehmen? Du bekommst <%= sideText(p.gets, p.receive) %> und gibst <%= sideText(p.gives, p.pay) %>.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="version" value="<%= t.termsVersion || 0 %>">
+          <input type="hidden" name="zurueck" value="liste">
+          <button class="btn btn-primary btn-sm" type="submit" <%= lacksMoney ? 'disabled title="Dein Guthaben reicht nicht"' : '' %>>Annehmen</button>
+        </form>
+      <% } %>
+      <a class="btn btn-ghost btn-sm" href="/handel/angebot/<%= t._id %>"><%= listingRow ? (t.counters ? 'Gegenangebote ansehen' : 'Ansehen') : myTurn ? 'Verhandeln' : 'Öffnen' %></a>
+      <% if (listingRow) { %>
+        <form method="post" action="/handel/angebot/<%= t._id %>/beenden" data-confirm="Markt-Angebot zurückziehen?<%= t.counters ? ' Alle Gegenangebote darauf werden damit abgelehnt.' : '' %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="zurueck" value="liste">
+          <input type="hidden" name="reiter" value="<%= locals.reiter || 'meine' %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Zurückziehen</button>
+        </form>
+      <% } %>
+    </span>
+  </div>
+</li>

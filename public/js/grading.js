@@ -190,14 +190,18 @@
       var k = Number(btn.getAttribute('data-gr-zoom-step'));
       if (k) return setZoom(zoom * (k > 0 ? 1.25 : 1 / 1.25));
       setZoom(1);
-      tweenTo(-10, Math.round(ry / 360) * 360 + 18, 450);
+      // beim Messen bleibt die Karte flach von vorn
+      if (mode === 'measure') tweenTo(0, Math.round(ry / 360) * 360, 450);
+      else tweenTo(-10, Math.round(ry / 360) * 360 + 18, 450);
     });
   });
 
-  // ---------- Maus-Werkzeug: Drehen oder Putzen ----------
+  // ---------- Maus-Werkzeug: Drehen, Putzen oder Messen ----------
   var mode = 'rotate';
   var modeBtns = bench.querySelectorAll('[data-gr-mode]');
+  var measureBtn = bench.querySelector('[data-gr-mode="measure"]');
   function setMode(m) {
+    if (m === 'measure' && (!measureBtn || measureBtn.hidden)) return;
     mode = m;
     modeBtns.forEach(function (b) {
       var on = b.getAttribute('data-gr-mode') === m;
@@ -206,6 +210,14 @@
     });
     stage.classList.toggle('mode-clean', m === 'clean');
     stage.classList.toggle('mode-rotate', m === 'rotate');
+    stage.classList.toggle('mode-measure', m === 'measure');
+    readout.hidden = m !== 'measure';
+    if (m === 'measure') {
+      // Messen geht nur von vorn: Karte flach mit der Vorderseite zur Kamera legen
+      var front0 = Math.round(ry / 360) * 360;
+      tweenTo(0, front0, 350);
+      renderGuides();
+    }
     showHint();
   }
   modeBtns.forEach(function (b) {
@@ -255,22 +267,94 @@
     return Math.round((sum / spots.length) * 100);
   }
 
+  // ---------- Messen (Zentrierung) ----------
+  // Vier Messlinien auf der Vorderseite. Wer sie an die Kanten des Kartenbilds zieht, liest die Ränder in mm
+  // (Kartenformat 63 × 88 mm) und das Verhältnis ab – geschätzt wird nichts, messen muss man aber selbst.
+  // Die Linien starten bewusst nicht am Bildrand.
+  var CARD_MM = { w: 63, h: 88 };
+  var guides = { l: 0.1, r: 0.9, t: 0.08, b: 0.92 };
+  var activeX = 'l';
+  var activeY = 't';
+  var readout = bench.querySelector('[data-gr-measure-read]');
+  var measureBox = el('div', 'gr-measure', front);
+  var guideEls = {};
+  ['l', 'r', 't', 'b'].forEach(function (k) { guideEls[k] = el('div', 'gr-guide gr-guide-' + k, measureBox); });
+  var mm = function (v) { return v.toFixed(1).replace('.', ',') + ' mm'; };
+  function ratio(a, b) {
+    if (a + b <= 0) return '–';
+    var big = Math.round((Math.max(a, b) / (a + b)) * 100);
+    return big + '/' + (100 - big);
+  }
+  function renderGuides() {
+    guideEls.l.style.left = (guides.l * 100).toFixed(2) + '%';
+    guideEls.r.style.left = (guides.r * 100).toFixed(2) + '%';
+    guideEls.t.style.top = (guides.t * 100).toFixed(2) + '%';
+    guideEls.b.style.top = (guides.b * 100).toFixed(2) + '%';
+    Object.keys(guideEls).forEach(function (k) { guideEls[k].classList.toggle('is-active', k === activeX || k === activeY); });
+    var l = guides.l * CARD_MM.w;
+    var r = (1 - guides.r) * CARD_MM.w;
+    var t = guides.t * CARD_MM.h;
+    var b = (1 - guides.b) * CARD_MM.h;
+    readout.innerHTML = '';
+    var rowX = el('div', 'gr-measure-row', readout);
+    el('span', '', rowX).textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
+    el('b', '', rowX).textContent = ratio(l, r);
+    var rowY = el('div', 'gr-measure-row', readout);
+    el('span', '', rowY).textContent = 'Oben ' + mm(t) + ' · Unten ' + mm(b);
+    el('b', '', rowY).textContent = ratio(t, b);
+  }
+  // Linie auf eine Position setzen; links/oben bleiben in der linken/oberen Hälfte, rechts/unten in der anderen
+  function setGuide(k, v) {
+    guides[k] = k === 'l' || k === 't' ? clamp(v, 0, 0.499) : clamp(v, 0.501, 1);
+    if (k === 'l' || k === 'r') activeX = k;
+    else activeY = k;
+    renderGuides();
+  }
+  /** Position des Zeigers auf der Vorderseite (0 … 1) – die Karte liegt beim Messen flach */
+  function onFront(x, y) {
+    var r = front.getBoundingClientRect();
+    return { x: (x - r.left) / r.width, y: (y - r.top) / r.height, w: r.width, h: r.height };
+  }
+  /** Die Linie, die dem Zeiger am nächsten ist, greifen */
+  function pickGuide(x, y) {
+    var p = onFront(x, y);
+    var best = null;
+    ['l', 'r', 't', 'b'].forEach(function (k) {
+      var d = k === 'l' || k === 'r' ? Math.abs(p.x - guides[k]) * p.w : Math.abs(p.y - guides[k]) * p.h;
+      if (!best || d < best.d) best = { k: k, d: d };
+    });
+    return best.k;
+  }
+  function moveGuide(k, x, y) {
+    var p = onFront(x, y);
+    setGuide(k, k === 'l' || k === 'r' ? p.x : p.y);
+  }
+
   // ---------- Zeiger ----------
   stage.addEventListener('pointerdown', function (e) {
     if (sent || e.button > 0 || e.target.closest('.gr-modes, .gr-zoom-btns')) return;
     e.preventDefault(); // keine Textauswahl beim Ziehen (die färbte die ganze Seite dunkel)
     drag = { x: e.clientX, y: e.clientY };
-    tween = null;
     vx = 0;
     vy = 0;
     try { stage.setPointerCapture(e.pointerId); } catch (err) { /* synthetische Ereignisse */ }
     stage.classList.add('is-pressed');
     hint.classList.add('is-gone');
+    if (mode === 'measure') {
+      drag.guide = pickGuide(e.clientX, e.clientY);
+      moveGuide(drag.guide, e.clientX, e.clientY);
+      return;
+    }
+    tween = null;
     if (mode === 'clean') rubAt(e.clientX, e.clientY, 6);
   });
 
   stage.addEventListener('pointermove', function (e) {
     if (!drag) return;
+    if (mode === 'measure') {
+      if (drag.guide) moveGuide(drag.guide, e.clientX, e.clientY);
+      return;
+    }
     var dx = e.clientX - drag.x;
     var dy = e.clientY - drag.y;
     drag.x = e.clientX;
@@ -295,11 +379,20 @@
   stage.addEventListener('pointercancel', endDrag);
   stage.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-  // Tastatur: Pfeiltasten drehen, D/P wechseln das Werkzeug
+  // Tastatur: Pfeiltasten drehen (beim Messen: Linien fein verschieben, mit Umschalt in größeren Schritten),
+  // D/P/M wechseln das Werkzeug
   stage.tabIndex = 0;
   stage.addEventListener('keydown', function (e) {
     if (e.key === 'd' || e.key === 'D') return setMode('rotate');
     if (e.key === 'p' || e.key === 'P') return setMode('clean');
+    if (e.key === 'm' || e.key === 'M') return setMode('measure');
+    if (mode === 'measure') {
+      var stepV = e.shiftKey ? 0.01 : 0.001;
+      var nudge = { ArrowLeft: [activeX, -stepV], ArrowRight: [activeX, stepV], ArrowUp: [activeY, -stepV], ArrowDown: [activeY, stepV] }[e.key];
+      if (!nudge) return;
+      e.preventDefault();
+      return setGuide(nudge[0], guides[nudge[0]] + nudge[1]);
+    }
     var map = { ArrowLeft: [0, -12], ArrowRight: [0, 12], ArrowUp: [12, 0], ArrowDown: [-12, 0] };
     if (!map[e.key]) return;
     e.preventDefault();
@@ -312,13 +405,17 @@
   var step = null;
   var HINTS = {
     clean: { clean: 'Putzen: mit gedrückter Maustaste über die Flecken reiben', rotate: 'Drehen: ziehen, um die Karte zu wenden · Mausrad = Zoom' },
-    grade: { clean: 'Putzen: mit gedrückter Maustaste reiben', rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom' },
+    grade: {
+      clean: 'Putzen: mit gedrückter Maustaste reiben',
+      rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom',
+      measure: 'Messen: Linien an die Kanten des Kartenbilds ziehen · Pfeiltasten = fein · Mausrad = Zoom',
+    },
     slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
     send: { clean: 'Fertig – ab zum Kunden!', rotate: 'Fertig – ab zum Kunden!' },
   };
   function showHint() {
     if (!step) return;
-    hint.textContent = HINTS[step][mode];
+    hint.textContent = HINTS[step][mode] || HINTS[step].rotate;
     hint.classList.remove('is-gone');
   }
   function setStep(name) {
@@ -329,6 +426,8 @@
       li.classList.toggle('is-done', i < idx);
       li.classList.toggle('is-active', i === idx);
     });
+    // Messen gibt es nur beim Benoten
+    if (measureBtn) measureBtn.hidden = name !== 'grade';
     setMode(name === 'clean' ? 'clean' : 'rotate');
     if (name === 'slab') startMeter();
   }

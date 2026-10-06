@@ -1,7 +1,7 @@
 <%#
   Großansicht folierter Karten (public/js/foil-view.js) – einmal pro Seite einbinden.
   favForm: true im Album – dann lässt sich die Karte als Favorit zeigen.
-  trade: true in fremden Sammlungen – dann führt "Tausch vorschlagen" zum Tauschangebot (data-trade-href).
+  trade: true in fremden Sammlungen – dann führt "Angebot machen" ins Handelsfenster (data-trade-href).
 %>
 <dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
   <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
@@ -15,7 +15,7 @@
   <% } %>
   <% if (locals.trade) { %>
     <div class="foil-modal-actions" data-foil-trade hidden>
-      <a class="btn btn-primary">Tausch vorschlagen</a>
+      <a class="btn btn-primary">Angebot machen</a>
     </div>
   <% } %>
 </dialog>

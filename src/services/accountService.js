@@ -16,7 +16,7 @@ const roles = require('./roles');
 const { CoinHolding } = require('../models/Coin');
 const { IhkRun, IhkState } = require('../models/Ihk');
 const { GradingShop, GradingJob } = require('../models/Grading');
-const { Trade, TradeTalk } = require('../models/Trade');
+const { Trade } = require('../models/Trade');
 const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const { inTransaction } = require('./betService');
 const { UserError } = require('../lib/util');
@@ -57,8 +57,6 @@ async function propagateName(userId, oldName, name, session) {
     Trade.updateMany({ seller: userId }, { $set: { sellerName: name } }, opt),
     Trade.updateMany({ buyer: userId }, { $set: { buyerName: name } }, opt),
     Trade.updateMany({ to: userId }, { $set: { toName: name } }, opt),
-    TradeTalk.updateMany({ seller: userId }, { $set: { sellerName: name } }, opt),
-    TradeTalk.updateMany({ to: userId }, { $set: { toName: name } }, opt),
     PackGrant.updateMany({ by: userId }, { $set: { byName: name } }, opt),
     PackGrant.updateMany({ to: userId }, { $set: { toName: name } }, opt),
   ]);
@@ -157,10 +155,10 @@ async function deleteAccount({ user, password }) {
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),
       require('../models/Deck').deleteMany({ user: id }, opt),
-      // offene Handelsangebote verschwinden; abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
+      // offene Handelsangebote verschwinden (auch Gegenangebote auf eigene Markt-Angebote – sie tragen den Verkäufer);
+      // abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),
       Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),
-      TradeTalk.updateMany({ $or: [{ seller: id }, { to: id }], status: 'offen' }, { $set: { status: 'beendet' } }, opt),
       // Kommentare: Text entfernen
       Comment.updateMany({ user: id }, { $set: { deleted: true, text: '' } }, opt),
       // Forum: Texte der eigenen Beiträge entfernen (auch das aufbewahrte Original), Upvotes und Lesestände löschen
@@ -182,8 +180,6 @@ async function deleteAccount({ user, password }) {
     // Nachrichten aus Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
     await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
-    await TradeTalk.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
-    await TradeTalk.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
     // Dungeon: Anmeldungen verlassen (leere verschwinden, die Leitung geht weiter), Chat-Nachrichten entfernen;
     // im laufenden Durchlauf spielt der Platz ohne Lohn zu Ende (die Karte gibt es nicht mehr)
     await DungeonParty.updateMany({ $or: [{ 'members.user': id }, { 'invites.user': id }, { 'chat.user': id }] }, { $pull: { members: { user: id }, invites: { user: id }, chat: { user: id } } }, opt);
