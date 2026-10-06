@@ -29,6 +29,7 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
+const suspicionService = require('../moderation/suspicionService');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
@@ -40,7 +41,7 @@ const router = express.Router();
 // adminOnly: Reiter, in dem Devs nichts tun können, wird für sie ausgeblendet
 const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen.' },
-  { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans und Mehrfach-Konten.' },
+  { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
   { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes, Devs und Mods.' },
@@ -55,6 +56,7 @@ const SUBTABS = {
     { key: 'meldungen', label: 'Meldungen' },
     { key: 'bans', label: 'Bans' },
     { key: 'geraete', label: 'Mehrfach-Konten' },
+    { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
   ],
   spielwerte: [
     { key: 'tcg', label: 'TCG' },
@@ -114,15 +116,16 @@ router.get('/admin', requireStaff, async (req, res) => {
     disputes: res.locals.betDisputes || 0,
     reports: reportCount,
     deviceAlerts: res.locals.deviceAlerts || 0,
+    suspicionAlerts: res.locals.suspicionAlerts || 0,
     suspicious: res.locals.tradeAlerts || 0,
     packLogNew: res.locals.packLogNew || 0,
     bans: bans.length,
   };
-  counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts;
+  counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts + counts.suspicionAlerts;
   counts.vergaben = counts.packLogNew;
   counts.protokolle = counts.suspicious;
   // Zähler je Unterreiter
-  const subCounts = { streit: counts.disputes, meldungen: counts.reports, geraete: counts.deviceAlerts, bans: counts.bans };
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
 
   // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
   const subs = SUBTABS[tab] || null;
@@ -135,13 +138,14 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, codes, grants, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
     needsSub('moderation', 'streit') ? disputeList(me) : [],
     needsSub('moderation', 'meldungen') ? openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
+    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.list() : [],
     needs('team') ? listActiveCodes() : [],
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
@@ -176,6 +180,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     noteMax: betService.NOTE_MAX,
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
+    suspicions,
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
@@ -287,6 +292,12 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(D
 router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
   res.redirect(subUrl('moderation', 'geraete'));
+});
+
+// ---------- Auffälligkeiten (Manipulationserkennung): Hinweise abhaken (Admin und Devs) ----------
+router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
@@ -891,7 +902,7 @@ async function panelNav(user, locals) {
   return {
     panelSections: sectionsFor(user),
     panelBadges: {
-      moderation: (locals.betDisputes || 0) + reports + (locals.deviceAlerts || 0),
+      moderation: (locals.betDisputes || 0) + reports + (locals.deviceAlerts || 0) + (locals.suspicionAlerts || 0),
       vergaben: locals.packLogNew || 0,
       protokolle: locals.tradeAlerts || 0,
     },

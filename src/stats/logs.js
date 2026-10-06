@@ -840,6 +840,7 @@ module.exports = {
   logByKey,
   pageOf,
   cardLabel,
+  swapLabel,
   cardSummary,
   resolvePlayer,
   tradeLog,

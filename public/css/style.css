@@ -692,8 +692,11 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 #handellog .leader-search { margin: 0 0 10px; flex-wrap: wrap; }
 .trade-log td { vertical-align: top; }
 .device-done > .code-list { margin-top: 12px; }
+/* Auffälligkeiten: betroffene Geschäfte bei Wertverschiebung */
+.susp-trades { margin: 4px 0; padding-left: 18px; overflow-wrap: anywhere; }
 .nav-badge.nav-badge-device { background: #e3b341; color: var(--color-bg); }
 .nav-badge.nav-badge-suspicious { background: #f87171; color: var(--color-bg); }
+.nav-badge.nav-badge-suspicion { background: #c084fc; color: var(--color-bg); }
 /* Handel-Log: Geschäft zwischen Mehrfach-Konten */
 .trade-log tr.trade-flagged td { background: rgba(220, 38, 38, .08); }
 .trade-flag { background: rgba(220, 38, 38, .18); color: #f87171; margin-top: 4px; }
