@@ -467,7 +467,7 @@ async function startDue({ now = Date.now(), force = false } = {}) {
     const solos = makeTeams(list.filter((p) => p.solo));
     for (const team of [...groups, ...solos]) {
       try {
-        const players = team.flatMap((p) => p.members.map(({ joinedAt, ...m }) => m));
+        const players = team.flatMap((p) => p.members);
         await startTeam(slot, team, players, team.length === 1 ? team[0].chat : [], now);
         started++;
       } catch (err) {

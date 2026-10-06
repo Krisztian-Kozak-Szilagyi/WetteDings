@@ -137,6 +137,7 @@ router.post('/anmelden', authLimiter, async (req, res) => {
 router.post('/geraet', async (req, res) => {
   const fp = deviceLogic.cleanFp(req.body.fp);
   if (fp) req.session.fp = fp;
+  if (req.body.wd === '1') req.session.webdriver = true; // ferngesteuerter Browser (Manipulationserkennung)
   const alt = str(req.body.alt);
   const altId = deviceLogic.readToken(config.sessionSecret, alt);
   const restored = !!altId && altId !== req.deviceId;

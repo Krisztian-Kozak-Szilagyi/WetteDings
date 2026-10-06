@@ -48,6 +48,7 @@ const runSchema = new Schema(
             foil: { type: Boolean, default: false }, // Folie vom Boss
             bossCard: { type: Boolean, default: false }, // Boss-Karte (wird nachgereicht, sobald sie gezeichnet ist)
             seen: { type: Boolean, default: false }, // Beute-Fenster schon gezeigt
+            joinedAt: { type: Date, default: null }, // Anmeldung (Manipulationserkennung: sofort nach Öffnen der Anmeldung?)
           },
           { _id: false }
         ),

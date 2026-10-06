@@ -194,3 +194,99 @@ test('Wertverschiebung: Glitch für 1 € ja, Holo zum Marktpreis nein', () => {
   assert.equal(s.valuePairFinding([small], names, true).level, LEVEL.wahrscheinlich); // auch Mehrfach-Konto
   assert.equal(s.valuePairFinding([small, small, small], names).level, LEVEL.wahrscheinlich);
 });
+
+test('Dungeon: jeder Termin rund um die Uhr, sofort angemeldet, Beute nie angeschaut', () => {
+  const H = 3600e3;
+  const tz = 'Europe/Berlin';
+  const opts = { intervalMs: 2 * H, lockMs: 10e3, timeZone: tz };
+  const start = Date.UTC(2026, 9, 4, 22, 0, 0); // 0:00 deutsche Zeit
+  // Skript: 13 Termine in Folge (24 Std.), jeweils 5 s nach Öffnen der Anmeldung, Beute nie angeschaut
+  const bot = Array.from({ length: 13 }, (_, i) => {
+    const slot = start + i * 2 * H;
+    return { slot: new Date(slot), joinedAt: new Date(slot - 2 * H - 10e3 + 5e3), seen: false, finished: true };
+  });
+  const f = s.dungeonFinding(bot, opts);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.streak, 13);
+  assert.ok(f.joinMs <= 10e3);
+  assert.equal(f.unseen, 13);
+  assert.match(f.summary, /13 Termine in Folge/);
+  // Mensch: abends ein paar Termine, irgendwann während der zwei Stunden angemeldet, Beute angeschaut
+  const human = [18, 20, 22].flatMap((h, d) => [0, 1].map((day) => {
+    const slot = Date.UTC(2026, 9, 1 + day, h - 2, 0, 0);
+    return { slot: new Date(slot), joinedAt: new Date(slot - (40 + d * 20) * 60e3), seen: true, finished: true };
+  }));
+  assert.equal(human.length, 6);
+  assert.equal(s.dungeonFinding(human, opts), null);
+  // sofort angemeldet, aber tagsüber und Beute angeschaut: nur möglich
+  const quick = human.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 20e3) }));
+  assert.equal(s.dungeonFinding(quick, opts).level, LEVEL.moeglich);
+  // zu wenige Durchläufe
+  assert.equal(s.dungeonFinding(bot.slice(0, 5), opts), null);
+});
+
+test('Grading: fertig genau zur Mindestzeit', () => {
+  const job = (i, extraS, clean = 100, seal = 100) => ({ createdAt: new Date(t0 + i * 600e3), doneAt: new Date(t0 + i * 600e3 + 10 * 800 + extraS * 1000), clean, seal, spots: 10 });
+  const bot = Array.from({ length: 8 }, (_, i) => job(i, 0.5));
+  const f = s.gradingFinding(bot, 800);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.perfect, 8);
+  // von Hand: deutlich länger als die Mindestzeit
+  assert.equal(s.gradingFinding(Array.from({ length: 8 }, (_, i) => job(i, 25 + i)), 800), null);
+  // knapp über der Mindestzeit, nicht perfekt: möglich
+  assert.equal(s.gradingFinding(Array.from({ length: 8 }, (_, i) => job(i, 3, 90, 80)), 800).level, LEVEL.moeglich);
+  assert.equal(s.gradingFinding(bot.slice(0, 5), 800), null);
+});
+
+test('Rund um die Uhr: über 20 Stunden ohne Schlafpause, auch nachts', () => {
+  const tz = 'Europe/Berlin';
+  const start = Date.UTC(2026, 9, 4, 10, 0, 0); // 12:00 deutsche Zeit
+  // alle 30 Minuten eine Aktion, 32 Stunden lang
+  const bot = Array.from({ length: 65 }, (_, i) => new Date(start + i * 30 * 60e3));
+  const f = s.activityFinding(bot, tz);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.ok(f.nightHours >= 3);
+  // 22 Stunden: nur möglich
+  assert.equal(s.activityFinding(bot.slice(0, 45), tz).level, LEVEL.moeglich);
+  // Mensch: tagsüber viel, nachts 7 Stunden Pause
+  const day = (d) => Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2026, 9, d, 6, 0, 0) + i * 30 * 60e3)); // 8–23 Uhr
+  assert.equal(s.activityFinding([...day(4), ...day(5)], tz), null);
+});
+
+test('Kein normaler Browser: ferngesteuert, Skript-Werkzeug oder ohne Fingerabdruck und Kopfzeilen', () => {
+  const day = (x) => ({ actions: 0, noProbe: 0, noFetchMeta: 0, bare: 0, webdriver: 0, botUa: 0, uas: [], firstAt: new Date(t0), lastAt: new Date(t0 + 3600e3), ...x });
+  assert.equal(s.browserFinding([day({ actions: 50 })]), null);
+  const wd = s.browserFinding([day({ actions: 50, webdriver: 50, uas: ['Mozilla/5.0 Chrome'] })]);
+  assert.equal(wd.level, LEVEL.wahrscheinlich);
+  assert.match(wd.summary, /ferngesteuerten Browser/);
+  assert.equal(s.browserFinding([day({ actions: 5, botUa: 5, uas: ['python-requests/2.31'] })]).level, LEVEL.wahrscheinlich);
+  assert.equal(s.browserFinding([day({ actions: 40, noProbe: 30, noFetchMeta: 30, bare: 30 })]).level, LEVEL.wahrscheinlich);
+  // nur ohne Fingerabdruck (z. B. ohne JavaScript): möglich
+  assert.equal(s.browserFinding([day({ actions: 40, noProbe: 30 })]).level, LEVEL.moeglich);
+  // alter Safari ohne Sec-Fetch-Kopfzeilen, aber mit Fingerabdruck: unauffällig
+  assert.equal(s.browserFinding([day({ actions: 40, noFetchMeta: 40 })]), null);
+  // einzelne Ausreißer reichen nicht
+  assert.equal(s.browserFinding([day({ actions: 200, bare: 5, noProbe: 5, noFetchMeta: 5 })]), null);
+});
+
+test('Ungewöhnliche Einnahmen: weit über dem Üblichen', () => {
+  const at = new Date(t0);
+  const normal = Array.from({ length: 9 }, (_, i) => ({ user: `u${i}`, type: 'ihk_lohn', amount: 3000 + i * 100, createdAt: at }));
+  const out = s.incomeFindings([...normal, { user: 'bot', type: 'dungeon_lohn', amount: 60000, createdAt: at }, { user: 'bot', type: 'ihk_lohn', amount: 20000, createdAt: at }]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].user, 'bot');
+  assert.equal(out[0].level, LEVEL.moeglich);
+  assert.match(out[0].summary, /Dungeon/);
+  // zu wenige Spieler für einen Vergleich
+  assert.deepEqual(s.incomeFindings([...normal.slice(0, 5), { user: 'bot', type: 'dungeon_lohn', amount: 60000, createdAt: at }]), []);
+  // Lotto und Wettgewinne zählen nicht
+  assert.deepEqual(s.incomeFindings([...normal, { user: 'glück', type: 'lotto_gewinn', amount: 900000, createdAt: at }]), []);
+});
+
+test('Wett-Einsätze zählen bei Tempo und Takt mit', () => {
+  assert.ok(s.ACTIONS.wetten);
+  assert.ok(s.tempoFinding(series(Array(8).fill(0.5)), 'wetten'));
+});

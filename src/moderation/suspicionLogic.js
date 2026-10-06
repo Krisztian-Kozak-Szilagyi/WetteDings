@@ -9,6 +9,7 @@ const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const SEC = 1000;
 const MIN = 60 * SEC;
+const HOUR = 60 * MIN;
 
 // ---------- Schwellen (bei Bedarf hier nachjustieren) ----------
 
@@ -20,6 +21,7 @@ const ACTIONS = {
   oeffnen: { label: 'Pack-Öffnungen', floorMs: 1500, log: 'packs' },
   verkaufen: { label: 'Bank-Verkäufe', floorMs: 800, log: 'verkauf' },
   broker: { label: 'Broker-Aufträge', floorMs: 1000, log: 'broker' },
+  wetten: { label: 'Wett-Einsätze', floorMs: 1500, log: 'einsaetze' },
 };
 
 const TEMPO_RUN = 5; // so viele Abstände in Folge unter der Untergrenze
@@ -51,7 +53,43 @@ const VALUE_SHARE = 0.2; // die andere Seite ist weniger als 20 % davon wert
 const VALUE_STRONG_CENTS = 50000; // ab 500 € insgesamt verschoben
 const VALUE_STRONG_COUNT = 3; // oder ab so vielen Geschäften zwischen denselben Konten
 
-const KIND_LABEL = { tempo: 'Tempo', takt: 'Takt', ihk: 'IHK sekundengenau', scalping: 'Broker-Scalping', wert: 'Wertverschiebung' };
+const DUNGEON_MIN_RUNS = 6; // so viele Durchläufe braucht es für eine Aussage
+const DUNGEON_JOIN_MS = MIN; // Median: angemeldet so kurz, nachdem die Anmeldung für den Termin aufging
+const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts)
+const DUNGEON_UNSEEN_SHARE = 0.8; // Beute so oft nie angeschaut (die Seite meldet das beim Ansehen)
+const DUNGEON_NIGHT = 2; // so viele Termine zwischen 0 und 6 Uhr machen schnelles Anmelden wahrscheinlich
+
+const GRADING_MIN_JOBS = 6;
+const GRADING_EXCESS_MS = 4 * SEC; // Median: fertig gemeldet so kurz nach der Mindestzeit (Putzen, Drehen, Benoten dauern)
+const GRADING_EXCESS_STRONG_MS = 1500;
+const GRADING_PERFECT_SHARE = 0.9; // und dabei fast immer perfekt geputzt und versiegelt
+
+const AWAKE_GAP_MS = 3 * HOUR; // längere Pause = geschlafen
+const AWAKE_MS = 20 * HOUR; // so lange ohne solche Pause aktiv …
+const AWAKE_STRONG_MS = 30 * HOUR;
+const AWAKE_NIGHT_HOURS = 3; // … und dabei in mindestens so vielen Nachtstunden (0–6 Uhr)
+
+const BROWSER_MIN = 10; // so viele Aktionen ohne Fingerabdruck und ohne Browser-Kopfzeilen
+const BROWSER_SHARE = 0.5; // und mindestens dieser Anteil aller Spiel-Aktionen
+const BROWSER_NOPROBE_MIN = 20; // nur ohne Fingerabdruck (die Seite lief ohne JavaScript): schwächer
+
+const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
+const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
+const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
+const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
+
+const KIND_LABEL = {
+  tempo: 'Tempo',
+  takt: 'Takt',
+  ihk: 'IHK sekundengenau',
+  scalping: 'Broker-Scalping',
+  wert: 'Wertverschiebung',
+  dungeon: 'Dungeon-Automatik',
+  grading: 'Grading zur Mindestzeit',
+  dauer: 'Rund um die Uhr',
+  browser: 'Kein normaler Browser',
+  ertrag: 'Ungewöhnliche Einnahmen',
+};
 
 // ---------- Hilfen ----------
 
@@ -86,6 +124,7 @@ function bursts(times, maxGap = BURST_GAP) {
   return out;
 }
 
+const hoursText = (ms) => `${Math.round(ms / HOUR)} Std.`;
 const seconds = (ms) => `${(ms / 1000).toLocaleString('de-DE', { maximumFractionDigits: ms < 10 * SEC ? 1 : 0 })} s`;
 const percent = (x) => `${Math.round(x * 100)} %`;
 
@@ -309,6 +348,199 @@ function valuePairFinding(items, names, flagged = false) {
   };
 }
 
+// ---------- Dungeon ----------
+
+/**
+ * Dungeon-Automatik: an jedem Termin dabei (auch nachts), immer sofort angemeldet, wenn die Anmeldung aufgeht, oder
+ * die Beute nie angeschaut. runs: [{ slot, joinedAt, seen, finished }] eines Mitglieds; intervalMs = Abstand der
+ * Termine, lockMs = so lange vor dem Start schließt die Anmeldung (danach gilt sie für den nächsten Termin).
+ */
+function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
+  const list = runs.filter((r) => r.slot).sort((x, y) => toMs(x.slot) - toMs(y.slot));
+  if (list.length < DUNGEON_MIN_RUNS) return null;
+  const slotMs = list.map((r) => toMs(r.slot));
+
+  // Anmelde-Verzögerung: Zeit zwischen Öffnen der Anmeldung und Anmeldung
+  const joined = list.filter((r) => r.joinedAt).map((r) => ({ at: toMs(r.slot), delay: Math.max(0, toMs(r.joinedAt) - (toMs(r.slot) - intervalMs - lockMs)) }));
+  const joinMs = joined.length >= DUNGEON_MIN_RUNS ? median(joined.map((j) => j.delay)) : null;
+  const joinHit = joinMs !== null && joinMs <= DUNGEON_JOIN_MS;
+
+  // längste Serie aufeinanderfolgender Termine ohne Lücke
+  let best = { from: slotMs[0], to: slotMs[0], count: 1 };
+  let cur = { ...best };
+  for (let i = 1; i < slotMs.length; i++) {
+    if (Math.abs(slotMs[i] - slotMs[i - 1] - intervalMs) < MIN) cur = { ...cur, to: slotMs[i], count: cur.count + 1 };
+    else cur = { from: slotMs[i], to: slotMs[i], count: 1 };
+    if (cur.count > best.count) best = { ...cur };
+  }
+  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS;
+
+  const finished = list.filter((r) => r.finished);
+  const unseen = finished.filter((r) => !r.seen);
+  const unseenHit = finished.length >= DUNGEON_MIN_RUNS && unseen.length / finished.length >= DUNGEON_UNSEEN_SHARE;
+  if (!joinHit && !streakHit && !unseenHit) return null;
+
+  const night = slotMs.filter((t) => {
+    const h = hourIn(t, timeZone);
+    return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
+  }).length;
+  const strong = streakHit || (joinHit && (night >= DUNGEON_NIGHT || unseenHit));
+  const parts = [];
+  if (streakHit) parts.push(`${best.count} Termine in Folge ohne Lücke (${hoursText(best.to - best.from)})`);
+  if (joinHit) parts.push(`im Schnitt ${seconds(joinMs)} nach Öffnen der Anmeldung angemeldet`);
+  if (unseenHit) parts.push(`Beute ${unseen.length} von ${finished.length} Mal nie angeschaut`);
+  const ends = [];
+  if (streakHit) ends.push(best.to);
+  if (joinHit) ends.push(Math.max(...joined.filter((j) => j.delay <= DUNGEON_JOIN_MS).map((j) => j.at)));
+  if (unseenHit) ends.push(toMs(unseen[unseen.length - 1].slot));
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: list.length,
+    joinMs,
+    streak: best.count,
+    night,
+    unseen: unseen.length,
+    from: new Date(slotMs[0]),
+    to: new Date(Math.max(...ends)),
+    summary: `${list.length} Dungeons: ${parts.join(', ')}` + (night ? `, ${night}× zwischen ${IHK_NIGHT[0]} und ${IHK_NIGHT[1]} Uhr` : ''),
+  };
+}
+
+// ---------- Grading ----------
+
+/**
+ * Grading zur Mindestzeit: Aufträge werden fast genau dann fertig gemeldet, wenn der Server es frühestens erlaubt
+ * (Flecken × msPerSpot × Sauberkeit). Von Hand dauern Putzen, Drehen, Benoten und Versiegeln deutlich länger.
+ * jobs: [{ createdAt, doneAt, clean, seal, spots }] eines Mitglieds (nur fertige; spots = Zahl der Flecken).
+ */
+function gradingFinding(jobs, msPerSpot) {
+  const list = jobs
+    .filter((j) => j.doneAt && j.createdAt)
+    .map((j) => ({ at: toMs(j.doneAt), excess: toMs(j.doneAt) - toMs(j.createdAt) - ((j.spots || 0) * msPerSpot * (j.clean || 0)) / 100, perfect: j.clean >= 100 && (j.seal == null || j.seal >= 99) }))
+    .sort((x, y) => x.at - y.at);
+  if (list.length < GRADING_MIN_JOBS) return null;
+  const excessMs = median(list.map((j) => j.excess));
+  if (excessMs > GRADING_EXCESS_MS) return null;
+  const perfect = list.filter((j) => j.perfect).length;
+  const strong = excessMs <= GRADING_EXCESS_STRONG_MS || perfect / list.length >= GRADING_PERFECT_SHARE;
+  const fast = list.filter((j) => j.excess <= GRADING_EXCESS_MS);
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: list.length,
+    excessMs,
+    perfect,
+    from: new Date(list[0].at),
+    to: new Date(fast[fast.length - 1].at),
+    summary: `${list.length} Aufträge im Schnitt nur ${seconds(Math.max(0, excessMs))} nach der frühestmöglichen Zeit fertig gemeldet, ${perfect} davon perfekt`,
+  };
+}
+
+// ---------- Rund um die Uhr ----------
+
+/**
+ * Rund um die Uhr: über viele Stunden ohne längere Pause aktiv, auch nachts – ein Mensch schläft irgendwann.
+ * times: Zeitpunkte aller Aktionen eines Mitglieds. null, wenn unauffällig.
+ */
+function activityFinding(times, timeZone) {
+  let best = null;
+  for (const b of bursts(times, AWAKE_GAP_MS)) {
+    const span = b[b.length - 1] - b[0];
+    if (!best || span > best.span) best = { span, list: b };
+  }
+  if (!best || best.span < AWAKE_MS) return null;
+  // verschiedene Nachtstunden (Stunde + Tag), in denen etwas passiert ist
+  const nightHours = new Set(
+    best.list
+      .filter((t) => {
+        const h = hourIn(t, timeZone);
+        return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
+      })
+      .map((t) => Math.floor(t / HOUR))
+  ).size;
+  if (nightHours < AWAKE_NIGHT_HOURS) return null;
+  return {
+    level: best.span >= AWAKE_STRONG_MS ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: best.list.length,
+    spanMs: best.span,
+    nightHours,
+    from: new Date(best.list[0]),
+    to: new Date(best.list[best.list.length - 1]),
+    summary: `${best.list.length} Aktionen über ${hoursText(best.span)} ohne Pause von mehr als ${hoursText(AWAKE_GAP_MS)}, davon in ${nightHours} Nachtstunden (${IHK_NIGHT[0]}–${IHK_NIGHT[1]} Uhr)`,
+  };
+}
+
+// ---------- Kein normaler Browser ----------
+
+/**
+ * Spiel-Aktionen, die nicht aus einem normalen Browser kommen (models/ScriptSignal, je Tag). signals: [{ actions,
+ * noProbe, noFetchMeta, bare, webdriver, botUa, uas, firstAt, lastAt }] eines Mitglieds. null, wenn unauffällig.
+ */
+function browserFinding(signals) {
+  const sum = (k) => signals.reduce((s, x) => s + (x[k] || 0), 0);
+  const actions = sum('actions');
+  const [bare, noProbe, webdriver, botUa] = ['bare', 'noProbe', 'webdriver', 'botUa'].map(sum);
+  const bareHit = bare >= BROWSER_MIN && bare / actions >= BROWSER_SHARE;
+  const probeHit = noProbe >= BROWSER_NOPROBE_MIN && noProbe / actions >= BROWSER_SHARE;
+  if (!webdriver && !botUa && !bareHit && !probeHit) return null;
+  const parts = [];
+  if (webdriver) parts.push(`${webdriver}× aus einem ferngesteuerten Browser`);
+  if (botUa) parts.push(`${botUa}× mit dem User-Agent eines Skript-Werkzeugs`);
+  if (bareHit) parts.push(`${bare}× ohne Fingerabdruck und ohne Browser-Kopfzeilen`);
+  else if (probeHit) parts.push(`${noProbe}× ohne Fingerabdruck (Seite lief ohne JavaScript)`);
+  const uas = [...new Set(signals.flatMap((x) => x.uas || []))].slice(0, 3);
+  return {
+    level: webdriver || botUa || bareHit ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: actions,
+    uas,
+    from: new Date(Math.min(...signals.map((x) => toMs(x.firstAt || x.lastAt)))),
+    to: new Date(Math.max(...signals.map((x) => toMs(x.lastAt)))),
+    summary: `Von ${actions} Spiel-Aktionen: ${parts.join(', ')}` + (uas.length ? ` – ${uas.join(' | ')}` : ''),
+  };
+}
+
+// ---------- Ungewöhnliche Einnahmen ----------
+
+/**
+ * Einnahmen aus IHK, Dungeon, Grading und Bank-Verkäufen weit über dem üblichen Maß. entries: [{ user, type, amount,
+ * createdAt }] (Kontobuchungen, nur Einnahmen) oder zusammengefasst [{ user, type, amount, from, to }]. Liefert [{ user, level, total, factor, bySource, from, to, summary }].
+ * Nur ein Hinweis (möglich): Fleißige Spieler verdienen auch viel – zusammen mit anderen Mustern aussagekräftig.
+ */
+function incomeFindings(entries) {
+  const byUser = new Map();
+  for (const e of entries) {
+    const label = INCOME_SOURCES[e.type];
+    if (!label || !(e.amount > 0)) continue;
+    const k = String(e.user);
+    const u = byUser.get(k) || { total: 0, bySource: {}, from: Infinity, to: 0 };
+    u.total += e.amount;
+    u.bySource[label] = (u.bySource[label] || 0) + e.amount;
+    u.from = Math.min(u.from, toMs(e.from || e.createdAt));
+    u.to = Math.max(u.to, toMs(e.to || e.createdAt));
+    byUser.set(k, u);
+  }
+  if (byUser.size < INCOME_MIN_PLAYERS) return [];
+  const med = median([...byUser.values()].map((u) => u.total));
+  const out = [];
+  for (const [user, u] of byUser) {
+    if (u.total < INCOME_MIN_CENTS || u.total < med * INCOME_FACTOR) continue;
+    const factor = u.total / med;
+    const sources = Object.entries(u.bySource)
+      .sort((x, y) => y[1] - x[1])
+      .map(([k, v]) => `${k} ${euro(v)}`)
+      .join(', ');
+    out.push({
+      user,
+      level: LEVEL.moeglich,
+      total: u.total,
+      factor,
+      from: new Date(u.from),
+      to: new Date(u.to),
+      summary: `${euro(u.total)} eingenommen, das ${Math.round(factor)}-Fache des Üblichen (${euro(med)}): ${sources}`,
+    });
+  }
+  return out;
+}
+
 module.exports = {
   ACTIONS,
   KIND_LABEL,
@@ -318,6 +550,7 @@ module.exports = {
   IHK_MIN_RUNS,
   SCALP_MIN_ROUNDS,
   VALUE_MIN_CENTS,
+  INCOME_SOURCES,
   median,
   gaps,
   bursts,
@@ -328,4 +561,9 @@ module.exports = {
   scalpFinding,
   valueFinding,
   valuePairFinding,
+  dungeonFinding,
+  gradingFinding,
+  activityFinding,
+  browserFinding,
+  incomeFindings,
 };
