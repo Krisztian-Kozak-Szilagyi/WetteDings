@@ -153,7 +153,7 @@
 </section>
 <% } else { %>
 <section class="stats-block" id="geraete">
-  <%- blockHead('Mehrfach-Konten', 'Konten, die vom selben Gerät aus benutzt wurden.<br><strong>Sicher</strong>: derselbe Browser (Geräte-Kennung).<br><strong>Wahrscheinlich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse.<br><strong>Möglich</strong>: nur gleiche Geräte-Merkmale – kommt auch bei baugleichen Geräten vor und zählt nicht fürs Abzeichen.') %>
+  <%- blockHead('Mehrfach-Konten', 'Konten, die vom selben Gerät aus benutzt wurden.<br><strong>Sicher</strong>: derselbe Browser (Geräte-Kennung).<br><strong>Wahrscheinlich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse.<br><strong>Möglich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse, aber gleichzeitig benutzt – kommt auch bei baugleichen Geräten vor und zählt nicht fürs Abzeichen.<br>Gleiche Geräte-Merkmale allein oder ein geteiltes Netz (z. B. Schule) ergeben keinen Hinweis.') %>
   <div class="card">
     <% if (!openAlerts.length) { %>
       <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
