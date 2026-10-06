@@ -81,18 +81,18 @@ function settlement(trade, { buyer, taxPercent = taxService.rate(trade.kind) } =
 function parseOfferForm(body = {}) {
   const side = (prefix) => {
     const out = [];
-    const counts = {};
+    const counts = new Map(); // Map statt Objekt: Karten-IDs kommen vom Nutzer (sonst z. B. "__proto__" als Schlüssel)
     for (const [key, value] of Object.entries(body)) {
       if (!key.startsWith(prefix + ':')) continue;
       const n = parseInt(str(Array.isArray(value) ? value[value.length - 1] : value), 10);
-      if (n > 0) counts[key.slice(prefix.length + 1)] = Math.min(n, MAX_LINES + 1);
+      if (n > 0) counts.set(key.slice(prefix.length + 1), Math.min(n, MAX_LINES + 1));
     }
     const raw = body[prefix];
     for (const v of (Array.isArray(raw) ? raw : raw ? [raw] : []).map(str)) {
       if (v.startsWith('f:')) out.push({ copy: v.slice(2) });
-      else if (v) counts[v] = Math.min((counts[v] || 0) + 1, MAX_LINES + 1);
+      else if (v) counts.set(v, Math.min((counts.get(v) || 0) + 1, MAX_LINES + 1));
     }
-    for (const [card, n] of Object.entries(counts)) for (let i = 0; i < n; i++) out.push({ card });
+    for (const [card, n] of counts) for (let i = 0; i < n; i++) out.push({ card });
     return out;
   };
   const pay = str(body.geld_gib).trim() ? parseEuro(str(body.geld_gib)) : 0;
