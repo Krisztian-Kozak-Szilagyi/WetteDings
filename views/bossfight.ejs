@@ -1,0 +1,11 @@
+<%- include('partials/head') %>
+<link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
+<%# Bosskampf – Bossraum (Hintergrundbild) + Boss auf dem Canvas, gezeichnet und bewegt von public/js/bossfight.js %>
+<div class="bf-page">
+  <div class="bf-stage">
+    <canvas class="bf-canvas" data-boss-canvas aria-label="Riesige Höhlenspinne"></canvas>
+  </div>
+</div>
+
+<script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>
