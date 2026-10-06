@@ -190,18 +190,21 @@
       var k = Number(btn.getAttribute('data-gr-zoom-step'));
       if (k) return setZoom(zoom * (k > 0 ? 1.25 : 1 / 1.25));
       setZoom(1);
-      // beim Messen bleibt die Karte flach von vorn
-      if (mode === 'measure') tweenTo(0, Math.round(ry / 360) * 360, 450);
+      // beim Messen und Ableuchten bleibt die Karte flach von vorn
+      if (mode === 'measure' || mode === 'uv') tweenTo(0, Math.round(ry / 360) * 360, 450);
       else tweenTo(-10, Math.round(ry / 360) * 360 + 18, 450);
     });
   });
 
-  // ---------- Maus-Werkzeug: Drehen, Putzen oder Messen ----------
+  // ---------- Maus-Werkzeug: Drehen, Putzen, Messen oder UV-Lampe ----------
   var mode = 'rotate';
   var modeBtns = bench.querySelectorAll('[data-gr-mode]');
   var measureBtn = bench.querySelector('[data-gr-mode="measure"]');
+  var uvBtn = bench.querySelector('[data-gr-mode="uv"]');
+  // Messen und UV-Lampe gibt es nur beim Benoten (Knopf sonst ausgeblendet)
+  var gradeTools = { measure: measureBtn, uv: uvBtn };
   function setMode(m) {
-    if (m === 'measure' && (!measureBtn || measureBtn.hidden)) return;
+    if (m in gradeTools && (!gradeTools[m] || gradeTools[m].hidden)) return;
     mode = m;
     modeBtns.forEach(function (b) {
       var on = b.getAttribute('data-gr-mode') === m;
@@ -211,17 +214,46 @@
     stage.classList.toggle('mode-clean', m === 'clean');
     stage.classList.toggle('mode-rotate', m === 'rotate');
     stage.classList.toggle('mode-measure', m === 'measure');
+    stage.classList.toggle('mode-uv', m === 'uv');
     readout.hidden = m !== 'measure';
-    if (m === 'measure') {
-      // Messen geht nur von vorn: Karte flach mit der Vorderseite zur Kamera legen
+    if (m !== 'uv') uvOff();
+    if (m === 'measure' || m === 'uv') {
+      // Messen und Ableuchten gehen von vorn: Karte flach mit der Vorderseite zur Kamera legen
       var front0 = Math.round(ry / 360) * 360;
       tweenTo(0, front0, 350);
-      renderGuides();
+      if (m === 'measure') renderGuides();
     }
     showHint();
   }
   modeBtns.forEach(function (b) {
     b.addEventListener('click', function () { setMode(b.getAttribute('data-gr-mode')); });
+  });
+
+  // ---------- UV-Lampe ----------
+  // Der Zeiger wird zu einem violetten Lichtkegel, die Bühne dunkler. Bestoßene Ecken und Kantenmacken leuchten
+  // grün, solange der Kegel sie trifft – auf hellen Karten (Holo, Icon) sind sie im normalen Licht kaum zu sehen.
+  var UV_R = 64; // Radius des Lichtkegels in Pixeln
+  el('div', 'gr-uv-shade', stage); // dunkelt alles außerhalb des Kegels ab (Mitte: --ux/--uy)
+  el('div', 'gr-uv-light', stage);
+  var uvMarks = [].slice.call(defects.querySelectorAll('.gr-corner, .gr-nick')); // höchstens eine Handvoll
+  function uvOff() {
+    stage.classList.remove('uv-on');
+    uvMarks.forEach(function (n) { n.classList.remove('is-uv'); });
+  }
+  function uvAt(x, y) {
+    var r = stage.getBoundingClientRect();
+    stage.style.setProperty('--ux', (x - r.left).toFixed(0) + 'px');
+    stage.style.setProperty('--uy', (y - r.top).toFixed(0) + 'px');
+    stage.classList.add('uv-on');
+    uvMarks.forEach(function (n) {
+      var b = n.getBoundingClientRect();
+      var dx = x - (b.left + b.width / 2);
+      var dy = y - (b.top + b.height / 2);
+      n.classList.toggle('is-uv', facingFront && Math.sqrt(dx * dx + dy * dy) <= UV_R + Math.max(b.width, b.height) / 2);
+    });
+  }
+  stage.addEventListener('pointerleave', function (e) {
+    if (mode === 'uv' && e.pointerType === 'mouse') uvOff();
   });
 
   // ---------- Putzen ----------
@@ -341,11 +373,17 @@
       moveGuide(drag.guide, e.clientX);
       return;
     }
+    if (mode === 'uv') return uvAt(e.clientX, e.clientY); // Ableuchten dreht die Karte nicht
     tween = null;
     if (mode === 'clean') rubAt(e.clientX, e.clientY, 6);
   });
 
   stage.addEventListener('pointermove', function (e) {
+    // UV-Lampe: mit der Maus schon beim Darüberfahren, mit dem Finger beim Ziehen
+    if (mode === 'uv') {
+      if (!sent && (drag || e.pointerType === 'mouse')) uvAt(e.clientX, e.clientY);
+      return;
+    }
     if (!drag) return;
     if (mode === 'measure') {
       if (drag.guide) moveGuide(drag.guide, e.clientX);
@@ -376,12 +414,13 @@
   stage.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
   // Tastatur: Pfeiltasten drehen (beim Messen: links/rechts die Linie fein verschieben, mit Umschalt in größeren Schritten),
-  // D/P/M wechseln das Werkzeug
+  // D/P/M/U wechseln das Werkzeug
   stage.tabIndex = 0;
   stage.addEventListener('keydown', function (e) {
     if (e.key === 'd' || e.key === 'D') return setMode('rotate');
     if (e.key === 'p' || e.key === 'P') return setMode('clean');
     if (e.key === 'm' || e.key === 'M') return setMode('measure');
+    if (e.key === 'u' || e.key === 'U') return setMode('uv');
     if (mode === 'measure') {
       var stepV = e.shiftKey ? 0.01 : 0.001;
       var nudge = { ArrowLeft: -stepV, ArrowRight: stepV }[e.key];
@@ -405,6 +444,7 @@
       clean: 'Putzen: mit gedrückter Maustaste reiben',
       rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom',
       measure: 'Messen: Linien an den linken und rechten Rand des Kartenbilds ziehen · Pfeiltasten ←→ = fein · Mausrad = Zoom',
+      uv: 'UV-Lampe: langsam an Ecken und Kanten entlangfahren – Macken leuchten grün auf · Mausrad = Zoom',
     },
     slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
     send: { clean: 'Fertig – ab zum Kunden!', rotate: 'Fertig – ab zum Kunden!' },
@@ -422,8 +462,9 @@
       li.classList.toggle('is-done', i < idx);
       li.classList.toggle('is-active', i === idx);
     });
-    // Messen gibt es nur beim Benoten
+    // Messen und UV-Lampe gibt es nur beim Benoten
     if (measureBtn) measureBtn.hidden = name !== 'grade';
+    if (uvBtn) uvBtn.hidden = name !== 'grade';
     setMode(name === 'clean' ? 'clean' : 'rotate');
     if (name === 'slab') startMeter();
   }
