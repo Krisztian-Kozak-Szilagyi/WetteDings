@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="256" height="256" role="img" aria-label="MK Coin (MIA)"><title>MK Coin (MIA)</title>
+<defs><linearGradient id="mk-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f6fb"/><stop offset=".45" stop-color="#a9b0c2"/><stop offset="1" stop-color="#4b5266"/></linearGradient>
+<radialGradient id="mk-face" cx=".38" cy=".32" r=".85"><stop offset="0" stop-color="#3a1030"/><stop offset=".6" stop-color="#1c0818"/><stop offset="1" stop-color="#0b030a"/></radialGradient>
+<linearGradient id="mk-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd27a"/><stop offset="1" stop-color="#e0841c"/></linearGradient>
+<radialGradient id="mk-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff7ab8" stop-opacity=".45"/><stop offset="1" stop-color="#ff7ab8" stop-opacity="0"/></radialGradient></defs>
+<circle cx="200" cy="200" r="194" fill="url(#mk-rim)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="200" r="168" fill="none" stroke="#1a161c" stroke-width="4" stroke-dasharray="6 10" opacity=".55"/>
+<circle cx="200" cy="200" r="150" fill="url(#mk-face)" stroke="#1a161c" stroke-width="12"/>
+<circle cx="200" cy="190" r="120" fill="url(#mk-glow)"/>
+<path d="M96,262 V140 L140,206 L184,140 V262" fill="none" stroke="url(#mk-gold)" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M226,140 V262 M226,206 L296,140 M246,190 L300,262" fill="none" stroke="url(#mk-gold)" stroke-width="26" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M150,300 Q200,318 250,300" fill="none" stroke="#ff7ab8" stroke-width="6" stroke-linecap="round" opacity=".8"/>
+<circle cx="200" cy="96" r="7" fill="#ff7ab8"/>
+</svg>

@@ -51,6 +51,8 @@ module.exports = {
   lotteryTicketPrice: eurosToCents(process.env.LOTTERY_TICKET_EUR, 100),
   lotteryTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(process.env.LOTTERY_TIME || '') ? process.env.LOTTERY_TIME : '20:00',
   lotteryMaxTicketsPerPurchase: 10,
+  // Broker: Schlagwort, dessen Video-Aufrufe den MK Coin (MIA) bewegen (coin/tagViews.js) – leer = Coin ohne Trend
+  miaCoinTag: (process.env.MIA_COIN_TAG || '').trim().slice(0, 80),
   // TCG: Preis eines Booster Packs (5 Karten)
   tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 90),
   // Support-Bot (Groq API). Ohne Schlüssel ist der Chat ausgeblendet.
