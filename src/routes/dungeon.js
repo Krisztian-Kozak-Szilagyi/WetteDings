@@ -23,10 +23,11 @@ router.use('/dungeon', requireLogin, requireDungeon);
 
 const same = (a, b) => a && b && String(a) === String(b);
 
-/** Platz für die Anzeige: Karte, Boost, Name, Leiter, ich */
+/** Platz für die Anzeige: Karte, Boost, Name, Leiter, ich. In der Lobby darf die Karte noch fehlen (choosing). */
 const slotView = (m, me, leaderId) => {
-  const card = catalog.cardById[m.card];
+  const card = m.card ? catalog.cardById[m.card] : null;
   return {
+    choosing: !card,
     name: m.name,
     bot: !m.user,
     me: same(m.user, me),
@@ -77,14 +78,22 @@ router.get('/dungeon', async (req, res) => {
   let slots = [];
   if (running) slots = running.members.map((m) => slotView(m, me));
   else if (party) {
-    slots = party.members.map((m) => slotView(m, me, party.leader));
+    slots = party.members.map((m) => slotView(m, me, party.solo ? null : party.leader)); // Solo Queue: kein Gruppenleiter
     party.invites.forEach((i) => slots.push({ invited: true, name: i.name, userId: String(i.user) }));
   }
   while (slots.length < dungeon.TEAM_SIZE) slots.push({ empty: true, solo: phase === 'solo' });
 
-  // Kartenauswahl: zum Anmelden/Beitreten – und angemeldet zum Tauschen (eigene Dungeon-Karten zählen als frei)
+  // Kartenauswahl in der Lobby (eigene Dungeon-Karten zählen als frei); vor dem Beitritt nur für die Start-Kacheln
   const mine = party ? party.members.find((m) => same(m.user, me)) : null;
   const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party });
+  // Start-Kacheln (wie "Zum Album"): eigene Charaktere als Fächer, fehlende als graue Beispielkarten
+  const samples = catalog.CARDS.filter((c) => c.isCharacter && !(catalog.rarityByKey[c.rarity] || {}).hidden);
+  const fanOf = (n) => {
+    const own = (cards ? cards.characters : []).slice(0, n).map((card) => ({ card, sample: false }));
+    for (let i = 0; own.length < n && i < samples.length; i++) if (!own.some((f) => f.card.id === samples[i].id)) own.push({ card: samples[i], sample: true });
+    return own;
+  };
+  const startFans = phase === 'frei' ? { solo: fanOf(1), gruppe: fanOf(3) } : null;
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
@@ -111,6 +120,7 @@ router.get('/dungeon', async (req, res) => {
     playback: running && runDungeon ? playback(running, runDungeon, now) : null,
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
+    startFans,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
     loot,
     rareLoot,
@@ -133,15 +143,18 @@ router.get('/dungeon/status', async (req, res) => {
   });
 });
 
+// Nach einer Aktion zurück zu den Plätzen (#111: kein Suchen nach der Lobby unter dem Bild);
+// bei einem Fehler oben bleiben, dort steht die Meldung
 async function handle(req, res, fn) {
   try {
     const msg = await fn();
     if (msg) req.flash('success', msg);
+    res.redirect(msg ? '/dungeon' : '/dungeon#dg-tisch');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
+    res.redirect('/dungeon');
   }
-  res.redirect('/dungeon');
 }
 
 const partyId = (req) => {
@@ -151,7 +164,7 @@ const partyId = (req) => {
 };
 
 router.post('/dungeon/anmelden', (req, res) =>
-  handle(req, res, () => dungeon.register({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null, solo: str(req.body.mode) !== 'gruppe' }).then(() => null))
+  handle(req, res, () => dungeon.register({ user: req.user, solo: str(req.body.mode) !== 'gruppe' }).then(() => null))
 );
 
 router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS }));
@@ -163,9 +176,19 @@ router.get('/dungeon/geschichte/:key', (req, res, next) => {
   res.render('dungeon-geschichte', { title: `Dungeon – ${dg.title}`, dg });
 });
 
-router.post('/dungeon/karten', (req, res) =>
-  handle(req, res, () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card), boostId: str(req.body.boost) || null }).then(() => null))
-);
+// Karten in der Lobby wählen: aus dem Auswahl-Fenster per fetch (JSON, Fehler erscheinen im Fenster), sonst wie gewohnt
+const wantsJson = (req) => (req.get('Accept') || '').includes('application/json');
+router.post('/dungeon/karten', async (req, res) => {
+  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null });
+  if (!wantsJson(req)) return handle(req, res, () => pick().then(() => null));
+  try {
+    await pick();
+    res.json({ ok: true });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
 
 // Beute-Fenster geschlossen (per fetch)
 router.post('/dungeon/beute-gesehen', async (req, res) => {
@@ -185,7 +208,7 @@ router.post('/dungeon/einladung-zurueck', (req, res) =>
 );
 
 router.post('/dungeon/beitreten', (req, res) =>
-  handle(req, res, () => dungeon.accept({ user: req.user, partyId: partyId(req), cardId: str(req.body.card), boostId: str(req.body.boost) || null }).then(() => null))
+  handle(req, res, () => dungeon.accept({ user: req.user, partyId: partyId(req) }).then(() => null))
 );
 
 router.post('/dungeon/ablehnen', (req, res) => handle(req, res, () => dungeon.decline({ user: req.user, partyId: partyId(req) }).then(() => null)));
