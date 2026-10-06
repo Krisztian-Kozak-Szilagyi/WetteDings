@@ -166,15 +166,16 @@ async function playmates(userId, limit = 5) {
   if (!top.length) return [];
   const ids = top.slice(0, limit * 2).map((e) => e.id);
   const [users, counts] = await Promise.all([
-    User.find({ _id: { $in: ids }, deletedAt: null }).select('username').lean(),
+    User.find({ _id: { $in: ids }, deletedAt: null }).select('username avatar').lean(),
     Achievement.aggregate([{ $match: { user: { $in: ids } } }, { $group: { _id: '$user', n: { $sum: 1 } } }]),
   ]);
   const names = new Map(users.map((u) => [String(u._id), u.username]));
+  const pictures = new Map(users.map((u) => [String(u._id), u.avatar || null]));
   const achievements = new Map(counts.map((c) => [String(c._id), c.n]));
   return top
     .filter((e) => names.has(String(e.id)))
     .slice(0, limit)
-    .map((e) => ({ username: names.get(String(e.id)), together: e.together, dungeons: e.dungeons, duels: e.duels, achievements: achievements.get(String(e.id)) || 0 }));
+    .map((e) => ({ username: names.get(String(e.id)), avatar: pictures.get(String(e.id)), together: e.together, dungeons: e.dungeons, duels: e.duels, achievements: achievements.get(String(e.id)) || 0 }));
 }
 
 module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, popupJson, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };

@@ -80,7 +80,7 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
     },
     { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] } } },
     { $sort: { total: -1, createdAt: 1 } },
-    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
+    { $project: { username: 1, avatar: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
   ];
   if (limit) pipeline.push({ $limit: limit });
   return User.aggregate(pipeline);
