@@ -23,15 +23,15 @@
   </div>
 <% } %>
 
-<div class="rang-table">
-  <% if (!leaders.length) { %>
-    <p class="muted"><%= q ? 'Kein Mitglied gefunden.' : 'Noch niemand dabei.' %></p>
+<% const rangTable = (rows, empty) => { %>
+  <% if (!rows.length) { %>
+    <p class="muted"><%= empty %></p>
   <% } else { %>
     <div class="table-wrap">
       <table class="table leaderboard">
         <thead><tr><th>#</th><th>Name</th><th class="num">Gesamt</th><th class="num hide-sm">Verfügbar</th><th class="num hide-sm">In Wetten</th><th class="num hide-sm">In Coins</th><th class="num hide-sm" title="Verkaufswert der Karten (folierte mit Wertsteigerung) plus ungeöffnete Packs zum Packpreis; per Handel bekommene Karten <%= freshDays %> Tage lang höchstens mit dem, was dafür gegeben wurde">In Karten</th></tr></thead>
         <tbody>
-          <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
+          <% rows.forEach((u) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
             <tr class="<%= [me ? 'me' : '', u.rank <= 3 ? 'top-' + u.rank : ''].join(' ').trim() %>">
               <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
               <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><%- roleBadge(u.username) %></td>
@@ -45,9 +45,20 @@
         </tbody>
       </table>
     </div>
-    <p class="muted small">Per Handel bekommene Karten zählen hier <%= freshDays %> Tage lang höchstens mit dem, was du dafür gegeben hast, danach mit ihrem vollen Wert.</p>
   <% } %>
+<% } %>
+
+<div class="rang-table">
+  <% rangTable(leaders, q ? (teamLeaders.length ? 'Kein Spieler gefunden.' : 'Kein Mitglied gefunden.') : 'Noch niemand dabei.') %>
+  <% if (leaders.length) { %><p class="muted small">Per Handel bekommene Karten zählen hier <%= freshDays %> Tage lang höchstens mit dem, was du dafür gegeben hast, danach mit ihrem vollen Wert.</p><% } %>
 </div>
+
+<% if (teamLeaders.length) { %>
+  <section class="rang-table rang-team">
+    <h2>Team</h2>
+    <% rangTable(teamLeaders, '') %>
+  </section>
+<% } %>
 
 </div>
 
