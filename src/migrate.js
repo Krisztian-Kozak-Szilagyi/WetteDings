@@ -127,17 +127,19 @@ async function migrate() {
  */
 async function migrateTrades() {
   const raw = Trade.collection;
+  // Alten Index zuerst entfernen: Das Umstellen löscht cardDoc, und mehrere offene Angebote ohne cardDoc
+  // verletzen sonst den eindeutigen Index (doppelter Schlüssel null)
+  const idx = await raw.indexes().catch(() => []);
+  if (idx.some((x) => x.name === 'cardDoc_1')) {
+    await raw.dropIndex('cardDoc_1');
+    console.log('Migration: alter Handels-Index cardDoc_1 entfernt.');
+  }
   const old = await raw.find({ card: { $exists: true } }).toArray(); // beide Vorformen (siehe lines.migrateTradeDoc)
   for (let i = 0; i < old.length; i += 500) {
     const ops = old.slice(i, i + 500).map((t) => ({ updateOne: { filter: { _id: t._id }, update: migrateTradeDoc(t) } })).filter((op) => op.updateOne.update);
     if (ops.length) await raw.bulkWrite(ops, { ordered: false });
   }
   if (old.length) console.log(`Migration: ${old.length} Handelsangebot(e) auf Positionen umgestellt.`);
-  const idx = await raw.indexes().catch(() => []);
-  if (idx.some((x) => x.name === 'cardDoc_1')) {
-    await raw.dropIndex('cardDoc_1');
-    console.log('Migration: alter Handels-Index cardDoc_1 entfernt.');
-  }
   await Trade.createIndexes();
 }
 
