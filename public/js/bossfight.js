@@ -437,6 +437,14 @@
     requestAnimationFrame(loop);
   }
 
+  // Vollbild ohne Navigation: Esc führt zurück
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (history.length > 1) history.back();
+      else location.href = '/';
+    }
+  });
+
   if (still) {
     resize();
     frame(0);

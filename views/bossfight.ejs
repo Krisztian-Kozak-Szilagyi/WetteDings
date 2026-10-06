@@ -1,11 +1,18 @@
-<%- include('partials/head') %>
-<link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
-<%# Bosskampf – Bossraum (Hintergrundbild) + Boss auf dem Canvas, gezeichnet und bewegt von public/js/bossfight.js %>
-<div class="bf-page">
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title><%= title %> · <%= appName %></title>
+  <meta name="theme-color" content="#0d0b14">
+  <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
+</head>
+<%# Bosskampf – Vollbild ohne Navigation und Fußzeile: Bossraum (Hintergrundbild) + Boss auf dem Canvas (public/js/bossfight.js). Esc = zurück %>
+<body class="bf-body">
   <div class="bf-stage">
     <canvas class="bf-canvas" data-boss-canvas aria-label="Riesige Höhlenspinne"></canvas>
   </div>
-</div>
-
-<script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
-<%- include('partials/foot') %>
+  <script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>
