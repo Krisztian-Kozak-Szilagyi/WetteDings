@@ -346,6 +346,10 @@
   <section class="stats-block" id="boersenbericht">
     <header class="stats-block-head"><div><h2>Börsenbericht (BTCG)</h2></div></header>
     <p class="muted small">Jeden Tag um 18:45 Uhr: Kennzahlen der letzten 24 Stunden gegen den Schnitt der 7 Vortage; daraus der Sprung des ETF. Nur für den Admin sichtbar.</p>
+    <form method="post" action="/admin/boersenbericht/neu" class="stats-boerse-redo">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn-ghost btn-sm" title="Wertet den heutigen Tag neu aus: Der ETF springt um die Differenz zum bisherigen Sprung, der alte Forum-Beitrag wird durch einen neuen ersetzt.">Heute neu auswerten</button>
+    </form>
     <% boerse.forEach((r) => { %>
       <details class="card stats-collapsed">
         <summary><strong><%= r._id.split('-').reverse().join('.') %></strong> · Sprung <strong><%= pct(r.change) %></strong> · Stimmung <%= r.sentiment.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %> · Rekorde <%= r.records %><% if (r.thread) { %> · <a href="/forum/t/<%= r.thread %>">Beitrag</a><% } %></summary>
