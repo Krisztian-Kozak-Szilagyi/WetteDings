@@ -76,7 +76,7 @@
     <%# Noch nicht entschieden: statt leerer Kartenrahmen zwei Kacheln (wie "Zum Album") – Karten wählt man danach in der Lobby %>
     <form method="post" action="/dungeon/anmelden" class="dg-mode-tiles">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <% [['solo', 'Solo Queue', 'Allein beitreten', 'Mitspieler werden beim Start zugelost'], ['gruppe', 'Party gründen', 'Mit Freunden', 'Bis zu zwei Mitglieder einladen, eigener Chat']].forEach(([mode, title, kicker, hint]) => { %>
+      <% [['solo', 'Solo Queue', 'Allein beitreten', 'Mitspieler werden beim Start zugelost'], ['gruppe', 'Party gründen', 'Mit Freunden', 'Bis zu zwei Mitglieder einladen']].forEach(([mode, title, kicker, hint]) => { %>
         <button class="tcg-album-tile dg-mode-tile is-<%= mode %>" type="submit" name="mode" value="<%= mode %>">
           <span class="tcg-fan" aria-hidden="true">
             <% startFans[mode].forEach((f) => { %><img src="<%= f.card.image %>" alt="" width="720" height="1008" loading="lazy" class="<%= f.sample ? 'is-sample' : '' %>"><% }) %>
@@ -91,7 +91,7 @@
           </span>
         </button>
       <% }) %>
-      <p class="dg-start-note muted small">Karten wählst du nach dem Beitritt in der Lobby.<% if (!cards.characters.length) { %> <strong>Du hast gerade keine freie Charakterkarte</strong> – ohne sie bist du beim Start nicht dabei.<% } %></p>
+      <% if (!cards.characters.length) { %><p class="dg-start-note muted small"><strong>Du hast gerade keine freie Charakterkarte</strong> – ohne sie bist du beim Start nicht dabei.</p><% } %>
     </form>
   <% } else { %>
   <div class="dg-slots">
