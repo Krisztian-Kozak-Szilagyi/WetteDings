@@ -20,6 +20,7 @@ const deviceSchema = new Schema({
 deviceSchema.index({ user: 1, deviceId: 1 }, { unique: true });
 deviceSchema.index({ deviceId: 1 });
 deviceSchema.index({ fp: 1 });
+deviceSchema.index({ ips: 1 }); // geteilte Netze erkennen (viele Konten an einer IP)
 
 // Hinweis für den Admin: zwei Konten wurden vom selben Gerät benutzt
 const deviceAlertSchema = new Schema(

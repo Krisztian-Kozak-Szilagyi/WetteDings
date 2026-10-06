@@ -35,11 +35,18 @@ async function record({ userId, deviceId, fp = null, ip = null, ua = '', login =
   await checkMatches(dev);
 }
 
-/** Häufige fp|ip-Kombinationen (viele Konten, baugleiche Geräte im selben Netz) für diese Fingerabdrücke */
-async function commonPrintsFor(fps) {
-  const list = [...new Set(fps.filter(Boolean))];
-  if (!list.length) return new Set();
-  return logic.commonPrints(await Device.find({ fp: { $in: list } }).select('user fp ips').lean());
+/**
+ * Was bei diesen Geräten nicht als Beleg zählt: häufige fp|ip-Kombinationen (baugleiche Geräte im selben Netz, #89)
+ * und geteilte Netze (IPs, die viele Konten benutzen, z. B. das Schulnetz)
+ */
+async function commonFor(devices) {
+  const fps = [...new Set(devices.map((d) => d.fp).filter(Boolean))];
+  const ips = [...new Set(devices.flatMap((d) => d.ips || []))];
+  const [byFp, byIp] = await Promise.all([
+    fps.length ? Device.find({ fp: { $in: fps } }).select('user fp ips').lean() : [],
+    ips.length ? Device.find({ ips: { $in: ips } }).select('user ips').lean() : [],
+  ]);
+  return new Set([...logic.commonPrints(byFp), ...logic.crowdedNets(byIp)]);
 }
 
 /**
@@ -48,7 +55,7 @@ async function commonPrintsFor(fps) {
  */
 async function updatePair(userA, userB, common) {
   const [da, db] = await Promise.all([Device.find({ user: userA }).lean(), Device.find({ user: userB }).lean()]);
-  const level = logic.pairLevel(da, db, common || (await commonPrintsFor([...da, ...db].map((d) => d.fp))));
+  const level = logic.pairLevel(da, db, common || (await commonFor([...da, ...db])));
   const key = logic.pairKey(userA, userB);
   const alert = await DeviceAlert.findOne({ key });
   if (!alert) {
@@ -71,16 +78,18 @@ async function checkMatches(dev) {
   if (dev.fp) or.push({ fp: dev.fp });
   const others = await Device.find({ user: { $ne: dev.user }, $or: or }).select('user').lean();
   const ids = [...new Set(others.map((o) => String(o.user)))];
-  for (const other of ids) await updatePair(dev.user, other);
+  if (!ids.length) return;
+  // gemeinsame Ausnahmen einmal für alle beteiligten Geräte – nicht je Paar (Schulnetz: viele Konten auf einmal)
+  const common = await commonFor(await Device.find({ user: { $in: [dev.user, ...ids] } }).select('fp ips').lean());
+  for (const other of ids) await updatePair(dev.user, other, common);
 }
 
-/** Alle Hinweise mit den aktuellen Regeln neu bewerten (beim Start, siehe migrate.js) – z. B. nach #89 */
+/** Alle Hinweise mit den aktuellen Regeln neu bewerten (beim Start, siehe migrate.js) – z. B. nach #89 und geteilten Netzen */
 async function recomputeAlerts() {
   const alerts = await DeviceAlert.find().select('users').lean();
   if (!alerts.length) return 0;
   const ids = [...new Set(alerts.flatMap((a) => a.users.map(String)))];
-  const fps = await Device.distinct('fp', { user: { $in: ids }, fp: { $ne: null } });
-  const common = await commonPrintsFor(fps);
+  const common = await commonFor(await Device.find({ user: { $in: ids } }).select('fp ips').lean());
   for (const a of alerts) await updatePair(a.users[0], a.users[1], common);
   return alerts.length;
 }
@@ -130,7 +139,7 @@ async function listAlerts() {
     User.find({ _id: { $in: ids } }).select('username bannedUntil deletedAt createdAt').lean(),
     Device.find({ user: { $in: ids } }).lean(),
   ]);
-  const common = await commonPrintsFor(devices.map((d) => d.fp));
+  const common = await commonFor(devices);
   const userById = new Map(users.map((u) => [String(u._id), u]));
   const devsByUser = new Map();
   for (const d of devices) {

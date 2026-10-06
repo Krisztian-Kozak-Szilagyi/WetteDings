@@ -841,6 +841,7 @@ module.exports = {
   logByKey,
   pageOf,
   cardLabel,
+  tradeSide,
   cardSummary,
   resolvePlayer,
   tradeLog,

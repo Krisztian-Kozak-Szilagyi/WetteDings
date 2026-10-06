@@ -158,3 +158,26 @@ test('#89: baugleiche Geräte im selben WLAN sind kein Mehrfach-Konto', () => {
   assert.equal(d.pairLevel([a], [b, { ...c, user: 'u2' }]), d.LEVEL.wahrscheinlich);
   assert.equal(d.pairLevel([a], [{ deviceId: 'x', fp: 'zz', ips: [] }]), 0);
 });
+
+test('Geteiltes Netz (Schulnetz): zwei baugleiche Handys einer Klasse sind kein Mehrfach-Konto', () => {
+  const H = 3600e3;
+  const t0 = Date.UTC(2026, 9, 1);
+  const at = (from, to) => ({ firstAt: new Date(t0 + from * H), lastAt: new Date(t0 + to * H) });
+  // zwei Klassenkameraden mit demselben Handymodell, nacheinander im Schul-WLAN (IP "schule")
+  const a = { user: 'u1', deviceId: 'd1', fp: 'f1', ips: ['schule'], ...at(0, 2) };
+  const b = { user: 'u2', deviceId: 'd2', fp: 'f1', ips: ['schule'], ...at(3, 5) };
+  // der Rest der Klasse benutzt ganz andere Geräte, aber dieselbe IP
+  const klasse = ['u3', 'u4', 'u5'].map((user, i) => ({ user, deviceId: `k${i}`, fp: `fk${i}`, ips: ['schule'] }));
+  const common = new Set([...d.commonPrints([a, b, ...klasse]), ...d.crowdedNets([a, b, ...klasse])]);
+  assert.ok(common.has(d.netKey('schule')));
+  assert.equal(d.matchLevel(a, b, common), d.LEVEL.moeglich);
+  // dieselben zwei Geräte in einem Heimnetz mit nur zwei Konten: weiter wahrscheinlich (Cookie gelöscht, neues Konto)
+  const home = [{ ...a, ips: ['heim'] }, { ...b, ips: ['heim'] }];
+  const homeCommon = new Set([...d.commonPrints(home), ...d.crowdedNets(home)]);
+  assert.equal(homeCommon.size, 0);
+  assert.equal(d.matchLevel(home[0], home[1], homeCommon), d.LEVEL.wahrscheinlich);
+  // erst ab NET_CROWD Konten ist ein Netz geteilt
+  assert.equal(d.crowdedNets([a, b, ...klasse.slice(0, d.NET_CROWD - 3)]).size, 0);
+  // gleiches Cookie bleibt auch im Schulnetz sicher
+  assert.equal(d.matchLevel(a, { ...b, deviceId: 'd1' }, common), d.LEVEL.sicher);
+});

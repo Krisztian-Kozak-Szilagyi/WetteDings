@@ -65,6 +65,7 @@
         if (betDisputes) adminBadges.push({ n: betDisputes, cls: 'nav-badge-dispute', title: 'Strittige Wetten, die ein Dev entscheiden muss', aria: betDisputes + ' strittige Wetten' });
         if (tradeAlerts) adminBadges.push({ n: tradeAlerts, cls: 'nav-badge-suspicious', title: 'Handel zwischen Mehrfach-Konten', aria: tradeAlerts + ' Geschäfte zwischen Mehrfach-Konten' });
         if (deviceAlerts) adminBadges.push({ n: deviceAlerts, cls: 'nav-badge-device', title: 'Konten, die dasselbe Gerät benutzen', aria: deviceAlerts + ' Hinweise auf Mehrfach-Konten' });
+        if (suspicionAlerts) adminBadges.push({ n: suspicionAlerts, cls: 'nav-badge-suspicion', title: 'Auffälligkeiten: Verdacht auf Skript oder Wertverschiebung', aria: suspicionAlerts + ' Auffälligkeiten' });
         if (packLogNew) adminBadges.push({ n: packLogNew, cls: '', title: 'Neue Vergaben und entfernte Karten (Vergabe-Log)', aria: packLogNew + ' neue Einträge im Vergabe-Log' });
         navItems.push({ href: '/admin', label: currentUser.isAdmin ? 'Admin' : 'Dev', active: currentPath.startsWith('/admin'), badges: adminBadges });
       }
