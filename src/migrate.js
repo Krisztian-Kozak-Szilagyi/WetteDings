@@ -114,7 +114,8 @@ async function migrate() {
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
 
-  // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN)
+  // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN,
+  // geteilte Netze wie das Schulnetz)
   await require('./device/deviceService').recomputeAlerts();
 }
 
