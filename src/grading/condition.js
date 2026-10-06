@@ -6,7 +6,8 @@
 const crypto = require('crypto');
 
 // Version der Würfel-Regeln: ändern sie sich, bleiben gespeicherte Zustände gültig und unterscheidbar
-const CONDITION_VERSION = 1;
+// 2: Zentrierung nur noch links/rechts (oben/unten wird nicht mehr gewürfelt und zählt nicht)
+const CONDITION_VERSION = 2;
 
 const rnd = (min, max) => min + (crypto.randomInt(1000000) / 1000000) * (max - min);
 const chance = (p) => crypto.randomInt(1000000) < p * 1000000;
@@ -21,7 +22,8 @@ function weighted(weights) {
   return 0;
 }
 
-// Zentrierung je Achse (links/rechts, oben/unten) als Anteil der breiteren Seite, z. B. 58 = 58/42.
+// Zentrierung links/rechts als Anteil der breiteren Seite, z. B. 58 = 58/42. Oben/unten zählt nicht (ältere
+// Zustände haben noch tb gespeichert – es wird ignoriert).
 // Bereiche, aus denen gewürfelt wird, und die Höchstnote je Bereich (wie bei PSA: Zentrierung begrenzt die Note)
 const CENTERING = [
   { max: 55, cap: 10 },
@@ -34,27 +36,29 @@ const CENTERING = [
 const CREASE_CAP = 4;
 
 // Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
-// centering: Gewichte je Achse für die Bereiche in CENTERING (null = immer perfekt zentriert, z. B. alte Aufträge).
+// centering: Gewichte für die Bereiche in CENTERING (null = immer perfekt zentriert, z. B. alte Aufträge).
+// Die Gewichte entsprechen genau der schlechteren von zwei Achsen mit [78, 13, 5, 3, 1] bzw. [86, 9, 3, 1, 1] –
+// so blieb die Notenverteilung gleich, als oben/unten wegfiel (Version 2).
 // kunde: gebrauchte Karten der Kunden im Grading-Shop – Note 8 am häufigsten (≈ 23 %), 10 ≈ 9 %, Ø 7,2
 // frisch: Karten aus dem Pack, dem Black Market oder vom Team – Note 8 am häufigsten (≈ 28 %), 9 ≈ 26 %,
 // 10 ≈ 11 %, Ø 7,8 (exakt nachrechenbar; test/condition.test.js prüft die Form)
 const PROFILES = {
-  kunde: { scratches: [42, 35, 18, 5], corner: 0.13, edges: [62, 30, 8], crease: 0.06, centering: [78, 13, 5, 3, 1] },
-  frisch: { scratches: [30, 44, 21, 5], corner: 0.10, edges: [74, 22, 4], crease: 0.02, centering: [86, 9, 3, 1, 1] },
+  kunde: { scratches: [42, 35, 18, 5], corner: 0.13, edges: [62, 30, 8], crease: 0.06, centering: [6084, 2197, 935, 585, 199] },
+  frisch: { scratches: [30, 44, 21, 5], corner: 0.10, edges: [74, 22, 4], crease: 0.02, centering: [7396, 1629, 579, 197, 199] },
 };
 
-/** Zentrierung einer Achse: Bereich nach Gewichten, darin ein ganzzahliger Wert (50 = perfekt) */
+/** Zentrierung links/rechts: Bereich nach Gewichten, darin ein ganzzahliger Wert (50 = perfekt) */
 function rollAxis(weights) {
   const i = weighted(weights);
   const min = i === 0 ? 50 : CENTERING[i - 1].max + 1;
   return min + crypto.randomInt(CENTERING[i].max - min + 1);
 }
 
-/** Höchstnote durch die Zentrierung (schlechtere Achse zählt); ohne Angabe 10 */
+/** Höchstnote durch die Zentrierung (nur links/rechts); ohne Angabe 10 */
 function centeringCap(centering) {
   if (!centering) return 10;
-  const worst = Math.max(centering.lr || 50, centering.tb || 50);
-  const range = CENTERING.find((c) => worst <= c.max) || CENTERING[CENTERING.length - 1];
+  const lr = centering.lr || 50;
+  const range = CENTERING.find((c) => lr <= c.max) || CENTERING[CENTERING.length - 1];
   return range.cap;
 }
 
@@ -71,7 +75,7 @@ function rollDefects(profile = 'kunde') {
   const edges = Array.from({ length: weighted(p.edges) }, () => ({ side: crypto.randomInt(4), pos: Math.round(rnd(20, 80)) }));
   const crease = chance(p.crease);
   const defects = { scratches, corners, edges, crease };
-  if (p.centering) defects.centering = { lr: rollAxis(p.centering), tb: rollAxis(p.centering) };
+  if (p.centering) defects.centering = { lr: rollAxis(p.centering) };
   return defects;
 }
 
@@ -103,15 +107,15 @@ function rollCondition(profile = 'frisch') {
 /**
  * Sichtbarer Versatz einer folierten Karte aus ihrer Zentrierung: { x, y } von −1 bis 1 (0 = mittig).
  * Gespeichert ist nur, wie schief (z. B. 62/38) – in welche Richtung, ergibt sich fest aus der Exemplar-ID,
- * damit dasselbe Exemplar immer gleich aussieht. Ohne Zentrierung: null.
+ * damit dasselbe Exemplar immer gleich aussieht. Nur waagerecht (oben/unten zählt nicht), y ist immer 0.
+ * Ohne Zentrierung: null.
  */
 function centerShift(centering, id) {
   if (!centering) return null;
   const bits = Number.parseInt(String(id || '').slice(-2), 16) || 0;
   const sx = bits & 1 ? -1 : 1;
-  const sy = bits & 2 ? -1 : 1;
   const r = (v) => Math.round(v * 1000) / 1000;
-  return { x: r((sx * ((centering.lr || 50) - 50)) / 50), y: r((sy * ((centering.tb || 50) - 50)) / 50) };
+  return { x: r((sx * ((centering.lr || 50) - 50)) / 50), y: 0 };
 }
 
 // Bezeichnungen der Noten (wie auf echten Grading-Etiketten)
