@@ -361,20 +361,72 @@ test('Panel: Kennzahlen, Zusatzzeilen und Bündelung je Spieler', () => {
   assert.deepEqual(s.extrasOf({ trades: ['a'], uas: ['b'], nets: ['c'] }), ['a', 'b', 'c']);
 
   const u = (id) => ({ _id: id, username: id });
-  const alert = (users, level, mins, done = false) => ({ users, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: done ? new Date(t0) : null });
+  const alert = (users, kind, level, mins, done = false) => ({ users, kind, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: done ? new Date(t0) : null });
   const groups = s.groupAlerts([
-    alert([u('ben')], 1, 50),
-    alert([u('sam')], 1, 10),
-    alert([u('sam')], 2, 5),
-    alert([u('sam')], 2, 1, true),
-    alert([u('sam'), u('anna')], 2, 3),
-    alert([u('anna'), u('sam')], 1, 4),
-    alert([u('old')], 2, 60, true),
+    alert([u('ben')], 'dauer', 1, 50),
+    alert([u('sam')], 'tempo', 1, 10),
+    alert([u('sam')], 'takt', 2, 5),
+    alert([u('sam')], 'ihk', 2, 1, true),
+    alert([u('sam'), u('anna')], 'wert', 2, 3),
+    alert([u('anna'), u('sam')], 'wert', 1, 4),
+    alert([u('old')], 'takt', 2, 60, true),
   ]);
+  // sam und das Paar: je Verdacht mit 4 Punkten, sam mit jüngerem Beleg zuerst; ben nur beobachten
   assert.deepEqual(groups.map((g) => g.users.map((x) => x._id).join('+')), ['sam', 'sam+anna', 'ben', 'old']);
   assert.equal(groups[0].open, 2);
   assert.equal(groups[0].level, 2);
   assert.deepEqual(groups[0].alerts.map((a) => [a.level, Boolean(a.doneAt)]), [[2, false], [1, false], [2, true]]); // offene zuerst
   assert.equal(groups[1].alerts.length, 2); // Paar unabhängig von der Reihenfolge
   assert.equal(groups[3].open, 0); // nur erledigte: ganz unten
+});
+
+test('Gesamtbewertung: Belege aus verschiedenen Bereichen zählen, gleiche Ursache nicht doppelt', () => {
+  const a = (kind, level, done = false) => ({ kind, level, doneAt: done ? new Date(t0) : null });
+  // ein schwacher Hinweis: beobachten
+  const one = s.overallRating([a('rechenzentrum', 1)]);
+  assert.equal(one.stage, s.STAGE.beobachten);
+  assert.equal(one.label, 'Beobachten');
+  assert.deepEqual(one.areas, { verhalten: 0, technik: 1, ergebnis: 0 });
+  // drei schwache aus drei Bereichen: eindeutig (Beispiel aus der Beschreibung)
+  const three = s.overallRating([a('dauer', 1), a('rechenzentrum', 1), a('ertrag', 1)]);
+  assert.equal(three.stage, s.STAGE.eindeutig);
+  assert.equal(three.score, 6); // 3 Punkte × 2
+  assert.match(three.reason, /Spielverhalten, Technik und Ergebnis/);
+  // ein klares Muster: Verdacht
+  assert.equal(s.overallRating([a('takt', 2)]).stage, s.STAGE.verdacht);
+  // schwache aus zwei Bereichen: Verdacht
+  const two = s.overallRating([a('takt', 1), a('reaktion', 1)]);
+  assert.equal(two.stage, s.STAGE.verdacht);
+  assert.match(two.reason, /kein Vorteil erkennbar/);
+  // zwei Bereiche, einer wahrscheinlich: starker Verdacht
+  assert.equal(s.overallRating([a('takt', 2), a('reaktion', 1)]).stage, s.STAGE.stark);
+  // gleiche Ursache (Technik dreimal wahrscheinlich): nur ein Bereich, Punkte gedeckelt
+  const tech = s.overallRating([a('browser', 2), a('reaktion', 2), a('eingabe', 2), a('rechenzentrum', 1)]);
+  assert.equal(tech.stage, s.STAGE.verdacht);
+  assert.equal(tech.areas.technik, 5);
+  assert.equal(tech.score, 5);
+  // Falle (zweimal): eindeutig
+  assert.equal(s.overallRating([a('falle', 2)]).stage, s.STAGE.eindeutig);
+  assert.match(s.overallRating([a('falle', 2)]).reason, /Falle/);
+  // Mehrfach-Konto zählt zum Ergebnis
+  const multi = s.overallRating([a('dungeon', 2)], { deviceLevel: 3 });
+  assert.equal(multi.stage, s.STAGE.stark);
+  assert.match(multi.reason, /Mehrfach-Konto/);
+  // nur erledigte Hinweise: keine Bewertung
+  assert.equal(s.overallRating([a('takt', 2, true)]), null);
+});
+
+test('Gesamtbewertung bestimmt die Reihenfolge der Spieler', () => {
+  const u = (id) => ({ _id: id, username: id });
+  const al = (user, kind, level, mins) => ({ users: [u(user)], kind, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: null });
+  const groups = s.groupAlerts(
+    [al('einzeln', 'takt', 2, 50), al('breit', 'dauer', 1, 1), al('breit', 'rechenzentrum', 1, 2), al('breit', 'eingabe', 1, 2), al('zweit', 'dungeon', 1, 3)],
+    new Map([['zweit', 3]])
+  );
+  // zweit: Dungeon + Mehrfach-Konto → starker Verdacht; breit: drei schwache aus zwei Bereichen → Verdacht (4,5 Punkte);
+  // einzeln: ein klares Muster → Verdacht (3 Punkte)
+  assert.deepEqual(groups.map((g) => [g.users[0]._id, g.rating.label]), [['zweit', 'Starker Verdacht'], ['breit', 'Verdacht'], ['einzeln', 'Verdacht']]);
+  // bei einem Konten-Paar zählt das Mehrfach-Konto eines der beiden nicht
+  const pair = s.groupAlerts([{ users: [u('zweit'), u('x')], kind: 'wert', level: 1, evidenceAt: new Date(t0), doneAt: null }], new Map([['zweit', 3]]));
+  assert.equal(pair[0].rating.stage, s.STAGE.beobachten);
 });

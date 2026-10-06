@@ -104,18 +104,18 @@
   const openGroups = suspicionGroups.filter((g) => g.open);
   const doneGroups = suspicionGroups.filter((g) => !g.open);
   const openAlertCount = openGroups.reduce((s, g) => s + g.open, 0);
-  const likelyCount = openGroups.reduce((s, g) => s + g.alerts.filter((a) => !a.doneAt && a.level >= 2).length, 0);
-  const LEVEL_TEXT = { 2: 'Wahrscheinlich', 1: 'Möglich', 0: 'Erledigt' };
+  const stageAtLeast = (n) => openGroups.filter((g) => g.rating && g.rating.stage >= n).length;
+  const AREA_LABEL = { verhalten: 'Spielverhalten', technik: 'Technik', ergebnis: 'Ergebnis' };
 %>
 <section class="stats-block" id="auffaelligkeiten">
-  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.<br><strong>Dungeon-Automatik</strong>: an jedem Termin dabei (auch nachts), immer sofort nach Öffnen der Anmeldung angemeldet oder die Beute nie angeschaut.<br><strong>Grading zur Mindestzeit</strong>: Aufträge fast genau zur frühestmöglichen Zeit fertig gemeldet.<br><strong>Rund um die Uhr</strong>: über 20 Stunden ohne Pause von mehr als 3 Stunden aktiv, auch nachts.<br><strong>Kein normaler Browser</strong>: Spiel-Aktionen aus einem ferngesteuerten Browser, mit dem User-Agent eines Skript-Werkzeugs oder ohne Fingerabdruck und Browser-Kopfzeilen.<br><strong>Ungewöhnliche Einnahmen</strong>: in 24 Stunden mindestens das Fünffache des Üblichen aus IHK, Dungeon, Grading und Bank-Verkäufen (allein nur „Möglich“).<br><strong>Reaktionszeit</strong>: Aktionen weniger als 0,4 s nach dem Laden der Seite oder immer fast gleich lange danach; wiederverwendete Seiten-Kennzeichen; Aktionen ohne vorher geladene Seite.<br><strong>Ohne echte Eingabe</strong>: vor den Aktionen keine Maus-, Touch- oder Tastatureingabe, nur künstliche Klicks (Userscript, Auto-Klicker).<br><strong>Falle ausgelöst</strong>: einen unsichtbaren Link aufgerufen, den nur ein Programm findet.<br><strong>Aus einem Rechenzentrum</strong>: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs, daher nur „Möglich“).<br><strong>Gleichzeitig von zwei Geräten</strong>: Aktionen wechseln innerhalb von 10 Minuten mehrmals zwischen zwei Geräten und zwei Netzen hin und her.') %>
+  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Gesamtbewertung</strong> je Spieler aus drei Bereichen – Spielverhalten (Tempo, Takt, IHK, Dungeon, Grading, Scalping, Rund um die Uhr), Technik (Browser, Reaktionszeit, Eingabe, Falle, Rechenzentrum, zwei Geräte) und Ergebnis (Einnahmen, Wertverschiebung, Mehrfach-Konto). Muster aus demselben Bereich bestätigen sich kaum, Belege aus verschiedenen Bereichen stark. <em>Beobachten</em>: einzelne schwache Hinweise. <em>Verdacht</em>: ein klares Muster oder schwache aus mehreren Bereichen. <em>Starker Verdacht</em>: mindestens zwei Bereiche, davon einer „Wahrscheinlich“. <em>Eindeutig</em>: alle drei Bereiche oder Falle. Das Menü-Abzeichen zählt Spieler ab „Verdacht“.<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.<br><strong>Dungeon-Automatik</strong>: an jedem Termin dabei (auch nachts), immer sofort nach Öffnen der Anmeldung angemeldet oder die Beute nie angeschaut.<br><strong>Grading zur Mindestzeit</strong>: Aufträge fast genau zur frühestmöglichen Zeit fertig gemeldet.<br><strong>Rund um die Uhr</strong>: über 20 Stunden ohne Pause von mehr als 3 Stunden aktiv, auch nachts.<br><strong>Kein normaler Browser</strong>: Spiel-Aktionen aus einem ferngesteuerten Browser, mit dem User-Agent eines Skript-Werkzeugs oder ohne Fingerabdruck und Browser-Kopfzeilen.<br><strong>Ungewöhnliche Einnahmen</strong>: in 24 Stunden mindestens das Fünffache des Üblichen aus IHK, Dungeon, Grading und Bank-Verkäufen (allein nur „Möglich“).<br><strong>Reaktionszeit</strong>: Aktionen weniger als 0,4 s nach dem Laden der Seite oder immer fast gleich lange danach; wiederverwendete Seiten-Kennzeichen; Aktionen ohne vorher geladene Seite.<br><strong>Ohne echte Eingabe</strong>: vor den Aktionen keine Maus-, Touch- oder Tastatureingabe, nur künstliche Klicks (Userscript, Auto-Klicker).<br><strong>Falle ausgelöst</strong>: einen unsichtbaren Link aufgerufen, den nur ein Programm findet.<br><strong>Aus einem Rechenzentrum</strong>: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs, daher nur „Möglich“).<br><strong>Gleichzeitig von zwei Geräten</strong>: Aktionen wechseln innerhalb von 10 Minuten mehrmals zwischen zwei Geräten und zwei Netzen hin und her.') %>
   <% if (!openGroups.length) { %>
     <div class="card"><p class="muted">Aktuell gibt es keine offenen Auffälligkeiten.</p></div>
   <% } else { %>
     <div class="susp-overview">
-      <div class="susp-stat"><span class="susp-stat-value"><%= openGroups.length %></span><span class="susp-stat-label">betroffene Spieler</span></div>
-      <div class="susp-stat"><span class="susp-stat-value"><%= openAlertCount %></span><span class="susp-stat-label">offene Hinweise</span></div>
-      <div class="susp-stat susp-stat-likely"><span class="susp-stat-value"><%= likelyCount %></span><span class="susp-stat-label">davon wahrscheinlich</span></div>
+      <div class="susp-stat"><span class="susp-stat-value"><%= openGroups.length %></span><span class="susp-stat-label">betroffene Spieler · <%= openAlertCount %> Hinweise</span></div>
+      <div class="susp-stat susp-stat-likely"><span class="susp-stat-value"><%= stageAtLeast(2) %></span><span class="susp-stat-label">mit Verdacht oder mehr</span></div>
+      <div class="susp-stat susp-stat-sure"><span class="susp-stat-value"><%= stageAtLeast(3) %></span><span class="susp-stat-label">starker Verdacht oder eindeutig</span></div>
     </div>
   <% } %>
 
@@ -155,7 +155,7 @@
 
   <% const groupCard = (g) => { %>
     <% const openAlerts = g.alerts.filter((a) => !a.doneAt); const doneAlerts = g.alerts.filter((a) => a.doneAt); %>
-    <article class="card susp-group susp-lvl-<%= g.level %>">
+    <article class="card susp-group susp-stage-<%= g.rating ? g.rating.stage : 0 %>">
       <header class="susp-group-head">
         <div class="susp-who">
           <span class="susp-avatar" aria-hidden="true"><%= g.users[0].username.charAt(0).toUpperCase() %></span>
@@ -170,7 +170,6 @@
           </div>
         </div>
         <div class="susp-group-actions">
-          <% if (g.open) { %><span class="susp-pill susp-lvl-<%= g.level %>"><%= LEVEL_TEXT[g.level] %></span><% } %>
           <% if (g.users.length === 1) { %>
             <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: 'gesamt', spieler: g.users[0].username }) %>">Alle Aktionen</a>
           <% } %>
@@ -183,6 +182,20 @@
           <% } %>
         </div>
       </header>
+      <% if (g.rating) { %>
+        <div class="susp-rating susp-stage-<%= g.rating.stage %>">
+          <div class="susp-rating-main">
+            <span class="susp-rating-label">Gesamtbewertung</span>
+            <span class="susp-pill susp-stage-<%= g.rating.stage %>"><%= g.rating.label %></span>
+            <span class="susp-rating-reason"><%= g.rating.reason %></span>
+          </div>
+          <div class="susp-rating-areas" title="Punkte je Bereich: stärkster Hinweis 1 (möglich) bzw. 3 (wahrscheinlich), jeder weitere +1, höchstens 5">
+            <% Object.entries(g.rating.areas).forEach(([k, p]) => { %>
+              <span class="susp-area <%= p ? 'is-hit' : '' %>"><span class="susp-area-name"><%= AREA_LABEL[k] %></span><span class="susp-area-bar"><i style="width: <%= p * 20 %>%"></i></span></span>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
       <% if (openAlerts.length) { %>
         <ul class="susp-findings"><% openAlerts.forEach(finding) %></ul>
       <% } %>

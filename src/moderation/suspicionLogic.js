@@ -91,6 +91,21 @@ const PARALLEL_WINDOW_MS = 10 * MIN; // in dieser Zeit …
 const PARALLEL_SWITCHES = 3; // … so oft zwischen zwei Geräten und Netzen hin und her
 const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
 
+// ---------- Gesamtbewertung je Spieler (overallRating) ----------
+// Muster mit derselben Ursache bestätigen sich nicht gegenseitig (Tempo und Takt derselben Aktion; ein Skript löst
+// Browser, Reaktionszeit und Eingabe zugleich aus). Aussagekräftig ist Bestätigung aus verschiedenen Bereichen.
+const RATING_AREAS = {
+  verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer'] },
+  technik: { label: 'Technik', kinds: ['browser', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'] },
+  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
+};
+const RATING_POINTS = { 1: 1, 2: 3 }; // Punkte je Stufe des stärksten Hinweises im Bereich (möglich, wahrscheinlich)
+const RATING_EXTRA = 1; // jeder weitere Hinweis im selben Bereich
+const RATING_AREA_MAX = 5; // höchstens so viele Punkte je Bereich
+const RATING_FACTOR = { 1: 1, 2: 1.5, 3: 2 }; // Bonus, wenn Belege aus 2 bzw. 3 Bereichen kommen
+const STAGE = { beobachten: 1, verdacht: 2, stark: 3, eindeutig: 4 };
+const STAGE_LABEL = { 1: 'Beobachten', 2: 'Verdacht', 3: 'Starker Verdacht', 4: 'Eindeutig' };
+
 const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
 const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
 const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
@@ -686,6 +701,53 @@ function parallelFinding(traces) {
   };
 }
 
+// ---------- Gesamtbewertung ----------
+
+const AREA_OF = Object.fromEntries(Object.entries(RATING_AREAS).flatMap(([area, a]) => a.kinds.map((k) => [k, area])));
+
+/**
+ * Gesamtbewertung eines Spielers (bzw. Konten-Paars) aus seinen offenen Hinweisen. deviceLevel = höchste Stufe eines
+ * offenen Mehrfach-Konten-Hinweises (0 = keiner), zählt zum Bereich Ergebnis.
+ * Liefert { stage, label, score, areas: { verhalten, technik, ergebnis }, reason } oder null ohne offene Hinweise.
+ *   Eindeutig: Belege aus allen drei Bereichen oder Falle (Wahrscheinlich)
+ *   Starker Verdacht: Belege aus mindestens zwei Bereichen, davon einer „Wahrscheinlich“
+ *   Verdacht: ein klares Muster („Wahrscheinlich“) oder schwache Belege aus mehreren Bereichen
+ *   Beobachten: einzelne schwache Hinweise
+ */
+function overallRating(alerts, { deviceLevel = 0 } = {}) {
+  const open = alerts.filter((a) => !a.doneAt);
+  if (!open.length) return null;
+  const levels = { verhalten: [], technik: [], ergebnis: [] };
+  for (const a of open) if (AREA_OF[a.kind]) levels[AREA_OF[a.kind]].push(Math.min(a.level, LEVEL.wahrscheinlich));
+  if (deviceLevel) levels.ergebnis.push(Math.min(deviceLevel, LEVEL.wahrscheinlich));
+  const areas = {};
+  for (const [area, list] of Object.entries(levels)) {
+    if (!list.length) {
+      areas[area] = 0;
+      continue;
+    }
+    const sorted = [...list].sort((x, y) => y - x);
+    areas[area] = Math.min(RATING_AREA_MAX, RATING_POINTS[sorted[0]] + (sorted.length - 1) * RATING_EXTRA);
+  }
+  const hit = Object.keys(areas).filter((k) => areas[k] > 0);
+  const sum = Object.values(areas).reduce((x, y) => x + y, 0);
+  const score = Math.round(sum * (RATING_FACTOR[hit.length] || 1) * 10) / 10;
+  const strong = [...levels.verhalten, ...levels.technik, ...levels.ergebnis].some((l) => l >= LEVEL.wahrscheinlich);
+  const trap = open.some((a) => a.kind === 'falle' && a.level >= LEVEL.wahrscheinlich);
+  let stage = STAGE.beobachten;
+  if (hit.length >= 3 || trap) stage = STAGE.eindeutig;
+  else if (hit.length >= 2 && strong) stage = STAGE.stark;
+  else if (strong || hit.length >= 2) stage = STAGE.verdacht;
+
+  const names = hit.map((k) => RATING_AREAS[k].label);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : names[0] || '';
+  let reason = `Belege aus ${list}`;
+  if (!areas.ergebnis) reason += ', kein Vorteil erkennbar';
+  if (trap) reason += ' – Falle ausgelöst';
+  if (deviceLevel >= LEVEL.wahrscheinlich) reason += ' – auch als Mehrfach-Konto erkannt';
+  return { stage, label: STAGE_LABEL[stage], score, areas, reason };
+}
+
 // ---------- Anzeige im Panel ----------
 
 // Was "count" je Muster zählt
@@ -746,10 +808,11 @@ function extrasOf(details = {}) {
 }
 
 /**
- * Hinweise fürs Panel nach Spieler (bzw. Konten-Paar) bündeln: [{ key, users, alerts, open, level, lastAt }].
- * Gruppen mit offenen Hinweisen zuerst, dann nach höchster offener Stufe und jüngstem Beleg.
+ * Hinweise fürs Panel nach Spieler (bzw. Konten-Paar) bündeln: [{ key, users, alerts, open, level, lastAt, rating }].
+ * deviceLevels: Map userId → höchste Stufe eines offenen Mehrfach-Konten-Hinweises (für die Gesamtbewertung).
+ * Gruppen mit offenen Hinweisen zuerst, dann nach Gesamtbewertung, Punkten und jüngstem Beleg.
  */
-function groupAlerts(alerts) {
+function groupAlerts(alerts, deviceLevels = new Map()) {
   const groups = new Map();
   for (const a of alerts) {
     const key = a.users.map((u) => String(u._id)).sort().join(':');
@@ -759,8 +822,12 @@ function groupAlerts(alerts) {
   return [...groups.values()]
     .map((g) => {
       const open = g.alerts.filter((a) => !a.doneAt);
+      // Mehrfach-Konto zählt nur bei einem einzelnen Spieler – bei einem Konten-Paar (Wertverschiebung) beträfe es
+      // womöglich ein ganz anderes Konto; ob das Paar selbst ein Mehrfach-Konto ist, steht schon im Hinweis
+      const deviceLevel = g.users.length === 1 ? deviceLevels.get(String(g.users[0]._id)) || 0 : 0;
       return {
         ...g,
+        rating: overallRating(g.alerts, { deviceLevel }),
         open: open.length,
         level: Math.max(0, ...open.map((a) => a.level)),
         lastAt: new Date(Math.max(...g.alerts.map((a) => toMs(a.evidenceAt)))),
@@ -768,7 +835,7 @@ function groupAlerts(alerts) {
         alerts: [...g.alerts].sort((x, y) => Boolean(x.doneAt) - Boolean(y.doneAt) || y.level - x.level || toMs(y.evidenceAt) - toMs(x.evidenceAt)),
       };
     })
-    .sort((x, y) => (y.open > 0) - (x.open > 0) || y.level - x.level || toMs(y.lastAt) - toMs(x.lastAt));
+    .sort((x, y) => (y.open > 0) - (x.open > 0) || (y.rating ? y.rating.stage : 0) - (x.rating ? x.rating.stage : 0) || (y.rating ? y.rating.score : 0) - (x.rating ? x.rating.score : 0) || toMs(y.lastAt) - toMs(x.lastAt));
 }
 
 module.exports = {
@@ -804,4 +871,8 @@ module.exports = {
   factsOf,
   extrasOf,
   groupAlerts,
+  overallRating,
+  RATING_AREAS,
+  STAGE,
+  STAGE_LABEL,
 };

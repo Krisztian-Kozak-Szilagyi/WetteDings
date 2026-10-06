@@ -145,7 +145,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     needsSub('moderation', 'streit') ? disputeList(me) : [],
     needsSub('moderation', 'meldungen') ? openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
-    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.list() : [],
+    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
     needs('team') ? listActiveCodes() : [],
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
@@ -180,7 +180,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     noteMax: betService.NOTE_MAX,
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
-    suspicionGroups: suspicionService.groups(suspicions),
+    suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',

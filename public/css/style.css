@@ -703,6 +703,20 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .susp-stat-label { font-size: 12px; color: var(--muted); }
 .susp-stat-likely .susp-stat-value { color: #f59e0b; }
 .susp-stat-sure .susp-stat-value { color: var(--nein); }
+/* Gesamtbewertung: 4 eindeutig, 3 starker Verdacht, 2 Verdacht, 1 beobachten */
+.susp-stage-4 { --susp: var(--nein); }
+.susp-stage-3 { --susp: #f97316; }
+.susp-stage-2 { --susp: #f59e0b; }
+.susp-stage-1, .susp-stage-0 { --susp: var(--color-neutral-500); }
+.susp-rating { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; padding: 12px 18px; background: color-mix(in srgb, var(--susp) 7%, transparent); border-bottom: 1px solid var(--color-neutral-800); }
+.susp-rating-main { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; min-width: 0; }
+.susp-rating-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.susp-rating-reason { font-size: 13px; color: color-mix(in srgb, var(--color-text) 82%, transparent); }
+.susp-rating-areas { display: flex; gap: 14px; flex-wrap: wrap; }
+.susp-area { display: flex; flex-direction: column; gap: 4px; min-width: 92px; font-size: 11px; color: var(--muted); }
+.susp-area.is-hit .susp-area-name { color: var(--color-text); }
+.susp-area-bar { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 10%, transparent); overflow: hidden; }
+.susp-area-bar i { display: block; height: 100%; border-radius: 2px; background: var(--susp); }
 .susp-empty { margin: 0; padding: 14px 18px; font-size: 13px; }
 /* Mehrfach-Konten: gemeinsames Gerät, Anmeldungen beider Konten nebeneinander */
 .dev-shared { grid-template-columns: 1fr; }

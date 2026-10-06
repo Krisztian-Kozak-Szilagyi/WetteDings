@@ -13,6 +13,7 @@ const { DungeonRun } = require('../models/Dungeon');
 const { GradingJob } = require('../models/Grading');
 const ScriptSignal = require('../models/ScriptSignal');
 const ActionTrace = require('../models/ActionTrace');
+const { DeviceAlert } = require('../models/Device');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
@@ -256,8 +257,21 @@ async function scan(now = new Date()) {
   }
 }
 
-/** Offene Hinweise ab "wahrscheinlich" – für das Abzeichen am Admin-Menüpunkt (wie deviceService.alertCount) */
-const openCount = () => SuspicionAlert.countDocuments({ doneAt: null, level: { $gte: deviceLogic.LEVEL.wahrscheinlich } });
+/** Höchste Stufe offener Mehrfach-Konten-Hinweise je Konto: Map userId → Stufe (für die Gesamtbewertung) */
+async function deviceLevels() {
+  const alerts = await DeviceAlert.find({ doneAt: null }).select('users level').lean();
+  const out = new Map();
+  for (const a of alerts) for (const u of a.users) out.set(String(u), Math.max(out.get(String(u)) || 0, a.level));
+  return out;
+}
+
+/** Spieler (bzw. Konten-Paare) mit Gesamtbewertung ab "Verdacht" – für das Abzeichen am Admin-Menüpunkt */
+async function openCount() {
+  const alerts = await SuspicionAlert.find({ doneAt: null }).select('kind level users evidenceAt').lean();
+  if (!alerts.length) return 0;
+  const groups = logic.groupAlerts(alerts.map((a) => ({ ...a, users: a.users.map((id) => ({ _id: id })) })), await deviceLevels());
+  return groups.filter((g) => g.rating && g.rating.stage >= logic.STAGE.verdacht).length;
+}
 
 /** Hinweise fürs Panel: offene zuerst, dann nach Stufe und Zeit; mit Namen und Link ins passende Protokoll */
 async function list() {
@@ -284,6 +298,12 @@ async function list() {
     .filter(Boolean);
 }
 
+/** Hinweise fürs Panel, gebündelt je Spieler mit Gesamtbewertung (siehe suspicionLogic.groupAlerts) */
+async function listGroups() {
+  const [alerts, levels] = await Promise.all([list(), deviceLevels()]);
+  return logic.groupAlerts(alerts, levels);
+}
+
 /** Mehrere Hinweise auf einmal erledigen bzw. wieder öffnen ("Alle erledigt" je Spieler) */
 async function setDoneMany(ids, done, actor) {
   for (const id of ids) await setDone(id, done, actor);
@@ -296,4 +316,4 @@ async function setDone(id, done, actor) {
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen */
 const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId })]);
 
-module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, groups: logic.groupAlerts, setDone, setDoneMany, forgetUser };
+module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, listGroups, setDone, setDoneMany, forgetUser };

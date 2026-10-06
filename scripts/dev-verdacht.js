@@ -229,6 +229,8 @@ async function main() {
     const alerts = await SuspicionAlert.find({ users: skript._id }).select('kind action level').lean();
     console.log(`Scan: ${found} Funde, davon ${alerts.length} für den verdächtigen Spieler "${skript.username}":`);
     for (const a of alerts) console.log(`  - ${a.kind}${a.action ? ` (${a.action})` : ''}: ${a.level === 2 ? 'Wahrscheinlich' : 'Möglich'}`);
+    const group = (await suspicionService.listGroups()).find((g) => g.users.length === 1 && String(g.users[0]._id) === String(skript._id));
+    if (group && group.rating) console.log(`Gesamtbewertung: ${group.rating.label} – ${group.rating.reason}`);
     console.log(`Ansehen: http://127.0.0.1:3000/admin?bereich=moderation (als admin / test1234). Anmeldung als "${skript.username}" oder "${zweit.username}" ebenfalls mit test1234.`);
   } finally {
     await mongoose.disconnect();

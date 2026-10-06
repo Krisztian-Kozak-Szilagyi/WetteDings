@@ -105,7 +105,7 @@ function createApp() {
     betDisputes: 0, // strittige Wetten (nur für Devs/Admins)
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
     tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
-    suspicionAlerts: 0, // offene Hinweise der Manipulationserkennung (Admin und Devs)
+    suspicionAlerts: 0, // Spieler mit Gesamtbewertung ab "Verdacht" (Manipulationserkennung, Admin und Devs)
     bellNotes: [], // Glocke: Benachrichtigungen (ungelesene und die neuesten gelesenen)
     bellUnread: 0,
     deviceProbe: false,
@@ -176,7 +176,7 @@ function createApp() {
         u.isAdmin ? require('./routes/admin').packLogNewCount(u) : 0, // nur Admin: Pack-Vergaben der Devs
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
-        u.isStaff ? suspicionService.openCount() : 0, // Admin und Devs: Verdacht auf Skript oder Wertverschiebung
+        u.isStaff ? suspicionService.openCount() : 0, // Admin und Devs: Spieler mit Verdacht auf Skript oder Wertverschiebung
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
         giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
