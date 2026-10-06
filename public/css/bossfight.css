@@ -106,7 +106,7 @@ html, body.bf-body {
 .bf-player {
   position: absolute;
   left: 22px;
-  bottom: 22px;
+  bottom: 70px;
   width: 170px;
   display: grid;
   justify-items: start;
@@ -115,9 +115,8 @@ html, body.bf-body {
 .bf-avatar {
   width: 84px;
   height: 84px;
-  border-radius: 50%;
-  background: #1b1622;
-  box-shadow: 0 0 0 3px rgba(217, 164, 65, .8), 0 8px 20px rgba(0, 0, 0, .6);
+  border-radius: 8px;
+  object-fit: cover;
 }
 .bf-player-name {
   font-size: 14px;
@@ -186,47 +185,26 @@ html, body.bf-body {
   box-shadow: 0 8px 22px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .14);
 }
 .bf-card-back { background: #1b1622 url('/img/tcg-backs/season-1.webp') center / cover; transform: rotateY(180deg); }
-.bf-card-front {
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  box-sizing: border-box;
-  background:
-    radial-gradient(120% 70% at 50% 0%, rgba(217, 164, 65, .18), transparent 60%),
-    linear-gradient(180deg, #2b2236, #15111b);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .65), inset 0 0 0 2px rgba(217, 164, 65, .55);
-}
-.bf-card-cost {
+.bf-card-front { background: #15111b; overflow: hidden; }
+.bf-card-front img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bf-hand-hint {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(circle at 35% 30%, #6fb6ff, #1d4f9a);
-  box-shadow: 0 0 0 2px #0d0b14;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(13, 11, 20, .8);
   font-size: 14px;
-  font-weight: 800;
+  pointer-events: auto;
 }
-.bf-card-art {
-  flex: 1;
-  margin: 14px 0 8px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, .35);
-  font-size: calc(var(--card-h) * .2);
-}
-.bf-card-name { font-size: 13px; font-weight: 800; text-align: center; }
-.bf-card-text { margin-top: 3px; font-size: 11px; color: #b9b0cc; text-align: center; }
+.bf-hand-hint a { color: #f3cf7a; }
 /* Karte unter der Maus hebt sich aus dem Fächer */
 .bf-card:hover { z-index: 50 !important; }
 .bf-card:hover .bf-card-inner { translate: 0 -28px; }
 
 @media (max-width: 700px) {
-  .bf-player { width: 120px; left: 12px; bottom: 12px; }
+  .bf-player { width: 120px; left: 12px; bottom: 40px; }
   .bf-avatar { width: 56px; height: 56px; }
   .bf-deck { right: 14px; bottom: 14px; }
 }

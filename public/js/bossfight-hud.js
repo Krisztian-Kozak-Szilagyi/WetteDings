@@ -1,4 +1,5 @@
-// Bosskampf-Oberfläche: Lebensbalken (Boss 200, Spieler 100), Platzhalter-Deck rechts, beim Start 5 Karten in die Hand.
+// Bosskampf-Oberfläche: Lebensbalken (Boss 200, Spieler 100), eigenes Deck rechts (zuletzt geändertes aus /api/deck),
+// beim Start 5 Karten in die Hand.
 // Zum Ausprobieren in der Konsole: bossfight.boss.damage(30), bossfight.player.damage(10), bossfight.player.heal(5), bossfight.draw(1)
 (function () {
   var hand = document.querySelector('[data-bf-hand]');
@@ -46,21 +47,22 @@
   var boss = HpBar(document.querySelector('[data-bf-hp="boss"]'));
   var player = HpBar(document.querySelector('[data-bf-hp="player"]'));
 
-  // ---------- Platzhalter-Deck ----------
-  var VORLAGEN = [
-    { name: 'Hieb', text: '6 Schaden', cost: 1, icon: '⚔️' },
-    { name: 'Block', text: '5 Rüstung', cost: 1, icon: '🛡️' },
-    { name: 'Feuerball', text: '12 Schaden', cost: 2, icon: '🔥' },
-    { name: 'Heiltrank', text: '8 Leben', cost: 1, icon: '🧪' },
-    { name: 'Giftpfeil', text: '3 Gift', cost: 1, icon: '🏹' },
-  ];
-  var deck = [];
-  for (var i = 0; i < 30; i++) deck.push(VORLAGEN[i % VORLAGEN.length]);
-  for (var j = deck.length - 1; j > 0; j--) {
-    var r = Math.floor(Math.random() * (j + 1));
-    var tmp = deck[j];
-    deck[j] = deck[r];
-    deck[r] = tmp;
+  // ---------- Deck ----------
+  var deck = []; // Karten als { id, name, image }, oben = Ende
+  function shuffle(list) {
+    for (var j = list.length - 1; j > 0; j--) {
+      var r = Math.floor(Math.random() * (j + 1));
+      var tmp = list[j];
+      list[j] = list[r];
+      list[r] = tmp;
+    }
+    return list;
+  }
+  function hint(html) {
+    var p = document.createElement('p');
+    p.className = 'bf-hand-hint';
+    p.innerHTML = html;
+    hand.appendChild(p);
   }
   var cards = []; // Karten in der Hand (DOM)
 
@@ -75,13 +77,12 @@
     el.className = 'bf-card bf-flipped';
     el.innerHTML =
       '<div class="bf-card-inner">' +
-      '<div class="bf-card-face bf-card-front"><span class="bf-card-cost"></span><div class="bf-card-art"></div>' +
-      '<div class="bf-card-name"></div><div class="bf-card-text"></div></div>' +
+      '<div class="bf-card-face bf-card-front"><img alt="" draggable="false"></div>' +
       '<div class="bf-card-face bf-card-back"></div></div>';
-    el.querySelector('.bf-card-cost').textContent = c.cost;
-    el.querySelector('.bf-card-art').textContent = c.icon;
-    el.querySelector('.bf-card-name').textContent = c.name;
-    el.querySelector('.bf-card-text').textContent = c.text;
+    var img = el.querySelector('img');
+    img.src = c.image;
+    img.alt = c.name;
+    el.title = c.name;
     return el;
   }
 
@@ -129,7 +130,33 @@
 
   window.addEventListener('resize', layout);
   updateDeck();
-  setTimeout(function () { draw(5); }, 400);
+
+  // Zuletzt geändertes Deck laden, Karten nach Anzahl auffächern und mischen
+  fetch('/api/deck', { headers: { Accept: 'application/json' } })
+    .then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var byId = new Map(data.pool.map(function (c) { return [c.id, c]; }));
+      var decks = data.decks.slice().sort(function (a, b) { return new Date(b.updatedAt) - new Date(a.updatedAt); });
+      var d = decks[0];
+      if (!d || !d.cards.length) {
+        hint('Du hast noch kein Deck. <a href="/deck">Deck bauen</a>');
+        return;
+      }
+      d.cards.forEach(function (e) {
+        var c = byId.get(e.card);
+        if (!c) return;
+        for (var k = 0; k < e.n; k++) deck.push(c);
+      });
+      shuffle(deck);
+      updateDeck();
+      setTimeout(function () { draw(5); }, 300);
+    })
+    .catch(function () {
+      hint('Das Deck konnte nicht geladen werden.');
+    });
 
   window.bossfight = { boss: boss, player: player, draw: draw };
 })();
