@@ -18,7 +18,8 @@ test('Zustand: Mängel im Format der Grading-Aufträge, Note folgt aus den Mäng
     assert.equal(c.grade, gradeFor(c.defects));
     assert.ok(c.grade >= 1 && c.grade <= 10);
     assert.deepEqual(Object.keys(c.defects).sort(), ['centering', 'corners', 'crease', 'edges', 'scratches']);
-    for (const axis of ['lr', 'tb']) assert.ok(c.defects.centering[axis] >= 50 && c.defects.centering[axis] <= 80);
+    assert.deepEqual(Object.keys(c.defects.centering), ['lr']); // nur links/rechts (Version 2)
+    assert.ok(c.defects.centering.lr >= 50 && c.defects.centering.lr <= 80);
     // passt 1:1 in einen Grading-Auftrag (Grundlage für "eigene Karte in den Shop schicken")
     const job = new GradingJob({ user: '64b000000000000000000000', day: '2026-10-05', level: 1, card: 'x', customer: 'K', grade: c.grade, defects: c.defects });
     assert.equal(job.validateSync(), undefined);
@@ -92,25 +93,26 @@ test('Versatz auf der Folie: Stärke aus der Zentrierung, Richtung fest aus dem 
   const { centerShift } = condition;
   assert.equal(centerShift(undefined, 'abc'), null);
   assert.deepEqual(centerShift({ lr: 50, tb: 50 }, '6abf00'), { x: 0, y: 0 });
-  const a = centerShift({ lr: 80, tb: 60 }, '6abf00'); // Bits 00: beide positiv
-  assert.deepEqual(a, { x: 0.6, y: 0.2 });
-  const b = centerShift({ lr: 80, tb: 60 }, '6abf03'); // Bits 11: beide negativ
-  assert.deepEqual(b, { x: -0.6, y: -0.2 });
+  const a = centerShift({ lr: 80, tb: 60 }, '6abf00'); // Bit 0 aus: nach rechts; oben/unten (alte Zustände) zählt nicht
+  assert.deepEqual(a, { x: 0.6, y: 0 });
+  const b = centerShift({ lr: 80, tb: 60 }, '6abf03'); // Bit 0 an: nach links
+  assert.deepEqual(b, { x: -0.6, y: 0 });
   assert.deepEqual(centerShift({ lr: 80, tb: 60 }, '6abf00'), a); // dasselbe Exemplar sieht immer gleich aus
   for (let i = 0; i < 200; i++) {
     const s = centerShift(rollCondition().defects.centering, i.toString(16));
-    assert.ok(Math.abs(s.x) <= 0.6 && Math.abs(s.y) <= 0.6); // höchstens 80/20
+    assert.ok(Math.abs(s.x) <= 0.6 && s.y === 0); // höchstens 80/20, nur waagerecht
   }
 });
 
-test('Erst Obergrenze (Knick, Zentrierung – schlechtere Achse zählt), dann je Mangel −1', () => {
+test('Erst Obergrenze (Knick, Zentrierung – nur links/rechts zählt), dann je Mangel −1', () => {
   const { centeringCap } = condition;
   const none = { scratches: [], corners: [], edges: [], crease: false };
   assert.equal(centeringCap(undefined), 10); // alte Aufträge ohne Zentrierung
   assert.equal(centeringCap({ lr: 55, tb: 50 }), 10);
-  assert.equal(centeringCap({ lr: 52, tb: 58 }), 9);
+  assert.equal(centeringCap({ lr: 52, tb: 58 }), 10); // oben/unten (alte Zustände) zählt nicht mehr
+  assert.equal(centeringCap({ lr: 58 }), 9);
   assert.equal(centeringCap({ lr: 65, tb: 50 }), 8);
-  assert.equal(centeringCap({ lr: 70, tb: 70 }), 7);
+  assert.equal(centeringCap({ lr: 70, tb: 80 }), 7);
   assert.equal(centeringCap({ lr: 80, tb: 50 }), 6);
   assert.equal(gradeFor({ ...none, centering: { lr: 62, tb: 51 } }), 8); // makellos, aber 62/38
   assert.equal(gradeFor({ ...none, scratches: [{}, {}, {}], centering: { lr: 62, tb: 51 } }), 5); // erst Obergrenze 8, dann −3

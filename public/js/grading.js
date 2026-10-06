@@ -268,17 +268,16 @@
   }
 
   // ---------- Messen (Zentrierung) ----------
-  // Vier Messlinien auf der Vorderseite. Wer sie an die Kanten des Kartenbilds zieht, liest die Ränder in mm
-  // (Kartenformat 63 × 88 mm) und das Verhältnis ab – geschätzt wird nichts, messen muss man aber selbst.
-  // Die Linien starten bewusst nicht am Bildrand.
-  var CARD_MM = { w: 63, h: 88 };
-  var guides = { l: 0.1, r: 0.9, t: 0.08, b: 0.92 };
-  var activeX = 'l';
-  var activeY = 't';
+  // Zwei Messlinien auf der Vorderseite (nur links/rechts – für die Note zählt nur die seitliche Zentrierung).
+  // Wer sie an die Kanten des Kartenbilds zieht, liest die Ränder in mm (Kartenbreite 63 mm) und das Verhältnis ab –
+  // geschätzt wird nichts, messen muss man aber selbst. Die Linien starten bewusst nicht am Bildrand.
+  var CARD_MM = 63;
+  var guides = { l: 0.1, r: 0.9 };
+  var active = 'l';
   var readout = bench.querySelector('[data-gr-measure-read]');
   var measureBox = el('div', 'gr-measure', front);
   var guideEls = {};
-  ['l', 'r', 't', 'b'].forEach(function (k) { guideEls[k] = el('div', 'gr-guide gr-guide-' + k, measureBox); });
+  ['l', 'r'].forEach(function (k) { guideEls[k] = el('div', 'gr-guide gr-guide-' + k, measureBox); });
   var mm = function (v) { return v.toFixed(1).replace('.', ',') + ' mm'; };
   function ratio(a, b) {
     if (a + b <= 0) return '–';
@@ -288,46 +287,32 @@
   function renderGuides() {
     guideEls.l.style.left = (guides.l * 100).toFixed(2) + '%';
     guideEls.r.style.left = (guides.r * 100).toFixed(2) + '%';
-    guideEls.t.style.top = (guides.t * 100).toFixed(2) + '%';
-    guideEls.b.style.top = (guides.b * 100).toFixed(2) + '%';
-    Object.keys(guideEls).forEach(function (k) { guideEls[k].classList.toggle('is-active', k === activeX || k === activeY); });
-    var l = guides.l * CARD_MM.w;
-    var r = (1 - guides.r) * CARD_MM.w;
-    var t = guides.t * CARD_MM.h;
-    var b = (1 - guides.b) * CARD_MM.h;
+    Object.keys(guideEls).forEach(function (k) { guideEls[k].classList.toggle('is-active', k === active); });
+    var l = guides.l * CARD_MM;
+    var r = (1 - guides.r) * CARD_MM;
     readout.innerHTML = '';
-    var rowX = el('div', 'gr-measure-row', readout);
-    el('span', '', rowX).textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
-    el('b', '', rowX).textContent = ratio(l, r);
-    var rowY = el('div', 'gr-measure-row', readout);
-    el('span', '', rowY).textContent = 'Oben ' + mm(t) + ' · Unten ' + mm(b);
-    el('b', '', rowY).textContent = ratio(t, b);
+    var row = el('div', 'gr-measure-row', readout);
+    el('span', '', row).textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
+    el('b', '', row).textContent = ratio(l, r);
   }
-  // Linie auf eine Position setzen; links/oben bleiben in der linken/oberen Hälfte, rechts/unten in der anderen
+  // Linie auf eine Position setzen; die linke bleibt in der linken Hälfte, die rechte in der anderen
   function setGuide(k, v) {
-    guides[k] = k === 'l' || k === 't' ? clamp(v, 0, 0.499) : clamp(v, 0.501, 1);
-    if (k === 'l' || k === 'r') activeX = k;
-    else activeY = k;
+    guides[k] = k === 'l' ? clamp(v, 0, 0.499) : clamp(v, 0.501, 1);
+    active = k;
     renderGuides();
   }
-  /** Position des Zeigers auf der Vorderseite (0 … 1) – die Karte liegt beim Messen flach */
-  function onFront(x, y) {
+  /** Waagerechte Position des Zeigers auf der Vorderseite (0 … 1) – die Karte liegt beim Messen flach */
+  function onFront(x) {
     var r = front.getBoundingClientRect();
-    return { x: (x - r.left) / r.width, y: (y - r.top) / r.height, w: r.width, h: r.height };
+    return (x - r.left) / r.width;
   }
   /** Die Linie, die dem Zeiger am nächsten ist, greifen */
-  function pickGuide(x, y) {
-    var p = onFront(x, y);
-    var best = null;
-    ['l', 'r', 't', 'b'].forEach(function (k) {
-      var d = k === 'l' || k === 'r' ? Math.abs(p.x - guides[k]) * p.w : Math.abs(p.y - guides[k]) * p.h;
-      if (!best || d < best.d) best = { k: k, d: d };
-    });
-    return best.k;
+  function pickGuide(x) {
+    var p = onFront(x);
+    return Math.abs(p - guides.l) <= Math.abs(p - guides.r) ? 'l' : 'r';
   }
-  function moveGuide(k, x, y) {
-    var p = onFront(x, y);
-    setGuide(k, k === 'l' || k === 'r' ? p.x : p.y);
+  function moveGuide(k, x) {
+    setGuide(k, onFront(x));
   }
 
   // ---------- Zeiger ----------
@@ -341,8 +326,8 @@
     stage.classList.add('is-pressed');
     hint.classList.add('is-gone');
     if (mode === 'measure') {
-      drag.guide = pickGuide(e.clientX, e.clientY);
-      moveGuide(drag.guide, e.clientX, e.clientY);
+      drag.guide = pickGuide(e.clientX);
+      moveGuide(drag.guide, e.clientX);
       return;
     }
     tween = null;
@@ -352,7 +337,7 @@
   stage.addEventListener('pointermove', function (e) {
     if (!drag) return;
     if (mode === 'measure') {
-      if (drag.guide) moveGuide(drag.guide, e.clientX, e.clientY);
+      if (drag.guide) moveGuide(drag.guide, e.clientX);
       return;
     }
     var dx = e.clientX - drag.x;
@@ -379,7 +364,7 @@
   stage.addEventListener('pointercancel', endDrag);
   stage.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-  // Tastatur: Pfeiltasten drehen (beim Messen: Linien fein verschieben, mit Umschalt in größeren Schritten),
+  // Tastatur: Pfeiltasten drehen (beim Messen: links/rechts die Linie fein verschieben, mit Umschalt in größeren Schritten),
   // D/P/M wechseln das Werkzeug
   stage.tabIndex = 0;
   stage.addEventListener('keydown', function (e) {
@@ -388,10 +373,10 @@
     if (e.key === 'm' || e.key === 'M') return setMode('measure');
     if (mode === 'measure') {
       var stepV = e.shiftKey ? 0.01 : 0.001;
-      var nudge = { ArrowLeft: [activeX, -stepV], ArrowRight: [activeX, stepV], ArrowUp: [activeY, -stepV], ArrowDown: [activeY, stepV] }[e.key];
+      var nudge = { ArrowLeft: -stepV, ArrowRight: stepV }[e.key];
       if (!nudge) return;
       e.preventDefault();
-      return setGuide(nudge[0], guides[nudge[0]] + nudge[1]);
+      return setGuide(active, guides[active] + nudge);
     }
     var map = { ArrowLeft: [0, -12], ArrowRight: [0, 12], ArrowUp: [12, 0], ArrowDown: [-12, 0] };
     if (!map[e.key]) return;
@@ -408,7 +393,7 @@
     grade: {
       clean: 'Putzen: mit gedrückter Maustaste reiben',
       rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom',
-      measure: 'Messen: Linien an die Kanten des Kartenbilds ziehen · Pfeiltasten = fein · Mausrad = Zoom',
+      measure: 'Messen: Linien an den linken und rechten Rand des Kartenbilds ziehen · Pfeiltasten ←→ = fein · Mausrad = Zoom',
     },
     slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
     send: { clean: 'Fertig – ab zum Kunden!', rotate: 'Fertig – ab zum Kunden!' },
@@ -469,7 +454,7 @@
     if ((d.corners || []).length) minus.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
     if ((d.edges || []).length) minus.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
     var c = d.centering;
-    var worst = c ? Math.max(c.lr || 50, c.tb || 50) : 50;
+    var worst = c ? c.lr || 50 : 50; // nur links/rechts zählt
     if (worst > 55) card.classList.add('is-offcenter');
     var capBy = d.crease && 4 <= job.centerCap ? 'Knick' : job.centerCap < 10 ? 'Zentrierung ' + worst + '/' + (100 - worst) : '';
     var cap = d.crease ? Math.min(4, job.centerCap) : job.centerCap;
