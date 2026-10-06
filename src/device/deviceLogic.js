@@ -108,16 +108,18 @@ function usedInParallel(a, b) {
  * Wie sicher ist es, dass zwei Geräte-Einträge dasselbe Gerät sind?
  * Gleiches Cookie = sicher. Gleicher Fingerabdruck und gleiche IP = wahrscheinlich – aber nur, wenn die beiden
  * Einträge nacheinander benutzt wurden (typisch: Cookie gelöscht, neues Konto) und die Kombination nicht von vielen
- * Konten stammt. Laufen beide parallel oder teilen sich viele Konten Fingerabdruck und Netz, sind das baugleiche
- * Geräte im selben WLAN (#89) – dann wie ein gleicher Fingerabdruck ohne gemeinsame IP nur möglich. Dasselbe gilt für
- * eine IP, die viele Konten benutzen (Schulnetz): zwei baugleiche Handys einer Klasse sind keine Person.
+ * Konten stammt. Laufen beide parallel, ist es nur möglich (z. B. Geschwister mit demselben Handymodell, #89).
+ * Ohne eine solche gemeinsame IP ist der Fingerabdruck allein kein Beleg: baugleiche Geräte (Schul-PCs mit demselben
+ * Image, dasselbe Handymodell) haben denselben. Das gilt auch für fp|ip-Kombinationen vieler Konten (#89) und für
+ * IPs, die viele Konten benutzen (Schulnetz) – dann gibt es keinen Hinweis.
  * common = Set aus commonPrints() und crowdedNets().
  */
 function matchLevel(a, b, common = new Set()) {
   if (a.deviceId && a.deviceId === b.deviceId) return LEVEL.sicher;
   if (!a.fp || a.fp !== b.fp) return 0;
   const shared = (a.ips || []).filter((ip) => (b.ips || []).includes(ip) && !common.has(printKey(a.fp, ip)) && !common.has(netKey(ip)));
-  return shared.length && !usedInParallel(a, b) ? LEVEL.wahrscheinlich : LEVEL.moeglich;
+  if (!shared.length) return 0;
+  return usedInParallel(a, b) ? LEVEL.moeglich : LEVEL.wahrscheinlich;
 }
 
 /** Stärkster Treffer zwischen den Geräten zweier Konten (0 = keiner) */
