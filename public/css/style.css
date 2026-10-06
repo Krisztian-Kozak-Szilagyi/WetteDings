@@ -3708,6 +3708,25 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-round:hover { border-color: var(--color-accent); }
 .gr-hint { bottom: 14px; max-width: 70%; padding: 7px 14px; font-size: 12px; color: var(--color-neutral-200); background: rgba(10, 10, 20, .6); }
 @media (max-width: 560px) { .gr-hint { max-width: calc(100% - 24px); } }
+.gr-mode[hidden] { display: none; }
+
+/* Messen (Zentrierung): Messlinien auf der Vorderseite, Anzeige der Ränder unten auf der Bühne */
+.gr-stage.mode-measure { cursor: crosshair; }
+.gr-measure { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: none; }
+.gr-stage.mode-measure .gr-measure { display: block; }
+.gr-guide { position: absolute; background: #22d3ee; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45); opacity: .85; }
+.gr-guide-l, .gr-guide-r { top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+.gr-guide-t, .gr-guide-b { left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+.gr-guide.is-active { background: #facc15; opacity: 1; }
+.gr-measure-read {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3; pointer-events: none;
+  display: grid; gap: 2px; padding: 7px 12px; border-radius: var(--radius-md, 8px); width: max-content; max-width: calc(100% - 24px);
+  font: 500 12px var(--font); color: var(--color-neutral-200); background: rgba(10, 10, 20, .75); border: 1px solid var(--color-neutral-700);
+}
+.gr-measure-read[hidden] { display: none; }
+.gr-measure-row { display: flex; justify-content: space-between; gap: 14px; }
+.gr-measure-row b { color: #facc15; font-variant-numeric: tabular-nums; }
+.gr-stage.mode-measure .gr-hint { bottom: 70px; }
 
 /* Slab-Etikett im BfW-Lila */
 .gr-slab-label { background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 0 rgba(255, 255, 255, .6); font-weight: 600; }
