@@ -16,7 +16,6 @@ const forumRoutes = require('./routes/forum');
 const forumService = require('./forum/forumService');
 const groupService = require('./services/groupService');
 const roles = require('./services/roles');
-const { systemAuthor } = require('./forum/systemAuthors');
 const betService = require('./services/betService');
 const deviceService = require('./device/deviceService');
 const suspicionService = require('./moderation/suspicionService');
@@ -111,7 +110,6 @@ function createApp() {
     bellUnread: 0,
     deviceProbe: false,
     roleBadge: roles.roleBadge,
-    forumAvatar: (name) => (systemAuthor(name) ? systemAuthor(name).avatar : '/img/avatar-placeholder.svg'), // Forum: Bild neben dem Beitrag
     userLink: roles.userLink, // Name als Profil-Link samt Zusätzen // Abzeichen neben Namen (Admin rot, Dev grün)
     currentPath: '',
     flash: null,
