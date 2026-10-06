@@ -281,6 +281,16 @@ html, body.bf-body {
 /* Boss greift an: kurzes rotes Aufflackern am Rand */
 .bf-boss-attack .bf-hud { box-shadow: inset 0 0 120px rgba(200, 20, 20, .45); transition: box-shadow .15s; }
 
+/* Effekt-Ebene (public/js/bossfight-fx.js): über Boss und Oberfläche, unter den Schadenszahlen */
+.bf-fx {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 90;
+  pointer-events: none;
+}
+
 /* aufsteigende Schadenszahl */
 .bf-pop {
   position: fixed;
@@ -296,6 +306,7 @@ html, body.bf-body {
 }
 .bf-pop-boss { color: #f3cf7a; }
 .bf-pop-player { color: #ff7a6e; font-size: 20px; }
+.bf-pop-gross { font-size: 40px; }
 @keyframes bf-pop {
   from { opacity: 1; margin-top: 0; }
   to { opacity: 0; margin-top: -50px; }
