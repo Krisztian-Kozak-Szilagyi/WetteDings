@@ -3729,6 +3729,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-measure-row { display: flex; justify-content: space-between; gap: 14px; }
 .gr-measure-row b { color: #facc15; font-variant-numeric: tabular-nums; }
 .gr-stage.mode-measure .gr-hint { bottom: 70px; }
+.gr-measure-cap { margin-top: 2px; color: #facc15; font-weight: 600; }
 
 /* Slab-Etikett im BfW-Lila */
 .gr-slab-label { background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 0 rgba(255, 255, 255, .6); font-weight: 600; }

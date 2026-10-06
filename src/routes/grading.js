@@ -3,6 +3,13 @@ const { requireLogin } = require('../middleware');
 const grading = require('../grading/gradingService');
 const catalog = require('../tcg/catalog');
 const { centerShift, centeringCap, CENTERING } = require('../grading/condition');
+
+// Zentrierungs-Bereiche fürs Benoten: { from, to, cap } in % der breiteren Seite, beide Grenzen eingeschlossen
+const ratio = (v) => `${v}/${100 - v}`;
+const centeringScale = CENTERING.map((c, i) => {
+  const from = i === 0 ? 50 : CENTERING[i - 1].max + 1;
+  return { from, to: c.max, fromLabel: ratio(from), toLabel: ratio(c.max), cap: c.cap };
+});
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -31,8 +38,9 @@ router.get('/grading', async (req, res) => {
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
     // Für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server
-    // Zentrierung → Höchstnote für die Regeln beim Benoten, z. B. "55/45" → 10, …, "darüber" → 6
-    centeringScale: CENTERING.map((c, i) => ({ label: i === CENTERING.length - 1 ? 'darüber' : `${c.max}/${100 - c.max}`, cap: c.cap })),
+    // Zentrierung → Höchstnote für die Regeln beim Benoten, als Bereiche mit beiden Grenzen (beide eingeschlossen):
+    // 50/50–55/45 → 10, 56/44–60/40 → 9, … – so ist z. B. 59/41 eindeutig (→ 9)
+    centeringScale,
     jobData: job
       ? {
           steps: grading.levelInfo(job.level).steps,
@@ -44,6 +52,7 @@ router.get('/grading', async (req, res) => {
           // Zentrierung: sichtbarer Versatz (Rand ungleich breit) und für die Auflösung die Höchstnote
           center: centerShift(job.defects && job.defects.centering, job._id),
           centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
+          centerScale: centeringScale.map(({ from, to, cap }) => ({ from, to, cap })), // fürs Messwerkzeug: Bereich → Höchstnote
           minMs: job.spots.length * grading.MS_PER_SPOT,
           startedAt: new Date(job.createdAt).getTime(),
           // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen

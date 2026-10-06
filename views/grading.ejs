@@ -114,7 +114,7 @@
                     <div class="gr-cap-center">
                       <small>Zentrierung <span>– Rand ungleich breit</span></small>
                       <ol class="gr-center-scale">
-                        <% centeringScale.forEach((c) => { %><li><span><%= c.label %></span><b><%= c.cap %></b></li><% }) %>
+                        <% centeringScale.forEach((c) => { %><li title="<%= c.fromLabel %> bis einschließlich <%= c.toLabel %>"><span><%= c.fromLabel %>–</span><span><%= c.toLabel %></span><b><%= c.cap %></b></li><% }) %>
                       </ol>
                     </div>
                   </div>
