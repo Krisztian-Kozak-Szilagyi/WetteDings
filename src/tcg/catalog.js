@@ -52,7 +52,11 @@ const TOTAL_WEIGHT = RARITIES.reduce((s, r) => s + r.weight, 0);
  * rarityByKey, cardsByRarity und visibleRarities() überall bekannt. noBank = die Bank kauft sie nicht an;
  * sell ist dann nur der Kartenwert (zählt zum Vermögen, foliert mit Wertsteigerung), kein Ankaufspreis.
  */
-const DROP_RARITIES = [{ key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true }];
+// test-item: Test-Karten für den Kampfmodus (Bosskampf), nur für Admins (src/migrate.js), ohne Wert und für Mitglieder unsichtbar
+const DROP_RARITIES = [
+  { key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true },
+  { key: 'test-item', label: 'Test-Item', weight: 0, sell: 0, dropOnly: true, noBank: true, hidden: true },
+];
 const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES];
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
 // Die Chancen ergeben dabei immer zusammen TOTAL_WEIGHT (= 100 %).
