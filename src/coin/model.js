@@ -11,7 +11,7 @@
  *  5. Nach Sprüngen steigt die Volatilität (Panik / FOMO) und klingt langsam wieder ab.
  *  6. Kein Ankerkurs: Der Kurs ist ein Zufallspfad im Log-Maß. Weil Einbrüche größer ausfallen können als
  *     Anstiege, geht der große Sprung etwas öfter nach oben (upChance) – so heben sie sich im Log-Maß auf.
- *  7. Optionaler Trend (state.mu, Log-Rendite pro Tag): beim ETF aus der Aktivität der Seite (siehe etfTrend.js).
+ *  7. Optionaler Trend (state.mu, Log-Rendite pro Tag): derzeit von keinem Wert genutzt (der ETF springt stattdessen täglich, siehe marketReport.js).
  *  8. 51101 Coin: Das Wetter an der NOAA-Boje 51101 (siehe buoy.js) bestimmt nur, wie wild der Kurs ist –
  *     nie die Richtung. So lässt sich aus dem Wetter kein sicherer Gewinn ableiten.
  */

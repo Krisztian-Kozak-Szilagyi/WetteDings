@@ -8,6 +8,7 @@ const { takeDailySnapshot } = require('./stats/snapshot');
 const dungeonService = require('./dungeon/dungeonService');
 const achievementService = require('./achievements/achievementService');
 const suspicionService = require('./moderation/suspicionService');
+const reportService = require('./coin/reportService');
 
 /**
  * Wetten, deren Ergebnis nach Einsatzschluss zu lange nicht eingetragen wurde,
@@ -77,6 +78,11 @@ function startJobs() {
   const suspicion = () => suspicionService.scan().catch((err) => console.error('Manipulationserkennung-Fehler:', err));
   setTimeout(suspicion, 30 * 1000).unref();
   setInterval(suspicion, 10 * 60 * 1000).unref();
+
+  // Börsenbericht: jede Minute prüfen, ob der Bericht des Tages (18:45 Uhr) fällig ist – danach springt der ETF
+  const boerse = () => reportService.runDue().catch((err) => console.error('Börsenbericht-Fehler:', err));
+  setTimeout(boerse, 45 * 1000).unref();
+  setInterval(boerse, 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };

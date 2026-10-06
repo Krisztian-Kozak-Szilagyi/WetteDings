@@ -8,6 +8,7 @@ const stats = require('../stats/statsService');
 const { ranking } = require('../services/rankService');
 const exportCsv = require('../stats/exportCsv');
 const { panelNav } = require('./admin');
+const reportService = require('../coin/reportService');
 
 const router = express.Router();
 
@@ -99,9 +100,12 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
   // Reiterleiste des Panels (die Statistik ist ein Reiter im Panel)
   const nav = await panelNav(req.user, res.locals);
   if (key === 'mitglied' && !member) {
-    return res.render('statistik', { ...nav, title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null });
+    return res.render('statistik', { ...nav, title: 'Statistik', sections: stats.SECTIONS, ranges: stats.RANGES, rangeLabel: stats.rangeLabel, active: key, data: null, range, member, members, fmt, fmtDelta, date, chartData: null, boerse: [] });
   }
-  const data = await stats.section(key, range, new Date(), { user: member });
+  const [data, boerse] = await Promise.all([
+    stats.section(key, range, new Date(), { user: member }),
+    key === 'spiele' && req.user.isAdmin ? reportService.latest() : [], // Börsenbericht: nur der Admin
+  ]);
   res.render('statistik', {
     ...nav,
     title: 'Statistik',
@@ -113,6 +117,7 @@ router.get('/admin/statistik', requireStaff, async (req, res) => {
     member,
     members,
     data,
+    boerse,
     fmt,
     fmtDelta,
     date,
