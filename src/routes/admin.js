@@ -30,6 +30,7 @@ const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
 const suspicionService = require('../moderation/suspicionService');
+const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
@@ -316,6 +317,19 @@ router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?b
     else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
   }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
+});
+
+// ---------- Kartenhistorie: Lebenslauf eines Exemplars (Admin und Devs) ----------
+// Suche nach Kartenname (alle Exemplare mit Besitzer) bzw. Verlauf eines Exemplars (TcgCard-_id)
+router.get('/admin/kartenhistorie', requireStaff, async (req, res) => {
+  const q = str(req.query.karte).trim().slice(0, 40);
+  res.render('kartenhistorie', { title: 'Kartenhistorie', q, results: q ? await cardHistory.searchCopies(q) : null, history: null });
+});
+
+router.get('/admin/kartenhistorie/:id', requireStaff, async (req, res) => {
+  const history = await cardHistory.historyOf(req.params.id);
+  if (!history) return res.status(404).render('error', { title: 'Kartenhistorie', status: 404, message: 'Zu diesem Exemplar gibt es keine Spur.' });
+  res.render('kartenhistorie', { title: `Kartenhistorie: ${history.label}`, q: '', results: null, history });
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
@@ -692,9 +706,9 @@ async function revokeCardFrom(req) {
     req.flash('error', 'Es können 1 bis 50 Exemplare entfernt werden.');
   } else {
     try {
-      const { removed, remaining } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
+      const { removed, remaining, docs } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
       const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
-      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed });
+      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed, docs });
       req.flash('success', `${removed}× ${label} bei ${user.username} entfernt (noch ${remaining} im Besitz).`);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;

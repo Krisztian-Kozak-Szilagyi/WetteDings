@@ -154,6 +154,9 @@
         </div>
       </div>
       <div class="susp-finding-actions">
+        <% (a.cardLinks || []).forEach((l) => { %>
+          <a class="btn btn-ghost btn-sm" href="<%= l.href %>"><%= l.label %></a>
+        <% }) %>
         <% a.users.forEach((u) => { %>
           <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: a.log, spieler: u.username }) %>">Protokoll<%= a.users.length > 1 ? ' ' + u.username : '' %></a>
         <% }) %>

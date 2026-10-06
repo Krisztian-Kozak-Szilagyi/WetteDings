@@ -751,6 +751,17 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .susp-summary { margin: 0; font-size: 13px; line-height: 1.5; color: color-mix(in srgb, var(--color-text) 82%, transparent); }
 .susp-extras { margin: 0; padding: 8px 12px; list-style: none; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-bg) 55%, transparent); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted); overflow-wrap: anywhere; }
 .susp-extras li + li { margin-top: 4px; }
+/* Kartenhistorie (Admin/Devs): Zeitleiste eines Exemplars */
+.card-history-search { display: flex; gap: 8px; align-items: center; }
+.card-history-search input { flex: 1; min-width: 0; }
+.card-history { list-style: none; margin: 16px 0; padding: 0; }
+.card-history-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--color-divider); overflow-wrap: anywhere; }
+.card-history-step:first-child { border-top: 0; }
+.card-history-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--color-bg); font-size: 14px; }
+.card-history-time { font-size: 12px; color: var(--muted); }
+.card-history-handel .card-history-icon, .card-history-duell .card-history-icon { background: color-mix(in srgb, var(--color-accent) 25%, var(--color-bg)); }
+.card-history-step.is-guess { opacity: 0.75; }
+.card-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 .susp-time { font-size: 12px; color: var(--muted); }
 .susp-finding-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .susp-finding-actions form { margin: 0; }

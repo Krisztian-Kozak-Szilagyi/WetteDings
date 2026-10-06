@@ -22,7 +22,7 @@
   // Erklärung je Protokoll (hinter dem ?)
   const LOG_HELP = {
     gesamt: 'Alle Protokolle in einer Liste, neueste zuerst – Wetten, Einsätze, Broker, Lotterie, Handel, Packs, Verkäufe, IHK, Dungeons, Grading, Vergaben, Registrierungen, Einstellungen und Erkennungs-Urteile. Von den Buchungen nur die, die sonst nirgends stehen (Tagesbonus, Provisionen, Auszahlungen, Erfolge, Pack-Käufe …), damit nichts doppelt erscheint. Ein Klick auf den Bereich öffnet das Protokoll mit allen Details. Geblättert werden kann bis Seite 40; der Export enthält die neuesten 5.000 Einträge.',
-    handel: 'Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.',
+    handel: 'Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert. „Verlauf ›“ unter einer Karte öffnet den Lebenslauf dieses Exemplars (Kartenhistorie).',
     packs: 'Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.',
     verkauf: 'Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.',
     ihk: 'Jede gestartete IHK-Quest mit eingesetzten Karten, Ergebnis, Lohn und Pack-Fund. Bei laufenden Quests steht das Ergebnis schon fest, wird hier aber erst nach Ablauf gezeigt.',
@@ -38,6 +38,10 @@
     einstellungen: 'Jede Änderung an Preisen, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon – mit altem und neuem Wert. Mit Spieler: seine Änderungen.',
     urteile: 'Jedes Urteil zu einem Hinweis der Manipulationserkennung (Bestätigt, Fehlalarm, zurückgenommen) und jedes Mal, wenn ein beurteilter Hinweis durch neue Belege wieder aufgeht – mit einer Kopie des Hinweises in diesem Moment: Muster, Stufe, Gesamtbewertung, Zusammenfassung und alle Kennzahlen. Daraus entsteht die Trefferquote unter Moderation → Auffälligkeiten. Der JSON-Export enthält die Kennzahlen vollständig und eignet sich zum Auswerten der Schwellen. Einträge bleiben dauerhaft erhalten; bei einer Kontolöschung werden sie anonymisiert.',
   };
+  // Links zur Kartenhistorie der gehandelten Exemplare (bei mehreren mit Namen)
+  const historyLinks = (copies) => (copies && copies.length
+    ? `<div class="small">${copies.map((c) => `<a class="card-link" href="/admin/kartenhistorie/${esc(c.doc)}" title="Verlauf dieses Exemplars">${copies.length > 1 ? esc(c.label) : 'Verlauf'} ›</a>`).join(' · ')}</div>`
+    : '');
   const signedEuro = (c) => `<span class="${c < 0 ? 'neg' : 'pos'}">${c > 0 ? '+' : ''}${euro(c)}</span>`;
 %>
 <section class="stats-block" id="protokoll">
@@ -92,6 +96,7 @@
             </div>
           </details>
         <% } %>
+        <a class="btn btn-ghost btn-sm" href="/admin/kartenhistorie<%= data && data.q ? '?karte=' + encodeURIComponent(data.q) : '' %>" title="Alle Exemplare einer Karte und der Verlauf jedes Exemplars">Kartenhistorie</a>
       </div>
     </div>
   </form>
@@ -120,8 +125,8 @@
                   <td class="nowrap"><%= dateSec(t.at) %><% if (t.flagged) { %><br><span class="badge trade-flag" title="Beide Konten werden vom selben Gerät aus benutzt">Mehrfach-Konto</span><% } %><% if (t.isNew) { %> <span class="badge badge-offen">Neu</span><% } %></td>
                   <td><%- userLink(t.from, { realName: false }) %></td>
                   <td><%- userLink(t.to, { realName: false }) %></td>
-                  <td><%= t.card %></td>
-                  <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %></td>
+                  <td><%= t.card %><%- historyLinks(t.giveCopies) %></td>
+                  <td><%= t.back %><% if (t.tax) { %> <span class="muted small">(Steuer <%= euro(t.tax) %>)</span><% } %><%- historyLinks(t.wantCopies) %></td>
                   <td class="nowrap"><%= t.kind %></td>
                 </tr>
               <% }) %>

@@ -133,6 +133,9 @@ async function paged(Model, filter, sort, pageValue, select, all = false) {
 
 // ---------- Handel: wer wem welche Karte gegeben hat ----------
 
+/** Karten-Exemplare eines Handels (für den Link zur Kartenhistorie): [{ doc, label }] – Gegenstände nicht */
+const copiesOf = (lines) => (lines || []).filter((l) => l.doc && tcgCatalog.cardById[l.card]).map((l) => ({ doc: String(l.doc), label: cardLabel(l.card) }));
+
 /**
  * Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte.
  * Geschäfte zwischen Mehrfach-Konten (Hinweis "sicher"/"wahrscheinlich") sind markiert, neue seit seenAt zusätzlich "Neu";
@@ -151,7 +154,7 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
     const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
     and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { 'give.card': { $in: cardIds } }, { 'want.card': { $in: cardIds } }] });
   }
-  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName give.card want.card price extraFrom tax closedAt', all);
+  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName give.card give.doc want.card want.doc price extraFrom tax closedAt', all);
   const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
@@ -163,7 +166,7 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
       const sellerPays = t.extraFrom === 'seller';
       const flagged = pairs.has(deviceService.tradePairKey(t));
       const isNew = flagged && new Date(t.closedAt).getTime() > seen;
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: tradeSide(t.give, sellerPays ? t.price : 0), back: tradeSide(t.want, sellerPays ? 0 : t.price), tax: t.tax, flagged, isNew };
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: tradeSide(t.give, sellerPays ? t.price : 0), back: tradeSide(t.want, sellerPays ? 0 : t.price), tax: t.tax, flagged, isNew, giveCopies: copiesOf(t.give), wantCopies: copiesOf(t.want) };
     }),
   };
 }

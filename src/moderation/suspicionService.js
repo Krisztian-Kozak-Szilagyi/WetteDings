@@ -69,6 +69,9 @@ function valueOf(cardId) {
   return r ? r.sell || 0 : 0;
 }
 
+/** Karten-Exemplare eines Geschäfts (beide Seiten): [{ doc, label }] – für Links zur Kartenhistorie */
+const copiesOf = (t) => [...(t.give || []), ...(t.want || [])].filter((l) => l.doc && catalog.cardById[l.card]).map((l) => ({ doc: String(l.doc), card: l.card, label: logs.cardLabel(l.card) }));
+
 /** Geschäft als Text wie im Handel-Protokoll, mit Bankwerten */
 function tradeText(t, f) {
   const sellerPays = t.extraFrom === 'seller';
@@ -223,11 +226,15 @@ async function findAll(now = new Date()) {
     names.set(String(t.buyer || t.to), t.buyerName || t.toName);
     const key = deviceLogic.pairKey(f.from, f.to);
     if (!byPair.has(key)) byPair.set(key, []);
-    byPair.get(key).push({ ...f, at: t.closedAt, text: tradeText(t, f) });
+    byPair.get(key).push({ ...f, at: t.closedAt, text: tradeText(t, f), copies: copiesOf(t) });
   }
   for (const [key, items] of byPair) {
     const f = logic.valuePairFinding(items, names, pairs.has(key));
-    found.push({ key: `wert:${key}`, kind: 'wert', action: null, users: key.split(':'), ...pick(f, ['count', 'total', 'winner', 'trades']), ...base(f) });
+    const found1 = { key: `wert:${key}`, kind: 'wert', action: null, users: key.split(':'), ...pick(f, ['count', 'total', 'winner', 'trades']), ...base(f) };
+    // Exemplare der jüngsten Geschäfte – im Panel als Links zur Kartenhistorie
+    // nur nennenswerte Karten (die Crumpled als Gegenleistung interessiert nicht)
+    found1.details.cards = [...items].sort((x, y) => new Date(x.at) - new Date(y.at)).slice(-5).flatMap((i) => i.copies).filter((c) => valueOf(c.card) >= logic.VALUE_MIN_CENTS).slice(0, 8);
+    found.push(found1);
   }
   return found;
 }
@@ -472,6 +479,11 @@ async function list() {
         log: a.action && logic.ACTIONS[a.action] ? logic.ACTIONS[a.action].log : LOG_OF[a.kind] || 'gesamt',
         users: list.map((u) => ({ _id: u._id, username: u.username, banned: deviceLogic.isBanned(u) })),
         facts: logic.factsOf(a.kind, a.details),
+        // Links zur Kartenhistorie: das kreisende Exemplar bzw. die Exemplare ungleicher Geschäfte
+        cardLinks:
+          a.kind === 'kreislauf'
+            ? [{ href: `/admin/kartenhistorie/${a.key.split(':')[1]}`, label: 'Kartenhistorie' }]
+            : ((a.details && a.details.cards) || []).map((c) => ({ href: `/admin/kartenhistorie/${c.doc}`, label: `Verlauf: ${c.label}` })),
         extras: logic.extrasOf(a.details),
       };
     })
