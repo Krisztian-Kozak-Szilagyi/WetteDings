@@ -7,7 +7,8 @@ const { migrateTradeDoc } = require('./trade/lines');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
 const { LotteryRound } = require('./models/Lottery');
-const { rollCondition } = require('./grading/condition');
+const { rollCondition, gradeFor } = require('./grading/condition');
+const { GradingJob } = require('./models/Grading');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -106,6 +107,10 @@ async function migrate() {
   const conditioned = await rollMissingConditions();
   if (conditioned) console.log(`Migration: Zustand für ${conditioned} Karte(n) ausgewürfelt.`);
 
+  // Zentrierung zählt nur noch links/rechts: Noten neu rechnen, wo oben/unten sie bisher gedrückt hat
+  const regraded = await regradeWithoutTopBottom();
+  if (regraded.cards || regraded.jobs) console.log(`Migration: Note ohne Oben/Unten-Zentrierung neu berechnet (${regraded.cards} Karte(n), ${regraded.jobs} Auftrag/Aufträge).`);
+
   // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel)
   const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null } };
   const trades = await Trade.find({ status: 'offen', $or: [{ give: missing }, { want: missing }] }).select('give want').lean();
@@ -157,4 +162,29 @@ async function rollMissingConditions(batch = 1000) {
   }
 }
 
-module.exports = { migrate };
+/**
+ * Zentrierung zählt nur noch links/rechts. Neu gerechnet wird, was noch niemand gesehen hat: die geheime Note
+ * unfolierter Karten und offene Grading-Aufträge ohne Tipp. Folierte Karten behalten ihre sichtbare Note.
+ * Nur Zustände mit oben/unten über 55 können sich ändern (darunter galt ohnehin keine Grenze). Idempotent.
+ */
+async function regradeWithoutTopBottom() {
+  // prefix: wo defects und grade im Dokument liegen ('condition.' bei Karten, '' bei Aufträgen)
+  const regrade = async (coll, filter, prefix) => {
+    const docs = await coll.find(filter).project({ [`${prefix}defects`]: 1, [`${prefix}grade`]: 1 }).toArray();
+    const ops = [];
+    for (const d of docs) {
+      const holder = prefix ? d.condition : d;
+      if (!holder || !holder.defects) continue;
+      const grade = gradeFor({ scratches: [], corners: [], edges: [], ...holder.defects });
+      if (grade !== holder.grade) ops.push({ updateOne: { filter: { _id: d._id }, update: { $set: { [`${prefix}grade`]: grade } } } });
+    }
+    if (ops.length) await coll.bulkWrite(ops, { ordered: false });
+    return ops.length;
+  };
+  const tb = { $gt: 55 };
+  const cards = await regrade(TcgCard.collection, { foiledAt: null, 'condition.defects.centering.tb': tb }, 'condition.');
+  const jobs = await regrade(GradingJob.collection, { status: 'offen', guess: null, 'defects.centering.tb': tb }, '');
+  return { cards, jobs };
+}
+
+module.exports = { migrate, regradeWithoutTopBottom };
