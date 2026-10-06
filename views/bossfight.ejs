@@ -33,6 +33,13 @@
         <span class="bf-hp-text"></span>
       </div>
     </section>
+    <%# Ausgerüstete Items (zwei Hände) – Waffe/Zauber anklicken = angreifen %>
+    <section class="bf-gear" data-bf-gear aria-label="Ausrüstung"></section>
+
+    <section class="bf-turn">
+      <span class="bf-round" data-bf-round>Runde 1</span>
+      <button type="button" class="bf-end" data-bf-end>Runde beenden</button>
+    </section>
 
     <section class="bf-deck" data-bf-deck aria-label="Deck">
       <span class="bf-deck-card"></span><span class="bf-deck-card"></span><span class="bf-deck-card"></span>
@@ -40,6 +47,7 @@
     </section>
 
     <div class="bf-hand" data-bf-hand></div>
+    <div class="bf-result" data-bf-result hidden></div>
   </div>
 
   <script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
