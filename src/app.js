@@ -221,7 +221,6 @@ function createApp() {
   app.use(require('./routes/dungeon'));
   app.use(require('./routes/trade'));
   app.use(require('./routes/grading'));
-  app.use(require('./routes/deck'));
 
   app.use((req, res) => {
     res.status(404).render('error', {

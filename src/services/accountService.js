@@ -154,7 +154,6 @@ async function deleteAccount({ user, password }) {
       IhkState.deleteOne({ _id: id }, opt),
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),
-      require('../models/Deck').deleteMany({ user: id }, opt),
       // offene Handelsangebote verschwinden (auch Gegenangebote auf eigene Markt-Angebote – sie tragen den Verkäufer);
       // abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),
