@@ -35,6 +35,7 @@ const { GradingJob } = require(path.join(ROOT, 'src/models/Grading'));
 const { Trade } = require(path.join(ROOT, 'src/models/Trade'));
 const { Device, DeviceAlert } = require(path.join(ROOT, 'src/models/Device'));
 const ScriptSignal = require(path.join(ROOT, 'src/models/ScriptSignal'));
+const { escapeRegex } = require(path.join(ROOT, 'src/lib/util'));
 const ActionTrace = require(path.join(ROOT, 'src/models/ActionTrace'));
 const SuspicionAlert = require(path.join(ROOT, 'src/models/SuspicionAlert'));
 const catalog = require(path.join(ROOT, 'src/tcg/catalog'));
@@ -185,7 +186,8 @@ const PATTERNS = {
 
 /** Alle Testspieler und alles, was an ihnen hängt, entfernen */
 async function remove() {
-  const ids = (await User.find({ email: new RegExp(`${MAIL.replace(/\./g, '\\.')}$`) }).select('_id').lean()).map((u) => u._id);
+  // alle Sonderzeichen maskiert, nicht nur Punkte (CodeQL #79)
+  const ids = (await User.find({ email: new RegExp(`${escapeRegex(MAIL)}$`) }).select('_id').lean()).map((u) => u._id);
   if (!ids.length) return 0;
   await Promise.all([
     Ledger.deleteMany({ user: { $in: ids } }),
