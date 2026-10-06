@@ -5122,6 +5122,18 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 .pf-id { display: flex; gap: 22px; align-items: flex-start; min-width: 0; flex: 1 1 420px; }
 .pf-avatar { flex: none; display: block; width: 152px; height: 152px; border-radius: 8px; }
+/* Profilbild wählen (Admin/Dev): beim Draufzeigen abgedunkelt mit „Ändern“ */
+.pf-avatar-pick { position: relative; flex: none; padding: 0; border: 0; border-radius: 8px; background: none; cursor: var(--cur-pointer); }
+.pf-avatar-hint {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 8px; font-weight: 700; color: #fff;
+  background: rgb(0 0 0 / .5); opacity: 0; transition: opacity .15s;
+}
+.pf-avatar-pick:hover .pf-avatar-hint, .pf-avatar-pick:focus-visible .pf-avatar-hint { opacity: 1; }
+.pf-bild-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+.pf-bild-opt { padding: 4px; border: 2px solid transparent; border-radius: 12px; background: none; cursor: var(--cur-pointer); }
+.pf-bild-opt img { display: block; width: 100%; height: auto; }
+.pf-bild-opt:hover { border-color: var(--color-neutral-600); }
+.pf-bild-opt.is-on { border-color: var(--color-accent); }
 .pf-id-text { min-width: 0; flex: 1; }
 .pf-name { margin: 4px 0 0; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; overflow-wrap: anywhere; }
 .pf-realname { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }

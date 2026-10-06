@@ -43,6 +43,8 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
+    // Profilbild: ID aus src/profile/avatars.js, null = Platzhalter (wählen vorerst nur Admin und Devs)
+    avatar: { type: String, default: null },
     // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
     statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)

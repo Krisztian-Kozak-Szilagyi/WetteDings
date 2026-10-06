@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
 const { str } = require('../lib/util');
-const { requireLogin } = require('../middleware');
+const { requireLogin, requireStaff } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
 const rankService = require('../services/rankService');
@@ -16,6 +16,7 @@ const achievementLogic = require('../achievements/logic');
 const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
 const { profileStats } = require('../stats/profileStats');
+const avatars = require('../profile/avatars');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -35,7 +36,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
 router.get('/profil/:name', requireLogin, async (req, res) => {
-  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements profileAsset statsPublic').lean();
+  const profile = await User.findOne({ usernameLower: str(req.params.name).toLowerCase(), deletedAt: null }).select('username usernameLower role realName createdAt tcgFavorites top1Seconds bannedUntil banReason bannedAt bannedByName bannedBy banHistory bio pinnedAchievements profileAsset statsPublic avatar').lean();
   if (!profile) return res.status(404).render('error', { title: 'Profil', status: 404, message: 'Dieses Mitglied gibt es nicht.' });
   const assetEngine = profile.profileAsset ? markets.get(profile.profileAsset) : null; // nur Werte aus der festen Liste
   const isMe = profile._id.equals(req.user._id);
@@ -89,6 +90,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     pinnedChosen: pinnedKeys.length > 0,
     pinnedKeys,
     playmates,
+    // Profilbild wählen: vorerst nur Admin und Devs im eigenen Profil
+    avatarChoices: isMe && req.user.isStaff ? avatars.AVATARS : null,
     countTier: achievementLogic.countTier,
     shareText: achievementLogic.shareText,
     bioMax: achievementLogic.BIO_MAX,
@@ -114,6 +117,13 @@ router.post('/profil/text', requireLogin, async (req, res) => {
 router.post('/profil/statistik', requireLogin, async (req, res) => {
   await User.updateOne({ _id: req.user._id }, { $set: { statsPublic: str(req.body.oeffentlich) === '1' } });
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}#statistik`);
+});
+
+// Profilbild wählen (vorerst nur Admin und Devs); leer oder unbekannt = Platzhalter
+router.post('/profil/bild', requireStaff, async (req, res) => {
+  const id = str(req.body.bild);
+  await User.updateOne({ _id: req.user._id }, { $set: { avatar: avatars.has(id) ? id : null } });
+  res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
 });
 
 // Broker-Wert für die Profil-Seitenleiste wählen (leer = keinen zeigen)
