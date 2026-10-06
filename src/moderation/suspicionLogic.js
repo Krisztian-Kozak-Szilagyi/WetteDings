@@ -1044,23 +1044,59 @@ function factsOf(kind, details = {}) {
   return out;
 }
 
+const VERDICT_EVENTS = new Set(['bestaetigt', 'fehlalarm', 'zurueckgenommen']);
+const rateOf = (c) => ({ ...c, rate: c.confirmed + c.falseAlarms ? c.confirmed / (c.confirmed + c.falseAlarms) : null });
+
 /**
- * Trefferquote je Muster: rows [{ kind, verdict, count }] (verdict: 'bestaetigt' | 'fehlalarm' | null) →
- * [{ kind, label, total, confirmed, falseAlarms, rate }], rate = bestätigt ÷ (bestätigt + Fehlalarm), null ohne Urteil.
- * Muster mit Urteilen zuerst, dann nach Zahl der Hinweise.
+ * Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (models/SuspicionVerdict).
+ * events: [{ key, event, kind, level, createdAt }] in beliebiger Reihenfolge. Je Hinweis zählt nur sein letztes Urteil,
+ * mit der Stufe, die er dabei hatte; ein zurückgenommenes Urteil zählt nicht, "neue_belege" ändert nichts.
+ * counts: Map kind → Zahl der aktuellen Hinweise (Spalte "Hinweise").
+ * Liefert [{ kind, label, total, confirmed, falseAlarms, rate, levels: { 1: {...}, 2: {...} } }], rate =
+ * bestätigt ÷ (bestätigt + Fehlalarm) bzw. null ohne Urteil. Muster mit Urteilen zuerst, dann nach Zahl der Hinweise.
  */
-function precisionRows(rows) {
+function precisionRows(events, counts = new Map()) {
+  const last = new Map(); // key → letztes Urteil
+  for (const e of events) {
+    if (!VERDICT_EVENTS.has(e.event)) continue;
+    const prev = last.get(e.key);
+    if (!prev || toMs(e.createdAt) >= toMs(prev.createdAt)) last.set(e.key, e);
+  }
+  const empty = () => ({ confirmed: 0, falseAlarms: 0 });
   const byKind = new Map();
-  for (const r of rows) {
-    if (!byKind.has(r.kind)) byKind.set(r.kind, { kind: r.kind, label: KIND_LABEL[r.kind] || r.kind, total: 0, confirmed: 0, falseAlarms: 0 });
-    const k = byKind.get(r.kind);
-    k.total += r.count;
-    if (r.verdict === 'bestaetigt') k.confirmed += r.count;
-    if (r.verdict === 'fehlalarm') k.falseAlarms += r.count;
+  const row = (kind) => {
+    if (!byKind.has(kind)) byKind.set(kind, { kind, label: KIND_LABEL[kind] || kind, total: counts.get(kind) || 0, ...empty(), levels: { [LEVEL.moeglich]: empty(), [LEVEL.wahrscheinlich]: empty() } });
+    return byKind.get(kind);
+  };
+  for (const kind of counts.keys()) row(kind);
+  for (const e of last.values()) {
+    if (e.event === 'zurueckgenommen') continue;
+    const r = row(e.kind);
+    const field = e.event === 'bestaetigt' ? 'confirmed' : 'falseAlarms';
+    r[field]++;
+    const lvl = Math.min(Math.max(e.level || LEVEL.moeglich, LEVEL.moeglich), LEVEL.wahrscheinlich);
+    r.levels[lvl][field]++;
   }
   return [...byKind.values()]
-    .map((k) => ({ ...k, rate: k.confirmed + k.falseAlarms ? k.confirmed / (k.confirmed + k.falseAlarms) : null }))
+    .map((r) => ({ ...rateOf(r), levels: Object.fromEntries(Object.entries(r.levels).map(([l, c]) => [l, rateOf(c)])) }))
     .sort((x, y) => (y.rate !== null) - (x.rate !== null) || y.total - x.total || x.label.localeCompare(y.label, 'de'));
+}
+
+/**
+ * Namen aus einem gespeicherten Wert entfernen (Zusammenfassung, Kennzahlen, Beispiel-Zeilen) – für die Anonymisierung
+ * des Urteils-Protokolls nach einer Kontolöschung. Ersetzt jedes Vorkommen der Namen in allen Texten, auch verschachtelt.
+ */
+function scrubNames(value, names, replacement = 'gelöschtes Konto') {
+  const list = [...new Set(names.filter((n) => typeof n === 'string' && n.length >= 2))].sort((a, b) => b.length - a.length);
+  if (!list.length) return value;
+  const re = new RegExp(list.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  const walk = (v) => {
+    if (typeof v === 'string') return v.replace(re, replacement);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object' && !(v instanceof Date)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value);
 }
 
 /** Zusätzliche Zeilen eines Hinweises (Beispiel-Geschäfte, User-Agents, Netzbetreiber) */
@@ -1141,6 +1177,7 @@ module.exports = {
   factsOf,
   extrasOf,
   precisionRows,
+  scrubNames,
   groupAlerts,
   overallRating,
   RATING_AREAS,

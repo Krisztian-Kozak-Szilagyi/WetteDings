@@ -21,7 +21,7 @@
     : '<span class="muted">–</span>';
   // Erklärung je Protokoll (hinter dem ?)
   const LOG_HELP = {
-    gesamt: 'Alle Protokolle in einer Liste, neueste zuerst – Wetten, Einsätze, Broker, Lotterie, Handel, Packs, Verkäufe, IHK, Dungeons, Grading, Vergaben, Registrierungen und Einstellungen. Von den Buchungen nur die, die sonst nirgends stehen (Tagesbonus, Provisionen, Auszahlungen, Erfolge, Pack-Käufe …), damit nichts doppelt erscheint. Ein Klick auf den Bereich öffnet das Protokoll mit allen Details. Geblättert werden kann bis Seite 40; der Export enthält die neuesten 5.000 Einträge.',
+    gesamt: 'Alle Protokolle in einer Liste, neueste zuerst – Wetten, Einsätze, Broker, Lotterie, Handel, Packs, Verkäufe, IHK, Dungeons, Grading, Vergaben, Registrierungen, Einstellungen und Erkennungs-Urteile. Von den Buchungen nur die, die sonst nirgends stehen (Tagesbonus, Provisionen, Auszahlungen, Erfolge, Pack-Käufe …), damit nichts doppelt erscheint. Ein Klick auf den Bereich öffnet das Protokoll mit allen Details. Geblättert werden kann bis Seite 40; der Export enthält die neuesten 5.000 Einträge.',
     handel: 'Alle abgeschlossenen Geschäfte: „Von“ hat die Karte abgegeben, „An“ hat sie bekommen. Geschäfte zwischen Konten, die vom selben Gerät aus benutzt werden (Mehrfach-Konten, „sicher“ oder „wahrscheinlich“), sind rot markiert.',
     packs: 'Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.',
     verkauf: 'Karten und Gegenstände, die an die Bank verkauft wurden, und Karten aus dem Black Market. Verkäufe zwischen Spielern stehen im Handel-Log.',
@@ -36,6 +36,7 @@
     vergaben: 'Jede Vergabe durch Admin oder Devs: Packs, Karten, Gegenstände und entfernte Karten – auch „an alle“. Mit Spieler: was er vergeben oder bekommen hat.',
     registrierungen: 'Jede Registrierung: Zeitpunkt, Benutzername, Klarname (falls angegeben), benutzter Einladungscode und wer ihn erzeugt hat. Code und Einladender werden erst seit diesem Update gespeichert – bei älteren Konten steht dort „–“.',
     einstellungen: 'Jede Änderung an Preisen, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon – mit altem und neuem Wert. Mit Spieler: seine Änderungen.',
+    urteile: 'Jedes Urteil zu einem Hinweis der Manipulationserkennung (Bestätigt, Fehlalarm, zurückgenommen) und jedes Mal, wenn ein beurteilter Hinweis durch neue Belege wieder aufgeht – mit einer Kopie des Hinweises in diesem Moment: Muster, Stufe, Gesamtbewertung, Zusammenfassung und alle Kennzahlen. Daraus entsteht die Trefferquote unter Moderation → Auffälligkeiten. Der JSON-Export enthält die Kennzahlen vollständig und eignet sich zum Auswerten der Schwellen. Einträge bleiben dauerhaft erhalten; bei einer Kontolöschung werden sie anonymisiert.',
   };
   const signedEuro = (c) => `<span class="${c < 0 ? 'neg' : 'pos'}">${c > 0 ? '+' : ''}${euro(c)}</span>`;
 %>
@@ -484,6 +485,32 @@
                     <% c.changes.slice(0, 8).forEach((x) => { %><div><code><%= x.path %></code> <span class="muted"><%= x.from %> →</span> <%= x.to %></div><% }) %>
                     <% if (c.changes.length > 8) { %><div class="muted">… und <%= c.changes.length - 8 %> weitere</div><% } %>
                   </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <%- pager(data, logUrl) %>
+
+    <% } else if (data && logKey === 'urteile') { %>
+      <% const EVENT_CLASS = { bestaetigt: 'badge-streitig', fehlalarm: 'badge-entschieden', zurueckgenommen: '', neue_belege: 'badge-streitig' }; %>
+      <p class="muted small log-count"><%- help(LOG_HELP[logKey]) %><%= countLine(data, 'Eintrag', 'Einträge') %></p>
+      <% if (!data.rows.length) { %>
+        <p class="muted">Noch keine Urteile. Sie entstehen, wenn unter Moderation → Auffälligkeiten ein Hinweis als „Bestätigt“ oder „Fehlalarm“ markiert wird.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table trade-log">
+            <thead><tr><th>Zeitpunkt</th><th>Ereignis</th><th>Muster</th><th>Spieler</th><th>Hinweis zu diesem Zeitpunkt</th><th>Von</th></tr></thead>
+            <tbody>
+              <% data.rows.forEach((v) => { %>
+                <tr>
+                  <td class="nowrap"><%= dateSec(v.at) %></td>
+                  <td class="nowrap"><span class="badge <%= EVENT_CLASS[v.event] || '' %>"><%= v.eventLabel %></span></td>
+                  <td><strong><%= v.kindLabel %></strong><%= v.actionLabel ? ' · ' + v.actionLabel : '' %><div class="muted small"><%= v.levelLabel %><%= v.stageLabel ? ' · Gesamt: ' + v.stageLabel : '' %></div></td>
+                  <td><%= v.players.join(', ') || '–' %><% if (v.anonymized) { %> <span class="badge">anonymisiert</span><% } %></td>
+                  <td class="small"><%= v.summary %><% if (v.alertCreatedAt) { %><div class="muted">Hinweis seit <%= dateSec(v.alertCreatedAt) %></div><% } %></td>
+                  <td class="nowrap"><%= v.by %></td>
                 </tr>
               <% }) %>
             </tbody>

@@ -304,7 +304,7 @@ const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? acti
 router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
   const verdict = verdictOf(req.body.action);
-  if (verdict) for (const id of ids) await suspicionService.setVerdict(id, verdict, req.user);
+  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
   else await suspicionService.setDoneMany(ids, true, req.user);
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });

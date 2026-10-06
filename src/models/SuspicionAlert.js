@@ -23,6 +23,10 @@ const suspicionAlertSchema = new Schema(
     verdict: { type: String, enum: ['bestaetigt', 'fehlalarm', null], default: null },
     verdictByName: { type: String, default: null },
     verdictAt: { type: Date, default: null },
+    // was beurteilt wurde: Stufe und Zusammenfassung beim Urteil (neue Belege überschreiben summary später).
+    // Die vollständige Kopie samt Kennzahlen steht im Urteils-Protokoll (models/SuspicionVerdict).
+    verdictLevel: { type: Number, default: null },
+    verdictSummary: { type: String, default: null },
   },
   { timestamps: true }
 );

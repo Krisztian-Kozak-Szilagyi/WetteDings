@@ -5,6 +5,7 @@
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const SuspicionAlert = require('../models/SuspicionAlert');
+const SuspicionVerdict = require('../models/SuspicionVerdict');
 const { TcgOpening } = require('../models/Tcg');
 const { CoinTrade, CoinEvent } = require('../models/Coin');
 const Bet = require('../models/Bet');
@@ -340,6 +341,70 @@ async function upsert(f) {
     alert.doneByName = null;
   }
   await alert.save();
+  // beurteilter Hinweis geht wieder auf: bestätigt und macht weiter, oder ein Fehlalarm wird doch stärker
+  if (reopen && alert.verdict) await logEvent(alert.toObject(), 'neue_belege');
+}
+
+// ---------- Urteils-Protokoll (models/SuspicionVerdict) ----------
+
+/** Gesamtbewertung der Gruppe (genau diese Konten) aus ihren offenen Hinweisen – wie im Panel */
+async function ratingFor(userIds) {
+  const key = userIds.map(String).sort().join(':');
+  const alerts = await SuspicionAlert.find({ users: { $all: userIds, $size: userIds.length }, doneAt: null }).select('kind level users evidenceAt doneAt').lean();
+  if (!alerts.length) return null;
+  const levels = userIds.length === 1 ? await deviceLevels() : new Map();
+  const group = logic.groupAlerts(alerts.map((a) => ({ ...a, users: a.users.map((id) => ({ _id: id })) })), levels).find((g) => g.key === key);
+  return group ? group.rating : null;
+}
+
+/**
+ * Ereignis mit einer Kopie des Hinweises ins Urteils-Protokoll schreiben. rating = Gesamtbewertung in diesem Moment
+ * (ohne Angabe wird sie berechnet). Ein Fehler hier darf das Urteil selbst nicht verhindern.
+ */
+async function logEvent(alert, event, byName = null, rating) {
+  try {
+    const users = await User.find({ _id: { $in: alert.users } }).select('username').lean();
+    const nameById = new Map(users.map((u) => [String(u._id), u.username]));
+    const r = rating === undefined ? await ratingFor(alert.users) : rating;
+    await SuspicionVerdict.create({
+      alert: alert._id,
+      key: alert.key,
+      event,
+      byName,
+      kind: alert.kind,
+      action: alert.action || null,
+      level: alert.level,
+      summary: alert.summary,
+      details: alert.details || {},
+      from: alert.from || null,
+      evidenceAt: alert.evidenceAt || null,
+      alertCreatedAt: alert.createdAt || null,
+      stage: r ? r.stage : null,
+      stageLabel: r ? r.label : null,
+      users: alert.users,
+      names: alert.users.map((id) => nameById.get(String(id)) || 'unbekannt'),
+    });
+  } catch (err) {
+    console.error('Urteils-Protokoll fehlgeschlagen:', err.message);
+  }
+}
+
+/** Konto gelöscht: seine Einträge im Urteils-Protokoll anonymisieren (ID entfernen, Namen in allen Texten ersetzen) */
+async function anonymizeVerdicts(userId) {
+  const entries = await SuspicionVerdict.find({ users: userId });
+  for (const e of entries) {
+    const i = e.users.findIndex((u) => u.equals(userId));
+    const name = i >= 0 ? e.names[i] : null;
+    e.users = e.users.filter((u) => !u.equals(userId));
+    if (name) {
+      e.names = e.names.map((n, j) => (j === i ? 'gelöschtes Konto' : n));
+      e.summary = logic.scrubNames(e.summary, [name]);
+      e.details = logic.scrubNames(e.details || {}, [name]);
+      e.markModified('details');
+    }
+    e.anonymized = true;
+    await e.save();
+  }
 }
 
 /** Hinweise zu gelöschten oder fehlenden Konten entfernen – das Panel zeigt sie nicht, das Abzeichen soll sie nicht zählen */
@@ -348,7 +413,9 @@ async function forgetGone() {
   if (!ids.length) return;
   const alive = new Set((await User.find({ _id: { $in: ids }, deletedAt: null }).distinct('_id')).map(String));
   const gone = ids.filter((id) => !alive.has(String(id)));
-  if (gone.length) await SuspicionAlert.deleteMany({ users: { $in: gone } });
+  if (!gone.length) return;
+  await SuspicionAlert.deleteMany({ users: { $in: gone } });
+  for (const id of gone) await anonymizeVerdicts(id);
 }
 
 let running = false;
@@ -422,28 +489,50 @@ async function setDoneMany(ids, done, actor) {
   for (const id of ids) await setDone(id, done, actor);
 }
 
-/** Erledigen bzw. wieder öffnen. Wieder öffnen nimmt auch ein Urteil zurück (es war wohl voreilig). */
+/** Erledigen bzw. wieder öffnen. Wieder öffnen nimmt auch ein Urteil zurück (es war wohl voreilig) – das wird protokolliert. */
 async function setDone(id, done, actor) {
   const $set = { doneAt: done ? new Date() : null, doneByName: done && actor ? actor.username : null };
-  if (!done) Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null });
+  if (!done) {
+    const alert = await SuspicionAlert.findById(id).lean();
+    if (alert && alert.verdict) await logEvent(alert, 'zurueckgenommen', actor ? actor.username : null, null);
+    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null, verdictSummary: null });
+  }
   await SuspicionAlert.updateOne({ _id: id }, { $set }, { timestamps: false });
 }
 
-/** Urteil festhalten (bestätigt oder Fehlalarm) – erledigt den Hinweis zugleich */
-async function setVerdict(id, verdict, actor) {
-  if (!VERDICTS.includes(verdict)) return;
+/**
+ * Urteil festhalten (bestätigt oder Fehlalarm) – erledigt den Hinweis zugleich und schreibt eine Kopie ins
+ * Urteils-Protokoll. Mehrere Hinweise eines Spielers auf einmal: alle mit der Gesamtbewertung von vorher.
+ */
+async function setVerdictMany(ids, verdict, actor) {
+  if (!VERDICTS.includes(verdict) || !ids.length) return;
+  const alerts = await SuspicionAlert.find({ _id: { $in: ids } }).lean();
+  if (!alerts.length) return;
+  const rating = await ratingFor(alerts[0].users);
   const at = new Date();
   const by = actor ? actor.username : null;
-  await SuspicionAlert.updateOne({ _id: id }, { $set: { verdict, verdictAt: at, verdictByName: by, doneAt: at, doneByName: by } }, { timestamps: false });
+  for (const a of alerts) {
+    await logEvent(a, verdict, by, rating);
+    await SuspicionAlert.updateOne(
+      { _id: a._id },
+      { $set: { verdict, verdictAt: at, verdictByName: by, verdictLevel: a.level, verdictSummary: a.summary, doneAt: at, doneByName: by } },
+      { timestamps: false }
+    );
+  }
 }
 
-/** Trefferquote je Muster aus allen Hinweisen mit Urteil (logic.precisionRows) */
+const setVerdict = (id, verdict, actor) => setVerdictMany([id], verdict, actor);
+
+/** Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (logic.precisionRows) */
 async function precision() {
-  const rows = await SuspicionAlert.aggregate([{ $group: { _id: { kind: '$kind', verdict: '$verdict' }, n: { $sum: 1 } } }]);
-  return logic.precisionRows(rows.map((r) => ({ kind: r._id.kind, verdict: r._id.verdict, count: r.n })));
+  const [events, counts] = await Promise.all([
+    SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt').lean(),
+    SuspicionAlert.aggregate([{ $group: { _id: '$kind', n: { $sum: 1 } } }]),
+  ]);
+  return logic.precisionRows(events, new Map(counts.map((c) => [c._id, c.n])));
 }
 
-/** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen */
-const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId })]);
+/** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen, das Urteils-Protokoll anonymisieren */
+const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId }), anonymizeVerdicts(userId)]);
 
-module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, listGroups, setDone, setDoneMany, setVerdict, precision, forgetUser };
+module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, listGroups, setDone, setDoneMany, setVerdict, setVerdictMany, precision, anonymizeVerdicts, forgetUser };

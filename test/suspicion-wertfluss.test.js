@@ -133,16 +133,47 @@ test('Broker: Reaktion auf Kurssprünge', () => {
   assert.equal(s.marketReactionFinding(bot.map((t) => ({ ...t, coin: 'ETF' })), events), null);
 });
 
-test('Trefferquote je Muster aus den Urteilen', () => {
-  const rows = s.precisionRows([
-    { kind: 'dungeon', verdict: 'bestaetigt', count: 3 },
-    { kind: 'dungeon', verdict: 'fehlalarm', count: 1 },
-    { kind: 'dungeon', verdict: null, count: 2 },
-    { kind: 'takt', verdict: null, count: 9 },
-  ]);
-  assert.deepEqual(rows[0], { kind: 'dungeon', label: 'Dungeon-Automatik', total: 6, confirmed: 3, falseAlarms: 1, rate: 0.75 });
-  assert.equal(rows[1].kind, 'takt');
-  assert.equal(rows[1].rate, null);
+test('Trefferquote je Muster und Stufe aus dem Urteils-Protokoll', () => {
+  const at = (min) => new Date(t0 + min * MIN);
+  const events = [
+    { key: 'dungeon:a', event: 'bestaetigt', kind: 'dungeon', level: 2, createdAt: at(1) },
+    { key: 'dungeon:b', event: 'bestaetigt', kind: 'dungeon', level: 2, createdAt: at(2) },
+    { key: 'dungeon:c', event: 'fehlalarm', kind: 'dungeon', level: 1, createdAt: at(3) },
+    { key: 'dungeon:d', event: 'bestaetigt', kind: 'dungeon', level: 1, createdAt: at(4) },
+    // zuerst Fehlalarm, später doch bestätigt: nur das letzte Urteil zählt, mit der Stufe von damals
+    { key: 'dungeon:e', event: 'fehlalarm', kind: 'dungeon', level: 1, createdAt: at(5) },
+    { key: 'dungeon:e', event: 'neue_belege', kind: 'dungeon', level: 2, createdAt: at(6) },
+    { key: 'dungeon:e', event: 'bestaetigt', kind: 'dungeon', level: 2, createdAt: at(7) },
+    // Urteil zurückgenommen: zählt nicht
+    { key: 'markt:x', event: 'bestaetigt', kind: 'markt', level: 2, createdAt: at(8) },
+    { key: 'markt:x', event: 'zurueckgenommen', kind: 'markt', level: 2, createdAt: at(9) },
+  ];
+  const rows = s.precisionRows(events.reverse(), new Map([['dungeon', 4], ['takt', 9], ['markt', 1]]));
+  const dungeon = rows.find((r) => r.kind === 'dungeon');
+  assert.equal(rows[0].kind, 'dungeon'); // Muster mit Urteilen zuerst
+  assert.equal(dungeon.total, 4);
+  assert.equal(dungeon.confirmed, 4);
+  assert.equal(dungeon.falseAlarms, 1);
+  assert.equal(dungeon.rate, 0.8);
+  assert.deepEqual(dungeon.levels[2], { confirmed: 3, falseAlarms: 0, rate: 1 });
+  assert.deepEqual(dungeon.levels[1], { confirmed: 1, falseAlarms: 1, rate: 0.5 });
+  const markt = rows.find((r) => r.kind === 'markt');
+  assert.equal(markt.rate, null);
+  assert.equal(markt.confirmed, 0);
+  assert.equal(rows.find((r) => r.kind === 'takt').rate, null);
+  // Urteile zu Mustern ohne aktuelle Hinweise erscheinen trotzdem (der Hinweis ist längst gelöscht)
+  assert.equal(s.precisionRows([{ key: 'netz:z', event: 'fehlalarm', kind: 'netz', level: 1, createdAt: at(1) }])[0].falseAlarms, 1);
+});
+
+test('Urteils-Protokoll anonymisieren: Namen in allen Texten ersetzen', () => {
+  const details = { count: 3, trades: ['05.10., 12:00 Anna → Ben (Handel)', 'Ben hielt sie 26 Std.'], nested: { who: 'Benjamin und Ben' }, at: new Date(t0) };
+  const out = s.scrubNames(details, ['Ben']);
+  assert.deepEqual(out.trades, ['05.10., 12:00 Anna → gelöschtes Konto (Handel)', 'gelöschtes Konto hielt sie 26 Std.']);
+  assert.equal(out.count, 3);
+  assert.ok(out.at instanceof Date);
+  // längere Namen zuerst, Sonderzeichen sicher
+  assert.equal(s.scrubNames('Ben.X und Ben', ['Ben', 'Ben.X']), 'gelöschtes Konto und gelöschtes Konto');
+  assert.equal(s.scrubNames('nichts', []), 'nichts');
 });
 
 test('Rangliste: Anschaffungswert je erhaltenem Exemplar, nach Wert aufgeteilt', () => {
