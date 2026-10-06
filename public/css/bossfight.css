@@ -1,17 +1,18 @@
-/* Bosskampf (/bossfight) – Bossraum im Bildformat 1672×941, Canvas liegt genau darüber. */
-.bf-page {
-  display: flex;
-  justify-content: center;
-  margin: -8px 0 0;
+/* Bosskampf (/bossfight) – Vollbild: der Bossraum (1672×941) füllt das Fenster wie „cover“, Canvas liegt genau darüber. */
+html, body.bf-body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0d0b14;
 }
 .bf-stage {
-  position: relative;
-  width: min(100%, calc((100vh - 140px) * 1672 / 941));
-  aspect-ratio: 1672 / 941;
-  border-radius: 14px;
-  overflow: hidden;
-  background: #0d0b14 url('/img/bossfight/spinnenhoehle.webp') center / cover no-repeat;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(160, 140, 210, .15);
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, calc(100vh * 1672 / 941));
+  height: max(100vh, calc(100vw * 941 / 1672));
+  transform: translate(-50%, -50%);
+  background: url('/img/bossfight/spinnenhoehle.webp') center / 100% 100% no-repeat;
 }
 .bf-canvas {
   position: absolute;
