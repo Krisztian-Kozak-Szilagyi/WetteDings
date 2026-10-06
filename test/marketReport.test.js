@@ -49,13 +49,13 @@ test('Börsenbericht: Zufall nur als kleines Rauschen, gleicher Seed → gleiche
   assert.ok(Math.abs(a.log - base) <= 0.03 + 1e-9);
 });
 
-test('Börsenbericht: Text nennt Kennzahlen und Rekorde, aber keine Kurse', () => {
+test('Börsenbericht: Artikel nennt Kennzahlen und Rekorde, aber keine Kurse', () => {
   const res = evaluate({ ...day(10), wetten: 30 }, week(10), half);
   const { title, body } = reportText(res, '06.10.2026', mulberry32(3));
-  assert.equal(title, 'Börsenbericht vom 06.10.2026');
-  assert.ok(body.includes('Wettgeschäft: 30 Einsätze'));
-  assert.ok(body.includes('**Rekord**'));
-  assert.ok(!/ETF|BTCG|Kurs/.test(body), body);
+  assert.ok(title.startsWith('Börsenbericht vom 06.10.2026: '), title);
+  assert.ok(body.includes('30 Einsätze'), body);
+  assert.ok(/Allzeithoch|Höchststand|Bestmarke/.test(body), body);
+  assert.ok(!/ETF|BTCG|Kurs|Spielgeld|^- /m.test(body), body); // Fließtext, keine Kurse, keine Liste
 });
 
 test('Börsenbericht: Kennzahlen je Mitglied gedeckelt, Aktivität aus den Stunden', () => {
@@ -74,13 +74,23 @@ test('Börsenbericht: Kennzahlen je Mitglied gedeckelt, Aktivität aus den Stund
   const { today, history } = tally(rows, pulses, 2);
   assert.equal(today.wetten, PER_USER_CAP + 3);
   assert.deepEqual([today.anleger, today.aktionen], [2, 15]);
-  assert.equal(history.length, 2); // nur Tage, an denen schon gezählt wurde
+  assert.equal(history.length, 30); // Buchungen reichen 30 Tage zurück
   assert.equal(history[0].broker, 6);
   assert.deepEqual([history[1].anleger, history[1].aktionen], [1, 4]);
+  assert.deepEqual([history[2].anleger, history[2].aktionen], [null, null]); // vor Beginn der Zählung: kein Wert
 });
 
 test('Börsenbericht: fällig um 18:45 deutscher Zeit (Sommer- und Winterzeit)', () => {
   assert.equal(dueOf(new Date('2026-10-06T12:00:00Z')).due.toISOString(), '2026-10-06T16:45:00.000Z');
   assert.equal(dueOf(new Date('2026-12-06T12:00:00Z')).due.toISOString(), '2026-12-06T17:45:00.000Z');
   assert.equal(dueOf(new Date('2026-10-06T22:30:00Z')).day, '2026-10-07'); // nach Mitternacht deutscher Zeit
+});
+
+test('Börsenbericht: nicht erfasste Tage (null) zählen weder zum Schnitt noch zum Rekord – der Rest springt trotzdem', () => {
+  const past = week(10).map((d) => ({ ...d, anleger: null, aktionen: null }));
+  const res = evaluate({ ...day(20), anleger: 50, aktionen: 50 }, past, half);
+  const anleger = res.rows.find((r) => r.key === 'anleger');
+  assert.equal(anleger.avg, null);
+  assert.equal(anleger.record, false);
+  assert.ok(res.change > 0.2, `Sprung trotz fehlender Aktivitätszählung ${res.change}`);
 });
