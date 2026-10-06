@@ -31,7 +31,7 @@ const AREAS = {
   'so-gehts': 'info',
 };
 
-/** Bereich zu einem Pfad, z. B. "/handel/tausch" → "handel" */
+/** Bereich zu einem Pfad, z. B. "/handel/neu" → "handel" */
 function areaOf(path) {
   const first = String(path || '/').split('/')[1] || '';
   return AREAS[first] || 'sonstiges';

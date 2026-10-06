@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const { Item, ItemStack, ItemLog } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
 const { Trade, openFilter } = require('../models/Trade');
+const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { lockedDocs, claim } = require('../tcg/locks');
@@ -24,8 +25,7 @@ const MAX_SELL = 100;
 // Obergrenze pro Vorgang (Schutz vor Fehlern im Code): Stücke sind einzelne Dokumente, ein Stapel nur eine Zahl
 const maxAdd = (t) => (t.storage === 'stapel' ? 10000 : 500);
 
-// Im Handel steht ein Gegenstand wie eine Karte: Trade.card = "item:<Art>", Trade.cardDoc = das Item-Dokument
-const ITEM_PREFIX = 'item:';
+// Im Handel steht ein Gegenstand wie eine Karte: Position card = "item:<Art>", doc = das Item-Dokument (trade/lines.js)
 const itemCardId = (key) => ITEM_PREFIX + key;
 /** Handelbare Gegenstands-Art zu einer Handels-"Karten"-ID – oder null, wenn es eine echte Karte ist */
 const itemByCardId = (id) =>
@@ -52,8 +52,8 @@ async function logItems(entries, session) {
 
 /** Item-IDs eines Nutzers, die gerade in einem offenen Handelsangebot stehen */
 async function lockedItemIds(userId, session) {
-  const trades = await Trade.find({ ...openFilter(), seller: userId, card: { $regex: '^item:' } }).select('cardDoc').session(session || null).lean();
-  return new Set(trades.map((t) => String(t.cardDoc)));
+  const trades = await Trade.find({ ...openFilter(), $or: [{ seller: userId }, { to: userId }], lockDocs: { $exists: true } }).select('seller to give want lockDocs').session(session || null).lean();
+  return new Set(trades.flatMap((t) => lockedFor(t, userId)).map(String));
 }
 
 /** Freie Stücke einer Art (storage 'stueck', nicht im Handel), älteste zuerst */

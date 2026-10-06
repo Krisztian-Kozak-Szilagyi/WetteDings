@@ -505,7 +505,8 @@ async function tcg(p, now = new Date()) {
         },
       },
     ]),
-    Trade.find({ status: 'verkauft', kind: { $in: ['markt', 'privat'] }, ...inP(p, 'closedAt') }).select('card price').lean(),
+    // Marktpreise: nur Verkäufe genau einer Karte gegen Geld (bei Bündeln lässt sich der Preis keiner Karte zuordnen)
+    Trade.find({ status: 'verkauft', kind: { $in: ['markt', 'privat'] }, want: { $size: 0 }, give: { $size: 1 }, extraFrom: { $ne: 'seller' }, ...inP(p, 'closedAt') }).select('give.card price').lean(),
     BlackMarket.find({ _id: { $gte: p.from, $lte: p.to } }).lean(),
   ]);
 
@@ -520,7 +521,7 @@ async function tcg(p, now = new Date()) {
   // Marktpreise je Seltenheit gegenüber dem Bankwert
   const prices = {};
   for (const t of marketSales) {
-    const c = catalog.cardById[t.card];
+    const c = catalog.cardById[t.give[0].card];
     if (c) (prices[c.rarity] = prices[c.rarity] || []).push(t.price);
   }
 

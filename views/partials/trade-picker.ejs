@@ -1,0 +1,68 @@
+<%#
+  Kartenauswahl im Handelsfenster (public/js/handel-neu.js): Karte antippen oder ins Fenster ziehen = eine mehr, "−" = eine weniger.
+  Ohne JS stehen die Zahlenfelder unter den Karten. side = 'gib' | 'will' (Feldnamen "gib:<Karte>" = Anzahl,
+  "gib" = "f:<Exemplar>" für folierte Karten), pool = { cards: [{ card, max }], foiled: [...], goods: [{ card, max }], counts },
+  preset = { counts, copies }, own = eigene Sammlung, partnerName = Name des Mitglieds,
+  wish = Wunschkarten eines Markt-Angebots (alle Karten; "du hast …" statt Bestand).
+%>
+<%
+  const pickRar = (c) => rarityByKey[c.rarity] || { label: '', sell: 0 };
+  const wish = !!locals.wish;
+  const holds = (x) => (wish ? (x.owned ? 'du hast ' + x.owned : 'fehlt dir') : x.max + (own ? ' frei' : ' im Besitz'));
+  const total = pool.cards.length + pool.foiled.length + pool.goods.length;
+  const present = rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key));
+  const inRarity = (key) => pool.cards.filter((x) => x.card.rarity === key).length + pool.foiled.filter((f) => f.card.rarity === key).length;
+  const step = (name, label, max, n) => { %>
+    <button type="button" class="hb-minus" data-hb-step="-1" aria-label="Eine <%= label %> weniger">−</button>
+    <span class="hb-step">
+      <button type="button" class="hb-step-btn" data-hb-step="-1" aria-label="Eine <%= label %> weniger">−</button>
+      <input type="number" name="<%= name %>" min="0" max="<%= max %>" value="<%= n %>" inputmode="numeric" aria-label="Anzahl <%= label %>">
+      <button type="button" class="hb-step-btn" data-hb-step="1" aria-label="Eine <%= label %> mehr">+</button>
+    </span>
+<% }; %>
+<div class="hb-picker" data-filter-scope>
+  <% if (!total) { %>
+    <p class="hb-none-all muted"><%= own ? 'Du hast gerade keine freien Karten oder Gegenstände.' : partnerName + ' hat noch keine Karten.' %></p>
+  <% } else { %>
+    <div class="hb-picker-tools">
+      <%# Such-/Filterknopf (partials/mkt-bar): Seltenheit filtert public/js/tcg.js über data-tcg-filter, die Suche public/js/handel-neu.js %>
+      <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : wish ? 'Wunschkarte suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
+        { attr: 'tcg-filter', title: 'Seltenheit', allCount: total, opts: present.map((r) => ({ key: r.key, label: r.label, count: inRarity(r.key) })) },
+      ] }) %>
+      <span class="hb-picker-hint muted small"><%= own ? 'Antippen oder nach oben ins Fenster ziehen' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
+    </div>
+    <div class="tcg-grid hb-grid">
+      <% pool.goods.forEach((g) => { const n = Math.min(preset.counts[g.card.id] || 0, g.max); %>
+        <div class="tcg-slot hb-card is-item" data-hb-slot data-rarity="item" data-rank="99" data-owned="<%= pool.counts[g.card.id] || 0 %>" data-rarity-label="Gegenstand" data-name="<%= g.card.name.toLowerCase() %>" data-label="<%= g.card.name %>" data-image="<%= g.card.image %>" data-value="<%= g.card.sell %>">
+          <span class="hb-art" role="button" tabindex="0" data-hb-step="1" aria-label="<%= g.card.name %> hinzufügen">
+            <img src="<%= g.card.image %>" alt="" width="64" height="64">
+            <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
+          </span>
+          <span class="hb-card-name"><%= g.card.name %></span>
+          <span class="hb-card-sub"><%= wish ? 'Gegenstand' : g.max + (own ? ' frei' : ' im Besitz') %> · <%= euro(g.card.sell) %></span>
+          <% step(side + ':' + g.card.id, g.card.name, g.max, n) %>
+        </div>
+      <% }) %>
+      <% pool.cards.forEach((x) => { const c = x.card; const r = pickRar(c); const n = Math.min(preset.counts[c.id] || 0, x.max); %>
+        <div class="tcg-slot hb-card r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-owned="<%= x.owned || 0 %>" data-rarity-label="<%= r.label %>" data-name="<%= c.name.toLowerCase() %> <%= r.label.toLowerCase() %>" data-label="<%= c.name %> (<%= r.label %>)" data-image="<%= c.image %>" data-value="<%= r.sell || 0 %>">
+          <span class="tcg-art hb-art" role="button" tabindex="0" data-hb-step="1" aria-label="<%= c.name %>, <%= r.label %> hinzufügen">
+            <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
+          </span>
+          <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
+          <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
+          <% step(side + ':' + c.id, c.name, x.max, n) %>
+        </div>
+      <% }) %>
+      <% pool.foiled.forEach((f) => { const c = f.card; const r = pickRar(c); const on = preset.copies.has(f.id); %>
+        <label class="tcg-slot hb-card hb-foil r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %> foliert" data-label="<%= c.name %> (foliert)" data-image="<%= c.image %>" data-value="<%= f.value %>" data-foil>
+          <input type="checkbox" name="<%= side %>" value="f:<%= f.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %>">
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %></span>
+          <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
+          <span class="hb-card-sub">Foliert<%= f.grade ? ' · Note ' + f.grade : '' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
+        </label>
+      <% }) %>
+    </div>
+    <p class="muted small" data-hb-none hidden>Keine Karte passt zur Suche.</p>
+  <% } %>
+</div>

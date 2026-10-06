@@ -86,13 +86,18 @@ async function seed() {
     const [, anna, ben, carla] = users;
     const [annaCards, benCards, carlaCards] = await Promise.all([anna, ben, carla].map((u) => TcgCard.distinct('card', { user: u._id })));
     const benGives = benCards.find((id) => id !== benCards[0] && id !== annaCards[1]);
-    await trade.create({ user: anna, kind: 'markt', cardId: annaCards[0], price: 2500 });
-    await trade.create({ user: ben, kind: 'markt', cardId: benCards[0], price: 9900 });
-    await trade.create({ user: carla, kind: 'privat', cardId: carlaCards[0], price: 1500, toName: 'anna' });
+    const card = (id) => ({ card: id });
+    await trade.create({ user: anna, gives: [card(annaCards[0])], price: 2500 });
+    await trade.create({ user: ben, gives: [card(benCards[0])], price: 9900 });
+    // Bündel auf dem Markt: zwei Karten zusammen
+    await trade.create({ user: carla, gives: [card(carlaCards[1]), card(carlaCards[2])], price: 4000 });
+    await trade.create({ user: carla, toName: 'anna', gives: [card(carlaCards[0])], price: 1500 });
     // Ben bietet Anna einen Tausch an und legt 5 € drauf
-    await trade.create({ user: ben, kind: 'tausch', cardId: benGives, wantCardId: annaCards[1], price: 500, extraFrom: 'seller', toName: 'anna' });
+    await trade.create({ user: ben, toName: 'anna', gives: [card(benGives)], gets: [card(annaCards[1])], price: 500, iPay: true });
+    // Kaufanfrage: Anna möchte eine Karte von Carla und zahlt dafür
+    await trade.create({ user: anna, toName: 'carla', gets: [card(carlaCards[3])], price: 2000, iPay: true });
 
-    console.log(`[dev] ${users.length} Spieler, ${cards.length} Karten, 4 Angebote angelegt.`);
+    console.log(`[dev] ${users.length} Spieler, ${cards.length} Karten, 6 Angebote angelegt.`);
   } finally {
     await mongoose.disconnect();
   }
