@@ -3,7 +3,6 @@
  */
 const model = require('./model');
 const { createEngine, DAY } = require('./engine');
-const etfTrend = require('./etfTrend');
 const buoy = require('./buoy');
 
 const LIST = [
@@ -27,7 +26,7 @@ const LIST = [
     kind: 'etf',
     startPrice: 100,
     params: model.ETF_PARAMS,
-    trend: { target: () => etfTrend.target(), tauDays: 0.25 },
+    report: true, // Sprung nach dem täglichen Börsenbericht (reportService.js); Stimmung = letzter Bericht
   }),
 ];
 

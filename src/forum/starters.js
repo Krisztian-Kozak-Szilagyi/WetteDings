@@ -16,6 +16,7 @@ const CATEGORIES = [
   { key: 'ihk', title: 'IHK-Quests', titles: ['IHK'], description: 'Quests, Karten-Kombinationen, Tipps.', parent: 'allgemein', order: 3 },
   { key: 'feedback', title: 'Feedback & Bugs', description: 'Wünsche, Fehler und Verbesserungen.', parent: 'allgemein', order: 4 },
   { key: 'halloffame', title: 'Hall of Fame', description: 'Die größten Gewinne und seltensten Pulls.', parent: 'allgemein', order: 5 },
+  { key: 'boersenbericht', title: 'Börsenbericht', description: 'Der tägliche Bericht der Börse um 18:30 Uhr.', parent: 'allgemein', order: 6, staffOnly: true },
   { key: 'ankuendigungen', title: 'Ankündigungen', description: 'Wichtiges und Geplantes.', parent: null, create: false },
 ];
 

@@ -61,7 +61,7 @@ async function ensureDefaults() {
         if (found.title !== def.title) Object.assign(set, { title: def.title, description: def.description }); // z. B. "Wetten" → "Wetten & Duelle"
         cat = await ForumCategory.findOneAndUpdate({ _id: found._id }, { $set: set }, { new: true }).lean();
       } else if (def.create !== false) {
-        cat = (await ForumCategory.create({ key: def.key, title: def.title, description: def.description, parent: parent ? parent._id : null, order: def.order })).toObject();
+        cat = (await ForumCategory.create({ key: def.key, title: def.title, description: def.description, parent: parent ? parent._id : null, order: def.order, staffOnly: !!def.staffOnly })).toObject();
         console.log(`Forum: Bereich „${def.title}“ angelegt.`);
       }
     }
@@ -264,6 +264,19 @@ async function createThread({ user, categoryId, title, body, poll = null }) {
   if (p) await ForumPoll.create({ thread: thread._id, ...p });
   await markRead(user._id, thread._id, now);
   await notifyMentions({ user, thread, body: b, href: `/forum/t/${thread._id}` });
+  return thread;
+}
+
+/**
+ * Thema der Seite selbst (z. B. Börsenbericht) in einem festen Bereich: Verfasser aus forum/systemAuthors.js,
+ * keine Benachrichtigungen, keine Rollen-Tags.
+ */
+async function systemThread({ author, categoryKey, title, body }) {
+  const cat = await ForumCategory.findOne({ key: categoryKey }).lean();
+  if (!cat) throw new Error(`Forum-Bereich „${categoryKey}“ fehlt.`);
+  const now = new Date();
+  const thread = await ForumThread.create({ category: cat._id, title: cleanTitle(title), author: author.id, authorName: author.name, lastPostAt: now, lastPostBy: author.id, lastPostByName: author.name, participants: [] });
+  await ForumPost.create({ thread: thread._id, author: author.id, authorName: author.name, body: cleanBody(body, []), isFirst: true });
   return thread;
 }
 
@@ -507,6 +520,7 @@ async function patchNewCount(user) {
 const openReportCount = () => ForumReport.countDocuments({ done: false });
 
 module.exports = {
+  systemThread,
   TITLE_MAX,
   BODY_MAX,
   THREADS_PER_PAGE,
