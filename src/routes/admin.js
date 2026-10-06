@@ -30,6 +30,7 @@ const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
 const suspicionService = require('../moderation/suspicionService');
+const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
@@ -138,7 +139,7 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
@@ -146,6 +147,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     needsSub('moderation', 'meldungen') ? openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
+    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.precision() : [],
     needs('team') ? listActiveCodes() : [],
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
@@ -181,6 +183,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
+    suspicionPrecision: precision, // Trefferquote je Muster (Urteile bestätigt/Fehlalarm)
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
@@ -295,16 +298,38 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 });
 
 // ---------- Auffälligkeiten (Manipulationserkennung): Hinweise abhaken (Admin und Devs) ----------
-// "Alle erledigt" je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt)
+// Urteil (bestätigt/Fehlalarm) erledigt zugleich und zählt für die Trefferquote je Muster.
+const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
+
+// Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
 router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
-  await suspicionService.setDoneMany(ids, true, req.user);
+  const verdict = verdictOf(req.body.action);
+  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
+  else await suspicionService.setDoneMany(ids, true, req.user);
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
 router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
+});
+
+// ---------- Kartenhistorie: Lebenslauf eines Exemplars (Admin und Devs) ----------
+// Suche nach Kartenname (alle Exemplare mit Besitzer) bzw. Verlauf eines Exemplars (TcgCard-_id)
+router.get('/admin/kartenhistorie', requireStaff, async (req, res) => {
+  const q = str(req.query.karte).trim().slice(0, 40);
+  res.render('kartenhistorie', { title: 'Kartenhistorie', q, results: q ? await cardHistory.searchCopies(q) : null, history: null });
+});
+
+router.get('/admin/kartenhistorie/:id', requireStaff, async (req, res) => {
+  const history = await cardHistory.historyOf(req.params.id);
+  if (!history) return res.status(404).render('error', { title: 'Kartenhistorie', status: 404, message: 'Zu diesem Exemplar gibt es keine Spur.' });
+  res.render('kartenhistorie', { title: `Kartenhistorie: ${history.label}`, q: '', results: null, history });
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
@@ -681,9 +706,9 @@ async function revokeCardFrom(req) {
     req.flash('error', 'Es können 1 bis 50 Exemplare entfernt werden.');
   } else {
     try {
-      const { removed, remaining } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
+      const { removed, remaining, docs } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
       const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
-      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed });
+      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed, docs });
       req.flash('success', `${removed}× ${label} bei ${user.username} entfernt (noch ${remaining} im Besitz).`);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;

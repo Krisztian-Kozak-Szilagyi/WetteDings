@@ -52,6 +52,32 @@ const VALUE_MIN_CENTS = 5000; // Wertverschiebung erst ab einem Kartenwert von 5
 const VALUE_SHARE = 0.2; // die andere Seite ist weniger als 20 % davon wert
 const VALUE_STRONG_CENTS = 50000; // ab 500 € insgesamt verschoben
 const VALUE_STRONG_COUNT = 3; // oder ab so vielen Geschäften zwischen denselben Konten
+// große Beträge auch bei weniger krassem Verhältnis: eine 10.000-€-Karte für 3.000 € verschiebt 7.000 €
+const VALUE_ABS_CENTS = 200000; // ab 2.000 € Unterschied …
+const VALUE_ABS_SHARE = 0.5; // … wenn die andere Seite weniger als die Hälfte wert ist
+
+const CIRC_MIN_CENTS = 50000; // Kartenkreislauf: nur Exemplare ab 500 € Bankwert
+const CIRC_STRONG_CENTS = 500000; // ab 5.000 € wahrscheinlich
+const CIRC_OWNERS = 3; // so viele verschiedene Besitzer (sonst muss die Karte zu einem früheren zurückkommen)
+
+const RANK_LOOKBACK_MS = 30 * 24 * HOUR; // Platz 1: netto erhaltene Werte aus so langer Zeit davor zählen
+const RANK_SLACK_MS = 5 * MIN; // Geschäft kurz nach Beginn des Abschnitts zählt noch (Platz 1 wird minütlich geprüft)
+const RANK_MIN_MS = 30 * MIN; // so lange mindestens auf Platz 1 mit geliehenem Wert
+const RANK_STRONG_MS = 6 * HOUR;
+
+const FUNNEL_FLOW_CENTS = 5000; // Wertfluss: Geschäft mit mindestens 50 € Unterschied
+const FUNNEL_DONORS = 3; // Sammelkonto: so viele verschiedene Geber …
+const FUNNEL_MIN_CENTS = 100000; // … zusammen mindestens 1.000 € netto …
+const FUNNEL_BACK_SHARE = 0.2; // … und weniger als 20 % davon fließt zurück
+const FUNNEL_STRONG_DONORS = 5;
+const FUNNEL_STRONG_CENTS = 500000;
+
+const MARKET_REACT_MS = 20 * SEC; // Broker: gehandelt so kurz nach einem Kurssprung (Kurs-Abfrage alle 5 s)
+const MARKET_MIN_EVENTS = 5; // auf so viele verschiedene Sprünge …
+const MARKET_SHARE = 0.3; // … und mindestens auf diesen Anteil aller Sprünge der gehandelten Werte
+const MARKET_STRONG_EVENTS = 10;
+const MARKET_NIGHT_STRONG = 2; // so viele Reaktionen zwischen 0 und 6 Uhr: wahrscheinlich
+const MARKET_SKIP = new Set(['zusammenlegung', 'aufteilung']); // Splits sind keine Kurssprünge
 
 const DUNGEON_MIN_RUNS = 6; // so viele Durchläufe braucht es für eine Aussage
 const DUNGEON_JOIN_MS = MIN; // Median: angemeldet so kurz, nachdem die Anmeldung für den Termin aufging
@@ -95,9 +121,9 @@ const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
 // Muster mit derselben Ursache bestätigen sich nicht gegenseitig (Tempo und Takt derselben Aktion; ein Skript löst
 // Browser, Reaktionszeit und Eingabe zugleich aus). Aussagekräftig ist Bestätigung aus verschiedenen Bereichen.
 const RATING_AREAS = {
-  verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer'] },
+  verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer', 'markt'] },
   technik: { label: 'Technik', kinds: ['browser', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'] },
-  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
+  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert', 'kreislauf', 'rang', 'netz'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
 };
 const RATING_POINTS = { 1: 1, 2: 3 }; // Punkte je Stufe des stärksten Hinweises im Bereich (möglich, wahrscheinlich)
 const RATING_EXTRA = 1; // jeder weitere Hinweis im selben Bereich
@@ -127,6 +153,10 @@ const KIND_LABEL = {
   falle: 'Falle ausgelöst',
   rechenzentrum: 'Aus einem Rechenzentrum',
   parallel: 'Gleichzeitig von zwei Geräten',
+  kreislauf: 'Kartenkreislauf',
+  rang: 'Platz 1 mit geliehenem Wert',
+  netz: 'Sammelkonto',
+  markt: 'Reaktion auf Kurssprünge',
 };
 
 // ---------- Hilfen ----------
@@ -163,6 +193,7 @@ function bursts(times, maxGap = BURST_GAP) {
 }
 
 const hoursText = (ms) => `${Math.round(ms / HOUR)} Std.`;
+const durationText = (ms) => (ms < HOUR ? `${Math.max(1, Math.round(ms / MIN))} Min.` : hoursText(ms));
 const seconds = (ms) => `${(ms / 1000).toLocaleString('de-DE', { maximumFractionDigits: ms < 10 * SEC ? 1 : 0 })} s`;
 const percent = (x) => `${Math.round(x * 100)} %`;
 
@@ -342,23 +373,33 @@ function scalpFinding(trades) {
 // ---------- Wertverschiebung ----------
 
 /**
- * Ein abgeschlossenes Geschäft mit sehr ungleichem Wert. valueOf(cardId) = Bankwert in Cent.
+ * Wertfluss eines abgeschlossenen Geschäfts. valueOf(cardId) = Bankwert in Cent.
  * trade: { seller, buyer, to, give, want, price, extraFrom } wie im Trade-Modell: der Anbieter gibt give, die
  * Gegenseite (buyer bzw. to) gibt want, das Geld zahlt extraFrom (ohne Angabe die Gegenseite, siehe trade/lines.js).
- * Liefert { from, to, given, received, shifted } (from gibt viel und bekommt wenig) oder null.
+ * Liefert { from, to, given, received, shifted } (from gibt mehr, als es bekommt) oder null ohne Gegenseite.
  */
-function valueFinding(trade, valueOf) {
+function tradeFlow(trade, valueOf) {
   const other = trade.buyer || trade.to;
   if (!other) return null;
   const sum = (lines) => (lines || []).reduce((s, l) => s + (valueOf(l.card) || 0), 0);
   const sellerPays = trade.extraFrom === 'seller';
   const a = sum(trade.give) + (sellerPays ? trade.price || 0 : 0); // Anbieter-Seite
   const b = sum(trade.want) + (sellerPays ? 0 : trade.price || 0); // Gegenseite
-  const big = Math.max(a, b);
-  const small = Math.min(a, b);
-  if (big < VALUE_MIN_CENTS || small >= big * VALUE_SHARE) return null;
-  const [from, to] = a > b ? [trade.seller, other] : [other, trade.seller];
-  return { from, to, given: big, received: small, shifted: big - small };
+  const [from, to] = a >= b ? [trade.seller, other] : [other, trade.seller];
+  return { from, to, given: Math.max(a, b), received: Math.min(a, b), shifted: Math.abs(a - b) };
+}
+
+/**
+ * Ein abgeschlossenes Geschäft mit sehr ungleichem Wert: die andere Seite ist weniger als VALUE_SHARE wert, oder es
+ * werden mindestens VALUE_ABS_CENTS verschoben und die andere Seite ist weniger als die Hälfte wert.
+ * Liefert { from, to, given, received, shifted } (from gibt viel und bekommt wenig) oder null.
+ */
+function valueFinding(trade, valueOf) {
+  const f = tradeFlow(trade, valueOf);
+  if (!f || f.given < VALUE_MIN_CENTS) return null;
+  const lopsided = f.received < f.given * VALUE_SHARE;
+  const large = f.shifted >= VALUE_ABS_CENTS && f.received < f.given * VALUE_ABS_SHARE;
+  return lopsided || large ? f : null;
 }
 
 /**
@@ -383,6 +424,197 @@ function valuePairFinding(items, names, flagged = false) {
       `${items.length === 1 ? 'Ein Geschäft' : `${items.length} Geschäfte`} mit sehr ungleichem Wert, zusammen ${euro(total)} zugunsten von ${names.get(winner) || 'unbekannt'}` +
       (flagged ? ' – die Konten sind auch als Mehrfach-Konto erkannt' : ''),
     trades: sorted.slice(-5).map((i) => i.text),
+  };
+}
+
+// ---------- Kartenkreislauf, Platz 1 mit geliehenem Wert, Sammelkonten ----------
+
+const dayTimeFmt = new Map();
+/** "02.10., 14:03" in der Zeitzone */
+function dayTime(t, timeZone) {
+  if (!dayTimeFmt.has(timeZone)) dayTimeFmt.set(timeZone, new Intl.DateTimeFormat('de-DE', { timeZone, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
+  return dayTimeFmt.get(timeZone).format(new Date(toMs(t)));
+}
+
+/** Erfolge, die user im Zeitraum [from, to] (ms) freigeschaltet hat. earned: [{ user, label, at }] */
+const earnedIn = (earned, user, from, to) => earned.filter((e) => String(e.user) === String(user) && toMs(e.at) >= from && toMs(e.at) <= to);
+
+/**
+ * Kartenkreislauf: ein wertvolles Exemplar wandert durch mehrere Konten oder kommt zu einem früheren Besitzer zurück –
+ * etwa eine teure Karte, die reihum weitergereicht wird, damit jeder kurz auf Platz 1 steht.
+ * chain: Besitzerwechsel dieses Exemplars [{ from, to, at, via: 'handel' | 'duell', counter }] (counter = Gegenwert in
+ * Cent, den der Abgebende bekam). opts: value = Bankwert, card = Name, earned = [{ user, label, at }] Erfolge der
+ * Beteiligten, names = Map userId → Name, now, timeZone. Liefert { level, users, count, owners, returns, perks, total,
+ * from, to, summary, trades } oder null.
+ */
+function circulationFinding(chain, { value, card = 'Karte', earned = [], names = new Map(), now = Date.now(), timeZone = 'Europe/Berlin' }) {
+  if (!(value >= CIRC_MIN_CENTS)) return null;
+  const list = [...chain].sort((x, y) => toMs(x.at) - toMs(y.at));
+  if (list.length < 2) return null;
+  const owners = [String(list[0].from)];
+  let returns = 0;
+  for (const t of list) {
+    if (owners.includes(String(t.to))) returns++;
+    owners.push(String(t.to));
+  }
+  const users = [...new Set(owners)];
+  if (!returns && users.length < CIRC_OWNERS) return null;
+
+  // Haltezeit je Besitzerwechsel: vom Erhalt bis zur Weitergabe (der letzte hält sie bis jetzt)
+  const holds = list.map((t, i) => ({ user: String(t.to), from: toMs(t.at), to: i + 1 < list.length ? toMs(list[i + 1].at) : toMs(now) }));
+  const perks = holds.flatMap((h) => earnedIn(earned, h.user, h.from, h.to));
+  const name = (id) => names.get(String(id)) || 'unbekannt';
+  const lines = list.map((t, i) => {
+    const h = holds[i];
+    const got = earnedIn(earned, h.user, h.from, h.to).map((e) => `„${e.label}“`);
+    const held = i + 1 < list.length ? `${name(t.to)} hielt sie ${durationText(h.to - h.from)}` : `${name(t.to)} hat sie seitdem`;
+    return `${dayTime(t.at, timeZone)} ${name(t.from)} → ${name(t.to)} (${t.via === 'duell' ? 'Duell' : 'Handel'}, Gegenwert ${euro(t.counter)}), ${held}` + (got.length ? ` · Erfolg ${got.join(', ')}` : '');
+  });
+  const strong = value >= CIRC_STRONG_CENTS || returns > 1 || perks.length > 0;
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    users,
+    count: list.length,
+    owners: users.length,
+    returns,
+    perks: perks.length,
+    total: value,
+    from: new Date(toMs(list[0].at)),
+    to: new Date(toMs(list[list.length - 1].at)),
+    summary:
+      `${card} (Wert ${euro(value)}) ${list.length}× weitergegeben zwischen ${users.length} Konten` +
+      (returns ? `, ${returns}× zurück an einen früheren Besitzer` : '') +
+      (perks.length ? `, dabei ${perks.length === 1 ? 'ein Erfolg' : `${perks.length} Erfolge`} freigeschaltet` : ''),
+    trades: lines.slice(-8),
+  };
+}
+
+/**
+ * Platz 1 mit geliehenem Wert: Abschnitte auf Platz 1, in denen der Spieler ohne die netto per Handel erhaltenen Werte
+ * nicht vorne gelegen hätte (erhaltener Wert > kleinster Vorsprung auf Platz 2).
+ * stints: [{ from, to, minLead }] eines Spielers, flows: [{ at, net }] (je Geschäft: Bankwert erhalten − Gegenwert
+ * gegeben, positiv = erhalten), earned: [{ label, at }] seine Erfolge. null, wenn unauffällig.
+ */
+function rankFinding(stints, flows, earned = []) {
+  const hits = [];
+  for (const s of stints) {
+    const from = toMs(s.from);
+    const to = toMs(s.to);
+    const net = flows.filter((f) => toMs(f.at) >= from - RANK_LOOKBACK_MS && toMs(f.at) <= from + RANK_SLACK_MS).reduce((sum, f) => sum + f.net, 0);
+    if (net > (s.minLead || 0)) hits.push({ from, to, net, lead: s.minLead || 0, perks: earned.filter((e) => toMs(e.at) >= from && toMs(e.at) <= to + RANK_SLACK_MS) });
+  }
+  const ms = hits.reduce((sum, h) => sum + (h.to - h.from), 0);
+  if (!hits.length || ms < RANK_MIN_MS) return null;
+  const perks = hits.flatMap((h) => h.perks.map((e) => `„${e.label}“`));
+  const best = hits.reduce((x, y) => (y.net > x.net ? y : x));
+  return {
+    level: ms >= RANK_STRONG_MS || perks.length ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: hits.length,
+    spanMs: ms,
+    total: best.net,
+    from: new Date(hits[0].from),
+    to: new Date(Math.max(...hits.map((h) => h.to))),
+    summary:
+      `${durationText(ms)} auf Platz 1 nur dank erhaltener Werte: netto ${euro(best.net)} per Handel bekommen, Vorsprung zeitweise nur ${euro(best.lead)}` +
+      (perks.length ? `, dabei ${[...new Set(perks)].join(', ')} freigeschaltet` : ''),
+  };
+}
+
+/**
+ * Sammelkonten: Konten, die von mehreren anderen über ungleiche Geschäfte netto viel Wert bekommen und kaum etwas
+ * zurückgeben – typisch für Zweit-Konten, die ein Hauptkonto füttern, oder abgesprochene Geschenke.
+ * flows: [{ from, to, shifted, at }] (ungleiche Geschäfte, siehe tradeFlow), names: Map userId → Name,
+ * flagged: Set von Konten-Paaren (deviceLogic.pairKey), die auch als Mehrfach-Konto erkannt sind.
+ * Liefert [{ user, level, donors, total, back, from, to, summary, trades }].
+ */
+function funnelFindings(flows, { names = new Map(), flagged = new Set(), pairKey = (a, b) => [String(a), String(b)].sort().join(':') } = {}) {
+  const edges = new Map(); // "von>an" → Summe
+  for (const f of flows) {
+    if (!(f.shifted >= FUNNEL_FLOW_CENTS)) continue;
+    const k = `${f.from}>${f.to}`;
+    edges.set(k, (edges.get(k) || 0) + f.shifted);
+  }
+  const receivers = new Set(flows.map((f) => String(f.to)));
+  const out = [];
+  for (const user of receivers) {
+    const donors = [];
+    let inflow = 0;
+    let back = 0;
+    for (const [k, v] of edges) {
+      const [from, to] = k.split('>');
+      if (to !== user) continue;
+      const ret = edges.get(`${user}>${from}`) || 0;
+      inflow += v;
+      back += Math.min(ret, v);
+      if (v - ret > 0) donors.push({ user: from, net: v - ret });
+    }
+    const total = donors.reduce((s, d) => s + d.net, 0);
+    if (donors.length < FUNNEL_DONORS || total < FUNNEL_MIN_CENTS || back >= inflow * FUNNEL_BACK_SHARE) continue;
+    const linked = donors.some((d) => flagged.has(pairKey(d.user, user)));
+    const mine = flows.filter((f) => String(f.to) === user && donors.some((d) => d.user === String(f.from))).sort((x, y) => toMs(x.at) - toMs(y.at));
+    donors.sort((x, y) => y.net - x.net);
+    out.push({
+      user,
+      level: donors.length >= FUNNEL_STRONG_DONORS || total >= FUNNEL_STRONG_CENTS || linked ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+      count: donors.length,
+      total,
+      back,
+      from: new Date(toMs(mine[0].at)),
+      to: new Date(toMs(mine[mine.length - 1].at)),
+      summary:
+        `Bekam von ${donors.length} Konten netto ${euro(total)} über ungleiche Geschäfte und gab ${back ? `nur ${euro(back)}` : 'nichts'} zurück` +
+        (linked ? ' – mindestens ein Geber ist auch als Mehrfach-Konto erkannt' : ''),
+      trades: donors.slice(0, 8).map((d) => `${names.get(d.user) || 'unbekannt'}: netto ${euro(d.net)}`),
+    });
+  }
+  return out;
+}
+
+// ---------- Broker: Reaktion auf Kurssprünge ----------
+
+/**
+ * Handelt fast immer wenige Sekunden nach einem Kurssprung (Anstieg, Einbruch, Pump, Crash) im selben Wert – ein
+ * Mensch müsste die Seite dauernd im Blick haben, ein Skript fragt den Kurs ohnehin alle paar Sekunden ab.
+ * trades: [{ coin, side, createdAt }] eines Mitglieds, events: [{ coin, at, type, change }] aller Werte.
+ * null, wenn unauffällig.
+ */
+function marketReactionFinding(trades, events, timeZone = 'Europe/Berlin') {
+  const coins = new Set(trades.map((t) => t.coin));
+  const relevant = events.filter((e) => coins.has(e.coin) && !MARKET_SKIP.has(e.type)).sort((x, y) => toMs(x.at) - toMs(y.at));
+  if (relevant.length < MARKET_MIN_EVENTS) return null;
+  const byCoin = new Map();
+  for (const t of trades) {
+    if (!byCoin.has(t.coin)) byCoin.set(t.coin, []);
+    byCoin.get(t.coin).push({ at: toMs(t.createdAt), side: t.side });
+  }
+  const hits = [];
+  for (const e of relevant) {
+    const at = toMs(e.at);
+    const first = (byCoin.get(e.coin) || []).filter((t) => t.at >= at && t.at - at <= MARKET_REACT_MS).sort((x, y) => x.at - y.at)[0];
+    if (!first) continue;
+    // passend: nach einem Sprung nach oben verkaufen, nach einem Sturz kaufen (oder dem Trend hinterher)
+    hits.push({ at: first.at, delay: first.at - at, aligned: (e.change > 0) === (first.side === 'verkauf'), up: e.change > 0, side: first.side });
+  }
+  if (hits.length < MARKET_MIN_EVENTS || hits.length / relevant.length < MARKET_SHARE) return null;
+  const night = hits.filter((h) => {
+    const hr = hourIn(h.at, timeZone);
+    return hr >= IHK_NIGHT[0] && hr < IHK_NIGHT[1];
+  }).length;
+  const aligned = hits.filter((h) => h.aligned).length;
+  const medianMs = median(hits.map((h) => h.delay));
+  return {
+    level: hits.length >= MARKET_STRONG_EVENTS || night >= MARKET_NIGHT_STRONG ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: hits.length,
+    events: relevant.length,
+    medianMs,
+    night,
+    aligned,
+    from: new Date(Math.min(...hits.map((h) => h.at))),
+    to: new Date(Math.max(...hits.map((h) => h.at))),
+    summary:
+      `Auf ${hits.length} von ${relevant.length} Kurssprüngen im Schnitt ${seconds(medianMs)} danach gehandelt` +
+      ` (${aligned}× gegen den Sprung, also Kauf nach Einbruch bzw. Verkauf nach Anstieg)` +
+      (night ? `, ${night}× zwischen ${IHK_NIGHT[0]} und ${IHK_NIGHT[1]} Uhr` : ''),
   };
 }
 
@@ -766,6 +998,10 @@ const COUNT_LABEL = {
   falle: 'Aufrufe',
   rechenzentrum: 'aus Rechenzentrum',
   parallel: 'Wechsel',
+  kreislauf: 'Weitergaben',
+  rang: 'Abschnitte',
+  netz: 'Geber',
+  markt: 'Reaktionen',
 };
 
 /**
@@ -778,7 +1014,12 @@ function factsOf(kind, details = {}) {
   const add = (ok, value, label) => ok && out.push({ value, label });
   const num = (v) => v !== undefined && v !== null && Number.isFinite(v);
   add(num(d.count) && COUNT_LABEL[kind], String(d.count), COUNT_LABEL[kind]);
-  add(num(d.medianMs), seconds(d.medianMs), kind === 'reaktion' ? 'nach Laden der Seite' : 'Abstand');
+  add(num(d.medianMs), seconds(d.medianMs), kind === 'reaktion' ? 'nach Laden der Seite' : kind === 'markt' ? 'nach dem Sprung' : 'Abstand');
+  add(num(d.events), String(d.events), 'Kurssprünge');
+  add(num(d.aligned), String(d.aligned), 'gegen den Sprung');
+  add(num(d.owners), String(d.owners), 'Besitzer');
+  add(num(d.returns) && d.returns > 0, `${d.returns}×`, 'zurück');
+  add(num(d.perks) && d.perks > 0, String(d.perks), 'Erfolge dabei');
   add(num(d.spread), d.spread < 0.01 ? '< 1 %' : percent(d.spread), 'Abweichung');
   add(num(d.runs) && d.runs > 1, `${d.runs}×`, 'Serien');
   add(num(d.reactMs), seconds(d.reactMs), 'nach Ablauf abgeholt');
@@ -791,14 +1032,71 @@ function factsOf(kind, details = {}) {
   add(num(d.unseen) && d.unseen > 0, String(d.unseen), 'Beute ungesehen');
   add(num(d.excessMs), seconds(Math.max(0, d.excessMs)), 'über Mindestzeit');
   add(num(d.perfect), String(d.perfect), 'perfekt');
-  add(num(d.spanMs), hoursText(d.spanMs), 'ohne Pause');
+  add(num(d.spanMs), durationText(d.spanMs), kind === 'rang' ? 'auf Platz 1' : 'ohne Pause');
   add(num(d.nightHours), String(d.nightHours), 'Nachtstunden');
   add(num(d.night) && d.night > 0, `${d.night}×`, 'nachts');
   add(num(d.windows), `${d.windows}×`, 'Zeitfenster');
   add(num(d.devices), String(d.devices), 'Geräte');
-  add(num(d.total), euro(d.total), kind === 'ertrag' ? 'eingenommen' : 'verschoben');
+  const TOTAL_LABEL = { ertrag: 'eingenommen', kreislauf: 'Kartenwert', rang: 'netto erhalten', netz: 'netto erhalten' };
+  add(num(d.total), euro(d.total), TOTAL_LABEL[kind] || 'verschoben');
+  add(num(d.back) && d.back > 0, euro(d.back), 'zurück');
   add(num(d.factor), `${Math.round(d.factor)}×`, 'das Übliche');
   return out;
+}
+
+const VERDICT_EVENTS = new Set(['bestaetigt', 'fehlalarm', 'zurueckgenommen']);
+const rateOf = (c) => ({ ...c, rate: c.confirmed + c.falseAlarms ? c.confirmed / (c.confirmed + c.falseAlarms) : null });
+
+/**
+ * Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (models/SuspicionVerdict).
+ * events: [{ key, event, kind, level, createdAt }] in beliebiger Reihenfolge. Je Hinweis zählt nur sein letztes Urteil,
+ * mit der Stufe, die er dabei hatte; ein zurückgenommenes Urteil zählt nicht, "neue_belege" ändert nichts.
+ * counts: Map kind → Zahl der aktuellen Hinweise (Spalte "Hinweise").
+ * Liefert [{ kind, label, total, confirmed, falseAlarms, rate, levels: { 1: {...}, 2: {...} } }], rate =
+ * bestätigt ÷ (bestätigt + Fehlalarm) bzw. null ohne Urteil. Muster mit Urteilen zuerst, dann nach Zahl der Hinweise.
+ */
+function precisionRows(events, counts = new Map()) {
+  const last = new Map(); // key → letztes Urteil
+  for (const e of events) {
+    if (!VERDICT_EVENTS.has(e.event)) continue;
+    const prev = last.get(e.key);
+    if (!prev || toMs(e.createdAt) >= toMs(prev.createdAt)) last.set(e.key, e);
+  }
+  const empty = () => ({ confirmed: 0, falseAlarms: 0 });
+  const byKind = new Map();
+  const row = (kind) => {
+    if (!byKind.has(kind)) byKind.set(kind, { kind, label: KIND_LABEL[kind] || kind, total: counts.get(kind) || 0, ...empty(), levels: { [LEVEL.moeglich]: empty(), [LEVEL.wahrscheinlich]: empty() } });
+    return byKind.get(kind);
+  };
+  for (const kind of counts.keys()) row(kind);
+  for (const e of last.values()) {
+    if (e.event === 'zurueckgenommen') continue;
+    const r = row(e.kind);
+    const field = e.event === 'bestaetigt' ? 'confirmed' : 'falseAlarms';
+    r[field]++;
+    const lvl = Math.min(Math.max(e.level || LEVEL.moeglich, LEVEL.moeglich), LEVEL.wahrscheinlich);
+    r.levels[lvl][field]++;
+  }
+  return [...byKind.values()]
+    .map((r) => ({ ...rateOf(r), levels: Object.fromEntries(Object.entries(r.levels).map(([l, c]) => [l, rateOf(c)])) }))
+    .sort((x, y) => (y.rate !== null) - (x.rate !== null) || y.total - x.total || x.label.localeCompare(y.label, 'de'));
+}
+
+/**
+ * Namen aus einem gespeicherten Wert entfernen (Zusammenfassung, Kennzahlen, Beispiel-Zeilen) – für die Anonymisierung
+ * des Urteils-Protokolls nach einer Kontolöschung. Ersetzt jedes Vorkommen der Namen in allen Texten, auch verschachtelt.
+ */
+function scrubNames(value, names, replacement = 'gelöschtes Konto') {
+  const list = [...new Set(names.filter((n) => typeof n === 'string' && n.length >= 2))].sort((a, b) => b.length - a.length);
+  if (!list.length) return value;
+  const re = new RegExp(list.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  const walk = (v) => {
+    if (typeof v === 'string') return v.replace(re, replacement);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object' && !(v instanceof Date)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value);
 }
 
 /** Zusätzliche Zeilen eines Hinweises (Beispiel-Geschäfte, User-Agents, Netzbetreiber) */
@@ -847,6 +1145,9 @@ module.exports = {
   IHK_MIN_RUNS,
   SCALP_MIN_ROUNDS,
   VALUE_MIN_CENTS,
+  CIRC_MIN_CENTS,
+  FUNNEL_FLOW_CENTS,
+  RANK_LOOKBACK_MS,
   INCOME_SOURCES,
   median,
   gaps,
@@ -856,8 +1157,13 @@ module.exports = {
   rhythmFinding,
   ihkFinding,
   scalpFinding,
+  tradeFlow,
   valueFinding,
   valuePairFinding,
+  circulationFinding,
+  rankFinding,
+  funnelFindings,
+  marketReactionFinding,
   dungeonFinding,
   gradingFinding,
   activityFinding,
@@ -870,6 +1176,8 @@ module.exports = {
   parallelFinding,
   factsOf,
   extrasOf,
+  precisionRows,
+  scrubNames,
   groupAlerts,
   overallRating,
   RATING_AREAS,

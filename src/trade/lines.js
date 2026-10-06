@@ -133,8 +133,24 @@ function migrateTradeDoc(old) {
   return { $set, $unset: unset };
 }
 
+/**
+ * Anschaffungswert je erhaltenem Exemplar (Rangliste, siehe rankService.FRESH_DAYS): paid = was der Empfänger
+ * insgesamt gegeben hat (Cent), aufgeteilt nach dem Wert der erhaltenen Exemplare. received: [{ doc, value }] →
+ * Map doc → Cent (abgerundet). Haben alle Exemplare keinen Wert, wird gleichmäßig verteilt.
+ */
+function costShares(received, paid) {
+  const out = new Map();
+  const total = received.reduce((s, r) => s + Math.max(0, r.value || 0), 0);
+  for (const r of received) {
+    const share = total > 0 ? Math.max(0, r.value || 0) / total : 1 / received.length;
+    out.set(String(r.doc), Math.floor(Math.max(0, paid || 0) * share));
+  }
+  return out;
+}
+
 module.exports = {
   ITEM_PREFIX,
+  costShares,
   isItemId,
   otherRole,
   cardName,

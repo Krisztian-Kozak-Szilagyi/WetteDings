@@ -17,7 +17,7 @@
         <span class="podium-rank"><%= u.rank %></span>
         <img class="podium-avatar" src="<%= avatarUrl(u) %>?v=<%= assetVersion %>" alt="">
         <span class="podium-name"><%= u.username %><%- roleBadge(u.username) %></span>
-        <span class="podium-total"><%= euro(u.total) %></span>
+        <span class="podium-total"><%= euro(u.rankTotal) %></span>
       </a>
     <% }) %>
   </div>
@@ -29,22 +29,23 @@
   <% } else { %>
     <div class="table-wrap">
       <table class="table leaderboard">
-        <thead><tr><th>#</th><th>Name</th><th class="num">Gesamt</th><th class="num hide-sm">Verfügbar</th><th class="num hide-sm">In Wetten</th><th class="num hide-sm">In Coins</th><th class="num hide-sm" title="Verkaufswert der Karten (folierte mit Wertsteigerung) plus ungeöffnete Packs zum Packpreis">In Karten</th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th class="num">Gesamt</th><th class="num hide-sm">Verfügbar</th><th class="num hide-sm">In Wetten</th><th class="num hide-sm">In Coins</th><th class="num hide-sm" title="Verkaufswert der Karten (folierte mit Wertsteigerung) plus ungeöffnete Packs zum Packpreis; per Handel bekommene Karten <%= freshDays %> Tage lang höchstens mit dem, was dafür gegeben wurde">In Karten</th></tr></thead>
         <tbody>
           <% leaders.forEach((u, i) => { const me = currentUser && String(currentUser._id) === String(u._id); %>
             <tr class="<%= [me ? 'me' : '', u.rank <= 3 ? 'top-' + u.rank : ''].join(' ').trim() %>">
               <td class="rank rank-<%= u.rank %>"><%= u.rank %></td>
               <td><a href="/profil/<%= encodeURIComponent(u.username) %>"><%= u.username %></a><%- roleBadge(u.username) %></td>
-              <td class="num"><strong><%= euro(u.total) %></strong></td>
+              <td class="num"><strong><%= euro(u.rankTotal) %></strong></td>
               <td class="num hide-sm"><%= euro(u.balance) %></td>
               <td class="num hide-sm"><%= euro(u.inPlay) %></td>
               <td class="num hide-sm"><%= euro(u.coinValue) %></td>
-              <td class="num hide-sm"><%= euro(u.cardValue) %></td>
+              <td class="num hide-sm"><%= euro(u.cardValue - u.fresh) %></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+    <p class="muted small">Per Handel bekommene Karten zählen hier <%= freshDays %> Tage lang höchstens mit dem, was du dafür gegeben hast, danach mit ihrem vollen Wert.</p>
   <% } %>
 </div>
 

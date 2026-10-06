@@ -106,9 +106,19 @@
   const openAlertCount = openGroups.reduce((s, g) => s + g.open, 0);
   const stageAtLeast = (n) => openGroups.filter((g) => g.rating && g.rating.stage >= n).length;
   const AREA_LABEL = { verhalten: 'Spielverhalten', technik: 'Technik', ergebnis: 'Ergebnis' };
+  const VERDICT_LABEL = { bestaetigt: 'Bestätigt', fehlalarm: 'Fehlalarm' };
 %>
+<%# Formular für einen Hinweis bzw. eine Gruppe (ids); action: erledigt, oeffnen, bestaetigt, fehlalarm %>
+<% const alertForm = (id, action, label, confirm, ids) => { %>
+  <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= ids ? 'gruppe' : id %>" data-confirm="<%= confirm %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <% if (ids) { %><input type="hidden" name="ids" value="<%= ids %>"><% } %>
+    <input type="hidden" name="action" value="<%= action %>">
+    <button class="btn btn-ghost btn-sm" type="submit"><%= label %></button>
+  </form>
+<% } %>
 <section class="stats-block" id="auffaelligkeiten">
-  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Gesamtbewertung</strong> je Spieler aus drei Bereichen – Spielverhalten (Tempo, Takt, IHK, Dungeon, Grading, Scalping, Rund um die Uhr), Technik (Browser, Reaktionszeit, Eingabe, Falle, Rechenzentrum, zwei Geräte) und Ergebnis (Einnahmen, Wertverschiebung, Mehrfach-Konto). Muster aus demselben Bereich bestätigen sich kaum, Belege aus verschiedenen Bereichen stark. <em>Beobachten</em>: einzelne schwache Hinweise. <em>Verdacht</em>: ein klares Muster oder schwache aus mehreren Bereichen. <em>Starker Verdacht</em>: mindestens zwei Bereiche, davon einer „Wahrscheinlich“. <em>Eindeutig</em>: alle drei Bereiche oder Falle. Das Menü-Abzeichen zählt Spieler ab „Verdacht“.<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.<br><strong>Dungeon-Automatik</strong>: an jedem Termin dabei (auch nachts), immer sofort nach Öffnen der Anmeldung angemeldet oder die Beute nie angeschaut.<br><strong>Grading zur Mindestzeit</strong>: Aufträge fast genau zur frühestmöglichen Zeit fertig gemeldet.<br><strong>Rund um die Uhr</strong>: über 20 Stunden ohne Pause von mehr als 3 Stunden aktiv, auch nachts.<br><strong>Kein normaler Browser</strong>: Spiel-Aktionen aus einem ferngesteuerten Browser, mit dem User-Agent eines Skript-Werkzeugs oder ohne Fingerabdruck und Browser-Kopfzeilen.<br><strong>Ungewöhnliche Einnahmen</strong>: in 24 Stunden mindestens das Fünffache des Üblichen aus IHK, Dungeon, Grading und Bank-Verkäufen (allein nur „Möglich“).<br><strong>Reaktionszeit</strong>: Aktionen weniger als 0,4 s nach dem Laden der Seite oder immer fast gleich lange danach; wiederverwendete Seiten-Kennzeichen; Aktionen ohne vorher geladene Seite.<br><strong>Ohne echte Eingabe</strong>: vor den Aktionen keine Maus-, Touch- oder Tastatureingabe, nur künstliche Klicks (Userscript, Auto-Klicker).<br><strong>Falle ausgelöst</strong>: einen unsichtbaren Link aufgerufen, den nur ein Programm findet.<br><strong>Aus einem Rechenzentrum</strong>: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs, daher nur „Möglich“).<br><strong>Gleichzeitig von zwei Geräten</strong>: Aktionen wechseln innerhalb von 10 Minuten mehrmals zwischen zwei Geräten und zwei Netzen hin und her.') %>
+  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Gesamtbewertung</strong> je Spieler aus drei Bereichen – Spielverhalten (Tempo, Takt, IHK, Dungeon, Grading, Scalping, Rund um die Uhr, Kurssprünge), Technik (Browser, Reaktionszeit, Eingabe, Falle, Rechenzentrum, zwei Geräte) und Ergebnis (Einnahmen, Wertverschiebung, Kartenkreislauf, Platz 1 mit geliehenem Wert, Sammelkonto, Mehrfach-Konto). Muster aus demselben Bereich bestätigen sich kaum, Belege aus verschiedenen Bereichen stark. <em>Beobachten</em>: einzelne schwache Hinweise. <em>Verdacht</em>: ein klares Muster oder schwache aus mehreren Bereichen. <em>Starker Verdacht</em>: mindestens zwei Bereiche, davon einer „Wahrscheinlich“. <em>Eindeutig</em>: alle drei Bereiche oder Falle. Das Menü-Abzeichen zählt Spieler ab „Verdacht“.<br><strong>Urteil</strong>: Markiere geprüfte Hinweise als <em>Bestätigt</em> (war Manipulation) oder <em>Fehlalarm</em> statt nur als erledigt. Daraus entsteht unten die Trefferquote je Muster und Stufe, mit der sich die Schwellen nachjustieren lassen. Jedes Urteil landet mit einer Kopie des Hinweises im Protokoll „Erkennungs-Urteile“ (dauerhaft, bei Kontolöschung anonymisiert, Export als CSV oder JSON).<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.<br><strong>Dungeon-Automatik</strong>: an jedem Termin dabei (auch nachts), immer sofort nach Öffnen der Anmeldung angemeldet oder die Beute nie angeschaut.<br><strong>Grading zur Mindestzeit</strong>: Aufträge fast genau zur frühestmöglichen Zeit fertig gemeldet.<br><strong>Rund um die Uhr</strong>: über 20 Stunden ohne Pause von mehr als 3 Stunden aktiv, auch nachts.<br><strong>Kein normaler Browser</strong>: Spiel-Aktionen aus einem ferngesteuerten Browser, mit dem User-Agent eines Skript-Werkzeugs oder ohne Fingerabdruck und Browser-Kopfzeilen.<br><strong>Ungewöhnliche Einnahmen</strong>: in 24 Stunden mindestens das Fünffache des Üblichen aus IHK, Dungeon, Grading und Bank-Verkäufen (allein nur „Möglich“).<br><strong>Reaktionszeit</strong>: Aktionen weniger als 0,4 s nach dem Laden der Seite oder immer fast gleich lange danach; wiederverwendete Seiten-Kennzeichen; Aktionen ohne vorher geladene Seite.<br><strong>Ohne echte Eingabe</strong>: vor den Aktionen keine Maus-, Touch- oder Tastatureingabe, nur künstliche Klicks (Userscript, Auto-Klicker).<br><strong>Falle ausgelöst</strong>: einen unsichtbaren Link aufgerufen, den nur ein Programm findet.<br><strong>Aus einem Rechenzentrum</strong>: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs, daher nur „Möglich“).<br><strong>Gleichzeitig von zwei Geräten</strong>: Aktionen wechseln innerhalb von 10 Minuten mehrmals zwischen zwei Geräten und zwei Netzen hin und her.<br><strong>Reaktion auf Kurssprünge</strong>: beim Broker immer wieder wenige Sekunden nach einem Kurssprung im selben Wert gehandelt.<br><strong>Kartenkreislauf</strong>: ein wertvolles Exemplar (ab 500 €) wandert durch mindestens drei Konten oder kommt zu einem früheren Besitzer zurück; „Wahrscheinlich“, wenn dabei jemand einen Erfolg freischaltet.<br><strong>Platz 1 mit geliehenem Wert</strong>: auf Platz 1 nur dank Werten, die das Konto vorher per Handel geschenkt oder billig bekommen hat.<br><strong>Sammelkonto</strong>: bekommt von mindestens drei Konten über ungleiche Geschäfte netto viel Wert und gibt kaum etwas zurück.') %>
   <% if (!openGroups.length) { %>
     <div class="card"><p class="muted">Aktuell gibt es keine offenen Auffälligkeiten.</p></div>
   <% } else { %>
@@ -124,7 +134,7 @@
       <div class="susp-finding-body">
         <div class="susp-finding-title">
           <strong><%= a.kindLabel %></strong><% if (a.actionLabel) { %><span class="muted"> · <%= a.actionLabel %></span><% } %>
-          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? 'Erledigt' : a.levelLabel %></span>
+          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? (VERDICT_LABEL[a.verdict] || 'Erledigt') : a.levelLabel %></span>
         </div>
         <% if (a.facts.length) { %>
           <div class="susp-facts">
@@ -132,23 +142,31 @@
           </div>
         <% } %>
         <p class="susp-summary"><%= a.summary %></p>
+        <% if (a.verdict && a.verdictSummary && a.verdictSummary !== a.summary) { %>
+          <p class="susp-summary muted small">Beurteilt wurde (<%= a.verdictLevel === 2 ? 'Wahrscheinlich' : 'Möglich' %>): <%= a.verdictSummary %></p>
+        <% } %>
         <% if (a.extras.length) { %>
           <ul class="susp-extras"><% a.extras.forEach((t) => { %><li><%= t %></li><% }) %></ul>
         <% } %>
         <div class="susp-time" title="<%= (a.from ? dateSec(a.from) + ' – ' : '') + dateSec(a.evidenceAt) %>">
           <%= timeSpan(a.from, a.evidenceAt) %>
-          <% if (a.doneAt) { %> · erledigt <%= date(a.doneAt) %><%= a.doneByName ? ' von ' + a.doneByName : '' %><% } %>
+          <% if (a.doneAt) { %> · <%= a.verdict ? VERDICT_LABEL[a.verdict].toLowerCase() : 'erledigt' %> <%= date(a.doneAt) %><%= a.doneByName ? ' von ' + a.doneByName : '' %><% } %>
         </div>
       </div>
       <div class="susp-finding-actions">
+        <% (a.cardLinks || []).forEach((l) => { %>
+          <a class="btn btn-ghost btn-sm" href="<%= l.href %>"><%= l.label %></a>
+        <% }) %>
         <% a.users.forEach((u) => { %>
           <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: a.log, spieler: u.username }) %>">Protokoll<%= a.users.length > 1 ? ' ' + u.username : '' %></a>
         <% }) %>
-        <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
-          <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
-        </form>
+        <% if (a.doneAt) { %>
+          <% alertForm(a._id, 'oeffnen', 'Wieder öffnen', 'Hinweis wieder öffnen?' + (a.verdict ? ' Das Urteil wird dabei zurückgenommen.' : '')) %>
+        <% } else { %>
+          <% alertForm(a._id, 'bestaetigt', 'Bestätigt', 'Als bestätigt markieren? Das Muster war tatsächlich Manipulation.') %>
+          <% alertForm(a._id, 'fehlalarm', 'Fehlalarm', 'Als Fehlalarm markieren? Das Muster hatte eine harmlose Ursache.') %>
+          <% alertForm(a._id, 'erledigt', 'Erledigt', 'Ohne Urteil als erledigt markieren?') %>
+        <% } %>
       </div>
     </li>
   <% } %>
@@ -160,7 +178,7 @@
         <div class="susp-who">
           <span class="susp-avatar" aria-hidden="true"><%= g.users[0].username.charAt(0).toUpperCase() %></span>
           <div>
-            <div class="susp-who-label"><%= g.users.length > 1 ? 'Konten-Paar' : 'Spieler' %></div>
+            <div class="susp-who-label"><%= g.users.length > 2 ? g.users.length + ' Konten' : g.users.length > 1 ? 'Konten-Paar' : 'Spieler' %></div>
             <div class="susp-names">
               <% g.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
             </div>
@@ -174,11 +192,9 @@
             <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: 'gesamt', spieler: g.users[0].username }) %>">Alle Aktionen</a>
           <% } %>
           <% if (openAlerts.length > 1) { %>
-            <form method="post" data-reauth action="/admin/auffaelligkeiten/gruppe" data-confirm="Alle <%= openAlerts.length %> offenen Hinweise als erledigt markieren?">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="hidden" name="ids" value="<%= openAlerts.map((a) => a._id).join(',') %>">
-              <button class="btn btn-ghost btn-sm" type="submit">Alle erledigt</button>
-            </form>
+            <% const ids = openAlerts.map((a) => a._id).join(','); %>
+            <% alertForm(null, 'bestaetigt', 'Alle bestätigt', `Alle ${openAlerts.length} offenen Hinweise als bestätigt markieren?`, ids) %>
+            <% alertForm(null, 'erledigt', 'Alle erledigt', `Alle ${openAlerts.length} offenen Hinweise als erledigt markieren?`, ids) %>
           <% } %>
         </div>
       </header>
@@ -211,6 +227,31 @@
   <div class="susp-groups">
     <% openGroups.forEach(groupCard) %>
   </div>
+  <% if (suspicionPrecision.some((r) => r.confirmed || r.falseAlarms)) { %>
+    <div class="card susp-precision">
+      <h3>Trefferquote je Muster</h3>
+      <p class="muted small">Aus allen Urteilen im Protokoll (je Hinweis das letzte, mit der Stufe, die er beim Urteil hatte). Eine niedrige Quote bei „Möglich“ heißt: Diese Schwelle meldet zu viele Harmlose. Liegt „Wahrscheinlich“ nahe 100 %, ist die Stufe verlässlich. Ohne Fehlalarme lässt sich eine Schwelle eher lockern. <a href="<%= panelUrl('protokolle', 'protokoll', { log: 'urteile' }) %>">Alle Urteile im Protokoll</a> (Export als CSV oder JSON).</p>
+      <% const quote = (c) => (c.rate === null ? '–' : `${Math.round(c.rate * 100)} % <span class="muted">(${c.confirmed}/${c.confirmed + c.falseAlarms})</span>`); %>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Muster</th><th class="num">Hinweise</th><th class="num">Bestätigt</th><th class="num">Fehlalarm</th><th class="num">Trefferquote</th><th class="num">bei „Möglich“</th><th class="num">bei „Wahrscheinlich“</th></tr></thead>
+          <tbody>
+            <% suspicionPrecision.forEach((r) => { %>
+              <tr>
+                <td><%= r.label %></td>
+                <td class="num"><%= r.total %></td>
+                <td class="num"><%= r.confirmed %></td>
+                <td class="num"><%= r.falseAlarms %></td>
+                <td class="num"><strong><%= r.rate === null ? '–' : Math.round(r.rate * 100) + ' %' %></strong></td>
+                <td class="num"><%- quote(r.levels[1]) %></td>
+                <td class="num"><%- quote(r.levels[2]) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
   <% if (doneGroups.length) { %>
     <details class="history device-done susp-done-groups">
       <summary>Erledigt (<%= doneGroups.length %> <%= doneGroups.length === 1 ? 'Spieler' : 'Spieler bzw. Paare' %>)</summary>

@@ -29,7 +29,10 @@ const bcrypt = require('bcryptjs');
 const User = require(path.join(ROOT, 'src/models/User'));
 const Ledger = require(path.join(ROOT, 'src/models/Ledger'));
 const { IhkRun } = require(path.join(ROOT, 'src/models/Ihk'));
-const { CoinTrade } = require(path.join(ROOT, 'src/models/Coin'));
+const { CoinTrade, CoinEvent } = require(path.join(ROOT, 'src/models/Coin'));
+const { TcgCard } = require(path.join(ROOT, 'src/models/Tcg'));
+const Achievement = require(path.join(ROOT, 'src/models/Achievement'));
+const RankStint = require(path.join(ROOT, 'src/models/RankStint'));
 const { DungeonRun } = require(path.join(ROOT, 'src/models/Dungeon'));
 const { GradingJob } = require(path.join(ROOT, 'src/models/Grading'));
 const { Trade } = require(path.join(ROOT, 'src/models/Trade'));
@@ -47,6 +50,7 @@ const suspicionService = require(path.join(ROOT, 'src/moderation/suspicionServic
 
 const MAIL = '@verdacht.dev.local'; // daran erkennt --weg die Testspieler
 const SUSPECT = 'Grindmaster99'; // der verdächtige Testspieler
+const TEST_EVENT_PRICE = -1; // Kurssprünge der Testdaten (kein echter Kurs ist negativ) – daran erkennt --weg sie
 const SEC = 1000;
 const MIN = 60 * SEC;
 const HOUR = 60 * MIN;
@@ -177,6 +181,41 @@ const PATTERNS = {
     await ActionTrace.collection.insertMany(traces);
   },
 
+  // Kartenkreislauf und Platz 1 mit geliehenem Wert: die Sith-Karte geht für eine Crumpled-Karte reihum
+  // (Verdächtiger → Zweitkonto → lena → zurück); das Zweitkonto steht danach 26 Std. vorne und bekommt "Thronfolger"
+  async kreislauf(u, { zweit, filler }) {
+    const sith = catalog.CARDS.find((c) => c.rarity === 'sith') || cardOf('icon');
+    const crumpled = cardOf('crumpled');
+    const doc = new mongoose.Types.ObjectId();
+    const t0 = now - 4 * 24 * HOUR;
+    const steps = [
+      [u, zweit, t0],
+      [zweit, filler[0], t0 + 27 * HOUR],
+      [filler[0], u, t0 + 50 * HOUR],
+    ];
+    await Trade.collection.insertMany(
+      steps.map(([from, to, t]) => ({ kind: 'tausch', seller: from._id, sellerName: from.username, to: to._id, toName: to.username, buyer: to._id, buyerName: to.username, give: [{ card: sith.id, doc }], want: [{ card: crumpled.id, doc: new mongoose.Types.ObjectId() }], price: 0, status: 'verkauft', expiresAt: at(t), closedAt: at(t), createdAt: at(t - MIN) }))
+    );
+    await TcgCard.collection.insertOne({ _id: doc, user: u._id, card: sith.id, rarity: sith.rarity, createdAt: at(t0 - 24 * HOUR), tradedAt: at(t0 + 50 * HOUR), tradedCost: 300 });
+    await Achievement.collection.insertOne({ user: zweit._id, key: 'thronfolger', reward: 10000, earnedAt: at(t0 + 25 * HOUR), seenAt: at(t0 + 25 * HOUR) });
+    await RankStint.collection.insertOne({ user: zweit._id, from: at(t0 + MIN), to: at(t0 + 26 * HOUR), minLead: 150000 });
+  },
+
+  // Sammelkonto: drei Vergleichsspieler geben dem Verdächtigen je eine Glitch-Karte für 1 €
+  async netz(u, { filler }) {
+    const glitch = cardOf('glitch');
+    await Trade.collection.insertMany(
+      filler.slice(1, 4).map((f, i) => ({ kind: 'privat', seller: f._id, sellerName: f.username, to: u._id, toName: u.username, buyer: u._id, buyerName: u.username, give: [{ card: glitch.id, doc: new mongoose.Types.ObjectId() }], want: [], price: 100, extraFrom: 'to', status: 'verkauft', expiresAt: at(now), closedAt: at(now - (10 + i) * HOUR), createdAt: at(now - (11 + i) * HOUR) }))
+    );
+  },
+
+  // Reaktion auf Kurssprünge: 8 Sprünge in den letzten Tagen, je 4–6 s danach gehandelt (2 davon nachts)
+  async markt(u) {
+    const events = Array.from({ length: 8 }, (_, i) => ({ coin: 'SAM', at: at(i < 2 ? lastHour(now - (i + 1) * 24 * HOUR, (h) => h === 3) : now - (i * 7 + 5) * HOUR), type: i % 2 ? 'einbruch' : 'anstieg', change: i % 2 ? -0.18 : 0.22, price: TEST_EVENT_PRICE }));
+    await CoinEvent.collection.insertMany(events);
+    await CoinTrade.collection.insertMany(events.map((e, i) => ({ user: u._id, coin: 'SAM', side: e.change > 0 ? 'verkauf' : 'kauf', units: 1000, price: 50, cents: 50000, createdAt: at(e.at.getTime() + (4 + (i % 3)) * SEC) })));
+  },
+
   // Mehrfach-Konto: das Zweitkonto meldet sich mit demselben Gerät (Cookie) an wie der Verdächtige → "Sicher"
   async mehrfach(u, { zweit }) {
     await deviceService.record({ userId: u._id, deviceId: 'testdaten-geraet-1', fp: 'a'.repeat(32), ip: 'testdaten-ip', ua: 'Mozilla/5.0 (Windows NT 10.0) Chrome/140.0' });
@@ -196,6 +235,10 @@ async function remove() {
     DungeonRun.deleteMany({ 'members.user': { $in: ids } }),
     GradingJob.deleteMany({ user: { $in: ids } }),
     Trade.deleteMany({ seller: { $in: ids } }),
+    TcgCard.deleteMany({ user: { $in: ids } }),
+    Achievement.deleteMany({ user: { $in: ids } }),
+    RankStint.deleteMany({ user: { $in: ids } }),
+    CoinEvent.deleteMany({ price: TEST_EVENT_PRICE }),
     Device.deleteMany({ user: { $in: ids } }),
     DeviceAlert.deleteMany({ users: { $in: ids } }),
     ScriptSignal.deleteMany({ user: { $in: ids } }),
@@ -228,8 +271,8 @@ async function main() {
       console.log(`  ✓ ${name}`);
     }
     const found = await suspicionService.scan(new Date());
-    const alerts = await SuspicionAlert.find({ users: skript._id }).select('kind action level').lean();
-    console.log(`Scan: ${found} Funde, davon ${alerts.length} für den verdächtigen Spieler "${skript.username}":`);
+    const alerts = await SuspicionAlert.find({ users: { $in: [skript._id, zweit._id] } }).select('kind action level').lean();
+    console.log(`Scan: ${found} Funde, davon ${alerts.length} für "${skript.username}" und sein Zweitkonto:`);
     for (const a of alerts) console.log(`  - ${a.kind}${a.action ? ` (${a.action})` : ''}: ${a.level === 2 ? 'Wahrscheinlich' : 'Möglich'}`);
     const group = (await suspicionService.listGroups()).find((g) => g.users.length === 1 && String(g.users[0]._id) === String(skript._id));
     if (group && group.rating) console.log(`Gesamtbewertung: ${group.rating.label} – ${group.rating.reason}`);

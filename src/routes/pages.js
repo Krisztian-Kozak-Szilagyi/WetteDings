@@ -31,7 +31,7 @@ router.get('/rangliste', requireLogin, async (req, res) => {
   const q = str(req.query.suche).trim().slice(0, 30);
   const needle = q.toLowerCase();
   const found = needle ? leaders.filter((u) => u.username.toLowerCase().includes(needle)) : leaders;
-  res.render('leaderboard', { title: 'Rangliste', leaders: found.slice(0, LEADERBOARD_LIMIT), q, memberCount: leaders.length });
+  res.render('leaderboard', { title: 'Rangliste', leaders: found.slice(0, LEADERBOARD_LIMIT), q, memberCount: leaders.length, freshDays: rankService.FRESH_DAYS });
 });
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
@@ -192,7 +192,7 @@ router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
   });
 });
 
-router.get('/regeln', (req, res) => res.render('rules', { title: 'Regeln', tcgPackPrice: tcgSettings.getPackPrice() }));
+router.get('/regeln', (req, res) => res.render('rules', { title: 'Regeln', tcgPackPrice: tcgSettings.getPackPrice(), freshDays: rankService.FRESH_DAYS }));
 router.get('/so-gehts', (req, res) => res.redirect(301, '/regeln'));
 router.get('/impressum', (req, res) => res.render('impressum', { title: 'Impressum' }));
 router.get('/datenschutz', (req, res) => res.render('datenschutz', { title: 'Datenschutz' }));

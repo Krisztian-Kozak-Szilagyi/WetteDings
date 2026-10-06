@@ -14,6 +14,9 @@ const { CoinTrade } = require('../models/Coin');
 const { GradingJob } = require('../models/Grading');
 const { PackGrant } = require('../models/Tcg');
 const SettingsChange = require('../models/SettingsChange');
+const SuspicionVerdict = require('../models/SuspicionVerdict');
+const suspicionLogic = require('../moderation/suspicionLogic');
+const { LEVEL_LABEL } = require('../device/deviceLogic');
 const coinMarkets = require('../coin/markets');
 const { LEVELS: GRADING_LEVELS } = require('../grading/gradingService');
 const tcgCatalog = require('../tcg/catalog');
@@ -51,6 +54,7 @@ const LOGS = [
   { key: 'vergaben', label: 'Vergaben', page: 'vergabeseite', group: 'team' },
   { key: 'registrierungen', label: 'Registrierungen', page: 'registrierungsseite', group: 'team' },
   { key: 'einstellungen', label: 'Einstellungen', page: 'einstellungsseite', group: 'team' },
+  { key: 'urteile', label: 'Erkennungs-Urteile', page: 'urteilseite', group: 'team' },
 ];
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
@@ -129,6 +133,9 @@ async function paged(Model, filter, sort, pageValue, select, all = false) {
 
 // ---------- Handel: wer wem welche Karte gegeben hat ----------
 
+/** Karten-Exemplare eines Handels (für den Link zur Kartenhistorie): [{ doc, label }] – Gegenstände nicht */
+const copiesOf = (lines) => (lines || []).filter((l) => l.doc && tcgCatalog.cardById[l.card]).map((l) => ({ doc: String(l.doc), label: cardLabel(l.card) }));
+
 /**
  * Abgeschlossene Geschäfte, neueste zuerst; Suche nach Namen (Anbieter, Käufer, Empfänger) oder Karte.
  * Geschäfte zwischen Mehrfach-Konten (Hinweis "sicher"/"wahrscheinlich") sind markiert, neue seit seenAt zusätzlich "Neu";
@@ -147,7 +154,7 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
     const cardIds = tcgCatalog.CARDS.filter((c) => rx.test(c.name) || rx.test(c.id)).map((c) => c.id);
     and.push({ $or: [{ sellerName: rx }, { buyerName: rx }, { toName: rx }, { 'give.card': { $in: cardIds } }, { 'want.card': { $in: cardIds } }] });
   }
-  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName give.card want.card price extraFrom tax closedAt', all);
+  const { docs, ...pg } = await paged(Trade, { $and: and }, { closedAt: -1, _id: -1 }, query.handelseite, 'kind seller buyer to sellerName buyerName toName give.card give.doc want.card want.doc price extraFrom tax closedAt', all);
   const seen = seenAt ? new Date(seenAt).getTime() : 0;
   return {
     q,
@@ -159,7 +166,7 @@ async function tradeLog(query, { player = null, seenAt = null, all = false } = {
       const sellerPays = t.extraFrom === 'seller';
       const flagged = pairs.has(deviceService.tradePairKey(t));
       const isNew = flagged && new Date(t.closedAt).getTime() > seen;
-      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: tradeSide(t.give, sellerPays ? t.price : 0), back: tradeSide(t.want, sellerPays ? 0 : t.price), tax: t.tax, flagged, isNew };
+      return { at: t.closedAt, kind: KIND_LABEL[t.kind] || t.kind, from: t.sellerName, to: to || '–', card: tradeSide(t.give, sellerPays ? t.price : 0), back: tradeSide(t.want, sellerPays ? 0 : t.price), tax: t.tax, flagged, isNew, giveCopies: copiesOf(t.give), wantCopies: copiesOf(t.want) };
     }),
   };
 }
@@ -485,6 +492,41 @@ async function settingsLog(query, { player = null, all = false } = {}) {
   return { ...pg, rows: docs.map(settingsRow) };
 }
 
+// ---------- Erkennungs-Urteile: Urteile des Teams zu Hinweisen der Manipulationserkennung ----------
+
+const VERDICT_EVENT = { bestaetigt: 'Bestätigt', fehlalarm: 'Fehlalarm', zurueckgenommen: 'Urteil zurückgenommen', neue_belege: 'Neue Belege' };
+
+function verdictRow(v) {
+  return {
+    at: v.createdAt,
+    event: v.event,
+    eventLabel: VERDICT_EVENT[v.event] || v.event,
+    by: v.byName || 'Scan',
+    kind: v.kind,
+    kindLabel: suspicionLogic.KIND_LABEL[v.kind] || v.kind,
+    action: v.action || null,
+    actionLabel: v.action && suspicionLogic.ACTIONS[v.action] ? suspicionLogic.ACTIONS[v.action].label : null,
+    level: v.level,
+    levelLabel: LEVEL_LABEL[v.level] || String(v.level),
+    stage: v.stage,
+    stageLabel: v.stageLabel || null,
+    players: v.names || [],
+    anonymized: !!v.anonymized,
+    summary: v.summary,
+    details: v.details || {}, // Kennzahlen – im JSON-Export vollständig
+    from: v.from || null,
+    evidenceAt: v.evidenceAt || null,
+    alertCreatedAt: v.alertCreatedAt || null,
+    key: v.key,
+  };
+}
+
+async function verdictLog(query, { player = null, all = false } = {}) {
+  const filter = player ? { users: player._id } : {};
+  const { docs, ...pg } = await paged(SuspicionVerdict, filter, { createdAt: -1, _id: -1 }, query.urteilseite, null, all);
+  return { ...pg, rows: docs.map(verdictRow) };
+}
+
 // ---------- Gesamt: alle Protokolle in einer Liste, neueste zuerst ----------
 
 // Buchungen, die kein anderes Protokoll zeigt (Lose, Verkäufe, Einsätze, Broker, Quests, Handel, Vergaben,
@@ -691,6 +733,18 @@ const GESAMT_SOURCES = [
         return { at: r.at, player: r.by, text: `${r.area} geändert${shown ? ': ' + shown : ''}${more}`, amount: null };
       }),
   },
+  {
+    log: 'urteile',
+    Model: SuspicionVerdict,
+    time: 'createdAt',
+    select: 'key event byName kind action level stage stageLabel names anonymized summary createdAt',
+    filter: async (p) => (p ? { users: p._id } : {}),
+    rows: async (docs) =>
+      docs.map((d) => {
+        const r = verdictRow(d);
+        return { at: r.at, player: r.by, text: `Erkennung ${r.eventLabel}: ${r.kindLabel} (${r.levelLabel}) – ${r.players.join(', ') || '–'}`, amount: null };
+      }),
+  },
 ];
 
 /** Zeilen mehrerer Quellen zusammenführen: neueste zuerst (stabil – bei gleicher Zeit bleibt die Reihenfolge der Quellen) */
@@ -740,6 +794,10 @@ const CSV = {
   registrierungen: {
     head: ['Zeitpunkt', 'Benutzername', 'Klarname', 'Code', 'Eingeladen von', 'Konto gelöscht'],
     rows: (r) => [[csvDate(r.at), r.name, r.realName || '', r.code || '', r.invitedBy || '', yesNo(r.deleted)]],
+  },
+  urteile: {
+    head: ['Zeitpunkt', 'Ereignis', 'Von', 'Muster', 'Aktion', 'Stufe', 'Gesamtbewertung', 'Spieler', 'Zusammenfassung', 'Kennzahlen (JSON)', 'Auffällig ab', 'Letzter Beleg', 'Hinweis seit', 'Schlüssel'],
+    rows: (v) => [[csvDate(v.at), v.eventLabel, v.by, v.kindLabel, v.actionLabel || '', v.levelLabel, v.stageLabel || '', v.players.join(', '), v.summary, JSON.stringify(v.details), csvDate(v.from), csvDate(v.evidenceAt), csvDate(v.alertCreatedAt), v.key]],
   },
   einstellungen: {
     head: ['Zeitpunkt', 'Von', 'Bereich', 'Wert', 'Vorher', 'Nachher'],
@@ -823,7 +881,7 @@ function exportFileName(key, playerName, ext, now = new Date()) {
   return `${['protokoll', key, playerName].filter(Boolean).map(slug).join('-')}-${day}.${ext}`;
 }
 
-const LOADERS = { gesamt: gesamtLog, wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, registrierungen: registrationLog, einstellungen: settingsLog };
+const LOADERS = { gesamt: gesamtLog, wetten: betLog, einsaetze: stakeLog, broker: coinLog, lotterie: lottoLog, konto: ledgerLog, handel: tradeLog, packs: packLog, verkauf: sellLog, ihk: ihkLog, dungeon: dungeonLog, grading: gradingLog, vergaben: grantLog, registrierungen: registrationLog, einstellungen: settingsLog, urteile: verdictLog };
 
 /** Den gewählten Log laden: { key, data } */
 async function loadLog(query, opts = {}) {
@@ -867,4 +925,5 @@ module.exports = {
   GESAMT_LEDGER_TYPES,
   grantRow,
   settingsRow,
+  verdictRow,
 };
