@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Position = require('../models/Position');
@@ -16,7 +15,7 @@ const { UserError } = require('../lib/util');
 const roles = require('../services/roles');
 const groups = require('../services/groupService');
 const invites = require('../services/inviteService');
-const { formatCode, remainingText, revokeCode } = require('../services/codeService');
+const { formatCode, remainingText } = require('../services/codeService');
 
 const router = express.Router();
 
@@ -98,39 +97,19 @@ router.get('/konto/gruppen', requireLogin, async (req, res) => {
   });
 });
 
-// Einladungen: eigene Einladungslinks und geworbene Mitglieder mit Provision
+// Einladungen: Links, die das Team für dieses Mitglied erstellt hat, und geworbene Mitglieder mit Provision
 router.get('/konto/einladungen', requireLogin, async (req, res) => {
-  const [links, invited] = await Promise.all([invites.ownLinks(req.user._id), invites.invitedMembers(req.user._id)]);
+  const [links, invited] = await Promise.all([invites.linksFor(req.user._id), invites.invitedMembers(req.user._id)]);
   const now = Date.now();
   const origin = `${req.protocol}://${req.get('host')}`;
   show(res, 'einladungen', {
-    mayInvite: invites.mayInvite(req.user),
-    invitePacks: invites.settings.packs,
-    maxOpenLinks: invites.MAX_OPEN_LINKS,
-    linkTtlText: invites.linkTtlText,
     // Benutzte Links stehen bei den geworbenen Mitgliedern; hier nur die noch offenen
-    openLinks: links.filter((l) => !l.usedAt && new Date(l.expiresAt).getTime() > now).map((l) => ({ ...l, url: invites.linkUrl(origin, l.code), shown: formatCode(l.code), left: remainingText(l.expiresAt, now) })),
+    openLinks: links
+      .filter((l) => !l.usedAt && new Date(l.expiresAt).getTime() > now)
+      .map((l) => ({ ...l, url: invites.linkUrl(origin, l.code), shown: formatCode(l.code), left: remainingText(l.expiresAt, now), reward: invites.packsText(l.rewardPacks) })),
     invited,
     rewardTotal: invited.reduce((s, u) => s + ((u.inviteReward && u.inviteReward.packs) || 0), 0),
   });
-});
-
-router.post('/konto/einladungen', requireLogin, async (req, res) => {
-  try {
-    await invites.createLink(req.user);
-    req.flash('success', `Neuer Einladungslink erstellt – gültig für ${invites.linkTtlText} und eine Person.`);
-  } catch (err) {
-    if (!(err instanceof UserError)) throw err;
-    req.flash('error', err.message);
-  }
-  res.redirect('/konto/einladungen');
-});
-
-// Nur eigene Links (revokeCode löscht für Nicht-Admins nur, was man selbst erstellt hat)
-router.post('/konto/einladungen/:id/loeschen', requireLogin, async (req, res) => {
-  const ok = mongoose.isValidObjectId(req.params.id) && (await revokeCode(req.params.id, { _id: req.user._id, isAdmin: false }));
-  req.flash(ok ? 'info' : 'error', ok ? 'Einladungslink gelöscht.' : 'Diesen Link gibt es nicht mehr.');
-  res.redirect('/konto/einladungen');
 });
 
 router.get('/konto/einstellungen', requireLogin, (req, res) => {

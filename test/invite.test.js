@@ -5,34 +5,24 @@ const test = require('node:test');
 const assert = require('node:assert');
 const invites = require('../src/services/inviteService');
 
-test('Einladung: Provision nur für echte Einladungen', () => {
+test('Einladungslink: Provision nur für echte Einladungen', () => {
   const now = Date.UTC(2026, 9, 6);
-  const inviter = { deletedAt: null, bannedUntil: null };
-  assert.deepEqual(invites.rewardDecision({ packs: 2, inviter, sameDevice: false, now }), { packs: 2, withheld: null });
-  assert.deepEqual(invites.rewardDecision({ packs: 0, inviter, sameDevice: false, now }), { packs: 0, withheld: null });
-  assert.deepEqual(invites.rewardDecision({ packs: 2, inviter, sameDevice: true, now }), { packs: 0, withheld: 'gleiches Gerät wie der Einlader' });
-  assert.equal(invites.rewardDecision({ packs: 2, inviter: null, sameDevice: false, now }).packs, 0);
-  assert.equal(invites.rewardDecision({ packs: 2, inviter: { deletedAt: new Date(now) }, sameDevice: false, now }).packs, 0);
+  const beneficiary = { deletedAt: null, bannedUntil: null };
+  assert.deepEqual(invites.rewardDecision({ packs: 2, beneficiary, sameDevice: false, now }), { packs: 2, withheld: null });
+  assert.deepEqual(invites.rewardDecision({ packs: 0, beneficiary, sameDevice: false, now }), { packs: 0, withheld: null });
+  assert.deepEqual(invites.rewardDecision({ packs: 2, beneficiary, sameDevice: true, now }), { packs: 0, withheld: 'gleiches Gerät wie der Einladende' });
+  assert.equal(invites.rewardDecision({ packs: 2, beneficiary: null, sameDevice: false, now }).packs, 0);
+  assert.equal(invites.rewardDecision({ packs: 2, beneficiary: { deletedAt: new Date(now) }, sameDevice: false, now }).packs, 0);
   // Gesperrt nur, solange die Sperre läuft
-  assert.equal(invites.rewardDecision({ packs: 2, inviter: { bannedUntil: new Date(now + 60000) }, sameDevice: false, now }).withheld, 'Einlader gesperrt');
-  assert.equal(invites.rewardDecision({ packs: 2, inviter: { bannedUntil: new Date(now - 60000) }, sameDevice: false, now }).packs, 2);
+  assert.equal(invites.rewardDecision({ packs: 2, beneficiary: { bannedUntil: new Date(now + 60000) }, sameDevice: false, now }).withheld, 'Einladender gesperrt');
+  assert.equal(invites.rewardDecision({ packs: 2, beneficiary: { bannedUntil: new Date(now - 60000) }, sameDevice: false, now }).packs, 2);
 });
 
-test('Einladung: Link, Freigabe und Grenzen', () => {
+test('Einladungslink: Provision aus dem Formular, Link und Texte', () => {
+  for (const [input, want] of [['0', 0], ['3', 3], [' 20 ', 20], [5, 5]]) assert.equal(invites.parsePacks(input), want, String(input));
+  for (const bad of [undefined, '', '-1', '21', '1.5', 'abc', ['2'], { a: 1 }]) assert.equal(invites.parsePacks(bad), null, String(bad));
   assert.equal(invites.linkUrl('https://example.org', 'ABCD2345'), 'https://example.org/registrieren?code=ABCD-2345');
-  assert.equal(invites.linkTtlText, '7 Tage');
-  assert.equal(invites.DEFAULTS.open, false);
-  assert.ok(invites.DEFAULTS.packs >= 0 && invites.DEFAULTS.packs <= invites.MAX_PACKS);
-
-  const open = invites.settings.open;
-  try {
-    invites.settings.open = false;
-    assert.equal(invites.mayInvite({ isAdmin: false }), false);
-    assert.equal(invites.mayInvite({ isAdmin: true }), true);
-    invites.settings.open = true;
-    assert.equal(invites.mayInvite({ isAdmin: false }), true);
-    assert.equal(invites.mayInvite(null), false);
-  } finally {
-    invites.settings.open = open;
-  }
+  assert.equal(invites.packsText(0), 'keine Booster Packs');
+  assert.equal(invites.packsText(1), 'ein Booster Pack');
+  assert.equal(invites.packsText(4), '4 Booster Packs');
 });

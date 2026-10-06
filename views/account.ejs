@@ -160,43 +160,29 @@
 <% if (section === 'einladungen') { %>
 <div class="card" id="einladungen">
   <h2>Freunde einladen</h2>
-  <% if (!mayInvite) { %>
-    <p class="muted">Einladungslinks gibt es bald. Bis dahin bekommen neue Mitglieder ihren Registrierungscode vom Team.</p>
+  <p class="muted">
+    Möchtest du jemanden einladen, frag einen Dev nach einem Einladungslink. Er erstellt ihn für dich und legt fest, wie lange er gilt und wie viele Booster Packs du als Provision bekommst.
+    Schick den Link dann der Person weiter – registriert sie sich darüber, landet die Provision in deinem Inventar. Jeder Link gilt für genau eine Person.
+    Zweitkonten bringen nichts: Kommt das neue Konto von deinem Gerät, gibt es keine Provision.
+  </p>
+  <% if (!openLinks.length) { %>
+    <p class="muted">Du hast gerade keinen gültigen Einladungslink.</p>
   <% } else { %>
-    <p class="muted">
-      Erstelle einen persönlichen Einladungslink und schick ihn der Person, die du einladen möchtest. Jeder Link gilt <%= linkTtlText %> und für genau eine Person.
-      <% if (invitePacks) { %>Registriert sie sich darüber, bekommst du <strong><%= invitePacks === 1 ? 'ein Booster Pack' : invitePacks + ' Booster Packs' %></strong> als Provision ins Inventar.<% } %>
-      Zweitkonten bringen nichts: Kommt das neue Konto von deinem Gerät, gibt es keine Provision.
-    </p>
-    <% if (openLinks.length < maxOpenLinks) { %>
-      <form method="post" action="/konto/einladungen" class="admin-generate">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="btn btn-primary" type="submit">+ Einladungslink erstellen</button>
-      </form>
-    <% } else { %>
-      <p class="muted small">Du hast <%= maxOpenLinks %> offene Links – mehr gehen nicht gleichzeitig.</p>
-    <% } %>
-    <% if (openLinks.length) { %>
-      <ul class="code-list">
-        <% openLinks.forEach((l) => { %>
-          <li class="code-item">
-            <div class="code-main">
-              <code class="code-value"><%= l.shown %></code>
-              <span class="badge badge-offen">Gültig · <%= l.left %></span>
-            </div>
-            <div class="code-meta muted small">erstellt <%= date(l.createdAt) %> · läuft ab <%= date(l.expiresAt) %></div>
-            <div class="code-actions">
-              <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.url %>">Link kopieren</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.shown %>">Code kopieren</button>
-              <form method="post" action="/konto/einladungen/<%= l._id %>/loeschen" data-confirm="Diesen Einladungslink löschen?">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button class="btn btn-danger btn-sm" type="submit">Löschen</button>
-              </form>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } %>
+    <ul class="code-list">
+      <% openLinks.forEach((l) => { %>
+        <li class="code-item">
+          <div class="code-main">
+            <code class="code-value"><%= l.shown %></code>
+            <span class="badge badge-offen">Gültig · <%= l.left %></span>
+          </div>
+          <div class="code-meta muted small">Provision: <%= l.reward %> · erstellt von <%= l.createdByName %> · läuft ab <%= date(l.expiresAt) %></div>
+          <div class="code-actions">
+            <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.url %>">Link kopieren</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.shown %>">Code kopieren</button>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
   <% } %>
 </div>
 

@@ -7,7 +7,6 @@
     { key: 'ihk', label: 'IHK-Quests', on: ihk.settings.open },
     { key: 'dungeon', label: 'Dungeon', on: dungeon.settings.open },
     { key: 'grading', label: 'Grading-Shop', on: gradingOpen() },
-    { key: 'einladung', label: 'Einladungslinks', on: invite.settings.open },
   ];
 %>
 <div class="panel-features" aria-label="Für alle Mitglieder verfügbar">
@@ -253,27 +252,6 @@
     </div>
   </section>
 <% } %>
-  <% if (sub === 'einladung') { %>
-  <section class="stats-block" id="einladung">
-    <%- blockHead('Einladungslinks &amp; Provision', `Mitglieder erstellen unter Mein Konto → Einladungen persönliche Links (je ${invite.ttlText} gültig, eine Person, höchstens ${invite.maxOpen} offene gleichzeitig). Registriert sich jemand über so einen Link, bekommt der Einlader die Provision als Booster Packs ins Inventar. Keine Provision gibt es, wenn das neue Konto vom Gerät des Einladers kommt oder der Einlader gesperrt ist. Gilt ab der nächsten Registrierung.`) %>
-    <div class="card">
-      <form method="post" data-reauth action="/admin/einladung" class="form panel-form">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label class="check admin-ihk-open">
-          <input type="checkbox" name="open" value="1" <%= invite.settings.open ? 'checked' : '' %>>
-          <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
-        </label>
-        <label class="field admin-tcg-pack">
-          <span>Provision: Booster Packs je neuem Mitglied (0–<%= invite.maxPacks %>)</span>
-          <input type="number" name="packs" min="0" max="<%= invite.maxPacks %>" step="1" value="<%= invite.settings.packs %>" required>
-          <small class="muted">Standard: <%= invite.defaults.packs %> (aus der .env: INVITE_REWARD_PACKS)</small>
-        </label>
-        <button class="btn btn-primary" type="submit">Speichern</button>
-      </form>
-    </div>
-  </section>
-<% } %>
-
   <% if (sub === 'dungeon') { %>
   <section class="stats-block" id="dungeon">
     <%- blockHead('Dungeon: Termine, Lohn &amp; Beute', 'Abstand der Starts, Ziel-Punkte und Lohn (pro Spieler) je Kampf, Beute-Chancen beim Boss und welche Karten Bots bekommen. Gilt ab dem nächsten Start.') %>

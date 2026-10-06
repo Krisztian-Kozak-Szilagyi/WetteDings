@@ -11,6 +11,39 @@
       </label>
       <button class="btn btn-primary" type="submit">+ Einladungscode erzeugen</button>
     </form>
+  </div>
+</section>
+
+<section class="stats-block" id="einladungslinks">
+  <%- blockHead('Einladungslink für ein Mitglied', `Wünscht sich ein Mitglied einen Einladungslink, erstellst du ihn hier für dieses Mitglied. Es findet ihn unter <strong>Mein Konto → Einladungen</strong> (mit Benachrichtigung) und schickt ihn weiter. Registriert sich jemand darüber, bekommt das Mitglied die hier festgelegte Provision als Booster Packs – nicht, wenn das neue Konto von seinem Gerät kommt. Der Link gilt wie ein Code für <strong>genau eine Person</strong> und erscheint unten in der Liste.`) %>
+  <div class="card">
+    <form method="post" action="/admin/codes/einladungslink" class="admin-generate">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="admin-generate-ttl">
+        <span>Für Mitglied</span>
+        <select name="user" required>
+          <option value="">– Mitglied wählen –</option>
+          <% users.forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+        </select>
+      </label>
+      <label class="admin-generate-ttl">
+        <span>Gültig für</span>
+        <select name="ttl">
+          <% ttlOptions.forEach((m) => { %><option value="<%= m %>"><%= ttlText(m) %></option><% }) %>
+        </select>
+      </label>
+      <label class="admin-generate-ttl">
+        <span>Provision (Booster Packs)</span>
+        <input type="number" name="packs" min="0" max="<%= inviteMaxPacks %>" step="1" value="1" required>
+      </label>
+      <button class="btn btn-primary" type="submit">+ Einladungslink erstellen</button>
+    </form>
+  </div>
+</section>
+
+<section class="stats-block" id="codes-liste">
+  <%- blockHead('Gültige Codes und Links', 'Alle Codes und Einladungslinks, die noch nicht abgelaufen sind – benutzte bleiben bis zum Ablauf sichtbar.') %>
+  <div class="card">
     <% if (!codes.length) { %>
       <p class="muted">Aktuell gibt es keine gültigen Codes.</p>
     <% } else { %>
@@ -20,7 +53,7 @@
           <li class="code-item <%= used ? 'is-used' : '' %>">
             <div class="code-main">
               <code class="code-value"><%= formatCode(c.code) %></code>
-              <% if (c.reward) { %><span class="tag" title="Einladungslink eines Mitglieds – bringt dem Ersteller eine Provision">Mitglieder-Link</span><% } %>
+              <% if (c.reward) { %><span class="tag" title="Einladungslink – <%= c.beneficiaryName %> bekommt die Provision">Link für <%= c.beneficiaryName %> · <%= c.rewardPacks %> Pack<%= c.rewardPacks === 1 ? '' : 's' %></span><% } %>
               <% if (used) { %>
                 <span class="badge badge-entschieden">Benutzt von <%= c.usedByName %></span>
               <% } else { %>

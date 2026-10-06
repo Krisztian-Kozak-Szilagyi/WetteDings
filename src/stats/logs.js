@@ -471,7 +471,7 @@ async function registrationLog(query, { player = null, all = false } = {}) {
 
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
-const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', dungeon: 'Dungeon', lotterie: 'Lotterie', einladung: 'Einladungen', config: 'Serverstart (.env)' };
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', dungeon: 'Dungeon', lotterie: 'Lotterie', config: 'Serverstart (.env)' };
 const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function settingsRow(c) {

@@ -14,14 +14,17 @@ const registrationCodeSchema = new Schema(
     usedAt: { type: Date, default: null },
     usedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     usedByName: { type: String, default: null },
-    // Einladungslink eines Mitglieds: der Ersteller bekommt eine Provision, wenn sich jemand damit registriert
-    // (siehe services/inviteService). Codes aus dem Team-Bereich bringen nichts ein.
+    // Einladungslink für ein Mitglied (siehe services/inviteService): Ein Dev erstellt ihn für beneficiary; registriert
+    // sich jemand damit, bekommt dieses Mitglied rewardPacks Booster Packs. Gewöhnliche Codes bringen nichts ein.
     reward: { type: Boolean, default: false },
+    beneficiary: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    beneficiaryName: { type: String, default: null },
+    rewardPacks: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
 registrationCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-registrationCodeSchema.index({ createdBy: 1, reward: 1 });
+registrationCodeSchema.index({ beneficiary: 1 }, { sparse: true });
 
 module.exports = model('RegistrationCode', registrationCodeSchema);
