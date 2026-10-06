@@ -277,9 +277,16 @@ async function list() {
         actionLabel: a.action && logic.ACTIONS[a.action] ? logic.ACTIONS[a.action].label : null,
         log: a.action && logic.ACTIONS[a.action] ? logic.ACTIONS[a.action].log : LOG_OF[a.kind] || 'gesamt',
         users: list.map((u) => ({ _id: u._id, username: u.username, banned: deviceLogic.isBanned(u) })),
+        facts: logic.factsOf(a.kind, a.details),
+        extras: logic.extrasOf(a.details),
       };
     })
     .filter(Boolean);
+}
+
+/** Mehrere Hinweise auf einmal erledigen bzw. wieder öffnen ("Alle erledigt" je Spieler) */
+async function setDoneMany(ids, done, actor) {
+  for (const id of ids) await setDone(id, done, actor);
 }
 
 async function setDone(id, done, actor) {
@@ -289,4 +296,4 @@ async function setDone(id, done, actor) {
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen */
 const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId })]);
 
-module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, setDone, forgetUser };
+module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, groups: logic.groupAlerts, setDone, setDoneMany, forgetUser };

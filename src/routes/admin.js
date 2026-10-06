@@ -180,7 +180,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     noteMax: betService.NOTE_MAX,
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
-    suspicions,
+    suspicionGroups: suspicionService.groups(suspicions),
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
@@ -295,6 +295,13 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 });
 
 // ---------- Auffälligkeiten (Manipulationserkennung): Hinweise abhaken (Admin und Devs) ----------
+// "Alle erledigt" je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt)
+router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+  const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
+  await suspicionService.setDoneMany(ids, true, req.user);
+  res.redirect(subUrl('moderation', 'auffaelligkeiten'));
+});
+
 router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));

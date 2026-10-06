@@ -517,7 +517,7 @@ function browserFinding(signals) {
     uas,
     from: new Date(Math.min(...signals.map((x) => toMs(x.firstAt || x.lastAt)))),
     to: new Date(Math.max(...signals.map((x) => toMs(x.lastAt)))),
-    summary: `Von ${actions} Spiel-Aktionen: ${parts.join(', ')}` + (uas.length ? ` – ${uas.join(' | ')}` : ''),
+    summary: `Von ${actions} Spiel-Aktionen: ${parts.join(', ')}`, // die User-Agents stehen darunter (extrasOf)
   };
 }
 
@@ -645,7 +645,7 @@ function hostingFinding(signals) {
     count: hosting,
     nets,
     ...spanOfSignals(signals.filter((x) => x.hosting)),
-    summary: `${hosting} von ${actions} Spiel-Aktionen aus einem Rechenzentrum${nets.length ? `: ${nets.join(', ')}` : ''} (auch VPNs laufen dort)`,
+    summary: `${hosting} von ${actions} Spiel-Aktionen aus einem Rechenzentrum (auch VPNs laufen dort)`, // Netzbetreiber stehen darunter
   };
 }
 
@@ -686,6 +686,91 @@ function parallelFinding(traces) {
   };
 }
 
+// ---------- Anzeige im Panel ----------
+
+// Was "count" je Muster zählt
+const COUNT_LABEL = {
+  tempo: 'in Folge',
+  takt: 'Aktionen',
+  ihk: 'Quests',
+  scalping: 'Runden',
+  wert: 'Geschäfte',
+  dungeon: 'Durchläufe',
+  grading: 'Aufträge',
+  dauer: 'Aktionen',
+  browser: 'Spiel-Aktionen',
+  reaktion: 'Spiel-Aktionen',
+  eingabe: 'Aktionen',
+  falle: 'Aufrufe',
+  rechenzentrum: 'aus Rechenzentrum',
+  parallel: 'Wechsel',
+};
+
+/**
+ * Kennzahlen eines Hinweises als kurze Kacheln fürs Panel: [{ value, label }] in sinnvoller Reihenfolge.
+ * details = gespeicherte Kennzahlen (SuspicionAlert.details).
+ */
+function factsOf(kind, details = {}) {
+  const d = details || {};
+  const out = [];
+  const add = (ok, value, label) => ok && out.push({ value, label });
+  const num = (v) => v !== undefined && v !== null && Number.isFinite(v);
+  add(num(d.count) && COUNT_LABEL[kind], String(d.count), COUNT_LABEL[kind]);
+  add(num(d.medianMs), seconds(d.medianMs), kind === 'reaktion' ? 'nach Laden der Seite' : 'Abstand');
+  add(num(d.spread), d.spread < 0.01 ? '< 1 %' : percent(d.spread), 'Abweichung');
+  add(num(d.runs) && d.runs > 1, `${d.runs}×`, 'Serien');
+  add(num(d.reactMs), seconds(d.reactMs), 'nach Ablauf abgeholt');
+  add(num(d.restartMs), seconds(d.restartMs), 'bis zum Neustart');
+  add(num(d.rate), percent(d.rate), 'im Plus');
+  add(num(d.gain), euro(d.gain), 'Gewinn');
+  add(num(d.holdMs), seconds(d.holdMs), 'Haltedauer');
+  add(num(d.streak) && d.streak > 1, String(d.streak), 'Termine in Folge');
+  add(num(d.joinMs), seconds(d.joinMs), 'nach Öffnen angemeldet');
+  add(num(d.unseen) && d.unseen > 0, String(d.unseen), 'Beute ungesehen');
+  add(num(d.excessMs), seconds(Math.max(0, d.excessMs)), 'über Mindestzeit');
+  add(num(d.perfect), String(d.perfect), 'perfekt');
+  add(num(d.spanMs), hoursText(d.spanMs), 'ohne Pause');
+  add(num(d.nightHours), String(d.nightHours), 'Nachtstunden');
+  add(num(d.night) && d.night > 0, `${d.night}×`, 'nachts');
+  add(num(d.windows), `${d.windows}×`, 'Zeitfenster');
+  add(num(d.devices), String(d.devices), 'Geräte');
+  add(num(d.total), euro(d.total), kind === 'ertrag' ? 'eingenommen' : 'verschoben');
+  add(num(d.factor), `${Math.round(d.factor)}×`, 'das Übliche');
+  return out;
+}
+
+/** Zusätzliche Zeilen eines Hinweises (Beispiel-Geschäfte, User-Agents, Netzbetreiber) */
+function extrasOf(details = {}) {
+  const d = details || {};
+  return [...(Array.isArray(d.trades) ? d.trades : []), ...(Array.isArray(d.uas) ? d.uas : []), ...(Array.isArray(d.nets) ? d.nets : [])];
+}
+
+/**
+ * Hinweise fürs Panel nach Spieler (bzw. Konten-Paar) bündeln: [{ key, users, alerts, open, level, lastAt }].
+ * Gruppen mit offenen Hinweisen zuerst, dann nach höchster offener Stufe und jüngstem Beleg.
+ */
+function groupAlerts(alerts) {
+  const groups = new Map();
+  for (const a of alerts) {
+    const key = a.users.map((u) => String(u._id)).sort().join(':');
+    if (!groups.has(key)) groups.set(key, { key, users: a.users, alerts: [] });
+    groups.get(key).alerts.push(a);
+  }
+  return [...groups.values()]
+    .map((g) => {
+      const open = g.alerts.filter((a) => !a.doneAt);
+      return {
+        ...g,
+        open: open.length,
+        level: Math.max(0, ...open.map((a) => a.level)),
+        lastAt: new Date(Math.max(...g.alerts.map((a) => toMs(a.evidenceAt)))),
+        // offene zuerst, darin nach Stufe und jüngstem Beleg
+        alerts: [...g.alerts].sort((x, y) => Boolean(x.doneAt) - Boolean(y.doneAt) || y.level - x.level || toMs(y.evidenceAt) - toMs(x.evidenceAt)),
+      };
+    })
+    .sort((x, y) => (y.open > 0) - (x.open > 0) || y.level - x.level || toMs(y.lastAt) - toMs(x.lastAt));
+}
+
 module.exports = {
   ACTIONS,
   KIND_LABEL,
@@ -716,4 +801,7 @@ module.exports = {
   trapFinding,
   hostingFinding,
   parallelFinding,
+  factsOf,
+  extrasOf,
+  groupAlerts,
 };

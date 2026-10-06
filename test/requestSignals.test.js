@@ -79,3 +79,12 @@ test('Netz: Rechenzentrum, Private Relay und IPv6-Netzanteil', () => {
   assert.equal(network.netOf('::ffff:1.2.3.4'), '1.2.3.4');
   assert.equal(network.lookup('1.2.3.4'), null); // ohne Datenbank aus
 });
+
+test('Zeitraum kompakt fürs Panel', () => {
+  const { timeSpan } = require('../src/lib/viewHelpers');
+  const t = Date.UTC(2026, 9, 6, 6, 54); // 08:54 deutsche Zeit
+  assert.equal(timeSpan(new Date(t), new Date(t + 2 * 3600e3)), '06.10. 08:54–10:54 Uhr');
+  assert.equal(timeSpan(new Date(t - 12 * 3600e3), new Date(t)), '05.10. 20:54 – 06.10. 08:54 Uhr');
+  assert.equal(timeSpan(null, new Date(t)), '06.10. 08:54 Uhr');
+  assert.equal(timeSpan(new Date(t), new Date(t)), '06.10. 08:54 Uhr');
+});

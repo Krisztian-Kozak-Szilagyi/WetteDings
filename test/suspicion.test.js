@@ -329,7 +329,7 @@ test('Falle und Rechenzentrum', () => {
   assert.equal(s.hostingFinding([sig({ actions: 10, hosting: 2 })]), null);
   const h = s.hostingFinding([sig({ actions: 10, hosting: 8, nets: ['Hetzner Online GmbH (AS24940)'] })]);
   assert.equal(h.level, LEVEL.moeglich);
-  assert.match(h.summary, /Hetzner/);
+  assert.deepEqual(h.nets, ['Hetzner Online GmbH (AS24940)']);
 });
 
 test('Gleichzeitig von zwei Geräten: Hin und Her, nicht ein einzelner Netzwechsel', () => {
@@ -349,4 +349,32 @@ test('Gleichzeitig von zwei Geräten: Hin und Her, nicht ein einzelner Netzwechs
   assert.equal(s.parallelFinding([...Array(5)].map((_, i) => ({ dev: i < 3 ? 'A' : 'B', net: i < 3 ? 'na' : 'nb', at: at(i) }))), null);
   // Wechsel über Stunden verteilt
   assert.equal(s.parallelFinding([...Array(6)].map((_, i) => ({ dev: i % 2 ? 'B' : 'A', net: i % 2 ? 'nb' : 'na', at: at(i * 30) }))), null);
+});
+
+test('Panel: Kennzahlen, Zusatzzeilen und Bündelung je Spieler', () => {
+  const facts = s.factsOf('dungeon', { count: 13, joinMs: 5000, streak: 13, night: 3, unseen: 0 });
+  assert.deepEqual(facts.map((f) => f.label), ['Durchläufe', 'Termine in Folge', 'nach Öffnen angemeldet', 'nachts']);
+  assert.equal(facts[2].value, '5 s');
+  assert.deepEqual(s.factsOf('takt', { count: 24, medianMs: 2000, spread: 0.004, runs: 1 }).map((f) => f.value), ['24', '2 s', '< 1 %']);
+  assert.match(s.factsOf('ertrag', { total: 90000, factor: 26 })[0].value, /900,00/);
+  assert.deepEqual(s.factsOf('falle', null), []);
+  assert.deepEqual(s.extrasOf({ trades: ['a'], uas: ['b'], nets: ['c'] }), ['a', 'b', 'c']);
+
+  const u = (id) => ({ _id: id, username: id });
+  const alert = (users, level, mins, done = false) => ({ users, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: done ? new Date(t0) : null });
+  const groups = s.groupAlerts([
+    alert([u('ben')], 1, 50),
+    alert([u('sam')], 1, 10),
+    alert([u('sam')], 2, 5),
+    alert([u('sam')], 2, 1, true),
+    alert([u('sam'), u('anna')], 2, 3),
+    alert([u('anna'), u('sam')], 1, 4),
+    alert([u('old')], 2, 60, true),
+  ]);
+  assert.deepEqual(groups.map((g) => g.users.map((x) => x._id).join('+')), ['sam', 'sam+anna', 'ben', 'old']);
+  assert.equal(groups[0].open, 2);
+  assert.equal(groups[0].level, 2);
+  assert.deepEqual(groups[0].alerts.map((a) => [a.level, Boolean(a.doneAt)]), [[2, false], [1, false], [2, true]]); // offene zuerst
+  assert.equal(groups[1].alerts.length, 2); // Paar unabhängig von der Reihenfolge
+  assert.equal(groups[3].open, 0); // nur erledigte: ganz unten
 });
