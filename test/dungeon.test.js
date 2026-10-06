@@ -98,6 +98,19 @@ test('Einzelspieler werden in Dreiergruppen gelost', () => {
   assert.deepEqual(d.makeTeams([]), []);
 });
 
+test('Start (#111): nur wer in der Lobby einen Charakter gewählt hat, ist dabei', () => {
+  const at = new Date();
+  const party = { members: [
+    { user: 'a', name: 'A', card: 'x', cardDoc: 'd1', boost: null, boostDoc: null, joinedAt: at },
+    { user: 'b', name: 'B', card: null, cardDoc: null, boost: 'y', boostDoc: 'd2', joinedAt: at }, // nur Boost gewählt
+  ] };
+  const { players, dropped } = d.splitPlayers([party, { members: [{ user: 'c', name: 'C', card: null, joinedAt: at }] }]);
+  assert.deepEqual(players.map((m) => m.user), ['a']);
+  assert.equal(players[0].joinedAt, at); // Anmeldezeit bleibt im Durchlauf (Manipulationserkennung)
+  assert.deepEqual(dropped, ['b', 'c']);
+  assert.deepEqual(d.splitPlayers([]), { players: [], dropped: [] });
+});
+
 test('Wiedergabe: gewonnene Kämpfe enden früher, verlorene dauern die volle Zeit', () => {
   const team = [{ card: card('krisz-3-gold') }, { card: card('adrian-3-gold') }, { card: card('aleks-3-gold') }];
   const lost = d.fight(team, 'fia', 100000);

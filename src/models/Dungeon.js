@@ -1,6 +1,7 @@
 const { Schema, model } = require('mongoose');
 
 // Ein Spieler mit Charakter- und Boost-Karte. Die Exemplare (cardDoc, boostDoc) sind bis zum Ende gesperrt (tcg/locks).
+// In der Anmeldung (Lobby) darf die Karte noch fehlen: Man tritt zuerst bei und wählt dann (#111).
 const memberFields = {
   user: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // null = Bot
   name: { type: String, required: true },
@@ -18,7 +19,7 @@ const partySchema = new Schema(
     slot: { type: Date, required: true }, // Startzeit des Dungeons
     solo: { type: Boolean, default: false },
     leader: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    members: { type: [new Schema({ ...memberFields, joinedAt: { type: Date, default: Date.now } }, { _id: false })], default: [] },
+    members: { type: [new Schema({ ...memberFields, card: { type: String, default: null }, joinedAt: { type: Date, default: Date.now } }, { _id: false })], default: [] },
     invites: { type: [new Schema({ user: { type: Schema.Types.ObjectId, ref: 'User' }, name: String, at: { type: Date, default: Date.now } }, { _id: false })], default: [] },
     chat: { type: [chatSchema], default: [] },
   },

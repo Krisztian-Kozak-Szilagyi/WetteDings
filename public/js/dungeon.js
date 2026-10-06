@@ -173,8 +173,86 @@
     sync();
   });
 
-  // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 20 Karten ----------
-  const PER_PAGE = 20;
+  // ---------- Kartenauswahl in der Lobby (#111): Fenster neben dem eigenen Platz, Klick übernimmt sofort ----------
+  const cardsForm = page.querySelector('[data-dg-cards-form]');
+  if (cardsForm) {
+    const pickers = [...cardsForm.querySelectorAll('[data-dg-picker]')];
+    const close = (dlg) => (typeof dlg.close === 'function' ? dlg.close() : dlg.removeAttribute('open'));
+    // Breite Fenster: neben (sonst unter/über) dem angeklickten Platz; schmale: als Blatt von unten (CSS)
+    function place(dlg, trigger) {
+      dlg.style.left = dlg.style.top = '';
+      dlg.classList.remove('is-anchored');
+      if (window.innerWidth < 720 || !trigger) return;
+      const r = trigger.getBoundingClientRect();
+      const w = dlg.offsetWidth;
+      const h = dlg.offsetHeight;
+      const gap = 14;
+      let left = r.right + gap;
+      if (left + w > window.innerWidth - 8) left = r.left - gap - w; // rechts kein Platz: links daneben
+      if (left < 8) left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+      const top = Math.min(Math.max(8, r.top + r.height / 2 - h / 2), window.innerHeight - h - 8);
+      dlg.style.left = left + 'px';
+      dlg.style.top = Math.max(8, top) + 'px';
+      dlg.classList.add('is-anchored');
+    }
+    page.querySelectorAll('[data-dg-open]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const dlg = cardsForm.querySelector('[data-dg-picker="' + btn.dataset.dgOpen + '"]');
+        if (!dlg) return;
+        if (typeof dlg.showModal === 'function') dlg.showModal();
+        else dlg.setAttribute('open', '');
+        place(dlg, btn.closest('.dg-slot-card, .dg-boost') || btn);
+        const search = dlg.querySelector('[data-dg-search]');
+        if (search && window.innerWidth >= 720) search.focus();
+      })
+    );
+    pickers.forEach((dlg) => {
+      dlg.querySelector('[data-dg-picker-close]').addEventListener('click', () => close(dlg));
+      dlg.addEventListener('click', (e) => {
+        if (e.target === dlg) close(dlg); // Klick daneben schließt
+      });
+    });
+    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && dlg.classList.contains('is-anchored') && close(dlg)));
+    // Auswahl sofort speichern, danach neu laden (Scroll-Position bleibt). Fehler stehen im Fenster selbst.
+    let saving = false;
+    const showError = (dlg, text) => {
+      let el = dlg.querySelector('[data-dg-picker-error]');
+      if (!el) {
+        el = document.createElement('p');
+        el.className = 'dg-picker-error';
+        el.setAttribute('data-dg-picker-error', '');
+        el.setAttribute('role', 'alert');
+        dlg.querySelector('.dg-picker-head').after(el);
+      }
+      el.textContent = text;
+    };
+    cardsForm.addEventListener('change', async (e) => {
+      if (saving || (e.target.name !== 'card' && e.target.name !== 'boost')) return;
+      const dlg = e.target.closest('[data-dg-picker]');
+      saving = true;
+      dlg.classList.add('is-saving');
+      try {
+        const r = await fetch(cardsForm.action, {
+          method: 'POST',
+          body: new URLSearchParams(new FormData(cardsForm)),
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok && data.ok) return location.reload();
+        showError(dlg, data.error || 'Das hat nicht geklappt. Bitte lade die Seite neu.');
+        cardsForm.reset(); // Auswahl wieder wie gespeichert
+      } catch {
+        showError(dlg, 'Keine Verbindung. Bitte versuche es erneut.');
+        cardsForm.reset();
+      }
+      saving = false;
+      dlg.classList.remove('is-saving');
+    });
+  }
+
+  // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 12 Karten ----------
+  const PER_PAGE = 12;
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
     const items = [...box.querySelectorAll('[data-dg-item]')];
     const search = box.querySelector('[data-dg-search]');

@@ -279,10 +279,19 @@
   var guideEls = {};
   ['l', 'r'].forEach(function (k) { guideEls[k] = el('div', 'gr-guide gr-guide-' + k, measureBox); });
   var mm = function (v) { return v.toFixed(1).replace('.', ',') + ' mm'; };
+  // breitere Seite in ganzen Prozent (wie die Zentrierung gespeichert ist, z. B. 59 = 59/41)
+  function bigShare(a, b) { return a + b > 0 ? Math.round((Math.max(a, b) / (a + b)) * 100) : null; }
   function ratio(a, b) {
-    if (a + b <= 0) return '–';
-    var big = Math.round((Math.max(a, b) / (a + b)) * 100);
-    return big + '/' + (100 - big);
+    var big = bigShare(a, b);
+    return big === null ? '–' : big + '/' + (100 - big);
+  }
+  /** Höchstnote zum gemessenen Verhältnis (Bereiche mit beiden Grenzen eingeschlossen; über dem letzten zählt er) */
+  function capFor(a, b) {
+    var big = bigShare(a, b);
+    var scale = job.centerScale || [];
+    if (big === null || !scale.length) return null;
+    for (var i = 0; i < scale.length; i++) if (big <= scale[i].to) return scale[i].cap;
+    return scale[scale.length - 1].cap;
   }
   function renderGuides() {
     guideEls.l.style.left = (guides.l * 100).toFixed(2) + '%';
@@ -294,6 +303,8 @@
     var row = el('div', 'gr-measure-row', readout);
     el('span', '', row).textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
     el('b', '', row).textContent = ratio(l, r);
+    var cap = capFor(l, r);
+    if (cap) el('div', 'gr-measure-cap', readout).textContent = 'Zentrierung → Obergrenze ' + cap;
   }
   // Linie auf eine Position setzen; die linke bleibt in der linken Hälfte, die rechte in der anderen
   function setGuide(k, v) {

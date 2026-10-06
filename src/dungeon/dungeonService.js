@@ -1,6 +1,7 @@
 // Dungeon: alle paar Stunden (Admin-Panel, Standard 2) startet ein Dungeon für je drei Spieler.
 // Anmeldung allein (wird beim Start zugelost, fehlende Plätze füllen Bots) oder als Gruppe mit Einladungen
-// und eigenem Chat. Ablauf wie bei der IHK: Die Kämpfe (2× Trash, 1× Boss) werden beim Start mit den
+// und eigenem Chat. Karten wählt man erst in der Lobby (#111) – wer zum Start keinen Charakter hat, ist nicht dabei.
+// Ablauf wie bei der IHK: Die Kämpfe (2× Trash, 1× Boss) werden beim Start mit den
 // Kartenwerten und Fähigkeiten ausgewürfelt und danach abgespielt; am Ende gibt es Lohn und Beute.
 const crypto = require('crypto');
 const config = require('../config');
@@ -269,10 +270,16 @@ async function availableCards(userId, { ownDungeon = false } = {}) {
   return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts };
 }
 
-/** Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag */
+/** Mitglied ohne Karten – so tritt man bei, gewählt wird danach in der Lobby (#111) */
+const emptyMember = (user) => ({ user: user._id, name: user.username, card: null, cardDoc: null, boost: null, boostDoc: null });
+
+/**
+ * Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag.
+ * Ohne cardId bleibt der Charakter offen (in der Lobby darf man zuerst den Boost wählen).
+ */
 async function memberEntry(user, cardId, boostId, session, { ownDungeon = false } = {}) {
-  const card = catalog.cardById[cardId];
-  if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
+  const card = cardId ? catalog.cardById[cardId] : null;
+  if (cardId && (!card || !card.isCharacter)) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   let boost = null;
   if (boostId) {
     boost = catalog.cardById[boostId];
@@ -287,14 +294,15 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false 
   if (ownDungeon) [...locked.reasons].filter(([, r]) => r === 'dungeon').forEach(([id]) => locked.reasons.delete(id));
   // except: dieses Exemplar ist schon vergeben (dieselbe Karte als Charakter und Boost → zwei verschiedene Exemplare)
   const freeDoc = async (id, except) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d) && !(except && d._id.equals(except._id)));
-  const doc = await freeDoc(card.id);
-  if (!doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
-  const boostDoc = boost ? await freeDoc(boost.id, boost.id === card.id ? doc : null) : null;
+  const doc = card ? await freeDoc(card.id) : null;
+  if (card && !doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+  const same = !!card && !!boost && boost.id === card.id;
+  const boostDoc = boost ? await freeDoc(boost.id, same ? doc : null) : null;
   if (boost && !boostDoc) {
-    throw new UserError(boost.id === card.id ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie Exemplare.` : 'Die Boost-Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+    throw new UserError(same ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie Exemplare.` : 'Die Boost-Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
   }
   await claim([doc, boostDoc], user._id, session);
-  return { user: user._id, name: user.username, card: card.id, cardDoc: doc._id, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null };
+  return { user: user._id, name: user.username, card: card ? card.id : null, cardDoc: doc ? doc._id : null, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null };
 }
 
 const partyOf = (userId) => DungeonParty.findOne({ 'members.user': userId });
@@ -309,16 +317,12 @@ const duplicate = (err) => {
   throw err;
 };
 
-/** Anmelden: allein (solo) oder als neue Gruppe (du bist Gruppenleiter) */
-async function register({ user, cardId, boostId, solo }) {
+/** Anmelden: allein (solo) oder als neue Gruppe (du bist Gruppenleiter). Karten wählt man danach in der Lobby. */
+async function register({ user, solo }) {
   checkOpen(user);
   if (await runningRunOf(user._id)) throw new UserError('Du bist gerade in einem Dungeon.');
   if (await partyOf(user._id)) throw new UserError('Du bist schon für einen Dungeon angemeldet.');
-  return inTransaction(async (session) => {
-    const member = await memberEntry(user, cardId, boostId, session);
-    const [party] = await DungeonParty.create([{ slot: registrationSlot(), solo: !!solo, leader: user._id, members: [member] }], { session });
-    return party;
-  }).catch(duplicate);
+  return DungeonParty.create({ slot: registrationSlot(), solo: !!solo, leader: user._id, members: [emptyMember(user)] }).catch(duplicate);
 }
 
 /** Gruppenleiter lädt ein Mitglied ein (Name) */
@@ -346,31 +350,26 @@ async function cancelInvite({ user, inviteeId }) {
   await DungeonParty.updateOne({ leader: user._id, 'members.user': user._id }, { $pull: { invites: { user: inviteeId } } });
 }
 
-/** Einladung annehmen: mit eigener Karte in die Gruppe */
-async function accept({ user, partyId, cardId, boostId }) {
+/** Einladung annehmen: zuerst beitreten, die Karten wählt man danach in der Lobby */
+async function accept({ user, partyId }) {
   checkOpen(user);
   if (await runningRunOf(user._id)) throw new UserError('Du bist gerade in einem Dungeon.');
   if (await partyOf(user._id)) throw new UserError('Verlasse zuerst deine aktuelle Anmeldung.');
   const party = await DungeonParty.findOne({ _id: partyId, 'invites.user': user._id }).lean();
   if (!party) throw new UserError('Diese Einladung gibt es nicht mehr.');
   if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Beitreten ist nicht mehr möglich.');
-  return inTransaction(async (session) => {
-    const member = await memberEntry(user, cardId, boostId, session);
-    const res = await DungeonParty.updateOne(
-      { _id: party._id, 'invites.user': user._id, [`members.${TEAM_SIZE - 1}`]: { $exists: false } },
-      { $pull: { invites: { user: user._id } }, $push: { members: member } },
-      { session }
-    );
-    if (!res.modifiedCount) throw new UserError('Die Gruppe ist schon voll.');
-  }).catch(duplicate);
+  const res = await DungeonParty.updateOne(
+    { _id: party._id, 'invites.user': user._id, [`members.${TEAM_SIZE - 1}`]: { $exists: false } },
+    { $pull: { invites: { user: user._id } }, $push: { members: emptyMember(user) } }
+  ).catch(duplicate);
+  if (!res.modifiedCount) throw new UserError('Die Gruppe ist schon voll.');
 }
 
 async function decline({ user, partyId }) {
   await DungeonParty.updateOne({ _id: partyId }, { $pull: { invites: { user: user._id } } });
 }
 
-/** Abmelden bzw. Gruppe verlassen (bis kurz vor dem Start). Der Leiter gibt die Leitung weiter. */
-/** Karten tauschen, ohne die Anmeldung oder Gruppe zu verlassen (bis kurz vor dem Start) */
+/** Karten in der Lobby wählen oder tauschen (bis kurz vor dem Start); ohne cardId bleibt der Charakter offen */
 async function changeCards({ user, cardId, boostId }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
@@ -391,6 +390,7 @@ async function markLootSeen(runId, userId) {
   await DungeonRun.updateOne({ _id: runId }, { $set: { 'members.$[m].seen': true } }, { arrayFilters: [{ 'm.user': userId }] });
 }
 
+/** Abmelden bzw. Gruppe verlassen (bis kurz vor dem Start). Der Leiter gibt die Leitung weiter. */
 async function leave({ user }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
@@ -421,6 +421,15 @@ async function chat({ user, text }) {
 }
 
 // ---------- Start und Ende ----------
+/**
+ * Wer kann mit? Nur Spieler mit gewähltem Charakter – die anderen fallen beim Start heraus (#111).
+ * { players: Mitglieds-Einträge (mit joinedAt), dropped: Nutzer-IDs ohne Charakter }
+ */
+function splitPlayers(parties) {
+  const all = parties.flatMap((p) => p.members); // joinedAt bleibt im Durchlauf (Manipulationserkennung)
+  return { players: all.filter((m) => m.card), dropped: all.filter((m) => !m.card && m.user).map((m) => m.user) };
+}
+
 /** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
 async function startTeam(slot, parties, players, chatLog, now) {
   const dungeon = dungeonForSlot(slot, settings.intervalHours);
@@ -464,15 +473,27 @@ async function startDue({ now = Date.now(), force = false } = {}) {
   for (const list of bySlot.values()) {
     const slot = list[0].slot;
     const groups = list.filter((p) => !p.solo).map((p) => [p]);
-    const solos = makeTeams(list.filter((p) => p.solo));
-    for (const team of [...groups, ...solos]) {
+    // Einzelspieler ohne Charakter kommen gar nicht erst in die Auslosung
+    const soloParties = list.filter((p) => p.solo);
+    const idle = soloParties.filter((p) => !splitPlayers([p]).players.length);
+    const solos = makeTeams(soloParties.filter((p) => !idle.includes(p)));
+    const dropped = [];
+    for (const team of [...groups, ...solos, ...idle.map((p) => [p])]) {
       try {
-        const players = team.flatMap((p) => p.members);
-        await startTeam(slot, team, players, team.length === 1 ? team[0].chat : [], now);
-        started++;
+        const { players, dropped: out } = splitPlayers(team);
+        if (players.length) {
+          await startTeam(slot, team, players, team.length === 1 ? team[0].chat : [], now);
+          started++;
+        } else {
+          await DungeonParty.deleteMany({ _id: { $in: team.map((p) => p._id) } }); // niemand mit Charakter: kein Durchlauf
+        }
+        dropped.push(...out);
       } catch (err) {
         console.error('Dungeon-Start fehlgeschlagen:', err.message);
       }
+    }
+    if (dropped.length) {
+      await notify(dropped, { area: 'Dungeon', href: '/dungeon', text: 'Der Dungeon ist ohne dich gestartet – du hattest keine Charakterkarte gewählt.' }).catch((err) => console.error('Dungeon-Hinweis fehlgeschlagen:', err.message));
     }
   }
   return started;
@@ -579,7 +600,7 @@ async function pageState(userId) {
   // Fingerabdruck: ändert er sich, lädt die Seite neu (Beitritte, Einladungen, Start, Ende)
   const rev = crypto
     .createHash('sha1')
-    .update(JSON.stringify([party && [party._id, party.leader, party.members.map((m) => m.user), party.invites.map((i) => i.user)], invitations.map((p) => p._id), run && [run._id, run.status]]))
+    .update(JSON.stringify([party && [party._id, party.leader, party.members.map((m) => [m.user, m.card, m.boost]), party.invites.map((i) => i.user)], invitations.map((p) => p._id), run && [run._id, run.status]]))
     .digest('hex')
     .slice(0, 12);
   return { party, invitations, run, unseen, rev };
@@ -618,6 +639,7 @@ module.exports = {
   runSeconds,
   rewardsFor,
   makeTeams,
+  splitPlayers,
   availableCards,
   register,
   invite,
