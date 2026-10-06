@@ -20,6 +20,7 @@ function poolFor(owned) {
     image: c.image,
     owned: owned[c.id],
     limit: rules.copyLimit(c),
+    kampf: c.kampf || null, // Kampfwerte für den Bosskampf (public/js/bossfight-hud.js)
   }));
 }
 

@@ -4,6 +4,24 @@
 //   speed: Plakette oben rechts, am rechten Kartenrand (nicht direkt am Namen)
 //   text:  Innenfläche des großen Fensters für den Fähigkeitstext (Schrift wird kleiner, bis er passt)
 module.exports = {
+  // Item-Karten (Waffen, Schilde, Zauber; 720 × 1080): nur Name im Bild und ein großes Textfenster unten, keine Werte
+  item: {
+    width: 720,
+    height: 1080,
+    stats: [],
+    speed: null,
+    text: { x: 92, y: 866, w: 536, h: 128, size: 30, minSize: 18, lineHeight: 1.3 },
+    colors: {
+      value: '#f6d58e',
+      label: '#c99a4e',
+      text: '#f3e4cb',
+      outline: '#2a0507',
+      plate: '#4a0b10',
+      plateBorder: '#d6a54c',
+      up: '#8fe8a8',
+      down: '#ff9b9b',
+    },
+  },
   gilded: {
     width: 720,
     height: 1008,

@@ -185,8 +185,12 @@ html, body.bf-body {
   box-shadow: 0 8px 22px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .14);
 }
 .bf-card-back { background: #1b1622 url('/img/tcg-backs/season-1.webp') center / cover; transform: rotateY(180deg); }
-.bf-card-front { background: #15111b; overflow: hidden; }
-.bf-card-front img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Vorderseite = Kartenbild; contain, weil Item-Karten (2:3) etwas schmaler sind als die übrigen (5:7) */
+.bf-card-front { background: none; box-shadow: none; }
+.bf-card-front img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .65)); }
+.bf-card { cursor: not-allowed; }
+.bf-card.bf-playable { cursor: pointer; }
+.bf-card.bf-nope .bf-card-inner { animation: bf-shake .3s; }
 .bf-hand-hint {
   position: absolute;
   left: 50%;
@@ -203,8 +207,118 @@ html, body.bf-body {
 .bf-card:hover { z-index: 50 !important; }
 .bf-card:hover .bf-card-inner { translate: 0 -28px; }
 
+/* Ausrüstung rechts neben dem Spieler: bis zu zwei Items (Hände), Waffe/Zauber anklicken = angreifen */
+.bf-gear {
+  --gear-h: calc(var(--card-h) * .78);
+  position: absolute;
+  left: 210px;
+  bottom: 70px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.bf-gear-card {
+  position: relative;
+  width: calc(var(--gear-h) * 2 / 3);
+  height: var(--gear-h);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform .5s cubic-bezier(.2, .8, .25, 1), filter .2s, opacity .4s;
+  font: inherit;
+  color: inherit;
+}
+.bf-gear-card img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .7)); }
+.bf-gear-waffe:hover:not(.bf-used), .bf-gear-zauber:hover:not(.bf-used) { transform: translateY(-8px); }
+.bf-gear-schild { cursor: default; }
+.bf-gear-card.bf-used { filter: grayscale(.85) brightness(.6); cursor: default; }
+.bf-gear-badge {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: #2a2036;
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, .8), 0 4px 10px rgba(0, 0, 0, .6);
+  font-size: 12px;
+  font-weight: 800;
+}
+/* ersetzt: fällt nach unten weg; zerbrochen: zerspringt */
+.bf-gear-out { opacity: 0; transform: translateY(60px) rotate(-12deg); }
+.bf-gear-broken { opacity: 0; transform: scale(1.25); filter: brightness(2) blur(2px); }
+
+/* Runde: Anzeige und Knopf über dem Deck */
+.bf-turn {
+  position: absolute;
+  right: 26px;
+  bottom: calc(22px + var(--card-h) + 30px);
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.bf-round { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #d8cff0; text-shadow: 0 1px 4px rgba(0, 0, 0, .9); }
+.bf-end {
+  pointer-events: auto;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #d9a441, #a8741f);
+  color: #1b1310;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .6);
+}
+.bf-end:hover:not(:disabled) { filter: brightness(1.1); }
+.bf-end:disabled { opacity: .5; cursor: default; }
+
+/* Boss greift an: kurzes rotes Aufflackern am Rand */
+.bf-boss-attack .bf-hud { box-shadow: inset 0 0 120px rgba(200, 20, 20, .45); transition: box-shadow .15s; }
+
+/* aufsteigende Schadenszahl */
+.bf-pop {
+  position: fixed;
+  z-index: 100;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  white-space: nowrap;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .9);
+  animation: bf-pop 1.1s ease-out forwards;
+}
+.bf-pop-boss { color: #f3cf7a; }
+.bf-pop-player { color: #ff7a6e; font-size: 20px; }
+@keyframes bf-pop {
+  from { opacity: 1; margin-top: 0; }
+  to { opacity: 0; margin-top: -50px; }
+}
+
+/* Sieg / Niederlage */
+.bf-result {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 6, 12, .55);
+  font-size: clamp(40px, 9vw, 96px);
+  font-weight: 900;
+  letter-spacing: .06em;
+  color: #f3cf7a;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, .9);
+}
+.bf-result[hidden] { display: none; }
+
 @media (max-width: 700px) {
   .bf-player { width: 120px; left: 12px; bottom: 40px; }
   .bf-avatar { width: 56px; height: 56px; }
   .bf-deck { right: 14px; bottom: 14px; }
+  .bf-gear { left: 140px; bottom: 40px; }
 }

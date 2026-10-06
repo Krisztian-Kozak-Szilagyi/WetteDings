@@ -5034,6 +5034,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 /* Boss-Seltenheit (nur Beute): Farbe für Punkt, Rahmen und „?“-Platzhalter im Album */
 .r-boss { --rar: #e0a646; }
 .r-boss .tcg-locked-inner { border-color: #e0a646; color: #e0a646; opacity: 1; }
+.r-test-item { --rar: #7dd3fc; }
 
 /* ========== Profil (Steam-artig: Kopf mit Bild und Text, links Inhalt, rechts Vitrine) ========== */
 .pf-hero {

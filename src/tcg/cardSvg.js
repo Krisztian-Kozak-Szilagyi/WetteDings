@@ -128,7 +128,7 @@ function render(card, values = {}) {
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
-    speedSvg(frame, v.speed, base.speed) +
+    (frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'
