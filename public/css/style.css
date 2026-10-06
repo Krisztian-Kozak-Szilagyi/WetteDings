@@ -706,8 +706,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .susp-group { padding: 0; overflow: hidden; border-left: 3px solid var(--susp); }
 .susp-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800); }
 .susp-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.susp-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--susp); background: color-mix(in srgb, var(--susp) 16%, transparent); }
-.susp-names { font-size: 15px; overflow-wrap: anywhere; }
+.susp-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--susp); background: color-mix(in srgb, var(--susp) 16%, transparent); }
+.susp-who-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.susp-names { font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
+.susp-names .user-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
 .susp-group-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .susp-group-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .susp-group-actions form { margin: 0; }

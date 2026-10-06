@@ -160,6 +160,7 @@
         <div class="susp-who">
           <span class="susp-avatar" aria-hidden="true"><%= g.users[0].username.charAt(0).toUpperCase() %></span>
           <div>
+            <div class="susp-who-label"><%= g.users.length > 1 ? 'Konten-Paar' : 'Spieler' %></div>
             <div class="susp-names">
               <% g.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
             </div>

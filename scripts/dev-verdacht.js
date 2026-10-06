@@ -1,7 +1,8 @@
 /**
  * Testdaten für die Manipulationserkennung (nur für die lokale Entwicklung).
- * Legt in der laufenden Dev-Datenbank (npm run dev) einen Spieler "skript" an, der jedes Muster einmal zeigt,
- * dazu "zweitkonto" (gleiches Gerät wie skript) und acht unauffällige Spieler als Vergleich für die Einnahmen.
+ * Legt in der laufenden Dev-Datenbank (npm run dev) den verdächtigen Spieler "Grindmaster99" an, der jedes Muster
+ * einmal zeigt, dazu "Grindmaster_alt" (gleiches Gerät, Mehrfach-Konto) und acht unauffällige Spieler als Vergleich
+ * für die Einnahmen.
  * Danach läuft sofort ein Scan – die Hinweise stehen unter Admin → Moderation → Auffälligkeiten.
  *
  *   npm run dev                      (in einem zweiten Terminal laufen lassen)
@@ -44,6 +45,7 @@ const deviceService = require(path.join(ROOT, 'src/device/deviceService'));
 const suspicionService = require(path.join(ROOT, 'src/moderation/suspicionService'));
 
 const MAIL = '@verdacht.dev.local'; // daran erkennt --weg die Testspieler
+const SUSPECT = 'Grindmaster99'; // der verdächtige Testspieler
 const SEC = 1000;
 const MIN = 60 * SEC;
 const HOUR = 60 * MIN;
@@ -59,7 +61,7 @@ function lastHour(ms, test) {
 }
 const cardOf = (rarity) => catalog.CARDS.find((c) => c.rarity === rarity) || catalog.CARDS[0];
 
-// Jedes Muster: (skript, ctx) → schreibt seine Daten. ctx = { anna, filler, zweit }
+// Jedes Muster: (verdächtiger Spieler, ctx) → schreibt seine Daten. ctx = { anna, filler, zweit }
 const PATTERNS = {
   // Tempo und Takt: 24 Pack-Käufe im 2-s-Takt, 12 Bank-Verkäufe je 0,3 s, 8 Wett-Einsätze je 0,5 s
   async tempoTakt(u) {
@@ -123,7 +125,7 @@ const PATTERNS = {
     await Ledger.collection.insertMany(Array.from({ length: 65 }, (_, i) => ({ user: u._id, type: 'tcg_verkauf', amount: 400, createdAt: at(now - 32 * HOUR + i * 30 * MIN) })));
   },
 
-  // Ungewöhnliche Einnahmen: skript 900 € Dungeon-Lohn, acht Vergleichsspieler je 30–40 € IHK-Lohn
+  // Ungewöhnliche Einnahmen: der Verdächtige 900 € Dungeon-Lohn, acht Vergleichsspieler je 30–40 € IHK-Lohn
   async ertrag(u, { filler }) {
     await Ledger.collection.insertMany(filler.map((f, i) => ({ user: f._id, type: 'ihk_lohn', amount: 3000 + i * 100, createdAt: at(now - 2 * HOUR) })));
     await Ledger.collection.insertMany([{ user: u._id, type: 'dungeon_lohn', amount: 90000, createdAt: at(now - HOUR) }]);
@@ -174,7 +176,7 @@ const PATTERNS = {
     await ActionTrace.collection.insertMany(traces);
   },
 
-  // Mehrfach-Konto: zweitkonto meldet sich mit demselben Gerät (Cookie) an wie skript → "Sicher"
+  // Mehrfach-Konto: das Zweitkonto meldet sich mit demselben Gerät (Cookie) an wie der Verdächtige → "Sicher"
   async mehrfach(u, { zweit }) {
     await deviceService.record({ userId: u._id, deviceId: 'testdaten-geraet-1', fp: 'a'.repeat(32), ip: 'testdaten-ip', ua: 'Mozilla/5.0 (Windows NT 10.0) Chrome/140.0' });
     await deviceService.record({ userId: zweit._id, deviceId: 'testdaten-geraet-1', fp: 'a'.repeat(32), ip: 'testdaten-ip', ua: 'Mozilla/5.0 (Windows NT 10.0) Chrome/140.0' });
@@ -216,7 +218,8 @@ async function main() {
 
     const passwordHash = await bcrypt.hash('test1234', 10);
     const mk = (username) => ({ username, usernameLower: username.toLowerCase(), email: `${username}${MAIL}`, passwordHash, balance: 100000 });
-    const [skript, zweit, ...filler] = await User.insertMany([mk('skript'), mk('zweitkonto'), ...Array.from({ length: 8 }, (_, i) => mk(`spieler${i + 1}`))]);
+    const normal = ['lena', 'tom', 'mia', 'paul', 'sofia', 'jonas', 'emma', 'felix'];
+    const [skript, zweit, ...filler] = await User.insertMany([mk(SUSPECT), mk(`${SUSPECT.replace(/\d+$/, '')}_alt`), ...normal.map(mk)]);
     const anna = await User.findOne({ usernameLower: 'anna' }).lean();
     for (const [name, fill] of Object.entries(PATTERNS)) {
       await fill(skript, { anna, filler, zweit });
@@ -224,9 +227,9 @@ async function main() {
     }
     const found = await suspicionService.scan(new Date());
     const alerts = await SuspicionAlert.find({ users: skript._id }).select('kind action level').lean();
-    console.log(`Scan: ${found} Funde, davon ${alerts.length} für "skript":`);
+    console.log(`Scan: ${found} Funde, davon ${alerts.length} für den verdächtigen Spieler "${skript.username}":`);
     for (const a of alerts) console.log(`  - ${a.kind}${a.action ? ` (${a.action})` : ''}: ${a.level === 2 ? 'Wahrscheinlich' : 'Möglich'}`);
-    console.log('Ansehen: http://127.0.0.1:3000/admin?bereich=moderation (als admin / test1234). Anmeldung als "skript" oder "zweitkonto" ebenfalls mit test1234.');
+    console.log(`Ansehen: http://127.0.0.1:3000/admin?bereich=moderation (als admin / test1234). Anmeldung als "${skript.username}" oder "${zweit.username}" ebenfalls mit test1234.`);
   } finally {
     await mongoose.disconnect();
   }
