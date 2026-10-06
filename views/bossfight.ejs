@@ -26,7 +26,7 @@
     </section>
 
     <section class="bf-player" aria-label="Spieler">
-      <img class="bf-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="84" height="84">
+      <img class="bf-avatar" src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="84" height="84">
       <div class="bf-player-name"><%= currentUser.username %></div>
       <div class="bf-hp bf-hp-player" data-bf-hp="player" data-max="100">
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>

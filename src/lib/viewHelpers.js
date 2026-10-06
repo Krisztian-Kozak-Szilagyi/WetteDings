@@ -1,6 +1,7 @@
 const config = require('../config');
 const { quote: rawQuote, splitFee } = require('./payout');
 const { gradeWord } = require('../grading/condition');
+const avatars = require('../profile/avatars');
 
 const euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 const dateFmt = new Intl.DateTimeFormat('de-DE', {
@@ -166,8 +167,8 @@ function signedPercent(x) {
   return `${x > 0 ? '+' : ''}${v} %`;
 }
 
-/** Profilbild eines Mitglieds. Noch für alle der Platzhalter – später kann jeder sein eigenes Bild hochladen. */
-const avatarUrl = () => '/img/avatar-placeholder.svg';
+/** Profilbild eines Mitglieds (braucht das Feld avatar), ohne Auswahl der Platzhalter */
+const avatarUrl = (user) => avatars.urlOf(user && user.avatar);
 
 const editFieldLabels = { title: 'Titel', description: 'Beschreibung' };
 
