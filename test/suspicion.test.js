@@ -290,3 +290,63 @@ test('Wett-Einsätze zählen bei Tempo und Takt mit', () => {
   assert.ok(s.ACTIONS.wetten);
   assert.ok(s.tempoFinding(series(Array(8).fill(0.5)), 'wetten'));
 });
+
+const sig = (x) => ({ actions: 0, noProbe: 0, tokenOk: 0, fast: 0, tokenReused: 0, tokenMissing: 0, withInput: 0, noInput: 0, synthetic: 0, hosting: 0, trap: 0, dwell: [], nets: [], firstAt: new Date(t0), lastAt: new Date(t0 + 3600e3), ...x });
+
+test('Reaktionszeit: unmenschlich schnell oder immer gleich lang nach dem Laden der Seite', () => {
+  // Mensch: 1–8 s, stark gestreut
+  const human = Array.from({ length: 40 }, (_, i) => 1000 + ((i * 1777) % 7000));
+  assert.equal(s.reactionFinding([sig({ actions: 40, tokenOk: 40, dwell: human })]), null);
+  // Skript direkt nach dem Laden
+  const instant = s.reactionFinding([sig({ actions: 40, tokenOk: 40, fast: 38, dwell: Array(40).fill(120) })]);
+  assert.equal(instant.level, LEVEL.wahrscheinlich);
+  assert.match(instant.summary, /0,4 s/);
+  // feste Pause von 3 s
+  const fixed = s.reactionFinding([sig({ actions: 40, tokenOk: 40, dwell: Array.from({ length: 40 }, (_, i) => 3000 + (i % 3) * 20) })]);
+  assert.equal(fixed.level, LEVEL.wahrscheinlich);
+  assert.match(fixed.summary, /gleich lange/);
+  // zu wenige Messungen
+  assert.equal(s.reactionFinding([sig({ actions: 10, tokenOk: 10, fast: 10, dwell: Array(10).fill(100) })]), null);
+  // wiederverwendete Kennzeichen: möglich
+  assert.equal(s.reactionFinding([sig({ actions: 30, tokenOk: 25, tokenReused: 5, dwell: human.slice(0, 25) })]).level, LEVEL.moeglich);
+  // ohne Kennzeichen, obwohl JavaScript lief
+  assert.equal(s.reactionFinding([sig({ actions: 30, tokenMissing: 20 })]).level, LEVEL.moeglich);
+  // ohne JavaScript überhaupt: Sache von „Kein normaler Browser“
+  assert.equal(s.reactionFinding([sig({ actions: 30, noProbe: 30, tokenMissing: 30 })]), null);
+});
+
+test('Ohne echte Eingabe und künstliche Klicks', () => {
+  assert.equal(s.inputFinding([sig({ withInput: 50, noInput: 2 })]), null);
+  assert.equal(s.inputFinding([sig({ withInput: 50, noInput: 45 })]).level, LEVEL.wahrscheinlich);
+  assert.match(s.inputFinding([sig({ withInput: 15, noInput: 12, synthetic: 12 })]).summary, /künstliche Klicks/);
+  assert.equal(s.inputFinding([sig({ withInput: 10, noInput: 10 })]), null); // zu wenige
+});
+
+test('Falle und Rechenzentrum', () => {
+  assert.equal(s.trapFinding([sig({})]), null);
+  assert.equal(s.trapFinding([sig({ trap: 1 })]).level, LEVEL.moeglich);
+  assert.equal(s.trapFinding([sig({ trap: 1 }), sig({ trap: 1 })]).level, LEVEL.wahrscheinlich);
+  assert.equal(s.hostingFinding([sig({ actions: 10, hosting: 2 })]), null);
+  const h = s.hostingFinding([sig({ actions: 10, hosting: 8, nets: ['Hetzner Online GmbH (AS24940)'] })]);
+  assert.equal(h.level, LEVEL.moeglich);
+  assert.match(h.summary, /Hetzner/);
+});
+
+test('Gleichzeitig von zwei Geräten: Hin und Her, nicht ein einzelner Netzwechsel', () => {
+  const at = (min) => new Date(t0 + min * 60e3);
+  // Server-Skript (A) und Handy (B) abwechselnd, zweimal am Tag
+  const both = [];
+  for (const start of [0, 300]) for (let i = 0; i < 6; i++) both.push({ dev: i % 2 ? 'B' : 'A', net: i % 2 ? 'nb' : 'na', at: at(start + i) });
+  const f = s.parallelFinding(both);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.windows, 2);
+  // einmal am Tag: möglich
+  assert.equal(s.parallelFinding(both.slice(0, 6)).level, LEVEL.moeglich);
+  // WLAN → Mobilfunk mit demselben Gerät: nur das Netz wechselt
+  assert.equal(s.parallelFinding(both.map((t, i) => ({ ...t, dev: 'A', net: i < 6 ? 'na' : 'nb' }))), null);
+  // Handy und PC nacheinander (ein Wechsel)
+  assert.equal(s.parallelFinding([...Array(5)].map((_, i) => ({ dev: i < 3 ? 'A' : 'B', net: i < 3 ? 'na' : 'nb', at: at(i) }))), null);
+  // Wechsel über Stunden verteilt
+  assert.equal(s.parallelFinding([...Array(6)].map((_, i) => ({ dev: i % 2 ? 'B' : 'A', net: i % 2 ? 'nb' : 'na', at: at(i * 30) }))), null);
+});

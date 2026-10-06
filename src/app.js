@@ -147,7 +147,8 @@ function createApp() {
     if (!req.user) return res.status(401).json({ popup: null });
     res.json({ popup: giftService.popup(await giftService.nextUnseen(req.user._id)) });
   });
-  app.use(require('./moderation/requestSignals').trackSignals); // Manipulationserkennung: Spiel-Aktionen ohne normalen Browser
+  app.use(require('./moderation/requestSignals').trackSignals); // Manipulationserkennung: Herkunft und Merkmale jeder Spiel-Aktion
+  app.use(require('./moderation/requestSignals').trap); // Manipulationserkennung: unsichtbarer Link als Falle
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
   app.use(require('./coin/etfTrend').trackPulse); // Aktionen der Mitglieder bewegen den BfW-TCG ETF
   // Nach jeder erfolgreichen Aktion (POST) kurz darauf prüfen, ob jemand einen neuen Erfolg erreicht hat

@@ -5598,3 +5598,6 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 /* App herunterladen (Profil-Menü): wie die anderen Menüpunkte; bleibt versteckt, bis der Browser die Installation anbietet */
 .user-menu-list button.app-install { color: var(--text); }
 .user-menu-list button.app-install[hidden] { display: none; }
+
+/* Falle für Skripte (moderation/requestSignals.js): für Menschen unsichtbar */
+.hp-link { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

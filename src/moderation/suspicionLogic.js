@@ -73,6 +73,24 @@ const BROWSER_MIN = 10; // so viele Aktionen ohne Fingerabdruck und ohne Browser
 const BROWSER_SHARE = 0.5; // und mindestens dieser Anteil aller Spiel-Aktionen
 const BROWSER_NOPROBE_MIN = 20; // nur ohne Fingerabdruck (die Seite lief ohne JavaScript): schwächer
 
+const REACT_MIN = 20; // so viele gemessene Reaktionszeiten braucht es
+const REACT_FAST_SHARE = 0.5; // so viele davon unter 0,4 s
+const REACT_SPREAD = 0.05; // Abweichung vom Median unter 5 %: feste Pause
+const REACT_MAX_MEDIAN = 15 * SEC; // gleichmäßig zählt nur bei schnellen Aktionen
+const REACT_REUSED = 5; // Seiten-Kennzeichen so oft wiederverwendet
+const NO_PAGE_MIN = 10; // so viele Aktionen ohne vorher geladene Seite …
+const NO_PAGE_SHARE = 0.5; // … und mindestens dieser Anteil
+
+const INPUT_MIN = 20; // so viele Aktionen mit Angabe der Eingaben
+const INPUT_NONE_SHARE = 0.8; // so viele davon ohne echte Eingabe
+const INPUT_SYNTHETIC = 10; // so viele mit künstlichen Klicks statt echter Eingabe
+
+const HOSTING_MIN = 3; // so viele Aktionen aus einem Rechenzentrum
+
+const PARALLEL_WINDOW_MS = 10 * MIN; // in dieser Zeit …
+const PARALLEL_SWITCHES = 3; // … so oft zwischen zwei Geräten und Netzen hin und her
+const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
+
 const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
 const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
 const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
@@ -89,6 +107,11 @@ const KIND_LABEL = {
   dauer: 'Rund um die Uhr',
   browser: 'Kein normaler Browser',
   ertrag: 'Ungewöhnliche Einnahmen',
+  reaktion: 'Reaktionszeit',
+  eingabe: 'Ohne echte Eingabe',
+  falle: 'Falle ausgelöst',
+  rechenzentrum: 'Aus einem Rechenzentrum',
+  parallel: 'Gleichzeitig von zwei Geräten',
 };
 
 // ---------- Hilfen ----------
@@ -541,6 +564,128 @@ function incomeFindings(entries) {
   return out;
 }
 
+// ---------- Seiten-Kennzeichen, Eingaben, Falle, Netz (Stufe 1: nur gemessen) ----------
+
+const sumOf = (signals, k) => signals.reduce((s, x) => s + (x[k] || 0), 0);
+const spanOfSignals = (signals) => ({
+  from: new Date(Math.min(...signals.map((x) => toMs(x.firstAt || x.lastAt)))),
+  to: new Date(Math.max(...signals.map((x) => toMs(x.lastAt)))),
+});
+
+/**
+ * Reaktionszeit: Zeit zwischen Auslieferung der Seite und Abschicken der Aktion (models/ScriptSignal.dwell).
+ * Unmenschlich kurz (unter 0,4 s ist die Seite noch nicht einmal dargestellt) oder immer fast gleich lang; dazu
+ * wiederverwendete Kennzeichen und Aktionen ohne vorher geladene Seite. null, wenn unauffällig.
+ */
+function reactionFinding(signals) {
+  const dwell = signals.flatMap((x) => x.dwell || []);
+  const [ok, fast, reused, missing, actions, noProbe] = ['tokenOk', 'fast', 'tokenReused', 'tokenMissing', 'actions', 'noProbe'].map((k) => sumOf(signals, k));
+  const parts = [];
+  let strong = false;
+  const med = dwell.length >= REACT_MIN ? median(dwell) : null;
+  if (med !== null && ok && fast / ok >= REACT_FAST_SHARE) {
+    parts.push(`${fast} von ${ok} Aktionen weniger als 0,4 s nach dem Laden der Seite abgeschickt`);
+    strong = true;
+  }
+  const spread = med ? median(dwell.map((x) => Math.abs(x - med))) / med : null;
+  if (med !== null && med <= REACT_MAX_MEDIAN && spread < REACT_SPREAD) {
+    parts.push(`immer fast gleich lange nach dem Laden (${seconds(med)}, Abweichung ${percent(spread)})`);
+    strong = true;
+  }
+  if (reused >= REACT_REUSED) parts.push(`${reused}× ein schon benutztes Seiten-Kennzeichen geschickt`);
+  // ohne Kennzeichen, obwohl die Seite sonst mit JavaScript lief: Anfrage kam nicht von der Seite
+  const withJs = actions - noProbe;
+  if (missing >= NO_PAGE_MIN && withJs > 0 && missing / actions >= NO_PAGE_SHARE) parts.push(`${missing} von ${actions} Aktionen ohne vorher geladene Seite`);
+  if (!parts.length) return null;
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: actions,
+    medianMs: med,
+    spread,
+    ...spanOfSignals(signals),
+    summary: parts.join(', '),
+  };
+}
+
+/**
+ * Ohne echte Eingabe: Aktionen, vor denen es keine Maus-, Touch- oder Tastatureingabe gab (public/js/guard.js) –
+ * typisch für Userscripts und Auto-Klicker, die Knöpfe per Skript drücken. null, wenn unauffällig.
+ */
+function inputFinding(signals) {
+  const [withInput, noInput, synthetic] = ['withInput', 'noInput', 'synthetic'].map((k) => sumOf(signals, k));
+  const noneHit = withInput >= INPUT_MIN && noInput / withInput >= INPUT_NONE_SHARE;
+  const synthHit = synthetic >= INPUT_SYNTHETIC;
+  if (!noneHit && !synthHit) return null;
+  const parts = [];
+  if (noneHit) parts.push(`${noInput} von ${withInput} Aktionen ohne Maus-, Touch- oder Tastatureingabe davor`);
+  if (synthHit) parts.push(`${synthetic}× nur künstliche Klicks (Skript im Browser, z. B. Userscript)`);
+  return { level: LEVEL.wahrscheinlich, count: withInput, ...spanOfSignals(signals), summary: parts.join(', ') };
+}
+
+/** Falle: unsichtbaren Link aufgerufen – ein Mensch sieht ihn nicht. null, wenn nie. */
+function trapFinding(signals) {
+  const hits = sumOf(signals, 'trap');
+  if (!hits) return null;
+  return {
+    level: hits >= 2 ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: hits,
+    ...spanOfSignals(signals.filter((x) => x.trap)),
+    summary: `${hits}× den unsichtbaren Link aufgerufen, den nur ein Programm findet, das die Seite ausliest`,
+  };
+}
+
+/** Aus einem Rechenzentrum: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs). null, wenn unauffällig. */
+function hostingFinding(signals) {
+  const hosting = sumOf(signals, 'hosting');
+  if (hosting < HOSTING_MIN) return null;
+  const nets = [...new Set(signals.flatMap((x) => x.nets || []))].slice(0, 3);
+  const actions = sumOf(signals, 'actions');
+  return {
+    level: LEVEL.moeglich,
+    count: hosting,
+    nets,
+    ...spanOfSignals(signals.filter((x) => x.hosting)),
+    summary: `${hosting} von ${actions} Spiel-Aktionen aus einem Rechenzentrum${nets.length ? `: ${nets.join(', ')}` : ''} (auch VPNs laufen dort)`,
+  };
+}
+
+/**
+ * Gleichzeitig von zwei Geräten: Aktionen wechseln innerhalb kurzer Zeit mehrmals zwischen zwei Geräten UND zwei
+ * Netzen hin und her (z. B. Skript auf einem Server, nebenbei am Handy gespielt). Ein einzelner Wechsel (WLAN →
+ * Mobilfunk) zählt nicht. traces: [{ dev, net, at }] eines Mitglieds. null, wenn unauffällig.
+ */
+function parallelFinding(traces) {
+  const list = traces.filter((t) => t.dev && t.net).sort((x, y) => toMs(x.at) - toMs(y.at));
+  // Wechsel: Gerät und Netz anders als bei der Aktion davor
+  const switches = [];
+  for (let i = 1; i < list.length; i++) {
+    if (list[i].dev !== list[i - 1].dev && list[i].net !== list[i - 1].net) switches.push(toMs(list[i].at));
+  }
+  // Zeitfenster mit mindestens PARALLEL_SWITCHES Wechseln, nicht überlappend gezählt
+  const windows = [];
+  let i = 0;
+  while (i < switches.length) {
+    let j = i;
+    while (j + 1 < switches.length && switches[j + 1] - switches[i] <= PARALLEL_WINDOW_MS) j++;
+    if (j - i + 1 >= PARALLEL_SWITCHES) {
+      windows.push({ from: switches[i], to: switches[j], count: j - i + 1 });
+      i = j + 1;
+    } else i++;
+  }
+  if (!windows.length) return null;
+  const devices = new Set(list.map((t) => t.dev)).size;
+  const total = windows.reduce((s, w) => s + w.count, 0);
+  return {
+    level: windows.length >= PARALLEL_STRONG ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: total,
+    windows: windows.length,
+    devices,
+    from: new Date(windows[0].from),
+    to: new Date(windows[windows.length - 1].to),
+    summary: `${windows.length}× innerhalb von ${Math.round(PARALLEL_WINDOW_MS / MIN)} Minuten mehrmals zwischen zwei Geräten und Netzen hin und her (${total} Wechsel, ${devices} Geräte)`,
+  };
+}
+
 module.exports = {
   ACTIONS,
   KIND_LABEL,
@@ -566,4 +711,9 @@ module.exports = {
   activityFinding,
   browserFinding,
   incomeFindings,
+  reactionFinding,
+  inputFinding,
+  trapFinding,
+  hostingFinding,
+  parallelFinding,
 };

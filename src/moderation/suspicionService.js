@@ -12,6 +12,7 @@ const { Trade } = require('../models/Trade');
 const { DungeonRun } = require('../models/Dungeon');
 const { GradingJob } = require('../models/Grading');
 const ScriptSignal = require('../models/ScriptSignal');
+const ActionTrace = require('../models/ActionTrace');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
@@ -77,7 +78,7 @@ async function findAll(now = new Date()) {
   const awakeSince = new Date(now.getTime() - AWAKE_WINDOW_MS);
   const dungeonSince = new Date(now.getTime() - DUNGEON_WINDOW_MS);
   const ihkSince = new Date(now.getTime() - IHK_WINDOW_MS);
-  const [buys, opens, sells, coins, bets, runs, dungeons, jobs, signals, income, trades, pairs] = await Promise.all([
+  const [buys, opens, sells, coins, bets, runs, dungeons, jobs, signals, traces, income, trades, pairs] = await Promise.all([
     Ledger.find({ type: 'tcg_pack', amount: { $lt: 0 }, createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
     TcgOpening.find({ createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
     Ledger.find({ type: 'tcg_verkauf', createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
@@ -87,6 +88,7 @@ async function findAll(now = new Date()) {
     DungeonRun.find({ slot: { $gt: dungeonSince }, 'members.user': { $ne: null } }).select('slot status members.user members.joinedAt members.seen').lean(),
     GradingJob.find({ status: 'fertig', doneAt: { $gt: ihkSince } }).select('user createdAt doneAt clean seal spots.x').lean(),
     ScriptSignal.find({ day: { $in: daysBetween(awakeSince, now) } }).lean(),
+    ActionTrace.find({ at: { $gt: since } }).select('user dev net at').lean(),
     Ledger.aggregate([
       { $match: { type: { $in: Object.keys(logic.INCOME_SOURCES) }, amount: { $gt: 0 }, createdAt: { $gt: since } } },
       { $group: { _id: { user: '$user', type: '$type' }, amount: { $sum: '$amount' }, from: { $min: '$createdAt' }, to: { $max: '$createdAt' } } },
@@ -155,10 +157,25 @@ async function findAll(now = new Date()) {
     if (f) found.push({ key: `dauer:${user}`, kind: 'dauer', action: null, users: [user], ...pick(f, ['count', 'spanMs', 'nightHours']), ...base(f) });
   }
 
-  // Kein normaler Browser
+  // Kein normaler Browser, Reaktionszeit, Eingaben, Falle, Rechenzentrum (Tages-Merkmale aus requestSignals.js)
+  const signalChecks = [
+    ['browser', logic.browserFinding, ['count', 'uas']],
+    ['reaktion', logic.reactionFinding, ['count', 'medianMs', 'spread']],
+    ['eingabe', logic.inputFinding, ['count']],
+    ['falle', logic.trapFinding, ['count']],
+    ['rechenzentrum', logic.hostingFinding, ['count', 'nets']],
+  ];
   for (const [user, list] of groupByUser(signals)) {
-    const f = logic.browserFinding(list);
-    if (f) found.push({ key: `browser:${user}`, kind: 'browser', action: null, users: [user], ...pick(f, ['count', 'uas']), ...base(f) });
+    for (const [kind, check, keys] of signalChecks) {
+      const f = check(list);
+      if (f) found.push({ key: `${kind}:${user}`, kind, action: null, users: [user], ...pick(f, keys), ...base(f) });
+    }
+  }
+
+  // Gleichzeitig von zwei Geräten (Herkunft jeder Spiel-Aktion der letzten 24 Stunden)
+  for (const [user, list] of groupByUser(traces)) {
+    const f = logic.parallelFinding(list);
+    if (f) found.push({ key: `parallel:${user}`, kind: 'parallel', action: null, users: [user], ...pick(f, ['count', 'windows', 'devices']), ...base(f) });
   }
 
   // Ungewöhnliche Einnahmen
@@ -270,6 +287,6 @@ async function setDone(id, done, actor) {
 }
 
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen */
-const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId })]);
+const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId })]);
 
 module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, setDone, forgetUser };
