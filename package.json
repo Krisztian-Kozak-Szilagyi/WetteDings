@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node scripts/dev.js",
+    "dev:verdacht": "node scripts/dev-verdacht.js",
     "test": "node --test",
     "webp": "node scripts/webp.js"
   },
