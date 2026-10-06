@@ -102,21 +102,22 @@ function betHtml(id, bets) {
   );
 }
 
-function profileHtml(name, users) {
+function profileHtml(name, users, avatars) {
   const real = users && users.get(name.toLowerCase());
   if (!real) return null;
-  return `<a class="forum-embed forum-embed-user" href="${esc(profileHref(real))}"><img class="forum-embed-avatar" src="/img/avatar-placeholder.svg" alt="" width="24" height="24"><span class="forum-embed-title">${esc(real)}</span></a>`;
+  const src = (avatars && avatars.get(name.toLowerCase())) || '/img/avatar-placeholder.svg';
+  return `<a class="forum-embed forum-embed-user" href="${esc(profileHref(real))}"><img class="forum-embed-avatar" src="${esc(src)}" alt="" width="24" height="24"><span class="forum-embed-title">${esc(real)}</span></a>`;
 }
 
 // Einbettungen im (schon maskierten) Text einer Zeile ersetzen; keep schützt das HTML vor Fett und Unterstreichen
 const embedder =
-  ({ bets = null, users = null } = {}) =>
+  ({ bets = null, users = null, avatars = null } = {}) =>
   (h, keep) => {
     const swap = (html, m) => (html ? keep(html) : m);
     return h
       .replace(RE_CARD, (m, id) => swap(cardHtml(id), m))
       .replace(RE_BET, (m, id) => swap(betHtml(id, bets), m))
-      .replace(RE_PROFILE, (m, name) => swap(profileHtml(name, users), m))
+      .replace(RE_PROFILE, (m, name) => swap(profileHtml(name, users, avatars), m))
       .replace(RE_MENTION, (m, name) => {
         // "@max__" (z. B. in __@max__): erst den ganzen Namen, dann ohne die Zeichen am Ende versuchen
         const short = name.replace(/[_.-]+$/, '');
@@ -127,7 +128,7 @@ const embedder =
       });
   };
 
-/** ctx (optional): { bets: Map id → { title, status, pot, duel }, users: Map Name (klein) → Name } aus forum/embeds.js */
+/** ctx (optional): { bets: Map id → { title, status, pot, duel }, users: Map Name (klein) → Name, avatars: Map Name (klein) → Bild-URL } aus forum/embeds.js */
 function render(body, ctx = {}) {
   const text = bareToShort(body);
   const opts = { embed: embedder(ctx) };
