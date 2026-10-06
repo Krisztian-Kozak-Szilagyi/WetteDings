@@ -36,6 +36,18 @@ const dayDate = (d) => (d ? dayDateFmt.format(new Date(d)) : '–');
 const dateSecFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'medium', timeZone: config.timezone });
 const dateSec = (d) => (d ? `${dateSecFmt.format(new Date(d))} Uhr` : '–');
 
+// Zeitraum kompakt, minutengenau: "06.10. 08:54–10:54 Uhr" bzw. "05.10. 22:10 – 06.10. 10:54 Uhr"
+const spanDayFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', timeZone: config.timezone });
+const spanTimeFmt = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: config.timezone });
+function timeSpan(from, to) {
+  if (!to) return '–';
+  const [d2, t2] = [spanDayFmt.format(new Date(to)), spanTimeFmt.format(new Date(to))];
+  if (!from) return `${d2} ${t2} Uhr`;
+  const [d1, t1] = [spanDayFmt.format(new Date(from)), spanTimeFmt.format(new Date(from))];
+  if (d1 === d2) return t1 === t2 ? `${d2} ${t2} Uhr` : `${d2} ${t1}–${t2} Uhr`;
+  return `${d1} ${t1} – ${d2} ${t2} Uhr`;
+}
+
 function relTime(d) {
   const diff = (new Date(d).getTime() - Date.now()) / 1000;
   const abs = Math.abs(diff);
@@ -167,6 +179,7 @@ module.exports = {
   gradeWord,
   dateSec,
   relTime,
+  timeSpan,
   pool,
   quote,
   duelStakeText,
