@@ -13,13 +13,14 @@
 //            Die Felder legen wir mit den Spielregeln fest.
 // Test-Items für den Bosskampf (Seltenheit test-item, Admins bekommen sie beim Start – src/migrate.js).
 //   kampf.typ: waffe | zauber | schild; haende: belegte Hände (1 oder 2); schaden: Grundschaden, einmal pro Runde;
-//   schutz: weniger erlittener Schaden in %; haltbarkeit: Treffer bis zum Zerbrechen (0 = unzerstörbar)
+//   schutz: weniger erlittener Schaden in %; haltbarkeit: Treffer bis zum Zerbrechen (0 = unzerstörbar);
+//   fx: Effekt beim Einsatz (public/js/bossfight-fx.js): feuer | nekro | hieb | hieb-schwer
 const item = (name, abilityName, ability, kampf) => ({ season: 'season-1', frame: 'item', name, stats: [0, 0, 0, 0], abilityName, ability, kampf });
 const TEST_ITEMS = {
-  'one-handed-sword-test-item': item('One-Handed Sword', 'Einhändige Waffe', '8 Schaden, einmal pro Runde.', { typ: 'waffe', haende: 1, schaden: 8 }),
-  'axe-test-item': item('Axe', 'Zweihändige Waffe', '14 Schaden, einmal pro Runde.', { typ: 'waffe', haende: 2, schaden: 14 }),
-  'fire-spell-test-item': item('Fire Spell', 'Zauber', '12 Schaden, einmal pro Runde.', { typ: 'zauber', haende: 1, schaden: 12 }),
-  'necrotic-spell-test-item': item('Necrotic Spell', 'Zauber', '10 Schaden, einmal pro Runde.', { typ: 'zauber', haende: 1, schaden: 10 }),
+  'one-handed-sword-test-item': item('One-Handed Sword', 'Einhändige Waffe', '8 Schaden, einmal pro Runde.', { typ: 'waffe', haende: 1, schaden: 8, fx: 'hieb' }),
+  'axe-test-item': item('Axe', 'Zweihändige Waffe', '14 Schaden, einmal pro Runde.', { typ: 'waffe', haende: 2, schaden: 14, fx: 'hieb-schwer' }),
+  'fire-spell-test-item': item('Fire Spell', 'Zauber', '12 Schaden, einmal pro Runde.', { typ: 'zauber', haende: 1, schaden: 12, fx: 'feuer' }),
+  'necrotic-spell-test-item': item('Necrotic Spell', 'Zauber', '10 Schaden, einmal pro Runde.', { typ: 'zauber', haende: 1, schaden: 10, fx: 'nekro' }),
   'wooden-shield-test-item': item('Wooden Shield', 'Schild', '10 % weniger Schaden. Zerbricht nach 4 Treffern.', { typ: 'schild', haende: 1, schutz: 10, haltbarkeit: 4 }),
   'tower-shield-test-item': item('Tower Shield', 'Schild', '10 % weniger Schaden. Unzerstörbar.', { typ: 'schild', haende: 1, schutz: 10, haltbarkeit: 0 }),
 };

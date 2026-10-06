@@ -400,6 +400,13 @@
     ctx.restore();
   }
 
+  // Treffer (public/js/bossfight-fx.js): Spinne zuckt zurück und blitzt kurz in der Farbe des Effekts auf
+  var hit = null; // { start, farbe, staerke }
+  function treffer(farbe, staerke) {
+    hit = { start: animT, farbe: farbe || '255, 255, 255', staerke: staerke || 1, seite: Math.random() < 0.5 ? -1 : 1 };
+    if (still) wake(0.5);
+  }
+
   function frame(t) {
     var scale = canvas.width / W;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -416,12 +423,36 @@
       y: HEAD.y + 7 * Math.sin(t * 0.9) + 1.5 * Math.sin(t * 2.3),
       rot: 0.03 * Math.sin(t * 0.6),
     };
+    // Rückstoß: schnell nach hinten (oben) und zur Seite, federt zurück
+    var flash = 0;
+    if (hit) {
+      var ht = t - hit.start;
+      if (ht > 0.6) hit = null;
+      else {
+        var k = Math.exp(-ht * 9) * Math.sin(Math.min(1, ht * 30) * Math.PI / 2) * hit.staerke;
+        head.y -= 22 * k;
+        head.x += 10 * k * hit.seite;
+        head.rot += 0.05 * k * hit.seite;
+        flash = Math.max(0, 1 - ht / 0.14) * 0.6;
+      }
+    }
 
-    drawShadow(head);
     LEGS.forEach(function (leg) { if (leg.depth >= 2) drawLeg(leg, head); });
     drawAbdomen(head, t);
     LEGS.forEach(function (leg) { if (leg.depth < 2) drawLeg(leg, head); });
     drawHead(head, t);
+    if (flash > 0) {
+      // nur die Spinne einfärben (source-atop), Schatten kommt danach dahinter
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgba(' + hit.farbe + ', ' + flash + ')';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    ctx.globalCompositeOperation = 'destination-over';
+    drawShadow(head);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   function resize() {
@@ -435,13 +466,38 @@
     }
   }
 
-  var t0 = null;
+  // Animationszeit läuft selbst mit, damit ein Treffer sie kurz anhalten kann (Hit-Stop)
+  var animT = 0;
+  var last = null;
+  var stopBis = 0;
   function loop(now) {
-    if (t0 === null) t0 = now;
+    var dt = last === null ? 0 : Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (now >= stopBis) animT += dt;
     resize();
-    frame((now - t0) / 1000);
-    requestAnimationFrame(loop);
+    frame(animT);
+    if (!still || now < wakeBis) requestAnimationFrame(loop);
+    else last = null;
   }
+  // Bei reduzierter Bewegung steht die Spinne; für einen Treffer läuft die Schleife kurz an
+  var wakeBis = 0;
+  function wake(sek) {
+    var lief = performance.now() < wakeBis;
+    wakeBis = performance.now() + sek * 1000;
+    if (!lief) requestAnimationFrame(loop);
+  }
+
+  // Für die Effekte: Trefferpunkt auf dem Bildschirm (Kopfbruststück) und Treffer-Reaktion
+  window.bossfightBoss = {
+    punkt: function () {
+      var rc = canvas.getBoundingClientRect();
+      var x = BOSS_PIVOT[0] + (HEAD.x - BOSS_PIVOT[0]) * BOSS_SCALE;
+      var y = BOSS_PIVOT[1] + (HEAD.y + 10 - BOSS_PIVOT[1]) * BOSS_SCALE;
+      return { x: rc.left + (x / W) * rc.width, y: rc.top + (y / H) * rc.height, r: (110 / W) * rc.width };
+    },
+    treffer: treffer,
+    stopp: function (sek) { stopBis = performance.now() + sek * 1000; },
+  };
 
   // Vollbild ohne Navigation: Esc führt zurück
   document.addEventListener('keydown', function (e) {

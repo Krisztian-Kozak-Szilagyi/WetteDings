@@ -75,6 +75,17 @@
     setTimeout(function () { p.remove(); }, 1100);
   }
 
+  // Schadenszahl direkt an der Einschlagstelle
+  function popupAt(x, y, text, cls) {
+    var p = document.createElement('span');
+    p.className = 'bf-pop ' + (cls || '');
+    p.textContent = text;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    document.body.appendChild(p);
+    setTimeout(function () { p.remove(); }, 1100);
+  }
+
   function checkEnd() {
     if (over || !resultEl || !boss || !player) return;
     if (boss.hp > 0 && player.hp > 0) return;
@@ -243,20 +254,36 @@
     g.el.style.transform = '';
   }
 
-  // Waffe/Zauber einsetzen: einmal pro Runde
+  // Waffe/Zauber einsetzen: einmal pro Runde. Der Effekt (public/js/bossfight-fx.js) läuft zuerst,
+  // Schaden und Zahl kommen beim Einschlag
+  var laufend = 0; // Effekte unterwegs – solange kann die Runde nicht enden
+  function fxArt(k) {
+    if (k.fx) return k.fx;
+    if (k.typ === 'waffe') return (k.haende || 1) > 1 ? 'hieb-schwer' : 'hieb';
+    return 'feuer';
+  }
   function use(g) {
     if (over || g.card.kampf.typ === 'schild' || g.used) return;
     g.used = true;
     gearLabel(g);
     var dmg = g.card.kampf.schaden || 0;
-    boss.damage(dmg);
-    popup(boss.el, '−' + dmg, 'bf-pop-boss');
+    laufend++;
+    if (endBtn) endBtn.disabled = true;
+    var fx = window.bossfightFx ? window.bossfightFx.spiel(fxArt(g.card.kampf), g.el) : Promise.resolve(null);
+    fx.then(function (p) {
+      boss.damage(dmg);
+      if (p) popupAt(p.x, p.y - 40, '−' + dmg, 'bf-pop-boss bf-pop-gross');
+      else popup(boss.el, '−' + dmg, 'bf-pop-boss');
+    }).finally(function () {
+      laufend--;
+      if (!laufend && endBtn && !over) endBtn.disabled = false;
+    });
   }
 
   // ---------- Runden ----------
   var round = 1;
   function endRound() {
-    if (over) return;
+    if (over || laufend) return;
     endBtn.disabled = true;
     // Boss schlägt zu; jeder Schild nimmt seinen Anteil weg und zählt einen Treffer
     var hit = BOSS_HIT[0] + Math.floor(Math.random() * (BOSS_HIT[1] - BOSS_HIT[0] + 1));
@@ -264,6 +291,8 @@
     var pct = Math.min(90, shields.reduce(function (s, g) { return s + (g.card.kampf.schutz || 0); }, 0));
     var dmg = Math.round((hit * (100 - pct)) / 100);
     document.body.classList.add('bf-boss-attack');
+    var avatar = document.querySelector('.bf-avatar');
+    if (window.bossfightFx && avatar) window.bossfightFx.bossAngriff(avatar, pct > 0);
     setTimeout(function () {
       document.body.classList.remove('bf-boss-attack');
       player.damage(dmg);
@@ -318,5 +347,5 @@
       hint('Das Deck konnte nicht geladen werden.');
     });
 
-  window.bossfight = { boss: boss, player: player, draw: draw };
+  window.bossfight = { boss: boss, player: player, draw: draw, use: use, gear: gear };
 })();
