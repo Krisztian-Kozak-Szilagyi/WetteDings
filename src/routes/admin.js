@@ -18,6 +18,7 @@ const tcgService = require('../tcg/tcgService');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
+const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const giftService = require('../services/giftService');
@@ -30,6 +31,7 @@ const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
 const suspicionService = require('../moderation/suspicionService');
+const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
@@ -44,7 +46,7 @@ const PANEL_SECTIONS = [
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
-  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes, Devs und Mods.' },
+  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
@@ -138,7 +140,7 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
@@ -146,6 +148,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     needsSub('moderation', 'meldungen') ? openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
+    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.precision() : [],
     needs('team') ? listActiveCodes() : [],
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
@@ -181,6 +184,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
+    suspicionPrecision: precision, // Trefferquote je Muster (Urteile bestätigt/Fehlalarm)
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
@@ -203,6 +207,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     ttlOptions: CODE_TTL_OPTIONS,
     ttlText,
     remainingText,
+    inviteMaxPacks: inviteService.MAX_PACKS,
+    packsText: inviteService.packsText,
     now: Date.now(),
     tcg:
       needs('spielwerte') && isAdmin
@@ -295,16 +301,38 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 });
 
 // ---------- Auffälligkeiten (Manipulationserkennung): Hinweise abhaken (Admin und Devs) ----------
-// "Alle erledigt" je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt)
+// Urteil (bestätigt/Fehlalarm) erledigt zugleich und zählt für die Trefferquote je Muster.
+const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
+
+// Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
 router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
-  await suspicionService.setDoneMany(ids, true, req.user);
+  const verdict = verdictOf(req.body.action);
+  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
+  else await suspicionService.setDoneMany(ids, true, req.user);
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
 router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
+});
+
+// ---------- Kartenhistorie: Lebenslauf eines Exemplars (Admin und Devs) ----------
+// Suche nach Kartenname (alle Exemplare mit Besitzer) bzw. Verlauf eines Exemplars (TcgCard-_id)
+router.get('/admin/kartenhistorie', requireStaff, async (req, res) => {
+  const q = str(req.query.karte).trim().slice(0, 40);
+  res.render('kartenhistorie', { title: 'Kartenhistorie', q, results: q ? await cardHistory.searchCopies(q) : null, history: null });
+});
+
+router.get('/admin/kartenhistorie/:id', requireStaff, async (req, res) => {
+  const history = await cardHistory.historyOf(req.params.id);
+  if (!history) return res.status(404).render('error', { title: 'Kartenhistorie', status: 404, message: 'Zu diesem Exemplar gibt es keine Spur.' });
+  res.render('kartenhistorie', { title: `Kartenhistorie: ${history.label}`, q: '', results: null, history });
 });
 
 // ---------- Sperren: Konto samt allen bekannten Geräten ----------
@@ -681,9 +709,9 @@ async function revokeCardFrom(req) {
     req.flash('error', 'Es können 1 bis 50 Exemplare entfernt werden.');
   } else {
     try {
-      const { removed, remaining } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
+      const { removed, remaining, docs } = await tcgService.revokeCards({ userId: user._id, cardId: card.id, count });
       const label = `${card.name} (${tcgCatalog.rarityByKey[card.rarity].label})`;
-      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed });
+      await PackGrant.create({ by: req.user._id, byName: req.user.username, to: user._id, toName: user.username, kind: 'entzug', type: card.id, typeLabel: label, count: removed, docs });
       req.flash('success', `${removed}× ${label} bei ${user.username} entfernt (noch ${remaining} im Besitz).`);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;
@@ -894,6 +922,20 @@ router.post('/admin/codes', requireStaff, async (req, res) => {
   const code = await createCode(req.user, ttl);
   req.flash('success', `Neuer Einladungscode: ${formatCode(code.code)} – gültig für ${ttlText(ttl)} und eine Person.`);
   res.redirect(panelUrl('team', 'codes'));
+});
+
+// Einladungslink für ein Mitglied, das ihn sich gewünscht hat: Gültigkeit und Provision legt der Dev fest
+router.post('/admin/codes/einladungslink', requireStaff, async (req, res) => {
+  const userId = str(req.body.user);
+  const beneficiary = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username').lean() : null;
+  try {
+    const link = await inviteService.createLink({ staff: req.user, beneficiary, ttlMinutes: req.body.ttl, packs: req.body.packs });
+    req.flash('success', `Einladungslink für ${beneficiary.username}: ${formatCode(link.code)} – gültig für ${ttlText(parseTtl(req.body.ttl))}, Provision ${inviteService.packsText(link.rewardPacks)}. ${beneficiary.username} findet ihn unter Mein Konto → Einladungen.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(panelUrl('team', 'einladungslinks'));
 });
 
 // Der Admin löscht jeden Code, Devs nur ihre eigenen

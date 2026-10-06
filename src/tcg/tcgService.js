@@ -27,7 +27,9 @@ function soldMeta(docs) {
     entry.count++;
     byCard.set(d.card, entry);
   }
-  return { cards: [...byCard.values()] };
+  // Exemplare (wenn bekannt): Ende des Verlaufs in der Kartenhistorie (moderation/cardHistory.js)
+  const sold = docs.filter((d) => d._id).map((d) => ({ doc: d._id, card: d.card }));
+  return sold.length ? { cards: [...byCard.values()], docs: sold } : { cards: [...byCard.values()] };
 }
 
 /** Booster Packs kaufen (1 bis MAX_PACKS_PER_PURCHASE): Sie landen ungeöffnet im Inventar. */
@@ -90,7 +92,7 @@ async function grantCards({ userIds, cardId, count = 1 }) {
 /**
  * Exemplare einer Karte aus der Sammlung eines Mitglieds entfernen (Admin/Dev, z. B. nach einem Fehler).
  * Gesperrte Exemplare (laufende Quest, offenes Handelsangebot) bleiben unangetastet.
- * Gibt { card, removed, remaining } zurück.
+ * Gibt { card, removed, remaining, docs } zurück (docs = entfernte Exemplare, für das Vergabe-Protokoll).
  */
 async function revokeCards({ userId, cardId, count = 1 }) {
   const card = catalog.cardById[cardId];
@@ -107,7 +109,7 @@ async function revokeCards({ userId, cardId, count = 1 }) {
     const ids = free.slice(0, count).map((d) => d._id);
     const res = await TcgCard.deleteMany({ _id: { $in: ids }, user: userId }, { session });
     if (res.deletedCount !== ids.length) throw new UserError('Der Bestand hat sich geändert. Bitte versuche es erneut.');
-    return { card, removed: ids.length, remaining: owned.length - ids.length };
+    return { card, removed: ids.length, remaining: owned.length - ids.length, docs: ids };
   });
   // Favoriten/Schutz aufräumen, falls das letzte Exemplar weg ist
   if (!result.remaining) await User.updateOne({ _id: userId }, { $pull: { tcgFavorites: card.id, tcgProtected: card.id } });
@@ -215,7 +217,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
 
     const proceeds = rarity.sell * n;
     const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { balance: proceeds } }, { new: true, session });
-    await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta(toSell.map((c) => ({ card: cardId, rarity: c.rarity }))) }], { session });
+    await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta(toSell.map((c) => ({ _id: c._id, card: cardId, rarity: c.rarity }))) }], { session });
     return { count: n, proceeds, remaining: all.length - n, balance: updated.balance };
   });
 }

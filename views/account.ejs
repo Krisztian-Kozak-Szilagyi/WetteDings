@@ -157,6 +157,59 @@
 </div>
 <% } %>
 
+<% if (section === 'einladungen') { %>
+<div class="card" id="einladungen">
+  <h2>Freunde einladen</h2>
+  <p class="muted">
+    Möchtest du jemanden einladen, frag einen Dev nach einem Einladungslink. Er erstellt ihn für dich und legt fest, wie lange er gilt und wie viele Booster Packs du als Provision bekommst.
+    Schick den Link dann der Person weiter – registriert sie sich darüber, landet die Provision in deinem Inventar. Jeder Link gilt für genau eine Person.
+    Zweitkonten bringen nichts: Kommt das neue Konto von deinem Gerät, gibt es keine Provision.
+  </p>
+  <% if (!openLinks.length) { %>
+    <p class="muted">Du hast gerade keinen gültigen Einladungslink.</p>
+  <% } else { %>
+    <ul class="code-list">
+      <% openLinks.forEach((l) => { %>
+        <li class="code-item">
+          <div class="code-main">
+            <code class="code-value"><%= l.shown %></code>
+            <span class="badge badge-offen">Gültig · <%= l.left %></span>
+          </div>
+          <div class="code-meta muted small">Provision: <%= l.reward %> · erstellt von <%= l.createdByName %> · läuft ab <%= date(l.expiresAt) %></div>
+          <div class="code-actions">
+            <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.url %>">Link kopieren</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= l.shown %>">Code kopieren</button>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>Geworbene Mitglieder</h2>
+  <% if (!invited.length) { %>
+    <p class="muted">Über deine Links hat sich noch niemand registriert.</p>
+  <% } else { %>
+    <p class="muted"><%= invited.length %> <%= invited.length === 1 ? 'Mitglied' : 'Mitglieder' %> geworben · insgesamt <strong><%= rewardTotal %> Booster Pack<%= rewardTotal === 1 ? '' : 's' %></strong> Provision</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Mitglied</th><th>Registriert</th><th class="num">Provision</th></tr></thead>
+        <tbody>
+          <% invited.forEach((u) => { const r = u.inviteReward || {}; %>
+            <tr>
+              <td><%- u.deletedAt ? '<span class="muted">gelöschtes Konto</span>' : userLink(u.username) %></td>
+              <td class="nowrap"><%= date(u.createdAt) %></td>
+              <td class="num"><%= r.packs ? r.packs + ' Pack' + (r.packs === 1 ? '' : 's') : '' %><% if (!r.packs) { %><span class="muted small"><%= r.withheld ? 'keine (' + r.withheld + ')' : 'keine' %></span><% } %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+<% } %>
+
 <% if (section === 'einstellungen') { %>
 <div class="account-grid">
 <div class="card" id="name">

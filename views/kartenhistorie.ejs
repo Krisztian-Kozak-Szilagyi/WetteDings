@@ -1,0 +1,81 @@
+<%- include('partials/head') %>
+
+<div class="narrow">
+  <div class="page-head">
+    <h1>Kartenhistorie</h1>
+    <a class="btn btn-ghost btn-sm" href="/admin?bereich=moderation&amp;teil=auffaelligkeiten">← Auffälligkeiten</a>
+  </div>
+
+  <form method="get" action="/admin/kartenhistorie" class="card card-history-search" role="search">
+    <label class="sr-only" for="kh-karte">Karte suchen</label>
+    <input type="search" id="kh-karte" name="karte" value="<%= q %>" maxlength="40" placeholder="Karte suchen, z. B. Sigrist" autocomplete="off">
+    <button class="btn btn-sm" type="submit">Exemplare zeigen</button>
+  </form>
+
+  <% if (results) { %>
+    <% if (!results.length) { %>
+      <div class="card"><p class="muted">Keine Karte gefunden.</p></div>
+    <% } %>
+    <% results.forEach((r) => { %>
+      <section class="card card-history-copies">
+        <h2><%= r.label %></h2>
+        <p class="muted small"><%= r.copies.length %> <%= r.copies.length === 1 ? 'Exemplar' : 'Exemplare' %> vorhanden<%= r.gone.length ? ` · ${r.gone.length} nicht mehr vorhanden, aber im Handel nachweisbar` : '' %></p>
+        <% if (r.copies.length || r.gone.length) { %>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Besitzer</th><th>Entstanden</th><th class="num">Geschäfte</th><th></th></tr></thead>
+              <tbody>
+                <% r.copies.forEach((c) => { %>
+                  <tr>
+                    <td><%- userLink(c.owner, { realName: false }) %><% if (c.foiled) { %> <span class="badge">foliert</span><% } %></td>
+                    <td class="nowrap"><%= dateSec(c.createdAt) %></td>
+                    <td class="num"><%= c.trades %></td>
+                    <td><a class="btn btn-ghost btn-sm" href="/admin/kartenhistorie/<%= c.id %>">Verlauf</a></td>
+                  </tr>
+                <% }) %>
+                <% r.gone.forEach((c) => { %>
+                  <tr class="muted">
+                    <td>nicht mehr vorhanden</td>
+                    <td>–</td>
+                    <td class="num"><%= c.trades %></td>
+                    <td><a class="btn btn-ghost btn-sm" href="/admin/kartenhistorie/<%= c.id %>">Verlauf</a></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+    <% }) %>
+  <% } %>
+
+  <% if (history) { %>
+    <section class="card">
+      <h2><%= history.label %></h2>
+      <div class="susp-facts">
+        <span class="susp-fact"><b><%= euro(history.value) %></b> Bankwert</span>
+        <span class="susp-fact"><b><%= history.events.filter((e) => e.to).length %></b> Besitzerwechsel</span>
+        <% if (history.exists) { %>
+          <span class="susp-fact"><b><%= history.owner %></b> besitzt sie<%= history.ownerSince ? ' seit ' + date(history.ownerSince) : '' %></span>
+        <% } else { %>
+          <span class="susp-fact"><b>nicht mehr vorhanden</b></span>
+        <% } %>
+        <% if (history.foiledAt) { %><span class="susp-fact"><b>foliert</b></span><% } %>
+      </div>
+      <ol class="card-history">
+        <% history.events.forEach((e) => { %>
+          <li class="card-history-step card-history-<%= e.type %><%= e.guess ? ' is-guess' : '' %>">
+            <span class="card-history-icon" aria-hidden="true"><%= e.icon %></span>
+            <div>
+              <div class="card-history-time"><%= dateSec(e.at) %><% if (e.held) { %> · <%= e.from %> hielt sie <%= e.held %><% } %></div>
+              <div><%= e.text %></div>
+            </div>
+          </li>
+        <% }) %>
+      </ol>
+      <p class="muted small">Exemplar <code><%= history.id %></code>. Bank-Verkauf und Entfernen durch das Team sind erst seit Einführung dieser Seite je Exemplar gespeichert; ältere Enden sind aus den Buchungen erschlossen („vermutlich“).</p>
+    </section>
+  <% } %>
+</div>
+
+<%- include('partials/foot') %>
