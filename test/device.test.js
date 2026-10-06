@@ -129,3 +129,32 @@ test('Ban-Verlauf: Altbestand aus den Einzelfeldern, laufende Bans schließen, D
   assert.deepEqual(tl.map((b) => [b.byName, b.state]), [['B', 'aktiv'], ['A', 'abgelaufen']]);
   assert.equal(L.banTimeline({ banHistory: closed }, now.getTime())[0].state, 'aufgehoben');
 });
+
+test('#89: baugleiche Geräte im selben WLAN sind kein Mehrfach-Konto', () => {
+  const H = 3600e3;
+  const t0 = Date.UTC(2026, 9, 1);
+  const at = (from, to) => ({ firstAt: new Date(t0 + from * H), lastAt: new Date(t0 + to * H) });
+  // zwei Freunde mit demselben Handymodell im selben WLAN, beide nutzen die Seite über Tage parallel
+  const a = { user: 'u1', deviceId: 'd1', fp: 'f1', ips: ['i1'], ...at(0, 72) };
+  const b = { user: 'u2', deviceId: 'd2', fp: 'f1', ips: ['i1'], ...at(5, 80) };
+  assert.equal(d.usedInParallel(a, b), true);
+  assert.equal(d.matchLevel(a, b), d.LEVEL.moeglich);
+  // Cookie gelöscht, gleich danach neues Konto auf demselben Gerät: nacheinander → wahrscheinlich
+  const c = { user: 'u3', deviceId: 'd3', fp: 'f1', ips: ['i1'], ...at(72.5, 90) };
+  assert.equal(d.usedInParallel(a, c), false); // nur 0 h Überschneidung
+  assert.equal(d.matchLevel(a, c), d.LEVEL.wahrscheinlich);
+  // kurze Überschneidung (unter 1 Std.) zählt nicht als parallel
+  assert.equal(d.usedInParallel(a, { ...c, ...at(71.5, 90) }), false);
+  // viele Konten mit gleichem Fingerabdruck im selben Netz: auch nacheinander nur möglich
+  const crowd = d.commonPrints([a, b, c]);
+  assert.ok(crowd.has(d.printKey('f1', 'i1')));
+  assert.equal(d.matchLevel(a, c, crowd), d.LEVEL.moeglich);
+  assert.equal(d.commonPrints([a, b]).size, 0); // zwei Konten sind noch keine Menge
+  // ein anderes, nicht häufiges Netz zählt weiter
+  assert.equal(d.matchLevel({ ...a, ips: ['i1', 'i7'] }, { ...c, ips: ['i7'] }, crowd), d.LEVEL.wahrscheinlich);
+  // gleiches Cookie bleibt immer sicher
+  assert.equal(d.matchLevel(a, { ...b, deviceId: 'd1' }, crowd), d.LEVEL.sicher);
+  // stärkster Treffer zwischen allen Geräten zweier Konten
+  assert.equal(d.pairLevel([a], [b, { ...c, user: 'u2' }]), d.LEVEL.wahrscheinlich);
+  assert.equal(d.pairLevel([a], [{ deviceId: 'x', fp: 'zz', ips: [] }]), 0);
+});

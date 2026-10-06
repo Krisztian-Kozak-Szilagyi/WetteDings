@@ -11,6 +11,7 @@ const catalog = require('../tcg/catalog');
 const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
 const foil = require('../items/foil');
 const estimate = require('./estimate');
+const { rnd, chance, pick, weighted, rollDefects, gradeFor } = require('./condition');
 const { notify } = require('../services/notifyService');
 
 // ---------- Spielregeln (Demo-Werte) ----------
@@ -78,18 +79,7 @@ async function saveSettings({ admin, ...values }) {
 }
 
 // ---------- Auftrag auswürfeln ----------
-const rnd = (min, max) => min + (crypto.randomInt(1000000) / 1000000) * (max - min);
-const chance = (p) => crypto.randomInt(1000000) < p * 1000000;
-const pick = (list) => list[crypto.randomInt(list.length)];
-/** Index nach Gewichten, z. B. [40, 35, 18, 7] */
-function weighted(weights) {
-  let roll = crypto.randomInt(weights.reduce((s, w) => s + w, 0));
-  for (let i = 0; i < weights.length; i++) {
-    if (roll < weights[i]) return i;
-    roll -= weights[i];
-  }
-  return 0;
-}
+// Würfel-Hilfen, Mängel und Note teilen sich Kundenaufträge und Karten der Mitglieder (src/grading/condition.js)
 
 /** Karte des Kunden: Seltenheit nach CUSTOMER_RARITIES (nur Seltenheiten, zu denen es Karten gibt) */
 function rollCard() {
@@ -114,26 +104,6 @@ function rollSpots() {
   return spots;
 }
 
-/** Mängel der Vorderseite und die daraus folgende Note (10 minus Abzüge, mindestens 1) */
-function rollDefects() {
-  const scratches = Array.from({ length: weighted([40, 35, 18, 7]) }, () => ({
-    x: Math.round(rnd(20, 80)),
-    y: Math.round(rnd(18, 82)),
-    len: Math.round(rnd(14, 30)),
-    angle: Math.round(rnd(-70, 70)),
-  }));
-  const corners = [0, 1, 2, 3].filter(() => chance(0.15));
-  const edges = Array.from({ length: weighted([60, 30, 10]) }, () => ({ side: crypto.randomInt(4), pos: Math.round(rnd(20, 80)) }));
-  const crease = chance(0.08);
-  return { scratches, corners, edges, crease };
-}
-
-/** Note aus den Mängeln: Kratzer, Ecke, Kantenmacke je −1, Knick −3 */
-function gradeFor(defects) {
-  const minus = defects.scratches.length + defects.corners.length + defects.edges.length + (defects.crease ? 3 : 0);
-  return Math.max(1, 10 - minus);
-}
-
 /** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %) */
 function payFor({ level, clean = 100, grade, guess, seal, rarity }) {
   const info = levelInfo(level);
@@ -149,6 +119,25 @@ function payFor({ level, clean = 100, grade, guess, seal, rarity }) {
 
 // ---------- Ablauf ----------
 
+/**
+ * Heute verbrauchte Aufträge: nur die auf der aktuellen Stufe – wer ausbaut, bekommt am selben Tag ein neues
+ * volles Kontingent (#96). Der offene Auftrag zählt mit, wenn er heute auf dieser Stufe angenommen wurde.
+ */
+function usedToday({ done, open, level, day }) {
+  return done.filter((j) => j.level === level).length + (open && open.day === day && open.level === level ? 1 : 0);
+}
+
+// Wert des Shops im Gesamtvermögen (Rangliste, Profil, Dashboard): die Hälfte der bezahlten Ausbaukosten
+// (Krisztian, 2026-10-05) – mit den aktuellen Kosten aus den Einstellungen.
+const SHOP_VALUE_PERCENT = 50;
+/** Wert eines Shops dieser Stufe in Cent (Stufe 1 = 0) */
+function shopValue(level, costs = settings.costs) {
+  const paid = costs.slice(0, Math.max(0, Math.min(LEVELS.length, level || 1) - 1)).reduce((s, c) => s + c, 0);
+  return Math.floor((paid * SHOP_VALUE_PERCENT) / 100);
+}
+/** Wert je Stufe [Stufe 1, 2, 3, 4] – für die Ranglisten-Aggregation */
+const shopValues = () => LEVELS.map((l) => shopValue(l.level));
+
 /** Shop, offener Auftrag und heutige Aufträge */
 async function getState(userId) {
   const day = today();
@@ -158,7 +147,7 @@ async function getState(userId) {
     GradingJob.find({ user: userId, day, status: 'fertig' }).sort({ doneAt: -1 }).lean(),
   ]);
   const info = levelInfo(shop ? shop.level : 1);
-  return { shop, info, next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null, open, done, limit: info.jobs, used: done.length + (open && open.day === day ? 1 : 0) };
+  return { shop, info, next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null, open, done, limit: info.jobs, used: usedToday({ done, open, level: info.level, day }) };
 }
 
 /** Job annehmen: Vertrag über CONTRACT_DAYS Tage, ab jetzt kein Tagesbonus */
@@ -296,4 +285,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

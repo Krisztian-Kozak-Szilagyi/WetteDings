@@ -1172,3 +1172,74 @@
     }, 'image/png');
   }
 })();
+
+// ---------- Such-/Filterknopf (partials/mkt-bar) auf allen Seiten: Auswahl je Gruppe markieren, „Filtern nach“
+// anzeigen, Menü zuklappen. Gefiltert wird im Skript der jeweiligen Seite. ----------
+(function () {
+  'use strict';
+  var bars = Array.prototype.slice.call(document.querySelectorAll('[data-mkt-bar]'));
+  if (!bars.length) return;
+  function sync(bar) {
+    var parts = [];
+    bar.querySelectorAll('.mkt-group').forEach(function (g) {
+      var active = g.querySelector('.mkt-opt.active');
+      if (active && !active.hasAttribute('data-mkt-all')) parts.push(active.getAttribute('data-label') || active.textContent.trim());
+    });
+    var current = bar.querySelector('[data-mkt-current]');
+    if (current) current.textContent = parts.join(' · ') || 'Alle';
+    bar.classList.toggle('is-filtered', parts.length > 0);
+  }
+  bars.forEach(function (bar) {
+    bar.querySelectorAll('.mkt-opt').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        var group = opt.closest('.mkt-group') || bar;
+        group.querySelectorAll('.mkt-opt').forEach(function (o) {
+          o.classList.toggle('active', o === opt);
+          o.setAttribute('aria-selected', o === opt ? 'true' : 'false');
+        });
+        sync(bar);
+        opt.blur();
+      });
+    });
+    // Enter im Suchfeld schickt kein umgebendes Formular ab (IHK, Dungeon, Tausch)
+    var input = bar.querySelector('.mkt-bar-input');
+    if (input) input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') e.preventDefault();
+    });
+  });
+  // Seiten, die eine gemerkte Auswahl wiederherstellen (Broker), sind beim "load" fertig
+  window.addEventListener('load', function () { bars.forEach(sync); });
+})();
+
+// App herunterladen: Service Worker anmelden (macht die Seite installierbar) und Knopf im Profil-Menü zeigen,
+// sobald der Browser die Installation anbietet (Chrome/Edge/Android) – auf iPhone/iPad mit kurzer Anleitung.
+(function () {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
+  var btn = document.querySelector('[data-app-install]');
+  if (!btn) return;
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone) return; // läuft schon als App
+  var prompt = null;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) btn.hidden = false;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    prompt = e;
+    btn.hidden = false;
+  });
+  window.addEventListener('appinstalled', function () {
+    prompt = null;
+    btn.hidden = true;
+  });
+  btn.addEventListener('click', function () {
+    if (prompt) {
+      prompt.prompt();
+      prompt.userChoice.then(function () { prompt = null; btn.hidden = !ios; });
+      return;
+    }
+    var hint = document.getElementById('app-ios');
+    if (hint && hint.showModal) hint.showModal();
+  });
+})();

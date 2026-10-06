@@ -529,3 +529,39 @@
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
   else requestAnimationFrame(frame);
 })();
+
+// ---------- Kartenauswahl: Suchen + Seltenheit (partials/mkt-bar) ----------
+(function () {
+  'use strict';
+  var pick = document.querySelector('.ihk-pick');
+  if (!pick) return;
+  var search = pick.querySelector('[data-ihk-search]');
+  var opts = Array.prototype.slice.call(pick.querySelectorAll('[data-ihk-rar]'));
+  var cards = Array.prototype.slice.call(pick.querySelectorAll('.ihk-pick-card'));
+  var empty = pick.querySelector('[data-ihk-empty]');
+  var boostHead = pick.querySelector('[data-ihk-boost-head]');
+  var rarity = 'all';
+  function apply() {
+    var q = search ? search.value.trim().toLowerCase() : '';
+    var shownCards = 0;
+    var shownBoosts = 0;
+    cards.forEach(function (c) {
+      var ok = (rarity === 'all' || c.getAttribute('data-rarity') === rarity) && (!q || (c.getAttribute('data-name') || '').indexOf(q) !== -1);
+      c.hidden = !ok;
+      if (ok && c.getAttribute('data-drag') === 'boost') shownBoosts++;
+      else if (ok) shownCards++;
+    });
+    if (boostHead) {
+      boostHead.hidden = !shownBoosts;
+      boostHead.nextElementSibling.hidden = !shownBoosts;
+    }
+    if (empty) empty.hidden = shownCards + shownBoosts > 0;
+  }
+  opts.forEach(function (o) {
+    o.addEventListener('click', function () {
+      rarity = o.getAttribute('data-ihk-rar');
+      apply();
+    });
+  });
+  if (search) search.addEventListener('input', apply);
+})();

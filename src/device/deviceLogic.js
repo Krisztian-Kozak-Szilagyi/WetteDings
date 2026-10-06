@@ -57,15 +57,56 @@ function uaLabel(ua) {
 /** Schlüssel für ein Konten-Paar – unabhängig von der Reihenfolge */
 const pairKey = (a, b) => [String(a), String(b)].sort().join(':');
 
+// Ab so vielen Konten mit demselben Fingerabdruck im selben Netz (gleiche IP) ist das kein Hinweis auf eine Person,
+// sondern auf viele baugleiche Geräte im selben WLAN (#89)
+const CROWD = 3;
+// Kleine Überschneidung zweier Geräte-Einträge (z. B. Cookie gelöscht und gleich neu angemeldet) gilt nicht als gleichzeitig
+const PARALLEL_SLACK_MS = 60 * 60 * 1000;
+
+const printKey = (fp, ip) => `${fp}|${ip}`;
+
+/** fp|ip-Kombinationen, die mindestens min verschiedene Konten benutzt haben (devices: [{ user, fp, ips }]) */
+function commonPrints(devices, min = CROWD) {
+  const users = new Map();
+  for (const d of devices) {
+    if (!d.fp) continue;
+    for (const ip of d.ips || []) {
+      const k = printKey(d.fp, ip);
+      if (!users.has(k)) users.set(k, new Set());
+      users.get(k).add(String(d.user));
+    }
+  }
+  return new Set([...users].filter(([, u]) => u.size >= min).map(([k]) => k));
+}
+
+/** Wurden zwei Geräte-Einträge gleichzeitig benutzt (Zeiträume überschneiden sich deutlich)? Ohne Zeiten: nein */
+function usedInParallel(a, b) {
+  if (!a.firstAt || !a.lastAt || !b.firstAt || !b.lastAt) return false;
+  const start = Math.max(new Date(a.firstAt).getTime(), new Date(b.firstAt).getTime());
+  const end = Math.min(new Date(a.lastAt).getTime(), new Date(b.lastAt).getTime());
+  return end - start > PARALLEL_SLACK_MS;
+}
+
 /**
  * Wie sicher ist es, dass zwei Geräte-Einträge dasselbe Gerät sind?
- * Gleiches Cookie = sicher. Gleicher Fingerabdruck = wahrscheinlich, wenn auch eine IP übereinstimmt, sonst nur
- * möglich (baugleiche Geräte, z. B. Schulrechner oder dasselbe Handymodell, haben oft denselben Fingerabdruck).
+ * Gleiches Cookie = sicher. Gleicher Fingerabdruck und gleiche IP = wahrscheinlich – aber nur, wenn die beiden
+ * Einträge nacheinander benutzt wurden (typisch: Cookie gelöscht, neues Konto) und die Kombination nicht von vielen
+ * Konten stammt. Laufen beide parallel oder teilen sich viele Konten Fingerabdruck und Netz, sind das baugleiche
+ * Geräte im selben WLAN (#89) – dann wie ein gleicher Fingerabdruck ohne gemeinsame IP nur möglich.
+ * common = Set aus commonPrints().
  */
-function matchLevel(a, b) {
+function matchLevel(a, b, common = new Set()) {
   if (a.deviceId && a.deviceId === b.deviceId) return LEVEL.sicher;
-  if (a.fp && a.fp === b.fp) return (a.ips || []).some((ip) => (b.ips || []).includes(ip)) ? LEVEL.wahrscheinlich : LEVEL.moeglich;
-  return 0;
+  if (!a.fp || a.fp !== b.fp) return 0;
+  const shared = (a.ips || []).filter((ip) => (b.ips || []).includes(ip) && !common.has(printKey(a.fp, ip)));
+  return shared.length && !usedInParallel(a, b) ? LEVEL.wahrscheinlich : LEVEL.moeglich;
+}
+
+/** Stärkster Treffer zwischen den Geräten zweier Konten (0 = keiner) */
+function pairLevel(devsA, devsB, common = new Set()) {
+  let best = 0;
+  for (const a of devsA) for (const b of devsB) best = Math.max(best, matchLevel(a, b, common));
+  return best;
 }
 
 /** Ende eines Bans aus der Dauer in Stunden ("0" = dauerhaft); null bei ungültiger Eingabe */
@@ -144,4 +185,4 @@ function banTimeline(user, now = Date.now()) {
     .sort((x, y) => new Date(y.at) - new Date(x.at));
 }
 
-module.exports = { banHistory, closeOpenBans, banDurationText, banTimeline, COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };
+module.exports = { CROWD, printKey, commonPrints, usedInParallel, pairLevel, banHistory, closeOpenBans, banDurationText, banTimeline, COOKIE, LEVEL, LEVEL_LABEL, MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, banError, unbanError, FOREVER, newToken, readToken, cookieValue, ipHash, cleanFp, uaLabel, pairKey, matchLevel, banUntil, isForever, isBanned };

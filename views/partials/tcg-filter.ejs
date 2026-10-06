@@ -1,11 +1,13 @@
-<%# Seltenheits-Filter für das Kartenraster in derselben .card (public/js/tcg.js); Zahl = eigene / alle Karten der Seltenheit %>
+<%# Suchen + Seltenheits-Filter (partials/mkt-bar) für das Kartenraster in derselben .card bzw. [data-filter-scope]
+    (public/js/tcg.js); Zahl = eigene / alle Karten der Seltenheit. barName = eindeutige Feld-ID (Tausch: zwei Raster),
+    seasonOpts = zusätzliche Season-Gruppe (Album). %>
 <%
   const fOwned = (list) => list.filter((c) => counts[c.id]).length;
   const fVisible = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]);
+  const fGroups = [{
+    attr: 'tcg-filter', title: 'Seltenheit', allCount: fOwned(fVisible) + '/' + fVisible.length,
+    opts: rarities.map((r) => { const list = cards.filter((c) => c.rarity === r.key); return { key: r.key, label: r.label, count: fOwned(list) + '/' + list.length }; }),
+  }];
+  if (locals.seasonOpts && seasonOpts.length > 1) fGroups.push({ attr: 'album-season', title: 'Season', allLabel: 'Alle Seasons', dots: false, opts: seasonOpts });
 %>
-<div class="tcg-filter" role="tablist" aria-label="Nach Seltenheit filtern">
-  <button type="button" class="chip active" data-tcg-filter="all" role="tab" aria-selected="true"><span class="tcg-dot tcg-dot-all"></span>Alle<span class="chip-count"><%= fOwned(fVisible) %>/<%= fVisible.length %></span></button>
-  <% rarities.forEach((r) => { const list = cards.filter((c) => c.rarity === r.key); %>
-    <button type="button" class="chip r-<%= r.key %>" data-tcg-filter="<%= r.key %>" role="tab" aria-selected="false"><span class="tcg-dot"></span><%= r.label %><span class="chip-count"><%= fOwned(list) %>/<%= list.length %></span></button>
-  <% }) %>
-</div>
+<%- include('mkt-bar', { name: locals.barName || 'tcg', placeholder: 'Karte suchen …', searchAttr: 'tcg-search', groups: fGroups }) %>

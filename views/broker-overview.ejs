@@ -10,11 +10,8 @@
   <span class="bx-tax">Steuer auf Gewinne: Coins <strong><%= String(brokerTax.coin).replace('.', ',') %> %</strong> · ETFs <strong><%= String(brokerTax.etf).replace('.', ',') %> %</strong></span>
 </div>
 
-<div class="bx-filters" role="toolbar" aria-label="Filter">
-  <button type="button" class="chip active" data-bx-filter="alle" aria-pressed="true">Alle</button>
-  <button type="button" class="chip" data-bx-filter="depot" aria-pressed="false">Mein Depot<% if (owned) { %> <span class="chip-count"><%= owned %></span><% } %></button>
-  <button type="button" class="chip" data-bx-filter="coin" aria-pressed="false">Coins</button>
-  <button type="button" class="chip" data-bx-filter="etf" aria-pressed="false">ETFs</button>
+<div class="bx-filters">
+  <%- include('partials/mkt-bar', { name: 'bx', placeholder: 'Markt suchen …', label: 'Märkte filtern', groups: [{ attr: 'bx-filter', all: 'alle', dots: false, opts: [{ key: 'depot', label: 'Mein Depot', count: owned }, { key: 'coin', label: 'Coins' }, { key: 'etf', label: 'ETFs' }] }] }) %>
 </div>
 
 <div class="bx-table" data-bx-table>
@@ -29,7 +26,7 @@
   </div>
 
   <% rows.forEach((r) => { const up = r.change24h >= 0; %>
-    <a class="bx-row" href="<%= r.path %>" data-bx-row data-symbol="<%= r.symbol %>" data-kind="<%= r.kind %>" data-owned="<%= r.value > 0 ? 1 : 0 %>"
+    <a class="bx-row" href="<%= r.path %>" data-bx-row data-symbol="<%= r.symbol %>" data-name="<%= (r.symbol + " " + r.name).toLowerCase() %>" data-kind="<%= r.kind %>" data-owned="<%= r.value > 0 ? 1 : 0 %>"
        data-sort-name="<%= r.symbol %>" data-sort-change="<%= r.change24h %>" data-sort-price="<%= r.price %>" data-sort-depot="<%= r.value %>" data-sort-sent="<%= r.buyShare === null ? -1 : r.buyShare %>">
       <span class="bx-market">
         <%- mark(r) %>

@@ -12,6 +12,7 @@
     { key: 'coins', label: 'In Coins', value: w.coinValue },
     { key: 'cards', label: 'In Karten', value: w.cardValue },
   ];
+  if (w.shopValue) parts.push({ key: 'shop', label: 'Grading-Shop', value: w.shopValue });
   const partTotal = parts.reduce((s, p) => s + Math.max(0, p.value || 0), 0) || 1;
   const t = d.today;
   const ring = 2 * Math.PI * 22;
@@ -112,7 +113,7 @@
         <% d.favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; %>
           <% if (fv.foiledAt) { %>
             <a class="tcg-slot foil-slot r-<%= c.rarity %>" href="/inventar" aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %>">
-              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade, center: fv.center }) %></span>
             </a>
           <% } else { %>
             <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">

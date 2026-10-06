@@ -8,6 +8,8 @@ const { str } = require('../lib/util');
 const { coinValueCents } = require('../coin/tradeService');
 const { cardValueCents, inventory } = require('../tcg/tcgService');
 const catalog = require('../tcg/catalog');
+const grading = require('../grading/gradingService');
+const { GradingShop } = require('../models/Grading');
 const account = require('../services/accountService');
 const { UserError } = require('../lib/util');
 const roles = require('../services/roles');
@@ -38,7 +40,7 @@ const show = (res, section, data = {}) => res.render('account', { title: SECTION
 // Statistiken: Spielgeld, Wetten und Karten auf einen Blick
 router.get('/konto', requireLogin, async (req, res) => {
   const userId = req.user._id;
-  const [openAgg, statsAgg, coinValue, cardValue, owned] = await Promise.all([
+  const [openAgg, statsAgg, coinValue, cardValue, owned, shop] = await Promise.all([
     Position.aggregate([{ $match: { user: userId, payout: null } }, { $group: { _id: null, s: { $sum: '$amount' } } }]),
     Position.aggregate([
       { $match: { user: userId, payout: { $ne: null } } },
@@ -47,14 +49,17 @@ router.get('/konto', requireLogin, async (req, res) => {
     coinValueCents(userId),
     cardValueCents(userId),
     inventory(userId),
+    GradingShop.findById(userId).select('level').lean(),
   ]);
+  const shopValue = grading.shopValue(shop ? shop.level : 1);
   const inPlay = openAgg[0] ? openAgg[0].s : 0;
   const has = new Set(owned.map((o) => o._id));
   show(res, 'statistiken', {
     inPlay,
     coinValue,
     cardValue,
-    total: req.user.balance + inPlay + coinValue + cardValue,
+    shopValue,
+    total: req.user.balance + inPlay + coinValue + cardValue + shopValue,
     stats: statsAgg[0] || { won: 0, lost: 0 },
     cardCount: owned.reduce((n, o) => n + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,

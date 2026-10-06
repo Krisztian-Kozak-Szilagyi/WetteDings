@@ -1,14 +1,15 @@
 <%#
   Vorschaubild(er) eines Angebots: a = angebotene Karte, b = Wunschkarte bei einem Tausch.
   aFoil/bFoil: Foliendatum – dann öffnet ein Klick die 3D-Großansicht (public/js/foil-view.js).
+  aGrade/bGrade: Note des folierten Exemplars (Etikett in der Großansicht, #73).
   Jedes Bild ist ein Knopf, der die Karte groß zeigt (Zoom-Dialog auf /handel, public/js/handel.js).
 %>
 <%
   const ownCounts = locals.coll ? coll.counts : locals.ownedCounts || {};
   const owned = (c) => ownCounts[c.id] || 0;
-  const thumb = (c, foiledAt) => { const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
+  const thumb = (c, foiledAt, grade) => { const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
     <% if (foiledAt) { %>
-      <button type="button" class="trade-thumb trade-thumb-foil r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, foiledAt) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(foiledAt) %> – in 3D ansehen">
+      <button type="button" class="trade-thumb trade-thumb-foil r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, foiledAt, { grade }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(foiledAt) %> – in 3D ansehen">
         <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span>
       </button>
       <% return; } %>
@@ -20,10 +21,10 @@
 <% }; %>
 <% if (locals.b) { %>
   <div class="trade-thumbs">
-    <% thumb(a, locals.aFoil) %>
+    <% thumb(a, locals.aFoil, locals.aGrade) %>
     <svg class="trade-swap-icon" viewBox="0 0 24 24" width="16" height="16" aria-label="gegen"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
-    <% thumb(b, locals.bFoil) %>
+    <% thumb(b, locals.bFoil, locals.bGrade) %>
   </div>
 <% } else { %>
-  <% thumb(a, locals.aFoil) %>
+  <% thumb(a, locals.aFoil, locals.aGrade) %>
 <% } %>

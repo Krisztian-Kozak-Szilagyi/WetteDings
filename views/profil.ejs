@@ -140,8 +140,8 @@
         <div class="tcg-grid tcg-favs">
           <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity]; %>
             <% if (fv.foiledAt) { %>
-              <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
-                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label }) %></span>
+              <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt, { grade: fv.grade, center: fv.center }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
+                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade, center: fv.center }) %></span>
                 <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(fv.foiledAt) %></span>
               </button>
               <% return; } %>

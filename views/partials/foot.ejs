@@ -1,4 +1,12 @@
   </main>
+  <%# iPhone/iPad: Safari kann nicht selbst installieren – kurze Anleitung (öffnet app.js über „App herunterladen“) %>
+  <dialog class="dialog" id="app-ios" aria-labelledby="app-ios-title">
+    <div class="dialog-head">
+      <h2 id="app-ios-title">App herunterladen</h2>
+      <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+    </div>
+    <p>Tippe in Safari unten auf <strong>Teilen</strong> und dann auf <strong>Zum Home-Bildschirm</strong>.</p>
+  </dialog>
   <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
   <%# Neuer Erfolg: Fenster wie das Beute-Fenster. Steht für jedes angemeldete Mitglied bereit; ist schon ein Erfolg offen,

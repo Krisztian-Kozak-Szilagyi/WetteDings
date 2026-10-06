@@ -16,7 +16,7 @@ const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { LotteryRound, LotteryEntry, LotterySettings } = require('../models/Lottery');
 const { TcgPack } = require('../models/Tcg');
-const { Item } = require('../models/Item');
+const { grantItems } = require('../items/itemService');
 const catalog = require('../tcg/catalog');
 const { inTransaction } = require('./betService');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
@@ -318,7 +318,7 @@ async function drawDueRound(now = new Date(), key = 'taeglich') {
       if (packs) {
         await TcgPack.insertMany(Array.from({ length: packs }, () => ({ user: winner.user, type: catalog.DEFAULT_PACK, source: 'lotto', cost: 0 })), { session });
       }
-      if (foils) await Item.insertMany(Array.from({ length: foils }, () => ({ user: winner.user, type: 'folie', source: 'lotto' })), { session });
+      if (foils) await grantItems({ userIds: [winner.user], type: 'folie', count: foils, source: 'lotto', session, meta: { round: round.number } });
     }
 
     const updated = await LotteryRound.updateOne(

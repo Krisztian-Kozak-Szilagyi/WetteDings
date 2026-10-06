@@ -43,6 +43,9 @@ function createApp() {
     })
   );
   app.use(compression());
+  // Cursor-Bilder immer lange zwischenspeichern: sonst zeigt der Browser nach jedem Seitenwechsel kurz den System-Cursor,
+  // bis das Bild neu geprüft ist
+  app.use('/img/cursors', express.static(path.join(__dirname, '..', 'public', 'img', 'cursors'), { maxAge: '30d' }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
   app.use(require('./routes/cardImage')); // Rahmen-Karten als SVG, ebenfalls ohne Session
   app.use(require('./routes/achievementImage')); // Symbole der Erfolge als SVG

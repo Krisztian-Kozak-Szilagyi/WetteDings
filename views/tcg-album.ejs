@@ -8,6 +8,7 @@
       <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
       <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Wert <%= euro(collectionValue) %></span>
     </div>
+    <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
   <form class="album-dupes" method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett."
     title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht verkauft – auch ihre Duplikate nicht.">
@@ -18,19 +19,11 @@
 </div>
 
 <div class="album-body" id="sammlung">
-  <%- include('partials/tcg-filter') %>
-  <% if (!cardCount) { %>
-    <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
-  <% } %>
   <%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
   <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key) })).filter((s) => s.list.length); %>
-  <% if (seasonList.length > 1) { %>
-    <div class="tcg-filter album-season-filter" role="tablist" aria-label="Nach Season filtern">
-      <button type="button" class="chip active" data-album-season="all" role="tab" aria-selected="true">Alle Seasons</button>
-      <% seasonList.forEach((s) => { %>
-        <button type="button" class="chip" data-album-season="<%= s.key %>" role="tab" aria-selected="false"><%= s.label %></button>
-      <% }) %>
-    </div>
+  <div class="album-filter-row"><%- include('partials/tcg-filter', { seasonOpts: seasonList.map((s) => ({ key: s.key, label: s.label })) }) %></div>
+  <% if (!cardCount) { %>
+    <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
   <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
     <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
