@@ -180,6 +180,8 @@ function ihkFinding(runs, timeZone) {
   const reactMs = median(react);
   const restartMs = median(restart);
   if (reactMs > IHK_REACT_MS || restartMs === null || restartMs > IHK_RESTART_MS) return null;
+  // neue Belege nur durch sekundengenaue Abholungen – eine normale Abholung danach öffnet einen erledigten Hinweis nicht
+  const exact = list.filter((r, i) => react[i] <= IHK_REACT_MS);
   const night = list.filter((r) => {
     const h = hourIn(r.collectedAt, timeZone);
     return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
@@ -191,7 +193,7 @@ function ihkFinding(runs, timeZone) {
     restartMs,
     night,
     from: new Date(toMs(list[0].createdAt)),
-    to: new Date(toMs(list[list.length - 1].collectedAt)),
+    to: new Date(toMs(exact[exact.length - 1].collectedAt)),
     summary:
       `${list.length} Quests im Schnitt ${seconds(reactMs)} nach Ablauf abgeholt und ${seconds(restartMs)} später die nächste gestartet` +
       (night ? `, ${night}× zwischen ${IHK_NIGHT[0]} und ${IHK_NIGHT[1]} Uhr` : ''),
@@ -202,22 +204,42 @@ function ihkFinding(runs, timeZone) {
 
 /**
  * Scalping: viele schnelle Kauf-Verkauf-Runden mit auffällig hoher Trefferquote.
- * trades: [{ coin, side: 'kauf'|'verkauf', cents, createdAt }] eines Mitglieds. null, wenn unauffällig.
+ * trades: [{ coin, side: 'kauf'|'verkauf', units, cents, createdAt }] eines Mitglieds. null, wenn unauffällig.
+ * Ein Verkauf verbraucht die Käufe in ihrer Reihenfolge (FIFO), auch über mehrere Käufe oder nur einen Teil davon;
+ * Gewinn = Erlös minus anteiliger Einstand, Haltedauer ab dem ältesten verbrauchten Kauf. Verkäufe von Einheiten,
+ * die vor dem Zeitraum gekauft wurden (oder nach einem Split), zählen nicht – ihr Einstand ist unbekannt.
  */
 function scalpFinding(trades) {
   const list = [...trades].sort((x, y) => toMs(x.createdAt) - toMs(y.createdAt));
-  const lastBuy = new Map(); // Wert -> letzter Kauf ohne Verkauf
+  const lots = new Map(); // Wert -> offene Käufe [{ units, cents, at }], älteste zuerst
   const rounds = [];
   for (const t of list) {
+    const units = t.units || 0;
+    if (!(units > 0)) continue;
+    const at = toMs(t.createdAt);
+    if (!lots.has(t.coin)) lots.set(t.coin, []);
+    const queue = lots.get(t.coin);
     if (t.side === 'kauf') {
-      lastBuy.set(t.coin, t);
+      queue.push({ units, cents: t.cents, at });
       continue;
     }
-    const buy = lastBuy.get(t.coin);
-    if (!buy) continue;
-    lastBuy.delete(t.coin);
-    const hold = toMs(t.createdAt) - toMs(buy.createdAt);
-    if (hold <= SCALP_HOLD_MS) rounds.push({ hold, gain: t.cents - buy.cents, at: toMs(t.createdAt) });
+    let left = units;
+    let cost = 0;
+    let first = null;
+    while (left > 0 && queue.length) {
+      const lot = queue[0];
+      const used = Math.min(left, lot.units);
+      const part = (lot.cents * used) / lot.units;
+      cost += part;
+      lot.cents -= part;
+      lot.units -= used;
+      left -= used;
+      if (first === null) first = lot.at;
+      if (lot.units <= 0) queue.shift();
+    }
+    if (left > 0 || first === null) continue;
+    const hold = at - first;
+    if (hold <= SCALP_HOLD_MS) rounds.push({ hold, gain: t.cents - Math.round(cost), at });
   }
   if (rounds.length < SCALP_MIN_ROUNDS) return null;
   const wins = rounds.filter((r) => r.gain > 0).length;
@@ -234,7 +256,8 @@ function scalpFinding(trades) {
     gain,
     holdMs,
     from: new Date(rounds[0].at),
-    to: new Date(rounds[rounds.length - 1].at),
+    // neue Belege nur durch Runden im Plus – eine normale Runde danach öffnet einen erledigten Hinweis nicht
+    to: new Date(rounds.filter((r) => r.gain > 0).pop().at),
     summary: `${rounds.length} Kauf-Verkauf-Runden mit je ${seconds(holdMs)} Haltedauer, ${wins} davon im Plus (${percent(rate)}, Zufall wäre etwa 50 %), zusammen ${euro(gain)}`,
   };
 }
@@ -243,24 +266,17 @@ function scalpFinding(trades) {
 
 /**
  * Ein abgeschlossenes Geschäft mit sehr ungleichem Wert. valueOf(cardId) = Bankwert in Cent.
- * trade: { kind, seller, buyer, to, price, card, extraFrom, give, take } – give/take wie tradeService.swapSides.
+ * trade: { seller, buyer, to, give, want, price, extraFrom } wie im Trade-Modell: der Anbieter gibt give, die
+ * Gegenseite (buyer bzw. to) gibt want, das Geld zahlt extraFrom (ohne Angabe die Gegenseite, siehe trade/lines.js).
  * Liefert { from, to, given, received, shifted } (from gibt viel und bekommt wenig) oder null.
  */
 function valueFinding(trade, valueOf) {
-  const sum = (lines) => (lines || []).reduce((s, l) => s + (valueOf(l.card) || 0), 0);
-  let a; // Anbieter-Seite
-  let b; // Gegenseite
-  let other;
-  if (trade.kind === 'tausch') {
-    other = trade.to;
-    a = sum(trade.give) + (trade.extraFrom === 'seller' ? trade.price || 0 : 0);
-    b = sum(trade.take) + (trade.extraFrom === 'to' ? trade.price || 0 : 0);
-  } else {
-    other = trade.buyer;
-    a = valueOf(trade.card) || 0;
-    b = trade.price || 0;
-  }
+  const other = trade.buyer || trade.to;
   if (!other) return null;
+  const sum = (lines) => (lines || []).reduce((s, l) => s + (valueOf(l.card) || 0), 0);
+  const sellerPays = trade.extraFrom === 'seller';
+  const a = sum(trade.give) + (sellerPays ? trade.price || 0 : 0); // Anbieter-Seite
+  const b = sum(trade.want) + (sellerPays ? 0 : trade.price || 0); // Gegenseite
   const big = Math.max(a, b);
   const small = Math.min(a, b);
   if (big < VALUE_MIN_CENTS || small >= big * VALUE_SHARE) return null;

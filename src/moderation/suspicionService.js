@@ -11,7 +11,6 @@ const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
-const { swapSides } = require('../trade/tradeService');
 const deviceService = require('../device/deviceService');
 const deviceLogic = require('../device/deviceLogic');
 const logs = require('../stats/logs');
@@ -26,16 +25,18 @@ const IHK_WINDOW_MS = 14 * DAY;
 const KEEP_DONE_DAYS = 30; // erledigte Hinweise werden danach vergessen
 const LIST_MAX = 200;
 
-/** Zeitpunkte je Mitglied: Map userId -> [Date] */
-function byUser(docs, field = 'createdAt') {
-  const map = new Map();
+/** Datensätze je Mitglied: Map userId -> [map(doc)] */
+function groupByUser(docs, map = (d) => d) {
+  const out = new Map();
   for (const d of docs) {
     const k = String(d.user);
-    if (!map.has(k)) map.set(k, []);
-    map.get(k).push(d[field]);
+    if (!out.has(k)) out.set(k, []);
+    out.get(k).push(map(d));
   }
-  return map;
+  return out;
 }
+
+const times = (docs) => groupByUser(docs, (d) => d.createdAt);
 
 /** Bankwert einer Karte oder eines Gegenstands in Cent */
 function valueOf(cardId) {
@@ -48,10 +49,10 @@ function valueOf(cardId) {
 
 /** Geschäft als Text wie im Handel-Protokoll, mit Bankwerten */
 function tradeText(t, f) {
-  const to = t.kind === 'tausch' ? t.toName : t.buyerName;
-  const what = t.kind === 'tausch' ? logs.swapLabel(t, 'give') : logs.cardLabel(t.card);
-  const back = t.kind === 'tausch' ? logs.swapLabel(t, 'take') + (t.price > 0 ? ` + ${euro(t.price)}` : '') : euro(t.price);
-  return `${t.sellerName} → ${to || '–'}: ${what} gegen ${back} (Wert ca. ${euro(f.given)} gegen ${euro(f.received)})`;
+  const sellerPays = t.extraFrom === 'seller';
+  const what = logs.tradeSide(t.give, sellerPays ? t.price : 0);
+  const back = logs.tradeSide(t.want, sellerPays ? 0 : t.price);
+  return `${t.sellerName} → ${t.buyerName || t.toName || '–'}: ${what} gegen ${back} (Wert ca. ${euro(f.given)} gegen ${euro(f.received)})`;
 }
 
 /** Alle Funde der letzten Zeit: [{ key, kind, action, users, level, summary, details, from, evidenceAt }] */
@@ -62,44 +63,32 @@ async function findAll(now = new Date()) {
     Ledger.find({ type: 'tcg_pack', amount: { $lt: 0 }, createdAt: { $gt: since } }).select('user createdAt').lean(),
     TcgOpening.find({ createdAt: { $gt: since } }).select('user createdAt').lean(),
     Ledger.find({ type: 'tcg_verkauf', createdAt: { $gt: since } }).select('user createdAt').lean(),
-    CoinTrade.find({ createdAt: { $gt: since } }).select('user coin side cents createdAt').lean(),
+    CoinTrade.find({ createdAt: { $gt: since } }).select('user coin side units cents createdAt').lean(),
     IhkRun.find({ createdAt: { $gt: ihkSince }, collectedAt: { $ne: null } }).select('user createdAt endsAt collectedAt').lean(),
-    Trade.find({ status: 'verkauft', closedAt: { $gt: since } }).select('kind seller buyer to sellerName buyerName toName card cardDoc foiledAt grade wantCard wantCopy wantFoiledAt wantGrade give take price extraFrom closedAt').lean(),
+    Trade.find({ status: 'verkauft', closedAt: { $gt: since } }).select('kind seller buyer to sellerName buyerName toName give.card want.card price extraFrom closedAt').lean(),
     deviceService.flaggedPairs(),
   ]);
   const found = [];
 
   // Tempo und Takt je Aktion
-  const streams = { kaufen: byUser(buys), oeffnen: byUser(opens), verkaufen: byUser(sells), broker: byUser(coins) };
+  const streams = { kaufen: times(buys), oeffnen: times(opens), verkaufen: times(sells), broker: times(coins) };
   for (const [action, users] of Object.entries(streams)) {
-    for (const [user, times] of users) {
-      const tempo = logic.tempoFinding(times, action);
+    for (const [user, list] of users) {
+      const tempo = logic.tempoFinding(list, action);
       if (tempo) found.push({ key: `tempo:${action}:${user}`, kind: 'tempo', action, users: [user], ...pick(tempo, ['count', 'medianMs', 'runs']), ...base(tempo) });
-      const takt = logic.rhythmFinding(times, action);
+      const takt = logic.rhythmFinding(list, action);
       if (takt) found.push({ key: `takt:${action}:${user}`, kind: 'takt', action, users: [user], ...pick(takt, ['count', 'medianMs', 'spread', 'runs']), ...base(takt) });
     }
   }
 
   // IHK sekundengenau
-  const runsByUser = new Map();
-  for (const r of runs) {
-    const k = String(r.user);
-    if (!runsByUser.has(k)) runsByUser.set(k, []);
-    runsByUser.get(k).push(r);
-  }
-  for (const [user, list] of runsByUser) {
+  for (const [user, list] of groupByUser(runs)) {
     const f = logic.ihkFinding(list, config.timezone);
     if (f) found.push({ key: `ihk:${user}`, kind: 'ihk', action: null, users: [user], ...pick(f, ['count', 'reactMs', 'restartMs', 'night']), ...base(f) });
   }
 
   // Broker-Scalping
-  const coinByUser = new Map();
-  for (const c of coins) {
-    const k = String(c.user);
-    if (!coinByUser.has(k)) coinByUser.set(k, []);
-    coinByUser.get(k).push(c);
-  }
-  for (const [user, list] of coinByUser) {
+  for (const [user, list] of groupByUser(coins)) {
     const f = logic.scalpFinding(list);
     if (f) found.push({ key: `scalping:${user}`, kind: 'scalping', action: null, users: [user], ...pick(f, ['count', 'wins', 'rate', 'gain', 'holdMs']), ...base(f) });
   }
@@ -108,12 +97,10 @@ async function findAll(now = new Date()) {
   const byPair = new Map();
   const names = new Map();
   for (const t of trades) {
-    const sides = t.kind === 'tausch' ? swapSides(t) : {};
-    const f = logic.valueFinding({ ...t, give: sides.give, take: sides.take }, valueOf);
+    const f = logic.valueFinding(t, valueOf);
     if (!f) continue;
     names.set(String(t.seller), t.sellerName);
-    const other = t.kind === 'tausch' ? t.to : t.buyer;
-    names.set(String(other), t.kind === 'tausch' ? t.toName : t.buyerName);
+    names.set(String(t.buyer || t.to), t.buyerName || t.toName);
     const key = deviceLogic.pairKey(f.from, f.to);
     if (!byPair.has(key)) byPair.set(key, []);
     byPair.get(key).push({ ...f, at: t.closedAt, text: tradeText(t, f) });
@@ -152,6 +139,15 @@ async function upsert(f) {
   await alert.save();
 }
 
+/** Hinweise zu gelöschten oder fehlenden Konten entfernen – das Panel zeigt sie nicht, das Abzeichen soll sie nicht zählen */
+async function forgetGone() {
+  const ids = await SuspicionAlert.distinct('users');
+  if (!ids.length) return;
+  const alive = new Set((await User.find({ _id: { $in: ids }, deletedAt: null }).distinct('_id')).map(String));
+  const gone = ids.filter((id) => !alive.has(String(id)));
+  if (gone.length) await SuspicionAlert.deleteMany({ users: { $in: gone } });
+}
+
 let running = false;
 
 /** Ein Durchlauf (Job alle 10 Minuten, siehe jobs.js): Funde speichern, alte erledigte Hinweise vergessen */
@@ -162,14 +158,15 @@ async function scan(now = new Date()) {
     const found = await findAll(now);
     for (const f of found) await upsert(f);
     await SuspicionAlert.deleteMany({ doneAt: { $lt: new Date(now.getTime() - KEEP_DONE_DAYS * DAY) } });
+    await forgetGone();
     return found.length;
   } finally {
     running = false;
   }
 }
 
-/** Offene Hinweise – für das Abzeichen am Admin-Menüpunkt */
-const openCount = () => SuspicionAlert.countDocuments({ doneAt: null });
+/** Offene Hinweise ab "wahrscheinlich" – für das Abzeichen am Admin-Menüpunkt (wie deviceService.alertCount) */
+const openCount = () => SuspicionAlert.countDocuments({ doneAt: null, level: { $gte: deviceLogic.LEVEL.wahrscheinlich } });
 
 /** Hinweise fürs Panel: offene zuerst, dann nach Stufe und Zeit; mit Namen und Link ins passende Protokoll */
 async function list() {

@@ -90,6 +90,13 @@ test('IHK: direkt bei Ablauf abgeholt und sofort neu gestartet, auch nachts', ()
   assert.equal(s.ihkFinding(runs(t0, 10, 90, 300), tz), null);
   // zu wenige Quests
   assert.equal(s.ihkFinding(runs(t0, s.IHK_MIN_RUNS - 1, 1, 4), tz), null);
+  // eine normale Abholung danach ist kein neuer Beleg (sonst öffnet sich ein erledigter Hinweis wieder)
+  const exact = runs(t0, 10, 1, 4);
+  const lastExact = exact[exact.length - 1].collectedAt.getTime();
+  const later = { createdAt: new Date(lastExact + 3600 * 1000), endsAt: new Date(lastExact + 4200 * 1000), collectedAt: new Date(lastExact + 9000 * 1000) };
+  const withLater = s.ihkFinding([...exact, later], tz);
+  assert.ok(withLater);
+  assert.equal(withLater.to.getTime(), lastExact);
 });
 
 test('Broker-Scalping: viele schnelle Runden mit hoher Trefferquote', () => {
@@ -97,9 +104,9 @@ test('Broker-Scalping: viele schnelle Runden mit hoher Trefferquote', () => {
     const out = [];
     let at = t0;
     results.forEach((win) => {
-      out.push({ coin: 'SAM', side: 'kauf', cents: 50000, createdAt: new Date(at) });
+      out.push({ coin: 'SAM', side: 'kauf', units: 1000, cents: 50000, createdAt: new Date(at) });
       at += 30 * 1000;
-      out.push({ coin: 'SAM', side: 'verkauf', cents: win ? 50080 : 49950, createdAt: new Date(at) });
+      out.push({ coin: 'SAM', side: 'verkauf', units: 1000, cents: win ? 50080 : 49950, createdAt: new Date(at) });
       at += 20 * 1000;
     });
     return out;
@@ -116,25 +123,66 @@ test('Broker-Scalping: viele schnelle Runden mit hoher Trefferquote', () => {
   // lange Haltedauer zählt nicht als Runde
   const slow = trades(Array(10).fill(true)).map((t, i) => ({ ...t, createdAt: new Date(t0 + i * 10 * 60 * 1000) }));
   assert.equal(s.scalpFinding(slow), null);
+  // neue Belege nur durch Runden im Plus
+  const tail = trades([...Array(15).fill(true), false]);
+  assert.equal(s.scalpFinding(tail).to.getTime(), tail[tail.length - 3].createdAt.getTime());
+});
+
+test('Broker-Scalping: Verkauf über mehrere Käufe und Teilverkäufe mit anteiligem Einstand', () => {
+  // zweimal 10 € nachkaufen, alles für 19 € verkaufen: 1 € Verlust, kein Gewinn
+  const rounds = (n) => {
+    const out = [];
+    let at = t0;
+    for (let i = 0; i < n; i++) {
+      out.push({ coin: 'SAM', side: 'kauf', units: 100, cents: 1000, createdAt: new Date(at) });
+      out.push({ coin: 'SAM', side: 'kauf', units: 100, cents: 1000, createdAt: new Date(at + 10 * 1000) });
+      out.push({ coin: 'SAM', side: 'verkauf', units: 200, cents: 1900, createdAt: new Date(at + 20 * 1000) });
+      at += 60 * 1000;
+    }
+    return out;
+  };
+  assert.equal(s.scalpFinding(rounds(10)), null);
+  // Teilverkauf: Hälfte für 6 € bei 10 € Einstand ist ein Gewinn von 1 €, kein Verlust von 4 €
+  const halves = [];
+  let at = t0;
+  for (let i = 0; i < 8; i++) {
+    halves.push({ coin: 'SAM', side: 'kauf', units: 100, cents: 1000, createdAt: new Date(at) });
+    halves.push({ coin: 'SAM', side: 'verkauf', units: 50, cents: 600, createdAt: new Date(at + 10 * 1000) });
+    halves.push({ coin: 'SAM', side: 'verkauf', units: 50, cents: 600, createdAt: new Date(at + 20 * 1000) });
+    at += 60 * 1000;
+  }
+  const f = s.scalpFinding(halves);
+  assert.ok(f);
+  assert.equal(f.count, 16);
+  assert.equal(f.wins, 16);
+  assert.equal(f.gain, 16 * 100);
+  // Verkauf von Einheiten, die vor dem Zeitraum gekauft wurden: Einstand unbekannt, keine Runde
+  assert.equal(s.scalpFinding(halves.filter((t) => t.side === 'verkauf')), null);
 });
 
 test('Wertverschiebung: Glitch für 1 € ja, Holo zum Marktpreis nein', () => {
   const values = { glitch: 250000, holo: 9000, bockhaber: 70000, crumpled: 300 };
   const valueOf = (id) => values[id] || 0;
-  const glitch = s.valueFinding({ kind: 'privat', seller: 'a', buyer: 'b', card: 'glitch', price: 100 }, valueOf);
+  const sale = (card, price, extra = {}) => ({ kind: 'privat', seller: 'a', buyer: 'b', give: [{ card }], want: [], price, ...extra });
+  const glitch = s.valueFinding(sale('glitch', 100), valueOf);
   assert.deepEqual(glitch, { from: 'a', to: 'b', given: 250000, received: 100, shifted: 249900 });
-  assert.equal(s.valueFinding({ kind: 'markt', seller: 'a', buyer: 'b', card: 'holo', price: 25000 }, valueOf), null);
+  assert.equal(s.valueFinding(sale('holo', 25000, { kind: 'markt' }), valueOf), null);
+  // gewöhnlicher Verkauf zum Bankwert und darüber ist unauffällig (die Kartenseite zählt mit)
+  assert.equal(s.valueFinding(sale('bockhaber', 70000), valueOf), null);
   // Käufer zahlt viel zu viel für Crumpled: Geld fließt zum Anbieter
-  assert.equal(s.valueFinding({ kind: 'privat', seller: 'a', buyer: 'b', card: 'crumpled', price: 100000 }, valueOf).to, 'a');
+  assert.equal(s.valueFinding(sale('crumpled', 100000), valueOf).to, 'a');
   // Tausch Bockhaber gegen Crumpled: der Empfänger profitiert
-  const swap = s.valueFinding({ kind: 'tausch', seller: 'a', to: 'b', give: [{ card: 'bockhaber' }], take: [{ card: 'crumpled' }], price: 0 }, valueOf);
+  const swap = s.valueFinding({ kind: 'tausch', seller: 'a', to: 'b', buyer: 'b', give: [{ card: 'bockhaber' }], want: [{ card: 'crumpled' }], price: 0 }, valueOf);
   assert.equal(swap.to, 'b');
+  assert.equal(swap.received, 300);
   // Aufpreis gleicht aus
-  assert.equal(s.valueFinding({ kind: 'tausch', seller: 'a', to: 'b', give: [{ card: 'bockhaber' }], take: [{ card: 'crumpled' }], extraFrom: 'to', price: 60000 }, valueOf), null);
+  assert.equal(s.valueFinding({ kind: 'tausch', seller: 'a', to: 'b', give: [{ card: 'bockhaber' }], want: [{ card: 'crumpled' }], extraFrom: 'to', price: 60000 }, valueOf), null);
+  // Anbieter legt Geld drauf: zählt auf seiner Seite
+  assert.equal(s.valueFinding({ kind: 'tausch', seller: 'a', to: 'b', give: [{ card: 'crumpled' }], want: [{ card: 'bockhaber' }], extraFrom: 'seller', price: 60000 }, valueOf), null);
   // kleine Beträge sind egal
-  assert.equal(s.valueFinding({ kind: 'privat', seller: 'a', buyer: 'b', card: 'crumpled', price: 1 }, valueOf), null);
+  assert.equal(s.valueFinding(sale('crumpled', 1), valueOf), null);
   // offenes Angebot ohne Käufer
-  assert.equal(s.valueFinding({ kind: 'markt', seller: 'a', buyer: null, card: 'glitch', price: 1 }, valueOf), null);
+  assert.equal(s.valueFinding(sale('glitch', 1, { kind: 'markt', buyer: null }), valueOf), null);
 
   const names = new Map([['a', 'Anna'], ['b', 'Ben']]);
   const one = s.valuePairFinding([{ ...glitch, at: new Date(t0), text: 'x' }], names);

@@ -78,7 +78,10 @@ async function checkMatches(dev) {
   if (dev.fp) or.push({ fp: dev.fp });
   const others = await Device.find({ user: { $ne: dev.user }, $or: or }).select('user').lean();
   const ids = [...new Set(others.map((o) => String(o.user)))];
-  for (const other of ids) await updatePair(dev.user, other);
+  if (!ids.length) return;
+  // gemeinsame Ausnahmen einmal für alle beteiligten Geräte – nicht je Paar (Schulnetz: viele Konten auf einmal)
+  const common = await commonFor(await Device.find({ user: { $in: [dev.user, ...ids] } }).select('fp ips').lean());
+  for (const other of ids) await updatePair(dev.user, other, common);
 }
 
 /** Alle Hinweise mit den aktuellen Regeln neu bewerten (beim Start, siehe migrate.js) – z. B. nach #89 und geteilten Netzen */
