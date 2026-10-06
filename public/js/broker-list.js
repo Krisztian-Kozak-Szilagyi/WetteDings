@@ -8,11 +8,17 @@
   var empty = table.querySelector('[data-bx-empty]');
 
   // ---------- Filter ----------
+  // Suchknopf (partials/mkt-bar): Filter und Suche nach Kürzel/Name wirken zusammen
   var chips = document.querySelectorAll('[data-bx-filter]');
+  var search = document.querySelector('[data-bx-search]');
+  var current = 'alle';
   function applyFilter(name) {
+    current = name;
+    var q = search ? search.value.trim().toLowerCase() : '';
     var shown = 0;
     rows.forEach(function (row) {
       var ok = name === 'alle' || (name === 'depot' ? row.getAttribute('data-owned') === '1' : row.getAttribute('data-kind') === name);
+      if (q && (row.getAttribute('data-name') || '').indexOf(q) === -1) ok = false;
       row.hidden = !ok;
       if (ok) shown++;
     });
@@ -20,13 +26,14 @@
     chips.forEach(function (c) {
       var on = c.getAttribute('data-bx-filter') === name;
       c.classList.toggle('active', on);
-      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      c.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     try { sessionStorage.setItem('bx-filter', name); } catch (e) { /* egal */ }
   }
   chips.forEach(function (c) {
     c.addEventListener('click', function () { applyFilter(c.getAttribute('data-bx-filter')); });
   });
+  if (search) search.addEventListener('input', function () { applyFilter(current); });
   try {
     var saved = sessionStorage.getItem('bx-filter');
     if (saved && document.querySelector('[data-bx-filter="' + saved.replace(/[^a-z]/g, '') + '"]')) applyFilter(saved);

@@ -10,7 +10,7 @@ const { ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReacti
 const RegistrationCode = require('../models/RegistrationCode');
 const { LotteryRound, LotteryEntry } = require('../models/Lottery');
 const { TcgCard, TcgPack, TcgOpening, PackGrant } = require('../models/Tcg');
-const { Item } = require('../models/Item');
+const { Item, ItemStack } = require('../models/Item');
 const Group = require('../models/Group');
 const roles = require('./roles');
 const { CoinHolding } = require('../models/Coin');
@@ -147,13 +147,16 @@ async function deleteAccount({ user, password }) {
       TcgCard.deleteMany({ user: id }, opt),
       TcgPack.deleteMany({ user: id }, opt),
       Item.deleteMany({ user: id }, opt),
+      ItemStack.deleteMany({ user: id }, opt),
       CoinHolding.deleteMany({ user: id }, opt),
       // laufende Quest abbrechen (ihre Karte gibt es nicht mehr); abgeschlossene bleiben für die Statistik
       IhkRun.deleteMany({ user: id, status: 'laeuft' }, opt),
       IhkState.deleteOne({ _id: id }, opt),
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),
-      // offene Handelsangebote verschwinden; abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
+      require('../models/Deck').deleteMany({ user: id }, opt),
+      // offene Handelsangebote verschwinden (auch Gegenangebote auf eigene Markt-Angebote – sie tragen den Verkäufer);
+      // abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),
       Trade.updateMany({ to: id, status: 'offen' }, { $set: { status: 'abgelehnt', closedAt: new Date() } }, opt),
       // Kommentare: Text entfernen
@@ -174,7 +177,7 @@ async function deleteAccount({ user, password }) {
       Group.updateMany({ owner: id }, { $set: { deleted: true } }, opt),
       Group.updateMany({ members: id, owner: { $ne: id } }, { $pull: { members: id } }, opt),
     ]);
-    // Nachrichten aus Tausch-Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
+    // Nachrichten aus Verhandlungen entfernen (nacheinander, weil dieselben Angebote oben schon geändert werden)
     await Trade.updateMany({ seller: id }, { $pull: { messages: { from: 'seller' } } }, opt);
     await Trade.updateMany({ to: id }, { $pull: { messages: { from: 'to' } } }, opt);
     // Dungeon: Anmeldungen verlassen (leere verschwinden, die Leitung geht weiter), Chat-Nachrichten entfernen;

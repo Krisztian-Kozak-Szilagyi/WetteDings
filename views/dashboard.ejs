@@ -12,6 +12,7 @@
     { key: 'coins', label: 'In Coins', value: w.coinValue },
     { key: 'cards', label: 'In Karten', value: w.cardValue },
   ];
+  if (w.shopValue) parts.push({ key: 'shop', label: 'Grading-Shop', value: w.shopValue });
   const partTotal = parts.reduce((s, p) => s + Math.max(0, p.value || 0), 0) || 1;
   const t = d.today;
   const ring = 2 * Math.PI * 22;

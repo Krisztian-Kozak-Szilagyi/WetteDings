@@ -35,31 +35,54 @@ async function record({ userId, deviceId, fp = null, ip = null, ua = '', login =
   await checkMatches(dev);
 }
 
-/** Andere Konten mit demselben Gerät suchen und Hinweise anlegen bzw. hochstufen */
+/** Häufige fp|ip-Kombinationen (viele Konten, baugleiche Geräte im selben Netz) für diese Fingerabdrücke */
+async function commonPrintsFor(fps) {
+  const list = [...new Set(fps.filter(Boolean))];
+  if (!list.length) return new Set();
+  return logic.commonPrints(await Device.find({ fp: { $in: list } }).select('user fp ips').lean());
+}
+
+/**
+ * Hinweis für ein Konten-Paar anlegen bzw. auf den aktuellen Stand bringen – über alle Geräte beider Konten.
+ * Ein stärkerer Treffer zeigt einen erledigten Hinweis wieder als neu; ein schwächerer stuft nur herab (#89).
+ */
+async function updatePair(userA, userB, common) {
+  const [da, db] = await Promise.all([Device.find({ user: userA }).lean(), Device.find({ user: userB }).lean()]);
+  const level = logic.pairLevel(da, db, common || (await commonPrintsFor([...da, ...db].map((d) => d.fp))));
+  const key = logic.pairKey(userA, userB);
+  const alert = await DeviceAlert.findOne({ key });
+  if (!alert) {
+    if (!level) return;
+    await DeviceAlert.create({ key, users: [userA, userB], level }).catch((err) => {
+      if (!err || err.code !== 11000) throw err;
+    });
+  } else if (!level) {
+    await DeviceAlert.deleteOne({ _id: alert._id });
+  } else if (level !== alert.level) {
+    if (level > alert.level) alert.doneAt = null; // stärkerer Treffer als bisher: wieder als neu anzeigen
+    alert.level = level;
+    await alert.save();
+  }
+}
+
+/** Andere Konten mit demselben Gerät suchen und Hinweise anlegen bzw. anpassen */
 async function checkMatches(dev) {
   const or = [{ deviceId: dev.deviceId }];
   if (dev.fp) or.push({ fp: dev.fp });
-  const others = await Device.find({ user: { $ne: dev.user }, $or: or }).lean();
-  const best = new Map(); // anderes Konto -> stärkster Treffer
-  for (const o of others) {
-    const level = logic.matchLevel(dev, o);
-    const id = String(o.user);
-    if (level > (best.get(id) || 0)) best.set(id, level);
-  }
-  for (const [other, level] of best) {
-    const key = logic.pairKey(dev.user, other);
-    const alert = await DeviceAlert.findOne({ key });
-    if (!alert) {
-      await DeviceAlert.create({ key, users: [dev.user, other], level }).catch((err) => {
-        if (!err || err.code !== 11000) throw err;
-      });
-    } else if (level > alert.level) {
-      // stärkerer Treffer als bisher: wieder als neu anzeigen
-      alert.level = level;
-      alert.doneAt = null;
-      await alert.save();
-    }
-  }
+  const others = await Device.find({ user: { $ne: dev.user }, $or: or }).select('user').lean();
+  const ids = [...new Set(others.map((o) => String(o.user)))];
+  for (const other of ids) await updatePair(dev.user, other);
+}
+
+/** Alle Hinweise mit den aktuellen Regeln neu bewerten (beim Start, siehe migrate.js) – z. B. nach #89 */
+async function recomputeAlerts() {
+  const alerts = await DeviceAlert.find().select('users').lean();
+  if (!alerts.length) return 0;
+  const ids = [...new Set(alerts.flatMap((a) => a.users.map(String)))];
+  const fps = await Device.distinct('fp', { user: { $in: ids }, fp: { $ne: null } });
+  const common = await commonPrintsFor(fps);
+  for (const a of alerts) await updatePair(a.users[0], a.users[1], common);
+  return alerts.length;
 }
 
 // ---------- Handel zwischen Mehrfach-Konten ----------
@@ -107,6 +130,7 @@ async function listAlerts() {
     User.find({ _id: { $in: ids } }).select('username bannedUntil deletedAt createdAt').lean(),
     Device.find({ user: { $in: ids } }).lean(),
   ]);
+  const common = await commonPrintsFor(devices.map((d) => d.fp));
   const userById = new Map(users.map((u) => [String(u._id), u]));
   const devsByUser = new Map();
   for (const d of devices) {
@@ -124,7 +148,7 @@ async function listAlerts() {
       const shared = [];
       for (const x of da) {
         for (const y of db) {
-          const level = logic.matchLevel(x, y);
+          const level = logic.matchLevel(x, y, common);
           if (level) shared.push({ level, ua: x.ua || y.ua, a: x, b: y });
         }
       }
@@ -163,17 +187,36 @@ async function reload() {
     lastPurge = now;
     await Device.deleteMany({ lastAt: { $lt: new Date(now - KEEP_DAYS * DAY) } });
   }
-  const banned = await User.find({ bannedUntil: { $gt: new Date() }, deletedAt: null }).select('bannedUntil banReason').lean();
+  const banned = await User.find({ bannedUntil: { $gt: new Date() }, deletedAt: null }).select('bannedUntil banReason bannedAt').lean();
   const devices = new Map();
   const prints = new Map();
   if (banned.length) {
-    const info = new Map(banned.map((u) => [String(u._id), { until: u.bannedUntil, reason: u.banReason || '' }]));
+    const info = new Map(banned.map((u) => [String(u._id), { until: u.bannedUntil, reason: u.banReason || '', at: u.bannedAt }]));
     const devs = await Device.find({ user: { $in: banned.map((u) => u._id) } }).select('user deviceId fp ips').lean();
+    // Fingerabdruck+IP, die andere (nicht gesperrte) Konten schon vor der Sperre benutzt haben: baugleiche Geräte
+    // von Freunden im selben WLAN – die dürfen nicht mitgesperrt werden (#89). Ein danach neu angelegtes Konto
+    // auf demselben Gerät trifft die Sperre weiterhin.
+    const bannedIds = new Set(info.keys());
+    const fps = [...new Set(devs.map((d) => d.fp).filter(Boolean))];
+    const others = fps.length ? await Device.find({ fp: { $in: fps }, user: { $nin: [...bannedIds] } }).select('user fp ips firstAt').lean() : [];
+    const firstUse = new Map(); // fp|ip -> frühester Beginn bei einem anderen Konto
+    for (const o of others) for (const ip of o.ips) {
+      const k = logic.printKey(o.fp, ip);
+      const t = new Date(o.firstAt).getTime();
+      if (!firstUse.has(k) || t < firstUse.get(k)) firstUse.set(k, t);
+    }
     for (const d of devs) {
       const ban = info.get(String(d.user));
-      devices.set(d.deviceId, ban);
+      devices.set(d.deviceId, { until: ban.until, reason: ban.reason });
       // ohne Cookie zählt der Fingerabdruck nur zusammen mit derselben IP – sonst träfe es baugleiche Geräte
-      if (d.fp) for (const ip of d.ips) prints.set(`${d.fp}|${ip}`, ban);
+      if (d.fp) {
+        for (const ip of d.ips) {
+          const k = logic.printKey(d.fp, ip);
+          const before = firstUse.get(k);
+          if (before !== undefined && (!ban.at || before < new Date(ban.at).getTime())) continue;
+          prints.set(k, { until: ban.until, reason: ban.reason });
+        }
+      }
     }
   }
   cache = { at: now, devices, prints };
@@ -247,4 +290,4 @@ async function forgetUser(userId) {
   await Promise.all([Device.deleteMany({ user: userId }), DeviceAlert.deleteMany({ users: userId })]);
 }
 
-module.exports = { flaggedPairs, tradePairKey, tradeFilterForPairs, suspiciousTradeCount, record, alertCount, listAlerts, setAlertDone, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };
+module.exports = { recomputeAlerts, flaggedPairs, tradePairKey, tradeFilterForPairs, suspiciousTradeCount, record, alertCount, listAlerts, setAlertDone, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };

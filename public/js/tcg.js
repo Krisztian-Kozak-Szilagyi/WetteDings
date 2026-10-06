@@ -28,18 +28,31 @@
 
   // ---------- Filter der Sammlung ----------
   // Jeder Filter wirkt nur auf das Raster in seiner .card bzw. [data-filter-scope] (die Tauschseite hat zwei Raster)
+  // Suchknopf (partials/tcg-filter → mkt-bar): Seltenheit und Kartenname zusammen; ohne Namen (z. B. "?") passt keine Suche
+  var filterScope = function (scope) {
+    var active = $('[data-tcg-filter].active', scope);
+    var key = active ? active.getAttribute('data-tcg-filter') : 'all';
+    var search = $('[data-tcg-search]', scope);
+    var q = search ? search.value.trim().toLowerCase() : '';
+    $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
+      var name = (slot.getAttribute('data-name') || '').toLowerCase();
+      var hide = (key !== 'all' && slot.getAttribute('data-rarity') !== key) || (q && name.indexOf(q) === -1);
+      (slot.closest('.tcg-pick-multi') || slot).hidden = !!hide;
+    });
+  };
+  var scopeOf = function (el) { return el.closest('.card, [data-filter-scope]') || document; };
   $all('[data-tcg-filter]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var key = btn.getAttribute('data-tcg-filter');
-      var scope = btn.closest('.card, [data-filter-scope]') || document;
+      var scope = scopeOf(btn);
       $all('[data-tcg-filter]', scope).forEach(function (b) {
         b.classList.toggle('active', b === btn);
         b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
       });
-      $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
-        slot.hidden = key !== 'all' && slot.getAttribute('data-rarity') !== key;
-      });
+      filterScope(scope);
     });
+  });
+  $all('[data-tcg-search]').forEach(function (input) {
+    input.addEventListener('input', function () { filterScope(scopeOf(input)); });
   });
 
   // ---------- Season-Filter im Album: blendet ganze Season-Sektionen aus ----------

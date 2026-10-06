@@ -1551,32 +1551,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
 .tcg-coll-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .tcg-coll-head h2 { margin: 0; }
-/* Seltenheits-Filter als Segment-Leiste (wie Statistik-Zeitraum und Vergaben): aktive Wahl als Fläche mit
-   Schatten und einem Strich in der Farbe der Seltenheit */
-.tcg-filter {
-  display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; width: fit-content; max-width: 100%;
-  border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
-}
-.tcg-filter .chip {
-  position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 11px; border-radius: 8px;
-  background: transparent; border: 0; color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap;
-  transition: background .15s ease, color .15s ease;
-}
-.tcg-filter .chip:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
-.tcg-filter .chip.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
-.tcg-filter .chip.active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--rar, var(--color-accent)); }
-.tcg-filter .chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.tcg-filter .tcg-dot { width: 7px; height: 7px; }
-.tcg-filter .chip-count { font-weight: 500; font-size: 12px; }
-/* Handy: eine Zeile zum Wischen statt mehrerer umgebrochener Zeilen */
-@media (max-width: 640px) {
-  .tcg-filter {
-    flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; overscroll-behavior-x: contain;
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); /* rechts geht es weiter */
-  }
-  .tcg-filter::-webkit-scrollbar { display: none; }
-  .tcg-filter .chip { flex: none; }
-}
 .tcg-dot-all { --rar: var(--color-accent); }
 .chip-count { color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
 
@@ -3060,7 +3034,7 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .lotto-total { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lotto-buy-btn { height: 44px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 22%, transparent); }
 .lotto-how { padding: 0 6px; }
-.lotto-how summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--color-neutral-300); }
+.lotto-how summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: var(--cur-pointer); font-size: 14px; font-weight: 500; color: var(--color-neutral-300); }
 .lotto-how summary::-webkit-details-marker { display: none; }
 .lotto-how summary::after { content: '▾'; color: var(--color-neutral-500); transition: transform .15s; }
 .lotto-how[open] summary::after { transform: rotate(180deg); }
@@ -4721,7 +4695,7 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-boost-card { display: block; width: 100%; padding: 0; border: 0; border-radius: 8px; background: none; cursor: var(--cur-zoom-in); transition: transform .2s ease; }
 .dg-boost-card img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--rar, var(--color-neutral-600)) 50%, transparent), 0 8px 18px rgba(0, 0, 0, .45); }
 button.dg-boost-card:hover, button.dg-boost-card:focus-visible { outline: 0; transform: translateY(-3px); }
-.dg-boost-empty { aspect-ratio: 720 / 1008; border: 2px dashed var(--color-neutral-800); cursor: default; }
+.dg-boost-empty { aspect-ratio: 720 / 1008; border: 2px dashed var(--color-neutral-800); cursor: var(--cur-default); }
 .dg-boost-name { font-size: 12px; text-align: center; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .dg-boost-card { transition: none; } }
 
@@ -4780,14 +4754,15 @@ a.dg-start-tile:hover { color: var(--text); }
 .tcg-buy-dest:hover span, .tcg-buy-dest:focus-visible span { border-bottom-color: #c4b5fd; }
 /* Rangliste: eigene Zeilen-Hintergründe für die ersten drei – Platz 1 golden mit wanderndem Glanz */
 .leaderboard tr.top-1, .leaderboard tr.top-2, .leaderboard tr.top-3 { position: relative; }
-.leaderboard tr.top-1 {
+/* tbody im Selektor: so stark wie die Hover-Regel von .table (die sonst die Platz-Farben ersetzt) und weiter unten */
+.leaderboard tbody tr.top-1 {
   /* Glanz: warmer Bernstein-/Kupfer-Streifen über dem ruhigen Gold – passt zum Gold, hebt sich aber ab */
   background: linear-gradient(100deg, transparent 40%, rgba(255, 140, 50, .14) 46%, rgba(255, 120, 40, .28) 50%, rgba(255, 140, 50, .14) 54%, transparent 60%) 100% 0 / 300% 100% no-repeat,
     linear-gradient(100deg, rgba(242, 193, 78, .26), rgba(242, 193, 78, .10) 45%, rgba(242, 193, 78, .03));
   animation: rank-gold 7s ease-in-out infinite;
 }
-.leaderboard tr.top-2 { background: linear-gradient(100deg, rgba(207, 211, 229, .18), rgba(207, 211, 229, .06) 45%, rgba(207, 211, 229, .02)); }
-.leaderboard tr.top-3 { background: linear-gradient(100deg, rgba(201, 144, 103, .18), rgba(201, 144, 103, .06) 45%, rgba(201, 144, 103, .02)); }
+.leaderboard tbody tr.top-2 { background: linear-gradient(100deg, rgba(207, 211, 229, .18), rgba(207, 211, 229, .06) 45%, rgba(207, 211, 229, .02)); }
+.leaderboard tbody tr.top-3 { background: linear-gradient(100deg, rgba(201, 144, 103, .18), rgba(201, 144, 103, .06) 45%, rgba(201, 144, 103, .02)); }
 .leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-2 td:first-child { box-shadow: inset 3px 0 0 #cfd3e5, inset 0 -1px 0 var(--color-divider); }
 .leaderboard tr.top-3 td:first-child { box-shadow: inset 3px 0 0 #c99067, inset 0 -1px 0 var(--color-divider); }
@@ -4795,6 +4770,8 @@ a.dg-start-tile:hover { color: var(--text); }
 /* Leuchten nach innen: ein äußerer Schatten an der Zelle wurde von den Nachbarzellen überdeckt und sah wie ein eigener Kasten aus */
 .leaderboard tr.top-1 td:first-child { box-shadow: inset 3px 0 0 #f2c14e, inset 14px 0 16px -12px rgba(242, 193, 78, .45), inset 0 -1px 0 rgba(242, 193, 78, .35); }
 .leaderboard tr.top-1 td a { color: #fff4cf; }
+/* Hover: die Zeile hellt nur leicht auf, die Platz-Farbe bleibt */
+.leaderboard tbody tr:is(.top-1, .top-2, .top-3):hover td { background: color-mix(in srgb, var(--text) 4%, transparent); }
 @keyframes rank-gold { 0%, 100% { background-position: 100% 0, 0 0; } 50% { background-position: 0 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .leaderboard tr.top-1 { animation: none; } }
 
@@ -4822,8 +4799,6 @@ a.dg-start-tile:hover { color: var(--text); }
 .bx-head h1 { margin: 0; font-size: clamp(28px, 1.3rem + 1.4vw, 36px); }
 .bx-head .live { font-size: 12px; color: var(--color-neutral-400); }
 .bx-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-.bx-filters .chip { height: 32px; min-height: 0; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
-.bx-filters .chip.active { background: var(--color-surface); color: var(--text); box-shadow: 0 0 0 1px var(--color-accent-700); }
 .bx-table { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: linear-gradient(160deg, var(--color-surface), var(--color-bg)); box-shadow: 0 0 0 1px var(--color-neutral-800); overflow: hidden; }
 .bx-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(100px, .8fr) minmax(110px, 1fr) 130px 130px minmax(150px, 1.1fr) minmax(150px, 1.1fr); gap: 18px; align-items: center; padding: 12px 18px; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; transition: background .15s; }
 .bx-row:last-of-type { border-bottom: 0; }
@@ -4878,7 +4853,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 
 /* Broker-Übersicht: sortierbare Spaltenköpfe */
-.bx-sort { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; padding: 0; border: 0; background: none; text-align: left; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.bx-sort { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; padding: 0; border: 0; background: none; text-align: left; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: var(--cur-pointer); }
 .bx-sort:hover, .bx-sort.sort-asc, .bx-sort.sort-desc { color: var(--text); }
 .bx-sort::before { content: ''; flex: none; width: 1.2em; text-align: center; }
 .bx-sort.sort-asc::before { content: '▲'; }
@@ -5078,7 +5053,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 .pf-tip {
   position: absolute; left: 0; right: 0; bottom: calc(100% - 6px); z-index: 20; display: flex; flex-direction: column; gap: 8px;
   max-height: 60vh; overflow-y: auto; padding: 12px; border-radius: var(--radius-md); background: var(--color-neutral-900);
-  box-shadow: var(--shadow-md); color: var(--text); font-size: .82rem; font-weight: 500; line-height: 1.45; cursor: default;
+  box-shadow: var(--shadow-md); color: var(--text); font-size: .82rem; font-weight: 500; line-height: 1.45; cursor: var(--cur-default);
   opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s ease, transform .15s ease, visibility .15s;
 }
 .pf-badge:hover .pf-tip, .pf-badge:focus .pf-tip, .pf-badge:focus-within .pf-tip { opacity: 1; visibility: visible; transform: none; }
@@ -5447,3 +5422,85 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 .panel-hero .stats-icon { width: 14px; height: 14px; vertical-align: -2px; }
 @media (max-width: 900px) { .stats-kpis-core { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stats-kpi.is-core .stat-value { font-size: 1.4rem; } }
 
+/* Mehrfach-Tausch (#76): Karte ankreuzen, darunter die Anzahl */
+.tcg-pick-multi { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tcg-pick-multi .tcg-pick-count { align-self: center; padding: 2px 6px; border-radius: 6px; font-size: 13px; background: var(--color-bg); color: var(--text); border: 1px solid var(--border, rgba(255,255,255,.15)); }
+.tcg-pick-multi:not(:has(input:checked)) .tcg-pick-count { opacity: .45; }
+.nego-lines { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.tcg-pick-multi:has(> .tcg-slot[hidden]) { display: none; } /* Seltenheitsfilter blendet die Karte aus – die Anzahl mit */
+.nego-line { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 140px; text-align: center; font-size: 13px; }
+
+/* Markt: Suchen und Filtern in einem Knopf (nach „Mobile Search/Filter Button“, Dribbble) – in unseren Farben.
+   Eine Hälfte überfahren oder antippen (Fokus) → sie klappt über die ganze Breite auf. */
+.mkt-bar { --mkt-h: 36px; --mkt-ease: cubic-bezier(0, 0, .1, 1); --mkt-soft: cubic-bezier(0, 0, .5, 1); position: relative; flex: 0 0 280px; width: 280px; max-width: 100%; height: var(--mkt-h); }
+/* Rahmen an den Hälften (nicht am Knopf): sonst schimmert er an den runden Ecken in der Mitte durch */
+.mkt-bar > div { --mkt-half-bg: var(--color-surface); position: absolute; top: 0; height: 100%; width: 50%; background: var(--mkt-half-bg); transition: width .45s var(--mkt-ease), left .45s var(--mkt-ease), background-color .2s ease, border-radius .2s ease; }
+.mkt-bar-search { left: 0; overflow: hidden; z-index: 1; transition-delay: .1s; border-radius: var(--radius-md) 0 0 var(--radius-md); box-shadow: inset 1px 0 0 var(--color-neutral-800), inset 0 1px 0 var(--color-neutral-800), inset 0 -1px 0 var(--color-neutral-800); }
+.mkt-bar-filter { left: 50%; z-index: 1; transition-delay: .25s; border-radius: 0 var(--radius-md) var(--radius-md) 0; box-shadow: inset -1px 0 0 var(--color-neutral-800), inset 0 1px 0 var(--color-neutral-800), inset 0 -1px 0 var(--color-neutral-800); }
+.mkt-bar > div:hover { --mkt-half-bg: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface)); }
+/* Trennstrich zwischen den Hälften */
+.mkt-bar-search::after { content: ""; position: absolute; right: 0; top: 22%; width: 1px; height: 56%; background: var(--color-neutral-700); transition: opacity .2s ease; }
+.mkt-bar-label, .mkt-bar-toggle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 0; border: 0; background: none; color: var(--color-neutral-300); font: inherit; font-size: 14px; letter-spacing: .02em; cursor: var(--cur-pointer); }
+.mkt-bar-label { transition: opacity .3s var(--mkt-soft) .35s; }
+.mkt-bar-toggle:focus-visible, .mkt-opt:focus-visible { outline: 2px solid var(--color-accent-300); outline-offset: -2px; border-radius: var(--radius-md); }
+
+/* Suchen: Feld wächst als Kreis von links auf, die Lupe kommt von unten */
+/* Feld füllt die Hälfte ganz aus (kein eigener Rahmen), rechts bleibt Platz für die Lupe */
+.mkt-bar-input[type="search"] { position: absolute; left: 0; top: 0; width: calc(100% - 46px); height: 100%; min-height: 0; margin: 0; padding: 0 14px; border: 0; border-radius: var(--radius-md) 0 0 var(--radius-md); background: var(--color-bg); color: var(--text); font-size: 14px; clip-path: circle(0 at 18px 50%); transition: clip-path .45s var(--mkt-ease) .05s; }
+/* 1px-Rahmen wie im Vorbild – sonst verschwimmt das Feld mit dem Seitenhintergrund */
+/* 1px-Rahmen in der Farbe der Hälfte (wie das Lupen-Feld daneben) – sonst verschwimmt das Feld mit dem Seitenhintergrund */
+.mkt-bar-input[type="search"], .mkt-bar-input[type="search"]:focus { outline: none; box-shadow: inset 0 0 0 1px var(--mkt-half-bg); }
+.mkt-bar-current { box-shadow: inset 0 0 0 1px var(--mkt-half-bg); }
+.mkt-bar-icon { position: absolute; right: 0; top: 0; display: grid; place-items: center; width: 46px; height: 100%; color: var(--color-accent-300); transform: translateY(100%); opacity: 0; transition: transform .35s var(--mkt-ease), opacity .2s ease; pointer-events: none; }
+.mkt-bar-search:is(:hover, :focus-within), .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-search { width: 100%; z-index: 3; transition-delay: 0s; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-label, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-label { opacity: 0; pointer-events: none; transition-delay: 0s; }
+.mkt-bar-search:is(:hover, :focus-within)::after, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-search::after { opacity: 0; }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-input, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-input { clip-path: circle(150% at 18px 50%); transition-delay: .1s; }
+.mkt-bar-search:is(:hover, :focus-within) .mkt-bar-icon, .mkt-bar:has(.mkt-bar-input:not(:placeholder-shown)) .mkt-bar-icon { transform: translateY(0); opacity: 1; transition-delay: .3s; }
+
+/* Filtern: Feld mit der Auswahl schiebt sich auf, der Pfeil dreht sich, darunter klappt die Liste auf */
+.mkt-bar-word { transition: opacity .3s var(--mkt-soft) .35s; }
+.mkt-bar-current { position: absolute; left: 0; top: 0; bottom: 0; display: flex; align-items: center; gap: 6px; width: 0; padding: 0; overflow: hidden; white-space: nowrap; border-radius: var(--radius-md) 0 0 var(--radius-md); background: var(--color-bg); font-size: 13px; transition: width .45s var(--mkt-ease) .2s, padding .45s var(--mkt-ease) .2s; }
+.mkt-bar-current > * { opacity: 0; transition: opacity .25s ease; }
+.mkt-bar-current strong { color: var(--color-neutral-100); font-weight: 600; }
+.mkt-bar-arrow { position: absolute; right: 16px; top: 50%; margin-top: -7px; color: var(--color-neutral-400); transition: transform .45s var(--mkt-soft) .1s, color .2s ease; }
+.mkt-bar-filter:is(:hover, :focus-within) { left: 0; width: 100%; z-index: 3; transition-delay: 0s; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-word { opacity: 0; transition-delay: 0s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-current { width: calc(100% - 46px); padding: 0 14px; transition-delay: .15s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-current > * { opacity: 1; transition-delay: .4s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-arrow { transform: rotate(180deg); color: var(--color-accent-300); transition-delay: .35s; }
+.mkt-bar.is-filtered .mkt-bar-word, .mkt-bar.is-filtered .mkt-bar-arrow { color: var(--color-accent-300); }
+.mkt-bar.is-filtered .mkt-bar-word::after { content: " •"; }
+
+/* Die Liste hängt direkt am Knopf; der Abstand ist durchsichtiger Innenabstand und gehört noch zum Knopf (Hover bleibt) */
+.mkt-bar-drop { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; padding-top: 6px; visibility: hidden; transition: visibility 0s linear .25s; }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-drop { visibility: visible; transition-delay: 0s; }
+.mkt-bar-menu { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 6px; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 14px 34px rgba(0, 0, 0, .5), inset 0 0 0 1px var(--color-neutral-800); clip-path: inset(0 100% calc(100% - 2px) 0); }
+.mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { animation: mkt-drop .45s var(--mkt-soft) .2s both; }
+@keyframes mkt-drop {
+  0% { clip-path: inset(0 100% calc(100% - 2px) 0); }
+  45% { clip-path: inset(0 0 calc(100% - 2px) 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+.mkt-opt { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--color-neutral-200); font: inherit; font-size: 13px; text-align: left; cursor: var(--cur-pointer); }
+.mkt-opt:hover { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.mkt-opt.active { background: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent-200); font-weight: 600; }
+@media (max-width: 640px) { .mkt-bar { flex-basis: 100%; width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .mkt-bar *, .mkt-bar > div { transition-duration: 0s !important; transition-delay: 0s !important; }
+  .mkt-bar-filter:is(:hover, :focus-within) .mkt-bar-menu { animation: none; clip-path: none; }
+}
+.mkt-opt-count { margin-left: auto; padding-left: 8px; color: var(--color-neutral-500); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
+/* Mehrere Gruppen in einem Menü (Album: Seltenheit + Season) */
+.mkt-group { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.mkt-group + .mkt-group { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--color-neutral-800); }
+.mkt-group-title { padding: 4px 10px 2px; color: var(--color-neutral-500); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.mkt-bar-menu { max-height: min(70vh, 540px); overflow-y: auto; }
+.mkt-bar-current strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.album-filter-row { display: flex; margin-bottom: 14px; }
+.ihk-pick-tools { display: flex; margin-bottom: 12px; }
+.tcg-dot-missing { --rar: transparent; box-shadow: inset 0 0 0 1.5px var(--color-accent-300); } /* "Fehlt mir noch" im Filter */
+
+/* App herunterladen (Profil-Menü): wie die anderen Menüpunkte; bleibt versteckt, bis der Browser die Installation anbietet */
+.user-menu-list button.app-install { color: var(--text); }
+.user-menu-list button.app-install[hidden] { display: none; }

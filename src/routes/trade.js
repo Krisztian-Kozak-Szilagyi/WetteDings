@@ -107,6 +107,7 @@ async function pickable(member, { own, keep = [] } = {}) {
     .flatMap(([id, list]) => list.map((f) => ({ ...f, card: catalog.cardById[id], lock: keepCopies.has(f.id) ? null : f.lock })))
     .filter((f) => f.card && (!own || !f.lock));
   const goods = inv
+    .filter((it) => it.tradable) // nur Gegenstände, die sich handeln lassen (src/items/types.js)
     .map((it) => {
       const id = items.itemCardId(it.key);
       return { card: items.itemCard(it), max: own ? it.count - it.inTrade + (keepItems[id] || 0) : it.count };
@@ -124,7 +125,7 @@ function wishPool(counts) {
   return {
     cards: catalog.CARDS.filter((c) => visible.has(c.rarity)).map((c) => ({ card: c, max: trade.MAX_LINES, owned: counts[c.id] || 0 })),
     foiled: [],
-    goods: items.ITEM_TYPES.map((t) => ({ card: items.itemCard(t), max: trade.MAX_LINES })),
+    goods: items.ITEM_TYPES.filter((t) => t.tradable).map((t) => ({ card: items.itemCard(t), max: trade.MAX_LINES })),
     counts,
   };
 }

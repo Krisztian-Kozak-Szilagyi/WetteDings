@@ -30,7 +30,7 @@
     <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>
-      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
+      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
           <span class="tcg-exam-badge"><%= lockLabel %></span>
@@ -69,7 +69,7 @@
           <% inner() %>
         </button>
       <% } else { %>
-        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %>">
+        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %>">
           <% inner() %>
         </div>
       <% } %>
@@ -83,7 +83,7 @@
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </button>
       <% } else { %>
-        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen">
+        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %> – früher besessen">
           <span class="tcg-art"><img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – früher besessen" loading="lazy" width="720" height="1008"></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </div>

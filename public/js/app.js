@@ -1210,3 +1210,36 @@
   // Seiten, die eine gemerkte Auswahl wiederherstellen (Broker), sind beim "load" fertig
   window.addEventListener('load', function () { bars.forEach(sync); });
 })();
+
+// App herunterladen: Service Worker anmelden (macht die Seite installierbar) und Knopf im Profil-Menü zeigen,
+// sobald der Browser die Installation anbietet (Chrome/Edge/Android) – auf iPhone/iPad mit kurzer Anleitung.
+(function () {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
+  var btn = document.querySelector('[data-app-install]');
+  if (!btn) return;
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone) return; // läuft schon als App
+  var prompt = null;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) btn.hidden = false;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    prompt = e;
+    btn.hidden = false;
+  });
+  window.addEventListener('appinstalled', function () {
+    prompt = null;
+    btn.hidden = true;
+  });
+  btn.addEventListener('click', function () {
+    if (prompt) {
+      prompt.prompt();
+      prompt.userChoice.then(function () { prompt = null; btn.hidden = !ios; });
+      return;
+    }
+    var hint = document.getElementById('app-ios');
+    if (hint && hint.showModal) hint.showModal();
+  });
+})();

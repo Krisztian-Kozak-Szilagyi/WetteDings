@@ -217,5 +217,14 @@ test('Migration: altes Angebot mit einer Karte wird zu Positionen', () => {
   assert.deepEqual(verkauf.$set.want, []);
   assert.equal(verkauf.$set.extraFrom, 'to');
   assert.equal(verkauf.$set.lockDocs, undefined); // abgeschlossen: sperrt nichts
-  assert.equal(migrateTradeDoc({ give: [], card: A }), null); // schon umgestellt
+  assert.equal(migrateTradeDoc({ give: [], want: [] }), null); // schon umgestellt (kein card mehr)
+  // Tausch mit give/take aus der ersten Umsetzung von #76: nichts gesperrt, bewegte Exemplare in giveDocs/takeDocs
+  const neu = migrateTradeDoc({ kind: 'tausch', status: 'offen', card: A, cardDoc: 'platzhalter', give: [{ card: A }, { card: A, copy: 'c1', foiledAt: f }], take: [{ card: B }], price: 0 });
+  assert.deepEqual(neu.$set.give, [{ card: A, copy: null, doc: null, foiledAt: null, grade: null }, { card: A, copy: 'c1', doc: null, foiledAt: f, grade: null }]);
+  assert.deepEqual(neu.$set.want, [{ card: B, copy: null, doc: null, foiledAt: null, grade: null }]);
+  assert.equal(neu.$set.lockDocs, undefined);
+  assert.equal(neu.$unset.take, 1);
+  const zu = migrateTradeDoc({ kind: 'tausch', status: 'verkauft', card: A, cardDoc: 'p', give: [{ card: A }], take: [{ card: B }], giveDocs: ['g1'], takeDocs: ['t1'], to: 'b', buyer: 'b', price: 0 });
+  assert.equal(zu.$set.give[0].doc, 'g1');
+  assert.equal(zu.$set.want[0].doc, 't1');
 });

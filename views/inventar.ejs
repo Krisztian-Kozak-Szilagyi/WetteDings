@@ -49,7 +49,7 @@
     <div class="inv-items">
       <% itemList.forEach((it) => { %>
         <div class="inv-item<%= it.count ? '' : ' is-empty' %>">
-          <span class="inv-item-icon"><%- foilIcon %></span>
+          <span class="inv-item-icon"><% if (it.key === 'folie') { %><%- foilIcon %><% } else { %><img src="<%= it.image %>" alt="" width="22" height="22"><% } %></span>
           <div class="inv-item-text">
             <strong><%= it.label %> <span class="inv-count"><%= it.count %></span><% if (it.inTrade) { %> <span class="muted small">davon <%= it.inTrade %> im Handel</span><% } %></strong>
             <span class="muted small"><%= it.key === 'folie' ? 'Schweißt eine deiner Karten ein. Folierte Karten steigen sofort um ' + pct(foilSettings.bonusPercent) + ' % und danach jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.' : it.text %></span>
@@ -58,13 +58,17 @@
         <% const free = it.count - it.inTrade; %>
         <% if (free > 0) { %>
           <div class="inv-item-actions">
+            <% if (it.sell) { %>
             <form method="post" action="/inventar/verkaufen" data-confirm="1× <%= it.label %> für <%= euro(it.sell) %> an die Bank verkaufen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="type" value="<%= it.key %>">
               <input type="hidden" name="count" value="1">
               <button class="btn btn-ghost btn-sm" type="submit">1 verkaufen · <%= euro(it.sell) %></button>
             </form>
+            <% } %>
+            <% if (it.tradable) { %>
             <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=<%= encodeURIComponent('item:' + it.key) %>">Im Handel anbieten</a>
+            <% } %>
           </div>
         <% } %>
         <% if (it.key === 'folie') { %>

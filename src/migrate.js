@@ -116,15 +116,18 @@ async function migrate() {
     await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
+
+  // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN)
+  await require('./device/deviceService').recomputeAlerts();
 }
 
 /**
- * Handel (#76): Angebote mit einer Karte (card, wantCard …) auf Positionen (give/want) umstellen und den alten
+ * Handel (#76): Angebote mit einer Karte (card, wantCard …) bzw. dem Tausch mit give/take auf Positionen (give/want) umstellen und den alten
  * eindeutigen Index auf cardDoc durch den auf lockDocs ersetzen. Liest roh, weil das Schema die alten Felder nicht mehr kennt.
  */
 async function migrateTrades() {
   const raw = Trade.collection;
-  const old = await raw.find({ card: { $exists: true }, give: { $exists: false } }).toArray();
+  const old = await raw.find({ card: { $exists: true } }).toArray(); // beide Vorformen (siehe lines.migrateTradeDoc)
   for (let i = 0; i < old.length; i += 500) {
     const ops = old.slice(i, i + 500).map((t) => ({ updateOne: { filter: { _id: t._id }, update: migrateTradeDoc(t) } })).filter((op) => op.updateOne.update);
     if (ops.length) await raw.bulkWrite(ops, { ordered: false });

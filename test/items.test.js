@@ -66,3 +66,26 @@ test('Gegenstände im Handel: "item:folie" – wie Karten, auch im Tausch', () =
   assert.deepEqual(validateOffer({ give: [{ card: 'item:folie' }, { card: 'item:folie' }], want: [{ card }], price: 0 }), { extraFrom: null });
 });
 
+test('Gegenstands-Arten: Liste ist gültig, Fehler fallen beim Laden auf', () => {
+  const { ITEM_TYPES, validateTypes, itemType, SOURCES } = require('../src/items/types');
+  assert.equal(validateTypes(ITEM_TYPES), true);
+  const ok = { key: 'tuch', label: 'Tuch', category: 'material', storage: 'stapel', sell: 0 };
+  assert.equal(validateTypes([ok]), true);
+  assert.throws(() => validateTypes([ok, ok]), /doppelt/);
+  assert.throws(() => validateTypes([{ ...ok, key: 'Tuch!' }]), /Schlüssel/);
+  assert.throws(() => validateTypes([{ ...ok, category: 'xyz' }]), /Kategorie/);
+  assert.throws(() => validateTypes([{ ...ok, storage: 'sack' }]), /storage/);
+  assert.throws(() => validateTypes([{ ...ok, tradable: true }]), /Handel/); // Stapel sind (noch) nicht handelbar
+  assert.throws(() => validateTypes([{ ...ok, sell: 1.5 }]), /Cent/);
+  assert.equal(itemType('folie').storage, 'stueck');
+  assert.equal(itemType('__proto__'), null);
+  for (const s of ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren']) assert.ok(SOURCES.includes(s));
+});
+
+test('Gegenstände: Wegnehmen nur in einer Transaktion, unbekannte Quelle ist ein Programmfehler', async () => {
+  const { takeItems, addItems } = require('../src/items/itemService');
+  await assert.rejects(takeItems({ userId: null, type: 'folie', source: 'bank' }), /Transaktion/);
+  await assert.rejects(addItems({ userIds: [], type: 'folie', source: 'irgendwo' }), /Quelle/);
+  await assert.rejects(addItems({ userIds: [], type: 'gibtsnicht', source: 'admin' }), /gibt es nicht/);
+  await assert.rejects(addItems({ userIds: [], type: 'folie', count: 0, source: 'admin' }), /Anzahl/);
+});

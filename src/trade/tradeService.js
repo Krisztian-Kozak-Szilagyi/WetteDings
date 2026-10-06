@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
 const { Item } = require('../models/Item');
-const { itemByCardId, freeItems, claimItems } = require('../items/itemService');
+const { itemByCardId, freeItems, claimItems, logItems } = require('../items/itemService');
 const { Trade, openFilter } = require('../models/Trade');
 const { inTransaction } = require('../services/betService');
 const { UserError, str, parseEuro } = require('../lib/util');
@@ -275,8 +275,11 @@ async function claimLines(list, ownerId, session) {
   if (goods.length) await claimItems(goods, ownerId, session);
 }
 
-/** Exemplare einer Seite an den neuen Besitzer geben; fehlt eines, scheitert der ganze Abschluss */
-async function moveLines(list, from, to, session) {
+/**
+ * Exemplare einer Seite an den neuen Besitzer geben; fehlt eines, scheitert der ganze Abschluss.
+ * Gegenstände landen im Gegenstands-Protokoll (Quelle "handel", meta = { trade }).
+ */
+async function moveLines(list, from, to, session, meta = null) {
   for (const [Model, ids] of [
     [TcgCard, list.filter((l) => !itemByCardId(l.card)).map((l) => l.doc)],
     [Item, list.filter((l) => itemByCardId(l.card)).map((l) => l.doc)],
@@ -287,6 +290,13 @@ async function moveLines(list, from, to, session) {
   }
   const cards = list.filter((l) => !itemByCardId(l.card)).map((l) => l.card);
   if (cards.length) await markSeen(to, cards, session);
+  const moved = list.map((l) => itemByCardId(l.card)).filter(Boolean);
+  if (moved.length) {
+    await logItems(moved.flatMap((t) => [
+      { user: from, type: t.key, delta: -1, source: 'handel', meta },
+      { user: to, type: t.key, delta: 1, source: 'handel', meta },
+    ]), session);
+  }
 }
 
 /**
@@ -468,8 +478,8 @@ async function buy({ user, tradeId }) {
       const iPay = money.payer.equals(user._id);
       await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: iPay ? 'Dein Guthaben reicht dafür nicht aus.' : `${trade.sellerName} hat nicht mehr genug Guthaben.` }, session);
     }
-    await moveLines(trade.give, trade.seller, user._id, session);
-    await moveLines(want, user._id, trade.seller, session);
+    await moveLines(trade.give, trade.seller, user._id, session, { trade: trade._id });
+    await moveLines(want, user._id, trade.seller, session, { trade: trade._id });
 
     Object.assign(trade, {
       want,
@@ -527,8 +537,8 @@ async function accept({ user, tradeId, version }) {
       const other = role === 'to' ? trade.sellerName : trade.toName;
       await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: iPay ? 'Dein Guthaben reicht dafür nicht aus.' : `${other} hat nicht mehr genug Guthaben.` }, session);
     }
-    await moveLines(give, trade.seller, trade.to, session);
-    await moveLines(want, trade.to, trade.seller, session);
+    await moveLines(give, trade.seller, trade.to, session, { trade: trade._id });
+    await moveLines(want, trade.to, trade.seller, session, { trade: trade._id });
 
     Object.assign(trade, {
       give,

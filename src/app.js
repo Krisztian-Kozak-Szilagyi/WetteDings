@@ -43,6 +43,9 @@ function createApp() {
     })
   );
   app.use(compression());
+  // Cursor-Bilder immer lange zwischenspeichern: sonst zeigt der Browser nach jedem Seitenwechsel kurz den System-Cursor,
+  // bis das Bild neu geprüft ist
+  app.use('/img/cursors', express.static(path.join(__dirname, '..', 'public', 'img', 'cursors'), { maxAge: '30d' }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
   app.use(require('./routes/cardImage')); // Rahmen-Karten als SVG, ebenfalls ohne Session
   app.use(require('./routes/achievementImage')); // Symbole der Erfolge als SVG
@@ -191,9 +194,11 @@ function createApp() {
         bellNotes: bell.list,
         bellUnread: bell.unread,
         achPopup,
-        achPopupBack: req.originalUrl,
         giftPopup,
       });
+      // Ohne JavaScript führt "Weiter" im Erfolgs-/Geschenk-Fenster auf diese Seite zurück. Das Ziel steht in der
+      // Sitzung statt in einem Formularfeld, damit niemand eine fremde Adresse unterschieben kann (CodeQL #74).
+      if ((achPopup || giftPopup) && req.method === 'GET') req.session.popupBack = req.originalUrl;
     }
     next();
   });
@@ -216,6 +221,7 @@ function createApp() {
   app.use(require('./routes/dungeon'));
   app.use(require('./routes/trade'));
   app.use(require('./routes/grading'));
+  app.use(require('./routes/deck'));
 
   app.use((req, res) => {
     res.status(404).render('error', {

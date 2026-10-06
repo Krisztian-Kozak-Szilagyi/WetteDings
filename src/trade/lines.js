@@ -105,11 +105,20 @@ function termsText(t) {
 const countText = (lines) => `${lines.length} ${lines.length === 1 ? 'Karte' : 'Karten'}`;
 
 /**
- * Altes Angebot (eine Karte, optional eine Wunschkarte) in Positionen umwandeln.
+ * Altes Angebot in Positionen umwandeln – zwei Vorformen: eine Karte (card, optional wantCard) und der Tausch
+ * mit give/take aus der ersten Umsetzung von #76 (cardDoc dort nur Platzhalter, beim Tausch nichts gesperrt,
+ * bewegte Exemplare in giveDocs/takeDocs). Erkennbar am Feld card, das es im neuen Format nicht mehr gibt.
  * Gibt das Update für die Migration zurück – oder null, wenn das Angebot schon umgestellt ist.
  */
 function migrateTradeDoc(old) {
-  if (old.give || !old.card) return null;
+  if (!old.card) return null;
+  const unset = { card: 1, cardDoc: 1, foiledAt: 1, grade: 1, wantCard: 1, wantCopy: 1, wantCardDoc: 1, wantFoiledAt: 1, wantGrade: 1, take: 1, giveDocs: 1, takeDocs: 1 };
+  if (Array.isArray(old.take)) {
+    const line = (docs) => (l, i) => ({ card: l.card, copy: l.copy || null, doc: (docs && docs[i]) || null, foiledAt: l.foiledAt || null, grade: l.grade == null ? null : l.grade });
+    const $set = { give: (old.give || []).map(line(old.giveDocs)), want: old.take.map(line(old.takeDocs)) };
+    if (old.status === 'verkauft' && !old.buyer && old.to) $set.buyer = old.to;
+    return { $set, $unset: unset }; // nichts war gesperrt – belegt wird beim Annehmen
+  }
   const give = [{ card: old.card, copy: null, doc: old.cardDoc || null, foiledAt: old.foiledAt || null, grade: old.grade == null ? null : old.grade }];
   const want = old.kind === 'tausch' && old.wantCard
     ? [{ card: old.wantCard, copy: old.wantCopy || null, doc: old.wantCardDoc || null, foiledAt: old.wantFoiledAt || null, grade: old.wantGrade == null ? null : old.wantGrade }]
@@ -121,10 +130,7 @@ function migrateTradeDoc(old) {
   if (old.status === 'offen' && old.cardDoc) $set.lockDocs = [old.cardDoc];
   // Beim Verkauf ist der Empfänger bzw. Käufer die Gegenseite (Tausch hatte buyer schon = to)
   if (old.status === 'verkauft' && !old.buyer && old.to) $set.buyer = old.to;
-  return {
-    $set,
-    $unset: { card: 1, cardDoc: 1, foiledAt: 1, grade: 1, wantCard: 1, wantCopy: 1, wantCardDoc: 1, wantFoiledAt: 1, wantGrade: 1 },
-  };
+  return { $set, $unset: unset };
 }
 
 module.exports = {

@@ -82,7 +82,7 @@ async function wealth(user) {
     ]),
   ]);
   const mine = list.find((r) => r._id.equals(user._id));
-  const me = mine || { balance: user.balance, inPlay: 0, coinValue: 0, cardValue: 0, total: user.balance };
+  const me = mine || { balance: user.balance, inPlay: 0, coinValue: 0, cardValue: 0, shopValue: 0, total: user.balance };
   // Platz nur unter den Spielern – das Team ist nicht in der Wertung
   const ranked = list.filter((r) => !r.team);
   const i = ranked.findIndex((r) => r._id.equals(user._id));
