@@ -3,6 +3,7 @@
 const Bet = require('../models/Bet');
 const User = require('../models/User');
 const { collectRefs } = require('./render');
+const avatars = require('../profile/avatars');
 
 /**
  * Wetten zeigen nur, was alle Mitglieder sehen dürfen: keine Gruppen-Wetten und keine offenen Duell-Anfragen
@@ -12,11 +13,12 @@ async function loadEmbeds(bodies) {
   const { bets, names } = collectRefs(bodies.filter(Boolean));
   const [betDocs, users] = await Promise.all([
     bets.length ? Bet.find({ _id: { $in: bets }, group: null, 'duel.state': { $ne: 'angefragt' } }).select('title status options.total duel.state').lean() : [],
-    names.length ? User.find({ usernameLower: { $in: names }, deletedAt: null }).select('username usernameLower').lean() : [],
+    names.length ? User.find({ usernameLower: { $in: names }, deletedAt: null }).select('username usernameLower avatar').lean() : [],
   ]);
   return {
     bets: new Map(betDocs.map((b) => [String(b._id), { title: b.title, status: b.status, pot: (b.options || []).reduce((s, o) => s + (o.total || 0), 0), duel: !!b.duel }])),
     users: new Map(users.map((u) => [u.usernameLower, u.username])),
+    avatars: new Map(users.map((u) => [u.usernameLower, avatars.urlOf(u.avatar)])), // Profilbild je Name (klein)
   };
 }
 
