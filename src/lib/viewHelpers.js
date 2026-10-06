@@ -143,7 +143,7 @@ const ledgerLabels = {
   handel_verkauf: 'Karte verkauft (Handel)',
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
-  black_market: 'Karte gekauft (Black Market)',
+  black_market: 'Gekauft (Black Market)', // Karte oder Gegenstand – was genau, steht im Buchungstext
   konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
   grading_lohn: 'Grading-Auftrag erledigt',
   grading_ausbau: 'Grading-Shop ausgebaut',

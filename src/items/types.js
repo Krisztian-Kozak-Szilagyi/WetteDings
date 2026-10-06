@@ -19,7 +19,7 @@ const CATEGORIES = [
 ];
 
 // Woher ein Gegenstand kommt / wohin er geht (Item.source, ItemLog.source)
-const SOURCES = ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren'];
+const SOURCES = ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren', 'blackmarket'];
 
 const ITEM_TYPES = [
   {

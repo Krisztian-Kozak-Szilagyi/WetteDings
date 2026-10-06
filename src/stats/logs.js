@@ -186,15 +186,16 @@ async function packLog(query, { player = null, all = false } = {}) {
   return { ...pg, rows: docs.map(packRow) };
 }
 
-// ---------- Verkäufe an die Bank, verkaufte Gegenstände, Black-Market-Käufe ----------
+// ---------- Verkäufe an die Bank, verkaufte Gegenstände, Black-Market-Käufe (Karten und Gegenstände) ----------
 
 /** Eine Buchung als Zeile; name = Spielername */
 function sellRow(l, name) {
   const m = l.meta || {};
   let items;
   if (l.type === 'tcg_verkauf') items = cardSummary(m.cards);
-  else if (l.type === 'black_market') items = m.card ? cardSummary([{ card: m.card, rarity: m.rarity }]) : [];
+  else if (l.type === 'black_market' && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
   else {
+    // verkaufter Gegenstand oder Gegenstand aus dem Black Market (meta.item)
     const t = itemService.itemTypeByKey[m.item];
     items = t ? [{ label: `${t.label} (Gegenstand)`, rarity: 'item', count: m.count || 1 }] : [];
   }

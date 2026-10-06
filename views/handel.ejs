@@ -51,16 +51,20 @@
   </<%= bm.open ? 'summary' : 'div' %>>
   <% if (bm.open) { %>
     <div class="bm-grid">
-      <% bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; const n = coll.counts[c.id] || 0; %>
-        <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
+      <%
+        // Angebot: Karte (auch Bosskarte, Seltenheit "boss") oder Gegenstand wie die Folie (card "item:folie", Seltenheit "item");
+        // alte Tagesdokumente ohne kind sind Karten
+        bm.offers.forEach((o, i) => { const c = cardInfo(o.card); const isItem = o.kind === 'gegenstand' || !!c.isItem; const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; const n = coll.counts[c.id] || 0; const value = isItem ? c.sell || 0 : r.sell || 0;
+      %>
+        <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %><%= isItem ? ' is-item' : '' %>">
           <button type="button" class="bm-card r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
-            data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= n %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+            data-sell-text="<%= euro(value) %>" data-owned="<%= n %>"<% if (isItem) { %> data-meta-text="Gegenstand · Bank zahlt <%= euro(value) %> · landet im Inventar"<% } %> aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
             <img src="<%= c.image %>" alt="" width="720" height="1008">
             <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
           </button>
           <div class="bm-info">
-            <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' : 'Fehlt dir' %></span></span>
-            <span class="bm-price"><strong><%= euro(o.price) %></strong><span>Wert <%= euro(r.sell || 0) %></span></span>
+            <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><% if (!isItem) { %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' : 'Fehlt dir' %></span><% } %></span>
+            <span class="bm-price"><strong><%= euro(o.price) %></strong><span><%= isItem ? 'Bank zahlt' : 'Wert' %> <%= euro(value) %></span></span>
             <% if (sold) { %>
               <span class="muted small">an <%- userLink(o.buyerName) %></span>
             <% } else { %>
