@@ -138,7 +138,7 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
@@ -146,6 +146,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     needsSub('moderation', 'meldungen') ? openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
+    needsSub('moderation', 'auffaelligkeiten') ? suspicionService.precision() : [],
     needs('team') ? listActiveCodes() : [],
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
@@ -181,6 +182,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     reports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
+    suspicionPrecision: precision, // Trefferquote je Muster (Urteile bestätigt/Fehlalarm)
     bans: bans.map((b) => ({ ...b, canUnban: isAdmin || String(b.bannedBy) === String(me._id) })),
     bannable: needs('moderation') ? bannableFor(me, users) : [],
     banPreselect: typeof req.query.ban === 'string' ? req.query.ban : '',
@@ -295,15 +297,24 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 });
 
 // ---------- Auffälligkeiten (Manipulationserkennung): Hinweise abhaken (Admin und Devs) ----------
-// "Alle erledigt" je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt)
+// Urteil (bestätigt/Fehlalarm) erledigt zugleich und zählt für die Trefferquote je Muster.
+const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
+
+// Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
 router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
-  await suspicionService.setDoneMany(ids, true, req.user);
+  const verdict = verdictOf(req.body.action);
+  if (verdict) for (const id of ids) await suspicionService.setVerdict(id, verdict, req.user);
+  else await suspicionService.setDoneMany(ids, true, req.user);
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
 router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 

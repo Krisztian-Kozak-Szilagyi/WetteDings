@@ -1,5 +1,6 @@
 // Rangliste nach Gesamtvermögen – und die Zeit, die ein Mitglied auf Platz 1 verbracht hat
 const User = require('../models/User');
+const RankStint = require('../models/RankStint');
 const markets = require('../coin/markets');
 const tcgSettings = require('../tcg/settings');
 const { sellValueExpr } = require('../tcg/tcgService');
@@ -7,6 +8,10 @@ const config = require('../config');
 
 const TICK_MS = 60 * 1000; // so oft wird Platz 1 geprüft
 const MAX_GAP_MS = 5 * 60 * 1000; // längere Pausen (Neustart, Ausfall) zählen nicht als Zeit auf Platz 1
+// Per Handel bekommene Karten zählen für die Platzierung so viele Tage höchstens mit dem, was man dafür gegeben hat
+// (TcgCard.tradedCost) – eine geschenkte oder billig weitergereichte teure Karte bringt niemanden auf Platz 1
+const FRESH_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ---------- Team (Admin und Devs) ----------
 // Das Team spielt mit, zählt aber nicht in der Rangliste und nicht in der Wirtschaft (Statistik): Seine Konten
@@ -23,6 +28,8 @@ const teamIds = () => User.distinct('_id', { $or: [{ role: 'dev' }, { usernameLo
  * Alle Mitglieder nach Gesamtvermögen, bestes zuerst – ohne das Team; mit team: true auch das Team (Feld team). Gesamtvermögen = Kontostand + offene Einsätze + Wert der
  * Broker-Bestände (Coins, ETF) zum aktuellen Kurs + Verkaufswert der TCG-Karten (inkl. ungeöffneter Packs zum Packpreis)
  * + Wert des Grading-Shops (Hälfte der Ausbaukosten, gradingService.shopValue).
+ * Sortiert wird nach rankTotal = total − fresh: fresh ist der Mehrwert frisch gehandelter Karten über dem, was dafür
+ * gegeben wurde (FRESH_DAYS). Statistiken der Wirtschaft nutzen weiter total.
  */
 function ranking({ limit = 0, team = false, userId = null } = {}) {
   // Cent je Einheit (1e-8) für jeden laufenden Broker-Wert
@@ -31,6 +38,7 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
   const centsPerUnit = branches.length ? { $switch: { branches, default: 0 } } : 0;
   // erst hier laden: gradingService zieht viele Module nach sich
   const shopValues = require('../grading/gradingService').shopValues();
+  const freshSince = new Date(Date.now() - FRESH_DAYS * DAY_MS);
   const pipeline = [
     // gelöschte Konten erscheinen nicht, das Team nur auf Wunsch; mit userId nur dieses Mitglied (Profil-Statistik)
     { $match: { deletedAt: null, ...(team ? {} : notTeam()), ...(userId ? { _id: userId } : {}) } },
@@ -59,7 +67,7 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
         let: { uid: '$_id' },
         pipeline: [
           { $match: { $expr: { $eq: ['$user', '$$uid'] } } },
-          { $group: { _id: null, s: { $sum: sellValueExpr() } } },
+          { $group: { _id: null, s: { $sum: sellValueExpr() }, fresh: { $sum: freshExcessExpr(freshSince) } } },
         ],
         as: 'cards',
       },
@@ -78,12 +86,27 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
         },
       },
     },
-    { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] } } },
-    { $sort: { total: -1, createdAt: 1 } },
-    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
+    { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] }, fresh: { $ifNull: [{ $first: '$cards.fresh' }, 0] } } },
+    { $addFields: { rankTotal: { $subtract: ['$total', '$fresh'] } } },
+    { $sort: { rankTotal: -1, createdAt: 1 } },
+    { $project: { username: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, fresh: 1, rankTotal: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
   ];
   if (limit) pipeline.push({ $limit: limit });
   return User.aggregate(pipeline);
+}
+
+/**
+ * MongoDB-Ausdruck je Karte: Mehrwert über dem Anschaffungswert, wenn sie seit since per Handel kam (sonst 0).
+ * Karten ohne tradedAt (aus Packs, Dungeon, Duell oder vor dieser Regel gehandelt) zählen voll.
+ */
+function freshExcessExpr(since) {
+  return {
+    $cond: [
+      { $and: [{ $gt: ['$tradedAt', since] }, { $ne: [{ $type: '$tradedCost' }, 'missing'] }] },
+      { $max: [0, { $subtract: [sellValueExpr(), '$tradedCost'] }] },
+      0,
+    ],
+  };
 }
 
 // ---------- Zeit auf Platz 1 ----------
@@ -95,8 +118,24 @@ async function trackTop1(now = Date.now()) {
   const first = !lastTick;
   lastTick = now;
   if (first || gap <= 0 || gap > MAX_GAP_MS) return;
-  const [top] = await ranking({ limit: 1 });
-  if (top) await User.updateOne({ _id: top._id }, { $inc: { top1Seconds: Math.round(gap / 1000) } }, { timestamps: false });
+  const [top, second] = await ranking({ limit: 2 });
+  if (!top) return;
+  await User.updateOne({ _id: top._id }, { $inc: { top1Seconds: Math.round(gap / 1000) } }, { timestamps: false });
+  await recordStint(top, second, now);
+}
+
+/**
+ * Abschnitt auf Platz 1 festhalten (Manipulationserkennung "Platz 1 mit geliehenem Wert"): Der letzte Abschnitt wird
+ * verlängert, wenn er demselben Spieler gehört und nicht zu lange her ist, sonst beginnt ein neuer.
+ */
+async function recordStint(top, second, now = Date.now()) {
+  const lead = Math.max(0, Math.round(top.rankTotal - (second ? second.rankTotal : 0)));
+  const last = await RankStint.findOne().sort({ to: -1 }).select('user to').lean();
+  if (last && last.user.equals(top._id) && now - last.to.getTime() <= MAX_GAP_MS) {
+    await RankStint.updateOne({ _id: last._id }, { $set: { to: new Date(now) }, $min: { minLead: lead } });
+  } else {
+    await RankStint.create({ user: top._id, from: new Date(now), to: new Date(now), minLead: lead });
+  }
 }
 
 /**
@@ -116,4 +155,4 @@ function top1Text(seconds) {
   return parts.join(' ');
 }
 
-module.exports = { ranking, isTeam, notTeam, teamIds, trackTop1, top1Text, TICK_MS };
+module.exports = { ranking, isTeam, notTeam, teamIds, trackTop1, recordStint, top1Text, TICK_MS, FRESH_DAYS };

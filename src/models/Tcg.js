@@ -14,6 +14,10 @@ const cardSchema = new Schema(
     // gebunden. Sichtbar nur auf der Folie. select: false – wird nur geladen, wenn ausdrücklich angefordert
     // (z. B. .select('condition.grade')), damit er nie versehentlich in Seiten oder JSON landet.
     condition: { type: conditionSchema, select: false, default: () => rollCondition() },
+    // Zuletzt per Handel bekommen (rankService.FRESH_DAYS): so lange zählt das Exemplar in der Rangliste höchstens mit
+    // tradedCost, dem Anteil dessen, was der Empfänger dafür gegeben hat – eine geschenkte Karte bringt niemanden auf Platz 1
+    tradedAt: { type: Date, default: undefined },
+    tradedCost: { type: Number, default: undefined }, // Cent
     lastClaimedAt: { type: Date }, // zuletzt für Quest/Handel beansprucht – nur Schreibzugriff gegen gleichzeitige Verkäufe, nicht die Sperre selbst (siehe tcg/locks)
   },
   { timestamps: true }

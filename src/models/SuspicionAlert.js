@@ -7,7 +7,7 @@ const suspicionAlertSchema = new Schema(
   {
     // pro Muster und Konto genau ein Hinweis, z. B. "takt:oeffnen:<userId>" oder "wert:<a>:<b>"
     key: { type: String, required: true, unique: true },
-    kind: { type: String, enum: ['tempo', 'takt', 'ihk', 'scalping', 'wert', 'dungeon', 'grading', 'dauer', 'browser', 'ertrag', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'], required: true },
+    kind: { type: String, enum: ['tempo', 'takt', 'ihk', 'scalping', 'wert', 'dungeon', 'grading', 'dauer', 'browser', 'ertrag', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel', 'kreislauf', 'rang', 'netz', 'markt'], required: true },
     action: { type: String, default: null }, // bei tempo/takt: kaufen | oeffnen | verkaufen | broker | wetten
     users: { type: [Schema.Types.ObjectId], required: true },
     level: { type: Number, required: true }, // 2 = wahrscheinlich, 1 = möglich (wie bei den Mehrfach-Konten)
@@ -18,10 +18,16 @@ const suspicionAlertSchema = new Schema(
     // als erledigt markiert; neue Belege danach oder eine höhere Stufe öffnen den Hinweis wieder
     doneAt: { type: Date, default: null },
     doneByName: { type: String, default: null },
+    // Urteil beim Erledigen: bestätigt (war Manipulation) oder Fehlalarm – Grundlage für die Trefferquote je Muster.
+    // Hinweise mit Urteil bleiben länger erhalten (suspicionService.KEEP_VERDICT_DAYS).
+    verdict: { type: String, enum: ['bestaetigt', 'fehlalarm', null], default: null },
+    verdictByName: { type: String, default: null },
+    verdictAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
 suspicionAlertSchema.index({ doneAt: 1, level: -1, evidenceAt: -1 });
 suspicionAlertSchema.index({ users: 1 });
+suspicionAlertSchema.index({ verdictAt: -1 });
 
 module.exports = model('SuspicionAlert', suspicionAlertSchema);
