@@ -30,6 +30,8 @@
   };
 
   var HEAD = { x: 836, y: 412 }; // Kopfbruststück in Ruhe
+  var BOSS_SCALE = 0.8;
+  var BOSS_PIVOT = [836, 600];
 
   // Beine: Hüfte relativ zum Kopf, Knie und Fuß in Ruhe (daraus die Längen); depth 0 = vorn, 3 = hinten
   var LEGS = [
@@ -402,6 +404,10 @@
     var scale = canvas.width / W;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    // Spinne etwas kleiner, damit Lebensbalken, Hand und Deck sie nicht verdecken (Mittelpunkt bleibt im Raum)
+    ctx.translate(BOSS_PIVOT[0], BOSS_PIVOT[1]);
+    ctx.scale(BOSS_SCALE, BOSS_SCALE);
+    ctx.translate(-BOSS_PIVOT[0], -BOSS_PIVOT[1]);
 
     if (!still) updateTap(t);
     // Körper wiegt leicht und hebt/senkt sich, die Füße bleiben stehen

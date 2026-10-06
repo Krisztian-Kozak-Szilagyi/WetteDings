@@ -21,3 +21,212 @@ html, body.bf-body {
   height: 100%;
   display: block;
 }
+
+/* ---------- Oberfläche (über dem Bossraum, am Fenster ausgerichtet) ---------- */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+.bf-hud {
+  --card-h: clamp(130px, 25vh, 230px);
+  --card-w: calc(var(--card-h) * 63 / 88);
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #e9e4f5;
+  user-select: none;
+}
+
+/* Lebensbalken: Füllung springt, die helle Spur dahinter läuft langsam nach */
+.bf-hp {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(8, 6, 12, .75);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 4px 14px rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+.bf-hp-fill, .bf-hp-lag {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  border-radius: inherit;
+}
+.bf-hp-fill {
+  background: linear-gradient(180deg, #ff5a4f, #c2201a 55%, #8e1210);
+  transition: width .25s ease-out;
+}
+.bf-hp-lag {
+  background: #f3d9a0;
+  transition: width .6s ease-in .45s;
+}
+.bf-hp-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+}
+.bf-hp.bf-hit { animation: bf-shake .3s; }
+@keyframes bf-shake {
+  20% { transform: translateX(-4px); }
+  45% { transform: translateX(4px); }
+  70% { transform: translateX(-2px); }
+}
+
+/* Boss oben */
+.bf-boss {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  width: min(62vw, 640px);
+  transform: translateX(-50%);
+  text-align: center;
+}
+.bf-boss-name {
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #d8cff0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .9);
+}
+.bf-hp-boss { height: 20px; }
+.bf-hp-boss .bf-hp-fill { background: linear-gradient(180deg, #b24bd8, #6d1f9a 55%, #48106a); }
+.bf-hp-boss .bf-hp-text { font-size: 12px; }
+
+/* Spieler unten links */
+.bf-player {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  width: 170px;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+.bf-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: #1b1622;
+  box-shadow: 0 0 0 3px rgba(217, 164, 65, .8), 0 8px 20px rgba(0, 0, 0, .6);
+}
+.bf-player-name {
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
+}
+.bf-hp-player { width: 100%; }
+
+/* Deck rechts */
+.bf-deck {
+  position: absolute;
+  right: 26px;
+  bottom: 22px;
+  width: var(--card-w);
+  height: var(--card-h);
+}
+.bf-deck-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: #1b1622 url('/img/tcg-backs/season-1.webp') center / cover;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .6), inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+.bf-deck-card:nth-child(1) { transform: translate(6px, 6px); }
+.bf-deck-card:nth-child(2) { transform: translate(3px, 3px); }
+.bf-deck[data-leer] .bf-deck-card { opacity: .15; }
+.bf-deck-count {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #2a2036;
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, .8), 0 4px 10px rgba(0, 0, 0, .6);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Hand unten Mitte: Karten liegen per JS im Fächer, fliegen vom Deck herein und drehen sich dabei um */
+.bf-hand { position: absolute; inset: 0; }
+.bf-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--card-w);
+  height: var(--card-h);
+  pointer-events: auto;
+  perspective: 900px;
+  transition: transform .55s cubic-bezier(.2, .8, .25, 1);
+  will-change: transform;
+}
+.bf-card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform .5s ease .1s, translate .15s ease;
+}
+.bf-card.bf-flipped .bf-card-inner { transform: rotateY(180deg); }
+.bf-card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .65), inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.bf-card-back { background: #1b1622 url('/img/tcg-backs/season-1.webp') center / cover; transform: rotateY(180deg); }
+.bf-card-front {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(217, 164, 65, .18), transparent 60%),
+    linear-gradient(180deg, #2b2236, #15111b);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .65), inset 0 0 0 2px rgba(217, 164, 65, .55);
+}
+.bf-card-cost {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #6fb6ff, #1d4f9a);
+  box-shadow: 0 0 0 2px #0d0b14;
+  font-size: 14px;
+  font-weight: 800;
+}
+.bf-card-art {
+  flex: 1;
+  margin: 14px 0 8px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .35);
+  font-size: calc(var(--card-h) * .2);
+}
+.bf-card-name { font-size: 13px; font-weight: 800; text-align: center; }
+.bf-card-text { margin-top: 3px; font-size: 11px; color: #b9b0cc; text-align: center; }
+/* Karte unter der Maus hebt sich aus dem Fächer */
+.bf-card:hover { z-index: 50 !important; }
+.bf-card:hover .bf-card-inner { translate: 0 -28px; }
+
+@media (max-width: 700px) {
+  .bf-player { width: 120px; left: 12px; bottom: 12px; }
+  .bf-avatar { width: 56px; height: 56px; }
+  .bf-deck { right: 14px; bottom: 14px; }
+}

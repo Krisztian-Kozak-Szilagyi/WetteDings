@@ -6,13 +6,43 @@
   <title><%= title %> · <%= appName %></title>
   <meta name="theme-color" content="#0d0b14">
   <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
+  <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
 </head>
-<%# Bosskampf – Vollbild ohne Navigation und Fußzeile: Bossraum (Hintergrundbild) + Boss auf dem Canvas (public/js/bossfight.js). Esc = zurück %>
+<%# Bosskampf – Vollbild ohne Navigation und Fußzeile: Bossraum (Hintergrundbild) + Boss auf dem Canvas (public/js/bossfight.js),
+    darüber die Oberfläche: Boss-Leben oben, Spieler unten links, Deck rechts, Hand unten Mitte (public/js/bossfight-hud.js). Esc = zurück %>
 <body class="bf-body">
   <div class="bf-stage">
     <canvas class="bf-canvas" data-boss-canvas aria-label="Riesige Höhlenspinne"></canvas>
   </div>
+
+  <div class="bf-hud">
+    <section class="bf-boss" aria-label="Boss">
+      <div class="bf-boss-name">Höhlenspinne</div>
+      <div class="bf-hp bf-hp-boss" data-bf-hp="boss" data-max="200">
+        <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
+        <span class="bf-hp-text"></span>
+      </div>
+    </section>
+
+    <section class="bf-player" aria-label="Spieler">
+      <img class="bf-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="84" height="84">
+      <div class="bf-player-name"><%= currentUser.username %></div>
+      <div class="bf-hp bf-hp-player" data-bf-hp="player" data-max="100">
+        <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
+        <span class="bf-hp-text"></span>
+      </div>
+    </section>
+
+    <section class="bf-deck" data-bf-deck aria-label="Deck">
+      <span class="bf-deck-card"></span><span class="bf-deck-card"></span><span class="bf-deck-card"></span>
+      <span class="bf-deck-count" data-bf-deck-count></span>
+    </section>
+
+    <div class="bf-hand" data-bf-hand></div>
+  </div>
+
   <script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/bossfight-hud.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>
