@@ -1,0 +1,36 @@
+<%- include('partials/head') %>
+<link rel="stylesheet" href="/css/deck.css?v=<%= assetVersion %>">
+<%# Deckbau – nur der Rahmen; Karten, Deck, Ziehen und Speichern macht public/js/deck.js über /api/deck %>
+<div class="dk-page" data-deck-app>
+  <form action="/api/deck" method="post" data-deck-form hidden>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="id" value="">
+    <input type="hidden" name="karten" value="">
+  </form>
+
+  <div class="dk-board">
+    <section class="dk-pool">
+      <header class="dk-pool-head">
+        <h1>Deckbau</h1>
+        <span class="dk-pool-hint">Karte ins Deck ziehen oder anklicken</span>
+      </header>
+      <p class="dk-empty" data-deck-empty hidden>Du hast noch keine Karten.</p>
+      <ul class="dk-pool-list" data-deck-pool></ul>
+    </section>
+
+    <aside class="dk-deck" data-deck-drop>
+      <div class="dk-deck-head">
+        <input class="dk-name" type="text" maxlength="30" placeholder="Mein Deck" aria-label="Deckname" data-deck-name>
+        <span class="dk-gem" data-deck-count><b>0</b><small>/ 30</small></span>
+      </div>
+      <div class="dk-meter" aria-hidden="true"><span data-deck-meter></span></div>
+      <ul class="dk-deck-list" data-deck-list></ul>
+      <p class="dk-drop-hint" data-deck-hint>Karten hierher ziehen</p>
+      <p class="dk-error" data-deck-error hidden></p>
+      <button type="button" class="dk-save" data-deck-save disabled>Speichern</button>
+    </aside>
+  </div>
+</div>
+
+<script src="/js/deck.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

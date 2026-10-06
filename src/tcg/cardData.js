@@ -9,6 +9,8 @@
 //   stats:   [Speed, FIA, FIS, BWL]
 //   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
+//   kampf:   Kampfwerte für den kommenden Kampfmodus (eigener Block, getrennt von den IHK-Werten in stats).
+//            Die Felder legen wir mit den Spielregeln fest.
 module.exports = {
   'st-ivan-boss': {
     season: 'season-1',
