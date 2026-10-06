@@ -139,6 +139,10 @@ test('Formular des Handelsfensters lesen', () => {
   assert.equal(trade.parseOfferForm({ [`gib:${A}`]: '0' }).gives.length, 0);
   assert.equal(trade.parseOfferForm({ [`gib:${A}`]: '999' }).gives.length, trade.MAX_LINES + 1); // gekappt, validateOffer meldet "Höchstens"
   rejects(() => trade.parseOfferForm({ geld_gib: '5', geld_will: '5' }), /eine Richtung/);
+  // Karten-IDs wie "__proto__" sind nur Text – kein Eingriff in Objekt-Prototypen (CodeQL #77, #78)
+  const odd = trade.parseOfferForm(JSON.parse('{"gib:__proto__":"2","gib":["__proto__","toString"]}'));
+  assert.deepEqual(odd.gives, [{ card: '__proto__' }, { card: '__proto__' }, { card: '__proto__' }, { card: 'toString' }]);
+  assert.equal({}.polluted, undefined);
   rejects(() => trade.parseOfferForm({ geld_gib: 'abc' }), /Betrag/);
 });
 
