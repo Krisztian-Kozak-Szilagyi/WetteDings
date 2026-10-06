@@ -106,7 +106,7 @@ test('Start (#111): nur wer in der Lobby einen Charakter gewählt hat, ist dabei
   ] };
   const { players, dropped } = d.splitPlayers([party, { members: [{ user: 'c', name: 'C', card: null, joinedAt: at }] }]);
   assert.deepEqual(players.map((m) => m.user), ['a']);
-  assert.ok(!('joinedAt' in players[0]));
+  assert.equal(players[0].joinedAt, at); // Anmeldezeit bleibt im Durchlauf (Manipulationserkennung)
   assert.deepEqual(dropped, ['b', 'c']);
   assert.deepEqual(d.splitPlayers([]), { players: [], dropped: [] });
 });

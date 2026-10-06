@@ -9,6 +9,7 @@ const euro = (cents) => euroFmt.format((cents || 0) / 100);
 
 const SEC = 1000;
 const MIN = 60 * SEC;
+const HOUR = 60 * MIN;
 
 // ---------- Schwellen (bei Bedarf hier nachjustieren) ----------
 
@@ -20,6 +21,7 @@ const ACTIONS = {
   oeffnen: { label: 'Pack-Öffnungen', floorMs: 1500, log: 'packs' },
   verkaufen: { label: 'Bank-Verkäufe', floorMs: 800, log: 'verkauf' },
   broker: { label: 'Broker-Aufträge', floorMs: 1000, log: 'broker' },
+  wetten: { label: 'Wett-Einsätze', floorMs: 1500, log: 'einsaetze' },
 };
 
 const TEMPO_RUN = 5; // so viele Abstände in Folge unter der Untergrenze
@@ -51,7 +53,81 @@ const VALUE_SHARE = 0.2; // die andere Seite ist weniger als 20 % davon wert
 const VALUE_STRONG_CENTS = 50000; // ab 500 € insgesamt verschoben
 const VALUE_STRONG_COUNT = 3; // oder ab so vielen Geschäften zwischen denselben Konten
 
-const KIND_LABEL = { tempo: 'Tempo', takt: 'Takt', ihk: 'IHK sekundengenau', scalping: 'Broker-Scalping', wert: 'Wertverschiebung' };
+const DUNGEON_MIN_RUNS = 6; // so viele Durchläufe braucht es für eine Aussage
+const DUNGEON_JOIN_MS = MIN; // Median: angemeldet so kurz, nachdem die Anmeldung für den Termin aufging
+const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts)
+const DUNGEON_UNSEEN_SHARE = 0.8; // Beute so oft nie angeschaut (die Seite meldet das beim Ansehen)
+const DUNGEON_NIGHT = 2; // so viele Termine zwischen 0 und 6 Uhr machen schnelles Anmelden wahrscheinlich
+
+const GRADING_MIN_JOBS = 6;
+const GRADING_EXCESS_MS = 4 * SEC; // Median: fertig gemeldet so kurz nach der Mindestzeit (Putzen, Drehen, Benoten dauern)
+const GRADING_EXCESS_STRONG_MS = 1500;
+const GRADING_PERFECT_SHARE = 0.9; // und dabei fast immer perfekt geputzt und versiegelt
+
+const AWAKE_GAP_MS = 3 * HOUR; // längere Pause = geschlafen
+const AWAKE_MS = 20 * HOUR; // so lange ohne solche Pause aktiv …
+const AWAKE_STRONG_MS = 30 * HOUR;
+const AWAKE_NIGHT_HOURS = 3; // … und dabei in mindestens so vielen Nachtstunden (0–6 Uhr)
+
+const BROWSER_MIN = 10; // so viele Aktionen ohne Fingerabdruck und ohne Browser-Kopfzeilen
+const BROWSER_SHARE = 0.5; // und mindestens dieser Anteil aller Spiel-Aktionen
+const BROWSER_NOPROBE_MIN = 20; // nur ohne Fingerabdruck (die Seite lief ohne JavaScript): schwächer
+
+const REACT_MIN = 20; // so viele gemessene Reaktionszeiten braucht es
+const REACT_FAST_SHARE = 0.5; // so viele davon unter 0,4 s
+const REACT_SPREAD = 0.05; // Abweichung vom Median unter 5 %: feste Pause
+const REACT_MAX_MEDIAN = 15 * SEC; // gleichmäßig zählt nur bei schnellen Aktionen
+const REACT_REUSED = 5; // Seiten-Kennzeichen so oft wiederverwendet
+const NO_PAGE_MIN = 10; // so viele Aktionen ohne vorher geladene Seite …
+const NO_PAGE_SHARE = 0.5; // … und mindestens dieser Anteil
+
+const INPUT_MIN = 20; // so viele Aktionen mit Angabe der Eingaben
+const INPUT_NONE_SHARE = 0.8; // so viele davon ohne echte Eingabe
+const INPUT_SYNTHETIC = 10; // so viele mit künstlichen Klicks statt echter Eingabe
+
+const HOSTING_MIN = 3; // so viele Aktionen aus einem Rechenzentrum
+
+const PARALLEL_WINDOW_MS = 10 * MIN; // in dieser Zeit …
+const PARALLEL_SWITCHES = 3; // … so oft zwischen zwei Geräten und Netzen hin und her
+const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
+
+// ---------- Gesamtbewertung je Spieler (overallRating) ----------
+// Muster mit derselben Ursache bestätigen sich nicht gegenseitig (Tempo und Takt derselben Aktion; ein Skript löst
+// Browser, Reaktionszeit und Eingabe zugleich aus). Aussagekräftig ist Bestätigung aus verschiedenen Bereichen.
+const RATING_AREAS = {
+  verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer'] },
+  technik: { label: 'Technik', kinds: ['browser', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'] },
+  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
+};
+const RATING_POINTS = { 1: 1, 2: 3 }; // Punkte je Stufe des stärksten Hinweises im Bereich (möglich, wahrscheinlich)
+const RATING_EXTRA = 1; // jeder weitere Hinweis im selben Bereich
+const RATING_AREA_MAX = 5; // höchstens so viele Punkte je Bereich
+const RATING_FACTOR = { 1: 1, 2: 1.5, 3: 2 }; // Bonus, wenn Belege aus 2 bzw. 3 Bereichen kommen
+const STAGE = { beobachten: 1, verdacht: 2, stark: 3, eindeutig: 4 };
+const STAGE_LABEL = { 1: 'Beobachten', 2: 'Verdacht', 3: 'Starker Verdacht', 4: 'Eindeutig' };
+
+const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
+const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
+const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
+const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
+
+const KIND_LABEL = {
+  tempo: 'Tempo',
+  takt: 'Takt',
+  ihk: 'IHK sekundengenau',
+  scalping: 'Broker-Scalping',
+  wert: 'Wertverschiebung',
+  dungeon: 'Dungeon-Automatik',
+  grading: 'Grading zur Mindestzeit',
+  dauer: 'Rund um die Uhr',
+  browser: 'Kein normaler Browser',
+  ertrag: 'Ungewöhnliche Einnahmen',
+  reaktion: 'Reaktionszeit',
+  eingabe: 'Ohne echte Eingabe',
+  falle: 'Falle ausgelöst',
+  rechenzentrum: 'Aus einem Rechenzentrum',
+  parallel: 'Gleichzeitig von zwei Geräten',
+};
 
 // ---------- Hilfen ----------
 
@@ -86,6 +162,7 @@ function bursts(times, maxGap = BURST_GAP) {
   return out;
 }
 
+const hoursText = (ms) => `${Math.round(ms / HOUR)} Std.`;
 const seconds = (ms) => `${(ms / 1000).toLocaleString('de-DE', { maximumFractionDigits: ms < 10 * SEC ? 1 : 0 })} s`;
 const percent = (x) => `${Math.round(x * 100)} %`;
 
@@ -309,6 +386,458 @@ function valuePairFinding(items, names, flagged = false) {
   };
 }
 
+// ---------- Dungeon ----------
+
+/**
+ * Dungeon-Automatik: an jedem Termin dabei (auch nachts), immer sofort angemeldet, wenn die Anmeldung aufgeht, oder
+ * die Beute nie angeschaut. runs: [{ slot, joinedAt, seen, finished }] eines Mitglieds; intervalMs = Abstand der
+ * Termine, lockMs = so lange vor dem Start schließt die Anmeldung (danach gilt sie für den nächsten Termin).
+ */
+function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
+  const list = runs.filter((r) => r.slot).sort((x, y) => toMs(x.slot) - toMs(y.slot));
+  if (list.length < DUNGEON_MIN_RUNS) return null;
+  const slotMs = list.map((r) => toMs(r.slot));
+
+  // Anmelde-Verzögerung: Zeit zwischen Öffnen der Anmeldung und Anmeldung
+  const joined = list.filter((r) => r.joinedAt).map((r) => ({ at: toMs(r.slot), delay: Math.max(0, toMs(r.joinedAt) - (toMs(r.slot) - intervalMs - lockMs)) }));
+  const joinMs = joined.length >= DUNGEON_MIN_RUNS ? median(joined.map((j) => j.delay)) : null;
+  const joinHit = joinMs !== null && joinMs <= DUNGEON_JOIN_MS;
+
+  // längste Serie aufeinanderfolgender Termine ohne Lücke
+  let best = { from: slotMs[0], to: slotMs[0], count: 1 };
+  let cur = { ...best };
+  for (let i = 1; i < slotMs.length; i++) {
+    if (Math.abs(slotMs[i] - slotMs[i - 1] - intervalMs) < MIN) cur = { ...cur, to: slotMs[i], count: cur.count + 1 };
+    else cur = { from: slotMs[i], to: slotMs[i], count: 1 };
+    if (cur.count > best.count) best = { ...cur };
+  }
+  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS;
+
+  const finished = list.filter((r) => r.finished);
+  const unseen = finished.filter((r) => !r.seen);
+  const unseenHit = finished.length >= DUNGEON_MIN_RUNS && unseen.length / finished.length >= DUNGEON_UNSEEN_SHARE;
+  if (!joinHit && !streakHit && !unseenHit) return null;
+
+  const night = slotMs.filter((t) => {
+    const h = hourIn(t, timeZone);
+    return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
+  }).length;
+  const strong = streakHit || (joinHit && (night >= DUNGEON_NIGHT || unseenHit));
+  const parts = [];
+  if (streakHit) parts.push(`${best.count} Termine in Folge ohne Lücke (${hoursText(best.to - best.from)})`);
+  if (joinHit) parts.push(`im Schnitt ${seconds(joinMs)} nach Öffnen der Anmeldung angemeldet`);
+  if (unseenHit) parts.push(`Beute ${unseen.length} von ${finished.length} Mal nie angeschaut`);
+  const ends = [];
+  if (streakHit) ends.push(best.to);
+  if (joinHit) ends.push(Math.max(...joined.filter((j) => j.delay <= DUNGEON_JOIN_MS).map((j) => j.at)));
+  if (unseenHit) ends.push(toMs(unseen[unseen.length - 1].slot));
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: list.length,
+    joinMs,
+    streak: best.count,
+    night,
+    unseen: unseen.length,
+    from: new Date(slotMs[0]),
+    to: new Date(Math.max(...ends)),
+    summary: `${list.length} Dungeons: ${parts.join(', ')}` + (night ? `, ${night}× zwischen ${IHK_NIGHT[0]} und ${IHK_NIGHT[1]} Uhr` : ''),
+  };
+}
+
+// ---------- Grading ----------
+
+/**
+ * Grading zur Mindestzeit: Aufträge werden fast genau dann fertig gemeldet, wenn der Server es frühestens erlaubt
+ * (Flecken × msPerSpot × Sauberkeit). Von Hand dauern Putzen, Drehen, Benoten und Versiegeln deutlich länger.
+ * jobs: [{ createdAt, doneAt, clean, seal, spots }] eines Mitglieds (nur fertige; spots = Zahl der Flecken).
+ */
+function gradingFinding(jobs, msPerSpot) {
+  const list = jobs
+    .filter((j) => j.doneAt && j.createdAt)
+    .map((j) => ({ at: toMs(j.doneAt), excess: toMs(j.doneAt) - toMs(j.createdAt) - ((j.spots || 0) * msPerSpot * (j.clean || 0)) / 100, perfect: j.clean >= 100 && (j.seal == null || j.seal >= 99) }))
+    .sort((x, y) => x.at - y.at);
+  if (list.length < GRADING_MIN_JOBS) return null;
+  const excessMs = median(list.map((j) => j.excess));
+  if (excessMs > GRADING_EXCESS_MS) return null;
+  const perfect = list.filter((j) => j.perfect).length;
+  const strong = excessMs <= GRADING_EXCESS_STRONG_MS || perfect / list.length >= GRADING_PERFECT_SHARE;
+  const fast = list.filter((j) => j.excess <= GRADING_EXCESS_MS);
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: list.length,
+    excessMs,
+    perfect,
+    from: new Date(list[0].at),
+    to: new Date(fast[fast.length - 1].at),
+    summary: `${list.length} Aufträge im Schnitt nur ${seconds(Math.max(0, excessMs))} nach der frühestmöglichen Zeit fertig gemeldet, ${perfect} davon perfekt`,
+  };
+}
+
+// ---------- Rund um die Uhr ----------
+
+/**
+ * Rund um die Uhr: über viele Stunden ohne längere Pause aktiv, auch nachts – ein Mensch schläft irgendwann.
+ * times: Zeitpunkte aller Aktionen eines Mitglieds. null, wenn unauffällig.
+ */
+function activityFinding(times, timeZone) {
+  let best = null;
+  for (const b of bursts(times, AWAKE_GAP_MS)) {
+    const span = b[b.length - 1] - b[0];
+    if (!best || span > best.span) best = { span, list: b };
+  }
+  if (!best || best.span < AWAKE_MS) return null;
+  // verschiedene Nachtstunden (Stunde + Tag), in denen etwas passiert ist
+  const nightHours = new Set(
+    best.list
+      .filter((t) => {
+        const h = hourIn(t, timeZone);
+        return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
+      })
+      .map((t) => Math.floor(t / HOUR))
+  ).size;
+  if (nightHours < AWAKE_NIGHT_HOURS) return null;
+  return {
+    level: best.span >= AWAKE_STRONG_MS ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: best.list.length,
+    spanMs: best.span,
+    nightHours,
+    from: new Date(best.list[0]),
+    to: new Date(best.list[best.list.length - 1]),
+    summary: `${best.list.length} Aktionen über ${hoursText(best.span)} ohne Pause von mehr als ${hoursText(AWAKE_GAP_MS)}, davon in ${nightHours} Nachtstunden (${IHK_NIGHT[0]}–${IHK_NIGHT[1]} Uhr)`,
+  };
+}
+
+// ---------- Kein normaler Browser ----------
+
+/**
+ * Spiel-Aktionen, die nicht aus einem normalen Browser kommen (models/ScriptSignal, je Tag). signals: [{ actions,
+ * noProbe, noFetchMeta, bare, webdriver, botUa, uas, firstAt, lastAt }] eines Mitglieds. null, wenn unauffällig.
+ */
+function browserFinding(signals) {
+  const sum = (k) => signals.reduce((s, x) => s + (x[k] || 0), 0);
+  const actions = sum('actions');
+  const [bare, noProbe, webdriver, botUa] = ['bare', 'noProbe', 'webdriver', 'botUa'].map(sum);
+  const bareHit = bare >= BROWSER_MIN && bare / actions >= BROWSER_SHARE;
+  const probeHit = noProbe >= BROWSER_NOPROBE_MIN && noProbe / actions >= BROWSER_SHARE;
+  if (!webdriver && !botUa && !bareHit && !probeHit) return null;
+  const parts = [];
+  if (webdriver) parts.push(`${webdriver}× aus einem ferngesteuerten Browser`);
+  if (botUa) parts.push(`${botUa}× mit dem User-Agent eines Skript-Werkzeugs`);
+  if (bareHit) parts.push(`${bare}× ohne Fingerabdruck und ohne Browser-Kopfzeilen`);
+  else if (probeHit) parts.push(`${noProbe}× ohne Fingerabdruck (Seite lief ohne JavaScript)`);
+  const uas = [...new Set(signals.flatMap((x) => x.uas || []))].slice(0, 3);
+  return {
+    level: webdriver || botUa || bareHit ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: actions,
+    uas,
+    from: new Date(Math.min(...signals.map((x) => toMs(x.firstAt || x.lastAt)))),
+    to: new Date(Math.max(...signals.map((x) => toMs(x.lastAt)))),
+    summary: `Von ${actions} Spiel-Aktionen: ${parts.join(', ')}`, // die User-Agents stehen darunter (extrasOf)
+  };
+}
+
+// ---------- Ungewöhnliche Einnahmen ----------
+
+/**
+ * Einnahmen aus IHK, Dungeon, Grading und Bank-Verkäufen weit über dem üblichen Maß. entries: [{ user, type, amount,
+ * createdAt }] (Kontobuchungen, nur Einnahmen) oder zusammengefasst [{ user, type, amount, from, to }]. Liefert [{ user, level, total, factor, bySource, from, to, summary }].
+ * Nur ein Hinweis (möglich): Fleißige Spieler verdienen auch viel – zusammen mit anderen Mustern aussagekräftig.
+ */
+function incomeFindings(entries) {
+  const byUser = new Map();
+  for (const e of entries) {
+    const label = INCOME_SOURCES[e.type];
+    if (!label || !(e.amount > 0)) continue;
+    const k = String(e.user);
+    const u = byUser.get(k) || { total: 0, bySource: {}, from: Infinity, to: 0 };
+    u.total += e.amount;
+    u.bySource[label] = (u.bySource[label] || 0) + e.amount;
+    u.from = Math.min(u.from, toMs(e.from || e.createdAt));
+    u.to = Math.max(u.to, toMs(e.to || e.createdAt));
+    byUser.set(k, u);
+  }
+  if (byUser.size < INCOME_MIN_PLAYERS) return [];
+  const med = median([...byUser.values()].map((u) => u.total));
+  const out = [];
+  for (const [user, u] of byUser) {
+    if (u.total < INCOME_MIN_CENTS || u.total < med * INCOME_FACTOR) continue;
+    const factor = u.total / med;
+    const sources = Object.entries(u.bySource)
+      .sort((x, y) => y[1] - x[1])
+      .map(([k, v]) => `${k} ${euro(v)}`)
+      .join(', ');
+    out.push({
+      user,
+      level: LEVEL.moeglich,
+      total: u.total,
+      factor,
+      from: new Date(u.from),
+      to: new Date(u.to),
+      summary: `${euro(u.total)} eingenommen, das ${Math.round(factor)}-Fache des Üblichen (${euro(med)}): ${sources}`,
+    });
+  }
+  return out;
+}
+
+// ---------- Seiten-Kennzeichen, Eingaben, Falle, Netz (Stufe 1: nur gemessen) ----------
+
+const sumOf = (signals, k) => signals.reduce((s, x) => s + (x[k] || 0), 0);
+const spanOfSignals = (signals) => ({
+  from: new Date(Math.min(...signals.map((x) => toMs(x.firstAt || x.lastAt)))),
+  to: new Date(Math.max(...signals.map((x) => toMs(x.lastAt)))),
+});
+
+/**
+ * Reaktionszeit: Zeit zwischen Auslieferung der Seite und Abschicken der Aktion (models/ScriptSignal.dwell).
+ * Unmenschlich kurz (unter 0,4 s ist die Seite noch nicht einmal dargestellt) oder immer fast gleich lang; dazu
+ * wiederverwendete Kennzeichen und Aktionen ohne vorher geladene Seite. null, wenn unauffällig.
+ */
+function reactionFinding(signals) {
+  const dwell = signals.flatMap((x) => x.dwell || []);
+  const [ok, fast, reused, missing, actions, noProbe] = ['tokenOk', 'fast', 'tokenReused', 'tokenMissing', 'actions', 'noProbe'].map((k) => sumOf(signals, k));
+  const parts = [];
+  let strong = false;
+  const med = dwell.length >= REACT_MIN ? median(dwell) : null;
+  if (med !== null && ok && fast / ok >= REACT_FAST_SHARE) {
+    parts.push(`${fast} von ${ok} Aktionen weniger als 0,4 s nach dem Laden der Seite abgeschickt`);
+    strong = true;
+  }
+  const spread = med ? median(dwell.map((x) => Math.abs(x - med))) / med : null;
+  if (med !== null && med <= REACT_MAX_MEDIAN && spread < REACT_SPREAD) {
+    parts.push(`immer fast gleich lange nach dem Laden (${seconds(med)}, Abweichung ${percent(spread)})`);
+    strong = true;
+  }
+  if (reused >= REACT_REUSED) parts.push(`${reused}× ein schon benutztes Seiten-Kennzeichen geschickt`);
+  // ohne Kennzeichen, obwohl die Seite sonst mit JavaScript lief: Anfrage kam nicht von der Seite
+  const withJs = actions - noProbe;
+  if (missing >= NO_PAGE_MIN && withJs > 0 && missing / actions >= NO_PAGE_SHARE) parts.push(`${missing} von ${actions} Aktionen ohne vorher geladene Seite`);
+  if (!parts.length) return null;
+  return {
+    level: strong ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: actions,
+    medianMs: med,
+    spread,
+    ...spanOfSignals(signals),
+    summary: parts.join(', '),
+  };
+}
+
+/**
+ * Ohne echte Eingabe: Aktionen, vor denen es keine Maus-, Touch- oder Tastatureingabe gab (public/js/guard.js) –
+ * typisch für Userscripts und Auto-Klicker, die Knöpfe per Skript drücken. null, wenn unauffällig.
+ */
+function inputFinding(signals) {
+  const [withInput, noInput, synthetic] = ['withInput', 'noInput', 'synthetic'].map((k) => sumOf(signals, k));
+  const noneHit = withInput >= INPUT_MIN && noInput / withInput >= INPUT_NONE_SHARE;
+  const synthHit = synthetic >= INPUT_SYNTHETIC;
+  if (!noneHit && !synthHit) return null;
+  const parts = [];
+  if (noneHit) parts.push(`${noInput} von ${withInput} Aktionen ohne Maus-, Touch- oder Tastatureingabe davor`);
+  if (synthHit) parts.push(`${synthetic}× nur künstliche Klicks (Skript im Browser, z. B. Userscript)`);
+  return { level: LEVEL.wahrscheinlich, count: withInput, ...spanOfSignals(signals), summary: parts.join(', ') };
+}
+
+/** Falle: unsichtbaren Link aufgerufen – ein Mensch sieht ihn nicht. null, wenn nie. */
+function trapFinding(signals) {
+  const hits = sumOf(signals, 'trap');
+  if (!hits) return null;
+  return {
+    level: hits >= 2 ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: hits,
+    ...spanOfSignals(signals.filter((x) => x.trap)),
+    summary: `${hits}× den unsichtbaren Link aufgerufen, den nur ein Programm findet, das die Seite ausliest`,
+  };
+}
+
+/** Aus einem Rechenzentrum: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs). null, wenn unauffällig. */
+function hostingFinding(signals) {
+  const hosting = sumOf(signals, 'hosting');
+  if (hosting < HOSTING_MIN) return null;
+  const nets = [...new Set(signals.flatMap((x) => x.nets || []))].slice(0, 3);
+  const actions = sumOf(signals, 'actions');
+  return {
+    level: LEVEL.moeglich,
+    count: hosting,
+    nets,
+    ...spanOfSignals(signals.filter((x) => x.hosting)),
+    summary: `${hosting} von ${actions} Spiel-Aktionen aus einem Rechenzentrum (auch VPNs laufen dort)`, // Netzbetreiber stehen darunter
+  };
+}
+
+/**
+ * Gleichzeitig von zwei Geräten: Aktionen wechseln innerhalb kurzer Zeit mehrmals zwischen zwei Geräten UND zwei
+ * Netzen hin und her (z. B. Skript auf einem Server, nebenbei am Handy gespielt). Ein einzelner Wechsel (WLAN →
+ * Mobilfunk) zählt nicht. traces: [{ dev, net, at }] eines Mitglieds. null, wenn unauffällig.
+ */
+function parallelFinding(traces) {
+  const list = traces.filter((t) => t.dev && t.net).sort((x, y) => toMs(x.at) - toMs(y.at));
+  // Wechsel: Gerät und Netz anders als bei der Aktion davor
+  const switches = [];
+  for (let i = 1; i < list.length; i++) {
+    if (list[i].dev !== list[i - 1].dev && list[i].net !== list[i - 1].net) switches.push(toMs(list[i].at));
+  }
+  // Zeitfenster mit mindestens PARALLEL_SWITCHES Wechseln, nicht überlappend gezählt
+  const windows = [];
+  let i = 0;
+  while (i < switches.length) {
+    let j = i;
+    while (j + 1 < switches.length && switches[j + 1] - switches[i] <= PARALLEL_WINDOW_MS) j++;
+    if (j - i + 1 >= PARALLEL_SWITCHES) {
+      windows.push({ from: switches[i], to: switches[j], count: j - i + 1 });
+      i = j + 1;
+    } else i++;
+  }
+  if (!windows.length) return null;
+  const devices = new Set(list.map((t) => t.dev)).size;
+  const total = windows.reduce((s, w) => s + w.count, 0);
+  return {
+    level: windows.length >= PARALLEL_STRONG ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: total,
+    windows: windows.length,
+    devices,
+    from: new Date(windows[0].from),
+    to: new Date(windows[windows.length - 1].to),
+    summary: `${windows.length}× innerhalb von ${Math.round(PARALLEL_WINDOW_MS / MIN)} Minuten mehrmals zwischen zwei Geräten und Netzen hin und her (${total} Wechsel, ${devices} Geräte)`,
+  };
+}
+
+// ---------- Gesamtbewertung ----------
+
+const AREA_OF = Object.fromEntries(Object.entries(RATING_AREAS).flatMap(([area, a]) => a.kinds.map((k) => [k, area])));
+
+/**
+ * Gesamtbewertung eines Spielers (bzw. Konten-Paars) aus seinen offenen Hinweisen. deviceLevel = höchste Stufe eines
+ * offenen Mehrfach-Konten-Hinweises (0 = keiner), zählt zum Bereich Ergebnis.
+ * Liefert { stage, label, score, areas: { verhalten, technik, ergebnis }, reason } oder null ohne offene Hinweise.
+ *   Eindeutig: Belege aus allen drei Bereichen oder Falle (Wahrscheinlich)
+ *   Starker Verdacht: Belege aus mindestens zwei Bereichen, davon einer „Wahrscheinlich“
+ *   Verdacht: ein klares Muster („Wahrscheinlich“) oder schwache Belege aus mehreren Bereichen
+ *   Beobachten: einzelne schwache Hinweise
+ */
+function overallRating(alerts, { deviceLevel = 0 } = {}) {
+  const open = alerts.filter((a) => !a.doneAt);
+  if (!open.length) return null;
+  const levels = { verhalten: [], technik: [], ergebnis: [] };
+  for (const a of open) if (AREA_OF[a.kind]) levels[AREA_OF[a.kind]].push(Math.min(a.level, LEVEL.wahrscheinlich));
+  if (deviceLevel) levels.ergebnis.push(Math.min(deviceLevel, LEVEL.wahrscheinlich));
+  const areas = {};
+  for (const [area, list] of Object.entries(levels)) {
+    if (!list.length) {
+      areas[area] = 0;
+      continue;
+    }
+    const sorted = [...list].sort((x, y) => y - x);
+    areas[area] = Math.min(RATING_AREA_MAX, RATING_POINTS[sorted[0]] + (sorted.length - 1) * RATING_EXTRA);
+  }
+  const hit = Object.keys(areas).filter((k) => areas[k] > 0);
+  const sum = Object.values(areas).reduce((x, y) => x + y, 0);
+  const score = Math.round(sum * (RATING_FACTOR[hit.length] || 1) * 10) / 10;
+  const strong = [...levels.verhalten, ...levels.technik, ...levels.ergebnis].some((l) => l >= LEVEL.wahrscheinlich);
+  const trap = open.some((a) => a.kind === 'falle' && a.level >= LEVEL.wahrscheinlich);
+  let stage = STAGE.beobachten;
+  if (hit.length >= 3 || trap) stage = STAGE.eindeutig;
+  else if (hit.length >= 2 && strong) stage = STAGE.stark;
+  else if (strong || hit.length >= 2) stage = STAGE.verdacht;
+
+  const names = hit.map((k) => RATING_AREAS[k].label);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : names[0] || '';
+  let reason = `Belege aus ${list}`;
+  if (!areas.ergebnis) reason += ', kein Vorteil erkennbar';
+  if (trap) reason += ' – Falle ausgelöst';
+  if (deviceLevel >= LEVEL.wahrscheinlich) reason += ' – auch als Mehrfach-Konto erkannt';
+  return { stage, label: STAGE_LABEL[stage], score, areas, reason };
+}
+
+// ---------- Anzeige im Panel ----------
+
+// Was "count" je Muster zählt
+const COUNT_LABEL = {
+  tempo: 'in Folge',
+  takt: 'Aktionen',
+  ihk: 'Quests',
+  scalping: 'Runden',
+  wert: 'Geschäfte',
+  dungeon: 'Durchläufe',
+  grading: 'Aufträge',
+  dauer: 'Aktionen',
+  browser: 'Spiel-Aktionen',
+  reaktion: 'Spiel-Aktionen',
+  eingabe: 'Aktionen',
+  falle: 'Aufrufe',
+  rechenzentrum: 'aus Rechenzentrum',
+  parallel: 'Wechsel',
+};
+
+/**
+ * Kennzahlen eines Hinweises als kurze Kacheln fürs Panel: [{ value, label }] in sinnvoller Reihenfolge.
+ * details = gespeicherte Kennzahlen (SuspicionAlert.details).
+ */
+function factsOf(kind, details = {}) {
+  const d = details || {};
+  const out = [];
+  const add = (ok, value, label) => ok && out.push({ value, label });
+  const num = (v) => v !== undefined && v !== null && Number.isFinite(v);
+  add(num(d.count) && COUNT_LABEL[kind], String(d.count), COUNT_LABEL[kind]);
+  add(num(d.medianMs), seconds(d.medianMs), kind === 'reaktion' ? 'nach Laden der Seite' : 'Abstand');
+  add(num(d.spread), d.spread < 0.01 ? '< 1 %' : percent(d.spread), 'Abweichung');
+  add(num(d.runs) && d.runs > 1, `${d.runs}×`, 'Serien');
+  add(num(d.reactMs), seconds(d.reactMs), 'nach Ablauf abgeholt');
+  add(num(d.restartMs), seconds(d.restartMs), 'bis zum Neustart');
+  add(num(d.rate), percent(d.rate), 'im Plus');
+  add(num(d.gain), euro(d.gain), 'Gewinn');
+  add(num(d.holdMs), seconds(d.holdMs), 'Haltedauer');
+  add(num(d.streak) && d.streak > 1, String(d.streak), 'Termine in Folge');
+  add(num(d.joinMs), seconds(d.joinMs), 'nach Öffnen angemeldet');
+  add(num(d.unseen) && d.unseen > 0, String(d.unseen), 'Beute ungesehen');
+  add(num(d.excessMs), seconds(Math.max(0, d.excessMs)), 'über Mindestzeit');
+  add(num(d.perfect), String(d.perfect), 'perfekt');
+  add(num(d.spanMs), hoursText(d.spanMs), 'ohne Pause');
+  add(num(d.nightHours), String(d.nightHours), 'Nachtstunden');
+  add(num(d.night) && d.night > 0, `${d.night}×`, 'nachts');
+  add(num(d.windows), `${d.windows}×`, 'Zeitfenster');
+  add(num(d.devices), String(d.devices), 'Geräte');
+  add(num(d.total), euro(d.total), kind === 'ertrag' ? 'eingenommen' : 'verschoben');
+  add(num(d.factor), `${Math.round(d.factor)}×`, 'das Übliche');
+  return out;
+}
+
+/** Zusätzliche Zeilen eines Hinweises (Beispiel-Geschäfte, User-Agents, Netzbetreiber) */
+function extrasOf(details = {}) {
+  const d = details || {};
+  return [...(Array.isArray(d.trades) ? d.trades : []), ...(Array.isArray(d.uas) ? d.uas : []), ...(Array.isArray(d.nets) ? d.nets : [])];
+}
+
+/**
+ * Hinweise fürs Panel nach Spieler (bzw. Konten-Paar) bündeln: [{ key, users, alerts, open, level, lastAt, rating }].
+ * deviceLevels: Map userId → höchste Stufe eines offenen Mehrfach-Konten-Hinweises (für die Gesamtbewertung).
+ * Gruppen mit offenen Hinweisen zuerst, dann nach Gesamtbewertung, Punkten und jüngstem Beleg.
+ */
+function groupAlerts(alerts, deviceLevels = new Map()) {
+  const groups = new Map();
+  for (const a of alerts) {
+    const key = a.users.map((u) => String(u._id)).sort().join(':');
+    if (!groups.has(key)) groups.set(key, { key, users: a.users, alerts: [] });
+    groups.get(key).alerts.push(a);
+  }
+  return [...groups.values()]
+    .map((g) => {
+      const open = g.alerts.filter((a) => !a.doneAt);
+      // Mehrfach-Konto zählt nur bei einem einzelnen Spieler – bei einem Konten-Paar (Wertverschiebung) beträfe es
+      // womöglich ein ganz anderes Konto; ob das Paar selbst ein Mehrfach-Konto ist, steht schon im Hinweis
+      const deviceLevel = g.users.length === 1 ? deviceLevels.get(String(g.users[0]._id)) || 0 : 0;
+      return {
+        ...g,
+        rating: overallRating(g.alerts, { deviceLevel }),
+        open: open.length,
+        level: Math.max(0, ...open.map((a) => a.level)),
+        lastAt: new Date(Math.max(...g.alerts.map((a) => toMs(a.evidenceAt)))),
+        // offene zuerst, darin nach Stufe und jüngstem Beleg
+        alerts: [...g.alerts].sort((x, y) => Boolean(x.doneAt) - Boolean(y.doneAt) || y.level - x.level || toMs(y.evidenceAt) - toMs(x.evidenceAt)),
+      };
+    })
+    .sort((x, y) => (y.open > 0) - (x.open > 0) || (y.rating ? y.rating.stage : 0) - (x.rating ? x.rating.stage : 0) || (y.rating ? y.rating.score : 0) - (x.rating ? x.rating.score : 0) || toMs(y.lastAt) - toMs(x.lastAt));
+}
+
 module.exports = {
   ACTIONS,
   KIND_LABEL,
@@ -318,6 +847,7 @@ module.exports = {
   IHK_MIN_RUNS,
   SCALP_MIN_ROUNDS,
   VALUE_MIN_CENTS,
+  INCOME_SOURCES,
   median,
   gaps,
   bursts,
@@ -328,4 +858,21 @@ module.exports = {
   scalpFinding,
   valueFinding,
   valuePairFinding,
+  dungeonFinding,
+  gradingFinding,
+  activityFinding,
+  browserFinding,
+  incomeFindings,
+  reactionFinding,
+  inputFinding,
+  trapFinding,
+  hostingFinding,
+  parallelFinding,
+  factsOf,
+  extrasOf,
+  groupAlerts,
+  overallRating,
+  RATING_AREAS,
+  STAGE,
+  STAGE_LABEL,
 };

@@ -7,8 +7,8 @@ const suspicionAlertSchema = new Schema(
   {
     // pro Muster und Konto genau ein Hinweis, z. B. "takt:oeffnen:<userId>" oder "wert:<a>:<b>"
     key: { type: String, required: true, unique: true },
-    kind: { type: String, enum: ['tempo', 'takt', 'ihk', 'scalping', 'wert'], required: true },
-    action: { type: String, default: null }, // bei tempo/takt: kaufen | oeffnen | verkaufen | broker
+    kind: { type: String, enum: ['tempo', 'takt', 'ihk', 'scalping', 'wert', 'dungeon', 'grading', 'dauer', 'browser', 'ertrag', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'], required: true },
+    action: { type: String, default: null }, // bei tempo/takt: kaufen | oeffnen | verkaufen | broker | wetten
     users: { type: [Schema.Types.ObjectId], required: true },
     level: { type: Number, required: true }, // 2 = wahrscheinlich, 1 = möglich (wie bei den Mehrfach-Konten)
     summary: { type: String, required: true },

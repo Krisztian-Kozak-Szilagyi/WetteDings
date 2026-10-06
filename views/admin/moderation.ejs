@@ -101,104 +101,208 @@
 </section>
 <% } else if (sub === 'auffaelligkeiten') { %>
 <%
-  const openSusp = suspicions.filter((a) => !a.doneAt);
-  const doneSusp = suspicions.filter((a) => a.doneAt);
+  const openGroups = suspicionGroups.filter((g) => g.open);
+  const doneGroups = suspicionGroups.filter((g) => !g.open);
+  const openAlertCount = openGroups.reduce((s, g) => s + g.open, 0);
+  const stageAtLeast = (n) => openGroups.filter((g) => g.rating && g.rating.stage >= n).length;
+  const AREA_LABEL = { verhalten: 'Spielverhalten', technik: 'Technik', ergebnis: 'Ergebnis' };
 %>
 <section class="stats-block" id="auffaelligkeiten">
-  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.') %>
-  <div class="card">
-    <% if (!openSusp.length) { %>
-      <p class="muted">Aktuell gibt es keine offenen Auffälligkeiten.</p>
-    <% } %>
-    <% const suspList = (list) => { %>
-      <ul class="code-list">
-        <% list.forEach((a) => { %>
-          <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
-            <div class="code-main">
-              <span class="badge device-level-<%= a.level %>"><%= a.levelLabel %></span>
-              <strong><%= a.kindLabel %></strong><%= a.actionLabel ? ' · ' + a.actionLabel : '' %> ·
-              <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
-            </div>
-            <div class="code-meta small">
-              <div><%= a.summary %></div>
-              <% if (a.details && Array.isArray(a.details.trades)) { %>
-                <ul class="susp-trades">
-                  <% a.details.trades.forEach((t) => { %><li><%= t %></li><% }) %>
-                </ul>
-              <% } %>
-              <div class="muted"><%= a.from && dateSec(a.from) !== dateSec(a.evidenceAt) ? dateSec(a.from) + ' – ' : '' %><%= dateSec(a.evidenceAt) %><%= a.doneAt ? ' · erledigt ' + date(a.doneAt) + (a.doneByName ? ' von ' + a.doneByName : '') : '' %></div>
-            </div>
-            <div class="code-actions">
-              <% a.users.forEach((u) => { %>
-                <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: a.log, spieler: u.username }) %>">Protokoll <%= a.users.length > 1 ? u.username : '' %></a>
-              <% }) %>
-              <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
-                <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
-              </form>
-            </div>
-          </li>
+  <%- blockHead('Auffälligkeiten', 'Muster, die nach Skript oder Geldverschiebung aussehen. Alle 10 Minuten neu ausgewertet. Das ist nur ein Verdacht, gebannt wird dadurch niemand: Schau dir die Aktionen im Protokoll an und entscheide selbst.<br><strong>Gesamtbewertung</strong> je Spieler aus drei Bereichen – Spielverhalten (Tempo, Takt, IHK, Dungeon, Grading, Scalping, Rund um die Uhr), Technik (Browser, Reaktionszeit, Eingabe, Falle, Rechenzentrum, zwei Geräte) und Ergebnis (Einnahmen, Wertverschiebung, Mehrfach-Konto). Muster aus demselben Bereich bestätigen sich kaum, Belege aus verschiedenen Bereichen stark. <em>Beobachten</em>: einzelne schwache Hinweise. <em>Verdacht</em>: ein klares Muster oder schwache aus mehreren Bereichen. <em>Starker Verdacht</em>: mindestens zwei Bereiche, davon einer „Wahrscheinlich“. <em>Eindeutig</em>: alle drei Bereiche oder Falle. Das Menü-Abzeichen zählt Spieler ab „Verdacht“.<br><strong>Tempo</strong>: mehrere Aktionen in Folge schneller, als man von Hand klicken kann.<br><strong>Takt</strong>: viele Aktionen in fast exakt gleichen Abständen.<br><strong>IHK sekundengenau</strong>: Quests fast immer direkt bei Ablauf abgeholt und sofort neu gestartet.<br><strong>Broker-Scalping</strong>: viele schnelle Kauf-Verkauf-Runden mit ungewöhnlich hoher Trefferquote.<br><strong>Wertverschiebung</strong>: Geschäfte mit sehr ungleichem Wert, z. B. eine teure Karte für 1 €.<br><strong>Dungeon-Automatik</strong>: an jedem Termin dabei (auch nachts), immer sofort nach Öffnen der Anmeldung angemeldet oder die Beute nie angeschaut.<br><strong>Grading zur Mindestzeit</strong>: Aufträge fast genau zur frühestmöglichen Zeit fertig gemeldet.<br><strong>Rund um die Uhr</strong>: über 20 Stunden ohne Pause von mehr als 3 Stunden aktiv, auch nachts.<br><strong>Kein normaler Browser</strong>: Spiel-Aktionen aus einem ferngesteuerten Browser, mit dem User-Agent eines Skript-Werkzeugs oder ohne Fingerabdruck und Browser-Kopfzeilen.<br><strong>Ungewöhnliche Einnahmen</strong>: in 24 Stunden mindestens das Fünffache des Üblichen aus IHK, Dungeon, Grading und Bank-Verkäufen (allein nur „Möglich“).<br><strong>Reaktionszeit</strong>: Aktionen weniger als 0,4 s nach dem Laden der Seite oder immer fast gleich lange danach; wiederverwendete Seiten-Kennzeichen; Aktionen ohne vorher geladene Seite.<br><strong>Ohne echte Eingabe</strong>: vor den Aktionen keine Maus-, Touch- oder Tastatureingabe, nur künstliche Klicks (Userscript, Auto-Klicker).<br><strong>Falle ausgelöst</strong>: einen unsichtbaren Link aufgerufen, den nur ein Programm findet.<br><strong>Aus einem Rechenzentrum</strong>: Spiel-Aktionen von einem gemieteten Server (auch manche VPNs, daher nur „Möglich“).<br><strong>Gleichzeitig von zwei Geräten</strong>: Aktionen wechseln innerhalb von 10 Minuten mehrmals zwischen zwei Geräten und zwei Netzen hin und her.') %>
+  <% if (!openGroups.length) { %>
+    <div class="card"><p class="muted">Aktuell gibt es keine offenen Auffälligkeiten.</p></div>
+  <% } else { %>
+    <div class="susp-overview">
+      <div class="susp-stat"><span class="susp-stat-value"><%= openGroups.length %></span><span class="susp-stat-label">betroffene Spieler · <%= openAlertCount %> Hinweise</span></div>
+      <div class="susp-stat susp-stat-likely"><span class="susp-stat-value"><%= stageAtLeast(2) %></span><span class="susp-stat-label">mit Verdacht oder mehr</span></div>
+      <div class="susp-stat susp-stat-sure"><span class="susp-stat-value"><%= stageAtLeast(3) %></span><span class="susp-stat-label">starker Verdacht oder eindeutig</span></div>
+    </div>
+  <% } %>
+
+  <% const finding = (a) => { %>
+    <li class="susp-finding susp-lvl-<%= a.doneAt ? 0 : a.level %>">
+      <div class="susp-finding-body">
+        <div class="susp-finding-title">
+          <strong><%= a.kindLabel %></strong><% if (a.actionLabel) { %><span class="muted"> · <%= a.actionLabel %></span><% } %>
+          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? 'Erledigt' : a.levelLabel %></span>
+        </div>
+        <% if (a.facts.length) { %>
+          <div class="susp-facts">
+            <% a.facts.forEach((f) => { %><span class="susp-fact"><b><%= f.value %></b> <%= f.label %></span><% }) %>
+          </div>
+        <% } %>
+        <p class="susp-summary"><%= a.summary %></p>
+        <% if (a.extras.length) { %>
+          <ul class="susp-extras"><% a.extras.forEach((t) => { %><li><%= t %></li><% }) %></ul>
+        <% } %>
+        <div class="susp-time" title="<%= (a.from ? dateSec(a.from) + ' – ' : '') + dateSec(a.evidenceAt) %>">
+          <%= timeSpan(a.from, a.evidenceAt) %>
+          <% if (a.doneAt) { %> · erledigt <%= date(a.doneAt) %><%= a.doneByName ? ' von ' + a.doneByName : '' %><% } %>
+        </div>
+      </div>
+      <div class="susp-finding-actions">
+        <% a.users.forEach((u) => { %>
+          <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: a.log, spieler: u.username }) %>">Protokoll<%= a.users.length > 1 ? ' ' + u.username : '' %></a>
         <% }) %>
-      </ul>
-    <% } %>
-    <% if (openSusp.length) suspList(openSusp); %>
-    <% if (doneSusp.length) { %>
-      <details class="history device-done">
-        <summary>Erledigte Auffälligkeiten (<%= doneSusp.length %>)</summary>
-        <% suspList(doneSusp); %>
-      </details>
-    <% } %>
+        <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
+          <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
+        </form>
+      </div>
+    </li>
+  <% } %>
+
+  <% const groupCard = (g) => { %>
+    <% const openAlerts = g.alerts.filter((a) => !a.doneAt); const doneAlerts = g.alerts.filter((a) => a.doneAt); %>
+    <article class="card susp-group susp-stage-<%= g.rating ? g.rating.stage : 0 %>">
+      <header class="susp-group-head">
+        <div class="susp-who">
+          <span class="susp-avatar" aria-hidden="true"><%= g.users[0].username.charAt(0).toUpperCase() %></span>
+          <div>
+            <div class="susp-who-label"><%= g.users.length > 1 ? 'Konten-Paar' : 'Spieler' %></div>
+            <div class="susp-names">
+              <% g.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
+            </div>
+            <div class="susp-group-sub">
+              <%= g.open ? g.open + (g.open === 1 ? ' offener Hinweis' : ' offene Hinweise') : 'alles erledigt' %> · zuletzt <%= relTime(g.lastAt) %>
+            </div>
+          </div>
+        </div>
+        <div class="susp-group-actions">
+          <% if (g.users.length === 1) { %>
+            <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: 'gesamt', spieler: g.users[0].username }) %>">Alle Aktionen</a>
+          <% } %>
+          <% if (openAlerts.length > 1) { %>
+            <form method="post" data-reauth action="/admin/auffaelligkeiten/gruppe" data-confirm="Alle <%= openAlerts.length %> offenen Hinweise als erledigt markieren?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="ids" value="<%= openAlerts.map((a) => a._id).join(',') %>">
+              <button class="btn btn-ghost btn-sm" type="submit">Alle erledigt</button>
+            </form>
+          <% } %>
+        </div>
+      </header>
+      <% if (g.rating) { %>
+        <div class="susp-rating susp-stage-<%= g.rating.stage %>">
+          <div class="susp-rating-main">
+            <span class="susp-rating-label">Gesamtbewertung</span>
+            <span class="susp-pill susp-stage-<%= g.rating.stage %>"><%= g.rating.label %></span>
+            <span class="susp-rating-reason"><%= g.rating.reason %></span>
+          </div>
+          <div class="susp-rating-areas" title="Punkte je Bereich: stärkster Hinweis 1 (möglich) bzw. 3 (wahrscheinlich), jeder weitere +1, höchstens 5">
+            <% Object.entries(g.rating.areas).forEach(([k, p]) => { %>
+              <span class="susp-area <%= p ? 'is-hit' : '' %>"><span class="susp-area-name"><%= AREA_LABEL[k] %></span><span class="susp-area-bar"><i style="width: <%= p * 20 %>%"></i></span></span>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+      <% if (openAlerts.length) { %>
+        <ul class="susp-findings"><% openAlerts.forEach(finding) %></ul>
+      <% } %>
+      <% if (doneAlerts.length) { %>
+        <details class="susp-done">
+          <summary><%= doneAlerts.length %> <%= doneAlerts.length === 1 ? 'erledigter Hinweis' : 'erledigte Hinweise' %></summary>
+          <ul class="susp-findings"><% doneAlerts.forEach(finding) %></ul>
+        </details>
+      <% } %>
+    </article>
+  <% } %>
+
+  <div class="susp-groups">
+    <% openGroups.forEach(groupCard) %>
   </div>
+  <% if (doneGroups.length) { %>
+    <details class="history device-done susp-done-groups">
+      <summary>Erledigt (<%= doneGroups.length %> <%= doneGroups.length === 1 ? 'Spieler' : 'Spieler bzw. Paare' %>)</summary>
+      <div class="susp-groups"><% doneGroups.forEach(groupCard) %></div>
+    </details>
+  <% } %>
 </section>
 <% } else { %>
 <section class="stats-block" id="geraete">
   <%- blockHead('Mehrfach-Konten', 'Konten, die vom selben Gerät aus benutzt wurden.<br><strong>Sicher</strong>: derselbe Browser (Geräte-Kennung).<br><strong>Wahrscheinlich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse.<br><strong>Möglich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse, aber gleichzeitig benutzt – kommt auch bei baugleichen Geräten vor und zählt nicht fürs Abzeichen.<br>Gleiche Geräte-Merkmale allein oder ein geteiltes Netz (z. B. Schule) ergeben keinen Hinweis.') %>
-  <div class="card">
-    <% if (!openAlerts.length) { %>
-      <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
-    <% } %>
-    <% const alertList = (list) => { %>
-      <ul class="code-list">
-        <% list.forEach((a) => { %>
-          <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
-            <div class="code-main">
-              <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
+  <%
+    const shortTime = (t) => timeSpan(null, t).replace(' Uhr', '');
+    const sureCount = openAlerts.filter((a) => a.level >= 3).length;
+    const likelyPairs = openAlerts.filter((a) => a.level === 2).length;
+  %>
+  <% if (!openAlerts.length) { %>
+    <div class="card"><p class="muted">Aktuell gibt es keine offenen Hinweise.</p></div>
+  <% } else { %>
+    <div class="susp-overview">
+      <div class="susp-stat"><span class="susp-stat-value"><%= openAlerts.length %></span><span class="susp-stat-label">offene Konten-Paare</span></div>
+      <div class="susp-stat susp-stat-sure"><span class="susp-stat-value"><%= sureCount %></span><span class="susp-stat-label">davon sicher</span></div>
+      <div class="susp-stat susp-stat-likely"><span class="susp-stat-value"><%= likelyPairs %></span><span class="susp-stat-label">davon wahrscheinlich</span></div>
+    </div>
+  <% } %>
+
+  <% const pairCard = (a) => { %>
+    <article class="card susp-group susp-lvl-<%= a.doneAt ? 0 : a.level %>">
+      <header class="susp-group-head">
+        <div class="susp-who">
+          <span class="susp-avatar" aria-hidden="true">⇄</span>
+          <div>
+            <div class="susp-who-label">Konten-Paar</div>
+            <div class="susp-names">
               <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
             </div>
-            <div class="code-meta small">
-              <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
-              <% a.shared.forEach((s) => { %>
-                <div class="device-shared">
-                  <div class="muted"><%= s.label %> · <%= s.ua || 'Gerät' %></div>
-                  <% a.users.forEach((u, i) => { %>
-                    <div><strong><%= u.username %>:</strong> <%= s.logins[i].times.length ? 'Anmeldungen ' + s.logins[i].times.map((t) => date(t)).join(' · ') : 'zuletzt gesehen ' + date(s.logins[i].lastAt) %></div>
+            <div class="susp-group-sub">
+              Konten erstellt: <%= a.users.map((u) => u.username + ' ' + dayDate(u.createdAt)).join(' · ') %>
+              <% if (a.doneAt) { %> · erledigt <%= date(a.doneAt) %><% } %>
+            </div>
+          </div>
+        </div>
+        <div class="susp-group-actions">
+          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? 'Erledigt' : a.label %></span>
+          <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
+            <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
+          <% }) %>
+          <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
+            <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
+          </form>
+        </div>
+      </header>
+      <% if (!a.shared.length) { %>
+        <p class="susp-empty muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</p>
+      <% } else { %>
+        <ul class="susp-findings">
+          <% a.shared.forEach((sh) => { %>
+            <li class="susp-finding dev-shared susp-lvl-<%= a.doneAt ? 0 : sh.level %>">
+              <div class="susp-finding-body">
+                <div class="susp-finding-title">
+                  <strong><%= sh.ua || 'Gerät' %></strong>
+                  <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : sh.level %>"><%= sh.label %></span>
+                </div>
+                <div class="dev-users">
+                  <% a.users.forEach((u, i) => { const l = sh.logins[i]; %>
+                    <div class="dev-user">
+                      <div class="dev-user-head"><strong><%= u.username %></strong><span class="muted">zuletzt <%= shortTime(l.lastAt) %></span></div>
+                      <% if (l.times.length) { %>
+                        <div class="susp-facts"><% l.times.forEach((t) => { %><span class="susp-fact"><%= shortTime(t) %></span><% }) %></div>
+                      <% } else { %>
+                        <div class="susp-time">keine Anmeldezeiten gespeichert</div>
+                      <% } %>
+                    </div>
                   <% }) %>
                 </div>
-              <% }) %>
-              <div class="muted">Konten erstellt: <%= a.users.map((u) => u.username + ' ' + date(u.createdAt)).join(' · ') %></div>
-            </div>
-            <div class="code-actions">
-              <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
-                <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
-              <% }) %>
-              <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
-                <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
-              </form>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } %>
-    <% if (openAlerts.length) alertList(openAlerts); %>
-    <% if (doneAlerts.length) { %>
-      <details class="history device-done">
-        <summary>Erledigte Hinweise (<%= doneAlerts.length %>)</summary>
-        <% alertList(doneAlerts); %>
-      </details>
-    <% } %>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </article>
+  <% } %>
+
+  <div class="susp-groups">
+    <% openAlerts.forEach(pairCard) %>
   </div>
+  <% if (doneAlerts.length) { %>
+    <details class="history device-done susp-done-groups">
+      <summary>Erledigt (<%= doneAlerts.length %> <%= doneAlerts.length === 1 ? 'Konten-Paar' : 'Konten-Paare' %>)</summary>
+      <div class="susp-groups"><% doneAlerts.forEach(pairCard) %></div>
+    </details>
+  <% } %>
 </section>
 <% } %>
