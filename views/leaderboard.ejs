@@ -50,7 +50,6 @@
 
 <div class="rang-table">
   <% rangTable(leaders, q ? (teamLeaders.length ? 'Kein Spieler gefunden.' : 'Kein Mitglied gefunden.') : 'Noch niemand dabei.') %>
-  <% if (leaders.length) { %><p class="muted small">Per Handel bekommene Karten zählen hier <%= freshDays %> Tage lang höchstens mit dem, was du dafür gegeben hast, danach mit ihrem vollen Wert.</p><% } %>
 </div>
 
 <% if (teamLeaders.length) { %>
