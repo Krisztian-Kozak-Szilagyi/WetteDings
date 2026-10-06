@@ -27,8 +27,8 @@ const deviceAlertSchema = new Schema(
     // beide Nutzer-IDs sortiert, "a:b" – pro Paar gibt es genau einen Hinweis
     key: { type: String, required: true, unique: true },
     users: { type: [Schema.Types.ObjectId], required: true },
-    // 3 = sicher (gleiches Geräte-Cookie), 2 = wahrscheinlich (gleicher Fingerabdruck und gleiche IP),
-    // 1 = möglich (nur gleicher Fingerabdruck)
+    // 3 = sicher (gleiches Geräte-Cookie), 2 = wahrscheinlich (gleicher Fingerabdruck und gleiche IP, nacheinander
+    // benutzt), 1 = möglich (nur gleicher Fingerabdruck, oder parallel bzw. von vielen Konten im selben Netz, #89)
     level: { type: Number, required: true },
     // vom Admin als erledigt markiert; ein stärkerer Treffer öffnet den Hinweis wieder
     doneAt: { type: Date, default: null },

@@ -18,6 +18,7 @@
   <div class="stat card"><span class="stat-label">In offenen Wetten</span><span class="stat-value"><%= euro(inPlay) %></span></div>
   <div class="stat card"><span class="stat-label">Im Broker</span><span class="stat-value"><%= euro(coinValue) %></span><a class="small" href="/broker">Zum Broker</a></div>
   <div class="stat card"><span class="stat-label">In TCG-Karten</span><span class="stat-value"><%= euro(cardValue) %></span><span class="muted small">inkl. ungeöffneter Packs</span></div>
+  <% if (shopValue) { %><div class="stat card"><span class="stat-label">Grading-Shop</span><span class="stat-value"><%= euro(shopValue) %></span><span class="muted small">halbe Ausbaukosten</span></div><% } %>
   <div class="stat card"><span class="stat-label">Gesamt</span><span class="stat-value"><%= euro(total) %></span></div>
 </div>
 

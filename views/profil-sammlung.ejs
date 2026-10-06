@@ -5,7 +5,10 @@
   <div class="ihk-title">
     <h1>Sammlung von <%= profile.username %><%- roleBadge(profile.username) %></h1>
   </div>
-  <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Wert <%= euro(collectionValue) %></span>
+  <div class="sammlung-head-side">
+    <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Wert <%= euro(collectionValue) %></span>
+    <%- include('partials/grade-stats', { graded, own: isMe }) %>
+  </div>
 </div>
 
 <div class="card" id="sammlung">

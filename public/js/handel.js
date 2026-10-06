@@ -58,7 +58,9 @@
       var q = (marketSearch.value || '').trim().toLowerCase();
       var shown = 0;
       $all('[data-market-item]', marketBox).forEach(function (li) {
-        var ok = (marketRarity === 'all' || li.getAttribute('data-rarity') === marketRarity) && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
+        // "missing" = nur Karten, die ich noch nicht besitze
+        var rarityOk = marketRarity === 'all' || (marketRarity === 'missing' ? li.hasAttribute('data-missing') : li.getAttribute('data-rarity') === marketRarity);
+        var ok = rarityOk && (!q || li.getAttribute('data-name').indexOf(q) !== -1);
         li.hidden = !ok;
         if (ok) shown++;
       });
@@ -75,6 +77,36 @@
       });
     });
     marketSearch.addEventListener('input', filterMarket);
+  }
+
+  // ---------- Deine Sammlung: nach Seltenheit und Kartenname filtern ----------
+  var collBox = $('[data-coll]');
+  if (collBox && $('[data-coll-search]', collBox)) {
+    var collSearch = $('[data-coll-search]', collBox);
+    var collEmpty = $('[data-coll-empty]', collBox);
+    var collRarity = 'all';
+    var filterColl = function () {
+      var q = (collSearch.value || '').trim().toLowerCase();
+      var shown = 0;
+      $all('.tcg-grid .tcg-slot', collBox).forEach(function (slot) {
+        var name = (slot.getAttribute('data-name') || '').toLowerCase();
+        var ok = (collRarity === 'all' || slot.getAttribute('data-rarity') === collRarity) && (!q || name.indexOf(q) !== -1);
+        slot.hidden = !ok;
+        if (ok) shown++;
+      });
+      if (collEmpty) collEmpty.hidden = shown > 0;
+    };
+    $all('[data-coll-rarity]', collBox).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        collRarity = btn.getAttribute('data-coll-rarity');
+        $all('[data-coll-rarity]', collBox).forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+        });
+        filterColl();
+      });
+    });
+    collSearch.addEventListener('input', filterColl);
   }
 
   // ---------- Verhandlung: Nachrichten live nachladen ----------

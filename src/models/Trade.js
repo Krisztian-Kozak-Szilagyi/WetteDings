@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 
-// Nachricht in der Verhandlung eines Tauschs. from = Rolle im Angebot ('seller' | 'to') oder 'system'
+// Nachricht in einer Verhandlung (Tausch, privat, Markt-Gespräch). from = Rolle ('seller' | 'to') oder 'system'
 // (Bedingungen geändert). Namen werden beim Anzeigen aus sellerName/toName genommen – so bleiben sie
 // nach einer Umbenennung aktuell.
 const messageSchema = new Schema(
@@ -11,8 +11,20 @@ const messageSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+// Eine Karte in einem Tausch (#76): card = Karten-ID; copy = ein bestimmtes foliertes Exemplar (sonst irgendein
+// freies, unfoliertes Exemplar beim Annehmen); foiledAt/grade nur zur Anzeige
+const swapLineSchema = new Schema(
+  {
+    card: { type: String, required: true },
+    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+    foiledAt: { type: Date, default: null },
+    grade: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
 // Handel: eine Karte gegen Spielgeld (privat an eine Person oder öffentlich auf dem Markt)
-// oder ein Tausch Karte gegen Karte an eine Person, optional mit Aufpreis
+// oder ein Tausch Karten gegen Karten an eine Person (je Seite 1–5, #76), optional mit Aufpreis
 const tradeSchema = new Schema(
   {
     kind: { type: String, enum: ['privat', 'markt', 'tausch'], required: true },
@@ -21,16 +33,27 @@ const tradeSchema = new Schema(
     to: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // nur bei privat und tausch
     toName: { type: String, default: null },
     card: { type: String, required: true }, // Karten-ID
-    cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // gesperrtes Exemplar
+    // gesperrtes Exemplar. Beim Tausch mit give/take (#76) steht hier die eigene _id als Platzhalter: getauschte
+    // Karten werden erst beim Annehmen geprüft und bewegt, vorher ist nichts gesperrt
+    cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true },
     foiledAt: { type: Date, default: null }, // angebotenes Exemplar ist foliert (seit)
+    grade: { type: Number, default: null }, // dessen Note auf der Folie (#73) – nur bei folierten Exemplaren
     // Gegenstände (z. B. Folie): card = "item:<Art>", cardDoc = das Item-Dokument (src/items/itemService.js)
     wantCopy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // nur bei tausch: ein bestimmtes foliertes Exemplar des Empfängers
     wantFoiledAt: { type: Date, default: null }, // dessen Foliendatum (zur Anzeige)
+    wantGrade: { type: Number, default: null }, // dessen Note auf der Folie (#73)
     wantCard: { type: String, default: null }, // nur bei tausch: gewünschte Karte des Empfängers
     wantCardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // erst beim Annehmen gesetzt
+    // Tausch mit mehreren Karten (#76): give = Karten des Anbieters, take = Karten des Empfängers. card/wantCard &
+    // Co. spiegeln jeweils die erste Karte (für Listen, Protokolle und ältere Auswertungen). Alte Tauschangebote
+    // haben give/take nicht – tradeService.swapSides liest beide Formen.
+    give: { type: [swapLineSchema], default: undefined },
+    take: { type: [swapLineSchema], default: undefined },
+    giveDocs: { type: [Schema.Types.ObjectId], default: undefined }, // beim Annehmen bewegte Exemplare
+    takeDocs: { type: [Schema.Types.ObjectId], default: undefined },
     extraFrom: { type: String, enum: ['seller', 'to', null], default: null }, // nur bei tausch: wer den Aufpreis zahlt
     price: { type: Number, required: true }, // Cent (bei tausch: Aufpreis, 0 erlaubt)
-    // Verhandlung (nur bei tausch): wer die aktuellen Bedingungen zuletzt gesetzt hat – annehmen darf nur die andere Seite
+    // Verhandlung (tausch und privat, #82): wer die aktuellen Bedingungen zuletzt gesetzt hat – annehmen darf nur die andere Seite
     lastChangeBy: { type: String, enum: ['seller', 'to'], default: 'seller' },
     termsVersion: { type: Number, default: 0 }, // steigt bei jeder Änderung; Annehmen veralteter Bedingungen wird abgelehnt
     messages: { type: [messageSchema], default: [] },
@@ -58,11 +81,39 @@ tradeSchema.index({ cardDoc: 1 }, { unique: true, partialFilterExpression: { sta
 // Admin-Einstellungen: _id "steuer" = Steuersätze je Bereich (services/taxService); "handel" = alte einheitliche Handelssteuer
 const settingsSchema = new Schema({ _id: { type: String, default: 'handel' }, taxPercent: Number, rates: { markt: Number, privat: Number, tausch: Number, coin: Number, etf: Number }, updatedByName: String }, { timestamps: true });
 
+// Verhandlung über ein Markt-Angebot (#82): jeder Interessent führt ein eigenes Gespräch mit dem Anbieter.
+// Einigen sie sich, gilt der Preis nur für ihn – das Angebot bleibt für alle anderen zum Marktpreis stehen.
+// Felder wie beim Trade (seller/to/price/lastChangeBy …), damit Regeln und Ansicht dieselben sind; to = Interessent.
+const talkSchema = new Schema(
+  {
+    trade: { type: Schema.Types.ObjectId, ref: 'Trade', required: true },
+    seller: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    sellerName: { type: String, required: true },
+    to: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    toName: { type: String, required: true },
+    card: { type: String, required: true }, // wie Trade.card (zur Anzeige und für die Benachrichtigungen)
+    price: { type: Number, required: true }, // aktueller Vorschlag in Cent (am Anfang der Marktpreis)
+    lastChangeBy: { type: String, enum: ['seller', 'to'], default: 'seller' },
+    termsVersion: { type: Number, default: 0 },
+    messages: { type: [messageSchema], default: [] },
+    activityAt: { type: Date, default: null },
+    sellerSeenAt: { type: Date, default: null },
+    toSeenAt: { type: Date, default: null },
+    status: { type: String, enum: ['offen', 'verkauft', 'beendet'], default: 'offen' },
+    expiresAt: { type: Date, required: true }, // = Ablauf des Markt-Angebots
+  },
+  { timestamps: true }
+);
+talkSchema.index({ trade: 1, to: 1 }, { unique: true });
+talkSchema.index({ seller: 1, status: 1 });
+talkSchema.index({ to: 1, status: 1 });
+
 /** Offene Angebote: Status "offen" und nicht abgelaufen (abgelaufene bleiben "offen", gelten aber nicht mehr) */
 const openFilter = () => ({ status: 'offen', expiresAt: { $gt: new Date() } });
 
 module.exports = {
   openFilter,
   Trade: model('Trade', tradeSchema),
+  TradeTalk: model('TradeTalk', talkSchema),
   TradeSettings: model('TradeSettings', settingsSchema),
 };

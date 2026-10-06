@@ -1,4 +1,5 @@
 const { Schema, model } = require('mongoose');
+const { defectsSchema } = require('./condition');
 
 // Grading-Shop eines Mitglieds (Mini-Game). _id = User-ID.
 // Solange active = true, gibt es keinen Tagesbonus; kündigen geht erst ab lockedUntil.
@@ -26,12 +27,7 @@ const jobSchema = new Schema(
     card: { type: String, required: true }, // Karten-ID aus dem Katalog
     customer: { type: String, required: true },
     spots: { type: [new Schema({ side: String, x: Number, y: Number, r: Number, kind: String }, { _id: false })], default: [] },
-    defects: {
-      scratches: { type: [new Schema({ x: Number, y: Number, len: Number, angle: Number }, { _id: false })], default: [] },
-      corners: { type: [Number], default: [] }, // 0 = oben links, 1 = oben rechts, 2 = unten rechts, 3 = unten links
-      edges: { type: [new Schema({ side: Number, pos: Number }, { _id: false })], default: [] }, // side wie corners: 0 oben, 1 rechts, 2 unten, 3 links
-      crease: { type: Boolean, default: false },
-    },
+    defects: { type: defectsSchema, default: () => ({}) }, // Kratzer, Ecken, Kanten, Knick (models/condition.js)
     grade: { type: Number, required: true }, // echte Note 1–10
     status: { type: String, enum: ['offen', 'fertig'], default: 'offen' },
     guess: { type: Number, default: null }, // Note des Spielers

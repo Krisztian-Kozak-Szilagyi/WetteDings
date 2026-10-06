@@ -24,7 +24,12 @@
 
   // ---------- Karte aufbauen ----------
   var card = el('div', 'gr-card' + (job.card && job.card.season ? ' season-' + job.card.season : ''), obj); // Rückseite je Season
-  var front = el('div', 'gr-face gr-front', card);
+  var front = el('div', 'gr-face gr-front' + (job.card ? ' r-' + job.card.rarity : ''), card);
+  // Zentrierung: Kartenbild sitzt im Rand (Farbe der Seltenheit) ungleich weit von den Kanten weg
+  if (job.center) {
+    front.style.setProperty('--cx', job.center.x);
+    front.style.setProperty('--cy', job.center.y);
+  }
   var img = el('img', 'gr-img', front);
   img.src = job.card ? job.card.image : '';
   img.alt = job.card ? job.card.name : '';
@@ -359,15 +364,22 @@
     });
     gradeOk.hidden = true;
     var diff = Math.abs(guess - grade);
-    var found = [];
-    if ((d.scratches || []).length) found.push(plural(d.scratches.length, 'Kratzer', 'Kratzer'));
-    if ((d.corners || []).length) found.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
-    if ((d.edges || []).length) found.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
-    if (d.crease) found.push('ein Knick');
+    // Rechenweg wie im Ablauf: 1 Obergrenze (Knick oder Zentrierung) – 2 Mängel abziehen = 3 Note
+    var minus = [];
+    if ((d.scratches || []).length) minus.push(plural(d.scratches.length, 'Kratzer', 'Kratzer'));
+    if ((d.corners || []).length) minus.push(plural(d.corners.length, 'bestoßene Ecke', 'bestoßene Ecken'));
+    if ((d.edges || []).length) minus.push(plural(d.edges.length, 'Kantenmacke', 'Kantenmacken'));
+    var c = d.centering;
+    var worst = c ? Math.max(c.lr || 50, c.tb || 50) : 50;
+    if (worst > 55) card.classList.add('is-offcenter');
+    var capBy = d.crease && 4 <= job.centerCap ? 'Knick' : job.centerCap < 10 ? 'Zentrierung ' + worst + '/' + (100 - worst) : '';
+    var cap = d.crease ? Math.min(4, job.centerCap) : job.centerCap;
+    var count = (d.scratches || []).length + (d.corners || []).length + (d.edges || []).length;
+    var calc = 'Obergrenze ' + cap + (capBy ? ' (' + capBy + ')' : '') + (count ? ' − ' + minus.join(', ') : '') + ' = Note ' + grade;
     verdict.className = 'gr-verdict ' + (diff === 0 ? 'is-right' : diff === 1 ? 'is-close' : 'is-wrong');
     verdict.innerHTML = '';
     el('strong', '', verdict).textContent = diff === 0 ? 'Exakt! Note ' + grade + '.' : diff === 1 ? 'Knapp daneben – richtig ist ' + grade + ' (halber Bonus).' : 'Daneben – richtig ist ' + grade + '.';
-    el('span', '', verdict).textContent = found.length ? ' Mängel: ' + found.join(', ') + ' – jetzt rot markiert.' : ' Die Karte war makellos.';
+    el('span', '', verdict).textContent = capBy || count ? ' ' + calc + ' – Mängel jetzt rot markiert.' : ' Die Karte war makellos.';
     verdict.hidden = false;
     gradeNext.hidden = false;
     card.classList.add('is-revealed');
@@ -401,6 +413,7 @@
   }
 
   // Versiegeln: Zeiger pendelt, Klick stoppt ihn
+  // gleiche Bezeichnungen wie GRADE_NAMES in src/grading/condition.js (Etikett der Folien)
   var GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
   var needle = bench.querySelector('[data-gr-needle]');
   var sealBtn = bench.querySelector('[data-gr-seal]');

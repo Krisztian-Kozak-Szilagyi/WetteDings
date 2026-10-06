@@ -3,7 +3,8 @@
   // mode: 'album' – Zoom-Dialog mit Verkaufen/Schützen/Favorit (public/js/tcg.js)
   //       'trade' – Handelsdialog auf /handel (public/js/handel.js)
   //       'view'  – nur ansehen; mit linkFor(cardId) öffnet ein Klick die Großansicht mit "Tausch vorschlagen"
-  //       'pick'  – Auswahl per Radio-Button (pickName, picked), funktioniert ohne JS
+  //       'pick'  – Auswahl per Radio-Button (pickName, picked), funktioniert ohne JS;
+  //                 mit pickCounts ({ cardId: Anzahl }) Mehrfachauswahl per Checkbox und Anzahl (Tausch, #76)
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
   // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
   // seenIds: schon einmal besessene Karten – fehlen sie, werden sie grau statt als "?" gezeigt
@@ -32,7 +33,7 @@
     <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>
-      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
+      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
           <span class="tcg-exam-badge"><%= lockLabel %></span>
@@ -69,9 +70,22 @@
           aria-label="<%= c.name %>, <%= r.label %>, <%= freeN %> frei – handeln">
           <% inner() %>
         </button>
+      <% } else if (mode === 'pick' && locals.pickCounts) { %>
+        <% const chosen = pickCounts[c.id] || 0; const maxN = Math.min(freeN, locals.pickMax || 5); %>
+        <div class="tcg-pick-multi">
+          <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>">
+            <input type="checkbox" name="<%= pickName %>" value="<%= c.id %>" <%= chosen ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>">
+            <% inner() %>
+          </label>
+          <% if (maxN > 1) { %>
+            <select class="tcg-pick-count" name="<%= pickName %>-anzahl-<%= c.id %>" aria-label="Anzahl <%= c.name %>">
+              <% for (let i = 1; i <= maxN; i++) { %><option value="<%= i %>" <%= i === Math.max(1, chosen) ? 'selected' : '' %>><%= i %>×</option><% } %>
+            </select>
+          <% } %>
+        </div>
       <% } else if (mode === 'pick') { %>
         <% const checked = picked === c.id; %>
-        <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>">
+        <label class="tcg-slot tcg-pick r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>">
           <input type="radio" name="<%= pickName %>" value="<%= c.id %>" required <%= checked ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>">
           <% inner() %>
         </label>
@@ -84,7 +98,7 @@
           <% inner() %>
         </button>
       <% } else { %>
-        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %>">
+        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %>">
           <% inner() %>
         </div>
       <% } %>
@@ -98,7 +112,7 @@
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </button>
       <% } else { %>
-        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen">
+        <div class="tcg-slot tcg-locked tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %> – früher besessen">
           <span class="tcg-art"><img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – früher besessen" loading="lazy" width="720" height="1008"></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
         </div>
@@ -111,17 +125,17 @@
     <% } %>
     <%# Folierte Exemplare: eigener Platz je Exemplar (Album: auch als Favorit wählbar; fremde Sammlung: ansehen und Tausch vorschlagen) %>
     <% if (isAlbum || mode === 'view') { (foiledCopies[c.id] || []).forEach((f) => { const favKey = 'f:' + f.id; const favOn = isAlbum && favoriteIds.has(favKey); %>
-      <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn } : { trade: locals.linkFor ? linkFor(favKey) : null }) %>
+      <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn, grade: f.grade, center: f.center } : { trade: locals.linkFor ? linkFor(favKey) : null, grade: f.grade, center: f.center }) %>
         aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %><%= favOn ? ', Favorit' : '' %> – ansehen">
-        <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %></span>
+        <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %></span>
         <% if (favOn) { %><span class="tcg-marks"><span class="tcg-mark tcg-mark-fav" title="Favorit"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="m12 2 3 6.6 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.2l1.4-7L2 9.4l7-.8L12 2Z"/></svg></span></span><% } %>
         <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
       </button>
     <% }) } %>
     <% if (mode === 'trade') { (foiledCopies[c.id] || []).forEach((f) => { %>
       <% if (f.lock) { %>
-        <div class="tcg-slot foil-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Diese folierte Karte ist gerade gesperrt (<%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %>)">
-          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %><span class="tcg-exam-badge"><%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %></span></span>
+        <div class="tcg-slot foil-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese folierte Karte ist gerade gesperrt (<%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %>)">
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %><span class="tcg-exam-badge"><%= f.lock === 'handel' ? 'Im Handel' : 'Auf Quest' %></span></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
         </div>
       <% } else { %>
@@ -129,7 +143,7 @@
           data-trade-card="<%= c.id %>" data-trade-copy="<%= f.id %>" data-foil-date="<%= dayDate(f.foiledAt) %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>"
           data-image="<%= c.image %>" data-free="1" data-sell-text="<%= euro(f.value) %>"
           aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %> – handeln">
-          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label }) %></span>
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span>Foliert · <%= dayDate(f.foiledAt) %></span>
         </button>
       <% } %>

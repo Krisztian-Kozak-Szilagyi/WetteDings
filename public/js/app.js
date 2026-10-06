@@ -1172,3 +1172,41 @@
     }, 'image/png');
   }
 })();
+
+// ---------- Such-/Filterknopf (partials/mkt-bar) auf allen Seiten: Auswahl je Gruppe markieren, „Filtern nach“
+// anzeigen, Menü zuklappen. Gefiltert wird im Skript der jeweiligen Seite. ----------
+(function () {
+  'use strict';
+  var bars = Array.prototype.slice.call(document.querySelectorAll('[data-mkt-bar]'));
+  if (!bars.length) return;
+  function sync(bar) {
+    var parts = [];
+    bar.querySelectorAll('.mkt-group').forEach(function (g) {
+      var active = g.querySelector('.mkt-opt.active');
+      if (active && !active.hasAttribute('data-mkt-all')) parts.push(active.getAttribute('data-label') || active.textContent.trim());
+    });
+    var current = bar.querySelector('[data-mkt-current]');
+    if (current) current.textContent = parts.join(' · ') || 'Alle';
+    bar.classList.toggle('is-filtered', parts.length > 0);
+  }
+  bars.forEach(function (bar) {
+    bar.querySelectorAll('.mkt-opt').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        var group = opt.closest('.mkt-group') || bar;
+        group.querySelectorAll('.mkt-opt').forEach(function (o) {
+          o.classList.toggle('active', o === opt);
+          o.setAttribute('aria-selected', o === opt ? 'true' : 'false');
+        });
+        sync(bar);
+        opt.blur();
+      });
+    });
+    // Enter im Suchfeld schickt kein umgebendes Formular ab (IHK, Dungeon, Tausch)
+    var input = bar.querySelector('.mkt-bar-input');
+    if (input) input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') e.preventDefault();
+    });
+  });
+  // Seiten, die eine gemerkte Auswahl wiederherstellen (Broker), sind beim "load" fertig
+  window.addEventListener('load', function () { bars.forEach(sync); });
+})();

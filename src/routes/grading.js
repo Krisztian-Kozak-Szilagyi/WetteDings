@@ -2,6 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const grading = require('../grading/gradingService');
 const catalog = require('../tcg/catalog');
+const { centerShift, centeringCap, CENTERING } = require('../grading/condition');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -30,6 +31,8 @@ router.get('/grading', async (req, res) => {
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
     // Für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server
+    // Zentrierung → Höchstnote für die Regeln beim Benoten, z. B. "55/45" → 10, …, "darüber" → 6
+    centeringScale: CENTERING.map((c, i) => ({ label: i === CENTERING.length - 1 ? 'darüber' : `${c.max}/${100 - c.max}`, cap: c.cap })),
     jobData: job
       ? {
           steps: grading.levelInfo(job.level).steps,
@@ -38,6 +41,9 @@ router.get('/grading', async (req, res) => {
           cert: String(parseInt(String(job._id).slice(-7), 16) % 100000000).padStart(8, '0'), // Zertifikatsnummer fürs Slab-Etikett
           spots: job.spots,
           defects: job.defects,
+          // Zentrierung: sichtbarer Versatz (Rand ungleich breit) und für die Auflösung die Höchstnote
+          center: centerShift(job.defects && job.defects.centering, job._id),
+          centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
           minMs: job.spots.length * grading.MS_PER_SPOT,
           startedAt: new Date(job.createdAt).getTime(),
           // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen
