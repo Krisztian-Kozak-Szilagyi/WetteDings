@@ -69,10 +69,13 @@
               <div class="gr-obj" data-gr-obj></div>
             </div>
             <div class="gr-hint" data-gr-hint></div>
-            <%# Maus-Werkzeug: Drehen oder Putzen (Tasten D und P) %>
+            <%# Messen: Ränder und Zentrierung aus den Messlinien (grading.js), nur beim Benoten %>
+            <div class="gr-measure-read" data-gr-measure-read aria-live="polite" hidden></div>
+            <%# Maus-Werkzeug: Drehen, Putzen oder Messen (Tasten D, P und M) %>
             <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
               <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
               <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
+              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
             </div>
             <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
             <div class="gr-zoom-btns">
@@ -99,7 +102,7 @@
 
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
-            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>.</p>
+            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an die Kanten des Kartenbilds und liest die Zentrierung ab.</p>
             <%# Bewertung in drei Stufen (src/grading/condition.js: gradeCap, gradeFor) – erst die Obergrenze, dann abziehen %>
             <ol class="gr-flow">
               <li class="gr-flow-step is-cap">
