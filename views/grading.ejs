@@ -71,11 +71,12 @@
             <div class="gr-hint" data-gr-hint></div>
             <%# Messen: Ränder und Zentrierung aus den Messlinien (grading.js), nur beim Benoten %>
             <div class="gr-measure-read" data-gr-measure-read aria-live="polite" hidden></div>
-            <%# Maus-Werkzeug: Drehen, Putzen oder Messen (Tasten D, P und M) %>
+            <%# Maus-Werkzeug: Drehen, Putzen, Messen oder UV-Lampe (Tasten D, P, M und U) %>
             <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
               <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
               <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
               <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
+              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode gr-mode-uv" role="radio" data-gr-mode="uv" title="UV-Lampe: Macken an Ecken und Kanten leuchten auf (Taste U)" hidden><span aria-hidden="true">🔦</span> UV-Lampe</button><% } %>
             </div>
             <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
             <div class="gr-zoom-btns">
@@ -102,7 +103,7 @@
 
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
-            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an den linken und rechten Rand des Kartenbilds und liest die seitliche Zentrierung ab.</p>
+            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an den linken und rechten Rand des Kartenbilds und liest die seitliche Zentrierung ab. Die <b>UV-Lampe</b> lässt bestoßene Ecken und Kantenmacken grün aufleuchten – fahr damit langsam am Rand entlang.</p>
             <%# Bewertung in drei Stufen (src/grading/condition.js: gradeCap, gradeFor) – erst die Obergrenze, dann abziehen %>
             <ol class="gr-flow">
               <li class="gr-flow-step is-cap">
