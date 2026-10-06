@@ -253,8 +253,8 @@
           return;
         }
         state.packsLeft = data.packsLeft;
-        // Seltenste Karte zuletzt – für die Spannung
-        state.cards = data.cards.slice().sort(function (a, b) { return a.rank - b.rank; });
+        // Reihenfolge wie gezogen (zufällig) – die Seltenheit verrät sich nicht durch den Platz
+        state.cards = data.cards.slice();
         packBtn.disabled = false;
         packBtn.classList.add('ready');
         hint.textContent = 'Tippe auf das Pack, um es aufzureißen';
@@ -383,7 +383,7 @@
 
   function finish() {
     reveal.classList.add('all-flipped');
-    var best = state.cards[state.cards.length - 1];
+    var best = state.cards.reduce(function (b, c) { return c.rank > b.rank ? c : b; });
     hint.textContent = best.rank >= RARE_RANK ? 'Wow – ' + best.name + ' (' + best.rarityLabel + ')!' : 'Alle Karten sind in deiner Sammlung.';
     flipAllBtn.hidden = true;
     againBtn.hidden = !state.packsLeft;
