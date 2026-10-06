@@ -208,51 +208,88 @@
 <% } else { %>
 <section class="stats-block" id="geraete">
   <%- blockHead('Mehrfach-Konten', 'Konten, die vom selben Gerät aus benutzt wurden.<br><strong>Sicher</strong>: derselbe Browser (Geräte-Kennung).<br><strong>Wahrscheinlich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse.<br><strong>Möglich</strong>: gleiche Geräte-Merkmale und gleiche IP-Adresse, aber gleichzeitig benutzt – kommt auch bei baugleichen Geräten vor und zählt nicht fürs Abzeichen.<br>Gleiche Geräte-Merkmale allein oder ein geteiltes Netz (z. B. Schule) ergeben keinen Hinweis.') %>
-  <div class="card">
-    <% if (!openAlerts.length) { %>
-      <p class="muted">Aktuell gibt es keine offenen Hinweise.</p>
-    <% } %>
-    <% const alertList = (list) => { %>
-      <ul class="code-list">
-        <% list.forEach((a) => { %>
-          <li class="code-item device-alert <%= a.doneAt ? 'is-used' : '' %>">
-            <div class="code-main">
-              <span class="badge device-level-<%= a.level %>"><%= a.label %></span>
+  <%
+    const shortTime = (t) => timeSpan(null, t).replace(' Uhr', '');
+    const sureCount = openAlerts.filter((a) => a.level >= 3).length;
+    const likelyPairs = openAlerts.filter((a) => a.level === 2).length;
+  %>
+  <% if (!openAlerts.length) { %>
+    <div class="card"><p class="muted">Aktuell gibt es keine offenen Hinweise.</p></div>
+  <% } else { %>
+    <div class="susp-overview">
+      <div class="susp-stat"><span class="susp-stat-value"><%= openAlerts.length %></span><span class="susp-stat-label">offene Konten-Paare</span></div>
+      <div class="susp-stat susp-stat-sure"><span class="susp-stat-value"><%= sureCount %></span><span class="susp-stat-label">davon sicher</span></div>
+      <div class="susp-stat susp-stat-likely"><span class="susp-stat-value"><%= likelyPairs %></span><span class="susp-stat-label">davon wahrscheinlich</span></div>
+    </div>
+  <% } %>
+
+  <% const pairCard = (a) => { %>
+    <article class="card susp-group susp-lvl-<%= a.doneAt ? 0 : a.level %>">
+      <header class="susp-group-head">
+        <div class="susp-who">
+          <span class="susp-avatar" aria-hidden="true">⇄</span>
+          <div>
+            <div class="susp-who-label">Konten-Paar</div>
+            <div class="susp-names">
               <% a.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
             </div>
-            <div class="code-meta small">
-              <% if (!a.shared.length) { %><span class="muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</span><% } %>
-              <% a.shared.forEach((s) => { %>
-                <div class="device-shared">
-                  <div class="muted"><%= s.label %> · <%= s.ua || 'Gerät' %></div>
-                  <% a.users.forEach((u, i) => { %>
-                    <div><strong><%= u.username %>:</strong> <%= s.logins[i].times.length ? 'Anmeldungen ' + s.logins[i].times.map((t) => date(t)).join(' · ') : 'zuletzt gesehen ' + date(s.logins[i].lastAt) %></div>
+            <div class="susp-group-sub">
+              Konten erstellt: <%= a.users.map((u) => u.username + ' ' + dayDate(u.createdAt)).join(' · ') %>
+              <% if (a.doneAt) { %> · erledigt <%= date(a.doneAt) %><% } %>
+            </div>
+          </div>
+        </div>
+        <div class="susp-group-actions">
+          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? 'Erledigt' : a.label %></span>
+          <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
+            <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
+          <% }) %>
+          <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
+            <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
+          </form>
+        </div>
+      </header>
+      <% if (!a.shared.length) { %>
+        <p class="susp-empty muted">Die Geräte-Daten dazu sind nicht mehr vorhanden.</p>
+      <% } else { %>
+        <ul class="susp-findings">
+          <% a.shared.forEach((sh) => { %>
+            <li class="susp-finding dev-shared susp-lvl-<%= a.doneAt ? 0 : sh.level %>">
+              <div class="susp-finding-body">
+                <div class="susp-finding-title">
+                  <strong><%= sh.ua || 'Gerät' %></strong>
+                  <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : sh.level %>"><%= sh.label %></span>
+                </div>
+                <div class="dev-users">
+                  <% a.users.forEach((u, i) => { const l = sh.logins[i]; %>
+                    <div class="dev-user">
+                      <div class="dev-user-head"><strong><%= u.username %></strong><span class="muted">zuletzt <%= shortTime(l.lastAt) %></span></div>
+                      <% if (l.times.length) { %>
+                        <div class="susp-facts"><% l.times.forEach((t) => { %><span class="susp-fact"><%= shortTime(t) %></span><% }) %></div>
+                      <% } else { %>
+                        <div class="susp-time">keine Anmeldezeiten gespeichert</div>
+                      <% } %>
+                    </div>
                   <% }) %>
                 </div>
-              <% }) %>
-              <div class="muted">Konten erstellt: <%= a.users.map((u) => u.username + ' ' + date(u.createdAt)).join(' · ') %></div>
-            </div>
-            <div class="code-actions">
-              <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
-                <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
-              <% }) %>
-              <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
-                <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
-              </form>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } %>
-    <% if (openAlerts.length) alertList(openAlerts); %>
-    <% if (doneAlerts.length) { %>
-      <details class="history device-done">
-        <summary>Erledigte Hinweise (<%= doneAlerts.length %>)</summary>
-        <% alertList(doneAlerts); %>
-      </details>
-    <% } %>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </article>
+  <% } %>
+
+  <div class="susp-groups">
+    <% openAlerts.forEach(pairCard) %>
   </div>
+  <% if (doneAlerts.length) { %>
+    <details class="history device-done susp-done-groups">
+      <summary>Erledigt (<%= doneAlerts.length %> <%= doneAlerts.length === 1 ? 'Konten-Paar' : 'Konten-Paare' %>)</summary>
+      <div class="susp-groups"><% doneAlerts.forEach(pairCard) %></div>
+    </details>
+  <% } %>
 </section>
 <% } %>
