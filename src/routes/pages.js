@@ -21,17 +21,22 @@ const avatars = require('../profile/avatars');
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
-// Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer
+// Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer.
+// Das Team (Admin + Devs) hat darunter eine eigene Rangliste mit eigenen Plätzen.
 router.get('/rangliste', requireLogin, async (req, res) => {
-  const leaders = await rankService.ranking();
-  // Platz über alle Mitglieder; die Suche filtert danach, damit der Platz stimmt
-  leaders.forEach((u, i) => {
-    u.rank = i + 1;
-  });
+  const all = await rankService.ranking({ team: true });
+  const players = all.filter((u) => !u.team);
+  const team = all.filter((u) => u.team);
+  // Platz innerhalb der eigenen Liste; die Suche filtert danach, damit der Platz stimmt
+  for (const list of [players, team]) {
+    list.forEach((u, i) => {
+      u.rank = i + 1;
+    });
+  }
   const q = str(req.query.suche).trim().slice(0, 30);
   const needle = q.toLowerCase();
-  const found = needle ? leaders.filter((u) => u.username.toLowerCase().includes(needle)) : leaders;
-  res.render('leaderboard', { title: 'Rangliste', leaders: found.slice(0, LEADERBOARD_LIMIT), q, memberCount: leaders.length, freshDays: rankService.FRESH_DAYS });
+  const match = (list) => (needle ? list.filter((u) => u.username.toLowerCase().includes(needle)) : list);
+  res.render('leaderboard', { title: 'Rangliste', leaders: match(players).slice(0, LEADERBOARD_LIMIT), teamLeaders: match(team), q, memberCount: players.length, freshDays: rankService.FRESH_DAYS });
 });
 
 // Öffentliches Profil eines Mitglieds (nur für angemeldete Nutzer): Sammlung, Wett-Trefferquote, Favoriten
