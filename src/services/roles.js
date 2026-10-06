@@ -8,6 +8,7 @@
 // ohne Datenbankabfrage auskommen.
 const config = require('../config');
 const User = require('../models/User');
+const { systemAuthor } = require('../forum/systemAuthors');
 
 const ASSIGNABLE = ['dev', 'mod']; // Rollen, die der Admin vergeben kann
 const byRole = { dev: new Set(), mod: new Set() }; // usernameLower je Rolle
@@ -84,6 +85,7 @@ function userLink(username, { nested = false, realName = true } = {}) {
   if (!name) return '';
   const extra = roleBadge(name, { realName });
   if (/^geloescht-/i.test(name)) return esc(name);
+  if (systemAuthor(name)) return `<span class="user-link is-system">${esc(name)}</span>`; // Börse & Co.: kein Profil
   const href = `/profil/${encodeURIComponent(name)}`;
   return nested
     ? `<span class="user-link" data-user-link="${href}" role="link" tabindex="0">${esc(name)}</span>${extra}`

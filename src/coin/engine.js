@@ -22,7 +22,6 @@ const BACKFILL_DAYS = 14; // beim allerersten Start: so viel Vorgeschichte simul
 const MAX_GAP_DAYS = 30; // längere Ausfälle werden nicht vollständig nachsimuliert
 const MINUTE_RETENTION = 3 * DAY;
 const EVENT_MIN_CHANGE = 0.1; // Ereignisse ab 10 % werden als Marktereignis gespeichert
-const TREND_REFRESH_MS = 10 * MIN; // so oft wird beim ETF die Aktivität der Seite neu bewertet
 
 const bucket = (ms, size) => Math.floor(ms / size) * size;
 
@@ -55,8 +54,7 @@ const RANGES = {
  * @param {number} cfg.startPrice
  * @param {object} cfg.params  Kursmodell (model.PARAMS, COW_PARAMS, ETF_PARAMS)
  * @param {number|null} cfg.surgeWindow  Würfelfenster für den großen Sprung in ms (null = kein großer Sprung)
- * @param {{target: () => Promise<{mu: number, sentiment: number}>, tauDays: number}|null} cfg.trend
- *        Trend (ETF): Zielwert aus der Aktivität; der Kurs-Trend folgt ihm gleitend (Zeitkonstante tauDays).
+ * @param {boolean} [cfg.report]  ETF: springt einmal am Tag nach dem Börsenbericht (jump); zeigt dessen Stimmung.
  * @param {{at: (ms: number) => object|null, params: (c: object|null) => object, storm: (c: object|null) => boolean}|null} cfg.weather
  *        Wetter (51101 Coin): at() liefert die Wetterlage zum Zeitpunkt, params() das Kursmodell dazu;
  *        der große Sprung wird nur gewürfelt, solange storm() gilt.
@@ -66,7 +64,7 @@ const RANGES = {
 function createEngine(cfg) {
   const { symbol: SYMBOL, name: NAME, kind = 'coin', startPrice: START_PRICE, params: PARAMS } = cfg;
   const SURGE_WINDOW = cfg.surgeWindow || null;
-  const trend = cfg.trend || null;
+  const REPORT = !!cfg.report;
   const weather = cfg.weather || null;
   const REBASE = cfg.rebase || null;
   const LN_MAX = model.lnMaxOf(PARAMS);
@@ -109,7 +107,6 @@ function createEngine(cfg) {
   }
 
   function advance(dtDays, atMs) {
-    if (trend) state.mu += (state.muTarget - state.mu) * (1 - Math.exp(-dtDays / trend.tauDays));
     const next = model.step(state, dtDays, Math.random, weather ? weather.params(weather.at(atMs)) : PARAMS);
     const surge = dueSurge(atMs);
     if (surge) {
@@ -235,12 +232,25 @@ function createEngine(cfg) {
     console.log(`${NAME}: Split (${type}, Kurs × ${f}) – neuer Kurs ${state.price.toFixed(4)} €`);
   }
 
-  /** ETF: Zielwert des Trends aus der Aktivität der Seite neu bestimmen */
-  async function refreshTrend() {
-    if (!trend) return;
-    const t = await trend.target();
-    state.muTarget = t.mu;
-    state.sentiment = t.sentiment;
+  /**
+   * ETF: Kurssprung nach dem Börsenbericht (Log-Rendite) und neue Stimmung (−1 … +1).
+   * Läuft erst den fälligen Tick, damit der Sprung auf dem aktuellen Kurs aufsetzt; danach sofort speichern.
+   */
+  function jump(log, sentiment) {
+    if (!state) throw new Error('Kurs-Engine läuft nicht.');
+    return exclusive(async () => {
+      tick();
+      const now = Date.now();
+      const before = state.price;
+      state.price = Math.max(PARAMS.floor, before * Math.exp(log));
+      state.sentiment = sentiment;
+      state.lastTickAt = new Date(now);
+      record(state.price, now);
+      const change = Math.expm1(log);
+      if (Math.abs(change) >= EVENT_MIN_CHANGE) pendingEvents.push({ coin: SYMBOL, at: new Date(now), type: change >= 0 ? 'anstieg' : 'einbruch', change, price: state.price });
+      await flush();
+      return { before, after: state.price };
+    });
   }
 
   async function doFlush() {
@@ -340,8 +350,8 @@ function createEngine(cfg) {
         athAt: new Date(doc.athAt),
         startedAt: new Date(doc.startedAt),
         surge: doc.surge && Number.isFinite(doc.surge.slot) ? { slot: doc.surge.slot, at: doc.surge.at ?? null, log: doc.surge.log || 0 } : null,
-        mu: doc.mu || 0,
-        muTarget: doc.muTarget || 0,
+        mu: 0, // früherer Aktivitäts-Trend des ETF (entfernt)
+        muTarget: 0,
         sentiment: doc.sentiment || 0,
         splits: doc.splits || 0,
       };
@@ -354,12 +364,10 @@ function createEngine(cfg) {
     }
     await flush();
     await refreshStats();
-    await refreshTrend().catch((err) => console.error(`${NAME}:`, err.message));
     console.log(`${NAME} läuft – aktueller Kurs ${state.price.toFixed(4)} €`);
 
     const safe = (fn) => () => Promise.resolve().then(fn).catch((err) => console.error(`${NAME}:`, err.message));
     timers = [setInterval(tick, TICK_MS), setInterval(safe(flush), FLUSH_MS), setInterval(safe(refreshStats), MIN)];
-    if (trend) timers.push(setInterval(safe(refreshTrend), TREND_REFRESH_MS));
   }
 
   async function stop() {
@@ -389,7 +397,7 @@ function createEngine(cfg) {
       ath: state.ath,
       athAt: state.athAt.getTime(),
       tickMs: TICK_MS,
-      sentiment: trend ? state.sentiment : null, // ETF: Marktstimmung −1 … +1
+      sentiment: REPORT ? state.sentiment || 0 : null, // ETF: Marktstimmung −1 … +1 (letzter Börsenbericht)
       splits: state.splits || 0, // Zahl der Splits – ändert sie sich, lädt die Broker-Seite neu
       weather: weather ? weatherNow() : null, // 51101 Coin: letzte Messung der Boje
     };
@@ -446,6 +454,7 @@ function createEngine(cfg) {
     snapshot,
     history,
     recentEvents,
+    jump,
     flush,
     exclusive,
   };
