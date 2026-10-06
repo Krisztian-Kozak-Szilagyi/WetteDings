@@ -1,8 +1,8 @@
 /**
- * Täglicher Börsenbericht um 18:30 Uhr deutscher Zeit: sammelt die Kennzahlen der letzten 24 Stunden (und der
+ * Täglicher Börsenbericht um 18:45 Uhr deutscher Zeit: sammelt die Kennzahlen der letzten 24 Stunden (und der
  * Vortage zum Vergleich), lässt den BfW-TCG ETF entsprechend springen und veröffentlicht den Bericht im Forum
  * (Bereich „Börsenbericht“, Verfasser „Börse“). Die Rechnung steht in marketReport.js.
- * Läuft höchstens einmal pro Tag (MarketReport mit dem Tag als _id); war der Server um 18:30 aus, folgt der
+ * Läuft höchstens einmal pro Tag (MarketReport mit dem Tag als _id); war der Server um 18:45 aus, folgt der
  * Bericht beim nächsten Start desselben Tages.
  */
 const config = require('../config');
@@ -15,7 +15,7 @@ const report = require('./marketReport');
 const markets = require('./markets');
 const { BOERSE } = require('../forum/systemAuthors');
 
-const REPORT_TIME = '18:30';
+const REPORT_TIME = '18:45';
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const HISTORY_DAYS = 30;
