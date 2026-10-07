@@ -115,10 +115,14 @@ async function revokeCards({ userId, cardId, count = 1 }) {
     const ids = free.slice(0, count).map((d) => d._id);
     const res = await TcgCard.deleteMany({ _id: { $in: ids }, user: userId }, { session });
     if (res.deletedCount !== ids.length) throw new UserError('Der Bestand hat sich geändert. Bitte versuche es erneut.');
-    return { card, removed: ids.length, remaining: owned.length - ids.length, docs: ids };
+    const remaining = owned.length - ids.length;
+    // Letztes Exemplar weg: auch „schon besessen“ (Album) und „selbst erbeutet“ entfernen, dazu Favoriten/Schutz –
+    // eine entzogene Karte soll aussehen, als hätte das Mitglied sie nie gehabt
+    if (!remaining) {
+      await User.updateOne({ _id: userId }, { $pull: { tcgSeen: card.id, tcgLooted: card.id, tcgFavorites: card.id, tcgProtected: card.id } }, { session });
+    }
+    return { card, removed: ids.length, remaining, docs: ids };
   });
-  // Favoriten/Schutz aufräumen, falls das letzte Exemplar weg ist
-  if (!result.remaining) await User.updateOne({ _id: userId }, { $pull: { tcgFavorites: card.id, tcgProtected: card.id } });
   await notify(userId, { area: 'TCG', href: '/tcg/album', text: `Das Team hat ${result.removed > 1 ? result.removed + ' Exemplare' : 'ein Exemplar'} von „${card.name}“ aus deiner Sammlung entfernt.` });
   return result;
 }
