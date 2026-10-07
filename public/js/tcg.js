@@ -200,13 +200,16 @@
   // ---------- Album: nach Favorit, Schützen oder Verkaufen an derselben Stelle weiter (#131) ----------
   // Die Aktionen sind Formulare und laden das Album neu – vorher merken wir uns Scroll-Position und Karte.
   // Danach: gleiche Stelle, das Kartenfenster wieder offen und die Meldung darin (sonst unten als kurzer Hinweis).
+  var BACK_KEY = 'tcg-album-back';
+  var session = {
+    get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
+    set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
+    clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
+  };
+  // Führt eine Aktion woandershin (ein neuer Favorit z. B. zur TCG-Seite), verfällt der Merker dort – sonst fände
+  // man beim nächsten Besuch im Album unerwartet das alte Kartenfenster offen (der Referrer ist leer: no-referrer)
+  if (window.location.pathname !== '/tcg/album') session.clear();
   if (window.location.pathname === '/tcg/album') {
-    var BACK_KEY = 'tcg-album-back';
-    var session = {
-      get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
-      set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
-      clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
-    };
     // app.js fragt vorher nach (data-confirm) – wer abbricht, bleibt einfach hier
     document.addEventListener('submit', function (e) {
       var f = e.target;
