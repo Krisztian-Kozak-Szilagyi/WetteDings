@@ -15,7 +15,7 @@ const { IhkRun } = require('../models/Ihk');
 const { DungeonRun } = require('../models/Dungeon');
 const catalog = require('../tcg/catalog');
 const { questById } = require('../ihk/quests');
-const { dungeonByKey } = require('../dungeon/dungeons');
+const { defOf } = require('../dungeon/dungeons');
 const { euro } = require('../lib/viewHelpers');
 const logs = require('../stats/logs');
 const { tradeFlow } = require('./suspicionLogic');
@@ -50,9 +50,9 @@ function matchOrigin(copy, owner, { grants = [], dungeons = [], markets = [] } =
   const grant = grants.find((g) => g.type === copy.card && (g.all || String(g.to) === owner) && near(g.createdAt, copy.createdAt, ORIGIN_SLACK_MS));
   if (grant) return { kind: 'vergabe', at: grant.createdAt, text: `Vom Team vergeben (${grant.byName})${grant.reason ? `: ${grant.reason}` : ''}` };
   for (const r of dungeons) {
-    const d = dungeonByKey[r.dungeon];
+    const d = defOf(r.dungeon);
     if (!d || d.bossCard !== copy.card || !near(r.updatedAt || r.endsAt, copy.createdAt, DUNGEON_SLACK_MS)) continue;
-    if ((r.members || []).some((m) => m.bossCard && String(m.user) === owner)) return { kind: 'dungeon', at: r.endsAt, text: `Boss-Beute im Dungeon „${d.title}“` };
+    if ((r.members || []).some((m) => m.bossCard && String(m.user) === owner)) return { kind: 'dungeon', at: r.endsAt, text: `Boss-Beute im ${d.floors ? '' : 'Dungeon '}„${d.title}“` };
   }
   for (const day of markets) {
     const o = (day.offers || []).find((x) => x.card === copy.card && String(x.buyer) === owner && near(x.soldAt, copy.createdAt, ORIGIN_SLACK_MS));
@@ -227,9 +227,10 @@ async function historyOf(docId) {
         return `In der IHK-Quest „${q ? q.title : e.quest}“ eingesetzt von ${name(e.who)} (${e.main ? 'Hauptkarte' : 'Boost'}, ${result})`;
       }
       case 'dungeon': {
-        const d = dungeonByKey[e.dungeon];
-        const result = e.status === 'fertig' ? (e.success ? 'Boss besiegt' : 'Rückzug') : 'läuft';
-        return `Im Dungeon „${d ? d.title : e.dungeon}“ eingesetzt von ${name(e.who)} (${e.main ? 'Charakter' : 'Boost'}, ${result})`;
+        const d = defOf(e.dungeon);
+        const tower = !!(d && d.floors);
+        const result = e.status === 'fertig' ? (tower ? 'beendet' : e.success ? 'Boss besiegt' : 'Rückzug') : 'läuft';
+        return `Im ${tower ? '' : 'Dungeon '}„${d ? d.title : e.dungeon}“ eingesetzt von ${name(e.who)} (${e.main ? 'Charakter' : 'Boost'}, ${result})`;
       }
       case 'folie':
         return `Foliert${e.grade !== null && e.grade !== undefined ? ` – Note ${e.grade}` : ''}`;

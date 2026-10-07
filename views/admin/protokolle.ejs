@@ -26,7 +26,7 @@
     packs: 'Jedes geöffnete Booster Pack mit allen gezogenen Karten (seltene ab Holo fett). Pack-Art und Herkunft gibt es erst für Packs, die seit diesem Update geöffnet wurden.',
     verkauf: 'Karten und Gegenstände, die an die Bank verkauft wurden, und Käufe im Black Market (Karten und Gegenstände). Verkäufe zwischen Spielern stehen im Handel-Log.',
     ihk: 'Jede gestartete IHK-Quest mit eingesetzten Karten, Ergebnis, Lohn und Pack-Fund. Bei laufenden Quests steht das Ergebnis schon fest, wird hier aber erst nach Ablauf gezeigt.',
-    dungeon: 'Jeder Dungeon-Durchlauf mit Gruppe, eingesetzten Karten und Beute je Spieler. Bots sind kursiv, ein gesuchter Spieler ist fett.',
+    dungeon: 'Jeder Dungeon- und Mage-Tower-Durchlauf mit Gruppe, eingesetzten Karten und Beute je Spieler. Bots sind kursiv, ein gesuchter Spieler ist fett.',
     wetten: 'Jede Wette mit Ersteller, Schiedsrichter, Topf und wie sie ausgegangen ist – wer sie entschieden hat und mit welcher Begründung. Mit einem Spieler: alle Wetten, die er erstellt, geschiedst oder mitgewettet hat.',
     einsaetze: 'Jeder Einsatz: wer auf welche Option gesetzt hat, wie viel und was nach der Auswertung ausgezahlt wurde.',
     broker: 'Jeder Kauf und Verkauf beim Broker (Coins und ETF) mit Menge, Kurs und Betrag – bei Verkäufen der Erlös nach Steuer auf den Gewinn.',
@@ -227,7 +227,7 @@
                   <td><%= r.dungeon %></td>
                   <td class="nowrap">
                     <% if (r.running) { %><span class="badge badge-wartend">Läuft</span><br><span class="muted small">bis <%= dateSec(r.at) %></span>
-                    <% } else { %><span class="badge <%= r.success ? 'badge-entschieden' : 'badge-streitig' %>"><%= r.success ? 'Boss besiegt' : 'Rückzug' %></span><br><span class="muted small"><%= r.progress %> Kämpfe<%= r.failedAt ? ' · gescheitert an ' + r.failedAt : '' %></span><% } %>
+                    <% } else { %><span class="badge <%= r.success ? 'badge-entschieden' : 'badge-streitig' %>"><%= r.result %></span><br><span class="muted small"><%= r.tower ? 'geschafft' : r.progress + ' Kämpfe' %><%= r.failedAt ? ' · gescheitert an ' + r.failedAt : '' %></span><% } %>
                   </td>
                   <td>
                     <% r.members.forEach((m) => {

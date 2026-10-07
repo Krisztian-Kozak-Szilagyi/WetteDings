@@ -103,7 +103,8 @@ async function findAll(now = new Date()) {
     Ledger.find({ type: 'einsatz', createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
     IhkRun.find({ createdAt: { $gt: ihkSince }, collectedAt: { $ne: null } }).select('user createdAt endsAt collectedAt').lean(),
     // mindestens ein echter Spieler ('members.user': { $ne: null } schlösse jeden Durchlauf mit Bot aus)
-    DungeonRun.find({ slot: { $gt: dungeonSince }, members: { $elemMatch: { user: { $ne: null } } } }).select('slot status members.user members.joinedAt members.seen').lean(),
+    // ohne Mage Tower: der hat keinen Termin, die Anmelde-Zeiten sagen dort nichts über Automatik
+    DungeonRun.find({ mode: { $ne: 'tower' }, slot: { $gt: dungeonSince }, members: { $elemMatch: { user: { $ne: null } } } }).select('slot status members.user members.joinedAt members.seen').lean(),
     GradingJob.find({ status: 'fertig', doneAt: { $gt: ihkSince } }).select('user createdAt doneAt clean seal spots.x').lean(),
     ScriptSignal.find({ day: { $in: daysBetween(awakeSince, now) } }).lean(),
     ActionTrace.find({ at: { $gt: since } }).select('user dev net at').lean(),
