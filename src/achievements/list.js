@@ -139,13 +139,14 @@ const ACHIEVEMENTS = [
   {
     key: 'archivar',
     name: 'Der Archivar',
-    text: 'Halte mindestens die Hälfte aller Karten einmal in den Händen (dein Album zählt jede Karte, die du je besessen hast).',
+    text: 'Erbeute mindestens die Hälfte aller Karten selbst – aus Booster Packs, als Boss-Beute oder im Black Market. Karten aus dem Handel zählen nicht.',
     icon: { glyph: 'cards', tone: 'gold', frame: 'bronze' },
+    // #127: nur selbst erbeutete Karten (tcgLooted) – nicht Handel, Duell oder Vergabe. Wer ihn schon hat, behält ihn.
     holders: async () => {
       const ids = catalog.CARDS.filter((c) => !(catalog.rarityByKey[c.rarity] || {}).dropOnly && !(catalog.rarityByKey[c.rarity] || {}).hidden).map((c) => c.id);
       const half = Math.ceil(ids.length / 2);
       if (!half) return [];
-      return User.distinct('_id', { deletedAt: null, $expr: { $gte: [{ $size: { $setIntersection: [{ $ifNull: ['$tcgSeen', []] }, ids] } }, half] } });
+      return User.distinct('_id', { deletedAt: null, $expr: { $gte: [{ $size: { $setIntersection: [{ $ifNull: ['$tcgLooted', []] }, ids] } }, half] } });
     },
   },
   {

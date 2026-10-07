@@ -96,6 +96,35 @@ async function migrate() {
     console.log(`Migration: "schon besessen" für ${ids.length} Konto/Konten nachgetragen.`);
   }
 
+  // "Selbst erbeutet" (tcgLooted, #127) für Altbestand nachtragen – zählt für den Erfolg „Der Archivar“: alle
+  // geöffneten Packs, Boss-Karten aus Dungeon und Mage Tower, Käufe im Black Market. Nicht: Handel, Duell, Vergabe.
+  // Läuft vor dem Serverstart nur für Konten, die das Feld noch nicht haben.
+  const lootTodo = await User.find({ tcgLooted: { $exists: false } }).select('_id').lean();
+  if (lootTodo.length) {
+    const { DungeonRun } = require('./models/Dungeon');
+    const BlackMarket = require('./models/BlackMarket');
+    const { defOf } = require('./dungeon/dungeons');
+    const catalog = require('./tcg/catalog');
+    const ids = lootTodo.map((u) => u._id);
+    const looted = new Map(ids.map((id) => [String(id), new Set()]));
+    const add = (user, card) => user && card && looted.has(String(user)) && catalog.cardById[card] && looted.get(String(user)).add(card);
+    const [openings, runs, markets] = await Promise.all([
+      TcgOpening.find({ user: { $in: ids } }).select('user cards.card').lean(),
+      DungeonRun.find({ status: 'fertig', 'members.bossCard': true }).select('dungeon members.user members.bossCard').lean(),
+      BlackMarket.find({ 'offers.buyer': { $in: ids } }).select('offers.card offers.buyer').lean(),
+    ]);
+    for (const o of openings) for (const c of o.cards) add(o.user, c.card);
+    for (const r of runs) {
+      const d = defOf(r.dungeon);
+      for (const m of r.members) if (m.bossCard && d && d.bossCard) add(m.user, d.bossCard);
+    }
+    for (const day of markets) for (const o of day.offers) add(o.buyer, o.card); // Gegenstände ("item:…") sind keine Karten
+    await User.bulkWrite(
+      ids.map((id) => ({ updateOne: { filter: { _id: id, tcgLooted: { $exists: false } }, update: { $set: { tcgLooted: [...looted.get(String(id))] } } } }))
+    );
+    console.log(`Migration: "selbst erbeutet" für ${ids.length} Konto/Konten nachgetragen.`);
+  }
+
   // Gelöschte Konten, auf denen sich (vor dem Fix in payOut) noch Auszahlungen gesammelt haben: Guthaben verfällt,
   // mit Buchung, damit die Summe aller Buchungen weiter der Geldmenge entspricht
   const shells = await User.find({ deletedAt: { $ne: null }, balance: { $gt: 0 } }).select('_id balance').lean();

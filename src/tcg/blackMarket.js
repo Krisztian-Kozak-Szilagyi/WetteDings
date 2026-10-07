@@ -173,7 +173,7 @@ async function buy({ user, index, now = Date.now() }) {
     if (card) {
       await TcgCard.create([{ user: user._id, card: card.id, rarity: card.rarity }], { session });
       await Ledger.create([{ user: user._id, type: 'black_market', amount: -offer.price, betTitle: `${card.name} (${catalog.rarityByKey[card.rarity].label})`, meta: { card: card.id, rarity: card.rarity } }], { session });
-      await markSeen(user._id, [card.id], session);
+      await markSeen(user._id, [card.id], session, { looted: true }); // zählt als selbst erbeutet (#127)
     } else {
       await itemService.addItems({ userIds: [user._id], type: item.key, source: 'blackmarket', session });
       await Ledger.create([{ user: user._id, type: 'black_market', amount: -offer.price, betTitle: `${item.label} (Gegenstand)`, meta: { item: item.key, count: 1 } }], { session });

@@ -51,10 +51,16 @@ async function buyPack({ user, type, count = 1 }) {
   });
 }
 
-/** Karten als "schon besessen" merken (Album, "Neu" beim Packöffnen). Optional in einer Transaktion. */
-async function markSeen(userId, cardIds, session) {
+/**
+ * Karten als "schon besessen" merken (Album, "Neu" beim Packöffnen). Optional in einer Transaktion.
+ * looted: selbst erbeutet (Pack, Black Market) – zählt dann auch für den Erfolg „Der Archivar“ (#127); Handel nicht.
+ */
+async function markSeen(userId, cardIds, session, { looted = false } = {}) {
   const ids = [...new Set(cardIds.filter(Boolean))];
-  if (ids.length) await User.updateOne({ _id: userId }, { $addToSet: { tcgSeen: { $each: ids } } }, { session });
+  if (!ids.length) return;
+  const add = { tcgSeen: { $each: ids } };
+  if (looted) add.tcgLooted = { $each: ids };
+  await User.updateOne({ _id: userId }, { $addToSet: add }, { session });
 }
 
 const packGiftText = (t, count) => `Du hast ${count > 1 ? count + '× ' : 'ein '}${t.label} geschenkt bekommen.`;
@@ -162,7 +168,7 @@ async function openPack({ user, type }) {
       seen.add(c.id);
       return true;
     });
-    await markSeen(user._id, drawn.map((c) => c.id), session);
+    await markSeen(user._id, drawn.map((c) => c.id), session, { looted: true });
     const packsLeft = await TcgPack.countDocuments({ user: user._id, type: t.key }).session(session);
     return { cards: drawn, isNew, packsLeft, openingId: opening._id };
   });

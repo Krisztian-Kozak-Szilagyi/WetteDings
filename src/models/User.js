@@ -25,6 +25,9 @@ const userSchema = new Schema(
     // TCG: Karten-IDs, die man schon einmal besessen hat (auch nach Verkauf) – Album zeigt sie durchsichtig,
     // beim Packöffnen sind die übrigen "Neu". Fehlt das Feld (Altbestand), füllt es die Migration beim Start.
     tcgSeen: { type: [String], default: undefined },
+    // TCG: Karten-IDs, die man selbst erbeutet hat – Pack, Dungeon-/Turm-Bosskarte, Black Market; nicht über Handel,
+    // Duell oder Vergabe (#127). Zählt für den Erfolg „Der Archivar“. Fehlt das Feld, füllt es die Migration beim Start.
+    tcgLooted: { type: [String], default: undefined },
     // Letzte Namensänderung (Wartezeit bis zur nächsten)
     usernameChangedAt: { type: Date, default: null },
     // Einwilligung in die Übermittlung der Chat-Nachrichten an den KI-Dienst (Support-Chat)
