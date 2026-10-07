@@ -78,9 +78,17 @@ const TEST_HELDEN = {
   'heart-of-the-grove-test-item': held('Heart of the Grove', [2, 0, 0, 2], 'Segen des Waldes', (k, e) => `Wähle eine Karte in deiner Hand: +${e.staerken.ang} ANG, +${e.staerken.sch} SCH und ${e.staerken.kosten} Energie billiger.`, { staerken: { ang: 3, sch: 2, kosten: 1 } }, 'feuer', 'hain'),
 };
 
+// Season-1-Karten ohne Werte, noch nicht erhältlich (unreleased, siehe catalog.js). Bilder: Footman = Original,
+// Gold/Holo/Arcane erzeugt mit scripts/rarity-variants.js.
+const unreleased = (name, ids) => Object.fromEntries(ids.map((id) => [id, { season: 'season-1', name, unreleased: true }]));
+const SEASON1_UNRELEASED = {
+  ...unreleased('Mark Suntouched', ['mark-suntouched-1-footman', 'mark-suntouched-2-gold', 'mark-suntouched-3-holo', 'mark-suntouched-4-arcane']),
+};
+
 module.exports = {
   ...TEST_ITEMS,
   ...TEST_HELDEN,
+  ...SEASON1_UNRELEASED,
   'st-ivan-boss': {
     season: 'season-1',
     frame: 'gilded',
