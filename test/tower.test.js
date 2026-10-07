@@ -110,3 +110,22 @@ test('Seltene Beute aus dem Turm heißt „Mage Tower“', () => {
   assert.equal(list[0].dungeon, 'Mage Tower');
   assert.equal(list[0].card.name, card(TOWER.bossCard).name);
 });
+
+test('Mage Tower: jede Karte nur einmal im Team (auch nicht als Charakter und Boost)', () => {
+  const members = [
+    { user: 'a', card: 'krisz-6-glitch', boost: 'kaffee' },
+    { user: 'b', card: null, boost: null },
+  ];
+  assert.equal(d.towerDuplicate(members, 'b', 'krisz-6-glitch', null), 'krisz-6-glitch'); // schon bei A
+  assert.equal(d.towerDuplicate(members, 'b', 'z', 'kaffee'), 'kaffee'); // A hat sie als Boost
+  assert.equal(d.towerDuplicate(members, 'b', 'z', 'z'), 'z'); // selbst doppelt
+  assert.equal(d.towerDuplicate(members, 'b', 'z', 'y'), null);
+  assert.equal(d.towerDuplicate(members, 'a', 'krisz-6-glitch', 'kaffee'), null); // eigene Wahl zählt nicht gegen sich selbst
+  assert.deepEqual([...d.teamTaken(members, 'b')].sort(), ['kaffee', 'krisz-6-glitch']);
+  // Bots im Turm: keine Karte doppelt, auch nicht die der Spieler
+  for (let i = 0; i < 100; i++) {
+    const team = d.fillBots([{ user: 'u1', name: 'A', card: 'krisz-3-gold', boost: null }], 'tower');
+    const ids = team.flatMap((m) => [m.card, m.boost]).filter(Boolean);
+    assert.equal(new Set(ids).size, ids.length);
+  }
+});

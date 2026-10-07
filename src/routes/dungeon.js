@@ -134,7 +134,9 @@ router.get('/dungeon', async (req, res) => {
     towerShown: dungeon.towerOpen(req.user),
     towerTitle: TOWER.title,
     towerPlayed,
-    towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower')),
+    towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost)),
+    // Mage Tower: Karten, die Mitspieler schon gewählt haben (jede Karte nur einmal im Team)
+    teamTaken: tower && party ? dungeon.teamTaken(party.members, me) : new Set(),
     towerSettings: dungeon.settings.tower,
     nextDungeon: next,
     run,
