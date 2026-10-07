@@ -26,6 +26,8 @@
     </section>
 
     <section class="bf-player" aria-label="Spieler">
+      <%# Laufende Effekte (Fluch, Nachladen, Block): Kartenbild im Kreis, der Ring zeigt die verbleibenden Runden %>
+      <div class="bf-effects" data-bf-effects aria-label="Laufende Effekte"></div>
       <img class="bf-avatar" src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="84" height="84">
       <div class="bf-player-name"><%= currentUser.username %></div>
       <div class="bf-hp bf-hp-player" data-bf-hp="player" data-max="100">

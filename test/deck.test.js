@@ -20,6 +20,10 @@ test('Regeln: 30 Karten, 2 gleiche, Boss 1, ein Deck', () => {
   assert.strictEqual(deck.MAX_DECKS, 1);
   assert.strictEqual(deck.copyLimit(cards.a), 2);
   assert.strictEqual(deck.copyLimit(cards.boss), 1);
+  // ausrüstbare Items nur 1-mal, Helden-Karten wie normale Karten
+  assert.strictEqual(deck.copyLimit({ rarity: 'test-item', kampf: { typ: 'waffe' } }), 1);
+  assert.strictEqual(deck.copyLimit({ rarity: 'test-item', kampf: { typ: 'schild' } }), 1);
+  assert.strictEqual(deck.copyLimit({ rarity: 'test-item', kampf: { typ: 'held' } }), 2);
 });
 
 test('alle Karten dürfen ins Deck, auch ohne Kampfwerte', () => {
