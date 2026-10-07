@@ -158,8 +158,9 @@ function createApp() {
   });
   // Abzeichen im Menü. Alle Zähler laufen gleichzeitig – so kostet das pro Seitenaufruf nur die Dauer der
   // langsamsten Abfrage statt der Summe aller (die Datenbank liegt nicht auf diesem Server).
+  // Nur bei echten Seitenaufrufen: Hintergrund-Abfragen (Kurse, Live-Stand, Dungeon alle paar Sekunden) brauchen kein Menü.
   app.use(async (req, res, next) => {
-    if (req.user && req.method === 'GET') {
+    if (req.user && req.method === 'GET' && require('./stats/activity').isPageRequest(req)) {
       const u = req.user;
       const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, bell, achPopup, giftPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
