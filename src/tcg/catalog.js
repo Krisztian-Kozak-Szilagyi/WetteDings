@@ -57,7 +57,15 @@ const DROP_RARITIES = [
   { key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true },
   { key: 'test-item', label: 'Test-Item', weight: 0, sell: 0, dropOnly: true, noBank: true, hidden: true },
 ];
-const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES];
+// Season-1-Seltenheiten, noch nicht veröffentlicht: Footman (Stufe wie BFWler) und Arcane (Stufe wie Glitch).
+// Gold und Holo nutzen die bestehenden Seltenheiten. Chance und Wert legen wir bei der Veröffentlichung fest –
+// bis dahin geheim, ohne Wert und nicht in RARITIES (Pack-Chancen und Admin-Panel bleiben unberührt).
+const SEASON1_RARITIES = [
+  { key: 'footman', label: 'Footman', weight: 0, sell: 0, noBank: true, hidden: true },
+  { key: 'arcane', label: 'Arcane', weight: 0, sell: 0, noBank: true, hidden: true },
+];
+// Neue Seltenheiten immer hinten anhängen: rank = Position, und PackOpening.best speichert den rank
+const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES, ...SEASON1_RARITIES];
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
 // Die Chancen ergeben dabei immer zusammen TOTAL_WEIGHT (= 100 %).
 const DEFAULT_SELL = Object.fromEntries(RARITIES.map((r) => [r.key, r.sell]));
@@ -126,6 +134,8 @@ function loadCards(dir = IMAGE_DIR) {
       };
       // Kampfwerte (eigener Block, nur neue Karten) für den kommenden Kampfmodus
       if (data && data.kampf) card.kampf = data.kampf;
+      // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
+      if (data && data.unreleased) card.unreleased = true;
       if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
@@ -135,7 +145,11 @@ function loadCards(dir = IMAGE_DIR) {
     .sort((a, b) => rarityByKey[a.rarity].rank - rarityByKey[b.rarity].rank || a.name.localeCompare(b.name, 'de'));
 }
 
-const CARDS = loadCards();
+// Unveröffentlichte Karten stehen in keiner Liste (Packs, Album, Black Market, Grading, Erfolge, Admin-Vergabe …).
+// Veröffentlichen = unreleased in cardData.js entfernen.
+const LOADED = loadCards();
+const CARDS = LOADED.filter((c) => !c.unreleased);
+const UNRELEASED_CARDS = LOADED.filter((c) => c.unreleased);
 const cardById = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const cardsByRarity = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
 const cardsBySeason = Object.fromEntries(SEASONS.map((s) => [s.key, CARDS.filter((c) => c.season === s.key)]));
@@ -222,6 +236,7 @@ module.exports = {
   DEFAULT_WEIGHT,
   TOTAL_WEIGHT,
   CARDS,
+  UNRELEASED_CARDS,
   rarityByKey,
   visibleRarities,
   cardById,

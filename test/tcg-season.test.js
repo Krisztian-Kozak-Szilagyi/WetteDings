@@ -44,6 +44,12 @@ test('Alle anderen Karten gehören zur Pre-Season', () => {
 
 test('cardData.js: jede Karte hat Bild, gültige Season, Rahmen und vier Werte', () => {
   for (const [id, d] of Object.entries(CARD_DATA)) {
+    // unveröffentlichte Karten: nur Bild und Season, noch ohne Rahmen und Werte
+    if (d.unreleased) {
+      assert.ok(catalog.UNRELEASED_CARDS.some((c) => c.id === id), `${id}: kein passendes Bild in public/img/tcg`);
+      assert.ok(catalog.seasonByKey[d.season], `${id}: unbekannte Season`);
+      continue;
+    }
     assert.ok(catalog.cardById[id], `${id}: kein passendes Bild in public/img/tcg`);
     assert.ok(catalog.seasonByKey[d.season], `${id}: unbekannte Season`);
     assert.ok(FRAMES[d.frame], `${id}: unbekannter Rahmen`);
