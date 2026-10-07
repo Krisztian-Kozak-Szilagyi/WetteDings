@@ -74,7 +74,50 @@
 </div>
 <% } %>
 
-<% if (section === 'auszug') { %>
+<% if (section === 'auszug') { const pageLink = (p) => '/konto/auszug?' + (coin ? 'coin=' + coin.symbol + '&' : '') + 'seite=' + p; %>
+<%# Unterreiter (#129): alle Buchungen, dazu je gehandeltem Broker-Wert ein Reiter mit Bilanz und Orders %>
+<% if (coinTabs.length) { %>
+  <nav class="tabs ledger-tabs" aria-label="Kontoauszug">
+    <a href="/konto/auszug" class="tab <%= coin ? '' : 'active' %>">Alle Buchungen</a>
+    <% coinTabs.forEach((t) => { %><a href="/konto/auszug?coin=<%= t.symbol %>" class="tab <%= coin && coin.symbol === t.symbol ? 'active' : '' %>"><%= t.name %></a><% }) %>
+  </nav>
+<% } %>
+<% if (coin) { const b = balance; %>
+<div class="card" id="auszug">
+  <h2><%= coin.name %> <span class="muted small">(<%= led.total %> <%= led.total === 1 ? 'Order' : 'Orders' %>)</span></h2>
+  <div class="stats stats-auto ledger-coin-stats">
+    <div class="stat"><span class="stat-label">Bestand</span><span class="stat-value"><%= coinAmount(b.units, coin.symbol) %></span><span class="muted small">≈ <%= euro(b.value) %> zum Kurs <%= coinPrice(b.price) %></span></div>
+    <div class="stat"><span class="stat-label">Gekauft für</span><span class="stat-value"><%= euro(b.invested) %></span></div>
+    <div class="stat"><span class="stat-label">Verkauft für</span><span class="stat-value"><%= euro(b.proceeds) %></span><span class="muted small">nach <%= euro(b.tax) %> Steuer</span></div>
+    <div class="stat"><span class="stat-label">Gewinn/Verlust</span><span class="stat-value <%= b.result > 0 ? 'pos' : b.result < 0 ? 'neg' : '' %>"><%= b.result > 0 ? '+' : '' %><%= euro(b.result) %></span><span class="muted small">Verkäufe + heutiger Bestand − Käufe</span></div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Datum</th><th>Order</th><th class="num">Menge</th><th class="num">Kurs</th><th class="num">Betrag</th><th class="num hide-sm">Steuer</th></tr></thead>
+      <tbody>
+        <% trades.forEach((t) => { const buy = t.side === 'kauf'; %>
+          <tr>
+            <td class="nowrap"><%= date(t.createdAt) %></td>
+            <td><%= buy ? 'Kauf' : 'Verkauf' %></td>
+            <td class="num nowrap"><%= coinAmount(t.units, coin.symbol) %></td>
+            <td class="num nowrap"><%= coinPrice(t.price) %></td>
+            <td class="num nowrap <%= buy ? 'neg' : 'pos' %>"><%= buy ? '−' : '+' %><%= euro(t.cents) %></td>
+            <td class="num nowrap hide-sm muted"><%= t.tax ? euro(t.tax) : '–' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small">Mengen stehen so, wie sie bei der Order waren (ein späterer Split ändert sie nicht). <a href="/broker/<%= coin.symbol.toLowerCase() %>">Zum Broker →</a></p>
+  <% if (led.pages > 1) { %>
+    <div class="log-pager">
+      <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= pageLink(led.page - 1) %>">← Neuere</a><% } %>
+      <span class="muted small">Seite <%= led.page %> / <%= led.pages %></span>
+      <% if (led.page < led.pages) { %><a class="btn btn-ghost btn-sm" href="<%= pageLink(led.page + 1) %>">Ältere →</a><% } %>
+    </div>
+  <% } %>
+</div>
+<% } else { %>
 <div class="card" id="auszug">
   <h2>Kontoauszug <span class="muted small">(<%= led.total %>)</span></h2>
   <div class="table-wrap">
@@ -91,14 +134,15 @@
       </tbody>
     </table>
   </div>
-  <% if (led.pages > 1) { const link = (p) => '/konto/auszug?seite=' + p; %>
+  <% if (led.pages > 1) { %>
     <div class="log-pager">
-      <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page - 1) %>">← Neuere</a><% } %>
+      <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= pageLink(led.page - 1) %>">← Neuere</a><% } %>
       <span class="muted small">Seite <%= led.page %> / <%= led.pages %></span>
-      <% if (led.page < led.pages) { %><a class="btn btn-ghost btn-sm" href="<%= link(led.page + 1) %>">Ältere →</a><% } %>
+      <% if (led.page < led.pages) { %><a class="btn btn-ghost btn-sm" href="<%= pageLink(led.page + 1) %>">Ältere →</a><% } %>
     </div>
   <% } %>
 </div>
+<% } %>
 <% } %>
 
 <% if (section === 'gruppen') { %>

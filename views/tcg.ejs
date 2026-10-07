@@ -71,22 +71,8 @@
       <% } else if (!favorites.length) { %>
         <p class="muted small">Zeig hier bis zu <%= maxFavorites %> Lieblingskarten: Öffne dein Album, tippe eine Karte an und wähle „Als Favorit zeigen“.</p>
       <% } %>
-      <div class="tcg-grid tcg-favs">
-        <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity]; %>
-          <% if (fv.foiledAt) { %>
-            <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt, { grade: fv.grade, center: fv.center }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
-              <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade, center: fv.center }) %></span>
-            </button>
-          <% } else { %>
-            <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
-              <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-            </a>
-          <% } %>
-        <% }) %>
-        <% for (let i = favorites.length; i < maxFavorites; i++) { %>
-          <a class="tcg-slot tcg-fav-empty" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><span>+</span></a>
-        <% } %>
-      </div>
+      <%# Klick vergrößert wie im Album, dort „Favorit entfernen“ (#130, partials/fav-grid) %>
+      <%- include('partials/fav-grid', { favorites, max: maxFavorites }) %>
     </div>
 
     <a class="tcg-album-tile" href="/tcg/album">
@@ -180,6 +166,8 @@
   </div>
 </div>
 
-<%- include('partials/foil-modal') %>
+<%- include('partials/card-zoom', { favForm: true }) %>
+<%- include('partials/foil-modal', { favForm: true }) %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/favorites.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

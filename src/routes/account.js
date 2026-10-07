@@ -5,7 +5,9 @@ const Position = require('../models/Position');
 const Ledger = require('../models/Ledger');
 const { requireLogin } = require('../middleware');
 const { str } = require('../lib/util');
-const { coinValueCents } = require('../coin/tradeService');
+const { coinValueCents, valueCents } = require('../coin/tradeService');
+const markets = require('../coin/markets');
+const { CoinTrade, CoinHolding } = require('../models/Coin');
 const { cardValueCents, inventory } = require('../tcg/tcgService');
 const catalog = require('../tcg/catalog');
 const grading = require('../grading/gradingService');
@@ -82,11 +84,35 @@ router.get('/konto/wetten', requireLogin, async (req, res) => {
   show(res, 'wetten', { positions: positions.filter((p) => p.bet), bets });
 });
 
+// Kontoauszug: Reiter „Alle Buchungen“ und je gehandeltem Broker-Wert ein Reiter (#129, ?coin=SAM) mit Bilanz und
+// allen Orders (Stückzahl, Kurs, Betrag, Steuer)
 router.get('/konto/auszug', requireLogin, async (req, res) => {
   const userId = req.user._id;
-  const led = pageOf(req, await Ledger.countDocuments({ user: userId }), LEDGER_PER_PAGE);
-  const ledger = await Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean();
-  show(res, 'auszug', { ledger, led });
+  const traded = new Set(await CoinTrade.distinct('coin', { user: userId }));
+  const coinTabs = markets.LIST.filter((e) => traded.has(e.SYMBOL)).map((e) => ({ symbol: e.SYMBOL, name: e.NAME }));
+  const engine = coinTabs.some((t) => t.symbol === str(req.query.coin)) ? markets.get(str(req.query.coin)) : null;
+  if (!engine) {
+    const led = pageOf(req, await Ledger.countDocuments({ user: userId }), LEDGER_PER_PAGE);
+    const ledger = await Ledger.find({ user: userId }).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean();
+    return show(res, 'auszug', { ledger, led, coinTabs, coin: null });
+  }
+  const symbol = engine.SYMBOL;
+  const filter = { user: userId, coin: symbol };
+  const [count, sums, holding] = await Promise.all([
+    CoinTrade.countDocuments(filter),
+    CoinTrade.aggregate([{ $match: filter }, { $group: { _id: '$side', cents: { $sum: '$cents' }, tax: { $sum: '$tax' } } }]),
+    CoinHolding.findOne(filter).select('units').lean(),
+  ]);
+  const led = pageOf(req, count, LEDGER_PER_PAGE);
+  const trades = await CoinTrade.find(filter).sort({ createdAt: -1, _id: -1 }).skip((led.page - 1) * LEDGER_PER_PAGE).limit(LEDGER_PER_PAGE).lean();
+  const side = (s) => sums.find((x) => x._id === s) || { cents: 0, tax: 0 };
+  const units = holding ? holding.units : 0;
+  const price = engine.getPrice();
+  const value = valueCents(units, price);
+  // Gewinn/Verlust = Verkaufserlöse (nach Steuer) + heutiger Wert des Bestands − alle Käufe
+  const balance = { units, price, value, invested: side('kauf').cents, proceeds: side('verkauf').cents, tax: side('verkauf').tax };
+  balance.result = balance.proceeds + value - balance.invested;
+  show(res, 'auszug', { coinTabs, coin: { symbol, name: engine.NAME, kind: engine.kind }, balance, trades, led });
 });
 
 router.get('/konto/gruppen', requireLogin, async (req, res) => {
