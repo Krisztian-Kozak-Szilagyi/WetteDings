@@ -720,12 +720,12 @@ async function finishDue({ now = Date.now() } = {}) {
           }
         }
         const foils = r.members.filter((x) => x.user && x.foil).map((x) => x.user);
-        // Boss-Karte: ein neues Exemplar je Gewinner, gilt danach als „schon besessen“ (Album)
+        // Boss-Karte: ein neues Exemplar je Gewinner, gilt danach als „schon besessen“ (Album) und als selbst erbeutet (#127)
         const card = bossCardOf(r.dungeon);
         const winners = card ? r.members.filter((x) => x.user && x.bossCard).map((x) => x.user) : [];
         if (winners.length) {
           await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
-          await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id } }, { session });
+          await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
         }
         if (foils.length) await grantItems({ userIds: foils, type: 'folie', source: 'dungeon', session });
         return r;
