@@ -15,6 +15,8 @@ const { UserError, str } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
+const cardBans = require('../tcg/cardBans');
+const { canBoost } = require('../ihk/abilities');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
 const bonusService = require('../services/bonusService');
@@ -59,6 +61,7 @@ const SUBTABS = {
     { key: 'bans', label: 'Bans' },
     { key: 'geraete', label: 'Mehrfach-Konten' },
     { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
+    { key: 'karten', label: 'Kartensperren' },
   ],
   spielwerte: [
     { key: 'tcg', label: 'TCG' },
@@ -230,6 +233,12 @@ router.get('/admin', requireStaff, async (req, res) => {
     gradingLevels: grading.LEVELS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
     gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
+    // Kartensperren: wählbar sind Karten, die in einem Spielmodus etwas tun (Charakter oder Boost)
+    cardBanModes: cardBans.MODES,
+    cardBanList: needsSub('moderation', 'karten') ? cardBans.list().map((b) => ({ ...b, rarityLabel: (tcgCatalog.rarityByKey[b.card.rarity] || {}).label || '' })) : [],
+    cardBanCards: needsSub('moderation', 'karten')
+      ? tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key && (c.isCharacter || canBoost(c))) })).filter((g) => g.cards.length)
+      : [],
     taxCategories: taxService.CATEGORIES,
     taxRates: taxService.rates,
     log, // { key, data } des gewählten Protokolls
@@ -353,6 +362,22 @@ router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=modera
     req.flash('error', err.message);
   }
   res.redirect(back);
+});
+
+// Kartensperre setzen, ändern oder aufheben (keine Modi angehakt = aufheben). Admin und Devs.
+const CARD_BAN_URL = subUrl('moderation', 'karten');
+router.post('/admin/kartensperre', requireStaff, requireReauth(CARD_BAN_URL), async (req, res) => {
+  try {
+    const { card, added, removed } = await cardBans.setBan({ cardId: str(req.body.card), modes: req.body.modes, admin: req.user });
+    if (added.length) req.flash('success', `${card.name} ist jetzt gesperrt: ${cardBans.modesText(added)}.`);
+    if (removed.length) req.flash('success', `Sperre von ${card.name} aufgehoben: ${cardBans.modesText(removed)}.`);
+    if (!added.length && !removed.length) req.flash('info', 'Nichts geändert.');
+    if (added.length) await dungeonService.notifyBanned(card.id, added).catch((err) => console.error('Sperr-Hinweis fehlgeschlagen:', err.message));
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(CARD_BAN_URL);
 });
 
 router.post('/admin/sperren/:id/aufheben', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
