@@ -20,8 +20,11 @@
 
 <div class="album-body" id="sammlung">
   <%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
-  <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key) })).filter((s) => s.list.length); %>
-  <div class="album-filter-row"><%- include('partials/tcg-filter', { seasonOpts: seasonList.map((s) => ({ key: s.key, label: s.label })) }) %></div>
+  <%# Test-Karten stehen nicht in ihrer Season, sondern (nur für Admins) im Abschnitt "Test" ganz unten.
+      Noch nicht erhältliche Karten kommen als "?" ans Ende ihrer Season und zählen nicht mit. %>
+  <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key && c.rarity !== 'test-item'), soon: unreleased.filter((c) => c.season === s.key) })).filter((s) => s.list.length || s.soon.length); %>
+  <% const seasonOpts = seasonList.map((s) => ({ key: s.key, label: s.label })).concat(testCards.length ? [{ key: 'test', label: 'Test' }] : []); %>
+  <div class="album-filter-row"><%- include('partials/tcg-filter', { seasonOpts }) %></div>
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
@@ -31,9 +34,18 @@
         <h2 id="season-<%= s.key %>"><%= s.label %></h2>
         <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
       </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list }) %>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list.concat(s.soon) }) %>
     </section>
   <% }) %>
+  <% if (testCards.length) { %>
+    <section class="album-season" data-album-season-section="test" aria-labelledby="season-test">
+      <div class="album-season-head">
+        <h2 id="season-test">Test</h2>
+        <span class="tcg-progress-num"><%= testCards.filter((c) => counts[c.id]).length %> / <%= testCards.length %></span>
+      </div>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: testCards }) %>
+    </section>
+  <% } %>
 </div>
 
 <!-- Karte vergrößern -->

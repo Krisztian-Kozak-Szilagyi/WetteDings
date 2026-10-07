@@ -59,6 +59,10 @@ router.get('/tcg/album', async (req, res) => {
     ...coll,
     cards: catalog.CARDS,
     seasons: catalog.SEASONS,
+    // noch nicht erhältliche Karten: als "?" in ihrer Season, zählen nicht mit
+    unreleased: catalog.UNRELEASED_CARDS,
+    // Test-Karten (Kampfmodus): eigener Abschnitt ganz unten, nur für Admins
+    testCards: req.user.isAdmin ? catalog.cardsByRarity['test-item'] : [],
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
     favoriteIds: new Set(req.user.tcgFavorites || []),

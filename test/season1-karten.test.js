@@ -38,3 +38,14 @@ test('Footman und Arcane: geheim, ohne Pack-Chance, bestehende Ränge unverände
   assert.strictEqual(catalog.rarityByKey.boss.rank, 8);
   assert.strictEqual(catalog.TOTAL_WEIGHT, 10000);
 });
+
+test('Album: unveröffentlichte Karte erscheint als „?“ mit verdeckter Seltenheit', () => {
+  const ejs = require('ejs');
+  const path = require('path');
+  const file = path.join(__dirname, '..', 'views', 'partials', 'tcg-grid.ejs');
+  const card = catalog.UNRELEASED_CARDS.find((c) => c.id === 'mark-suntouched-2-gold');
+  const html = ejs.render(require('fs').readFileSync(file, 'utf8'), { mode: 'album', cards: [card], counts: {}, rarityByKey: catalog.rarityByKey, protectedIds: new Set() }, { filename: file });
+  assert.match(html, /Noch nicht erhältlich/);
+  assert.match(html, /\?\?\?/);
+  assert.doesNotMatch(html, /Mark Suntouched|<img/);
+});
