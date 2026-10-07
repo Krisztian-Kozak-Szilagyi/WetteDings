@@ -21,14 +21,14 @@ const LIST = [
     weather: { at: (ms) => buoy.at(ms), params: model.bojeParams, storm: model.isStorm },
     rebase: { min: 1, max: 1000, factor: 10 },
   }),
-  // MK Coin: so unruhig wie der Samantha Coin; die Richtung kommt aus den Video-Aufrufen eines Schlagworts (tagViews.js):
+  // MK Coin: so unruhig wie der Samantha Coin, große Sprünge nur halb so weit; die Richtung kommt aus den Video-Aufrufen eines Schlagworts (tagViews.js):
   // mehr Zuwachs als im Schnitt der Vortage → Trend nach oben, weniger → nach unten. Splits wie beim 51101 Coin.
   createEngine({
     symbol: 'MIA',
     name: 'MK Coin',
     kind: 'coin',
     startPrice: 10,
-    params: model.PARAMS,
+    params: model.MIA_PARAMS,
     surgeWindow: DAY / 2,
     drift: { now: () => tagViews.now() },
     rebase: { min: 1, max: 1000, factor: 10 },
