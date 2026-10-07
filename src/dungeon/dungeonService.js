@@ -54,8 +54,10 @@ const DEFAULTS = {
   cardChance: 1,
   // Bots bringen keine Crumpled-Karten; selten Bockhaber, ganz selten Glitch (Summe 100 = Prozent)
   botWeights: { crumpled: 0, bfwler: 40, gold: 40, holo: 15, bockhaber: 4, glitch: 1, icon: 0, sith: 0 },
-  // Simulation (2026-10-07): Bot-/Gold-Gruppe schafft im Schnitt ~6 Runden, eine Holo-Gruppe ~8,5
-  tower: { open: false, baseRequired: 800, growth: 8, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4 },
+  // Simulation (2026-10-07, strategische Gruppen: stärkste Charaktere der Seltenheit + beste Boosts): Gold ~6, Holo ~7,
+  // Bockhaber ~8, Glitch ~14 Runden, beste Kombination (St. Ivan + Glitch, Mauch/Sigrist/Lili) ~17. Der steile Anstieg
+  // hält den Abstand klein – mit +8 % schaffte die beste Kombination 36 Runden (~3.500 € am Tag).
+  tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
 
