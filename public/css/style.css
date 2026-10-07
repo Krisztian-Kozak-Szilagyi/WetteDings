@@ -5452,6 +5452,14 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 /* Dungeon: Karte schon als Charakter gewählt, nur ein Exemplar → als Boost gesperrt */
 .dg-pick.is-blocked { cursor: var(--cur-no); }
 .dg-pick.is-blocked img { filter: grayscale(1) brightness(.55); }
+/* Kartensperre (Admin/Dev): Karte in diesem Modus bis zum Balance-Patch nicht spielbar */
+.dg-pick.is-banned:hover img { transform: none; box-shadow: none; }
+.dg-ban-tag {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  color: var(--color-neutral-100); background: rgba(14, 15, 26, .85); border: 1px solid var(--color-neutral-600); pointer-events: none;
+}
+.dg-ban-tag.is-inline { position: static; transform: none; display: inline-block; vertical-align: middle; font-size: 9px; padding: 1px 6px; }
 
 /* Profil: gewählter Broker-Wert in der Seitenleiste (Bestand + Wert) */
 .pf-asset-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: var(--radius-md); color: var(--text); text-decoration: none; }

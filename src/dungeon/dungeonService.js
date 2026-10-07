@@ -22,6 +22,7 @@ const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk
 const { grantItems } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
+const cardBans = require('../tcg/cardBans');
 
 const TEAM_SIZE = 3;
 const LOCK_SECONDS = 10; // so lange vor dem Start kann man sich nicht mehr abmelden (und nicht mehr beitreten)
@@ -157,8 +158,11 @@ function shuffle(list, rand = random) {
   return a;
 }
 
-/** Karte eines Bots: Seltenheit nach botWeights, darin eine zufällige Charakterkarte */
-function botCard(rand = random, weights = settings.botWeights) {
+/** Modus einer Anmeldung bzw. eines Durchlaufs für die Kartensperren (alte Anmeldungen ohne mode: Dungeon) */
+const modeOf = (doc) => (doc && doc.mode === 'tower' ? 'tower' : 'dungeon');
+
+/** Karte eines Bots: Seltenheit nach botWeights, darin eine zufällige Charakterkarte (gesperrte Karten nicht) */
+function botCard(rand = random, weights = settings.botWeights, banned = new Set()) {
   const pool = catalog.RARITIES.filter((r) => weights[r.key] > 0 && hasCharacters(r.key));
   const total = pool.reduce((s, r) => s + weights[r.key], 0);
   let x = rand() * total;
@@ -170,7 +174,9 @@ function botCard(rand = random, weights = settings.botWeights) {
       break;
     }
   }
-  const cards = catalog.cardsByRarity[rarity.key].filter((c) => c.isCharacter);
+  const all = catalog.cardsByRarity[rarity.key].filter((c) => c.isCharacter);
+  const allowed = all.filter((c) => !banned.has(c.id));
+  const cards = allowed.length ? allowed : all; // alles gesperrt: lieber eine gesperrte Karte als gar keine
   return cards[Math.floor(rand() * cards.length)];
 }
 
@@ -178,8 +184,8 @@ function botCard(rand = random, weights = settings.botWeights) {
  * Boost-Karte eines Bots: zufällige Karte, die im Boost-Slot wirkt (ohne Hermann, der eine Kaffee-Karte braucht).
  * Jede Karte zählt mit dem Gewicht ihrer Seltenheit (botWeights); ist dort keine dabei, gleich wahrscheinlich.
  */
-function botBoost(rand = random, weights = settings.botWeights) {
-  const pool = catalog.CARDS.filter((c) => canBoost(c) && !needsCoffee(c));
+function botBoost(rand = random, weights = settings.botWeights, banned = new Set()) {
+  const pool = catalog.CARDS.filter((c) => canBoost(c) && !needsCoffee(c) && !banned.has(c.id));
   if (!pool.length) return null;
   const w = (c) => weights[c.rarity] || 0;
   const total = pool.reduce((s, c) => s + w(c), 0);
@@ -363,7 +369,8 @@ const makeTeams = (entries, rand = random, teamOf = () => null) => {
 // ---------- Anmeldung ----------
 /** Freie Exemplare (nicht foliert, nicht gesperrt) – als Kartenliste für die Auswahl */
 /** ownDungeon: die eigenen, schon für den Dungeon gesperrten Karten zählen als frei (Karten tauschen vor dem Start) */
-async function availableCards(userId, { ownDungeon = false } = {}) {
+/** mode: 'dungeon' | 'tower' – banned = dort gesperrte Karten (Kartensperren); sie stehen in der Liste, sind aber nicht wählbar */
+async function availableCards(userId, { ownDungeon = false, mode = 'dungeon' } = {}) {
   const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
   const free = (d) => !isLocked(locked, d) || (ownDungeon && locked.reasons.get(String(d._id)) === 'dungeon');
   // counts: freie Exemplare je Karte – dieselbe Karte als Charakter UND Boost braucht zwei
@@ -374,7 +381,7 @@ async function availableCards(userId, { ownDungeon = false } = {}) {
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = Object.keys(counts).map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
   // Boost: Items, Spells und Charaktere mit Boost-Fähigkeit (Ömer, Pascal, Lili)
-  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts };
+  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts, banned: cardBans.bannedIn(mode) };
 }
 
 /** Mitglied ohne Karten – so tritt man bei, gewählt wird danach in der Lobby (#111) */
@@ -384,7 +391,7 @@ const emptyMember = (user) => ({ user: user._id, name: user.username, card: null
  * Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag.
  * Ohne cardId bleibt der Charakter offen (in der Lobby darf man zuerst den Boost wählen).
  */
-async function memberEntry(user, cardId, boostId, session, { ownDungeon = false } = {}) {
+async function memberEntry(user, cardId, boostId, session, { ownDungeon = false, mode = 'dungeon' } = {}) {
   const card = cardId ? catalog.cardById[cardId] : null;
   if (cardId && (!card || !card.isCharacter)) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   let boost = null;
@@ -392,6 +399,8 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false 
     boost = catalog.cardById[boostId];
     if (!boost || !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
   }
+  const banned = [card, boost].find((c) => c && cardBans.isBanned(c.id, mode));
+  if (banned) throw new UserError(`${banned.name} ist im ${cardBans.modeByKey[mode].label} bis zum nächsten Balance-Patch gesperrt.`);
   if (boost && needsCoffee(boost)) {
     const owned = await TcgCard.distinct('card', { user: user._id }).session(session);
     if (!owned.some((id) => isCoffee(catalog.cardById[id]))) throw new UserError(`${boost.name} kann nur ausgespielt werden, wenn du eine Kaffee-Karte besitzt.`);
@@ -535,7 +544,7 @@ async function changeCards({ user, cardId, boostId }) {
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
   await inTransaction(async (session) => {
-    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true });
+    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party) });
     const res = await DungeonParty.updateOne(
       { _id: party._id, 'members.user': user._id },
       { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc } },
@@ -543,6 +552,24 @@ async function changeCards({ user, cardId, boostId }) {
     );
     if (!res.matchedCount) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   });
+}
+
+/**
+ * Nach einer neuen Kartensperre (Admin/Dev): wer die Karte in einer noch nicht gestarteten Anmeldung dieses Modus
+ * gewählt hat, erfährt es – sonst fällt er beim Start heraus (Dungeon) bzw. der Leiter kann nicht starten (Turm).
+ */
+async function notifyBanned(cardId, modes) {
+  const card = catalog.cardById[cardId];
+  if (!card || !modes.length) return;
+  const modeFilter = modes.includes('dungeon') ? (modes.includes('tower') ? {} : { mode: { $ne: 'tower' } }) : { mode: 'tower' };
+  const parties = await DungeonParty.find({ ...modeFilter, $or: [{ 'members.card': card.id }, { 'members.boost': card.id }] }).select('mode members').lean();
+  const users = parties.flatMap((p) => p.members.filter((m) => m.user && (m.card === card.id || m.boost === card.id)).map((m) => ({ user: m.user, mode: modeOf(p) })));
+  for (const mode of modes) {
+    const ids = users.filter((u) => u.mode === mode).map((u) => u.user);
+    if (!ids.length) continue;
+    const label = cardBans.modeByKey[mode].label;
+    await notify(ids, { area: 'Dungeon', href: '/dungeon', text: `${card.name} ist im ${label} bis zum nächsten Balance-Patch gesperrt – bitte wähle eine andere Karte.` }).catch((err) => console.error('Sperr-Hinweis fehlgeschlagen:', err.message));
+  }
 }
 
 /** Beute-Fenster nur einmal zeigen: für diesen Spieler als gesehen markieren */
@@ -585,20 +612,30 @@ async function chat({ user, text }) {
  * Wer kann mit? Nur Spieler mit gewähltem Charakter – die anderen fallen beim Start heraus (#111).
  * { players: Mitglieds-Einträge (mit joinedAt), dropped: Nutzer-IDs ohne Charakter }
  */
-function splitPlayers(parties) {
+/**
+ * Wer startet: nur mit Charakter. bannedIds = im Modus gesperrte Karten – wer sie (als Charakter oder Boost) noch
+ * gewählt hat, fällt heraus (banned) und bekommt einen eigenen Hinweis.
+ */
+function splitPlayers(parties, bannedIds = new Set()) {
   const all = parties.flatMap((p) => p.members); // joinedAt bleibt im Durchlauf (Manipulationserkennung)
-  return { players: all.filter((m) => m.card), dropped: all.filter((m) => !m.card && m.user).map((m) => m.user) };
+  const isBannedPick = (m) => bannedIds.has(m.card) || (!!m.boost && bannedIds.has(m.boost));
+  return {
+    players: all.filter((m) => m.card && !isBannedPick(m)),
+    dropped: all.filter((m) => !m.card && m.user).map((m) => m.user),
+    banned: all.filter((m) => m.card && isBannedPick(m) && m.user).map((m) => m.user),
+  };
 }
 
 /** Spieler um Bots auf TEAM_SIZE auffüllen → [{ ...Mitglied, bot }] */
-function fillBots(players) {
+function fillBots(players, mode = 'dungeon') {
   const members = players.map((p) => ({ ...p, bot: false }));
   const usedBots = new Set();
+  const banned = cardBans.bannedIn(mode);
   while (members.length < TEAM_SIZE) {
-    const card = botCard();
+    const card = botCard(random, settings.botWeights, banned);
     const name = BOT_NAMES.find((n) => !usedBots.has(n)) || 'Bot';
     usedBots.add(name);
-    const boost = botBoost();
+    const boost = botBoost(random, settings.botWeights, banned);
     members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, bot: true });
   }
   return members;
@@ -610,7 +647,7 @@ const teamCards = (members) => members.map((m) => ({ card: catalog.cardById[m.ca
 /** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
 async function startTeam(slot, parties, players, chatLog, now) {
   const dungeon = dungeonForSlot(slot, settings.intervalHours);
-  const members = fillBots(players);
+  const members = fillBots(players, 'dungeon');
   const fights = playDungeon(dungeon, teamCards(members));
   const leaderId = parties.length === 1 && !parties[0].solo ? String(parties[0].leader) : null;
   const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot) }));
@@ -637,6 +674,8 @@ async function startTower({ user, now = Date.now() }) {
   if (!party.leader.equals(user._id)) throw new UserError('Nur der Gruppenleiter kann den Turm betreten.');
   const waiting = party.members.filter((m) => !m.card);
   if (waiting.length) throw new UserError(`Noch ohne Charakter: ${waiting.map((m) => m.name).join(', ')}.`);
+  const blocked = party.members.filter((m) => cardBans.isBanned(m.card, 'tower') || cardBans.isBanned(m.boost, 'tower'));
+  if (blocked.length) throw new UserError(`Gesperrte Karte im Mage Tower – bitte tauschen: ${blocked.map((m) => m.name).join(', ')}.`);
   const day = towerDay(now);
   const humans = party.members.filter((m) => m.user);
   const already = await TowerAttempt.find({ user: { $in: humans.map((m) => m.user) }, day }).select('user').lean();
@@ -648,7 +687,7 @@ async function startTower({ user, now = Date.now() }) {
   const opts = { ...settings.tower };
   // eSports: zählt für die Liga nur, wenn alle drei Spieler schon vor dieser Woche im selben Team waren
   const esportsTeam = humans.length === TEAM_SIZE ? await esports().towerTeam(humans.map((m) => m.user), now).catch(() => null) : null;
-  const members = fillBots(party.members);
+  const members = fillBots(party.members, 'tower');
   const fights = playTower(teamCards(members), random, opts);
   const rounds = fights.filter((f) => f.success).length;
   const leaderId = party.solo ? null : String(party.leader);
@@ -704,14 +743,16 @@ async function startDue({ now = Date.now(), force = false } = {}) {
     const groups = list.filter((p) => !p.solo).map((p) => [p]);
     // Einzelspieler ohne Charakter kommen gar nicht erst in die Auslosung
     const soloParties = list.filter((p) => p.solo);
-    const idle = soloParties.filter((p) => !splitPlayers([p]).players.length);
+    const bannedIds = cardBans.bannedIn('dungeon');
+    const idle = soloParties.filter((p) => !splitPlayers([p], bannedIds).players.length);
     const ready = soloParties.filter((p) => !idle.includes(p));
     const teamOf = await esports().teamsOf(ready.map((p) => p.members[0].user)).catch(() => new Map());
     const solos = makeTeams(ready, random, (p) => teamOf.get(String(p.members[0].user)) || null);
     const dropped = [];
+    const bannedOut = [];
     for (const team of [...groups, ...solos, ...idle.map((p) => [p])]) {
       try {
-        const { players, dropped: out } = splitPlayers(team);
+        const { players, dropped: out, banned: outBanned } = splitPlayers(team, bannedIds);
         if (players.length) {
           await startTeam(slot, team, players, team.length === 1 ? team[0].chat : [], now);
           started++;
@@ -719,12 +760,16 @@ async function startDue({ now = Date.now(), force = false } = {}) {
           await DungeonParty.deleteMany({ _id: { $in: team.map((p) => p._id) } }); // niemand mit Charakter: kein Durchlauf
         }
         dropped.push(...out);
+        bannedOut.push(...outBanned);
       } catch (err) {
         console.error('Dungeon-Start fehlgeschlagen:', err.message);
       }
     }
     if (dropped.length) {
       await notify(dropped, { area: 'Dungeon', href: '/dungeon', text: 'Der Dungeon ist ohne dich gestartet – du hattest keine Charakterkarte gewählt.' }).catch((err) => console.error('Dungeon-Hinweis fehlgeschlagen:', err.message));
+    }
+    if (bannedOut.length) {
+      await notify(bannedOut, { area: 'Dungeon', href: '/dungeon', text: 'Der Dungeon ist ohne dich gestartet – deine gewählte Karte ist dort gesperrt.' }).catch((err) => console.error('Dungeon-Hinweis fehlgeschlagen:', err.message));
     }
   }
   return started;
@@ -868,6 +913,8 @@ module.exports = {
   isLockedIn,
   botCard,
   botBoost,
+  modeOf,
+  notifyBanned,
   teamEffects,
   fight,
   playDungeon,

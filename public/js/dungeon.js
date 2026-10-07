@@ -265,6 +265,7 @@
       boostInputs.forEach((inp) => {
         const item = inp.closest('[data-dg-item]');
         if (!item) return;
+        if ('banned' in item.dataset) return; // gesperrte Karte (Kartensperren): bleibt immer gesperrt
         const blocked = !!main && inp.value === main.value && Number(item.dataset.count) < 2;
         inp.disabled = blocked;
         item.classList.toggle('is-blocked', blocked);

@@ -99,6 +99,56 @@
     <% } %>
   </div>
 </section>
+<% } else if (sub === 'karten') { %>
+<%# Kartensperren: zu starke Karten bis zum Balance-Patch aus einzelnen Spielmodi nehmen (src/tcg/cardBans.js) %>
+<% const modeChecks = (active) => cardBanModes.map((m) => `<label class="check"><input type="checkbox" name="modes" value="${m.key}"${active.includes(m.key) ? ' checked' : ''}><span>${m.label}</span></label>`).join(''); %>
+<section class="stats-block" id="kartensperre">
+  <%- blockHead('Karte sperren', 'Eine gesperrte Karte ist im gewählten Modus weder als Charakter noch als Boost spielbar, Bots nehmen sie auch nicht. Spieler sehen sie in der Auswahl grau mit „Gesperrt“.<br><br>Was schon läuft, läuft zu Ende. Wer die Karte für einen noch nicht gestarteten Dungeon gewählt hat, bekommt einen Hinweis und muss tauschen – sonst startet der Dungeon ohne ihn. Im Mage Tower kann der Leiter erst starten, wenn niemand mehr eine gesperrte Karte hat.<br><br>Jede Änderung steht im Protokoll „Einstellungen“.') %>
+  <div class="card">
+    <form method="post" data-reauth action="/admin/kartensperre" class="form" data-confirm="Diese Karte in den gewählten Modi sperren?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Karte</span>
+        <select name="card" required>
+          <option value="">– auswählen –</option>
+          <% cardBanCards.forEach((g) => { %><optgroup label="<%= g.rarity.label %>"><% g.cards.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></optgroup><% }) %>
+        </select>
+      </label>
+      <div class="field"><span>Gesperrt in</span><%- modeChecks(cardBanModes.map((m) => m.key)) %></div>
+      <button class="btn btn-danger" type="submit">Sperren</button>
+    </form>
+  </div>
+</section>
+
+<section class="stats-block" id="kartensperren">
+  <%- blockHead('Gesperrte Karten' + count(cardBanList.length), 'Haken ändern und speichern; ohne Haken ist die Sperre aufgehoben.') %>
+  <div class="card">
+    <% if (!cardBanList.length) { %>
+      <p class="muted">Aktuell ist keine Karte gesperrt.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% cardBanList.forEach((b) => { %>
+          <li class="code-item">
+            <div class="code-main"><strong><%= b.card.name %></strong> <span class="muted small"><%= b.rarityLabel %></span></div>
+            <div class="code-actions">
+              <form method="post" data-reauth action="/admin/kartensperre" class="form" data-confirm="Sperren von <%= b.card.name %> ändern?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="card" value="<%= b.card.id %>">
+                <%- modeChecks(b.modes.map((m) => m.key)) %>
+                <button class="btn btn-ghost btn-sm" type="submit">Speichern</button>
+              </form>
+              <form method="post" data-reauth action="/admin/kartensperre" data-confirm="Sperre von <%= b.card.name %> überall aufheben?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="card" value="<%= b.card.id %>">
+                <button class="btn btn-ghost btn-sm" type="submit">Aufheben</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
 <% } else if (sub === 'auffaelligkeiten') { %>
 <%
   const openGroups = suspicionGroups.filter((g) => g.open);

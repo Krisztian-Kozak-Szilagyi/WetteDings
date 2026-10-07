@@ -8,6 +8,7 @@ const { floorByKey } = require('../dungeon/tower');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
+const cardBans = require('../tcg/cardBans');
 
 const router = express.Router();
 
@@ -25,9 +26,11 @@ router.use('/dungeon', requireLogin, requireDungeon);
 const same = (a, b) => a && b && String(a) === String(b);
 
 /** Platz für die Anzeige: Karte, Boost, Name, Leiter, ich. In der Lobby darf die Karte noch fehlen (choosing). */
-const slotView = (m, me, leaderId) => {
+/** banMode: Modus einer noch nicht gestarteten Anmeldung – dann zeigt der Platz, ob eine gewählte Karte gesperrt ist */
+const slotView = (m, me, leaderId, banMode = null) => {
   const card = m.card ? catalog.cardById[m.card] : null;
   return {
+    banned: !!banMode && (cardBans.isBanned(m.card, banMode) || cardBans.isBanned(m.boost, banMode)),
     choosing: !card,
     name: m.name,
     bot: !m.user,
@@ -82,14 +85,14 @@ router.get('/dungeon', async (req, res) => {
   let slots = [];
   if (running) slots = running.members.map((m) => slotView(m, me));
   else if (party) {
-    slots = party.members.map((m) => slotView(m, me, party.solo ? null : party.leader)); // Solo Queue: kein Gruppenleiter
+    slots = party.members.map((m) => slotView(m, me, party.solo ? null : party.leader, dungeon.modeOf(party))); // Solo Queue: kein Gruppenleiter
     party.invites.forEach((i) => slots.push({ invited: true, name: i.name, userId: String(i.user) }));
   }
   while (slots.length < dungeon.TEAM_SIZE) slots.push({ empty: true, solo: phase === 'solo' });
 
   // Kartenauswahl in der Lobby (eigene Dungeon-Karten zählen als frei); vor dem Beitritt nur für die Start-Kacheln
   const mine = party ? party.members.find((m) => same(m.user, me)) : null;
-  const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party });
+  const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party, mode: dungeon.modeOf(party) });
   // Start-Kacheln (wie "Zum Album"): eigene Charaktere als Fächer, fehlende als graue Beispielkarten
   const samples = catalog.CARDS.filter((c) => c.isCharacter && !(catalog.rarityByKey[c.rarity] || {}).hidden);
   const fanOf = (n) => {
@@ -131,7 +134,7 @@ router.get('/dungeon', async (req, res) => {
     towerShown: dungeon.towerOpen(req.user),
     towerTitle: TOWER.title,
     towerPlayed,
-    towerReady: tower && !!party && party.members.every((m) => m.card),
+    towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower')),
     towerSettings: dungeon.settings.tower,
     nextDungeon: next,
     run,
