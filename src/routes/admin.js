@@ -432,16 +432,31 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
   const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
   const pct = (v) => Number(String(typeof v === 'string' ? v : 'x').replace(',', '.') || 'x');
   const fights = [0, 1, 2];
+  // "0" / "0,00" = kein Lohn
+  const euroOrZero = (v) => (/^\s*0+([.,]0*)?\s*$/.test(String(v || 'x')) ? 0 : centsOrNull(v));
   try {
     await dungeonService.saveSettings({
       open: req.body.open === '1',
       intervalHours: num(req.body.intervalHours),
       required: fights.map((i) => num(req.body[`required_${i}`])),
       // "0" / "0,00" = kein Lohn für diesen Kampf
-      rewards: fights.map((i) => (/^\s*0+([.,]0*)?\s*$/.test(String(req.body[`reward_${i}`] || 'x')) ? 0 : centsOrNull(req.body[`reward_${i}`]))),
+      rewards: fights.map((i) => euroOrZero(req.body[`reward_${i}`])),
       foilChance: pct(req.body.foilChance),
       cardChance: pct(req.body.cardChance),
       botWeights: Object.fromEntries(tcgCatalog.RARITIES.map((r) => [r.key, num(req.body[`bot_${r.key}`])])),
+      tower: {
+        open: req.body.towerOpen === '1',
+        baseRequired: num(req.body.towerBaseRequired),
+        growth: pct(req.body.towerGrowth),
+        rewardBase: euroOrZero(req.body.towerRewardBase),
+        rewardStep: euroOrZero(req.body.towerRewardStep),
+        foilPerRound: pct(req.body.towerFoilPerRound),
+        foilMax: pct(req.body.towerFoilMax),
+        cardPerRound: pct(req.body.towerCardPerRound),
+        cardMax: pct(req.body.towerCardMax),
+        fightSeconds: num(req.body.towerFightSeconds),
+        pauseSeconds: num(req.body.towerPauseSeconds),
+      },
       admin: req.user,
     });
     req.flash('success', 'Dungeon-Einstellungen gespeichert.');

@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const { requireLogin } = require('../middleware');
 const catalog = require('../tcg/catalog');
 const dungeon = require('../dungeon/dungeonService');
-const { DUNGEONS, dungeonByKey, dungeonForSlot } = require('../dungeon/dungeons');
+const { DUNGEONS, defOf, dungeonForSlot, TOWER } = require('../dungeon/dungeons');
+const { floorByKey } = require('../dungeon/tower');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
@@ -40,13 +41,14 @@ const slotView = (m, me, leaderId) => {
   };
 };
 
-/** Daten für die Wiedergabe im Browser (public/js/dungeon.js) */
+/** Daten für die Wiedergabe im Browser (public/js/dungeon.js). Turm: Runden ohne Gesamtzahl, Texte je Begegnung. */
 const playback = (run, d, now) => ({
   now,
+  tower: run.mode === 'tower',
   startedAt: new Date(run.startedAt).getTime(),
   endsAt: new Date(run.endsAt).getTime(),
   intro: dungeon.INTRO_SECONDS,
-  fightSeconds: dungeon.FIGHT_SECONDS, // volle Zeit eines Kampfes in echten Sekunden (Zeit-Balken)
+  fightSeconds: run.fightSeconds || dungeon.FIGHT_SECONDS, // volle Zeit eines Kampfes in echten Sekunden (Zeit-Balken)
   names: run.members.map((m) => m.name),
   // je Platz: Kartenbilder mit geänderten Werten (Boost/Debuff) – nur Rahmen-Karten; base = Grundbild
   cards: run.members.map((m, i) => {
@@ -54,10 +56,10 @@ const playback = (run, d, now) => ({
     const ticks = run.fights.flatMap((f) => f.ticks.filter((x) => x.m === i));
     return card && card.stats ? { base: card.image, stats: [card.stats.speed, card.stats.fia, card.stats.fis, card.stats.bwl], imgs: catalog.statImages(card, ticks) } : null;
   }),
-  pause: dungeon.PAUSE_SECONDS,
+  pause: run.pause ?? dungeon.PAUSE_SECONDS,
   fights: run.fights.map((f, i) => {
-    const def = d.fights[i] || {};
-    return { title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, start: f.start || 0, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
+    const def = (run.mode === 'tower' ? floorByKey[f.key] : d.fights[i]) || {};
+    return { round: i + 1, title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, start: f.start || 0, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
   }),
 });
 
@@ -65,11 +67,13 @@ router.get('/dungeon', async (req, res) => {
   const me = req.user._id;
   const now = Date.now();
   await dungeon.finishOwnDue(me);
-  const [{ party, invitations, run, unseen, rev }, rareLoot] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot()]);
+  const [{ party, invitations, run, unseen, rev }, rareLoot, towerPlayed] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot(), dungeon.playedTowerToday(me)]);
   const running = run && run.status === 'laeuft' ? run : null;
-  const slot = party ? party.slot : dungeon.registrationSlot(now);
+  // Mage Tower: eigene Anmeldung ohne Termin (der Leiter startet) – oder ein laufender Turm-Durchlauf
+  const tower = running ? running.mode === 'tower' : !!party && party.mode === 'tower';
+  const slot = party && !tower ? party.slot : dungeon.registrationSlot(now);
   const next = dungeonForSlot(slot, dungeon.settings.intervalHours);
-  const runDungeon = run ? dungeonByKey[run.dungeon] || DUNGEONS[0] : null; // alte Läufe: Dungeon gibt es nicht mehr
+  const runDungeon = run ? defOf(run.dungeon) || DUNGEONS[0] : null; // alte Läufe: Dungeon gibt es nicht mehr
 
   let phase = 'frei';
   if (running) phase = 'laeuft';
@@ -97,8 +101,17 @@ router.get('/dungeon', async (req, res) => {
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
+  const lootTower = !!unseen && unseen.mode === 'tower';
   const loot = unseen
-    ? { id: String(unseen._id), success: unseen.success, bossCard: dungeon.bossCardOf(unseen.dungeon), players: unseen.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })) }
+    ? {
+        id: String(unseen._id),
+        success: unseen.success,
+        tower: lootTower,
+        rounds: unseen.rounds || 0,
+        result: lootTower ? dungeon.towerResultText(unseen.rounds || 0) : null,
+        bossCard: dungeon.bossCardOf(unseen.dungeon),
+        players: unseen.members.map((m) => ({ name: m.name, bot: !m.user, me: same(m.user, me), reward: m.reward, foil: m.foil, bossCard: m.bossCard })),
+      }
     : null;
 
   res.render('dungeon', {
@@ -106,13 +119,20 @@ router.get('/dungeon', async (req, res) => {
     phase,
     party,
     isLeader: party && same(party.leader, me),
-    invitations: invitations.map((p) => ({ id: String(p._id), leader: (p.members.find((m) => same(m.user, p.leader)) || p.members[0] || {}).name, members: p.members.map((m) => m.name), slot: p.slot })),
+    invitations: invitations.map((p) => ({ id: String(p._id), tower: p.mode === 'tower', leader: (p.members.find((m) => same(m.user, p.leader)) || p.members[0] || {}).name, members: p.members.map((m) => m.name), slot: p.slot })),
     slots,
     slot,
     slotTime: toZonedLocalInput(new Date(slot), config.timezone).slice(11, 16),
     lockSeconds: dungeon.LOCK_SECONDS,
-    lockedIn: party ? dungeon.isLockedIn(party.slot, now) : false,
-    dg: running ? runDungeon : next,
+    lockedIn: party ? dungeon.partyLocked(party, now) : false,
+    dg: running ? runDungeon : tower ? TOWER : next,
+    tower,
+    // Turm-Kacheln vor dem Beitritt: verfügbar? heute schon gespielt? Startet der Leiter erst, wenn alle gewählt haben
+    towerShown: dungeon.towerOpen(req.user),
+    towerTitle: TOWER.title,
+    towerPlayed,
+    towerReady: tower && !!party && party.members.every((m) => m.card),
+    towerSettings: dungeon.settings.tower,
     nextDungeon: next,
     run,
     runDungeon,
@@ -129,6 +149,7 @@ router.get('/dungeon', async (req, res) => {
     chatMax: dungeon.CHAT_TEXT_MAX,
     rev,
     closedForOthers: !dungeon.settings.open,
+    towerClosedForOthers: !dungeon.settings.open || !dungeon.settings.tower.open,
   });
 });
 
@@ -167,7 +188,16 @@ router.post('/dungeon/anmelden', (req, res) =>
   handle(req, res, () => dungeon.register({ user: req.user, solo: str(req.body.mode) !== 'gruppe' }).then(() => null))
 );
 
-router.get('/dungeon/anleitung', (req, res) => res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS }));
+// Mage Tower: anmelden (allein oder als Gruppe) und – als Leiter – betreten
+router.post('/dungeon/turm/anmelden', (req, res) =>
+  handle(req, res, () => dungeon.registerTower({ user: req.user, solo: str(req.body.mode) !== 'gruppe' }).then(() => null))
+);
+
+router.post('/dungeon/turm/starten', (req, res) => handle(req, res, () => dungeon.startTower({ user: req.user }).then(() => null)));
+
+router.get('/dungeon/anleitung', (req, res) =>
+  res.render('dungeon-anleitung', { title: 'Dungeon – So funktioniert\'s', settings: dungeon.settings, lockSeconds: dungeon.LOCK_SECONDS, towerShown: dungeon.towerOpen(req.user) })
+);
 
 // Ganze Geschichte eines Dungeons – der Titel im Banner verlinkt hierher
 router.get('/dungeon/geschichte/:key', (req, res, next) => {

@@ -6,7 +6,8 @@
 
   const serverOffset = Date.now() - Number(page.dataset.now || Date.now()); // Uhr des Browsers minus Server-Uhr
   const serverNow = () => Date.now() - serverOffset;
-  const start = new Date(page.dataset.start).getTime();
+  // Mage Tower: kein Termin (data-start leer) – kein Countdown, Abmelden bis zum Betreten
+  const start = page.dataset.start ? new Date(page.dataset.start).getTime() : null;
   const lockMs = Number(page.dataset.lock || 10) * 1000;
   const rev = page.dataset.rev;
   const DRAFT_KEY = 'dg-chat-draft';
@@ -21,6 +22,7 @@
   const leaveBtn = page.querySelector('[data-dg-leave] button');
   const pad = (n) => String(n).padStart(2, '0');
   function tickCountdown() {
+    if (start === null) return;
     const left = start - serverNow();
     if (countdown) {
       if (left <= 0) countdown.textContent = 'startet …';
@@ -411,7 +413,18 @@
     setTimeout(() => slotEls[m].classList.remove('is-casting'), 900);
   }
 
-  function step(active) {
+  // Turm: nur die aktuelle Runde (die Gesamtzahl bleibt geheim)
+  const roundEl = page.querySelector('[data-dg-round]');
+  function step(active, after) {
+    if (roundEl) {
+      const i = active >= 0 ? active : Math.max(0, after);
+      const f = pb.fights[i];
+      const ended = active < 0 && after >= 0;
+      roundEl.textContent = 'Runde ' + (i + 1);
+      roundEl.classList.toggle('is-active', !ended);
+      roundEl.classList.toggle('is-win', ended && !!f && f.success);
+      roundEl.classList.toggle('is-loss', ended && !!f && !f.success);
+    }
     page.querySelectorAll('[data-dg-step]').forEach((li) => {
       const i = Number(li.dataset.dgStep);
       const f = pb.fights[i];
@@ -445,7 +458,7 @@
       if (t < t0) return;
       if (!s.started) {
         s.started = true;
-        log((f.boss ? 'Boss: ' : 'Kampf: ') + f.title, 'is-head');
+        log((pb.tower ? 'Runde ' + f.round + ': ' : f.boss ? 'Boss: ' : 'Kampf: ') + f.title, 'is-head');
         resetStats();
       }
       const end = f.success ? f.doneAt : f.limit;
@@ -490,20 +503,20 @@
     nextEl.hidden = active >= 0;
     if (active < 0) {
       if (after < 0) {
-        nextEl.textContent = 'Der erste Kampf beginnt in ' + secs(pb.intro - t);
+        nextEl.textContent = (pb.tower ? 'Runde 1 beginnt in ' : 'Der erste Kampf beginnt in ') + secs(pb.intro - t);
       } else {
         const f = pb.fights[after];
         const last = after === pb.fights.length - 1;
         titleEl.textContent = f.success ? f.title + ': besiegt!' : f.title + ': Zeit abgelaufen – Rückzug!';
         textEl.textContent = f.success ? f.successText : f.failText;
-        if (!last) nextEl.textContent = 'Nächster Kampf in ' + secs(starts[after + 1] - t);
+        if (!last) nextEl.textContent = (pb.tower ? 'Runde ' + (after + 2) + ' beginnt in ' : 'Nächster Kampf in ') + secs(starts[after + 1] - t);
         else if (t < total) nextEl.textContent = 'Beute wird verteilt in ' + secs(total - t);
         else nextEl.textContent = 'Beute wird verteilt …';
       }
     }
     // Zeit um: jede Sekunde nachfragen, damit das Ergebnis ohne Wartezeit erscheint
     if (t >= total && Math.floor(t * 4) % 4 === 0) poll();
-    step(active);
+    step(active, after);
     first = false;
   }
   frame();

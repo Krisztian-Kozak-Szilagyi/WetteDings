@@ -3,12 +3,14 @@
 // und eigenem Chat. Karten wählt man erst in der Lobby (#111) – wer zum Start keinen Charakter hat, ist nicht dabei.
 // Ablauf wie bei der IHK: Die Kämpfe (2× Trash, 1× Boss) werden beim Start mit den
 // Kartenwerten und Fähigkeiten ausgewürfelt und danach abgespielt; am Ende gibt es Lohn und Beute.
+// Mage Tower (mode 'tower'): einmal am Tag, der Leiter startet sofort. Runde für Runde schwerer, Fähigkeit zufällig,
+// bis eine Runde verloren geht – die geschafften Runden bestimmen Lohn und Beute-Chancen. Auch das steht beim Start fest.
 const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { TcgCard } = require('../models/Tcg');
-const { DungeonParty, DungeonRun, DungeonSettings } = require('../models/Dungeon');
+const { DungeonParty, DungeonRun, DungeonSettings, TowerAttempt } = require('../models/Dungeon');
 const { inTransaction } = require('../services/betService');
 const { notify } = require('../services/notifyService');
 const { toZonedLocalInput } = require('../lib/time');
@@ -19,7 +21,7 @@ const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
-const { dungeonByKey, dungeonForSlot } = require('./dungeons');
+const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
 
 const TEAM_SIZE = 3;
 const LOCK_SECONDS = 10; // so lange vor dem Start kann man sich nicht mehr abmelden (und nicht mehr beitreten)
@@ -39,6 +41,9 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 // required / rewards = Ziel-Punkte und Lohn (Cent pro Spieler) für [Trash 1, Trash 2, Boss]
 // foilChance / cardChance = Chance in % pro Spieler auf eine Folie bzw. die Boss-Karte (nur wenn der Boss fällt)
 // botWeights = Gewicht je Seltenheit für die Karte eines Bots
+// tower = Mage Tower: open (zusätzlich zu open), Ziel-Punkte der ersten Runde und Anstieg pro Runde (%), Lohn pro Spieler
+// für Runde 1 und Zuwachs je weitere Runde (Cent), Beute-Chance pro geschaffter Runde und ihre Obergrenze (%),
+// Wiedergabe je Runde und Pause (echte Sekunden)
 const DEFAULTS = {
   open: false,
   intervalHours: 2,
@@ -49,8 +54,26 @@ const DEFAULTS = {
   cardChance: 1,
   // Bots bringen keine Crumpled-Karten; selten Bockhaber, ganz selten Glitch (Summe 100 = Prozent)
   botWeights: { crumpled: 0, bfwler: 40, gold: 40, holo: 15, bockhaber: 4, glitch: 1, icon: 0, sith: 0 },
+  // Simulation (2026-10-07): Bot-/Gold-Gruppe schafft im Schnitt ~6 Runden, eine Holo-Gruppe ~8,5
+  tower: { open: false, baseRequired: 800, growth: 8, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
+
+// Erlaubte Werte des Mage Towers: [min, max, ganze Zahl?]
+const TOWER_LIMITS = {
+  baseRequired: [1, 100000, true],
+  growth: [1, 100, false],
+  rewardBase: [0, 10000000, true],
+  rewardStep: [0, 10000000, true],
+  foilPerRound: [0, 100, false],
+  foilMax: [0, 100, false],
+  cardPerRound: [0, 100, false],
+  cardMax: [0, 100, false],
+  fightSeconds: [5, 120, true],
+  pauseSeconds: [0, 30, true],
+};
+const validTower = (t) =>
+  !!t && typeof t.open === 'boolean' && Object.entries(TOWER_LIMITS).every(([k, [min, max, int]]) => Number.isFinite(t[k]) && t[k] >= min && t[k] <= max && (!int || Number.isInteger(t[k])));
 
 const validTriple = (list, min) => Array.isArray(list) && list.length === 3 && list.every((v) => Number.isInteger(v) && v >= min);
 const validChance = (c) => Number.isFinite(c) && c >= 0 && c <= 100;
@@ -72,15 +95,21 @@ async function loadSettings() {
   if (validChance(doc.foilChance)) settings.foilChance = doc.foilChance;
   if (validChance(doc.cardChance)) settings.cardChance = doc.cardChance;
   if (validWeights(doc.botWeights)) settings.botWeights = Object.fromEntries(catalog.RARITIES.map((r) => [r.key, doc.botWeights[r.key]]));
+  // Turm: fehlende Werte (neu hinzugekommen) vom Standard
+  const tower = doc.tower ? Object.fromEntries(Object.keys(DEFAULTS.tower).map((k) => [k, doc.tower[k] ?? DEFAULTS.tower[k]])) : null;
+  if (validTower(tower)) settings.tower = tower;
 }
 
-async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, admin }) {
+async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower = settings.tower, admin }) {
   if (!validInterval(intervalHours)) throw new UserError('Der Abstand muss 1, 2, 3, 4, 6, 8, 12 oder 24 Stunden sein.');
   if (!validTriple(required, 1) || required.some((r) => r > 100000)) throw new UserError('Bitte für jeden Kampf gültige Ziel-Punkte angeben (1–100000).');
   if (!validTriple(rewards, 0)) throw new UserError('Bitte für jeden Kampf einen gültigen Lohn angeben.');
   if (!validChance(foilChance) || !validChance(cardChance)) throw new UserError('Die Chancen müssen zwischen 0 und 100 % liegen.');
   if (!validWeights(botWeights)) throw new UserError('Bot-Karten: ganze Zahlen von 0 bis 10000, mindestens eine Seltenheit mit Charakterkarten über 0.');
-  const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights };
+  if (!validTower(tower)) {
+    throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s und Pause 0–30 s je Runde.');
+  }
+  const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower };
   await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { ...next, updatedByName: admin.username } }, { upsert: true });
   const before = JSON.parse(JSON.stringify(settings));
   Object.assign(settings, next);
@@ -105,6 +134,11 @@ function registrationSlot(now = Date.now(), hours = settings.intervalHours) {
 }
 
 const isLockedIn = (slot, now = Date.now()) => new Date(slot).getTime() - now <= LOCK_SECONDS * 1000;
+/** Anmeldung kurz vor dem Start gesperrt? Der Turm hat keinen Termin – er ist bis zum Knopfdruck offen. */
+const partyLocked = (party, now = Date.now()) => party.mode !== 'tower' && isLockedIn(party.slot, now);
+
+/** Tag in deutscher Zeit ("YYYY-MM-DD") – ein Turm-Versuch pro Tag */
+const towerDay = (now = Date.now()) => toZonedLocalInput(new Date(now), config.timezone).slice(0, 10);
 
 // ---------- Zufall ----------
 const random = () => crypto.randomInt(1000000) / 1000000;
@@ -182,8 +216,9 @@ function teamEffects(members, m) {
  * verloren, wenn die Zeit (limit, Spiel-Sekunden) vorher abläuft.
  * members: [{ card, boost }] (Katalog-Karten). Ergebnis: ticks [{ m, t, p, crit, ability, destroy }] nach Zeit,
  * abilities [{ m, from, team, label, text }] (from = wessen Karte die Fähigkeit bringt).
+ * fightSeconds: volle Zeit in der Wiedergabe (Turm: kürzer).
  */
-function fight(members, stat, required, rand = random) {
+function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECONDS) {
   const events = [];
   const abilities = [];
   let limit = WORK_TIME;
@@ -209,11 +244,11 @@ function fight(members, stat, required, rand = random) {
   // Fähigkeiten, die erst nach dem Sieg ausgelöst hätten, zählen nicht
   const used = abilities.filter((a) => ticks.some((x) => x.ability && x.m === a.m));
   const success = total >= required;
-  // Wiedergabe in gleichmäßigem Tempo (volle Zeit = FIGHT_SECONDS): ein gewonnener Kampf endet beim Sieg,
+  // Wiedergabe in gleichmäßigem Tempo (volle Zeit = fightSeconds): ein gewonnener Kampf endet beim Sieg,
   // ein verlorener mit Ablauf der Deadline. Sie beginnt erst eine Sekunde vor dem ersten Treffer (start,
   // Spielzeit) – die Takte davor bringen noch keine Punkte, die Deadline läuft dabei trotzdem.
-  const start = Math.max(0, Math.round(((ticks.length ? ticks[0].t : 0) - limit / FIGHT_SECONDS) * 10) / 10);
-  const seconds = Math.max(1, Math.round((FIGHT_SECONDS * ((success ? doneAt : limit) - start)) / limit * 10) / 10);
+  const start = Math.max(0, Math.round(((ticks.length ? ticks[0].t : 0) - limit / fightSeconds) * 10) / 10);
+  const seconds = Math.max(1, Math.round((fightSeconds * ((success ? doneAt : limit) - start)) / limit * 10) / 10);
   return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, start, seconds };
 }
 
@@ -229,12 +264,56 @@ function playDungeon(dungeon, members, rand = random, opts = settings) {
 }
 
 /** Wiedergabedauer in Sekunden: Einleitung, Kämpfe mit Pausen dazwischen, kurzer Abschluss */
-const runSeconds = (fights) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * PAUSE_SECONDS + END_SECONDS;
+const runSeconds = (fights, pause = PAUSE_SECONDS) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * pause + END_SECONDS;
 
-/** Karte, die der Boss dieses Dungeons fallen lässt (Katalogkarte), oder null */
+/** Karte, die der Boss dieses Dungeons (oder der Turm) fallen lässt (Katalogkarte), oder null */
 function bossCardOf(dungeonKey) {
-  const d = dungeonByKey[dungeonKey];
+  const d = defOf(dungeonKey);
   return (d && d.bossCard && catalog.cardById[d.bossCard]) || null;
+}
+
+// ---------- Mage Tower ----------
+const TOWER_STATS = ['fia', 'fis', 'bwl'];
+const MAX_ROUNDS = 100; // Sicherheitsgrenze – der Anstieg sorgt lange vorher für eine Niederlage
+
+/** Ziel-Punkte der Runde n (ab 1): jede Runde growth % mehr als die vorige */
+const towerRequired = (n, opts = settings.tower) => Math.round(opts.baseRequired * (1 + opts.growth / 100) ** (n - 1));
+/** Lohn pro Spieler für Runde n (Cent) */
+const towerReward = (n, opts = settings.tower) => opts.rewardBase + opts.rewardStep * (n - 1);
+/** Beute-Chancen in % nach `rounds` geschafften Runden */
+const towerChances = (rounds, opts = settings.tower) => ({
+  foil: Math.min(opts.foilMax, opts.foilPerRound * rounds),
+  card: Math.min(opts.cardMax, opts.cardPerRound * rounds),
+});
+
+/** Begegnung einer Runde: zufällige Fähigkeit, darin eine zufällige Begegnung – nicht dieselbe wie zuletzt */
+function towerFloor(prevKey, rand = random) {
+  const stat = TOWER_STATS[Math.floor(rand() * TOWER_STATS.length)];
+  const pool = TOWER.floors.filter((f) => f.stat === stat && f.key !== prevKey);
+  return pool[Math.floor(rand() * pool.length)];
+}
+
+/** Alle Runden eines Turm-Laufs: so lange, bis eine verloren geht (höchstens maxRounds) */
+function playTower(members, rand = random, opts = settings.tower, maxRounds = MAX_ROUNDS) {
+  const fights = [];
+  let prev = null;
+  for (let n = 1; n <= maxRounds; n++) {
+    const floor = towerFloor(prev, rand);
+    prev = floor.key;
+    const required = towerRequired(n, opts);
+    const r = fight(members, floor.stat, required, rand, opts.fightSeconds);
+    fights.push({ key: floor.key, boss: false, required, reward: towerReward(n, opts), ...r });
+    if (!r.success) break;
+  }
+  return fights;
+}
+
+/** Lohn und Beute pro Spieler im Turm: Lohn aller geschafften Runden, Folie und Karte mit den Chancen der Runden */
+function towerRewardsFor(fights, isBot, rand = random, opts = settings.tower) {
+  if (isBot) return { reward: 0, foil: false, bossCard: false };
+  const won = fights.filter((f) => f.success);
+  const chance = towerChances(won.length, opts);
+  return { reward: won.reduce((s, f) => s + f.reward, 0), foil: rand() * 100 < chance.foil, bossCard: rand() * 100 < chance.card };
 }
 
 /** Lohn und Beute pro Spieler (Bots bekommen nichts) */
@@ -312,6 +391,15 @@ function checkOpen(user) {
   if (!settings.open && !user.isAdmin) throw new UserError('Der Dungeon ist derzeit nicht verfügbar.');
 }
 
+/** Turm: für alle nur, wenn Dungeon und Turm freigegeben sind – Admins immer */
+const towerOpen = (user) => !!user.isAdmin || (settings.open && settings.tower.open);
+function checkTowerOpen(user) {
+  if (!towerOpen(user)) throw new UserError('Der Mage Tower ist derzeit nicht verfügbar.');
+}
+
+/** War dieser Spieler heute schon im Turm? */
+const playedTowerToday = async (userId, now = Date.now()) => !!(await TowerAttempt.exists({ user: userId, day: towerDay(now) }));
+
 const duplicate = (err) => {
   if (err.code === 11000) throw new UserError('Du bist schon für einen Dungeon angemeldet.');
   throw err;
@@ -325,23 +413,34 @@ async function register({ user, solo }) {
   return DungeonParty.create({ slot: registrationSlot(), solo: !!solo, leader: user._id, members: [emptyMember(user)] }).catch(duplicate);
 }
 
+/** Mage Tower: allein (Bots füllen auf) oder als Gruppe. Kein Termin – der Leiter startet, sobald alle gewählt haben. */
+async function registerTower({ user, solo }) {
+  checkTowerOpen(user);
+  if (await runningRunOf(user._id)) throw new UserError('Du bist gerade in einem Dungeon.');
+  if (await partyOf(user._id)) throw new UserError('Du bist schon für einen Dungeon angemeldet.');
+  if (await playedTowerToday(user._id)) throw new UserError('Du warst heute schon im Mage Tower – ab Mitternacht geht es wieder.');
+  return DungeonParty.create({ mode: 'tower', slot: new Date(), solo: !!solo, leader: user._id, members: [emptyMember(user)] }).catch(duplicate);
+}
+
 /** Gruppenleiter lädt ein Mitglied ein (Name) */
 async function invite({ user, name }) {
   const party = await partyOf(user._id);
   if (!party || party.solo) throw new UserError('Gründe zuerst eine Gruppe.');
   if (!party.leader.equals(user._id)) throw new UserError('Nur der Gruppenleiter kann einladen.');
-  if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Einladungen sind nicht mehr möglich.');
+  if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Einladungen sind nicht mehr möglich.');
   const target = await User.findOne({ usernameLower: String(name || '').trim().toLowerCase() }).select('_id username').lean();
   if (!target) throw new UserError('Dieses Mitglied gibt es nicht.');
   if (party.members.some((m) => m.user && m.user.equals(target._id))) throw new UserError(`${target.username} ist schon in deiner Gruppe.`);
   if (party.invites.some((i) => i.user.equals(target._id))) throw new UserError(`${target.username} ist schon eingeladen.`);
+  const tower = party.mode === 'tower';
+  if (tower && (await playedTowerToday(target._id))) throw new UserError(`${target.username} war heute schon im Mage Tower.`);
   // Filter macht es atomar: höchstens drei Plätze (Mitglieder + offene Einladungen)
   const res = await DungeonParty.updateOne(
     { _id: party._id, leader: user._id, 'invites.user': { $ne: target._id }, $expr: { $lt: [{ $add: [{ $size: '$members' }, { $size: '$invites' }] }, TEAM_SIZE] } },
     { $push: { invites: { user: target._id, name: target.username } } }
   );
   if (!res.modifiedCount) throw new UserError('Deine Gruppe ist schon voll.');
-  await notify([target._id], { area: 'Dungeon', href: '/dungeon', text: `${user.username} lädt dich in den Dungeon ein.` });
+  await notify([target._id], { area: 'Dungeon', href: '/dungeon', text: `${user.username} lädt dich in den ${tower ? 'Mage Tower' : 'Dungeon'} ein.` });
   return target;
 }
 
@@ -357,7 +456,11 @@ async function accept({ user, partyId }) {
   if (await partyOf(user._id)) throw new UserError('Verlasse zuerst deine aktuelle Anmeldung.');
   const party = await DungeonParty.findOne({ _id: partyId, 'invites.user': user._id }).lean();
   if (!party) throw new UserError('Diese Einladung gibt es nicht mehr.');
-  if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Beitreten ist nicht mehr möglich.');
+  if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Beitreten ist nicht mehr möglich.');
+  if (party.mode === 'tower') {
+    checkTowerOpen(user);
+    if (await playedTowerToday(user._id)) throw new UserError('Du warst heute schon im Mage Tower – ab Mitternacht geht es wieder.');
+  }
   const res = await DungeonParty.updateOne(
     { _id: party._id, 'invites.user': user._id, [`members.${TEAM_SIZE - 1}`]: { $exists: false } },
     { $pull: { invites: { user: user._id } }, $push: { members: emptyMember(user) } }
@@ -373,7 +476,7 @@ async function decline({ user, partyId }) {
 async function changeCards({ user, cardId, boostId }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
-  if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
+  if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
   await inTransaction(async (session) => {
     const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true });
     const res = await DungeonParty.updateOne(
@@ -394,7 +497,7 @@ async function markLootSeen(runId, userId) {
 async function leave({ user }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
-  if (isLockedIn(party.slot)) throw new UserError('Der Dungeon startet gleich – Abmelden ist nicht mehr möglich.');
+  if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Abmelden ist nicht mehr möglich.');
   const rest = party.members.filter((m) => !m.user.equals(user._id));
   if (!rest.length) {
     await DungeonParty.deleteOne({ _id: party._id, 'members.user': user._id });
@@ -430,9 +533,8 @@ function splitPlayers(parties) {
   return { players: all.filter((m) => m.card), dropped: all.filter((m) => !m.card && m.user).map((m) => m.user) };
 }
 
-/** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
-async function startTeam(slot, parties, players, chatLog, now) {
-  const dungeon = dungeonForSlot(slot, settings.intervalHours);
+/** Spieler um Bots auf TEAM_SIZE auffüllen → [{ ...Mitglied, bot }] */
+function fillBots(players) {
   const members = players.map((p) => ({ ...p, bot: false }));
   const usedBots = new Set();
   while (members.length < TEAM_SIZE) {
@@ -442,10 +544,17 @@ async function startTeam(slot, parties, players, chatLog, now) {
     const boost = botBoost();
     members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, bot: true });
   }
-  const fights = playDungeon(
-    dungeon,
-    members.map((m) => ({ card: catalog.cardById[m.card], boost: m.boost ? catalog.cardById[m.boost] : null }))
-  );
+  return members;
+}
+
+/** Mitglieder als Katalog-Karten für fight() */
+const teamCards = (members) => members.map((m) => ({ card: catalog.cardById[m.card], boost: m.boost ? catalog.cardById[m.boost] : null }));
+
+/** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
+async function startTeam(slot, parties, players, chatLog, now) {
+  const dungeon = dungeonForSlot(slot, settings.intervalHours);
+  const members = fillBots(players);
+  const fights = playDungeon(dungeon, teamCards(members));
   const leaderId = parties.length === 1 && !parties[0].solo ? String(parties[0].leader) : null;
   const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot) }));
   const success = fights.length === dungeon.fights.length && fights[fights.length - 1].success;
@@ -460,9 +569,69 @@ async function startTeam(slot, parties, players, chatLog, now) {
   });
 }
 
-/** Fällige Anmeldungen starten (force: alle sofort – Admin-Knopf zum Testen) */
+/**
+ * Mage Tower betreten: nur der Leiter (allein: man selbst), erst wenn alle Mitglieder einen Charakter haben.
+ * Offene Einladungen verfallen. Verbraucht den heutigen Versuch aller Mitglieder – das Ergebnis steht sofort fest.
+ */
+async function startTower({ user, now = Date.now() }) {
+  checkTowerOpen(user);
+  const party = await DungeonParty.findOne({ 'members.user': user._id }).lean();
+  if (!party || party.mode !== 'tower') throw new UserError('Du bist für keinen Mage Tower angemeldet.');
+  if (!party.leader.equals(user._id)) throw new UserError('Nur der Gruppenleiter kann den Turm betreten.');
+  const waiting = party.members.filter((m) => !m.card);
+  if (waiting.length) throw new UserError(`Noch ohne Charakter: ${waiting.map((m) => m.name).join(', ')}.`);
+  const day = towerDay(now);
+  const humans = party.members.filter((m) => m.user);
+  const already = await TowerAttempt.find({ user: { $in: humans.map((m) => m.user) }, day }).select('user').lean();
+  if (already.length) {
+    const names = humans.filter((m) => already.some((a) => a.user.equals(m.user))).map((m) => m.name);
+    throw new UserError(`${names.join(', ')} ${names.length > 1 ? 'waren' : 'war'} heute schon im Mage Tower.`);
+  }
+
+  const opts = { ...settings.tower };
+  const members = fillBots(party.members);
+  const fights = playTower(teamCards(members), random, opts);
+  const rounds = fights.filter((f) => f.success).length;
+  const leaderId = party.solo ? null : String(party.leader);
+  const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...towerRewardsFor(fights, bot, random, opts) }));
+  try {
+    await inTransaction(async (session) => {
+      const del = await DungeonParty.deleteOne({ _id: party._id, mode: 'tower' }, { session });
+      if (!del.deletedCount) throw new UserError('Die Anmeldung wurde gleichzeitig verändert – bitte lade die Seite neu.');
+      const [run] = await DungeonRun.create(
+        [{
+          mode: 'tower',
+          slot: new Date(now),
+          dungeon: TOWER.key,
+          rounds,
+          fightSeconds: opts.fightSeconds,
+          pause: opts.pauseSeconds,
+          members: runMembers,
+          fights,
+          success: rounds > 0,
+          startedAt: new Date(now),
+          endsAt: new Date(now + runSeconds(fights, opts.pauseSeconds) * 1000),
+          chat: party.chat || [],
+        }],
+        { session }
+      );
+      // eindeutiger Index (user, day): ein zweiter Versuch am selben Tag bricht die ganze Transaktion ab
+      await TowerAttempt.insertMany(humans.map((m) => ({ user: m.user, day, run: run._id })), { session });
+    });
+  } catch (err) {
+    if (err.code === 11000) throw new UserError('Ein Mitglied war heute schon im Mage Tower.');
+    throw err;
+  }
+  const others = humans.filter((m) => !m.user.equals(user._id)).map((m) => m.user);
+  if (others.length) {
+    await notify(others, { area: 'Dungeon', href: '/dungeon', text: `${user.username} hat eure Gruppe in den Mage Tower geführt.` }).catch((err) => console.error('Turm-Hinweis fehlgeschlagen:', err.message));
+  }
+  return { rounds };
+}
+
+/** Fällige Anmeldungen starten (force: alle sofort – Admin-Knopf zum Testen). Den Turm startet nur sein Leiter. */
 async function startDue({ now = Date.now(), force = false } = {}) {
-  const parties = await DungeonParty.find(force ? {} : { slot: { $lte: new Date(now) } }).lean();
+  const parties = await DungeonParty.find(force ? { mode: { $ne: 'tower' } } : { mode: { $ne: 'tower' }, slot: { $lte: new Date(now) } }).lean();
   const bySlot = new Map();
   parties.forEach((p) => {
     const k = force ? 'jetzt' : String(p.slot.getTime());
@@ -501,6 +670,9 @@ async function startDue({ now = Date.now(), force = false } = {}) {
 
 const euroText = (cents) => (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
+/** "3 Runden geschafft" / "1 Runde geschafft" / "gleich in der ersten Runde gescheitert" */
+const towerResultText = (rounds) => (rounds > 0 ? `${rounds} ${rounds === 1 ? 'Runde' : 'Runden'} geschafft` : 'gleich in der ersten Runde gescheitert');
+
 /** Abgelaufene Durchläufe abschließen: Lohn und Folien gutschreiben, Chat löschen, Karten freigeben */
 async function finishDue({ now = Date.now() } = {}) {
   const due = await DungeonRun.find({ status: 'laeuft', endsAt: { $lte: new Date(now) } }).select('_id').lean();
@@ -509,7 +681,7 @@ async function finishDue({ now = Date.now() } = {}) {
       const run = await inTransaction(async (session) => {
         const r = await DungeonRun.findOneAndUpdate({ _id, status: 'laeuft' }, { $set: { status: 'fertig', chat: [] } }, { new: true, session });
         if (!r) return null;
-        const d = dungeonByKey[r.dungeon];
+        const d = defOf(r.dungeon);
         for (const m of r.members.filter((x) => x.user)) {
           if (m.reward > 0) {
             await User.updateOne({ _id: m.user }, { $inc: { balance: m.reward } }, { session });
@@ -528,11 +700,12 @@ async function finishDue({ now = Date.now() } = {}) {
         return r;
       });
       if (!run) continue;
-      const d = dungeonByKey[run.dungeon];
+      const d = defOf(run.dungeon);
       const card = bossCardOf(run.dungeon);
       for (const m of run.members.filter((x) => x.user)) {
         const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
-        const head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
+        let head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
+        if (run.mode === 'tower') head = `Mage Tower: ${towerResultText(run.rounds)}.`;
         await notify([m.user], { area: 'Dungeon', href: '/dungeon', text: loot.length ? `${head} Beute: ${loot.join(', ')}.` : `${head} Diesmal ohne Beute.` });
       }
     } catch (err) {
@@ -548,7 +721,7 @@ async function finishDue({ now = Date.now() } = {}) {
 function lootEntries(runs, nameById = {}) {
   const out = [];
   for (const r of runs) {
-    const d = dungeonByKey[r.dungeon];
+    const d = defOf(r.dungeon);
     const card = bossCardOf(r.dungeon);
     for (const m of r.members) {
       if (!m.user || !(m.foil || (m.bossCard && card))) continue;
@@ -638,6 +811,21 @@ module.exports = {
   playDungeon,
   runSeconds,
   rewardsFor,
+  MAX_ROUNDS,
+  towerDay,
+  towerOpen,
+  partyLocked,
+  playedTowerToday,
+  towerRequired,
+  towerReward,
+  towerChances,
+  playTower,
+  towerRewardsFor,
+  towerResultText,
+  registerTower,
+  startTower,
+  fillBots,
+  teamCards,
   makeTeams,
   splitPlayers,
   availableCards,

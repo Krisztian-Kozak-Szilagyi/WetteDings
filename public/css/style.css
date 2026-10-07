@@ -4889,6 +4889,10 @@ a.dg-start-tile:hover { color: var(--text); }
 .dg-invitation { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-accent-800), var(--shadow-sm); }
 .dg-invitation-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .dg-invitation-btns { display: flex; gap: 8px; }
+/* Mage Tower: Einstieg unter den Einladungen (einmal am Tag) */
+.dg-tower-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.dg-tower-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dg-tower-btns { display: flex; gap: 8px; }
 
 /* Lobby: Status, Einladen und Verlassen direkt unter den Plätzen */
 .dg-lobby-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-sm); }
