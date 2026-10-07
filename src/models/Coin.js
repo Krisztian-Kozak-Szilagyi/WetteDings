@@ -22,6 +22,10 @@ const coinStateSchema = new Schema(
     sentiment: { type: Number, default: 0 },
     // Nur 51101 Coin: Zahl der bisherigen Splits (Bestände zusammengelegt oder aufgeteilt)
     splits: { type: Number, default: 0 },
+    // Gleitflug auf einen Zielkurs (src/coin/glide.js): endAt in ms, null = keiner
+    glide: { type: new Schema({ key: String, target: Number, endAt: Number }, { _id: false }), default: null },
+    // Schlüssel der schon ausgeführten einmaligen Aktionen (src/coin/markets.js) – nie wieder ausführen
+    oneTimeJumps: { type: [String], default: undefined },
   },
   { timestamps: true }
 );
