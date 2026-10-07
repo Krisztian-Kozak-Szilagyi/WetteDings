@@ -15,6 +15,7 @@
 .es-status.is-aktiv { background: color-mix(in srgb, var(--ja, #5fd08a) 22%, transparent); }
 .es-status.is-eingefroren { background: color-mix(in srgb, var(--warn, #e3b341) 25%, transparent); }
 .es-warn { color: var(--warn, #e3b341); }
+.es-debt { margin: 0 0 16px; }
 .es-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 8px; }
 .es-form .field { flex: 1 1 180px; }
 .es-form .es-ticker-field { flex: 0 1 140px; }

@@ -135,6 +135,7 @@ function createApp() {
   app.use(loadUser);
   app.use(device);
   app.use(dailyBonus);
+  app.use(require('./services/debtService').collectMiddleware); // offene Schulden zuerst tilgen – vor jeder Aktion
   app.use(csrf);
   // Neuer Erfolg? app.js fragt alle paar Sekunden – deshalb vor Statistik und Menü-Abzeichen (nur eine kleine Abfrage)
   app.get('/erfolge/neu', async (req, res) => {

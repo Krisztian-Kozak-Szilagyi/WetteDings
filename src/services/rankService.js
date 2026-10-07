@@ -88,7 +88,8 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
         },
       },
     },
-    { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] }, fresh: { $ifNull: [{ $first: '$cards.fresh' }, 0] } } },
+    { $addFields: { total: { $subtract: [{ $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] }, { $ifNull: ['$debt', 0] }] }, // offene Schulden mindern das Vermögen
+ fresh: { $ifNull: [{ $first: '$cards.fresh' }, 0] } } },
     { $addFields: { rankTotal: { $subtract: ['$total', '$fresh'] } } },
     { $sort: { rankTotal: -1, createdAt: 1 } },
     { $project: { username: 1, avatar: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, fresh: 1, rankTotal: 1, team: { $or: [{ $in: [{ $ifNull: ['$role', null] }, TEAM_ROLES] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },

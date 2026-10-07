@@ -92,6 +92,9 @@ function startJobs() {
   const bankrupt = () => esports.closeExpired().catch((err) => console.error('eSports-Konkurs-Fehler:', err));
   setTimeout(bankrupt, 70 * 1000).unref();
   setInterval(bankrupt, 60 * 60 * 1000).unref();
+  // Schulden: Einnahmen ohne Seitenaufruf (z. B. Wettgewinne) sofort tilgen
+  const debts = () => require('./services/debtService').collectAll().catch((err) => console.error('Schulden-Fehler:', err));
+  setInterval(debts, 5 * 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };
