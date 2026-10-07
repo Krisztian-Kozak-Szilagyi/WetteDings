@@ -145,6 +145,9 @@ const towerDay = (now = Date.now()) => toZonedLocalInput(new Date(now), config.t
 // ---------- Zufall ----------
 const random = () => crypto.randomInt(1000000) / 1000000;
 
+// erst bei Bedarf laden (eSports braucht seinerseits die Dungeon-Modelle)
+const esports = () => require('../esports/esportsService');
+
 function shuffle(list, rand = random) {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i--) {
@@ -326,11 +329,34 @@ function rewardsFor(fights, isBot, rand = random, opts = settings) {
   return { reward: money, foil: boss && rand() * 100 < opts.foilChance, bossCard: boss && rand() * 100 < opts.cardChance };
 }
 
-/** Solo-Anmeldungen in Dreiergruppen aufteilen (zufällig) */
-const makeTeams = (entries, rand = random) => {
-  const list = shuffle(entries, rand);
+/**
+ * Solo-Anmeldungen in Dreiergruppen aufteilen (zufällig). teamOf(entry) = eSports-Team oder null:
+ * Mitglieder desselben Teams kommen bevorzugt zusammen – volle Dreier zuerst, ein Rest von zwei bleibt
+ * zusammen und bekommt einen Dritten aus dem übrigen Pool.
+ */
+const makeTeams = (entries, rand = random, teamOf = () => null) => {
+  const groups = new Map();
+  const pool = [];
+  for (const e of shuffle(entries, rand)) {
+    const t = teamOf(e);
+    if (!t) pool.push(e);
+    else {
+      if (!groups.has(String(t))) groups.set(String(t), []);
+      groups.get(String(t)).push(e);
+    }
+  }
   const teams = [];
-  for (let i = 0; i < list.length; i += TEAM_SIZE) teams.push(list.slice(i, i + TEAM_SIZE));
+  const pairs = [];
+  for (const list of groups.values()) {
+    let i = 0;
+    for (; i + TEAM_SIZE <= list.length; i += TEAM_SIZE) teams.push(list.slice(i, i + TEAM_SIZE));
+    const rest = list.slice(i);
+    if (rest.length === 2) pairs.push(rest);
+    else pool.push(...rest);
+  }
+  const others = shuffle(pool, rand);
+  for (const pair of pairs) teams.push(others.length ? [...pair, others.shift()] : pair);
+  for (let i = 0; i < others.length; i += TEAM_SIZE) teams.push(others.slice(i, i + TEAM_SIZE));
   return teams;
 };
 
@@ -620,6 +646,8 @@ async function startTower({ user, now = Date.now() }) {
   }
 
   const opts = { ...settings.tower };
+  // eSports: zählt für die Liga nur, wenn alle drei Spieler schon vor dieser Woche im selben Team waren
+  const esportsTeam = humans.length === TEAM_SIZE ? await esports().towerTeam(humans.map((m) => m.user), now).catch(() => null) : null;
   const members = fillBots(party.members);
   const fights = playTower(teamCards(members), random, opts);
   const rounds = fights.filter((f) => f.success).length;
@@ -635,6 +663,7 @@ async function startTower({ user, now = Date.now() }) {
           slot: new Date(now),
           dungeon: TOWER.key,
           rounds,
+          esportsTeam,
           fightSeconds: opts.fightSeconds,
           pause: opts.pauseSeconds,
           members: runMembers,
@@ -676,7 +705,9 @@ async function startDue({ now = Date.now(), force = false } = {}) {
     // Einzelspieler ohne Charakter kommen gar nicht erst in die Auslosung
     const soloParties = list.filter((p) => p.solo);
     const idle = soloParties.filter((p) => !splitPlayers([p]).players.length);
-    const solos = makeTeams(soloParties.filter((p) => !idle.includes(p)));
+    const ready = soloParties.filter((p) => !idle.includes(p));
+    const teamOf = await esports().teamsOf(ready.map((p) => p.members[0].user)).catch(() => new Map());
+    const solos = makeTeams(ready, random, (p) => teamOf.get(String(p.members[0].user)) || null);
     const dropped = [];
     for (const team of [...groups, ...solos, ...idle.map((p) => [p])]) {
       try {

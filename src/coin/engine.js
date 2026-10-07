@@ -62,6 +62,9 @@ const RANGES = {
  *        Trend aus einer äußeren Datenquelle (MK Coin): mu = Log-Rendite pro Tag, sentiment −1 … +1 für die Anzeige.
  * @param {{min: number, max: number, factor: number}|null} cfg.rebase
  *        Split: unter min € werden je factor Coins zu einem zusammengelegt, über max € wird jeder in factor aufgeteilt.
+ * @param {number} [cfg.backfillDays]  Vorgeschichte beim allerersten Start (Standard 14 Tage; eSports-Teams: 0)
+ * @param {() => boolean} [cfg.paused]  true = Kurs steht still (eingefrorenes eSports-Team), die Zeit läuft weiter
+ * @param {object} [cfg.team]  eSports-Team ({ id, name }) – nur für die Anzeige
  */
 function createEngine(cfg) {
   const { symbol: SYMBOL, name: NAME, kind = 'coin', startPrice: START_PRICE, params: PARAMS } = cfg;
@@ -70,6 +73,9 @@ function createEngine(cfg) {
   const weather = cfg.weather || null;
   const DRIFT = cfg.drift || null;
   const REBASE = cfg.rebase || null;
+  const BACKFILL = cfg.backfillDays ?? BACKFILL_DAYS;
+  const PAUSED = cfg.paused || (() => false);
+  const TEAM = cfg.team || null;
   const LN_MAX = model.lnMaxOf(PARAMS);
 
   let state = null;
@@ -110,6 +116,10 @@ function createEngine(cfg) {
   }
 
   function advance(dtDays, atMs) {
+    if (PAUSED()) {
+      state.lastTickAt = new Date(atMs);
+      return;
+    }
     if (DRIFT) state.mu = DRIFT.now().mu;
     const next = model.step(state, dtDays, Math.random, weather ? weather.params(weather.at(atMs)) : PARAMS);
     const surge = dueSurge(atMs);
@@ -257,6 +267,18 @@ function createEngine(cfg) {
     });
   }
 
+  /**
+   * Kleine Kursbewegung sofort (eSports-Teams: Wirkung eines Kaufs/Verkaufs), ohne Warten und ohne eigenes Ereignis.
+   * Nur für Werte ohne Split – dort läuft exclusive() ohnehin sofort.
+   */
+  function nudge(log) {
+    if (!state) throw new Error('Kurs-Engine läuft nicht.');
+    if (!log || PAUSED()) return state.price;
+    state.price = Math.max(PARAMS.floor, state.price * Math.exp(log));
+    record(state.price, Date.now());
+    return state.price;
+  }
+
   async function doFlush() {
     const minCutoff = Date.now() - MINUTE_RETENTION;
     const mins = [...pendingMin.values(), ...(curMin ? [{ ...curMin }] : [])].filter((c) => c.t >= minCutoff);
@@ -327,7 +349,7 @@ function createEngine(cfg) {
     const now = Date.now();
     const doc = await CoinState.findById(SYMBOL).lean();
     if (!doc) {
-      const startMs = now - BACKFILL_DAYS * DAY;
+      const startMs = now - BACKFILL * DAY;
       const init = model.initialState(START_PRICE, PARAMS);
       state = {
         price: init.price,
@@ -343,8 +365,10 @@ function createEngine(cfg) {
         splits: 0,
       };
       record(state.price, startMs);
-      console.log(`${NAME}: erster Start – simuliere ${BACKFILL_DAYS} Tage Vorgeschichte …`);
-      await simulateGap(startMs, now);
+      if (BACKFILL) {
+        console.log(`${NAME}: erster Start – simuliere ${BACKFILL} Tage Vorgeschichte …`);
+        await simulateGap(startMs, now);
+      }
     } else {
       state = {
         price: doc.price,
@@ -404,6 +428,8 @@ function createEngine(cfg) {
       sentiment: REPORT ? state.sentiment || 0 : DRIFT ? DRIFT.now().sentiment : null, // Marktstimmung −1 … +1 (ETF: letzter Börsenbericht, MK Coin: Datenquelle)
       splits: state.splits || 0, // Zahl der Splits – ändert sie sich, lädt die Broker-Seite neu
       weather: weather ? weatherNow() : null, // 51101 Coin: letzte Messung der Boje
+      team: TEAM, // eSports-Team-ETF
+      frozen: PAUSED(),
     };
   }
 
@@ -451,6 +477,8 @@ function createEngine(cfg) {
     SYMBOL,
     NAME,
     kind,
+    team: TEAM,
+    isPaused: PAUSED,
     start,
     stop,
     isRunning,
@@ -459,6 +487,7 @@ function createEngine(cfg) {
     history,
     recentEvents,
     jump,
+    nudge,
     flush,
     exclusive,
   };

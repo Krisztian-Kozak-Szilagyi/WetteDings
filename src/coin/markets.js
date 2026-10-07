@@ -43,10 +43,29 @@ const LIST = [
   }),
 ];
 
-const SYMBOLS = LIST.map((e) => e.SYMBOL);
+const FIXED = LIST.map((e) => e.SYMBOL);
+const SYMBOLS = [...FIXED];
 
-/** Engine zu einem Symbol (nur aus der festen Liste) oder null */
+/** Engine zu einem Symbol (feste Liste und gehandelte eSports-Teams) oder null */
 const get = (symbol) => LIST.find((e) => e.SYMBOL === symbol) || null;
+
+/** eSports-Team-ETF zur Laufzeit aufnehmen (src/esports/esportsService.js) – startet die Engine */
+async function add(engine) {
+  if (get(engine.SYMBOL)) return get(engine.SYMBOL);
+  await engine.start();
+  LIST.push(engine);
+  SYMBOLS.push(engine.SYMBOL);
+  return engine;
+}
+
+/** eSports-Team-ETF entfernen (Konkurs/Auflösung): Kurs speichern, aus der Liste nehmen. Feste Werte bleiben. */
+async function remove(symbol) {
+  const e = get(symbol);
+  if (!e || FIXED.includes(symbol)) return;
+  LIST.splice(LIST.indexOf(e), 1);
+  SYMBOLS.splice(SYMBOLS.indexOf(symbol), 1);
+  await e.stop();
+}
 
 // Einmalige Kurssprünge (Krisztian): jeder Schlüssel läuft genau einmal, auch über Neustarts hinweg (Merker im CoinState)
 const ONE_TIME_JUMPS = [{ key: 'mia-median-2026-10-07', symbol: 'MIA', change: 0.75 }];
@@ -84,4 +103,4 @@ function prices() {
   return out;
 }
 
-module.exports = { LIST, SYMBOLS, get, start, stop, prices };
+module.exports = { LIST, FIXED, SYMBOLS, get, add, remove, start, stop, prices };

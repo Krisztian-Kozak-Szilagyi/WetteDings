@@ -45,6 +45,7 @@ const runSchema = new Schema(
     slot: { type: Date, required: true },
     dungeon: { type: String, required: true }, // Schlüssel aus src/dungeon/dungeons.js (Turm: 'mage-tower')
     rounds: { type: Number, default: null }, // Turm: geschaffte Runden
+    esportsTeam: { type: Schema.Types.ObjectId, ref: 'EsportsTeam', default: null }, // Turm: Lauf zählt für dieses Team (Liga)
     // Turm: Wiedergabe je Runde und Pause (echte Sekunden) zum Startzeitpunkt – Dungeon: Standardwerte
     fightSeconds: { type: Number, default: null },
     pause: { type: Number, default: null },
@@ -99,6 +100,7 @@ runSchema.index({ 'members.user': 1, status: 1 });
 runSchema.index({ status: 1, endsAt: 1 });
 runSchema.index({ startedAt: -1 }); // Protokolle: alle Durchläufe, neueste zuerst
 runSchema.index({ 'members.user': 1, startedAt: -1 });
+runSchema.index({ esportsTeam: 1, startedAt: -1 }, { partialFilterExpression: { esportsTeam: { $type: 'objectId' } } }); // eSports-Liga
 
 // Admin-Einstellungen (ein Dokument, _id "dungeon")
 const settingsSchema = new Schema(

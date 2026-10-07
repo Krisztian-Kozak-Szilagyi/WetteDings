@@ -83,6 +83,18 @@ function startJobs() {
   const boerse = () => reportService.runDue().catch((err) => console.error('Börsenbericht-Fehler:', err));
   setTimeout(boerse, 45 * 1000).unref();
   setInterval(boerse, 60 * 1000).unref();
+
+  // eSports: Wochenbericht (sonntags) und Konkurs eingefrorener Teams – jede Minute bzw. stündlich prüfen
+  const esports = require('./esports/esportsService');
+  const league = () => esports.runDue().catch((err) => console.error('eSports-Bericht-Fehler:', err));
+  setTimeout(league, 50 * 1000).unref();
+  setInterval(league, 60 * 1000).unref();
+  const bankrupt = () => esports.closeExpired().catch((err) => console.error('eSports-Konkurs-Fehler:', err));
+  setTimeout(bankrupt, 70 * 1000).unref();
+  setInterval(bankrupt, 60 * 60 * 1000).unref();
+  // Schulden: Einnahmen ohne Seitenaufruf (z. B. Wettgewinne) sofort tilgen
+  const debts = () => require('./services/debtService').collectAll().catch((err) => console.error('Schulden-Fehler:', err));
+  setInterval(debts, 5 * 60 * 1000).unref();
 }
 
 module.exports = { startJobs, voidStaleBets };

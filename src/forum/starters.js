@@ -17,6 +17,8 @@ const CATEGORIES = [
   { key: 'feedback', title: 'Feedback & Bugs', description: 'Wünsche, Fehler und Verbesserungen.', parent: 'allgemein', order: 4 },
   { key: 'halloffame', title: 'Hall of Fame', description: 'Die größten Gewinne und seltensten Pulls.', parent: 'allgemein', order: 5 },
   { key: 'boersenbericht', title: 'Börsenbericht', description: 'Der tägliche Bericht der Börse um 18:45 Uhr.', parent: 'allgemein', order: 6, staffOnly: true },
+  // eSports: je Team ein Unterbereich (legt esportsService bei der Gründung an), dort erscheinen die Wochenberichte
+  { key: 'esports', title: 'eSports', description: 'Die eSports-Teams und ihre Wochenberichte.', parent: null, order: 2, staffOnly: true },
   { key: 'ankuendigungen', title: 'Ankündigungen', description: 'Wichtiges und Geplantes.', parent: null, create: false },
 ];
 

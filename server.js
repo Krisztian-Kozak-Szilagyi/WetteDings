@@ -28,6 +28,7 @@ async function main() {
   await require('./src/forum/forumService').migratePatchnotes(); // alte Patchnotes ins Forum
   await require('./src/services/roles').load(); // Devs für die Abzeichen neben Namen
   await markets.start(); // Broker: SAM, COW, BOJE, BTCG
+  await require('./src/esports/esportsService').start(); // eSports: Team-ETFs in den Broker, Teams als Forum-Verfasser
 
   const app = createApp();
   const server = app.listen(config.port, config.host, () => {

@@ -88,6 +88,7 @@ function createApp() {
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
     dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
+    esportsOpen: (user) => !!user && require('./dungeon/dungeonService').towerOpen(user), // eSports hängt am Mage Tower
     blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
@@ -134,6 +135,7 @@ function createApp() {
   app.use(loadUser);
   app.use(device);
   app.use(dailyBonus);
+  app.use(require('./services/debtService').collectMiddleware); // offene Schulden zuerst tilgen – vor jeder Aktion
   app.use(csrf);
   // Neuer Erfolg? app.js fragt alle paar Sekunden – deshalb vor Statistik und Menü-Abzeichen (nur eine kleine Abfrage)
   app.get('/erfolge/neu', async (req, res) => {
@@ -226,6 +228,7 @@ function createApp() {
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
   app.use(require('./routes/dungeon'));
+  app.use(require('./routes/esports'));
   app.use(require('./routes/trade'));
   app.use(require('./routes/grading'));
   app.use(require('./routes/deck'));

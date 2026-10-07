@@ -1,0 +1,29 @@
+/* eSports-Seite (/esports). Nur Klassen mit Präfix .es – nutzt die Variablen aus style.css. */
+.es-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.es-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.es-card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.es-team-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.es-team-head h2 { margin: 2px 0 0; }
+.es-ticker { font-size: .8rem; font-weight: 600; letter-spacing: .06em; color: var(--muted); margin-left: 6px; }
+.es-list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; }
+.es-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.es-row:last-child { border-bottom: 0; }
+.es-row form { margin: 0; }
+.es-actions { display: flex; gap: 8px; }
+.es-tag { font-size: .72rem; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.es-status { font-size: .78rem; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.es-status.is-aktiv { background: color-mix(in srgb, var(--ja, #5fd08a) 22%, transparent); }
+.es-status.is-eingefroren { background: color-mix(in srgb, var(--warn, #e3b341) 25%, transparent); }
+.es-warn { color: var(--warn, #e3b341); }
+.es-debt { margin: 0 0 16px; }
+.es-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.es-form .field { flex: 1 1 180px; }
+.es-form .es-ticker-field { flex: 0 1 140px; }
+.es-form .es-ticker-field input { text-transform: uppercase; }
+.es-leave { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.es-leave label { display: flex; align-items: center; gap: 6px; }
+.es-table tr.is-mine td { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.es-rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
+@media (max-width: 860px) {
+  .es-grid { grid-template-columns: 1fr; }
+}
