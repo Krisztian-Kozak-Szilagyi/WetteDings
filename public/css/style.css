@@ -1092,6 +1092,15 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .flash-error { background: var(--nein-soft); color: var(--nein); border-color: color-mix(in srgb, var(--nein) 35%, transparent); }
 .flash-info { background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg)); color: var(--color-accent-300); border-color: var(--color-accent-700); }
 .flash-close { background: none; border: 0; font-size: 1.4rem; line-height: 1; cursor: var(--cur-pointer); color: inherit; padding: 0 4px; }
+/* Hinweis unten statt oben, wenn die Seite nach einer Aktion an derselben Stelle weitergeht (Album, #131) */
+.flash.flash-toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 90; width: max-content; max-width: min(520px, calc(100vw - 32px)); margin: 0;
+  transform: translateX(-50%); box-shadow: 0 12px 32px rgba(0, 0, 0, .45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  animation: flash-toast-in .3s cubic-bezier(.22, 1, .36, 1); transition: opacity .4s ease, transform .4s ease;
+}
+.flash.flash-toast.is-gone { opacity: 0; transform: translate(-50%, 8px); }
+@keyframes flash-toast-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+@media (prefers-reduced-motion: reduce) { .flash.flash-toast { animation: none; transition: none; } }
 
 .empty { text-align: center; padding: 48px 16px; color: var(--muted); background: transparent; border: 1px dashed var(--color-neutral-700); border-radius: var(--radius-lg); }
 .empty .btn { margin-top: 12px; }
@@ -1755,6 +1764,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .tcg-modal-info .muted { color: var(--color-neutral-400); }
 .tcg-modal-rarity { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: var(--color-neutral-300); }
 .tcg-modal-status { font-size: 13px; color: var(--color-neutral-400); }
+/* Meldung der letzten Aktion im Kartenfenster (#131) – Farben wie die Hinweise oben auf der Seite */
+.tcg-modal-note { margin: 0; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; border: 1px solid transparent; }
+.tcg-modal-note.is-success { background: var(--ja-soft); color: var(--ja); border-color: color-mix(in srgb, var(--ja) 35%, transparent); }
+.tcg-modal-note.is-error { background: var(--nein-soft); color: var(--nein); border-color: color-mix(in srgb, var(--nein) 35%, transparent); }
 .tcg-modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .tcg-modal-info form { margin: 0; }
 .tcg-modal-info .btn-block { justify-content: flex-start; padding: 0 14px; }
@@ -3483,7 +3496,13 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .hb-price input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 .hb-price input:focus { outline: none; }
 .hb-price .hb-money-unit { font-size: 22px; }
-.hb-price-note { margin: 0; }
+/* #115: kurze Zeile + ?; das Fenster richtet sich an der Zeile aus (nicht am ?), damit es auch schmal ins Bild passt */
+.hb-price-note { position: relative; display: flex; align-items: center; gap: 8px; margin: 0; }
+.hb-price-note .help-tip { position: static; }
+.hb-price-note .help-tip > summary { width: 18px; height: 18px; font-size: 11px; }
+.hb-price-note .help-tip-body { left: 0; right: auto; top: calc(100% + 6px); }
+.hb-price-note .help-tip-body p { margin: 0; }
+.hb-price-note .help-tip-body p + p { margin-top: 6px; }
 .hb-swap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 0 4px; position: relative; }
 .hb-swap::before { content: ""; position: absolute; top: 18px; bottom: 18px; left: 50%; width: 1px; background: var(--color-divider); }
 .hb-swap-icon { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--color-accent-200); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-accent-700); }

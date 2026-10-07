@@ -85,7 +85,7 @@
 <% if (currentUser.isAdmin) { %>
 <% [
      { key: 'dev', id: 'devs', title: 'Devs', label: 'Dev', text: 'Devs schreiben im Team-Bereich des Forums (z. B. Patchnotes), entscheiden Streitfälle, vergeben Booster Packs, bearbeiten Meldungen und Hinweise auf Mehrfach-Konten, laden neue Mitglieder per Code ein und können Mitglieder bis zu 7 Tage bannen (keine Devs, nur eigene Bans aufheben). Sie sehen das Dev-Panel und tragen ein grünes DEV-Abzeichen.' },
-     { key: 'mod', id: 'mods', title: 'Mods', label: 'Mod', text: 'Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.' },
+     { key: 'mod', id: 'mods', title: 'Mods', label: 'Mod', text: 'Mods moderieren das Forum und die Kommentare bei Wetten: Beiträge löschen oder bearbeiten, Themen anpinnen, schließen oder entfernen und Bereiche anlegen, ändern oder löschen – außer im Team-Bereich „Admin & Dev“. Sonst haben sie keine Sonderrechte und kein Panel. Wie Admin und Devs stehen sie in der Rangliste unter „Team“ und zählen nicht in der Wirtschafts-Statistik. Sie tragen ein oranges MOD-Abzeichen. Ein Mitglied hat immer nur eine Rolle.' },
    ].forEach((r) => { const list = users.filter((u) => u.role === r.key); %>
   <section class="stats-block" id="<%= r.id %>">
     <%- blockHead(`${r.title} <span class="panel-badge panel-badge-inline panel-badge-muted">${list.length}</span>`, r.text) %>

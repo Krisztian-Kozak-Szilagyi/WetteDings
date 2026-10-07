@@ -95,7 +95,7 @@
             <span class="sr-only">Preis</span>
             <input type="text" name="geld_will" inputmode="decimal" placeholder="Preis" value="<%= money(receive) %>" data-hb-money="will"><span class="hb-money-unit">€</span>
           </label>
-          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Oder statt Geld: Wunschkarten – dann wird getauscht.</li></ul>
+          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Optional: Wunschkarten – mit oder ohne Preis.</li></ul>
           <%# Wunschkarte suchen: Vorschläge aus allen Karten, fehlende zuerst (public/js/handel-neu.js) %>
           <div class="hb-wish" data-hb-wish>
             <label class="hb-wish-field">
@@ -108,7 +108,18 @@
               <ul class="hb-wish-list" id="hb-wish-list" role="listbox" aria-label="Vorschläge" data-hb-wish-list></ul>
             </div>
           </div>
-          <p class="hb-price-note muted small">Jeder kann sofort annehmen oder dir ein Gegenangebot machen.</p>
+          <%# #115: kurze Zeile, die Regeln stehen im ?-Fenster (Verhalten wie überall: public/js/app.js) %>
+          <div class="hb-price-note muted small">
+            <span>Wer zuerst annimmt, bekommt das Angebot.</span>
+            <details class="help-tip">
+              <summary aria-label="So funktioniert ein Markt-Angebot" title="So funktioniert ein Markt-Angebot">?</summary>
+              <div class="help-tip-body">
+                <p>Preis und Wunschkarten gehen einzeln oder zusammen.</p>
+                <p>Wer annimmt, gibt dir alles, was du hier verlangst, und bekommt dafür deine Karten. Bis dahin sind deine Karten gesperrt.</p>
+                <p>Statt anzunehmen kann man dir auch ein Gegenangebot machen – darüber entscheidest du.</p>
+              </div>
+            </details>
+          </div>
         <% } else { %>
           <button type="button" class="hb-side-head" data-hb-open="will" <%= showTheirs ? '' : 'disabled' %>>
             <span class="hb-side-label">Du bekommst<span class="hb-side-from"> von <%= partner.username %></span></span>

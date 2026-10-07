@@ -50,6 +50,8 @@
       <span class="tcg-modal-rarity"><span class="tcg-dot" data-tcg-modal-dot></span><span data-tcg-modal-rarity></span></span>
       <h2 data-tcg-modal-name></h2>
       <p class="tcg-modal-status" data-tcg-modal-count></p>
+      <%# Meldung der letzten Aktion (Favorit, Schützen, Verkaufen) – nach dem Neuladen hier statt oben auf der Seite (#131) %>
+      <p class="tcg-modal-note" data-tcg-modal-note role="status" hidden></p>
       <div class="tcg-modal-actions" data-tcg-owned-actions>
         <form method="post" action="/tcg/favorit" data-tcg-favorite>
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
