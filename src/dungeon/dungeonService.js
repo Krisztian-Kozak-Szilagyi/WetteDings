@@ -161,6 +161,20 @@ function shuffle(list, rand = random) {
 /** Modus einer Anmeldung bzw. eines Durchlaufs für die Kartensperren (alte Anmeldungen ohne mode: Dungeon) */
 const modeOf = (doc) => (doc && doc.mode === 'tower' ? 'tower' : 'dungeon');
 
+/** Karten, die die anderen Mitglieder einer Anmeldung schon gewählt haben (Charakter und Boost) */
+const teamTaken = (members, userId) =>
+  new Set(members.filter((m) => String(m.user) !== String(userId)).flatMap((m) => [m.card, m.boost]).filter(Boolean));
+
+/**
+ * Mage Tower: jede Karte nur einmal im Team – weder zwei Spieler mit derselben Karte (z. B. zweimal Krisz Glitch) noch
+ * dieselbe Karte als Charakter und Boost. Gibt die doppelte Karten-ID zurück oder null.
+ */
+function towerDuplicate(members, userId, cardId, boostId) {
+  if (cardId && boostId && cardId === boostId) return cardId;
+  const taken = teamTaken(members, userId);
+  return [cardId, boostId].find((id) => id && taken.has(id)) || null;
+}
+
 /** Karte eines Bots: Seltenheit nach botWeights, darin eine zufällige Charakterkarte (gesperrte Karten nicht) */
 function botCard(rand = random, weights = settings.botWeights, banned = new Set()) {
   const pool = catalog.RARITIES.filter((r) => weights[r.key] > 0 && hasCharacters(r.key));
@@ -544,6 +558,15 @@ async function changeCards({ user, cardId, boostId }) {
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
   await inTransaction(async (session) => {
+    if (modeOf(party) === 'tower') {
+      // in der Transaktion neu lesen: zwei Mitglieder, die gleichzeitig dieselbe Karte wählen, stoßen hier zusammen
+      const fresh = await DungeonParty.findById(party._id).session(session).lean();
+      const dup = fresh && towerDuplicate(fresh.members, user._id, cardId || null, boostId || null);
+      if (dup) {
+        const name = (catalog.cardById[dup] || { name: 'Diese Karte' }).name;
+        throw new UserError(cardId === boostId ? `Im Mage Tower darf jede Karte nur einmal mitspielen – ${name} nicht als Charakter und Boost.` : `${name} ist schon in eurem Team – im Mage Tower darf jede Karte nur einmal mitspielen.`);
+      }
+    }
     const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party) });
     const res = await DungeonParty.updateOne(
       { _id: party._id, 'members.user': user._id },
@@ -631,11 +654,16 @@ function fillBots(players, mode = 'dungeon') {
   const members = players.map((p) => ({ ...p, bot: false }));
   const usedBots = new Set();
   const banned = cardBans.bannedIn(mode);
+  // Mage Tower: jede Karte nur einmal im Team – auch Bots nehmen keine, die schon mitspielt
+  const unique = mode === 'tower';
+  if (unique) players.forEach((p) => [p.card, p.boost].forEach((id) => id && banned.add(id)));
   while (members.length < TEAM_SIZE) {
     const card = botCard(random, settings.botWeights, banned);
     const name = BOT_NAMES.find((n) => !usedBots.has(n)) || 'Bot';
     usedBots.add(name);
+    if (unique) banned.add(card.id);
     const boost = botBoost(random, settings.botWeights, banned);
+    if (unique && boost) banned.add(boost.id);
     members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, bot: true });
   }
   return members;
@@ -674,6 +702,8 @@ async function startTower({ user, now = Date.now() }) {
   if (!party.leader.equals(user._id)) throw new UserError('Nur der Gruppenleiter kann den Turm betreten.');
   const waiting = party.members.filter((m) => !m.card);
   if (waiting.length) throw new UserError(`Noch ohne Charakter: ${waiting.map((m) => m.name).join(', ')}.`);
+  const doubled = party.members.filter((m) => towerDuplicate(party.members, m.user, m.card, m.boost));
+  if (doubled.length) throw new UserError(`Im Mage Tower darf jede Karte nur einmal mitspielen – bitte tauschen: ${doubled.map((m) => m.name).join(', ')}.`);
   const blocked = party.members.filter((m) => cardBans.isBanned(m.card, 'tower') || cardBans.isBanned(m.boost, 'tower'));
   if (blocked.length) throw new UserError(`Gesperrte Karte im Mage Tower – bitte tauschen: ${blocked.map((m) => m.name).join(', ')}.`);
   const day = towerDay(now);
@@ -915,6 +945,8 @@ module.exports = {
   botBoost,
   modeOf,
   notifyBanned,
+  teamTaken,
+  towerDuplicate,
   teamEffects,
   fight,
   playDungeon,

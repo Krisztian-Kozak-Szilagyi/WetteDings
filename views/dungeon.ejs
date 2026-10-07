@@ -283,12 +283,12 @@
           <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
         </label>
       <% } %>
-      <% list.forEach((c, i) => { const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); %>
+      <% list.forEach((c, i) => { const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); %>
         <%# Gesperrte Karten (Kartensperren): sichtbar, aber nicht wählbar %>
-        <label class="dg-pick r-<%= c.rarity %><%= banned ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>" title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %>">
-          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= banned ? 'disabled' : '' %>>
+        <label class="dg-pick r-<%= c.rarity %><%= banned || taken ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned || taken ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>" title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %>">
+          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= banned || taken ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
-          <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } %>
+          <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } %>
           <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>
@@ -298,7 +298,7 @@
 <% } %>
 
 <% if (canPick) { %>
-  <form method="post" action="/dungeon/karten" data-dg-cards-form>
+  <form method="post" action="/dungeon/karten" data-dg-cards-form <%= tower ? 'data-dg-unique' : '' %>>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <% [['card', 'Charakter wählen', cards.characters], ['boost', 'Boost wählen', cards.boosts]].forEach(([kind, title, list]) => { %>
       <dialog class="dg-picker" data-dg-picker="<%= kind %>" aria-labelledby="dg-picker-<%= kind %>">
