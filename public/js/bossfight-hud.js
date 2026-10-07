@@ -2,6 +2,8 @@
 //   Lebensbalken (Boss 200, Spieler 100), eigenes Deck rechts (zuletzt geändertes aus /api/deck), Start mit 5 Karten.
 //   Item-Karten (kampf-Werte aus src/tcg/cardData.js) per Klick aus der Hand ausrüsten: sie erscheinen rechts neben dem
 //   Avatar. Zwei Hände – was keinen Platz mehr hat, fliegt raus und ist weg (nicht zurück in die Hand).
+//   Ausrüsten kostet Energie (1 pro Hand); ersetzt ein Item eines, das in der Runde schon angegriffen hat, greift es erst
+//   nächste Runde an (höchstens ein Angriff pro Hand und Runde). Karte 1 s unter der Maus = große Vorschau.
 //   Waffen und Zauber: Klick = Schaden am Boss, einmal pro Runde. Schilde: dauerhaft 10 % weniger Schaden,
 //   der Holzschild zerbricht nach 4 Treffern. „Runde beenden“: der Boss schlägt zu, dann eine neue Karte.
 //   Helden-Karten (typ held): kosten Energie (3 pro Runde), wirken sofort (Schaden, Block, Heilung, Fähigkeit) und sind weg.
@@ -136,7 +138,39 @@
     el.card = c;
     if (c.kampf) el.classList.add('bf-playable');
     el.addEventListener('click', function () { play(el); });
+    previewOn(el, c);
     return el;
+  }
+
+  // Vorschau: nach 1 s unter der Maus erscheint die Karte groß in der Bildschirmmitte (zum Lesen)
+  var preview = document.createElement('div');
+  preview.className = 'bf-preview';
+  preview.hidden = true;
+  preview.innerHTML = '<img alt=""><p class="bf-preview-info"></p>';
+  document.body.appendChild(preview);
+  var previewTimer = null;
+  function hidePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = null;
+    preview.hidden = true;
+  }
+  function previewOn(el, c) {
+    el.addEventListener('mouseenter', function () {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(function () {
+        if (!el.isConnected) return;
+        preview.querySelector('img').src = c.image;
+        preview.querySelector('img').alt = c.name;
+        var k = c.kampf;
+        var info = !k ? 'Kann im Bosskampf nicht gespielt werden.'
+          : k.typ === 'held' ? 'Kosten: ' + (k.kosten || 0) + ' Energie – wirkt sofort.'
+          : 'Ausrüsten: ' + itemKosten(k) + ' Energie' + (k.typ === 'schild' ? '.' : ' – danach einmal pro Runde einsetzbar.');
+        preview.querySelector('.bf-preview-info').textContent = info;
+        preview.hidden = false;
+      }, 1000);
+    });
+    el.addEventListener('mouseleave', hidePreview);
+    el.addEventListener('mousedown', hidePreview);
   }
 
   // Fächer unten in der Mitte: leicht gedreht, äußere Karten etwas tiefer
@@ -189,14 +223,24 @@
   }
 
   // Was muss für ein neues Item weichen? Erst ein Item derselben Art (Schild für Schild, sonst Waffe/Zauber),
-  // dann das älteste – so lange, bis genug Hände frei sind.
+  // dann das älteste – so lange, bis genug Hände frei sind. Gibt zurück, ob ein Ersetztes in dieser Runde
+  // schon angegriffen hat: dann kann das neue erst nächste Runde angreifen (sonst: Waffen tauschen = beliebig oft zuschlagen).
   function makeRoom(k) {
     var need = Math.min(HANDS, k.haende || 1);
     var shield = k.typ === 'schild';
+    var benutzt = false;
     while (gear.length && HANDS - gearHands() < need) {
       var same = gear.filter(function (g) { return (g.card.kampf.typ === 'schild') === shield; });
-      unequip(same[0] || gear[0], 'bf-gear-out');
+      var weg = same[0] || gear[0];
+      if (weg.used) benutzt = true;
+      unequip(weg, 'bf-gear-out');
     }
+    return benutzt;
+  }
+
+  // Ausrüsten kostet Energie: 1 pro belegter Hand
+  function itemKosten(k) {
+    return Math.min(HANDS, k.haende || 1);
   }
 
   function unequip(g, cls) {
@@ -229,14 +273,23 @@
     var c = el.card;
     if (!c.kampf) return nope(el);
     if (c.kampf.typ === 'held') return playHeld(el);
+    var kosten = itemKosten(c.kampf);
+    if (kosten > energie) {
+      nope(el);
+      popup(energieEl || el, 'Zu wenig Energie', 'bf-pop-info');
+      return;
+    }
+    energie -= kosten;
     gespielt++;
+    hidePreview();
     var from = el.getBoundingClientRect();
     cards.splice(cards.indexOf(el), 1);
     el.remove();
     layout();
-    makeRoom(c.kampf);
+    var erbt = makeRoom(c.kampf);
+    updateStatus();
 
-    var g = { card: c, used: false, hits: 0 };
+    var g = { card: c, used: erbt && c.kampf.typ !== 'schild', hits: 0 };
     g.el = document.createElement('button');
     g.el.type = 'button';
     g.el.className = 'bf-gear-card bf-gear-' + c.kampf.typ;
@@ -245,6 +298,7 @@
     g.el.querySelector('img').src = c.image;
     g.el.querySelector('img').alt = c.name;
     g.el.addEventListener('click', function () { use(g); });
+    previewOn(g.el, c);
     gearEl.appendChild(g.el);
     gear.push(g);
     gearLabel(g);
@@ -338,6 +392,7 @@
       return;
     }
     energie -= k.kosten || 0;
+    hidePreview();
     var vorher = gespielt;
     gespielt++;
 
