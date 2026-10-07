@@ -3,7 +3,7 @@
 //   Item-Karten (kampf-Werte aus src/tcg/cardData.js) per Klick aus der Hand ausrüsten: sie erscheinen rechts neben dem
 //   Avatar. Zwei Hände – was keinen Platz mehr hat, fliegt raus und ist weg (nicht zurück in die Hand).
 //   Ausrüsten kostet Energie (1 pro Hand); ersetzt ein Item eines, das in der Runde schon angegriffen hat, greift es erst
-//   nächste Runde an (höchstens ein Angriff pro Hand und Runde). Karte 1 s unter der Maus = große Vorschau.
+//   nächste Runde an (höchstens ein Angriff pro Hand und Runde). Karte 0,5 s unter der Maus = große Vorschau. Effekte stapeln nicht (gleiche Karte frischt auf).
 //   Waffen und Zauber: Klick = Schaden am Boss, einmal pro Runde. Schilde: dauerhaft 10 % weniger Schaden,
 //   der Holzschild zerbricht nach 4 Treffern. „Runde beenden“: der Boss schlägt zu, dann eine neue Karte.
 //   Helden-Karten (typ held): kosten Energie (3 pro Runde), wirken sofort (Schaden, Block, Heilung, Fähigkeit) und sind weg.
@@ -142,7 +142,7 @@
     return el;
   }
 
-  // Vorschau: nach 1 s unter der Maus erscheint die Karte groß in der Bildschirmmitte (zum Lesen)
+  // Vorschau: nach 0,5 s unter der Maus erscheint die Karte groß in der Bildschirmmitte (zum Lesen)
   var preview = document.createElement('div');
   preview.className = 'bf-preview';
   preview.hidden = true;
@@ -167,7 +167,7 @@
           : 'Ausrüsten: ' + itemKosten(k) + ' Energie' + (k.typ === 'schild' ? '.' : ' – danach einmal pro Runde einsetzbar.');
         preview.querySelector('.bf-preview-info').textContent = info;
         preview.hidden = false;
-      }, 1000);
+      }, 500);
     });
     el.addEventListener('mouseleave', hidePreview);
     el.addEventListener('mousedown', hidePreview);
@@ -343,10 +343,15 @@
   var ENERGIE = 3; // pro Runde
   var energie = ENERGIE;
   var gespielt = 0; // Karten, die in dieser Runde schon gespielt wurden (Hinterhalt)
-  var block = 0; // fängt Schaden des nächsten Boss-Angriffs ab
-  var blockKarten = []; // Karten, von denen der Block stammt (Anzeige über dem Avatar)
-  var fluch = []; // { schaden, runden, max, card } – trifft den Boss zu Beginn jeder Runde
-  var verzoegert = []; // { schaden, card } – schlägt zu Beginn der nächsten Runde ein (Nachladen)
+  // Effekte stapeln nicht: dieselbe Karte noch einmal frischt ihren Effekt nur auf (volle Dauer, Wert nicht addiert).
+  // Verschiedene Karten wirken nebeneinander.
+  var block = 0; // fängt Schaden des nächsten Boss-Angriffs ab (Summe aus blockKarten)
+  var blockKarten = []; // { card, wert } – je Karte höchstens ein Eintrag
+  var fluch = []; // { schaden, runden, max, card } – trifft den Boss zu Beginn jeder Runde, je Karte höchstens einer
+  var verzoegert = []; // { schaden, card } – schlägt zu Beginn der nächsten Runde ein (Nachladen), je Karte höchstens einer
+  function vonKarte(list, card) {
+    return list.filter(function (x) { return x.card.id === card.id; })[0] || null;
+  }
   var energieEl = document.querySelector('[data-bf-energy]');
   var statusEl = document.querySelector('[data-bf-status]');
   var effekteEl = document.querySelector('[data-bf-effects]');
@@ -356,14 +361,14 @@
   var effektEls = new Map();
   function effektListe() {
     var list = [];
-    blockKarten.forEach(function (c, i) {
-      list.push({ key: 'block' + i + c.id, card: c, rest: 1, max: 1, text: c.name + ': Block ' + block + ' gegen den nächsten Boss-Angriff', zahl: block });
+    blockKarten.forEach(function (b) {
+      list.push({ key: 'block' + b.card.id, card: b.card, rest: 1, max: 1, text: b.card.name + ': Block ' + b.wert + ' gegen den nächsten Boss-Angriff (1 Runde)', zahl: 1 });
     });
     fluch.forEach(function (f) {
-      list.push({ key: 'fluch' + f.nr, card: f.card, rest: f.runden, max: f.max, text: f.card.name + ': Fluch, ' + f.schaden + ' Schaden pro Runde, noch ' + f.runden + ' Runde(n)', zahl: f.runden });
+      list.push({ key: 'fluch' + f.card.id, card: f.card, rest: f.runden, max: f.max, text: f.card.name + ': Fluch, ' + f.schaden + ' Schaden pro Runde, noch ' + f.runden + ' Runde(n)', zahl: f.runden });
     });
     verzoegert.forEach(function (v) {
-      list.push({ key: 'lade' + v.nr, card: v.card, rest: 1, max: 1, text: v.card.name + ': ' + v.schaden + ' Schaden zu Beginn der nächsten Runde', zahl: v.schaden });
+      list.push({ key: 'lade' + v.card.id, card: v.card, rest: 1, max: 1, text: v.card.name + ': ' + v.schaden + ' Schaden zu Beginn der nächsten Runde (1 Runde)', zahl: 1 });
     });
     return list;
   }
@@ -395,7 +400,6 @@
       el.style.setProperty('--p', e.max ? e.rest / e.max : 1);
     });
   }
-  var effektNr = 0;
 
   function updateStatus() {
     if (energieEl) energieEl.textContent = '⚡ ' + energie + ' / ' + ENERGIE;
@@ -466,9 +470,11 @@
     setTimeout(function () { flash.remove(); }, 1800);
 
     if (k.sch) {
-      block += k.sch;
-      blockKarten.push(el.card);
-      popup(player.el, '+' + k.sch + ' Block', 'bf-pop-info');
+      var b = vonKarte(blockKarten, el.card);
+      if (b) b.wert = Math.max(b.wert, k.sch);
+      else blockKarten.push({ card: el.card, wert: k.sch });
+      block = blockKarten.reduce(function (sum, x) { return sum + x.wert; }, 0);
+      popup(player.el, b ? 'Block aufgefrischt' : '+' + k.sch + ' Block', 'bf-pop-info');
     }
     if (k.hei) {
       player.heal(k.hei);
@@ -478,9 +484,17 @@
       player.damage(e.selbst);
       popup(player.el, '−' + e.selbst, 'bf-pop-player');
     }
-    if (e.fluch) fluch.push({ nr: ++effektNr, schaden: e.fluch.schaden, runden: e.fluch.runden, max: e.fluch.runden, card: el.card });
+    if (e.fluch) {
+      var fl = vonKarte(fluch, el.card);
+      if (fl) fl.runden = fl.max; // auffrischen: wieder volle Dauer, nicht länger
+      else fluch.push({ schaden: e.fluch.schaden, runden: e.fluch.runden, max: e.fluch.runden, card: el.card });
+    }
     var dmg = (k.ang || 0) * (e.hinterhalt && vorher > 0 ? e.hinterhalt : 1);
-    if (dmg && e.verzoegert) verzoegert.push({ nr: ++effektNr, schaden: dmg, card: el.card });
+    if (dmg && e.verzoegert) {
+      var vz = vonKarte(verzoegert, el.card);
+      if (vz) vz.schaden = Math.max(vz.schaden, dmg);
+      else verzoegert.push({ schaden: dmg, card: el.card });
+    }
     else if (dmg) bossSchaden(dmg, k.fx, flash, e.treffer);
     updateStatus();
   }
