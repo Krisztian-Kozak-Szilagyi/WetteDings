@@ -1670,6 +1670,16 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--rar) 40%, transparent), 0 12px 26px rgba(0, 0, 0, .45);
 }
 .tcg-slot .tcg-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; box-shadow: none; transform: none; transition: none; }
+/* Album: Sprung zu einer Karte (#karte-<id>, public/js/tcg.js) – sie hebt sich kurz und leuchtet in ihrer Seltenheitsfarbe */
+.tcg-slot.is-spotlight { z-index: 2; }
+.tcg-slot.is-spotlight .tcg-art { animation: tcg-spotlight 2s cubic-bezier(.22, 1, .36, 1); }
+@keyframes tcg-spotlight {
+  18% { transform: translateY(-5px) scale(1.04); box-shadow: 0 0 0 3px var(--rar), 0 0 36px 8px color-mix(in srgb, var(--rar) 70%, transparent), 0 16px 30px rgba(0, 0, 0, .5); }
+  50% { transform: translateY(-3px) scale(1.02); box-shadow: 0 0 0 2px var(--rar), 0 0 24px 4px color-mix(in srgb, var(--rar) 55%, transparent), 0 14px 28px rgba(0, 0, 0, .45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tcg-slot.is-spotlight .tcg-art { animation: none; box-shadow: 0 0 0 3px var(--rar), 0 0 24px 4px color-mix(in srgb, var(--rar) 55%, transparent); }
+}
 .tcg-slot:hover .tcg-art, .tcg-slot:focus-visible .tcg-art { transform: translateY(-4px); box-shadow: 0 0 0 1px var(--rar), 0 14px 30px rgba(0, 0, 0, .5), 0 0 22px color-mix(in srgb, var(--rar) 30%, transparent); }
 .tcg-fx { position: absolute; inset: 0; pointer-events: none; }
 .tcg-fx-shine { background: linear-gradient(110deg, transparent 42%, rgba(255, 255, 255, .22) 50%, transparent 58%); background-size: 250% 100%; mix-blend-mode: overlay; animation: tcgShine 4s ease-in-out infinite; }

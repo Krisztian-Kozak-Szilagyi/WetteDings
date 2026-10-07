@@ -5,6 +5,7 @@
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
   // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
   // seenIds: schon einmal besessene Karten – fehlen sie, werden sie grau statt als "?" gezeigt
+  // data-album-card: eigene Karten (auch gesperrte) – Sprungziel für /tcg/album#karte-<id> (public/js/tcg.js)
   const seenIds = locals.seenIds || new Set();
   const showMissing = locals.showMissing !== false;
   const locks = locals.lockedByCard || {};
@@ -30,7 +31,7 @@
     <% const freeN = n - lockedPlain; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
     <% if (n && freeN <= 0) { %>
-      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
+      <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
           <span class="tcg-exam-badge"><%= lockLabel %></span>
@@ -53,7 +54,7 @@
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
       <% } %>
       <% if (isAlbum) { %>
-        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>"
+        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
           data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
           data-image="<%= c.image %>" data-count="<%= freeN %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
           data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>"
