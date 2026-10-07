@@ -4,7 +4,7 @@
  * Umgebungsvariable MIA_COIN_TAG; ohne sie wird nichts abgerufen und der Coin läuft ohne Trend.
  *
  * Stündlich: Aufrufe je Video speichern (TagReading). Daraus der Trend (driftFrom, rein und testbar):
- * Zuwachs der letzten 24 Stunden gegen den Schnitt der Vortage (bis zu 7) – m = log2(heute / Schnitt), begrenzt
+ * Zuwachs der letzten 24 Stunden gegen den Median der Vortage (bis zu 7) – m = log2(heute / Median), begrenzt
  * auf −1 … +1, Trend = m · MAX_DRIFT (Log-Rendite pro Tag). Gezählt wird nur der Zuwachs von Videos, die in beiden
  * Abrufen vorkommen – rutscht ein Video in die Liste oder heraus, springt die Summe also nicht.
  * Es werden keine Daten von Mitgliedern übertragen.
@@ -72,7 +72,11 @@ function driftFrom(list, now) {
     if (g !== null) past.push(g);
   }
   if (today === null || !past.length) return { mu: 0, sentiment: 0, today, base: null };
-  const base = past.reduce((s, g) => s + g, 0) / past.length;
+  // Median statt Schnitt: ein einzelner Ausreißer-Tag würde den Schnitt eine Woche lang anheben – dann läge fast
+  // jeder normale Tag darunter und der Kurs ginge stetig nach unten.
+  const sorted = [...past].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  const base = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   const sentiment = clamp(Math.log2((today + 1) / (base + 1)), -1, 1);
   return { mu: sentiment * MAX_DRIFT, sentiment, today, base };
 }

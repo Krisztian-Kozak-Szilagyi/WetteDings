@@ -96,3 +96,14 @@ test('Mindestkauf: 10 % des Kurses, mindestens 1 €', () => {
   assert.equal(minBuyCents(12.345), 124); // aufgerundet
   assert.equal(minBuyCents(10000), 100000);
 });
+
+test('MK Coin: großer Sprung halb so weit wie beim SAM (+10 … +50 %, −8 … −35 %)', () => {
+  const { MIA_PARAMS } = require('../src/coin/model');
+  const rng = mulberry32(7);
+  for (let i = 0; i < 2000; i++) {
+    const s = rollSurge(rng, MIA_PARAMS.surge);
+    if (!s) continue;
+    if (s.type === 'pump') assert.ok(s.change >= 0.1 - 1e-9 && s.change <= 0.5 + 1e-9, `pump ${s.change}`);
+    else assert.ok(s.change <= -0.083 && s.change >= -0.35 - 1e-9, `crash ${s.change}`);
+  }
+});
