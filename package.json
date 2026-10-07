@@ -9,7 +9,8 @@
     "dev": "node scripts/dev.js",
     "dev:verdacht": "node scripts/dev-verdacht.js",
     "test": "node --test",
-    "webp": "node scripts/webp.js"
+    "webp": "node scripts/webp.js",
+    "sim:bosskampf": "node scripts/bossfight-sim.js"
   },
   "engines": {
     "node": ">=20"

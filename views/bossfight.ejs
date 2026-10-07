@@ -23,6 +23,8 @@
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
         <span class="bf-hp-text"></span>
       </div>
+      <%# Ankündigung: was der Boss als Nächstes tut (Regeln: public/js/bossfight-regeln.js) %>
+      <div class="bf-intent" data-bf-intent aria-live="polite"></div>
     </section>
 
     <section class="bf-player" aria-label="Spieler">
@@ -34,7 +36,6 @@
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
         <span class="bf-hp-text"></span>
       </div>
-      <div class="bf-status" data-bf-status hidden></div>
     </section>
     <%# Ausgerüstete Items (zwei Hände) – Waffe/Zauber anklicken = angreifen %>
     <section class="bf-gear" data-bf-gear aria-label="Ausrüstung"></section>
@@ -56,6 +57,7 @@
 
   <script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/bossfight-fx.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/bossfight-regeln.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/bossfight-hud.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

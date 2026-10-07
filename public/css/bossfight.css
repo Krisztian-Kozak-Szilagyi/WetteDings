@@ -319,13 +319,6 @@ html, body.bf-body {
   font-weight: 800;
   color: #cfe8ff;
 }
-.bf-status {
-  font-size: 12px;
-  font-weight: 700;
-  color: #9fd8ff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
-}
-.bf-status[hidden] { display: none; }
 
 /* Helden-Karte: leuchtet kurz neben der Ausrüstung auf und verschwindet */
 .bf-held-flash {
@@ -456,4 +449,61 @@ html, body.bf-body {
 .bf-eff-weg { opacity: 0; transform: scale(.6); }
 @keyframes bf-eff-in {
   from { opacity: 0; transform: scale(.6); }
+}
+
+/* Ankündigung des Bosses unter seinem Lebensbalken */
+.bf-intent {
+  margin-top: 8px;
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(13, 11, 20, .78);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .5);
+  font-size: 14px;
+  color: #e9e4f5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+.bf-intent:empty { display: none; }
+.bf-intent b { color: #f3cf7a; }
+.bf-intent-schwer { box-shadow: 0 0 0 2px rgba(255, 90, 79, .85), 0 4px 16px rgba(255, 60, 40, .45); }
+.bf-intent-schwer b { color: #ff7a6e; }
+.bf-intent-wut::after { content: ' 🔥'; }
+
+/* Stärkung auf einer Handkarte (Druiden) */
+.bf-card-buff {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: #123018;
+  box-shadow: 0 0 0 2px #8fe8a8, 0 4px 10px rgba(0, 0, 0, .6);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #d9ffe3;
+}
+.bf-card-buff[hidden] { display: none; }
+.bf-card.bf-buffed .bf-card-inner { animation: bf-buff .6s ease-out; }
+@keyframes bf-buff {
+  40% { filter: drop-shadow(0 0 22px rgba(143, 232, 168, .95)) brightness(1.25); }
+}
+/* zu teuer für die restliche Energie */
+.bf-card.bf-zu-teuer .bf-card-front img { filter: grayscale(.6) brightness(.7) drop-shadow(0 8px 14px rgba(0, 0, 0, .65)); }
+
+/* Druide sucht ein Ziel: gültige Karten leuchten grün, die anderen treten zurück */
+.bf-zielwahl .bf-card { opacity: .45; }
+.bf-zielwahl .bf-card.bf-ziel, .bf-zielwahl .bf-card.bf-ziel-quelle { opacity: 1; }
+.bf-zielwahl .bf-card.bf-ziel { cursor: crosshair; }
+.bf-zielwahl .bf-card.bf-ziel .bf-card-front img { filter: drop-shadow(0 0 16px rgba(143, 232, 168, .9)); }
+.bf-zielwahl .bf-card.bf-ziel-quelle .bf-card-inner { translate: 0 -40px; }
+
+/* Effekte des Bosses (Gift, Netz) haben kein Kartenbild, sondern ein Symbol */
+.bf-eff-boss .bf-eff-bild {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: radial-gradient(circle, #3a1730, #170a14);
 }

@@ -100,7 +100,8 @@ function nameSvg(frame, name) {
   const n = frame.name;
   const c = frame.colors;
   const size = Math.max(n.minSize, Math.min(n.size, Math.floor(n.w / (String(name).length * CHAR_EM * 1.15))));
-  return `<text x="${n.x}" y="${n.y}" text-anchor="middle" dominant-baseline="middle" font-size="${size}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(name)}</text>`;
+  // Grundlinie so, dass die Großbuchstaben (Höhe ~0,69 em bei Georgia) mittig im Balken stehen
+  return `<text x="${n.x}" y="${(n.y + size * 0.34).toFixed(1)}" text-anchor="middle" font-size="${size}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(name)}</text>`;
 }
 
 // title = Name der Fähigkeit (fett, über dem Text); der Text passt sich dem restlichen Platz an
