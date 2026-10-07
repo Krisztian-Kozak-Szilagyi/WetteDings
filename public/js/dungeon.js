@@ -268,7 +268,8 @@
         const blocked = !!main && inp.value === main.value && Number(item.dataset.count) < 2;
         inp.disabled = blocked;
         item.classList.toggle('is-blocked', blocked);
-        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : '';
+        if (item.dataset.name && !('label' in item.dataset)) item.dataset.label = item.title; // Name (Seltenheit) merken
+        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : item.dataset.label || '';
         if (blocked && inp.checked) {
           inp.checked = false;
           const none = form.querySelector('input[name="boost"][value=""]');
@@ -282,47 +283,92 @@
     sync();
   });
 
-  // ---------- Kartenauswahl in der Lobby (#111): Fenster neben dem eigenen Platz, Klick übernimmt sofort ----------
+  // ---------- Kartenauswahl in der Lobby (#111, #114): zentriertes Fenster, Klick übernimmt sofort ----------
   const cardsForm = page.querySelector('[data-dg-cards-form]');
   if (cardsForm) {
     const pickers = [...cardsForm.querySelectorAll('[data-dg-picker]')];
     const close = (dlg) => (typeof dlg.close === 'function' ? dlg.close() : dlg.removeAttribute('open'));
-    // Breite Fenster: neben (sonst unter/über) dem angeklickten Platz; schmale: als Blatt von unten (CSS)
-    function place(dlg, trigger) {
-      dlg.style.left = dlg.style.top = '';
-      dlg.classList.remove('is-anchored');
-      if (window.innerWidth < 720 || !trigger) return;
-      const r = trigger.getBoundingClientRect();
-      const w = dlg.offsetWidth;
-      const h = dlg.offsetHeight;
-      const gap = 14;
-      let left = r.right + gap;
-      if (left + w > window.innerWidth - 8) left = r.left - gap - w; // rechts kein Platz: links daneben
-      if (left < 8) left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
-      const top = Math.min(Math.max(8, r.top + r.height / 2 - h / 2), window.innerHeight - h - 8);
-      dlg.style.left = left + 'px';
-      dlg.style.top = Math.max(8, top) + 'px';
-      dlg.classList.add('is-anchored');
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const PICK_MS = 450; // so lange hebt sich die gewählte Karte, bevor neu geladen wird
+    const LEAVE_MS = 200; // danach blendet das Fenster aus (CSS: .is-leaving)
+    const PEEK_PX = 40; // so weit schaut die vierte Kartenreihe hervor, wenn es mehr als drei gibt
+
+    // Kartenbilder im Hintergrund vorladen – mit loading="lazy" kämen sie erst beim Öffnen und ploppten nach dem
+    // Hereinfächern auf. Spätestens beim Zeigen auf einen Platz geht es los.
+    let warmed = false;
+    const warm = () => {
+      if (warmed) return;
+      warmed = true;
+      cardsForm.querySelectorAll('img[loading="lazy"]').forEach((img) => { img.loading = 'eager'; });
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 2500 });
+    else setTimeout(warm, 1500);
+
+    // Höhe: bis drei Reihen wächst das Fenster mit, ab der vierten scrollt das Raster (CSS: --dg-grid-max).
+    // Danach bleibt die Höhe stehen, damit das Fenster beim Suchen und Filtern nicht springt.
+    function sizePicker(dlg) {
+      const grid = dlg.querySelector('[data-dg-grid]');
+      dlg.style.minHeight = '';
+      if (!grid) return;
+      const first = [...grid.children].find((el) => !el.hidden);
+      if (first) {
+        const cs = getComputedStyle(grid);
+        const gap = parseFloat(cs.rowGap) || 0;
+        // drei volle Reihen; gibt es mehr, schaut die vierte ein Stück hervor (dort liegt die weiche Kante)
+        const rows = 3 * first.offsetHeight + 3 * gap + parseFloat(cs.paddingTop) + PEEK_PX;
+        grid.style.setProperty('--dg-grid-max', Math.ceil(rows) + 'px');
+      }
+      dlg.style.minHeight = dlg.offsetHeight + 'px';
     }
-    page.querySelectorAll('[data-dg-open]').forEach((btn) =>
+
+    page.querySelectorAll('[data-dg-open]').forEach((btn) => {
+      btn.addEventListener('pointerenter', warm);
       btn.addEventListener('click', () => {
         const dlg = cardsForm.querySelector('[data-dg-picker="' + btn.dataset.dgOpen + '"]');
         if (!dlg) return;
+        warm();
+        dlg.classList.remove('is-opening', 'is-leaving');
         if (typeof dlg.showModal === 'function') dlg.showModal();
         else dlg.setAttribute('open', '');
-        place(dlg, btn.closest('.dg-slot-card, .dg-boost') || btn);
+        sizePicker(dlg);
+        // Die schon gewählte Karte mittig zeigen
+        const grid = dlg.querySelector('[data-dg-grid]');
+        const chosen = grid && grid.querySelector('input:checked');
+        if (chosen) {
+          const g = grid.getBoundingClientRect();
+          const c = chosen.closest('.dg-pick').getBoundingClientRect();
+          grid.scrollTop += c.top - g.top - (g.height - c.height) / 2;
+        }
+        if (grid) {
+          fadeEdges(grid);
+          // Hereinfächern in der Reihenfolge, in der man die Karten sieht – auch wenn weiter unten gestartet wird
+          const top = grid.getBoundingClientRect().top;
+          const bottom = top + grid.clientHeight;
+          let n = 0;
+          [...grid.children].forEach((el) => {
+            if (el.hidden) return;
+            const r = el.getBoundingClientRect();
+            el.style.setProperty('--i', r.bottom > top && r.top < bottom ? n++ : 0);
+          });
+        }
+        void dlg.offsetWidth; // Animation auch beim zweiten Öffnen neu starten
+        dlg.classList.add('is-opening');
+        clearTimeout(dlg.openTimer);
+        dlg.openTimer = setTimeout(() => dlg.classList.remove('is-opening'), 850);
         const search = dlg.querySelector('[data-dg-search]');
-        if (search && window.innerWidth >= 720) search.focus();
-      })
-    );
+        if (search && window.innerWidth >= 720) search.focus({ preventScroll: true });
+      });
+    });
     pickers.forEach((dlg) => {
       dlg.querySelector('[data-dg-picker-close]').addEventListener('click', () => close(dlg));
       dlg.addEventListener('click', (e) => {
         if (e.target === dlg) close(dlg); // Klick daneben schließt
       });
     });
-    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && dlg.classList.contains('is-anchored') && close(dlg)));
+    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && sizePicker(dlg)));
     // Auswahl sofort speichern, danach neu laden (Scroll-Position bleibt). Fehler stehen im Fenster selbst.
+    // Währenddessen hebt sich die gewählte Karte, die übrigen treten zurück (CSS: .is-picking / .is-picked).
     let saving = false;
     const showError = (dlg, text) => {
       let el = dlg.querySelector('[data-dg-picker-error]');
@@ -338,17 +384,29 @@
     cardsForm.addEventListener('change', async (e) => {
       if (saving || (e.target.name !== 'card' && e.target.name !== 'boost')) return;
       const dlg = e.target.closest('[data-dg-picker]');
+      const item = e.target.closest('.dg-pick');
       saving = true;
-      dlg.classList.add('is-saving');
+      dlg.classList.remove('is-opening');
+      dlg.classList.add('is-saving', 'is-picking');
+      if (item) item.classList.add('is-picked');
       try {
-        const r = await fetch(cardsForm.action, {
-          method: 'POST',
-          body: new URLSearchParams(new FormData(cardsForm)),
-          credentials: 'same-origin',
-          headers: { Accept: 'application/json' },
-        });
+        const [r] = await Promise.all([
+          fetch(cardsForm.action, {
+            method: 'POST',
+            body: new URLSearchParams(new FormData(cardsForm)),
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          }),
+          wait(calm() ? 0 : PICK_MS),
+        ]);
         const data = await r.json().catch(() => ({}));
-        if (r.ok && data.ok) return location.reload();
+        if (r.ok && data.ok) {
+          if (!calm()) {
+            dlg.classList.add('is-leaving');
+            await wait(LEAVE_MS);
+          }
+          return location.reload();
+        }
         showError(dlg, data.error || 'Das hat nicht geklappt. Bitte lade die Seite neu.');
         cardsForm.reset(); // Auswahl wieder wie gespeichert
       } catch {
@@ -356,46 +414,39 @@
         cardsForm.reset();
       }
       saving = false;
-      dlg.classList.remove('is-saving');
+      dlg.classList.remove('is-saving', 'is-picking');
+      if (item) item.classList.remove('is-picked');
     });
   }
 
-  // ---------- Kartenauswahl: Suche, Seltenheit, Seiten zu je 12 Karten ----------
-  const PER_PAGE = 12;
+  // ---------- Kartenauswahl: Suche und Seltenheit blenden Karten aus, der Rest wird gescrollt ----------
+  // Weich ausgeblendet wird nur die Kante, hinter der noch Karten liegen (CSS: .has-above / .has-below)
+  function fadeEdges(grid) {
+    grid.classList.toggle('has-above', grid.scrollTop > 2);
+    grid.classList.toggle('has-below', grid.scrollTop + grid.clientHeight < grid.scrollHeight - 2);
+  }
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
+    const grid = box.querySelector('[data-dg-grid]');
     const items = [...box.querySelectorAll('[data-dg-item]')];
+    const none = box.querySelector('[data-dg-none]'); // "Ohne Boost" – nur ohne Suche und Filter
     const search = box.querySelector('[data-dg-search]');
     const chips = [...box.querySelectorAll('[data-dg-rar]')];
-    let rarity = '';
-    const prev = box.querySelector('[data-dg-prev]');
-    const next = box.querySelector('[data-dg-next]');
-    const info = box.querySelector('[data-dg-pageinfo]');
     const empty = box.querySelector('[data-dg-empty]');
-    let pageNo = 0;
-    const matches = () => {
-      const q = search ? search.value.trim().toLowerCase() : '';
-      const r = rarity;
-      return items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
-    };
+    let rarity = '';
     function render() {
-      const list = matches();
-      const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-      pageNo = Math.min(Math.max(0, pageNo), pages - 1);
-      const from = pageNo * PER_PAGE;
-      const visible = new Set(list.slice(from, from + PER_PAGE));
+      const q = search ? search.value.trim().toLowerCase() : '';
+      let shown = 0;
       items.forEach((it) => {
-        it.hidden = !visible.has(it);
+        it.hidden = !((!rarity || it.dataset.rarity === rarity) && (!q || it.dataset.name.includes(q)));
+        if (!it.hidden) shown++;
       });
-      prev.hidden = next.hidden = pages <= 1;
-      prev.disabled = pageNo === 0;
-      next.disabled = pageNo >= pages - 1;
-      info.textContent = pages > 1 ? 'Seite ' + (pageNo + 1) + ' von ' + pages : '';
-      empty.hidden = list.length > 0;
+      if (none) none.hidden = !!(q || rarity);
+      empty.hidden = shown > 0;
+      grid.scrollTop = 0;
+      fadeEdges(grid);
     }
-    // Anfangs die Seite mit der schon gewählten Karte zeigen
-    const checked = items.findIndex((it) => it.querySelector('input:checked'));
-    if (checked > 0) pageNo = Math.floor(checked / PER_PAGE);
-    if (search) search.addEventListener('input', () => { pageNo = 0; render(); });
+    grid.addEventListener('scroll', () => fadeEdges(grid), { passive: true });
+    if (search) search.addEventListener('input', render);
     chips.forEach((chip) =>
       chip.addEventListener('click', () => {
         rarity = chip.dataset.dgRar;
@@ -403,13 +454,9 @@
           c.classList.toggle('active', c === chip);
           c.setAttribute('aria-selected', c === chip ? 'true' : 'false');
         });
-        pageNo = 0;
         render();
       })
     );
-    prev.addEventListener('click', () => { pageNo--; render(); });
-    next.addEventListener('click', () => { pageNo++; render(); });
-    render();
   });
 
   // ---------- Beute-Fenster: Spieler für Spieler aufdecken ----------
