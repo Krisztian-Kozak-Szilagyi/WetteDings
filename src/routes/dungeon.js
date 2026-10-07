@@ -227,7 +227,13 @@ router.post('/dungeon/beute-gesehen', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/dungeon/einladen', (req, res) => handle(req, res, () => dungeon.invite({ user: req.user, name: str(req.body.name) }).then(() => null)));
+// Vorschläge fürs Einladen-Feld (per fetch beim Hineinklicken, public/js/dungeon.js) – nur wer gerade beitreten kann
+router.get('/dungeon/einladbar', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ players: await dungeon.invitablePlayers(req.user) });
+});
+
+router.post('/dungeon/einladen',(req, res) => handle(req, res, () => dungeon.invite({ user: req.user, name: str(req.body.name) }).then(() => null)));
 
 router.post('/dungeon/einladung-zurueck', (req, res) =>
   handle(req, res, async () => {

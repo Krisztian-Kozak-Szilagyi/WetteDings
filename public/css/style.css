@@ -4645,6 +4645,17 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .dg-register h2, .dg-invitation h2, .dg-result h2, .dg-log h2 { margin: 0; font-size: 18px; }
 .dg-invite { display: flex; gap: 8px; flex-wrap: wrap; }
 .dg-invite input { flex: 1; min-width: 180px; }
+/* Einladen: Vorschlagsliste unter dem Feld (nur Mitglieder, die gerade beitreten können) */
+.dg-invite-field { position: relative; display: flex; flex: 1; min-width: 160px; }
+.dg-invite-field input { width: 100%; }
+.dg-suggest {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60; margin: 0; padding: 6px; list-style: none;
+  max-height: 260px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow);
+}
+.dg-suggest li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.dg-suggest li:hover, .dg-suggest li.is-active { background: var(--surface-2); }
+.dg-suggest li small { color: var(--muted); white-space: nowrap; }
+.dg-suggest li.dg-suggest-empty { cursor: default; color: var(--muted); background: none; }
 .dg-actions form[data-dg-leave] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .dg-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .dg-admin { align-self: flex-start; }

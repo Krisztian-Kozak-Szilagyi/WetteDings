@@ -446,6 +446,35 @@ async function invite({ user, name }) {
   return target;
 }
 
+/**
+ * Wen der Gruppenleiter einladen kann – für die Vorschläge im Einladen-Feld. Nicht dabei: man selbst, wer schon in
+ * der Gruppe steht oder eingeladen ist, gelöschte und gesperrte Konten, wer in einer vollen Gruppe oder gerade in
+ * einem Durchlauf ist, beim Turm wer heute schon oben war, und ohne Freigabe alle außer Admins.
+ * → [{ name, note }] (note: z. B. "schon angemeldet" – muss die eigene Anmeldung erst verlassen)
+ */
+async function invitablePlayers(user, now = Date.now()) {
+  const party = await DungeonParty.findOne({ 'members.user': user._id, leader: user._id, solo: false }).lean();
+  if (!party) return [];
+  const tower = party.mode === 'tower';
+  const [users, parties, runs, played] = await Promise.all([
+    User.find({ deletedAt: null, $or: [{ bannedUntil: null }, { bannedUntil: { $lte: new Date(now) } }] }).select('username usernameLower').sort({ usernameLower: 1 }).lean(),
+    DungeonParty.find({}).select('members.user').lean(),
+    DungeonRun.find({ status: 'laeuft' }).select('members.user').lean(),
+    tower ? TowerAttempt.find({ day: towerDay(now) }).select('user').lean() : [],
+  ]);
+  const open = tower ? settings.open && settings.tower.open : settings.open;
+  const busy = new Set([String(user._id), ...party.members.map((m) => String(m.user)), ...party.invites.map((i) => String(i.user)), ...played.map((a) => String(a.user))]);
+  runs.forEach((r) => r.members.forEach((m) => m.user && busy.add(String(m.user))));
+  const registered = new Set();
+  for (const p of parties) {
+    const ids = p.members.map((m) => String(m.user));
+    ids.forEach((id) => (p.members.length >= TEAM_SIZE ? busy : registered).add(id));
+  }
+  return users
+    .filter((u) => !busy.has(String(u._id)) && (open || config.adminUsernames.includes(u.usernameLower)))
+    .map((u) => ({ name: u.username, note: registered.has(String(u._id)) ? 'schon angemeldet' : null }));
+}
+
 /** Einladung zurückziehen (Gruppenleiter) */
 async function cancelInvite({ user, inviteeId }) {
   await DungeonParty.updateOne({ leader: user._id, 'members.user': user._id }, { $pull: { invites: { user: inviteeId } } });
@@ -833,6 +862,7 @@ module.exports = {
   availableCards,
   register,
   invite,
+  invitablePlayers,
   cancelInvite,
   accept,
   decline,

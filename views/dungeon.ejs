@@ -239,7 +239,12 @@
       <% if (phase === 'gruppe' && isLeader && !lockedIn && slots.some((s) => s.empty)) { %>
         <form method="post" action="/dungeon/einladen" class="dg-invite">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="text" name="name" placeholder="Name des Mitglieds" required maxlength="40" autocomplete="off" aria-label="Name des Mitglieds">
+          <%# Vorschläge beim Hineinklicken: nur wer gerade beitreten kann (public/js/dungeon.js, GET /dungeon/einladbar) %>
+          <span class="dg-invite-field" data-dg-invite>
+            <input type="text" name="name" placeholder="Name des Mitglieds" required maxlength="40" autocomplete="off" aria-label="Name des Mitglieds"
+              role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="dg-invite-list">
+            <ul class="dg-suggest" id="dg-invite-list" role="listbox" aria-label="Verfügbare Mitglieder" hidden></ul>
+          </span>
           <button class="btn btn-primary" type="submit">Einladen</button>
         </form>
       <% } %>

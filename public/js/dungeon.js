@@ -120,6 +120,113 @@
     if (!document.hidden) poll();
   }, 3000);
 
+  // ---------- Einladen: Vorschläge beim Hineinklicken (nur wer gerade beitreten kann) ----------
+  const inviteBox = page.querySelector('[data-dg-invite]');
+  if (inviteBox) {
+    const input = inviteBox.querySelector('input');
+    const list = inviteBox.querySelector('.dg-suggest');
+    let players = null; // vom Server, beim Hineinklicken frisch geladen
+    let loadedAt = 0;
+    let shown = [];
+    let active = -1;
+
+    async function load() {
+      if (players && Date.now() - loadedAt < 10000) return;
+      try {
+        const r = await fetch('/dungeon/einladbar', { credentials: 'same-origin', cache: 'no-store' });
+        if (r.ok) {
+          players = (await r.json()).players || [];
+          loadedAt = Date.now();
+        }
+      } catch { /* ohne Verbindung: Name von Hand eintippen */ }
+    }
+
+    function setActive(i) {
+      active = i;
+      [...list.children].forEach((li, k) => li.classList.toggle('is-active', k === i));
+      const li = list.children[i];
+      if (li && li.id) {
+        input.setAttribute('aria-activedescendant', li.id);
+        li.scrollIntoView({ block: 'nearest' });
+      } else input.removeAttribute('aria-activedescendant');
+    }
+
+    function close() {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      setActive(-1);
+    }
+
+    // Treffer am Namensanfang zuerst, dann irgendwo im Namen
+    function render() {
+      if (!players) return close();
+      const q = input.value.trim().toLowerCase();
+      const starts = players.filter((p) => p.name.toLowerCase().startsWith(q));
+      const inside = q ? players.filter((p) => !p.name.toLowerCase().startsWith(q) && p.name.toLowerCase().includes(q)) : [];
+      shown = [...starts, ...inside];
+      list.replaceChildren(
+        ...shown.map((p, i) => {
+          const li = document.createElement('li');
+          li.id = 'dg-invite-opt-' + i;
+          li.setAttribute('role', 'option');
+          li.textContent = p.name;
+          if (p.note) {
+            const note = document.createElement('small');
+            note.textContent = p.note;
+            li.append(note);
+          }
+          return li;
+        })
+      );
+      if (!shown.length) {
+        const li = document.createElement('li');
+        li.className = 'dg-suggest-empty';
+        li.textContent = q ? 'Niemand Passendes frei.' : 'Gerade ist niemand frei.';
+        list.append(li);
+      }
+      list.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      setActive(-1);
+    }
+
+    function pick(i) {
+      const p = shown[i];
+      if (!p) return;
+      input.value = p.name;
+      close();
+      input.focus();
+    }
+
+    async function open() {
+      await load();
+      if (document.activeElement === input) render();
+    }
+
+    input.addEventListener('focus', open);
+    input.addEventListener('click', () => { if (list.hidden) open(); });
+    input.addEventListener('input', render);
+    input.addEventListener('blur', () => setTimeout(close, 120)); // Klick in die Liste zählt noch
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (list.hidden) return void open();
+        const n = shown.length;
+        if (n) setActive(e.key === 'ArrowDown' ? (active + 1) % n : (active - 1 + n) % n);
+      } else if (e.key === 'Enter' && !list.hidden && active >= 0) {
+        e.preventDefault(); // erst übernehmen, ein zweites Enter lädt ein
+        pick(active);
+      } else if (e.key === 'Escape' && !list.hidden) {
+        e.preventDefault();
+        close();
+      }
+    });
+    list.addEventListener('mousedown', (e) => e.preventDefault()); // Fokus bleibt im Feld
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('li[role="option"]');
+      if (li) pick([...list.children].indexOf(li));
+    });
+  }
+
   // ---------- Karte groß ansehen (Plätze und Kartenauswahl) ----------
   const zoom = document.querySelector('[data-zoom-modal]');
   if (zoom) {
