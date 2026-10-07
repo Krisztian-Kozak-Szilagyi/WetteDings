@@ -306,6 +306,40 @@ html, body.bf-body {
 }
 .bf-pop-boss { color: #f3cf7a; }
 .bf-pop-player { color: #ff7a6e; font-size: 20px; }
+.bf-pop-heal { color: #8fe8a8; font-size: 22px; }
+.bf-pop-info { color: #9fd8ff; font-size: 18px; }
+
+/* Energie (Helden-Karten) und Zustände des Spielers (Block, Fluch, Nachladen) */
+.bf-energy {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #2a2036;
+  box-shadow: 0 0 0 2px rgba(111, 182, 255, .8), 0 4px 10px rgba(0, 0, 0, .6);
+  font-size: 15px;
+  font-weight: 800;
+  color: #cfe8ff;
+}
+.bf-status {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9fd8ff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
+}
+.bf-status[hidden] { display: none; }
+
+/* Helden-Karte: leuchtet kurz neben der Ausrüstung auf und verschwindet */
+.bf-held-flash {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: 0;
+  width: calc(var(--gear-h) * 5 / 7);
+  height: var(--gear-h);
+  pointer-events: none;
+  transition: transform .5s cubic-bezier(.2, .8, .25, 1), opacity .45s, filter .45s;
+  filter: drop-shadow(0 0 18px rgba(243, 207, 122, .75));
+}
+.bf-held-flash img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.bf-held-flash.bf-held-weg { opacity: 0; transform: translateY(-30px) scale(1.08); filter: brightness(1.8) blur(3px); }
 .bf-pop-gross { font-size: 40px; }
 @keyframes bf-pop {
   from { opacity: 1; margin-top: 0; }

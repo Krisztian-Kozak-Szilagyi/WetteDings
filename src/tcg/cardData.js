@@ -25,8 +25,33 @@ const TEST_ITEMS = {
   'tower-shield-test-item': item('Tower Shield', 'Schild', '10 % weniger Schaden. Unzerstörbar.', { typ: 'schild', haende: 1, schutz: 10, haltbarkeit: 0 }),
 };
 
+// Helden-Test-Karten (Rahmen "held"): einmal ausspielen, wirken sofort, dann weg.
+//   kampf.typ: held; kosten: Energie (3 pro Runde); ang: Schaden am Boss; sch: Block gegen den nächsten Boss-Angriff;
+//   hei: Heilung; effekt: Fähigkeit – fluch { schaden, runden } | treffer (Anzahl Treffer) | hinterhalt (Faktor, wenn
+//   in der Runde schon eine Karte gespielt wurde) | selbst (eigener Schaden) | verzoegert (Schaden erst nächste Runde);
+//   fx: Effekt wie bei den Items
+const held = (name, [kosten, ang, sch, hei], abilityName, ability, effekt = null, fx = 'hieb') => ({
+  season: 'season-1',
+  frame: 'held',
+  name,
+  stats: [0, 0, 0, 0],
+  abilityName,
+  ability,
+  kampf: { typ: 'held', kosten, ang, sch, hei, effekt, fx },
+});
+const TEST_HELDEN = {
+  'necromancer-test-item': held('The Necromancer', [3, 4, 0, 4], 'Fluch', 'Der Boss erleidet 3 Runden lang je 4 Schaden.', { fluch: { schaden: 4, runden: 3 } }, 'nekro'),
+  'crusader-test-item': held('Crusader of Dawn', [2, 4, 12, 0], 'Schildwall', 'Fängt 12 Schaden des nächsten Boss-Angriffs ab.', null, 'hieb'),
+  'elven-marksman-test-item': held('Elven Marksman', [2, 5, 0, 0], 'Doppelschuss', 'Trifft zweimal.', { treffer: 2 }, 'hieb'),
+  'shadowblade-test-item': held('Shadowblade', [1, 4, 0, 0], 'Hinterhalt', 'Dreifacher Schaden, wenn du in dieser Runde schon eine andere Karte gespielt hast.', { hinterhalt: 3 }, 'hieb'),
+  'tide-mage-test-item': held('Tide Mage', [2, 3, 4, 10], 'Gezeitenwelle', 'Heilt 10 Leben und fängt 4 Schaden ab.', null, 'feuer'),
+  'berserker-test-item': held('Berserker', [2, 16, 0, 0], 'Blutrausch', 'Du verlierst selbst 5 Leben.', { selbst: 5 }, 'hieb-schwer'),
+  'siege-master-test-item': held('Siege Master', [3, 24, 0, 0], 'Nachladen', 'Der Schaden trifft erst zu Beginn der nächsten Runde.', { verzoegert: true }, 'feuer'),
+};
+
 module.exports = {
   ...TEST_ITEMS,
+  ...TEST_HELDEN,
   'st-ivan-boss': {
     season: 'season-1',
     frame: 'gilded',
