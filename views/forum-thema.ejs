@@ -92,7 +92,7 @@
 <ol class="forum-posts">
   <% posts.forEach((p) => { %>
     <li class="forum-post <%= p.isNew ? 'is-new' : '' %> <%= p.mine ? 'is-mine' : '' %> <%= p.deleted ? 'is-deleted' : '' %>" id="b-<%= p._id %>">
-      <img class="forum-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="40" height="40">
+      <img class="forum-avatar" src="<%= p.avatar %>?v=<%= assetVersion %>" alt="" width="40" height="40">
       <div class="forum-post-body">
         <div class="forum-post-head">
           <span class="forum-post-name"><%- userLink(p.authorName) %></span>

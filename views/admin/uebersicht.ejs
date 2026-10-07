@@ -4,7 +4,7 @@
     { n: counts.disputes, title: 'Streitfälle', text: 'Ersteller und Schiedsrichter sind sich uneinig.', href: subUrl('moderation', 'streit'), action: 'Entscheiden' },
     { n: counts.reports, title: 'Gemeldete Beiträge', text: 'Noch nicht geprüfte Meldungen aus dem Forum.', href: subUrl('moderation', 'meldungen'), action: 'Prüfen' },
     { n: counts.deviceAlerts, title: 'Mehrfach-Konten', text: 'Konten, die sicher oder wahrscheinlich ein Gerät teilen.', href: subUrl('moderation', 'geraete'), action: 'Ansehen' },
-    { n: counts.suspicionAlerts, title: 'Auffälligkeiten', text: 'Verdacht auf Skripte oder Wertverschiebung zwischen Konten.', href: subUrl('moderation', 'auffaelligkeiten'), action: 'Ansehen' },
+    { n: counts.suspicionAlerts, title: 'Auffälligkeiten', text: 'Spieler mit Verdacht auf Skripte oder Wertverschiebung zwischen Konten.', href: subUrl('moderation', 'auffaelligkeiten'), action: 'Ansehen' },
     { n: counts.suspicious, title: 'Handel zwischen Mehrfach-Konten', text: 'Neue Geschäfte zwischen Konten desselben Geräts.', href: panelUrl('protokolle', 'protokoll', { log: 'handel', verdacht: '1' }), action: 'Ansehen' },
     ...(currentUser.isAdmin ? [{ n: counts.packLogNew, title: 'Neue Vergaben', text: 'Von Devs vergeben oder entfernt seit deinem letzten Blick.', href: panelUrl('vergaben'), action: 'Ansehen' }] : []),
   ];

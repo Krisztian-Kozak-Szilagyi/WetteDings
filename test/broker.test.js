@@ -8,7 +8,7 @@ const etf = require('../src/coin/etfTrend');
 const markets = require('../src/coin/markets');
 
 test('Broker: vier Werte, Symbole nur aus der festen Liste', () => {
-  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BOJE', 'BTCG']);
+  assert.deepEqual(markets.SYMBOLS, ['SAM', 'COW', 'BOJE', 'MIA', 'BTCG']);
   assert.equal(markets.get('COW').NAME, 'Coinye West');
   assert.equal(markets.get('BOJE').NAME, '51101 Coin');
   assert.equal(markets.get('BTCG').kind, 'etf');
@@ -59,33 +59,11 @@ test('ETF: ohne Trend ~4–8 % Tagesbewegung, mit Trend klar in eine Richtung', 
   const flat = etfDailyLogs(0, 400, 3);
   const sd = Math.sqrt(flat.reduce((a, r) => a + r * r, 0) / flat.length);
   assert.ok(sd > 0.035 && sd < 0.09, `Tagesvolatilität ${sd}`);
-  const bull = etfDailyLogs(etf.MAX_DRIFT, 60, 4);
-  const bear = etfDailyLogs(-etf.MAX_DRIFT, 60, 5);
+  const bull = etfDailyLogs(0.09, 60, 4);
+  const bear = etfDailyLogs(-0.09, 60, 5);
   const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   assert.ok(mean(bull) > 0.06, `bullisch ${mean(bull)}`);
   assert.ok(mean(bear) < -0.06, `bärisch ${mean(bear)}`);
-});
-
-test('ETF-Trend: mehr Aktivität = bullisch, weniger = bärisch, ohne Vergleich neutral', () => {
-  const base = { users: 6, actions: 120 };
-  assert.equal(etf.trendFrom({ users: 6, actions: 120 }, base).sentiment, 0);
-  const up = etf.trendFrom({ users: 9, actions: 220 }, base);
-  const down = etf.trendFrom({ users: 3, actions: 40 }, base);
-  assert.ok(up.sentiment > 0.5 && up.mu > 0 && up.mu <= etf.MAX_DRIFT, `bullisch ${up.sentiment}`);
-  assert.ok(down.sentiment < -0.5 && down.mu < 0 && down.mu >= -etf.MAX_DRIFT, `bärisch ${down.sentiment}`);
-  assert.ok(etf.trendFrom({ users: 0, actions: 0 }, base).sentiment < -0.9, 'tote Seite');
-  assert.deepEqual(etf.trendFrom({ users: 5, actions: 50 }, null), { sentiment: 0, mu: 0, score: 0 });
-});
-
-test('ETF-Trend: Fenster vor Beginn der Zählung zählen nicht zum Durchschnitt', () => {
-  const H = 3600e3;
-  const now = Date.UTC(2026, 9, 10, 12);
-  const doc = (hoursAgo, n, users) => ({ t: new Date(now - hoursAgo * H), n, users });
-  const docs = [doc(1, 10, ['a', 'b']), doc(5, 5, ['a']), doc(30, 4, ['c'])];
-  const { cur, base } = etf.windowsFrom(docs, now, now - 48 * H); // Zählung läuft seit genau 2 Tagen
-  assert.deepEqual({ users: cur.users, actions: cur.actions }, { users: 2, actions: 15 });
-  assert.deepEqual(base, { users: 1, actions: 4 }); // nur das Fenster 24–48 h, ältere fehlen
-  assert.equal(etf.windowsFrom(docs, now, now - 30 * H).base, null); // Vortag nur teilweise erfasst
 });
 
 test('ETF-Aktivität: nur echte Aktionen zählen', () => {

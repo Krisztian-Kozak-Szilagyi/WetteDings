@@ -17,9 +17,11 @@
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
   <% if (deviceProbe) { %><script src="/js/device.js?v=<%= assetVersion %>" defer data-csrf="<%= csrfToken %>"></script><% } %>
+  <% if (locals.actionToken) { %><meta name="bfw-at" content="<%= actionToken %>"><script src="/js/guard.js?v=<%= assetVersion %>" defer></script><% } %>
 </head>
 <body>
   <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
+  <% if (locals.actionToken) { %><%# Falle für Skripte, die Seiten auslesen: unsichtbar, nicht erreichbar per Tastatur oder Vorlesefunktion (moderation/requestSignals.js) %><a class="hp-link" href="/tcg/gratis-packs" tabindex="-1" aria-hidden="true" rel="nofollow">Gratis-Packs abholen</a><% } %>
   <%
     // Menüpunkte samt Abzeichen – einmal aufgebaut, oben in der Leiste und (Handy/Tablet) im Profil-Menü gezeigt
     const cap = (n) => (n > 99 ? '99+' : n);
@@ -65,7 +67,7 @@
         if (betDisputes) adminBadges.push({ n: betDisputes, cls: 'nav-badge-dispute', title: 'Strittige Wetten, die ein Dev entscheiden muss', aria: betDisputes + ' strittige Wetten' });
         if (tradeAlerts) adminBadges.push({ n: tradeAlerts, cls: 'nav-badge-suspicious', title: 'Handel zwischen Mehrfach-Konten', aria: tradeAlerts + ' Geschäfte zwischen Mehrfach-Konten' });
         if (deviceAlerts) adminBadges.push({ n: deviceAlerts, cls: 'nav-badge-device', title: 'Konten, die dasselbe Gerät benutzen', aria: deviceAlerts + ' Hinweise auf Mehrfach-Konten' });
-        if (suspicionAlerts) adminBadges.push({ n: suspicionAlerts, cls: 'nav-badge-suspicion', title: 'Auffälligkeiten: Verdacht auf Skript oder Wertverschiebung', aria: suspicionAlerts + ' Auffälligkeiten' });
+        if (suspicionAlerts) adminBadges.push({ n: suspicionAlerts, cls: 'nav-badge-suspicion', title: 'Auffälligkeiten: Spieler mit Verdacht auf Skript oder Wertverschiebung', aria: suspicionAlerts + ' verdächtige Spieler' });
         if (packLogNew) adminBadges.push({ n: packLogNew, cls: '', title: 'Neue Vergaben und entfernte Karten (Vergabe-Log)', aria: packLogNew + ' neue Einträge im Vergabe-Log' });
         navItems.push({ href: '/admin', label: currentUser.isAdmin ? 'Admin' : 'Dev', active: currentPath.startsWith('/admin'), badges: adminBadges });
       }
@@ -162,7 +164,7 @@
                 <span class="balance-name"><%= currentUser.username %></span>
                 <strong><%= euro(currentUser.balance) %></strong>
               </span>
-              <img class="avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="34" height="34">
+              <img class="avatar" src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="34" height="34">
               <% if (navItems.some((it) => it.badges.length)) { %><span class="menu-dot" aria-hidden="true"></span><% } %>
             </summary>
             <div class="user-menu-list" role="menu">

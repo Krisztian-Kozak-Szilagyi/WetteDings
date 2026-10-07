@@ -23,15 +23,27 @@
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
         <span class="bf-hp-text"></span>
       </div>
+      <%# Ankündigung: was der Boss als Nächstes tut (Regeln: public/js/bossfight-regeln.js) %>
+      <div class="bf-intent" data-bf-intent aria-live="polite"></div>
     </section>
 
     <section class="bf-player" aria-label="Spieler">
-      <img class="bf-avatar" src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="" width="84" height="84">
+      <%# Laufende Effekte (Fluch, Nachladen, Block): Kartenbild im Kreis, der Ring zeigt die verbleibenden Runden %>
+      <div class="bf-effects" data-bf-effects aria-label="Laufende Effekte"></div>
+      <img class="bf-avatar" src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="84" height="84">
       <div class="bf-player-name"><%= currentUser.username %></div>
       <div class="bf-hp bf-hp-player" data-bf-hp="player" data-max="100">
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
         <span class="bf-hp-text"></span>
       </div>
+    </section>
+    <%# Ausgerüstete Items (zwei Hände) – Waffe/Zauber anklicken = angreifen %>
+    <section class="bf-gear" data-bf-gear aria-label="Ausrüstung"></section>
+
+    <section class="bf-turn">
+      <span class="bf-round" data-bf-round>Runde 1</span>
+      <span class="bf-energy" data-bf-energy title="Energie für Helden-Karten, jede Runde wieder voll"></span>
+      <button type="button" class="bf-end" data-bf-end>Runde beenden</button>
     </section>
 
     <section class="bf-deck" data-bf-deck aria-label="Deck">
@@ -40,9 +52,12 @@
     </section>
 
     <div class="bf-hand" data-bf-hand></div>
+    <div class="bf-result" data-bf-result hidden></div>
   </div>
 
   <script src="/js/bossfight.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/bossfight-fx.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/bossfight-regeln.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/bossfight-hud.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

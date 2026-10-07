@@ -4,7 +4,15 @@
 
 <section class="pf-hero">
   <div class="pf-id">
-    <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+    <% if (avatarChoices) { %>
+      <%# Profilbild wählen (vorerst nur Admin und Devs): beim Draufzeigen erscheint „Ändern“, Klick öffnet die Auswahl %>
+      <button type="button" class="pf-avatar-pick" data-dialog-open="pf-bild" aria-label="Profilbild ändern">
+        <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+        <span class="pf-avatar-hint" aria-hidden="true">Ändern</span>
+      </button>
+    <% } else { %>
+      <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+    <% } %>
     <div class="pf-id-text">
       <h1 class="pf-name"><%= profile.username %><%- roleBadge(profile.username) %></h1>
       <% if (profile.realName) { %><p class="pf-realname"><%= profile.realName %></p><% } %>
@@ -301,4 +309,24 @@
 <%- include('partials/foil-modal') %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
+<% if (avatarChoices) { %>
+<dialog class="dialog pf-bild-dialog" id="pf-bild" aria-labelledby="pf-bild-title">
+  <div class="dialog-head">
+    <h2 id="pf-bild-title">Profilbild wählen</h2>
+    <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+  </div>
+  <form method="post" action="/profil/bild" class="pf-bild-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <% avatarChoices.forEach((a) => { const on = profile.avatar === a.id; %>
+      <button type="submit" name="bild" value="<%= a.id %>" class="pf-bild-opt<%= on ? ' is-on' : '' %>" title="<%= a.name %>"<%= on ? ' aria-current="true"' : '' %>>
+        <img src="<%= a.url %>?v=<%= assetVersion %>" alt="<%= a.name %>" width="96" height="96">
+      </button>
+    <% }) %>
+    <button type="submit" name="bild" value="" class="pf-bild-opt<%= !avatarChoices.some((a) => a.id === profile.avatar) ? ' is-on' : '' %>" title="Standardbild">
+      <img src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="Standardbild" width="96" height="96">
+    </button>
+  </form>
+</dialog>
+<% } %>
+
 <%- include('partials/foot') %>

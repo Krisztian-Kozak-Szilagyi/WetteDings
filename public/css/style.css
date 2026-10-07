@@ -692,8 +692,93 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 #handellog .leader-search { margin: 0 0 10px; flex-wrap: wrap; }
 .trade-log td { vertical-align: top; }
 .device-done > .code-list { margin-top: 12px; }
-/* Auffälligkeiten: betroffene Geschäfte bei Wertverschiebung */
-.susp-trades { margin: 4px 0; padding-left: 18px; overflow-wrap: anywhere; }
+/* Auffälligkeiten (Moderation): je Spieler eine Karte mit seinen Hinweisen. Stufen: 2 wahrscheinlich, 1 möglich, 0 erledigt */
+.susp-lvl-3 { --susp: var(--nein); }
+.susp-lvl-2 { --susp: #f59e0b; }
+.susp-lvl-1 { --susp: var(--color-neutral-500); }
+.susp-lvl-0 { --susp: var(--color-neutral-700); }
+.susp-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.susp-stat { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); }
+.susp-stat-value { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.susp-stat-label { font-size: 12px; color: var(--muted); }
+.susp-stat-likely .susp-stat-value { color: #f59e0b; }
+.susp-stat-sure .susp-stat-value { color: var(--nein); }
+/* Gesamtbewertung: 4 eindeutig, 3 starker Verdacht, 2 Verdacht, 1 beobachten */
+.susp-stage-4 { --susp: var(--nein); }
+.susp-stage-3 { --susp: #f97316; }
+.susp-stage-2 { --susp: #f59e0b; }
+.susp-stage-1, .susp-stage-0 { --susp: var(--color-neutral-500); }
+.susp-rating { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; padding: 12px 18px; background: color-mix(in srgb, var(--susp) 7%, transparent); border-bottom: 1px solid var(--color-neutral-800); }
+.susp-rating-main { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; min-width: 0; }
+.susp-rating-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.susp-rating-reason { font-size: 13px; color: color-mix(in srgb, var(--color-text) 82%, transparent); }
+.susp-rating-areas { display: flex; gap: 14px; flex-wrap: wrap; }
+.susp-area { display: flex; flex-direction: column; gap: 4px; min-width: 92px; font-size: 11px; color: var(--muted); }
+.susp-area.is-hit .susp-area-name { color: var(--color-text); }
+.susp-area-bar { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 10%, transparent); overflow: hidden; }
+.susp-area-bar i { display: block; height: 100%; border-radius: 2px; background: var(--susp); }
+.susp-empty { margin: 0; padding: 14px 18px; font-size: 13px; }
+/* Mehrfach-Konten: gemeinsames Gerät, Anmeldungen beider Konten nebeneinander */
+.dev-shared { grid-template-columns: 1fr; }
+.dev-users { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.dev-user { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-bg) 55%, transparent); min-width: 0; }
+.dev-user-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.dev-user-head .muted { font-size: 12px; }
+.susp-groups { display: flex; flex-direction: column; gap: 14px; }
+.susp-groups .card { margin-bottom: 0; }
+.susp-group { padding: 0; overflow: hidden; border-left: 3px solid var(--susp); }
+.susp-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800); }
+.susp-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.susp-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--susp); background: color-mix(in srgb, var(--susp) 16%, transparent); }
+.susp-who-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.susp-names { font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
+.susp-names .user-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
+.susp-group-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.susp-group-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.susp-group-actions form { margin: 0; }
+.susp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--susp); background: color-mix(in srgb, var(--susp) 14%, transparent); white-space: nowrap; }
+.susp-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.susp-findings { list-style: none; margin: 0; padding: 0; }
+.susp-finding { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; padding: 14px 18px; }
+.susp-finding + .susp-finding { border-top: 1px solid var(--color-neutral-800); }
+.susp-finding.susp-lvl-0 { opacity: .65; }
+.susp-finding-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.susp-finding-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.susp-finding-title .susp-pill { margin-left: auto; }
+.susp-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.susp-fact { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-text) 6%, transparent); font-size: 12px; color: var(--muted); }
+.susp-fact b { color: var(--color-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.susp-summary { margin: 0; font-size: 13px; line-height: 1.5; color: color-mix(in srgb, var(--color-text) 82%, transparent); }
+.susp-extras { margin: 0; padding: 8px 12px; list-style: none; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-bg) 55%, transparent); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted); overflow-wrap: anywhere; }
+.susp-extras li + li { margin-top: 4px; }
+/* Kartenhistorie (Admin/Devs): Zeitleiste eines Exemplars */
+.card-history-search { display: flex; gap: 8px; align-items: center; }
+.card-history-search input { flex: 1; min-width: 0; }
+.card-history { list-style: none; margin: 16px 0; padding: 0; }
+.card-history-step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--color-divider); overflow-wrap: anywhere; }
+.card-history-step:first-child { border-top: 0; }
+.card-history-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--color-bg); font-size: 14px; }
+.card-history-time { font-size: 12px; color: var(--muted); }
+.card-history-handel .card-history-icon, .card-history-duell .card-history-icon { background: color-mix(in srgb, var(--color-accent) 25%, var(--color-bg)); }
+.card-history-step.is-guess { opacity: 0.75; }
+.card-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.susp-time { font-size: 12px; color: var(--muted); }
+.susp-finding-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.susp-finding-actions form { margin: 0; }
+.susp-finding-actions .btn { width: 100%; justify-content: center; }
+.susp-done { border-top: 1px solid var(--color-neutral-800); }
+.susp-done > summary { padding: 10px 18px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.susp-done-groups { margin-top: 18px; }
+.susp-done-groups .susp-groups { margin-top: 12px; }
+@media (max-width: 640px) {
+  .susp-overview { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .susp-stat { padding: 10px 12px; }
+  .susp-stat-value { font-size: 20px; }
+  .susp-group-head, .susp-finding { padding-left: 14px; padding-right: 14px; }
+  .susp-finding { grid-template-columns: 1fr; }
+  .susp-finding-actions { flex-direction: row; flex-wrap: wrap; }
+  .susp-finding-actions .btn { width: auto; }
+}
 .nav-badge.nav-badge-device { background: #e3b341; color: var(--color-bg); }
 .nav-badge.nav-badge-suspicious { background: #f87171; color: var(--color-bg); }
 .nav-badge.nav-badge-suspicion { background: #c084fc; color: var(--color-bg); }
@@ -4350,6 +4435,8 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 .foil-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
 .foil-info > strong { font-weight: 600; }
 .foil-info form { margin: 0; }
+/* Knöpfe dürfen umbrechen, sonst ragt „Handeln · Markt, Verkauf oder Tausch“ aus schmalen Kacheln heraus (#120) */
+.foil-info .btn { white-space: normal; text-align: center; max-width: 100%; }
 .foil-trade summary { cursor: var(--cur-pointer, pointer); color: var(--color-accent-300); font-size: 14px; }
 .foil-trade .form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .foil-trade .field { margin: 0; }
@@ -5039,6 +5126,7 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 /* Boss-Seltenheit (nur Beute): Farbe für Punkt, Rahmen und „?“-Platzhalter im Album */
 .r-boss { --rar: #e0a646; }
 .r-boss .tcg-locked-inner { border-color: #e0a646; color: #e0a646; opacity: 1; }
+.r-test-item { --rar: #7dd3fc; }
 
 /* ========== Profil (Steam-artig: Kopf mit Bild und Text, links Inhalt, rechts Vitrine) ========== */
 .pf-hero {
@@ -5052,6 +5140,18 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 .pf-id { display: flex; gap: 22px; align-items: flex-start; min-width: 0; flex: 1 1 420px; }
 .pf-avatar { flex: none; display: block; width: 152px; height: 152px; border-radius: 8px; }
+/* Profilbild wählen (Admin/Dev): beim Draufzeigen abgedunkelt mit „Ändern“ */
+.pf-avatar-pick { position: relative; flex: none; padding: 0; border: 0; border-radius: 8px; background: none; cursor: var(--cur-pointer); }
+.pf-avatar-hint {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 8px; font-weight: 700; color: #fff;
+  background: rgb(0 0 0 / .5); opacity: 0; transition: opacity .15s;
+}
+.pf-avatar-pick:hover .pf-avatar-hint, .pf-avatar-pick:focus-visible .pf-avatar-hint { opacity: 1; }
+.pf-bild-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+.pf-bild-opt { padding: 4px; border: 2px solid transparent; border-radius: 12px; background: none; cursor: var(--cur-pointer); }
+.pf-bild-opt img { display: block; width: 100%; height: auto; }
+.pf-bild-opt:hover { border-color: var(--color-neutral-600); }
+.pf-bild-opt.is-on { border-color: var(--color-accent); }
 .pf-id-text { min-width: 0; flex: 1; }
 .pf-name { margin: 4px 0 0; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; overflow-wrap: anywhere; }
 .pf-realname { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
@@ -5621,3 +5721,8 @@ a.dash-meta:hover { color: var(--color-accent-400); }
 /* App herunterladen (Profil-Menü): wie die anderen Menüpunkte; bleibt versteckt, bis der Browser die Installation anbietet */
 .user-menu-list button.app-install { color: var(--text); }
 .user-menu-list button.app-install[hidden] { display: none; }
+
+/* Falle für Skripte (moderation/requestSignals.js): für Menschen unsichtbar */
+.hp-link { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+/* Rangliste: eigene Liste für das Team (Admin + Devs) */
+.rang-team h2 { margin: 0 0 16px; font-size: 18px; font-weight: 500; }

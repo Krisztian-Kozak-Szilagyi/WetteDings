@@ -14,6 +14,8 @@ const { str, escapeRegex, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
 const polls = require('../forum/polls');
+const avatars = require('../profile/avatars');
+const { systemAuthor } = require('../forum/systemAuthors');
 
 const router = express.Router();
 router.use('/forum', requireLogin);
@@ -195,11 +197,15 @@ router.get('/forum/t/:id', async (req, res) => {
   const mine = (p) => String(p.author) === String(req.user._id);
   const showOriginal = (p) => p.deleted && forum.can.seeOriginal(req.user) && p.original;
   // Einbettungen (Wetten, Namen) für alle Beiträge der Seite auf einmal laden
-  const [embeds, reactions, poll] = await Promise.all([
+  const authorIds = [...new Set(posts.map((p) => String(p.author)))];
+  const [embeds, reactions, poll, authors] = await Promise.all([
     loadEmbeds(posts.map((p) => (p.deleted ? (showOriginal(p) ? p.original : null) : p.body))),
     forum.reactionsFor(posts.map((p) => p._id), req.user._id), // eine Abfrage für alle Beiträge der Seite
     forum.pollView(thread, req.user),
+    User.find({ _id: { $in: authorIds } }).select('avatar').lean(), // Profilbilder der Verfasser
   ]);
+  const pictures = new Map(authors.map((u) => [String(u._id), u.avatar]));
+  const avatarOf = (p) => (systemAuthor(p.authorName) ? systemAuthor(p.authorName).avatar : avatars.urlOf(pictures.get(String(p.author))));
   res.render('forum-thema', {
     title: thread.title,
     thread,
@@ -214,6 +220,7 @@ router.get('/forum/t/:id', async (req, res) => {
       originalHtml: showOriginal(p) ? render(p.original, embeds) : null,
       isNew: !mine(p) && (!lastRead || p.createdAt > lastRead), // seit dem letzten Besuch dazugekommen
       mine: mine(p),
+      avatar: avatarOf(p),
       canEdit: forum.can.editPost(req.user, p, thread),
       canDelete: forum.can.deletePost(req.user, p),
       reactions: reactions.get(String(p._id)) || reactionList(),

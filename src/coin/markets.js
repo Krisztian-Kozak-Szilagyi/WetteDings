@@ -1,10 +1,10 @@
 /**
- * Alle Werte im Broker: drei Coins und ein ETF. Jeder Wert hat seine eigene Kurs-Engine (engine.js).
+ * Alle Werte im Broker: vier Coins und ein ETF. Jeder Wert hat seine eigene Kurs-Engine (engine.js).
  */
 const model = require('./model');
 const { createEngine, DAY } = require('./engine');
-const etfTrend = require('./etfTrend');
 const buoy = require('./buoy');
+const tagViews = require('./tagViews');
 
 const LIST = [
   createEngine({ symbol: 'SAM', name: 'Samantha Coin', kind: 'coin', startPrice: 10, params: model.PARAMS, surgeWindow: DAY / 2 }),
@@ -21,13 +21,25 @@ const LIST = [
     weather: { at: (ms) => buoy.at(ms), params: model.bojeParams, storm: model.isStorm },
     rebase: { min: 1, max: 1000, factor: 10 },
   }),
+  // MK Coin: so unruhig wie der Samantha Coin; die Richtung kommt aus den Video-Aufrufen eines Schlagworts (tagViews.js):
+  // mehr Zuwachs als im Schnitt der Vortage → Trend nach oben, weniger → nach unten. Splits wie beim 51101 Coin.
+  createEngine({
+    symbol: 'MIA',
+    name: 'MK Coin',
+    kind: 'coin',
+    startPrice: 10,
+    params: model.PARAMS,
+    surgeWindow: DAY / 2,
+    drift: { now: () => tagViews.now() },
+    rebase: { min: 1, max: 1000, factor: 10 },
+  }),
   createEngine({
     symbol: 'BTCG',
     name: 'BfW-TCG ETF',
     kind: 'etf',
     startPrice: 100,
     params: model.ETF_PARAMS,
-    trend: { target: () => etfTrend.target(), tauDays: 0.25 },
+    report: true, // Sprung nach dem täglichen Börsenbericht (reportService.js); Stimmung = letzter Bericht
   }),
 ];
 
@@ -38,11 +50,13 @@ const get = (symbol) => LIST.find((e) => e.SYMBOL === symbol) || null;
 
 async function start() {
   await buoy.start(); // Wetterdaten zuerst – der 51101 Coin braucht sie schon beim Nachsimulieren
+  await tagViews.start(); // ebenso die Aufrufzahlen für den MK Coin
   for (const e of LIST) await e.start();
 }
 
 async function stop() {
   buoy.stop();
+  tagViews.stop();
   await Promise.all(LIST.map((e) => e.stop()));
 }
 

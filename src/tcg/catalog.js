@@ -52,7 +52,11 @@ const TOTAL_WEIGHT = RARITIES.reduce((s, r) => s + r.weight, 0);
  * rarityByKey, cardsByRarity und visibleRarities() überall bekannt. noBank = die Bank kauft sie nicht an;
  * sell ist dann nur der Kartenwert (zählt zum Vermögen, foliert mit Wertsteigerung), kein Ankaufspreis.
  */
-const DROP_RARITIES = [{ key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true }];
+// test-item: Test-Karten für den Kampfmodus (Bosskampf), nur für Admins (src/migrate.js), ohne Wert und für Mitglieder unsichtbar
+const DROP_RARITIES = [
+  { key: 'boss', label: 'Boss', weight: 0, sell: 500000, dropOnly: true, noBank: true },
+  { key: 'test-item', label: 'Test-Item', weight: 0, sell: 0, dropOnly: true, noBank: true, hidden: true },
+];
 const ALL_RARITIES = [...RARITIES, ...DROP_RARITIES];
 // Standardwerte; Chancen und Preise können im Admin-Panel geändert werden (src/tcg/settings.js).
 // Die Chancen ergeben dabei immer zusammen TOTAL_WEIGHT (= 100 %).
@@ -147,7 +151,7 @@ function cardImage(card, values = {}) {
   } catch {
     // Datei fehlt – ohne Bildversion
   }
-  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, mtime])).digest('hex').slice(0, 10);
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, card.kampf || null, mtime])).digest('hex').slice(0, 10);
   const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }

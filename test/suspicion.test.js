@@ -194,3 +194,239 @@ test('Wertverschiebung: Glitch für 1 € ja, Holo zum Marktpreis nein', () => {
   assert.equal(s.valuePairFinding([small], names, true).level, LEVEL.wahrscheinlich); // auch Mehrfach-Konto
   assert.equal(s.valuePairFinding([small, small, small], names).level, LEVEL.wahrscheinlich);
 });
+
+test('Dungeon: jeder Termin rund um die Uhr, sofort angemeldet, Beute nie angeschaut', () => {
+  const H = 3600e3;
+  const tz = 'Europe/Berlin';
+  const opts = { intervalMs: 2 * H, lockMs: 10e3, timeZone: tz };
+  const start = Date.UTC(2026, 9, 4, 22, 0, 0); // 0:00 deutsche Zeit
+  // Skript: 13 Termine in Folge (24 Std.), jeweils 5 s nach Öffnen der Anmeldung, Beute nie angeschaut
+  const bot = Array.from({ length: 13 }, (_, i) => {
+    const slot = start + i * 2 * H;
+    return { slot: new Date(slot), joinedAt: new Date(slot - 2 * H - 10e3 + 5e3), seen: false, finished: true };
+  });
+  const f = s.dungeonFinding(bot, opts);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.streak, 13);
+  assert.ok(f.joinMs <= 10e3);
+  assert.equal(f.unseen, 13);
+  assert.match(f.summary, /13 Termine in Folge/);
+  // Mensch: abends ein paar Termine, irgendwann während der zwei Stunden angemeldet, Beute angeschaut
+  const human = [18, 20, 22].flatMap((h, d) => [0, 1].map((day) => {
+    const slot = Date.UTC(2026, 9, 1 + day, h - 2, 0, 0);
+    return { slot: new Date(slot), joinedAt: new Date(slot - (40 + d * 20) * 60e3), seen: true, finished: true };
+  }));
+  assert.equal(human.length, 6);
+  assert.equal(s.dungeonFinding(human, opts), null);
+  // sofort angemeldet, aber tagsüber und Beute angeschaut: nur möglich
+  const quick = human.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 20e3) }));
+  assert.equal(s.dungeonFinding(quick, opts).level, LEVEL.moeglich);
+  // zu wenige Durchläufe
+  assert.equal(s.dungeonFinding(bot.slice(0, 5), opts), null);
+});
+
+test('Grading: fertig genau zur Mindestzeit', () => {
+  const job = (i, extraS, clean = 100, seal = 100) => ({ createdAt: new Date(t0 + i * 600e3), doneAt: new Date(t0 + i * 600e3 + 10 * 800 + extraS * 1000), clean, seal, spots: 10 });
+  const bot = Array.from({ length: 8 }, (_, i) => job(i, 0.5));
+  const f = s.gradingFinding(bot, 800);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.perfect, 8);
+  // von Hand: deutlich länger als die Mindestzeit
+  assert.equal(s.gradingFinding(Array.from({ length: 8 }, (_, i) => job(i, 25 + i)), 800), null);
+  // knapp über der Mindestzeit, nicht perfekt: möglich
+  assert.equal(s.gradingFinding(Array.from({ length: 8 }, (_, i) => job(i, 3, 90, 80)), 800).level, LEVEL.moeglich);
+  assert.equal(s.gradingFinding(bot.slice(0, 5), 800), null);
+});
+
+test('Rund um die Uhr: über 20 Stunden ohne Schlafpause, auch nachts', () => {
+  const tz = 'Europe/Berlin';
+  const start = Date.UTC(2026, 9, 4, 10, 0, 0); // 12:00 deutsche Zeit
+  // alle 30 Minuten eine Aktion, 32 Stunden lang
+  const bot = Array.from({ length: 65 }, (_, i) => new Date(start + i * 30 * 60e3));
+  const f = s.activityFinding(bot, tz);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.ok(f.nightHours >= 3);
+  // 22 Stunden: nur möglich
+  assert.equal(s.activityFinding(bot.slice(0, 45), tz).level, LEVEL.moeglich);
+  // Mensch: tagsüber viel, nachts 7 Stunden Pause
+  const day = (d) => Array.from({ length: 30 }, (_, i) => new Date(Date.UTC(2026, 9, d, 6, 0, 0) + i * 30 * 60e3)); // 8–23 Uhr
+  assert.equal(s.activityFinding([...day(4), ...day(5)], tz), null);
+});
+
+test('Kein normaler Browser: ferngesteuert, Skript-Werkzeug oder ohne Fingerabdruck und Kopfzeilen', () => {
+  const day = (x) => ({ actions: 0, noProbe: 0, noFetchMeta: 0, bare: 0, webdriver: 0, botUa: 0, uas: [], firstAt: new Date(t0), lastAt: new Date(t0 + 3600e3), ...x });
+  assert.equal(s.browserFinding([day({ actions: 50 })]), null);
+  const wd = s.browserFinding([day({ actions: 50, webdriver: 50, uas: ['Mozilla/5.0 Chrome'] })]);
+  assert.equal(wd.level, LEVEL.wahrscheinlich);
+  assert.match(wd.summary, /ferngesteuerten Browser/);
+  assert.equal(s.browserFinding([day({ actions: 5, botUa: 5, uas: ['python-requests/2.31'] })]).level, LEVEL.wahrscheinlich);
+  assert.equal(s.browserFinding([day({ actions: 40, noProbe: 30, noFetchMeta: 30, bare: 30 })]).level, LEVEL.wahrscheinlich);
+  // nur ohne Fingerabdruck (z. B. ohne JavaScript): möglich
+  assert.equal(s.browserFinding([day({ actions: 40, noProbe: 30 })]).level, LEVEL.moeglich);
+  // alter Safari ohne Sec-Fetch-Kopfzeilen, aber mit Fingerabdruck: unauffällig
+  assert.equal(s.browserFinding([day({ actions: 40, noFetchMeta: 40 })]), null);
+  // einzelne Ausreißer reichen nicht
+  assert.equal(s.browserFinding([day({ actions: 200, bare: 5, noProbe: 5, noFetchMeta: 5 })]), null);
+});
+
+test('Ungewöhnliche Einnahmen: weit über dem Üblichen', () => {
+  const at = new Date(t0);
+  const normal = Array.from({ length: 9 }, (_, i) => ({ user: `u${i}`, type: 'ihk_lohn', amount: 3000 + i * 100, createdAt: at }));
+  const out = s.incomeFindings([...normal, { user: 'bot', type: 'dungeon_lohn', amount: 60000, createdAt: at }, { user: 'bot', type: 'ihk_lohn', amount: 20000, createdAt: at }]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].user, 'bot');
+  assert.equal(out[0].level, LEVEL.moeglich);
+  assert.match(out[0].summary, /Dungeon/);
+  // zu wenige Spieler für einen Vergleich
+  assert.deepEqual(s.incomeFindings([...normal.slice(0, 5), { user: 'bot', type: 'dungeon_lohn', amount: 60000, createdAt: at }]), []);
+  // Lotto und Wettgewinne zählen nicht
+  assert.deepEqual(s.incomeFindings([...normal, { user: 'glück', type: 'lotto_gewinn', amount: 900000, createdAt: at }]), []);
+});
+
+test('Wett-Einsätze zählen bei Tempo und Takt mit', () => {
+  assert.ok(s.ACTIONS.wetten);
+  assert.ok(s.tempoFinding(series(Array(8).fill(0.5)), 'wetten'));
+});
+
+const sig = (x) => ({ actions: 0, noProbe: 0, tokenOk: 0, fast: 0, tokenReused: 0, tokenMissing: 0, withInput: 0, noInput: 0, synthetic: 0, hosting: 0, trap: 0, dwell: [], nets: [], firstAt: new Date(t0), lastAt: new Date(t0 + 3600e3), ...x });
+
+test('Reaktionszeit: unmenschlich schnell oder immer gleich lang nach dem Laden der Seite', () => {
+  // Mensch: 1–8 s, stark gestreut
+  const human = Array.from({ length: 40 }, (_, i) => 1000 + ((i * 1777) % 7000));
+  assert.equal(s.reactionFinding([sig({ actions: 40, tokenOk: 40, dwell: human })]), null);
+  // Skript direkt nach dem Laden
+  const instant = s.reactionFinding([sig({ actions: 40, tokenOk: 40, fast: 38, dwell: Array(40).fill(120) })]);
+  assert.equal(instant.level, LEVEL.wahrscheinlich);
+  assert.match(instant.summary, /0,4 s/);
+  // feste Pause von 3 s
+  const fixed = s.reactionFinding([sig({ actions: 40, tokenOk: 40, dwell: Array.from({ length: 40 }, (_, i) => 3000 + (i % 3) * 20) })]);
+  assert.equal(fixed.level, LEVEL.wahrscheinlich);
+  assert.match(fixed.summary, /gleich lange/);
+  // zu wenige Messungen
+  assert.equal(s.reactionFinding([sig({ actions: 10, tokenOk: 10, fast: 10, dwell: Array(10).fill(100) })]), null);
+  // wiederverwendete Kennzeichen: möglich
+  assert.equal(s.reactionFinding([sig({ actions: 30, tokenOk: 25, tokenReused: 5, dwell: human.slice(0, 25) })]).level, LEVEL.moeglich);
+  // ohne Kennzeichen, obwohl JavaScript lief
+  assert.equal(s.reactionFinding([sig({ actions: 30, tokenMissing: 20 })]).level, LEVEL.moeglich);
+  // ohne JavaScript überhaupt: Sache von „Kein normaler Browser“
+  assert.equal(s.reactionFinding([sig({ actions: 30, noProbe: 30, tokenMissing: 30 })]), null);
+});
+
+test('Ohne echte Eingabe und künstliche Klicks', () => {
+  assert.equal(s.inputFinding([sig({ withInput: 50, noInput: 2 })]), null);
+  assert.equal(s.inputFinding([sig({ withInput: 50, noInput: 45 })]).level, LEVEL.wahrscheinlich);
+  assert.match(s.inputFinding([sig({ withInput: 15, noInput: 12, synthetic: 12 })]).summary, /künstliche Klicks/);
+  assert.equal(s.inputFinding([sig({ withInput: 10, noInput: 10 })]), null); // zu wenige
+});
+
+test('Falle und Rechenzentrum', () => {
+  assert.equal(s.trapFinding([sig({})]), null);
+  assert.equal(s.trapFinding([sig({ trap: 1 })]).level, LEVEL.moeglich);
+  assert.equal(s.trapFinding([sig({ trap: 1 }), sig({ trap: 1 })]).level, LEVEL.wahrscheinlich);
+  assert.equal(s.hostingFinding([sig({ actions: 10, hosting: 2 })]), null);
+  const h = s.hostingFinding([sig({ actions: 10, hosting: 8, nets: ['Hetzner Online GmbH (AS24940)'] })]);
+  assert.equal(h.level, LEVEL.moeglich);
+  assert.deepEqual(h.nets, ['Hetzner Online GmbH (AS24940)']);
+});
+
+test('Gleichzeitig von zwei Geräten: Hin und Her, nicht ein einzelner Netzwechsel', () => {
+  const at = (min) => new Date(t0 + min * 60e3);
+  // Server-Skript (A) und Handy (B) abwechselnd, zweimal am Tag
+  const both = [];
+  for (const start of [0, 300]) for (let i = 0; i < 6; i++) both.push({ dev: i % 2 ? 'B' : 'A', net: i % 2 ? 'nb' : 'na', at: at(start + i) });
+  const f = s.parallelFinding(both);
+  assert.ok(f);
+  assert.equal(f.level, LEVEL.wahrscheinlich);
+  assert.equal(f.windows, 2);
+  // einmal am Tag: möglich
+  assert.equal(s.parallelFinding(both.slice(0, 6)).level, LEVEL.moeglich);
+  // WLAN → Mobilfunk mit demselben Gerät: nur das Netz wechselt
+  assert.equal(s.parallelFinding(both.map((t, i) => ({ ...t, dev: 'A', net: i < 6 ? 'na' : 'nb' }))), null);
+  // Handy und PC nacheinander (ein Wechsel)
+  assert.equal(s.parallelFinding([...Array(5)].map((_, i) => ({ dev: i < 3 ? 'A' : 'B', net: i < 3 ? 'na' : 'nb', at: at(i) }))), null);
+  // Wechsel über Stunden verteilt
+  assert.equal(s.parallelFinding([...Array(6)].map((_, i) => ({ dev: i % 2 ? 'B' : 'A', net: i % 2 ? 'nb' : 'na', at: at(i * 30) }))), null);
+});
+
+test('Panel: Kennzahlen, Zusatzzeilen und Bündelung je Spieler', () => {
+  const facts = s.factsOf('dungeon', { count: 13, joinMs: 5000, streak: 13, night: 3, unseen: 0 });
+  assert.deepEqual(facts.map((f) => f.label), ['Durchläufe', 'Termine in Folge', 'nach Öffnen angemeldet', 'nachts']);
+  assert.equal(facts[2].value, '5 s');
+  assert.deepEqual(s.factsOf('takt', { count: 24, medianMs: 2000, spread: 0.004, runs: 1 }).map((f) => f.value), ['24', '2 s', '< 1 %']);
+  assert.match(s.factsOf('ertrag', { total: 90000, factor: 26 })[0].value, /900,00/);
+  assert.deepEqual(s.factsOf('falle', null), []);
+  assert.deepEqual(s.extrasOf({ trades: ['a'], uas: ['b'], nets: ['c'] }), ['a', 'b', 'c']);
+
+  const u = (id) => ({ _id: id, username: id });
+  const alert = (users, kind, level, mins, done = false) => ({ users, kind, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: done ? new Date(t0) : null });
+  const groups = s.groupAlerts([
+    alert([u('ben')], 'dauer', 1, 50),
+    alert([u('sam')], 'tempo', 1, 10),
+    alert([u('sam')], 'takt', 2, 5),
+    alert([u('sam')], 'ihk', 2, 1, true),
+    alert([u('sam'), u('anna')], 'wert', 2, 3),
+    alert([u('anna'), u('sam')], 'wert', 1, 4),
+    alert([u('old')], 'takt', 2, 60, true),
+  ]);
+  // sam und das Paar: je Verdacht mit 4 Punkten, sam mit jüngerem Beleg zuerst; ben nur beobachten
+  assert.deepEqual(groups.map((g) => g.users.map((x) => x._id).join('+')), ['sam', 'sam+anna', 'ben', 'old']);
+  assert.equal(groups[0].open, 2);
+  assert.equal(groups[0].level, 2);
+  assert.deepEqual(groups[0].alerts.map((a) => [a.level, Boolean(a.doneAt)]), [[2, false], [1, false], [2, true]]); // offene zuerst
+  assert.equal(groups[1].alerts.length, 2); // Paar unabhängig von der Reihenfolge
+  assert.equal(groups[3].open, 0); // nur erledigte: ganz unten
+});
+
+test('Gesamtbewertung: Belege aus verschiedenen Bereichen zählen, gleiche Ursache nicht doppelt', () => {
+  const a = (kind, level, done = false) => ({ kind, level, doneAt: done ? new Date(t0) : null });
+  // ein schwacher Hinweis: beobachten
+  const one = s.overallRating([a('rechenzentrum', 1)]);
+  assert.equal(one.stage, s.STAGE.beobachten);
+  assert.equal(one.label, 'Beobachten');
+  assert.deepEqual(one.areas, { verhalten: 0, technik: 1, ergebnis: 0 });
+  // drei schwache aus drei Bereichen: eindeutig (Beispiel aus der Beschreibung)
+  const three = s.overallRating([a('dauer', 1), a('rechenzentrum', 1), a('ertrag', 1)]);
+  assert.equal(three.stage, s.STAGE.eindeutig);
+  assert.equal(three.score, 6); // 3 Punkte × 2
+  assert.match(three.reason, /Spielverhalten, Technik und Ergebnis/);
+  // ein klares Muster: Verdacht
+  assert.equal(s.overallRating([a('takt', 2)]).stage, s.STAGE.verdacht);
+  // schwache aus zwei Bereichen: Verdacht
+  const two = s.overallRating([a('takt', 1), a('reaktion', 1)]);
+  assert.equal(two.stage, s.STAGE.verdacht);
+  assert.match(two.reason, /kein Vorteil erkennbar/);
+  // zwei Bereiche, einer wahrscheinlich: starker Verdacht
+  assert.equal(s.overallRating([a('takt', 2), a('reaktion', 1)]).stage, s.STAGE.stark);
+  // gleiche Ursache (Technik dreimal wahrscheinlich): nur ein Bereich, Punkte gedeckelt
+  const tech = s.overallRating([a('browser', 2), a('reaktion', 2), a('eingabe', 2), a('rechenzentrum', 1)]);
+  assert.equal(tech.stage, s.STAGE.verdacht);
+  assert.equal(tech.areas.technik, 5);
+  assert.equal(tech.score, 5);
+  // Falle (zweimal): eindeutig
+  assert.equal(s.overallRating([a('falle', 2)]).stage, s.STAGE.eindeutig);
+  assert.match(s.overallRating([a('falle', 2)]).reason, /Falle/);
+  // Mehrfach-Konto zählt zum Ergebnis
+  const multi = s.overallRating([a('dungeon', 2)], { deviceLevel: 3 });
+  assert.equal(multi.stage, s.STAGE.stark);
+  assert.match(multi.reason, /Mehrfach-Konto/);
+  // nur erledigte Hinweise: keine Bewertung
+  assert.equal(s.overallRating([a('takt', 2, true)]), null);
+});
+
+test('Gesamtbewertung bestimmt die Reihenfolge der Spieler', () => {
+  const u = (id) => ({ _id: id, username: id });
+  const al = (user, kind, level, mins) => ({ users: [u(user)], kind, level, evidenceAt: new Date(t0 + mins * 60e3), doneAt: null });
+  const groups = s.groupAlerts(
+    [al('einzeln', 'takt', 2, 50), al('breit', 'dauer', 1, 1), al('breit', 'rechenzentrum', 1, 2), al('breit', 'eingabe', 1, 2), al('zweit', 'dungeon', 1, 3)],
+    new Map([['zweit', 3]])
+  );
+  // zweit: Dungeon + Mehrfach-Konto → starker Verdacht; breit: drei schwache aus zwei Bereichen → Verdacht (4,5 Punkte);
+  // einzeln: ein klares Muster → Verdacht (3 Punkte)
+  assert.deepEqual(groups.map((g) => [g.users[0]._id, g.rating.label]), [['zweit', 'Starker Verdacht'], ['breit', 'Verdacht'], ['einzeln', 'Verdacht']]);
+  // bei einem Konten-Paar zählt das Mehrfach-Konto eines der beiden nicht
+  const pair = s.groupAlerts([{ users: [u('zweit'), u('x')], kind: 'wert', level: 1, evidenceAt: new Date(t0), doneAt: null }], new Map([['zweit', 3]]));
+  assert.equal(pair[0].rating.stage, s.STAGE.beobachten);
+});

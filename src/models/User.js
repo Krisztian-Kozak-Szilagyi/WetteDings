@@ -35,6 +35,10 @@ const userSchema = new Schema(
     // Ältere Konten haben beides nicht – die Codes selbst löscht MongoDB nach Ablauf.
     registrationCode: { type: String, default: null },
     invitedByName: { type: String, default: null },
+    // Über den Einladungslink eines Mitglieds registriert: wer eingeladen hat und welche Provision er dafür bekam
+    // (packs = Booster Packs, withheld = Grund, falls keine, z. B. gleiches Gerät)
+    invitedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    inviteReward: { type: new Schema({ packs: Number, withheld: String }, { _id: false }), default: undefined },
     // Rolle: 'dev' oder 'mod' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
     role: { type: String, enum: ['dev', 'mod', null], default: null },
     // Profil: selbst geschriebener Text (höchstens 300 Zeichen, siehe achievements/logic.cleanBio) und bis zu
@@ -43,6 +47,8 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
+    // Profilbild: ID aus src/profile/avatars.js, null = Platzhalter (wählen vorerst nur Admin und Devs)
+    avatar: { type: String, default: null },
     // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
     statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)
@@ -74,5 +80,6 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ balance: -1 });
+userSchema.index({ invitedBy: 1 }, { sparse: true });
 
 module.exports = model('User', userSchema);

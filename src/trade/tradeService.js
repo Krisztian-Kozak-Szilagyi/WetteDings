@@ -11,11 +11,12 @@ const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 const { markSeen } = require('../tcg/tcgService');
+const foil = require('../items/foil');
 const taxService = require('../services/taxService');
 const { notify } = require('../services/notifyService');
 const lines = require('./lines');
 
-const { cardName, otherRole, kindOf, lockDocsOf, termsText, lineLabel } = lines;
+const { cardName, otherRole, kindOf, lockDocsOf, termsText, lineLabel, costShares } = lines;
 
 const PRIVATE_HOURS = 48; // Angebote an ein Mitglied und Gegenangebote laufen nach 48 Stunden ab
 const MARKET_DAYS = 7; // Markt-Angebote nach 7 Tagen
@@ -275,18 +276,38 @@ async function claimLines(list, ownerId, session) {
   if (goods.length) await claimItems(goods, ownerId, session);
 }
 
+/** Bankwert einer Position in Cent: Karte mit Folien-Steigerung (wie in der Rangliste), Gegenstand zum Bankpreis */
+function lineValue(l) {
+  const item = itemByCardId(l.card);
+  if (item) return item.sell || 0;
+  const card = catalog.cardById[l.card];
+  const r = card && catalog.rarityByKey[card.rarity];
+  return r ? foil.cardValue(r.sell || 0, l.foiledAt) : 0;
+}
+
+/** Was eine Seite beim Abschluss gibt: Bankwert ihrer Positionen plus das Geld, das sie zahlt (Cent) */
+const givenValue = (list, money, who) => list.reduce((s, l) => s + lineValue(l), 0) + (money && money.payer.equals(who) ? money.amount : 0);
+
 /**
  * Exemplare einer Seite an den neuen Besitzer geben; fehlt eines, scheitert der ganze Abschluss.
+ * paid = was der neue Besitzer dafür gegeben hat (givenValue): Karten zählen in der Rangliste ein paar Tage höchstens
+ * mit ihrem Anteil daran (tradedAt/tradedCost, siehe rankService.FRESH_DAYS).
  * Gegenstände landen im Gegenstands-Protokoll (Quelle "handel", meta = { trade }).
  */
-async function moveLines(list, from, to, session, meta = null) {
+async function moveLines(list, from, to, session, meta = null, paid = null) {
+  const cardLines = list.filter((l) => !itemByCardId(l.card));
   for (const [Model, ids] of [
-    [TcgCard, list.filter((l) => !itemByCardId(l.card)).map((l) => l.doc)],
+    [TcgCard, cardLines.map((l) => l.doc)],
     [Item, list.filter((l) => itemByCardId(l.card)).map((l) => l.doc)],
   ]) {
     if (!ids.length) continue;
     const res = await Model.updateMany({ _id: { $in: ids }, user: from }, { $set: { user: to } }, { session });
     if (res.modifiedCount !== ids.length) throw new UserError('Eine der Karten ist nicht mehr verfügbar.');
+  }
+  if (paid !== null && cardLines.length) {
+    const costs = costShares(cardLines.map((l) => ({ doc: l.doc, value: lineValue(l) })), paid);
+    const now = new Date();
+    await TcgCard.bulkWrite(cardLines.map((l) => ({ updateOne: { filter: { _id: l.doc }, update: { $set: { tradedAt: now, tradedCost: costs.get(String(l.doc)) } } } })), { session });
   }
   const cards = list.filter((l) => !itemByCardId(l.card)).map((l) => l.card);
   if (cards.length) await markSeen(to, cards, session);
@@ -478,8 +499,8 @@ async function buy({ user, tradeId }) {
       const iPay = money.payer.equals(user._id);
       await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: iPay ? 'Dein Guthaben reicht dafür nicht aus.' : `${trade.sellerName} hat nicht mehr genug Guthaben.` }, session);
     }
-    await moveLines(trade.give, trade.seller, user._id, session, { trade: trade._id });
-    await moveLines(want, user._id, trade.seller, session, { trade: trade._id });
+    await moveLines(trade.give, trade.seller, user._id, session, { trade: trade._id }, givenValue(want, money, user._id));
+    await moveLines(want, user._id, trade.seller, session, { trade: trade._id }, givenValue(trade.give, money, trade.seller));
 
     Object.assign(trade, {
       want,
@@ -537,8 +558,8 @@ async function accept({ user, tradeId, version }) {
       const other = role === 'to' ? trade.sellerName : trade.toName;
       await transfer(money, { title: dealTitle(trade), ...ledgerTypes(trade), payerMsg: iPay ? 'Dein Guthaben reicht dafür nicht aus.' : `${other} hat nicht mehr genug Guthaben.` }, session);
     }
-    await moveLines(give, trade.seller, trade.to, session, { trade: trade._id });
-    await moveLines(want, trade.to, trade.seller, session, { trade: trade._id });
+    await moveLines(give, trade.seller, trade.to, session, { trade: trade._id }, givenValue(want, money, trade.to));
+    await moveLines(want, trade.to, trade.seller, session, { trade: trade._id }, givenValue(give, money, trade.seller));
 
     Object.assign(trade, {
       give,

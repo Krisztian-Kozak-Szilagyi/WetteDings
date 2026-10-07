@@ -87,6 +87,7 @@
     var body = new URLSearchParams();
     body.set('_csrf', csrf);
     body.set('fp', fp);
+    if (n.webdriver) body.set('wd', '1'); // ferngesteuerter Browser (Selenium, Puppeteer …)
     if (stored && stored !== cookie(KEY)) body.set('alt', stored);
     return fetch('/geraet', { method: 'POST', body: body, credentials: 'same-origin' });
   }).catch(function () { /* nicht wichtig für die Seite */ });

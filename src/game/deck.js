@@ -1,7 +1,7 @@
 // Deckbau-Regeln – reine Logik ohne Datenbank/Express (wie coin/model.js), damit sie später auch im
 // eigenständigen Spiel (Steam) unverändert laufen. Speichern und Sammlung: src/game/deckService.js.
 //
-// Regeln (Krisztian, 2026-10-05): genau 30 Karten, höchstens 2 gleiche, Boss-Karten nur 1-mal,
+// Regeln (Krisztian, 2026-10-05): genau 30 Karten, höchstens 2 gleiche, Boss-Karten und ausrüstbare Items nur 1-mal,
 // alle Karten erlaubt, aber nur aus eigenen Exemplaren.
 // Eigene Exemplare werden NICHT gesperrt: Wer eine Karte verkauft, hat danach ein unvollständiges Deck.
 
@@ -15,8 +15,11 @@ const NAME_MAX = 30;
 
 const RULES = { deckSize: DECK_SIZE, maxCopies: MAX_COPIES, singleRarities: SINGLE_RARITIES, maxDecks: MAX_DECKS, nameMax: NAME_MAX };
 
+// Ausrüstbare Items (Bosskampf: Waffe, Zauber, Schild) – von jeder Karte nur 1 Exemplar (Krisztian, 2026-10-07)
+const SINGLE_KAMPF = ['waffe', 'zauber', 'schild'];
+
 /** Wie oft darf diese Karte ins Deck? */
-const copyLimit = (card) => (card && SINGLE_RARITIES.includes(card.rarity) ? 1 : MAX_COPIES);
+const copyLimit = (card) => (card && (SINGLE_RARITIES.includes(card.rarity) || (card.kampf && SINGLE_KAMPF.includes(card.kampf.typ))) ? 1 : MAX_COPIES);
 
 /** Kartenliste (IDs, Wiederholung = mehrere Exemplare) -> [{ card, n }] in Reihenfolge des ersten Auftretens */
 function countCards(ids) {

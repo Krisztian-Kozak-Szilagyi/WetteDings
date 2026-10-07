@@ -342,6 +342,33 @@
   </section>
 <% }) %>
 
+<% if (boerse && boerse.length) { const pct = (x) => (x > 0 ? '+' : '') + (x * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %'; %>
+  <section class="stats-block" id="boersenbericht">
+    <header class="stats-block-head"><div><h2>Börsenbericht (BTCG)</h2></div></header>
+    <p class="muted small">Jeden Tag um 18:45 Uhr: Kennzahlen der letzten 24 Stunden gegen den Schnitt der 7 Vortage; daraus der Sprung des ETF. Nur für den Admin sichtbar.</p>
+    <form method="post" data-reauth action="/admin/boersenbericht/neu" class="stats-boerse-redo" data-confirm="Den heutigen Börsenbericht neu auswerten? Der ETF springt dabei um die Differenz.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn-ghost btn-sm" title="Wertet den heutigen Tag neu aus: Der ETF springt um die Differenz zum bisherigen Sprung, der alte Forum-Beitrag wird durch einen neuen ersetzt.">Heute neu auswerten</button>
+    </form>
+    <% boerse.forEach((r) => { %>
+      <details class="card stats-collapsed">
+        <summary><strong><%= r._id.split('-').reverse().join('.') %></strong> · Sprung <strong><%= pct(r.change) %></strong> · Stimmung <%= r.sentiment.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %> · Rekorde <%= r.records %><% if (r.thread) { %> · <a href="/forum/t/<%= r.thread %>">Beitrag</a><% } %></summary>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Kennzahl</th><th class="num">Heute</th><th class="num">Schnitt 7 Tage</th><th class="num">Änderung</th><th class="num">Wertung</th><th></th></tr></thead>
+            <tbody>
+              <% r.rows.forEach((m) => { %>
+                <tr><td><%= m.label %></td><td class="num"><%= m.value %></td><td class="num"><%= m.avg === null ? '–' : m.avg.toLocaleString('de-DE', { maximumFractionDigits: 1 }) %></td><td class="num"><%= m.change === null ? '–' : pct(m.change) %></td><td class="num"><%= m.score.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %></td><td><%= m.record ? 'Rekord' : '' %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted small">Kurs vorher <%= r.priceBefore.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %> € → nachher <%= r.priceAfter.toLocaleString('de-DE', { maximumFractionDigits: 2 }) %> €</p>
+      </details>
+    <% }) %>
+  </section>
+<% } %>
+
 <script type="application/json" id="stats-data"><%- JSON.stringify(chartData).replace(/</g, '\\u003c') %></script>
 <script src="/js/stats.js?v=<%= assetVersion %>" defer></script>
 <% } %>

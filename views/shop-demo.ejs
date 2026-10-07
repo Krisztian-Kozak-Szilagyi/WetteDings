@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title><%= title %> · <%= appName %></title>
+  <meta name="theme-color" content="#0b0f1c">
+  <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/shop-demo.css?v=<%= assetVersion %>">
+</head>
+<%# Shop-Demo – Vollbild ohne Navigation: leerer Laden bei Nacht auf dem Canvas (public/js/shop-demo.js).
+    WASD/Pfeiltasten = laufen, Umschalt = rennen, Esc = zurück %>
+<body class="sd-body">
+  <canvas class="sd-canvas" data-shop-canvas aria-label="Leerer Laden bei Nacht"></canvas>
+  <div class="sd-hint">WASD laufen · Umschalt rennen · Esc zurück</div>
+  <script src="/js/shop-demo.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

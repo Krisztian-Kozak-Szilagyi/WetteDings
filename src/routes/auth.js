@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { registerUser } = require('../services/betService');
 const { str, safeRedirect, UserError } = require('../lib/util');
-const { normalizeCode } = require('../services/codeService');
+const { normalizeCode, formatCode } = require('../services/codeService');
 const { NAME_PATTERN, NAME_HINT, RESERVED_HINT, isReserved } = require('../services/usernameRules');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
@@ -47,7 +47,9 @@ router.use('/anmelden', (req, res, next) => {
 
 router.get('/registrieren', (req, res) => {
   if (req.user) return res.redirect('/');
-  res.render('register', { title: 'Registrieren', errors: [], values: {} });
+  // Einladungslink (/registrieren?code=ABCD-2345): Code schon eintragen
+  const code = normalizeCode(str(req.query.code).slice(0, 20));
+  res.render('register', { title: 'Registrieren', errors: [], values: code.length === 8 ? { code: formatCode(code) } : {} });
 });
 
 router.post('/registrieren', authLimiter, async (req, res) => {
@@ -74,7 +76,7 @@ router.post('/registrieren', authLimiter, async (req, res) => {
 
   if (!errors.length) {
     try {
-      const user = await registerUser({ username, email, password, code });
+      const user = await registerUser({ username, email, password, code, deviceId: req.deviceId });
       await startSession(req, user._id);
       req.flash('success', `Willkommen, ${user.username}! Dein Startguthaben ist gutgeschrieben. Viel Spaß!`);
       return res.redirect('/');
@@ -137,6 +139,7 @@ router.post('/anmelden', authLimiter, async (req, res) => {
 router.post('/geraet', async (req, res) => {
   const fp = deviceLogic.cleanFp(req.body.fp);
   if (fp) req.session.fp = fp;
+  if (req.body.wd === '1') req.session.webdriver = true; // ferngesteuerter Browser (Manipulationserkennung)
   const alt = str(req.body.alt);
   const altId = deviceLogic.readToken(config.sessionSecret, alt);
   const restored = !!altId && altId !== req.deviceId;

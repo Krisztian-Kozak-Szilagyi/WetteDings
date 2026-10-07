@@ -423,10 +423,10 @@ async function chat({ user, text }) {
 // ---------- Start und Ende ----------
 /**
  * Wer kann mit? Nur Spieler mit gewähltem Charakter – die anderen fallen beim Start heraus (#111).
- * { players: Mitglieds-Einträge (ohne joinedAt), dropped: Nutzer-IDs ohne Charakter }
+ * { players: Mitglieds-Einträge (mit joinedAt), dropped: Nutzer-IDs ohne Charakter }
  */
 function splitPlayers(parties) {
-  const all = parties.flatMap((p) => p.members.map(({ joinedAt, ...m }) => m));
+  const all = parties.flatMap((p) => p.members); // joinedAt bleibt im Durchlauf (Manipulationserkennung)
   return { players: all.filter((m) => m.card), dropped: all.filter((m) => !m.card && m.user).map((m) => m.user) };
 }
 
