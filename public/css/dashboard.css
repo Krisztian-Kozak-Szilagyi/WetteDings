@@ -58,7 +58,7 @@
 .dx-parts dd { margin: 2px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; }
 .dx-parts .is-zero dd { color: var(--color-neutral-500); }
 /* Broker-Ticker: Liste mit Abstand; ab mehr als 4 Werten scrollt sie, statt die Karte zu strecken */
-.dx-ticks { display: flex; flex-direction: column; gap: 8px; margin: 0 -6px -6px; max-height: calc(4 * 52px + 3 * 8px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--color-neutral-700) transparent; }
+.dx-ticks { display: flex; flex-direction: column; gap: 8px; margin: 0 -6px -6px; max-height: calc(4 * 52px + 3 * 8px); overflow-y: auto; }
 .dx-tick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 52px; flex: none; box-sizing: border-box; border-radius: var(--radius-md, 8px); color: var(--color-text); background: color-mix(in srgb, var(--color-bg) 60%, transparent); }
 .dx-tick:hover { background: var(--color-bg); color: var(--color-text); }
 .dx-tick-logo, .dx-tick-mark { width: 28px; height: 28px; flex: none; }
