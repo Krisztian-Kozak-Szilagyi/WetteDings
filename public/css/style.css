@@ -4651,15 +4651,26 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 
 .dg-pick-sub { margin: 0; font-size: 11px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
 .dg-pick-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(30%, 110px), 1fr)); }
-.dg-pick { position: relative; display: flex; flex-direction: column; gap: 4px; cursor: var(--cur-pointer); }
+/* Eine Karte in der Auswahl (#114): nur das Bild – Name und Werte stehen darauf. Gewählt: Ring und Leuchten in
+   der Farbe der Seltenheit (--rar aus .r-<seltenheit>), dazu ein ✓ */
+.dg-pick { position: relative; display: block; cursor: var(--cur-pointer); transition: opacity .3s ease, transform .3s ease, filter .3s ease; }
 .dg-pick input { position: absolute; opacity: 0; pointer-events: none; }
-.dg-pick img, .dg-pick .dg-slot-placeholder { display: block; width: 100%; height: auto; border-radius: 9px; transition: transform .15s, box-shadow .15s; box-shadow: 0 8px 18px rgba(0, 0, 0, .35); }
-.dg-pick .dg-slot-placeholder { display: grid; }
-.dg-pick:hover img { transform: translateY(-3px); }
-.dg-pick input:checked ~ img, .dg-pick input:checked ~ .dg-slot-placeholder { box-shadow: 0 0 0 2px var(--color-accent-300), 0 0 24px var(--color-accent); }
+.dg-pick img, .dg-pick .dg-slot-placeholder {
+  display: block; width: 100%; height: auto; border-radius: 10px;
+  transition: transform .2s ease, box-shadow .2s ease; box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+}
+.dg-pick .dg-slot-placeholder { display: grid; aspect-ratio: 720 / 1008; }
+.dg-pick:hover img, .dg-pick:hover .dg-slot-placeholder { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(0, 0, 0, .45); }
+.dg-pick input:checked ~ img, .dg-pick input:checked ~ .dg-slot-placeholder {
+  box-shadow: 0 0 0 2px var(--rar, var(--color-accent-300)), 0 0 26px color-mix(in srgb, var(--rar, var(--color-accent)) 60%, transparent);
+}
+.dg-pick:has(input:checked)::before {
+  content: '✓'; position: absolute; top: -6px; left: -6px; z-index: 2; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 50%; font-size: 13px; font-weight: 700; color: #0e0f1a; background: var(--rar, var(--color-accent-300)); box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+  transition: transform .2s ease;
+}
+.dg-pick:hover::before { transform: translateY(-4px); } /* wandert mit der angehobenen Karte */
 .dg-pick input:focus-visible ~ img, .dg-pick input:focus-visible ~ .dg-slot-placeholder { outline: 2px solid var(--color-accent-300); outline-offset: 3px; }
-.dg-pick-name { overflow: hidden; font-size: 12px; line-height: 1.3; white-space: nowrap; text-overflow: ellipsis; }
-.dg-pick-stats { display: grid; font-size: 10px; line-height: 1.3; color: var(--color-neutral-500); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .dg-log-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; max-height: 260px; overflow-y: auto; }
 .dg-log-list .is-head { font-weight: 600; margin-top: 4px; }
@@ -4728,15 +4739,7 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 /* Dungeon: Kartenauswahl mit Suche, Filter und Seiten – oben Suche, Mitte Karten (ohne Scrollen), unten Seiten */
 .dg-picklist { position: relative; display: flex; flex-direction: column; gap: 12px; }
 .dg-pick-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.dg-pick-foot { display: flex; align-items: center; justify-content: center; gap: 14px; }
-.dg-pick-foot.is-single { visibility: hidden; }
-.dg-page-btn {
-  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--color-accent); border-radius: 50%;
-  font-size: 20px; line-height: 1; color: var(--color-accent); background: none; cursor: var(--cur-pointer);
-}
-.dg-page-btn:disabled { opacity: .3; cursor: var(--cur-no); }
-.dg-pick[hidden], .dg-pick-foot[hidden] { display: none; }
-.dg-page-info { min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+.dg-pick[hidden] { display: none; }
 .dg-pick-empty { position: absolute; inset: 50% 0 auto; margin: 0; text-align: center; }
 
 /* Dungeon: Anleitungs-Kachel in der Chat-Spalte (wie „Zum Album“) */
@@ -4917,33 +4920,55 @@ a.dg-start-tile:hover { color: var(--text); }
 .dg-boost-pick.dg-boost-empty:hover, .dg-boost-pick.dg-boost-empty:focus-visible { border-color: var(--color-accent-400); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 @media (prefers-reduced-motion: reduce) { .dg-slot.is-me.is-choosing .dg-slot-choose { animation: none; } .dg-slot-choose, .dg-slot-pick { transition: none; } }
 
-/* Auswahl-Fenster (#114): zentriert mit fester Höhe, Karten füllen die Mitte – schmale Fenster: als Blatt von unten.
-   Spalten, Reihen und Kartenbreite (--dg-card-w) rechnet public/js/dungeon.js aus dem freien Platz. */
+/* Auswahl-Fenster (#114): zentriert mit fester Höhe, darin scrollen die Karten – schmale Fenster: als Blatt von unten.
+   Beim Öffnen fächern die Karten herein (.is-opening, --i = Reihenfolge), beim Wählen hebt sich die gewählte
+   Karte und die übrigen treten zurück (.is-picking / .is-picked) – gesetzt von public/js/dungeon.js */
 .dg-picker {
-  width: min(880px, calc(100vw - 32px)); max-width: none; height: min(720px, calc(100dvh - 32px)); max-height: none; padding: 20px 22px 16px; overflow: visible;
-  border: 0; border-radius: var(--radius-lg); color: var(--text); background: var(--color-surface);
+  width: min(880px, calc(100vw - 32px)); max-width: none; height: min(720px, calc(100dvh - 32px)); max-height: none; padding: 20px 22px 0; overflow: hidden;
+  border: 0; border-radius: var(--radius-lg); color: var(--text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-800) 30%, var(--color-surface)) 0, var(--color-surface) 140px);
   box-shadow: 0 0 0 1px var(--color-accent-800), 0 24px 60px rgba(0, 0, 0, .6);
 }
-.dg-picker::backdrop { background: rgba(5, 5, 12, .6); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-.dg-picker[open] { display: flex; flex-direction: column; gap: 14px; }
+.dg-picker::backdrop { background: rgba(5, 5, 12, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dg-picker[open] { display: flex; flex-direction: column; gap: 16px; animation: dg-picker-in .22s ease-out; }
+@keyframes dg-picker-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
 .dg-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dg-picker-head h2 { margin: 0; font-size: 18px; }
+.dg-picker-head h2 { margin: 0; font-size: 18px; letter-spacing: .01em; }
 .dg-picker-close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; font-size: 22px; line-height: 1; color: var(--color-neutral-400); background: none; cursor: var(--cur-pointer); }
 .dg-picker-close:hover, .dg-picker-close:focus-visible { outline: 0; color: var(--text); background: var(--color-neutral-800); }
-.dg-picker .dg-picklist { flex: 1 1 0; min-height: 0; }
-/* Platz für Anheben und Leuchten der gewählten Karte – das Raster selbst schneidet ab statt zu scrollen */
+.dg-picker .dg-picklist { flex: 1 1 0; min-height: 0; gap: 14px; }
+/* Raster scrollt; oben und unten blenden die Karten weich aus. Innenabstand = Platz für Anheben, Leuchten und ✓ */
 .dg-picker .dg-pick-grid {
-  flex: 1 1 0; min-height: 0; overflow: hidden; padding: 8px 10px; margin: 0 -10px;
-  grid-template-columns: repeat(auto-fill, var(--dg-card-w, 120px)); grid-auto-rows: max-content; align-content: start; justify-content: center; gap: 16px 14px;
+  flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 12px 28px; margin: 0 -12px;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 18px 14px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%);
+  scrollbar-width: thin; scrollbar-color: var(--color-neutral-700) transparent;
 }
-.dg-picker-hint { margin: 0; text-align: center; }
+.dg-picker .dg-pick-grid::-webkit-scrollbar { width: 8px; }
+.dg-picker .dg-pick-grid::-webkit-scrollbar-thumb { border-radius: 8px; background: var(--color-neutral-700); }
 .dg-picker-error { margin: 0; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #fecaca; background: color-mix(in srgb, #ef4444 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #ef4444 40%, transparent); }
 .dg-table { scroll-margin-top: 140px; } /* nach Aktionen: Plätze, darüber noch Startzeit und Countdown */
 .dg-picker.is-saving { pointer-events: none; }
-.dg-picker.is-saving .dg-picklist { opacity: .5; transition: opacity .2s ease; }
+/* Hereinfächern: von etwas unterhalb und leicht gedreht, nacheinander – höchstens 0,3 s Verzögerung */
+.dg-picker.is-opening .dg-pick { animation: dg-card-in .38s cubic-bezier(.2, .8, .3, 1.15) both; animation-delay: min(calc(var(--i, 0) * 25ms), 300ms); }
+@keyframes dg-card-in { from { opacity: 0; transform: translateY(18px) rotate(-3deg) scale(.94); } }
+/* Auswahl-Moment: die gewählte Karte hebt sich und leuchtet auf, die übrigen treten zurück */
+.dg-picker.is-picking .dg-pick:not(.is-picked) { opacity: .3; transform: scale(.96); filter: saturate(.4); }
+.dg-pick.is-picked { z-index: 2; }
+.dg-pick.is-picked::before { transform: translate(-6px, -14px); } /* Ecke der angehobenen, vergrößerten Karte */
+.dg-pick.is-picked img, .dg-pick.is-picked .dg-slot-placeholder { transform: translateY(-6px) scale(1.08); animation: dg-pick-glow .45s ease-out both; }
+@keyframes dg-pick-glow {
+  60% { box-shadow: 0 0 0 3px var(--rar, var(--color-accent-300)), 0 0 48px 8px color-mix(in srgb, var(--rar, var(--color-accent)) 70%, transparent); }
+  to { box-shadow: 0 0 0 2px var(--rar, var(--color-accent-300)), 0 0 30px color-mix(in srgb, var(--rar, var(--color-accent)) 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dg-picker[open], .dg-picker.is-opening .dg-pick, .dg-pick.is-picked img, .dg-pick.is-picked .dg-slot-placeholder { animation: none; }
+  .dg-pick, .dg-pick img, .dg-pick .dg-slot-placeholder { transition: none; }
+}
 @media (max-width: 719px) {
-  .dg-picker { width: 100vw; height: 88dvh; padding: 16px 16px 14px; margin: auto 0 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-  .dg-picker .dg-pick-grid { gap: 12px 10px; }
+  .dg-picker { width: 100vw; height: 88dvh; padding: 16px 16px 0; margin: auto 0 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .dg-picker .dg-pick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 10px; }
 }
 /* TCG: dezenter Hinweis unter dem Kauf-Knopf, wohin die Packs gehen */
 .tcg-buy-dest { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; font-size: 12px; color: var(--color-neutral-400); text-decoration: none; transition: color .2s ease; }
@@ -5366,7 +5391,6 @@ dialog.ach-pop[open], dialog.ach-pop.is-fresh { animation: ach-pop-in .45s cubic
 /* Dungeon: Karte schon als Charakter gewählt, nur ein Exemplar → als Boost gesperrt */
 .dg-pick.is-blocked { cursor: var(--cur-no); }
 .dg-pick.is-blocked img { filter: grayscale(1) brightness(.55); }
-.dg-pick.is-blocked .dg-pick-name { color: var(--color-neutral-600); }
 
 /* Profil: gewählter Broker-Wert in der Seitenleiste (Bestand + Wert) */
 .pf-asset-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: var(--radius-md); color: var(--text); text-decoration: none; }

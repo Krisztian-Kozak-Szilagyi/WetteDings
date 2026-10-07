@@ -159,7 +159,8 @@
         const blocked = !!main && inp.value === main.value && Number(item.dataset.count) < 2;
         inp.disabled = blocked;
         item.classList.toggle('is-blocked', blocked);
-        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : '';
+        if (item.dataset.name && !('label' in item.dataset)) item.dataset.label = item.title; // Name (Seltenheit) merken
+        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : item.dataset.label || '';
         if (blocked && inp.checked) {
           inp.checked = false;
           const none = form.querySelector('input[name="boost"][value=""]');
@@ -178,17 +179,30 @@
   if (cardsForm) {
     const pickers = [...cardsForm.querySelectorAll('[data-dg-picker]')];
     const close = (dlg) => (typeof dlg.close === 'function' ? dlg.close() : dlg.removeAttribute('open'));
-    // Karten je Seite erst messen, wenn das Fenster offen ist (Kartenliste weiter unten hört auf dg:fit)
-    const fit = (dlg) => dlg.querySelectorAll('[data-dg-picklist]').forEach((box) => box.dispatchEvent(new Event('dg:fit')));
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const PICK_MS = 450; // so lange hebt sich die gewählte Karte, bevor neu geladen wird
     page.querySelectorAll('[data-dg-open]').forEach((btn) =>
       btn.addEventListener('click', () => {
         const dlg = cardsForm.querySelector('[data-dg-picker="' + btn.dataset.dgOpen + '"]');
         if (!dlg) return;
         if (typeof dlg.showModal === 'function') dlg.showModal();
         else dlg.setAttribute('open', '');
-        fit(dlg);
+        // Die schon gewählte Karte mittig zeigen, dann die Karten hereinfächern lassen (CSS: .is-opening)
+        const grid = dlg.querySelector('[data-dg-grid]');
+        const chosen = grid && grid.querySelector('input:checked');
+        if (chosen) {
+          const g = grid.getBoundingClientRect();
+          const c = chosen.closest('.dg-pick').getBoundingClientRect();
+          grid.scrollTop += c.top - g.top - (g.height - c.height) / 2;
+        }
+        dlg.classList.remove('is-opening');
+        void dlg.offsetWidth; // Animation auch beim zweiten Öffnen neu starten
+        dlg.classList.add('is-opening');
+        clearTimeout(dlg.openTimer);
+        dlg.openTimer = setTimeout(() => dlg.classList.remove('is-opening'), 700);
         const search = dlg.querySelector('[data-dg-search]');
-        if (search && window.innerWidth >= 720) search.focus();
+        if (search && window.innerWidth >= 720) search.focus({ preventScroll: true });
       })
     );
     pickers.forEach((dlg) => {
@@ -197,8 +211,8 @@
         if (e.target === dlg) close(dlg); // Klick daneben schließt
       });
     });
-    window.addEventListener('resize', () => pickers.forEach((dlg) => dlg.open && fit(dlg)));
     // Auswahl sofort speichern, danach neu laden (Scroll-Position bleibt). Fehler stehen im Fenster selbst.
+    // Währenddessen hebt sich die gewählte Karte, die übrigen treten zurück (CSS: .is-picking / .is-picked).
     let saving = false;
     const showError = (dlg, text) => {
       let el = dlg.querySelector('[data-dg-picker-error]');
@@ -214,15 +228,21 @@
     cardsForm.addEventListener('change', async (e) => {
       if (saving || (e.target.name !== 'card' && e.target.name !== 'boost')) return;
       const dlg = e.target.closest('[data-dg-picker]');
+      const item = e.target.closest('.dg-pick');
       saving = true;
-      dlg.classList.add('is-saving');
+      dlg.classList.remove('is-opening');
+      dlg.classList.add('is-saving', 'is-picking');
+      if (item) item.classList.add('is-picked');
       try {
-        const r = await fetch(cardsForm.action, {
-          method: 'POST',
-          body: new URLSearchParams(new FormData(cardsForm)),
-          credentials: 'same-origin',
-          headers: { Accept: 'application/json' },
-        });
+        const [r] = await Promise.all([
+          fetch(cardsForm.action, {
+            method: 'POST',
+            body: new URLSearchParams(new FormData(cardsForm)),
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          }),
+          wait(calm() ? 0 : PICK_MS),
+        ]);
         const data = await r.json().catch(() => ({}));
         if (r.ok && data.ok) return location.reload();
         showError(dlg, data.error || 'Das hat nicht geklappt. Bitte lade die Seite neu.');
@@ -232,77 +252,32 @@
         cardsForm.reset();
       }
       saving = false;
-      dlg.classList.remove('is-saving');
+      dlg.classList.remove('is-saving', 'is-picking');
+      if (item) item.classList.remove('is-picked');
     });
   }
 
-  // ---------- Kartenauswahl: Suche, Seltenheit und Seiten – je Seite so viele Karten, wie ins Fenster passen ----------
-  const CARD_RATIO = 1008 / 720;
+  // ---------- Kartenauswahl: Suche und Seltenheit blenden Karten aus, der Rest wird gescrollt ----------
   page.querySelectorAll('[data-dg-picklist]').forEach((box) => {
     const grid = box.querySelector('[data-dg-grid]');
     const items = [...box.querySelectorAll('[data-dg-item]')];
-    const none = box.querySelector('[data-dg-none]'); // "Ohne Boost"
+    const none = box.querySelector('[data-dg-none]'); // "Ohne Boost" – nur ohne Suche und Filter
     const search = box.querySelector('[data-dg-search]');
     const chips = [...box.querySelectorAll('[data-dg-rar]')];
-    let rarity = '';
-    const pager = box.querySelector('[data-dg-pager]');
-    const prev = box.querySelector('[data-dg-prev]');
-    const next = box.querySelector('[data-dg-next]');
-    const info = box.querySelector('[data-dg-pageinfo]');
     const empty = box.querySelector('[data-dg-empty]');
-    let pageNo = 0;
-    let perPage = 12;
-    let fitted = false;
-    const matches = () => {
-      const q = search ? search.value.trim().toLowerCase() : '';
-      const r = rarity;
-      const list = items.filter((it) => (!r || it.dataset.rarity === r) && (!q || it.dataset.name.includes(q)));
-      return none && !q && !r ? [none, ...list] : list;
-    };
+    let rarity = '';
     function render() {
-      const list = matches();
-      const pages = Math.max(1, Math.ceil(list.length / perPage));
-      pageNo = Math.min(Math.max(0, pageNo), pages - 1);
-      const from = pageNo * perPage;
-      const visible = new Set(list.slice(from, from + perPage));
-      (none ? [none, ...items] : items).forEach((it) => {
-        it.hidden = !visible.has(it);
+      const q = search ? search.value.trim().toLowerCase() : '';
+      let shown = 0;
+      items.forEach((it) => {
+        it.hidden = !((!rarity || it.dataset.rarity === rarity) && (!q || it.dataset.name.includes(q)));
+        if (!it.hidden) shown++;
       });
-      pager.hidden = false;
-      pager.classList.toggle('is-single', pages <= 1); // Platz bleibt reserviert, sonst passt die Rechnung in fit() nicht
-      prev.disabled = pageNo === 0;
-      next.disabled = pageNo >= pages - 1;
-      info.textContent = 'Seite ' + (pageNo + 1) + ' von ' + pages;
-      empty.hidden = list.length > 0;
+      if (none) none.hidden = !!(q || rarity);
+      empty.hidden = shown > 0;
+      grid.scrollTop = 0;
     }
-    // Kartenbreite so, dass mindestens zwei Reihen und drei Spalten ins Fenster passen; daraus Spalten × Reihen je Seite
-    function fit() {
-      const cs = getComputedStyle(grid);
-      const h = grid.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const w = grid.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      if (h <= 0 || w <= 0) return;
-      const gapX = parseFloat(cs.columnGap) || 0;
-      const gapY = parseFloat(cs.rowGap) || 0;
-      // Höhe von Name und Werten unter dem Bild (an einer sichtbaren Karte gemessen)
-      const sample = items.find((it) => !it.hidden);
-      const text = sample ? sample.offsetHeight - sample.querySelector('img').offsetHeight : 48;
-      const cardW = Math.floor(Math.min(150, (w - 2 * gapX) / 3, Math.max(84, ((h - gapY) / 2 - text) / CARD_RATIO)));
-      grid.style.setProperty('--dg-card-w', cardW + 'px');
-      const cols = Math.max(1, Math.floor((w + gapX) / (cardW + gapX)));
-      const rows = Math.max(1, Math.floor((h + gapY) / (cardW * CARD_RATIO + text + gapY)));
-      const first = pageNo * perPage; // erste Karte der aktuellen Seite bleibt sichtbar
-      perPage = cols * rows;
-      if (fitted) pageNo = Math.floor(first / perPage);
-      else {
-        // beim ersten Öffnen: die Seite mit der schon gewählten Karte
-        const checked = matches().findIndex((it) => it.querySelector('input:checked'));
-        pageNo = checked > 0 ? Math.floor(checked / perPage) : 0;
-        fitted = true;
-      }
-      render();
-    }
-    box.addEventListener('dg:fit', fit);
-    if (search) search.addEventListener('input', () => { pageNo = 0; render(); });
+    if (search) search.addEventListener('input', render);
     chips.forEach((chip) =>
       chip.addEventListener('click', () => {
         rarity = chip.dataset.dgRar;
@@ -310,13 +285,9 @@
           c.classList.toggle('active', c === chip);
           c.setAttribute('aria-selected', c === chip ? 'true' : 'false');
         });
-        pageNo = 0;
         render();
       })
     );
-    prev.addEventListener('click', () => { pageNo--; render(); });
-    next.addEventListener('click', () => { pageNo++; render(); });
-    render();
   });
 
   // ---------- Beute-Fenster: Spieler für Spieler aufdecken ----------
