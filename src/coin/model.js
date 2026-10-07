@@ -69,6 +69,20 @@ const ETF_PARAMS = {
   floor: 0.01,
 };
 
+// eSports-Team-ETF: nur leises Grundrauschen (~1–2 % am Tag), keine Sprünge – den Kurs macht der Wochenbericht der Liga
+const TEAM_PARAMS = {
+  baseVol: 0.015,
+  volMeanRev: 3,
+  volOfVol: 0.3,
+  minVol: 0.01,
+  maxVol: 0.025,
+  dof: 5,
+  small: null,
+  big: null,
+  surge: null,
+  floor: 0.01,
+};
+
 // 51101 Coin: Grundmodell; Unruhe und Sprungrate setzt bojeParams() aus dem Wetter, große Sprünge gibt es nur bei Sturm
 const BOJE_PARAMS = {
   baseVol: 0.3,
@@ -199,6 +213,7 @@ module.exports = {
   COW_PARAMS,
   MIA_PARAMS,
   ETF_PARAMS,
+  TEAM_PARAMS,
   BOJE_PARAMS,
   BOJE_WEATHER,
   bojeParams,

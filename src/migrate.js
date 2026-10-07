@@ -29,6 +29,8 @@ async function migrate() {
   await require('./models/Achievement').createIndexes();
   // Mage Tower: ein Versuch pro Tag – der eindeutige Index muss vor dem ersten Turm-Start stehen
   await require('./models/Dungeon').TowerAttempt.createIndexes();
+  // eSports: ein Spieler in höchstens einem Team – eindeutiger Index vor dem ersten Beitritt
+  await require('./models/Esports').EsportsTeam.createIndexes();
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [
