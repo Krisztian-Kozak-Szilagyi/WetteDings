@@ -266,11 +266,13 @@
         const item = inp.closest('[data-dg-item]');
         if (!item) return;
         if ('banned' in item.dataset) return; // gesperrte Karte (Kartensperren): bleibt immer gesperrt
-        const blocked = !!main && inp.value === main.value && Number(item.dataset.count) < 2;
+        // Mage Tower (data-dg-unique): dieselbe Karte nie als Charakter und Boost; sonst nur mit zwei Exemplaren
+        const unique = 'dgUnique' in form.dataset;
+        const blocked = !!main && inp.value === main.value && (unique || Number(item.dataset.count) < 2);
         inp.disabled = blocked;
         item.classList.toggle('is-blocked', blocked);
         if (item.dataset.name && !('label' in item.dataset)) item.dataset.label = item.title; // Name (Seltenheit) merken
-        item.title = blocked ? 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar' : item.dataset.label || '';
+        item.title = blocked ? (unique ? 'Schon als Charakter gewählt – im Mage Tower spielt jede Karte nur einmal' : 'Schon als Charakter gewählt – als Boost brauchst du ein zweites Exemplar') : item.dataset.label || '';
         if (blocked && inp.checked) {
           inp.checked = false;
           const none = form.querySelector('input[name="boost"][value=""]');
