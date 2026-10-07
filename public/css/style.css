@@ -1499,9 +1499,9 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   box-shadow: inset 0 0 0 1px var(--color-neutral-800); color: var(--color-neutral-600); font-size: 26px; transition: transform .25s ease;
 }
 .tcg-fav-empty:hover { color: var(--color-accent-300); transform: translateY(-6px) rotate(-1.5deg); }
-/* Dashboard (#130): entfernter Favorit blendet aus, bevor der freie Platz kommt; Fehler im Zoom- bzw. Folien-Fenster */
+/* Favoriten (#130, Dashboard und TCG-Seite): entfernter Favorit blendet aus, bevor der freie Platz kommt; Fehler im Zoom- bzw. Folien-Fenster */
 .tcg-favs .tcg-slot.is-leaving { opacity: 0; transform: scale(.92); transition: opacity .2s ease, transform .2s ease; }
-.dx-fav-error { margin: 0 0 8px; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; color: var(--nein); background: var(--nein-soft); border: 1px solid color-mix(in srgb, var(--nein) 35%, transparent); }
+.fav-error { margin: 0 0 8px; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; color: var(--nein); background: var(--nein-soft); border: 1px solid color-mix(in srgb, var(--nein) 35%, transparent); }
 @media (prefers-reduced-motion: reduce) { .tcg-favs .tcg-slot.is-leaving { transition: none; } }
 
 .tcg-album-tile {

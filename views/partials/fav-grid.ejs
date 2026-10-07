@@ -1,0 +1,25 @@
+<%#
+  Favoriten-Raster (Dashboard, TCG-Seite – #130): Klick vergrößert wie im Album – normale Karten im Zoom
+  (partials/card-zoom mit favForm), folierte in der 3D-Ansicht (partials/foil-modal mit favForm); dort lässt sich der
+  Favorit entfernen (public/js/favorites.js, ohne Neuladen). Beide Fenster müssen auf der Seite eingebunden sein.
+  favorites: [{ key, card, foiledAt, grade, center, favOn? }] – favOn = false: zufällige eigene Karte, solange keine
+             Favoriten gewählt sind (Dashboard) – dort „Als Favorit zeigen“
+  max: Plätze insgesamt (freie Plätze führen ins Album), cls: zusätzliche Klasse für das Raster
+%>
+<div class="tcg-grid tcg-favs<%= locals.cls ? ' ' + cls : '' %>" data-fav-grid>
+  <% favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; const on = fv.favOn !== false; %>
+    <% if (fv.foiledAt) { %>
+      <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>" data-fav-key="<%= fv.key %>"<%- foilViewAttrs(c, r.label, fv.foiledAt, { fav: fv.key, favOn: on, grade: fv.grade, center: fv.center }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
+        <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade, center: fv.center }) %></span>
+      </button>
+    <% } else { %>
+      <button type="button" class="tcg-slot r-<%= c.rarity %>" data-fav-key="<%= fv.key %>" data-fav-zoom data-fav-on="<%= on ? 1 : 0 %>"
+        data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>" aria-label="<%= c.name %>, <%= r.label %> – ansehen">
+        <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+      </button>
+    <% } %>
+  <% }) %>
+  <% for (let i = favorites.length; i < max; i++) { %>
+    <a class="tcg-slot tcg-fav-empty" href="/tcg/album" aria-label="Freier Favoriten-Platz – zum Album"><span>+</span></a>
+  <% } %>
+</div>
