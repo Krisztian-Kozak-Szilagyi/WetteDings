@@ -5,6 +5,7 @@ const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const markets = require('./markets');
 const taxService = require('../services/taxService');
+const league = require('../esports/league');
 
 /** Engine zum Symbol; unbekannte Symbole sind ein Nutzerfehler */
 function engineOf(symbol) {
@@ -12,6 +13,12 @@ function engineOf(symbol) {
   if (!engine) throw new UserError('Diesen Wert gibt es im Broker nicht.');
   return engine;
 }
+
+/**
+ * eSports-Team-ETF: Der Auftrag bewegt den Kurs ein klein wenig (league.impactLog) – und zwar VOR der Ausführung,
+ * so kauft man zum angehobenen und verkauft zum gesenkten Kurs. Hin und her handeln bringt dadurch nie Gewinn.
+ */
+const nudgeTeam = (engine, cents, side) => (engine.team ? engine.nudge(league.impactLog(cents, side)) : null);
 
 const UNITS = 1e8; // 1 Coin = 100.000.000 Einheiten
 const MIN_TRADE_CENTS = 100; // Mindestbetrag 1 €
@@ -33,11 +40,9 @@ async function buy({ user, symbol = 'SAM', cents }) {
   // exclusive: wartet, falls gerade ein Split läuft (51101 Coin)
   return engine.exclusive(() =>
     inTransaction(async (session) => {
-      const price = engine.getPrice();
-      const min = minBuyCents(price);
+      if (engine.team && engine.isPaused()) throw new UserError('Dieses Team ist eingefroren – kaufen geht erst wieder, wenn es drei Mitglieder hat.');
+      const min = minBuyCents(engine.getPrice());
       if (cents < min) throw new UserError(`Du musst mindestens 10 % des aktuellen Kurses investieren – derzeit ${euroText(min)} €.`);
-      const units = Math.floor((cents / 100 / price) * UNITS);
-      if (units <= 0) throw new UserError('Der Betrag ist zu klein.');
 
       const updatedUser = await User.findOneAndUpdate(
         { _id: user._id, balance: { $gte: cents } },
@@ -45,6 +50,10 @@ async function buy({ user, symbol = 'SAM', cents }) {
         { new: true, session }
       );
       if (!updatedUser) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
+      nudgeTeam(engine, cents, 'kauf'); // erst nach der Guthaben-Prüfung: gescheiterte Käufe bewegen nichts
+      const price = engine.getPrice();
+      const units = Math.floor((cents / 100 / price) * UNITS);
+      if (units <= 0) throw new UserError('Der Betrag ist zu klein.');
 
       await CoinHolding.updateOne(
         { user: user._id, coin: symbol },
@@ -68,7 +77,7 @@ async function sell({ user, symbol = 'SAM', cents, all = false }) {
   // exclusive: wartet, falls gerade ein Split läuft (51101 Coin)
   return engine.exclusive(() =>
     inTransaction(async (session) => {
-      const price = engine.getPrice();
+      let price = engine.getPrice();
       const holding = await CoinHolding.findOne({ user: user._id, coin: symbol }).session(session);
       if (!holding || holding.units <= 0) throw new UserError(`Du besitzt keine Anteile von ${engine.NAME}.`);
 
@@ -76,8 +85,12 @@ async function sell({ user, symbol = 'SAM', cents, all = false }) {
       if (units > holding.units) {
         throw new UserError(`Du besitzt nur Anteile im Wert von ${(valueCents(holding.units, price) / 100).toFixed(2).replace('.', ',')} €.`);
       }
-      const proceeds = valueCents(units, price);
+      let proceeds = valueCents(units, price);
       if (proceeds <= 0) throw new UserError('Der Wert ist zu klein, um ihn zu verkaufen.');
+      if (engine.team) {
+        price = nudgeTeam(engine, proceeds, 'verkauf');
+        proceeds = valueCents(units, price);
+      }
 
       const costReduce = units === holding.units ? holding.costCents : Math.round((holding.costCents * units) / holding.units);
       const res = await CoinHolding.updateOne(

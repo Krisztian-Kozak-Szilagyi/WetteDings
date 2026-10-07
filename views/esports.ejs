@@ -1,0 +1,140 @@
+<%- include('partials/head') %>
+<%
+  const statusLabel = { offen: 'Sucht Mitglieder', aktiv: 'Gehandelt', eingefroren: 'Eingefroren', aufgeloest: 'Aufgelöst' };
+  const eur = (c) => euro(c);
+  const pctText = (x) => x === null || x === undefined ? '–' : signedPercent(x);
+  const live = teams.filter((t) => t.status !== 'aufgeloest');
+  const closed = teams.filter((t) => t.status === 'aufgeloest');
+%>
+<div class="page-head">
+  <h1>eSports</h1>
+  <span class="muted">Wochenbericht jeden Sonntag um <%= rules.REPORT_TIME %> Uhr · nächster: <%= dayDate(nextReport) %></span>
+</div>
+
+<div class="es-grid">
+  <div class="es-main">
+    <% if (!mine && invites.length) { %>
+      <section class="card es-card">
+        <h2>Einladungen</h2>
+        <ul class="es-list">
+          <% invites.forEach((t) => { %>
+            <li class="es-row">
+              <span><strong><%= t.name %></strong> <span class="muted">(<%= t.ticker %> · <%= t.members.length %> Mitglieder)</span></span>
+              <span class="es-actions">
+                <form method="post" action="/esports/annehmen"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="team" value="<%= t._id %>"><button class="btn btn-primary btn-sm" type="submit">Beitreten</button></form>
+                <form method="post" action="/esports/ablehnen"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="team" value="<%= t._id %>"><button class="btn btn-sm" type="submit">Ablehnen</button></form>
+              </span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <% if (mine) { %>
+      <section class="card es-card">
+        <div class="es-team-head">
+          <div>
+            <span class="kicker">Dein Team</span>
+            <h2><%= mine.name %> <span class="es-ticker"><%= mine.ticker %></span></h2>
+          </div>
+          <span class="es-status is-<%= mine.status %>"><%= statusLabel[mine.status] %></span>
+        </div>
+        <% if (mine.status === 'offen') { %>
+          <p class="muted small">Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer ETF im Broker gehandelt (Start: <%= rules.START_PRICE %> €).</p>
+        <% } else if (mine.status === 'eingefroren') { %>
+          <p class="es-warn small">Unter <%= rules.TEAM_SIZE %> Mitgliedern: Der ETF ist eingefroren. Ohne neue Mitglieder bis <%= dayDate(new Date(new Date(mine.frozenAt).getTime() + rules.FREEZE_DAYS * 864e5)) %> folgt der Konkurs.</p>
+        <% } else if (mine.lastRank) { %>
+          <p class="muted small">Letzte Woche: Platz <%= mine.lastRank %> von <%= mine.lastOf %> · <%= pctText(mine.lastChange) %></p>
+        <% } %>
+
+        <ul class="es-list">
+          <% mine.members.forEach((m) => { const isMe = String(m.user) === String(currentUser._id); const cap = String(m.user) === String(mine.captain); %>
+            <li class="es-row">
+              <span><%- userLink(m.name) %><% if (cap) { %> <span class="es-tag">Kapitän</span><% } %> <span class="muted small">seit <%= dayDate(m.joinedAt) %></span></span>
+              <% if (isCaptain && !isMe) { %>
+                <form method="post" action="/esports/entfernen"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="user" value="<%= m.user %>"><button class="btn btn-sm" type="submit">Entfernen</button></form>
+              <% } %>
+            </li>
+          <% }) %>
+          <% mine.invites.forEach((i) => { %>
+            <li class="es-row is-invite">
+              <span class="muted"><%= i.name %> · eingeladen</span>
+              <% if (isCaptain) { %>
+                <form method="post" action="/esports/einladung-zurueck"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="user" value="<%= i.user %>"><button class="btn btn-sm" type="submit">Zurückziehen</button></form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+
+        <% if (isCaptain && mine.members.length < rules.MAX_MEMBERS) { %>
+          <form class="es-form" method="post" action="/esports/einladen">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="field"><span>Spieler einladen</span><input type="text" name="username" maxlength="20" placeholder="Benutzername" required></label>
+            <button class="btn btn-primary" type="submit">Einladen</button>
+          </form>
+        <% } %>
+
+        <form class="es-leave" method="post" action="/esports/austreten">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="small"><input type="checkbox" name="confirm" value="1" required>
+            Austreten<% if (mine.status === 'aktiv') { %> – kostet <%= eur(rules.LEAVE_FEE) %> (geht an die übrigen Mitglieder)<% } else if (mine.status === 'eingefroren') { %> – kostet <%= eur(rules.BANKRUPT_FEE) %> wie beim Konkurs<% } %></label>
+          <button class="btn btn-sm" type="submit">Austreten</button>
+        </form>
+      </section>
+    <% } else { %>
+      <section class="card es-card">
+        <h2>Team gründen</h2>
+        <form class="es-form" method="post" action="/esports/gruenden">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field"><span>Teamname</span><input type="text" name="name" minlength="3" maxlength="24" required></label>
+          <label class="field es-ticker-field"><span>Kürzel im Broker</span><input type="text" name="ticker" minlength="3" maxlength="5" pattern="[A-Za-z]{3,5}" required></label>
+          <button class="btn btn-primary" type="submit"<%= currentUser.balance < rules.FOUND_COST ? ' disabled' : '' %>>Gründen · <%= eur(rules.FOUND_COST) %></button>
+        </form>
+      </section>
+    <% } %>
+
+    <section class="card es-card">
+      <h2>Teams</h2>
+      <% if (!live.length) { %>
+        <p class="muted">Noch kein Team gegründet.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table es-table">
+            <thead><tr><th class="num">Platz</th><th>Team</th><th>Kürzel</th><th class="num">Kurs</th><th class="num hide-sm">Letzte Woche</th><th class="num">Mitglieder</th><th class="hide-sm">Status</th></tr></thead>
+            <tbody>
+              <% live.forEach((t) => { %>
+                <tr class="<%= mine && String(mine._id) === String(t._id) ? 'is-mine' : '' %>">
+                  <td class="num"><%= t.lastRank || '–' %></td>
+                  <td><strong><%= t.name %></strong></td>
+                  <td><% if (t.path) { %><a href="<%= t.path %>"><%= t.ticker %></a><% } else { %><span class="muted"><%= t.ticker %></span><% } %></td>
+                  <td class="num"><%= t.price !== null ? coinPrice(t.price) : '–' %></td>
+                  <td class="num hide-sm"><%= pctText(t.lastChange) %></td>
+                  <td class="num"><%= t.members.length %>/<%= rules.MAX_MEMBERS %></td>
+                  <td class="hide-sm"><span class="es-status is-<%= t.status %>"><%= statusLabel[t.status] %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <% if (closed.length) { %>
+        <p class="muted small">Aufgelöst: <%= closed.map((t) => t.name).join(', ') %></p>
+      <% } %>
+    </section>
+  </div>
+
+  <aside class="card es-card es-rules">
+    <h2>So funktioniert's</h2>
+    <ul>
+      <li>Gründen kostet <%= eur(rules.FOUND_COST) %>. Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
+      <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
+      <li>Für die Liga zählen nur Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind (schon vor Beginn der Woche). Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
+      <li>Sonntags um <%= rules.REPORT_TIME %> Uhr: Platz 1 bringt <%= signedPercent(rules.TOP_CHANGE) %>, der letzte Platz <%= signedPercent(rules.BOTTOM_CHANGE) %>. Wer seinen Platz hält oder verbessert, bekommt <%= signedPercent(rules.HOLD_BONUS) %> dazu. Der Bericht erscheint im Forum unter eSports.</li>
+      <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
+      <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>.</li>
+    </ul>
+  </aside>
+</div>
+
+<link rel="stylesheet" href="/css/esports.css?v=<%= assetVersion %>">
+<%- include('partials/foot') %>

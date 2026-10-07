@@ -49,6 +49,7 @@
         { href: '/broker', label: 'Broker', active: currentPath === '/broker' || currentPath.startsWith('/broker/'), badges: [] },
         { href: '/lotterie', label: 'Lotterie', active: currentPath === '/lotterie' || currentPath.startsWith('/lotterie/'), badges: [] },
       ];
+      if (esportsOpen(currentUser)) gambling.splice(2, 0, { href: '/esports', label: 'eSports', active: currentPath === '/esports', badges: [] });
       navItems.push(navGroup('gambling', 'Gambling', gambling));
       navItems.push({ href: '/tcg', label: 'TCG', active: currentPath.startsWith('/tcg') || currentPath.startsWith('/inventar'), badges: newPacks ? [{ n: newPacks, cls: '', title: 'Neue Booster Packs im Inventar', aria: newPacks + ' neue Booster Packs' }] : [], live: newItems ? 'Neuer Gegenstand im Inventar' : '' });
       const tradeBadges = [];
