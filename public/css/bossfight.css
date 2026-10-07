@@ -402,3 +402,58 @@ html, body.bf-body {
 @keyframes bf-preview-in {
   from { opacity: 0; transform: translate(-50%, -50%) scale(.94); }
 }
+
+/* Laufende Effekte über dem Avatar: Kartenbild im Kreis, Ring = verbleibende Runden (--p: 1 … 0) */
+@property --p {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+.bf-effects {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 260px;
+}
+.bf-eff {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  padding: 3px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: auto;
+  background: conic-gradient(#f3cf7a calc(var(--p) * 360deg), rgba(255, 255, 255, .12) 0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .6);
+  transition: --p .6s ease, opacity .35s, transform .35s;
+  animation: bf-eff-in .3s ease-out;
+}
+.bf-eff-bild {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #1b1622 center 38% / 150% auto no-repeat;
+  box-shadow: inset 0 0 0 2px rgba(13, 11, 20, .9);
+}
+.bf-eff-zahl {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: #2a2036;
+  box-shadow: 0 0 0 2px rgba(217, 164, 65, .8);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.bf-eff-weg { opacity: 0; transform: scale(.6); }
+@keyframes bf-eff-in {
+  from { opacity: 0; transform: scale(.6); }
+}
