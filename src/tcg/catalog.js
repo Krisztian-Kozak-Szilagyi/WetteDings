@@ -145,12 +145,13 @@ function loadCards(dir = IMAGE_DIR) {
     .sort((a, b) => rarityByKey[a.rarity].rank - rarityByKey[b.rarity].rank || a.name.localeCompare(b.name, 'de'));
 }
 
-// Unveröffentlichte Karten stehen in keiner Liste (Packs, Album, Black Market, Grading, Erfolge, Admin-Vergabe …).
+// Unveröffentlichte Karten stehen in keiner Liste (Packs, Black Market, Grading, Erfolge, Handel …); das Album zeigt sie
+// als "?", nur Admins können sie vergeben. cardById kennt sie, damit vergebene Exemplare überall funktionieren.
 // Veröffentlichen = unreleased in cardData.js entfernen.
 const LOADED = loadCards();
 const CARDS = LOADED.filter((c) => !c.unreleased);
 const UNRELEASED_CARDS = LOADED.filter((c) => c.unreleased);
-const cardById = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+const cardById = Object.fromEntries(LOADED.map((c) => [c.id, c]));
 const cardsByRarity = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
 const cardsBySeason = Object.fromEntries(SEASONS.map((s) => [s.key, CARDS.filter((c) => c.season === s.key)]));
 

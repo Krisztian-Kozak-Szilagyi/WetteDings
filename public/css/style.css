@@ -1427,6 +1427,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .r-holo img { filter: brightness(.82) contrast(1.05); }
 .r-bockhaber { --rar: var(--r-bockhaber); }
 .r-glitch { --rar: var(--r-glitch); }
+.tcg-soon { --rar: var(--r-holo); } /* noch nicht erhältliche Karten im Album: eine Farbe für alle */
 .r-icon { --rar: var(--r-icon); }
 .r-sith { --rar: #ff2d3d; }
 /* Icon ist weiß – goldener Rand, damit es auch auf hellem Grund zu sehen ist */
