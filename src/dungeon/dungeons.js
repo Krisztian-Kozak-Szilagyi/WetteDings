@@ -5,6 +5,8 @@
 // bossCard: Karten-ID, die der Boss fallen lässt (Chance im Admin-Panel; Karte steht in src/tcg/cardData.js).
 // Welcher Dungeon dran ist, hängt von der Startzeit ab (dungeonForSlot) – derzeit gibt es nur einen.
 
+const { TOWER } = require('./tower');
+
 const PLACEHOLDER = '/img/dungeon/placeholder.svg';
 
 const DUNGEONS = [
@@ -55,7 +57,10 @@ const DUNGEONS = [
 ];
 const dungeonByKey = Object.fromEntries(DUNGEONS.map((d) => [d.key, d]));
 
+/** Dungeon oder Mage Tower zu einem gespeicherten Schlüssel (DungeonRun.dungeon) – der Turm ist nicht in der Rotation */
+const defOf = (key) => dungeonByKey[key] || (key === TOWER.key ? TOWER : null);
+
 /** Dungeon zu einer Startzeit: wechselt mit jedem Termin (hours = Abstand der Termine) */
 const dungeonForSlot = (slot, hours = 2) => DUNGEONS[Math.floor(new Date(slot).getTime() / 3600000 / Math.max(1, hours)) % DUNGEONS.length];
 
-module.exports = { DUNGEONS, dungeonByKey, dungeonForSlot, PLACEHOLDER };
+module.exports = { DUNGEONS, dungeonByKey, dungeonForSlot, defOf, TOWER, PLACEHOLDER };

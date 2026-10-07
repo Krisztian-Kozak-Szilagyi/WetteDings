@@ -254,7 +254,7 @@
 <% } %>
   <% if (sub === 'dungeon') { %>
   <section class="stats-block" id="dungeon">
-    <%- blockHead('Dungeon: Termine, Lohn &amp; Beute', 'Abstand der Starts, Ziel-Punkte und Lohn (pro Spieler) je Kampf, Beute-Chancen beim Boss und welche Karten Bots bekommen. Gilt ab dem nächsten Start.') %>
+    <%- blockHead('Dungeon: Termine, Lohn &amp; Beute', 'Abstand der Starts, Ziel-Punkte und Lohn (pro Spieler) je Kampf, Beute-Chancen beim Boss, welche Karten Bots bekommen und die Werte des Mage Towers. Gilt ab dem nächsten Start.') %>
     <div class="card">
       <form method="post" data-reauth action="/admin/dungeon" class="form panel-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -300,6 +300,37 @@
                   <td><span class="tcg-dot"></span> <%= r.label %></td>
                   <td><input type="number" name="bot_<%= r.key %>" min="0" max="10000" step="1" value="<%= w %>" required aria-label="Bot-Gewicht <%= r.label %>"></td>
                   <td class="muted"><%= botTotal ? (w / botTotal * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) : 0 %> %</td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% const tw = dungeon.settings.tower; const twd = dungeon.defaults.tower; const dec = (v) => String(v).replace('.', ','); const eur = (c) => (c / 100).toFixed(2).replace('.', ','); %>
+        <h3 class="admin-ihk-sub">Mage Tower (einmal am Tag)</h3>
+        <p class="muted small">Runde für Runde schwerer, bis die Gruppe scheitert. Ziel der Runde n = Ziel Runde 1 × (1 + Anstieg)<sup>n−1</sup>. Lohn und Beute-Chancen wachsen mit jeder geschafften Runde. Gilt ab dem nächsten Turm-Start.</p>
+        <label class="check admin-ihk-open">
+          <input type="checkbox" name="towerOpen" value="1" <%= tw.open ? 'checked' : '' %>>
+          <span><strong>Mage Tower für alle Mitglieder</strong> <span class="muted small">(nur wenn auch der Dungeon freigegeben ist – sonst nur für Admins)</span></span>
+        </label>
+        <div class="table-wrap">
+          <table class="table admin-tcg-table">
+            <thead><tr><th>Wert</th><th>Einstellung</th></tr></thead>
+            <tbody>
+              <% [
+                ['towerBaseRequired', 'Ziel Runde 1 (Punkte)', tw.baseRequired, twd.baseRequired, 'number'],
+                ['towerGrowth', 'Anstieg pro Runde (%)', dec(tw.growth), dec(twd.growth)],
+                ['towerRewardBase', 'Lohn Runde 1 pro Spieler (€)', eur(tw.rewardBase), eur(twd.rewardBase)],
+                ['towerRewardStep', 'Mehr Lohn je weitere Runde (€)', eur(tw.rewardStep), eur(twd.rewardStep)],
+                ['towerFoilPerRound', 'Folie: Chance je geschaffte Runde (%)', dec(tw.foilPerRound), dec(twd.foilPerRound)],
+                ['towerFoilMax', 'Folie: höchstens (%)', dec(tw.foilMax), dec(twd.foilMax)],
+                ['towerCardPerRound', 'Boss-Karte: Chance je geschaffte Runde (%)', dec(tw.cardPerRound), dec(twd.cardPerRound)],
+                ['towerCardMax', 'Boss-Karte: höchstens (%)', dec(tw.cardMax), dec(twd.cardMax)],
+                ['towerFightSeconds', 'Wiedergabe je Runde (Sekunden)', tw.fightSeconds, twd.fightSeconds, 'number'],
+                ['towerPauseSeconds', 'Pause zwischen Runden (Sekunden)', tw.pauseSeconds, twd.pauseSeconds, 'number'],
+              ].forEach(([name, label, value, def, type]) => { %>
+                <tr>
+                  <td><%= label %> <span class="muted small hide-sm">(Standard <%= def %>)</span></td>
+                  <td><input type="<%= type === 'number' ? 'number' : 'text' %>" name="<%= name %>" <%- type === 'number' ? 'min="0" step="1"' : 'inputmode="decimal"' %> value="<%= value %>" required aria-label="<%= label %>"></td>
                 </tr>
               <% }) %>
             </tbody>

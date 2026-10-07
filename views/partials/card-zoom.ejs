@@ -1,4 +1,5 @@
-<%# Karte groß ansehen – öffnet sich bei Klick auf [data-zoom-card] (public/js/handel.js) %>
+<%# Karte groß ansehen – öffnet sich bei Klick auf [data-zoom-card] (public/js/handel.js).
+    favForm: true im Dashboard – dann lässt sich die Karte als Favorit entfernen bzw. zeigen (public/js/dashboard.js) %>
 <dialog class="tcg-modal" data-zoom-modal aria-label="Karte ansehen">
   <button type="button" class="tcg-close" data-zoom-close aria-label="Schließen">×</button>
   <div class="tcg-modal-body">
@@ -14,6 +15,14 @@
       <p class="muted" data-zoom-meta></p>
       <%# nur in fremden Sammlungen sichtbar: Karte mit data-trade-href %>
       <a class="btn btn-primary btn-block" data-zoom-trade hidden>Angebot machen</a>
+      <% if (locals.favForm) { %>
+        <form method="post" action="/tcg/favorit" data-zoom-fav hidden>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <a class="btn btn-ghost btn-block" href="/tcg/album" data-zoom-album hidden>Im Album ansehen</a>
+      <% } %>
     </div>
   </div>
 </dialog>

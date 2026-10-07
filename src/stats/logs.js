@@ -23,7 +23,7 @@ const tcgCatalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
 const { questById, difficulty } = require('../ihk/quests');
-const { dungeonByKey } = require('../dungeon/dungeons');
+const { defOf } = require('../dungeon/dungeons');
 const { euro, ledgerLabels, optionLabel, coinAmount } = require('../lib/viewHelpers');
 const { field, num } = require('./exportCsv');
 const config = require('../config');
@@ -251,20 +251,29 @@ async function ihkLog(query, { player = null, all = false } = {}) {
 
 /** Ein Durchlauf als Zeile; playerId markiert den gesuchten Spieler */
 function dungeonRow(r, playerId = null) {
-  const d = dungeonByKey[r.dungeon];
+  const d = defOf(r.dungeon);
+  const tower = r.mode === 'tower';
+  // Turm: Begegnungen aus dem Pool (floors), Dungeon: feste Kämpfe
+  const defs = d ? (tower ? d.floors : d.fights) || [] : [];
   const fightTitle = (f) => {
-    const def = d && d.fights.find((x) => x.key === f.key);
+    const def = defs.find((x) => x.key === f.key);
     return def ? def.title : f.key;
   };
   const won = (r.fights || []).filter((f) => f.success).length;
+  const running = r.status === 'laeuft';
+  let result = r.success ? 'Boss besiegt' : 'Rückzug';
+  if (tower) result = `${won} ${won === 1 ? 'Runde' : 'Runden'}`;
+  if (running) result = 'Läuft';
   return {
     at: r.endsAt,
     startedAt: r.startedAt,
     dungeon: d ? d.title : r.dungeon,
-    running: r.status === 'laeuft',
+    tower,
+    running,
     success: r.success,
-    // gespeichert sind nur die ausgetragenen Kämpfe – gezählt wird gegen alle Kämpfe des Dungeons
-    progress: `${won} / ${d ? d.fights.length : (r.fights || []).length}`,
+    result,
+    // gespeichert sind nur die ausgetragenen Kämpfe – gezählt wird gegen alle Kämpfe des Dungeons (Turm: offen nach oben)
+    progress: tower ? String(won) : `${won} / ${d ? d.fights.length : (r.fights || []).length}`,
     // Kampf, an dem die Gruppe gescheitert ist
     failedAt: (r.fights || []).filter((f) => !f.success).map(fightTitle)[0] || null,
     members: (r.members || []).map((m) => ({
@@ -283,7 +292,7 @@ function dungeonRow(r, playerId = null) {
 
 async function dungeonLog(query, { player = null, all = false } = {}) {
   const filter = player ? { 'members.user': player._id } : {};
-  const { docs, ...pg } = await paged(DungeonRun, filter, { startedAt: -1, _id: -1 }, query.dungeonseite, 'dungeon members success fights.key fights.success startedAt endsAt status', all);
+  const { docs, ...pg } = await paged(DungeonRun, filter, { startedAt: -1, _id: -1 }, query.dungeonseite, 'mode dungeon members success fights.key fights.success startedAt endsAt status', all);
   return { ...pg, rows: docs.map((r) => dungeonRow(r, player && player._id)) };
 }
 
@@ -670,13 +679,14 @@ const GESAMT_SOURCES = [
     log: 'dungeon',
     Model: DungeonRun,
     time: 'startedAt',
-    select: 'dungeon members success fights.key fights.success startedAt endsAt status',
+    select: 'mode dungeon members success fights.key fights.success startedAt endsAt status',
     filter: async (p) => (p ? { 'members.user': p._id } : {}),
     rows: async (docs) =>
       docs.map((d) => {
         const r = dungeonRow(d);
         const players = r.members.filter((m) => !m.bot).map((m) => m.name).join(', ') || '–';
-        return { at: r.startedAt, player: players, text: `Dungeon ${r.dungeon}: ${r.running ? 'läuft' : r.success ? 'Boss besiegt' : 'Rückzug'} (${r.progress} Kämpfe)`, amount: null };
+        const text = r.tower ? `${r.dungeon}: ${r.running ? 'läuft' : `${r.result} geschafft`}` : `Dungeon ${r.dungeon}: ${r.running ? 'läuft' : r.success ? 'Boss besiegt' : 'Rückzug'} (${r.progress} Kämpfe)`;
+        return { at: r.startedAt, player: players, text, amount: null };
       }),
   },
   {
@@ -850,7 +860,7 @@ const CSV = {
         csvDate(r.startedAt),
         csvDate(r.at),
         r.dungeon,
-        r.running ? 'Läuft' : r.success ? 'Boss besiegt' : 'Rückzug',
+        r.result,
         r.progress,
         r.failedAt || '',
         m.name,

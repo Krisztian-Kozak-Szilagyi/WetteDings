@@ -109,16 +109,20 @@
         <a class="dx-link" href="/tcg/album">Zum Album →</a>
       </div>
       <% if (!d.cardCount) { %><p class="muted small">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p><% } %>
-      <div class="tcg-grid tcg-favs dx-fav-grid">
+      <%# Favoriten (#130): Klick vergrößert wie im Album – normale Karten im Zoom (partials/card-zoom), folierte in der
+          3D-Ansicht (partials/foil-modal); dort lässt sich der Favorit entfernen (public/js/dashboard.js, ohne Neuladen).
+          favOn = false: zufällige eigene Karte, solange keine Favoriten gewählt sind – dort „Als Favorit zeigen“. %>
+      <div class="tcg-grid tcg-favs dx-fav-grid" data-dx-favs>
         <% d.favorites.forEach((fv) => { const c = fv.card; const r = rarityByKey[c.rarity] || { label: '' }; %>
           <% if (fv.foiledAt) { %>
-            <a class="tcg-slot foil-slot r-<%= c.rarity %>" href="/inventar" aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %>">
+            <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>" data-fav-key="<%= fv.key %>"<%- foilViewAttrs(c, r.label, fv.foiledAt, { fav: fv.key, favOn: fv.favOn, grade: fv.grade, center: fv.center }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
               <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, grade: fv.grade, center: fv.center }) %></span>
-            </a>
+            </button>
           <% } else { %>
-            <a class="tcg-slot r-<%= c.rarity %>" href="/tcg/album" aria-label="<%= c.name %>, <%= r.label %> – zum Album">
+            <button type="button" class="tcg-slot r-<%= c.rarity %>" data-fav-key="<%= fv.key %>" data-dx-fav data-fav-on="<%= fv.favOn ? 1 : 0 %>"
+              data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>" aria-label="<%= c.name %>, <%= r.label %> – ansehen">
               <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
-            </a>
+            </button>
           <% } %>
         <% }) %>
         <% for (let i = d.favorites.length; i < d.favMax; i++) { %>
@@ -229,6 +233,10 @@
   </div>
 </div>
 
+<%- include('partials/card-zoom', { favForm: true }) %>
+<%- include('partials/foil-modal', { favForm: true }) %>
 <link rel="stylesheet" href="/css/dashboard.css?v=<%= assetVersion %>">
+<%# tcg.js: 3D-Neigung der vergrößerten Karte (window.tcgBindTilt) – wie in der Dungeon-Lobby %>
+<script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/dashboard.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

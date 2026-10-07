@@ -22,18 +22,19 @@ test('Zeit auf Platz 1: Tage erst ab 24 Stunden, Stunden erst ab 60 Minuten, nic
   assert.equal(top1Text(40 * D + 3 * H + 12 * MIN + 30), '40 Tage 3 Stunden 12 Minuten');
 });
 
-test('Team: Admin und Devs sind nicht in der Wertung, Mods und Spieler schon', () => {
+test('Team (#126): Admin, Devs und Mods sind nicht in der Wertung, Spieler schon', () => {
   const admin = config.adminUsernames[0];
   assert.ok(admin, 'ADMIN_USERNAMES für den Test gesetzt');
   assert.equal(isTeam({ usernameLower: admin, role: null }), true);
   assert.equal(isTeam({ usernameLower: 'anna', role: 'dev' }), true);
-  assert.equal(isTeam({ usernameLower: 'ben', role: 'mod' }), false);
+  assert.equal(isTeam({ usernameLower: 'ben', role: 'mod' }), true);
   assert.equal(isTeam({ usernameLower: 'carla', role: null }), false);
+  assert.equal(isTeam({ usernameLower: 'dora' }), false);
   assert.equal(isTeam(null), false);
 });
 
-test('Team: Filter für die Rangliste schließt Devs und Admin aus', () => {
+test('Team: Filter für die Rangliste schließt Devs, Mods und Admin aus', () => {
   const f = notTeam();
-  assert.deepStrictEqual(f.role, { $ne: 'dev' });
+  assert.deepStrictEqual(f.role, { $nin: ['dev', 'mod'] });
   assert.deepStrictEqual(f.usernameLower, { $nin: config.adminUsernames });
 });

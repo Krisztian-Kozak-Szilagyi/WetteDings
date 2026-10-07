@@ -27,6 +27,8 @@ async function migrate() {
   await LotteryRound.createIndexes();
   // Erfolge: der eindeutige Index (Mitglied + Erfolg) muss stehen, bevor der erste Erfolg vergeben wird
   await require('./models/Achievement').createIndexes();
+  // Mage Tower: ein Versuch pro Tag – der eindeutige Index muss vor dem ersten Turm-Start stehen
+  await require('./models/Dungeon').TowerAttempt.createIndexes();
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [

@@ -31,6 +31,21 @@
     <p class="muted small">Die Beute siehst du am Ende in einem Fenster; Folien landen im Inventar.</p>
   </div>
 
+  <% if (towerShown) { %>
+    <% const tw = settings.tower; const pct = (v) => String(v).replace('.', ','); %>
+    <div class="card">
+      <h2>Mage Tower</h2>
+      <p>Der zweite Modus, <strong>einmal am Tag</strong> (neuer Versuch ab Mitternacht). Es gibt keinen Termin: Du betrittst den Turm allein (die anderen Plätze übernehmen Bots) oder mit einer Gruppe, sobald alle ihre Karten gewählt haben.</p>
+      <ul>
+        <li><strong>Kein festes Ende:</strong> Ihr kämpft Runde für Runde, bis ihr eine nicht schafft. Jede Runde ist <%= pct(tw.growth) %> % schwerer als die vorige.</li>
+        <li><strong>Zufällige Prüfungen:</strong> Welche Fachrichtung eine Runde braucht, wird jedes Mal neu ausgewürfelt – wie im Dungeon verrät es nur der Text.</li>
+        <li><strong>Lohn:</strong> <%= euro(tw.rewardBase) %> für die erste Runde, jede weitere bringt <%= euro(tw.rewardStep) %> mehr.</li>
+        <li><strong>Seltene Beute:</strong> Jede geschaffte Runde erhöht die Chance auf eine Folie (+<%= pct(tw.foilPerRound) %> %, höchstens <%= pct(tw.foilMax) %> %) und auf die Boss-Karte (+<%= pct(tw.cardPerRound) %> %, höchstens <%= pct(tw.cardMax) %> %). Gewürfelt wird für jeden Spieler einzeln.</li>
+        <li>Das Ergebnis steht fest, sobald ihr den Turm betretet. Danach seht ihr euren Aufstieg Runde für Runde.</li>
+      </ul>
+    </div>
+  <% } %>
+
   <p><a class="btn btn-ghost" href="/dungeon">← Zurück zum Dungeon</a></p>
 </div>
 
