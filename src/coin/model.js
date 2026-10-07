@@ -49,6 +49,12 @@ const COW_PARAMS = {
   surge: surgeParams({ chance: 0.35, up: [0.15, 0.6], down: [0.12, 0.5], volBoost: 0.6 }),
 };
 
+// MK Coin: wie der SAM, der große Sprung aber nur halb so weit (Krisztian): nach oben +10 … +50 %, nach unten −8 … −35 %
+const MIA_PARAMS = {
+  ...PARAMS,
+  surge: surgeParams({ chance: 0.5, up: [0.1, 0.5], down: [(1 - 1 / 1.2) / 2, 0.35], volBoost: 0.8 }),
+};
+
 // ETF: ruhige Grundbewegung (~5 % pro Tag), keine großen Sprünge; die Richtung gibt der Trend (state.mu) vor
 const ETF_PARAMS = {
   baseVol: 0.05,
@@ -191,6 +197,7 @@ const initialState = (price = 10, params = PARAMS) => ({ price, lv: Math.log(par
 module.exports = {
   PARAMS,
   COW_PARAMS,
+  MIA_PARAMS,
   ETF_PARAMS,
   BOJE_PARAMS,
   BOJE_WEATHER,
