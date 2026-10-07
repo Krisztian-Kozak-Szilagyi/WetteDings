@@ -243,6 +243,41 @@
     }
   }
 
+  // ---------- Album: direkt zu einer Karte (#karte-<id>, z. B. „Im Album ansehen“ im Dashboard) ----------
+  // Weich hinscrollen, dann leuchtet die Karte kurz in der Farbe ihrer Seltenheit auf (CSS: .is-spotlight).
+  var jump = /^#karte-(.+)$/.exec(window.location.hash);
+  if (jump && window.location.pathname === '/tcg/album') {
+    var target = $('[data-album-card="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
+    if (target) {
+      history.replaceState(null, '', window.location.pathname + window.location.search); // Neuladen springt nicht erneut
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var glow = function () {
+        target.classList.remove('is-spotlight');
+        void target.offsetWidth; // Animation neu starten
+        target.classList.add('is-spotlight');
+        setTimeout(function () { target.classList.remove('is-spotlight'); }, 2200);
+      };
+      requestAnimationFrame(function () {
+        var startY = window.scrollY;
+        target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+        if (calm) return glow();
+        // Aufleuchten, sobald das Scrollen steht: scrollend, sonst warten, bis sich die Position nicht mehr ändert
+        // (muss gar nicht gescrollt werden, gleich)
+        var done = false;
+        var once = function () { if (!done) { done = true; glow(); } };
+        if ('onscrollend' in window) window.addEventListener('scrollend', once, { once: true });
+        var lastY = startY;
+        var settle = function () {
+          if (done) return;
+          if (window.scrollY === lastY) return once();
+          lastY = window.scrollY;
+          setTimeout(settle, 120);
+        };
+        setTimeout(settle, 150);
+      });
+    }
+  }
+
   // ---------- Pack öffnen ----------
   // Ein Formular pro Pack-Art im Inventar; form = das zuletzt benutzte (für "Nächstes Pack öffnen")
   var forms = $all('[data-tcg-open]');
