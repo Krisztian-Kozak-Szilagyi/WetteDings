@@ -11,6 +11,7 @@
  */
 const mongoose = require('mongoose');
 const model = require('./model');
+const { glideStep, glideFrom } = require('./glide');
 const { CoinState, CoinMinute, CoinHour, CoinEvent, CoinHolding } = require('../models/Coin');
 
 const TICK_MS = 5000;
@@ -121,8 +122,18 @@ function createEngine(cfg) {
       return;
     }
     if (DRIFT) state.mu = DRIFT.now().mu;
+    const prevMs = state.lastTickAt.getTime();
     const next = model.step(state, dtDays, Math.random, weather ? weather.params(weather.at(atMs)) : PARAMS);
-    const surge = dueSurge(atMs);
+    // Gleitflug (src/coin/glide.js): kein großer Sprung, der Kurs läuft gleichmäßig aufs Ziel zu
+    const surge = state.glide ? null : dueSurge(atMs);
+    if (state.glide) {
+      const g = glideStep(next.price, state.glide, prevMs, atMs);
+      next.price = Math.max(PARAMS.floor, g.price);
+      if (g.done) {
+        console.log(`${NAME}: Gleitflug (${state.glide.key}) beendet bei ${next.price.toFixed(4)} €`);
+        state.glide = null;
+      }
+    }
     if (surge) {
       next.price = Math.max(PARAMS.floor, next.price * Math.exp(surge.log));
       next.lv = Math.min(LN_MAX, next.lv + PARAMS.surge.volBoost); // danach geht es unruhig weiter
@@ -268,6 +279,20 @@ function createEngine(cfg) {
   }
 
   /**
+   * Gleitflug starten: der Kurs läuft bis endAt (ms) gleichmäßig auf target (€) zu, danach normal weiter.
+   * Wird gespeichert – ein Neustart setzt ihn fort, statt ihn neu zu beginnen.
+   */
+  function startGlide(key, target, endAt) {
+    if (!state) throw new Error('Kurs-Engine läuft nicht.');
+    return exclusive(async () => {
+      tick();
+      state.glide = { key, target, endAt };
+      await flush();
+      return { from: state.price, target, endAt };
+    });
+  }
+
+  /**
    * Kleine Kursbewegung sofort (eSports-Teams: Wirkung eines Kaufs/Verkaufs), ohne Warten und ohne eigenes Ereignis.
    * Nur für Werte ohne Split – dort läuft exclusive() ohnehin sofort.
    */
@@ -315,6 +340,7 @@ function createEngine(cfg) {
             mu: state.mu,
             muTarget: state.muTarget,
             sentiment: state.sentiment,
+            glide: state.glide,
           },
           $unset: { manual: '' }, // alte Admin-Kurssteuerung (entfernt)
         },
@@ -363,6 +389,7 @@ function createEngine(cfg) {
         muTarget: 0,
         sentiment: 0,
         splits: 0,
+        glide: null,
       };
       record(state.price, startMs);
       if (BACKFILL) {
@@ -382,6 +409,7 @@ function createEngine(cfg) {
         muTarget: 0,
         sentiment: doc.sentiment || 0,
         splits: doc.splits || 0,
+        glide: glideFrom(doc.glide),
       };
       let from = state.lastTickAt.getTime();
       if (now - from > MAX_GAP_DAYS * DAY) from = now - MAX_GAP_DAYS * DAY;
@@ -487,6 +515,7 @@ function createEngine(cfg) {
     history,
     recentEvents,
     jump,
+    startGlide,
     nudge,
     flush,
     exclusive,
