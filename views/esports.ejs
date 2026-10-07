@@ -132,7 +132,7 @@
       <li>Gründen kostet <%= eur(rules.FOUND_COST) %>. Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
       <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
       <li>Für die Liga zählen nur Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind (schon vor Beginn der Woche). Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
-      <li>Sonntags um <%= rules.REPORT_TIME %> Uhr: Platz 1 bringt <%= signedPercent(rules.TOP_CHANGE) %>, der letzte Platz <%= signedPercent(rules.BOTTOM_CHANGE) %>. Wer seinen Platz hält oder verbessert, bekommt <%= signedPercent(rules.HOLD_BONUS) %> dazu. Der Bericht erscheint im Forum unter eSports.</li>
+      <li>Jeden Sonntag wird ausgewertet: Euer Ergebnis entscheidet, in welche Richtung sich der Wert eures ETFs bewegt.</li>
       <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
       <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>. Reicht das Guthaben nicht, bleibt der Rest als Schuld und wird von jeder Einnahme abgezogen.</li>
     </ul>
