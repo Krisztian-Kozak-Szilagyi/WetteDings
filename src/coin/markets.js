@@ -67,19 +67,36 @@ async function remove(symbol) {
   await e.stop();
 }
 
-// Einmalige Kurssprünge (Krisztian): jeder Schlüssel läuft genau einmal, auch über Neustarts hinweg (Merker im CoinState)
-const ONE_TIME_JUMPS = [{ key: 'mia-median-2026-10-07', symbol: 'MIA', change: 0.75 }];
+/**
+ * Einmalige Aktionen (Krisztian): jeder Schlüssel läuft höchstens einmal – nie durch einen Neustart oder Deploy erneut.
+ * Dreifach gesichert: Merker im CoinState (oneTimeJumps, direkt über den MongoDB-Treiber gesetzt), Frist "until"
+ * (danach läuft die Aktion nie mehr) und erledigte Einträge werden aus der Liste gelöscht.
+ * Bisher erledigt: 'mia-median-2026-10-07' (+75 %) – lief durch einen Fehler bei jedem Deploy erneut (strictQuery
+ * strich die $ne-Bedingung, timestamps meldeten trotzdem "geändert"); deshalb die Rückführung unten.
+ *   glide: { target (€), hours } – Gleitflug auf den Zielkurs (src/coin/glide.js), danach normal weiter
+ */
+const ONE_TIME_ACTIONS = [
+  { key: 'mia-rueckfuehrung-2026-10-07', symbol: 'MIA', glide: { target: 6.5, hours: 8 }, until: Date.parse('2026-10-09T00:00:00+02:00') },
+];
 
-async function oneTimeJumps() {
+/** Merker setzen; true nur, wenn er vorher wirklich fehlte (Treiber direkt: kein strictQuery, keine timestamps) */
+async function claimOnce(symbol, key) {
   const { CoinState } = require('../models/Coin');
-  for (const j of ONE_TIME_JUMPS) {
-    const e = get(j.symbol);
+  const res = await CoinState.collection.updateOne({ _id: symbol, oneTimeJumps: { $ne: key } }, { $addToSet: { oneTimeJumps: key } });
+  return res.matchedCount === 1 && res.modifiedCount === 1;
+}
+
+async function oneTimeActions(now = Date.now()) {
+  for (const a of ONE_TIME_ACTIONS) {
+    if (!(now < a.until)) continue;
+    const e = get(a.symbol);
     if (!e || !e.isRunning()) continue;
-    // Merker zuerst setzen: lieber ein Sprung verloren als zwei
-    const res = await CoinState.updateOne({ _id: j.symbol, oneTimeJumps: { $ne: j.key } }, { $addToSet: { oneTimeJumps: j.key } }, { strict: false });
-    if (!res.modifiedCount) continue;
-    const { before, after } = await e.jump(Math.log1p(j.change), tagViews.now().sentiment);
-    console.log(`${e.NAME}: einmaliger Sprung (${j.key}) ${before.toFixed(4)} € → ${after.toFixed(4)} €`);
+    // Merker zuerst setzen: lieber eine Aktion verloren als zwei
+    if (!(await claimOnce(a.symbol, a.key))) continue;
+    if (a.glide) {
+      const r = await e.startGlide(a.key, a.glide.target, now + a.glide.hours * DAY / 24);
+      console.log(`${e.NAME}: einmaliger Gleitflug (${a.key}) ${r.from.toFixed(4)} € → ${r.target} € bis ${new Date(r.endAt).toISOString()}`);
+    }
   }
 }
 
@@ -87,7 +104,7 @@ async function start() {
   await buoy.start(); // Wetterdaten zuerst – der 51101 Coin braucht sie schon beim Nachsimulieren
   await tagViews.start(); // ebenso die Aufrufzahlen für den MK Coin
   for (const e of LIST) await e.start();
-  await oneTimeJumps().catch((err) => console.error('Einmaliger Kurssprung:', err.message));
+  await oneTimeActions().catch((err) => console.error('Einmalige Aktion:', err.message));
 }
 
 async function stop() {
@@ -103,4 +120,4 @@ function prices() {
   return out;
 }
 
-module.exports = { LIST, FIXED, SYMBOLS, get, add, remove, start, stop, prices };
+module.exports = { LIST, FIXED, SYMBOLS, ONE_TIME_ACTIONS, claimOnce, get, add, remove, start, stop, prices };
