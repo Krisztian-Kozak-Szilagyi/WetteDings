@@ -4,6 +4,7 @@
   //       'view'  – nur ansehen; mit linkFor(cardId) öffnet ein Klick die Großansicht mit "Angebot machen"
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
   // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
+  // c.unreleased: noch nicht erhältliche Karte – immer "?", Seltenheit verdeckt
   // seenIds: schon einmal besessene Karten – fehlen sie, werden sie grau statt als "?" gezeigt
   // data-album-card: eigene Karten (auch gesperrte) – Sprungziel für /tcg/album#karte-<id> (public/js/tcg.js)
   const seenIds = locals.seenIds || new Set();
@@ -90,9 +91,9 @@
         </div>
       <% } %>
     <% } else { %>
-      <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="Noch nicht gezogen">
+      <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.unreleased ? 'Noch nicht erhältlich' : 'Noch nicht gezogen' %>">
         <div class="tcg-locked-inner"><span>?</span></div>
-        <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden ? '???' : r.label %></span>
+        <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden || c.unreleased ? '???' : r.label %></span>
       </div>
     <% } %>
     <%# Folierte Exemplare: eigener Platz je Exemplar (Album: auch als Favorit wählbar; fremde Sammlung: ansehen und Angebot machen) %>
