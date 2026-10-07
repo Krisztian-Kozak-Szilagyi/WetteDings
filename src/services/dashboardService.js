@@ -210,8 +210,9 @@ async function collectionInfo(user) {
   const owned = await inventory(user._id);
   const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
   const plain = Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]));
-  let favs = (user.tcgFavorites || []).length ? await favoriteList(user, plain) : [];
-  if (!favs.length) favs = randomFavorites(plain, catalog.cardById, catalog.rarityByKey, MAX_FAVORITES);
+  // favOn: wirklich gewählter Favorit (lässt sich entfernen) – die zufälligen Lückenfüller lassen sich als Favorit zeigen
+  let favs = (user.tcgFavorites || []).length ? (await favoriteList(user, plain)).map((f) => ({ ...f, favOn: true })) : [];
+  if (!favs.length) favs = randomFavorites(plain, catalog.cardById, catalog.rarityByKey, MAX_FAVORITES).map((f) => ({ ...f, favOn: false }));
   return {
     favorites: favs,
     favMax: MAX_FAVORITES,

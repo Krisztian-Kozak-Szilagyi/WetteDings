@@ -139,13 +139,23 @@ router.post('/tcg/schuetzen', (req, res) =>
   })
 );
 
-// Karte als Favorit auf der TCG-Seite zeigen bzw. wieder entfernen
-router.post('/tcg/favorit', (req, res) =>
-  albumAction(req, res, async () => {
-    const cardId = str(req.body.card);
+// Karte als Favorit auf der TCG-Seite zeigen bzw. wieder entfernen.
+// Per fetch (Dashboard, #130): Antwort als JSON { ok, on } statt Weiterleitung ins Album.
+router.post('/tcg/favorit', async (req, res) => {
+  const cardId = str(req.body.card);
+  if (wantsJson(req)) {
+    try {
+      res.json({ ok: true, on: await tcg.toggleFavorite({ user: req.user, cardId }) });
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      res.status(400).json({ ok: false, error: err.message });
+    }
+    return;
+  }
+  return albumAction(req, res, async () => {
     const on = await tcg.toggleFavorite({ user: req.user, cardId });
     return on ? `${cardName(cardId)} ist jetzt ein Favorit.` : `${cardName(cardId)} ist kein Favorit mehr.`;
-  })
-);
+  });
+});
 
 module.exports = router;
