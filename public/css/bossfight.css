@@ -367,3 +367,38 @@ html, body.bf-body {
   .bf-deck { right: 14px; bottom: 14px; }
   .bf-gear { left: 140px; bottom: 40px; }
 }
+
+/* Vorschau: Karte groß in der Bildschirmmitte (1 s unter der Maus), damit man sie lesen kann */
+.bf-preview {
+  position: fixed;
+  left: 50%;
+  top: 46%;
+  z-index: 90;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  pointer-events: none;
+  animation: bf-preview-in .18s ease-out;
+}
+.bf-preview[hidden] { display: none; }
+.bf-preview img {
+  height: min(70vh, 640px);
+  width: auto;
+  max-width: 90vw;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, .8));
+}
+.bf-preview-info {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(13, 11, 20, .85);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e9e4f5;
+}
+@keyframes bf-preview-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.94); }
+}
