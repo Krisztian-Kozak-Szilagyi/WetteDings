@@ -200,13 +200,16 @@
   // ---------- Album: nach Favorit, Schützen oder Verkaufen an derselben Stelle weiter (#131) ----------
   // Die Aktionen sind Formulare und laden das Album neu – vorher merken wir uns Scroll-Position und Karte.
   // Danach: gleiche Stelle, das Kartenfenster wieder offen und die Meldung darin (sonst unten als kurzer Hinweis).
+  var BACK_KEY = 'tcg-album-back';
+  var session = {
+    get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
+    set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
+    clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
+  };
+  // Führt eine Aktion woandershin (ein neuer Favorit z. B. zur TCG-Seite), verfällt der Merker dort – sonst fände
+  // man beim nächsten Besuch im Album unerwartet das alte Kartenfenster offen (der Referrer ist leer: no-referrer)
+  if (window.location.pathname !== '/tcg/album') session.clear();
   if (window.location.pathname === '/tcg/album') {
-    var BACK_KEY = 'tcg-album-back';
-    var session = {
-      get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
-      set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
-      clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
-    };
     // app.js fragt vorher nach (data-confirm) – wer abbricht, bleibt einfach hier
     document.addEventListener('submit', function (e) {
       var f = e.target;
@@ -240,6 +243,45 @@
           note.hidden = false;
         }
       }
+    }
+  }
+
+  // ---------- Direkt zu einer Karte springen und sie aufleuchten lassen ----------
+  // Album: #karte-<id> („Im Album ansehen“ im Dashboard). TCG-Seite: #favorit-<key> (gerade als Favorit gewählt –
+  // zeigt die Karte an ihrem neuen Platz). Weich hinscrollen, dann leuchtet die Karte kurz in der Farbe ihrer
+  // Seltenheit auf (CSS: .is-spotlight).
+  var JUMPS = { '/tcg/album': [/^#karte-(.+)$/, 'data-album-card'], '/tcg': [/^#favorit-(.+)$/, 'data-fav-key'] };
+  var jumpRule = JUMPS[window.location.pathname];
+  var jump = jumpRule && jumpRule[0].exec(window.location.hash);
+  if (jump) {
+    var target = $('[' + jumpRule[1] + '="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
+    if (target) {
+      history.replaceState(null, '', window.location.pathname + window.location.search); // Neuladen springt nicht erneut
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var glow = function () {
+        target.classList.remove('is-spotlight');
+        void target.offsetWidth; // Animation neu starten
+        target.classList.add('is-spotlight');
+        setTimeout(function () { target.classList.remove('is-spotlight'); }, 2200);
+      };
+      requestAnimationFrame(function () {
+        var startY = window.scrollY;
+        target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+        if (calm) return glow();
+        // Aufleuchten, sobald das Scrollen steht: scrollend, sonst warten, bis sich die Position nicht mehr ändert
+        // (muss gar nicht gescrollt werden, gleich)
+        var done = false;
+        var once = function () { if (!done) { done = true; glow(); } };
+        if ('onscrollend' in window) window.addEventListener('scrollend', once, { once: true });
+        var lastY = startY;
+        var settle = function () {
+          if (done) return;
+          if (window.scrollY === lastY) return once();
+          lastY = window.scrollY;
+          setTimeout(settle, 120);
+        };
+        setTimeout(settle, 150);
+      });
     }
   }
 

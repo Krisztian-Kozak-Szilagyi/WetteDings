@@ -66,7 +66,11 @@
       zoomFav.hidden = false;
       zoomFav.querySelector('input[name="card"]').value = d.favKey;
       zoomFav.querySelector('button').textContent = on ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
-      if (zoomAlbum) zoomAlbum.hidden = false;
+      // direkt zu dieser Karte im Album – dort leuchtet sie kurz auf (public/js/tcg.js)
+      if (zoomAlbum) {
+        zoomAlbum.href = '/tcg/album#karte-' + encodeURIComponent(d.favKey);
+        zoomAlbum.hidden = false;
+      }
       clearError(zoom);
       if (typeof zoom.showModal === 'function') zoom.showModal();
       else zoom.setAttribute('open', '');
