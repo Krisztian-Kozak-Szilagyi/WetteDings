@@ -4,6 +4,7 @@
 //   Avatar. Zwei Hände – was keinen Platz mehr hat, fliegt raus und ist weg (nicht zurück in die Hand).
 //   Waffen und Zauber: Klick = Schaden am Boss, einmal pro Runde. Schilde: dauerhaft 10 % weniger Schaden,
 //   der Holzschild zerbricht nach 4 Treffern. „Runde beenden“: der Boss schlägt zu, dann eine neue Karte.
+//   Helden-Karten (typ held): kosten Energie (3 pro Runde), wirken sofort (Schaden, Block, Heilung, Fähigkeit) und sind weg.
 // Zum Ausprobieren in der Konsole: bossfight.boss.damage(30), bossfight.player.heal(5), bossfight.draw(1)
 (function () {
   var hand = document.querySelector('[data-bf-hand]');
@@ -216,16 +217,19 @@
     g.el.classList.toggle('bf-used', !!g.used);
   }
 
-  // Karte aus der Hand spielen: fliegt an ihren Platz neben dem Avatar
+  function nope(el) {
+    el.classList.remove('bf-nope');
+    void el.offsetWidth;
+    el.classList.add('bf-nope');
+  }
+
+  // Karte aus der Hand spielen: Items fliegen an ihren Platz neben dem Avatar, Helden wirken sofort (playHeld)
   function play(el) {
     if (over) return;
     var c = el.card;
-    if (!c.kampf) {
-      el.classList.remove('bf-nope');
-      void el.offsetWidth;
-      el.classList.add('bf-nope');
-      return;
-    }
+    if (!c.kampf) return nope(el);
+    if (c.kampf.typ === 'held') return playHeld(el);
+    gespielt++;
     var from = el.getBoundingClientRect();
     cards.splice(cards.indexOf(el), 1);
     el.remove();
@@ -280,23 +284,136 @@
     });
   }
 
+  // ---------- Helden-Karten: einmal ausspielen, wirken sofort, dann weg ----------
+  // kampf: { kosten, ang, sch, hei, effekt, fx } – siehe src/tcg/cardData.js (TEST_HELDEN)
+  var ENERGIE = 3; // pro Runde
+  var energie = ENERGIE;
+  var gespielt = 0; // Karten, die in dieser Runde schon gespielt wurden (Hinterhalt)
+  var block = 0; // fängt Schaden des nächsten Boss-Angriffs ab
+  var fluch = []; // { schaden, runden } – trifft den Boss zu Beginn jeder Runde
+  var verzoegert = []; // Schaden, der zu Beginn der nächsten Runde einschlägt (Nachladen)
+  var energieEl = document.querySelector('[data-bf-energy]');
+  var statusEl = document.querySelector('[data-bf-status]');
+
+  function updateStatus() {
+    if (energieEl) energieEl.textContent = '⚡ ' + energie + ' / ' + ENERGIE;
+    if (!statusEl) return;
+    var teile = [];
+    if (block) teile.push('Block ' + block);
+    var fl = fluch.reduce(function (s, f) { return s + f.schaden; }, 0);
+    if (fl) teile.push('Fluch ' + fl + '/Runde');
+    var vz = verzoegert.reduce(function (s, n) { return s + n; }, 0);
+    if (vz) teile.push('Nachladen ' + vz);
+    statusEl.textContent = teile.join(' · ');
+    statusEl.hidden = !teile.length;
+  }
+
+  // Schaden am Boss mit Effekt; treffer > 1 = nacheinander. Gibt ein Promise zurück (Ende des letzten Einschlags).
+  function bossSchaden(dmg, art, von, treffer) {
+    var kette = Promise.resolve();
+    for (var i = 0; i < (treffer || 1); i++) {
+      kette = kette.then(function () {
+        laufend++;
+        if (endBtn) endBtn.disabled = true;
+        var fx = window.bossfightFx ? window.bossfightFx.spiel(art, von) : Promise.resolve(null);
+        return fx.then(function (p) {
+          boss.damage(dmg);
+          if (p) popupAt(p.x, p.y - 40, '−' + dmg, 'bf-pop-boss bf-pop-gross');
+          else popup(boss.el, '−' + dmg, 'bf-pop-boss');
+        }).finally(function () {
+          laufend--;
+          if (!laufend && endBtn && !over) endBtn.disabled = false;
+        });
+      });
+    }
+    return kette;
+  }
+
+  function playHeld(el) {
+    var k = el.card.kampf;
+    var e = k.effekt || {};
+    if ((k.kosten || 0) > energie) {
+      nope(el);
+      popup(energieEl || el, 'Zu wenig Energie', 'bf-pop-info');
+      return;
+    }
+    energie -= k.kosten || 0;
+    var vorher = gespielt;
+    gespielt++;
+
+    // Karte leuchtet kurz neben dem Avatar auf und verschwindet
+    var from = el.getBoundingClientRect();
+    cards.splice(cards.indexOf(el), 1);
+    el.remove();
+    layout();
+    var flash = document.createElement('div');
+    flash.className = 'bf-held-flash';
+    flash.innerHTML = '<img alt="" draggable="false">';
+    flash.querySelector('img').src = el.card.image;
+    flash.querySelector('img').alt = el.card.name;
+    gearEl.appendChild(flash);
+    var to = flash.getBoundingClientRect();
+    flash.style.transition = 'none';
+    flash.style.transform = 'translate(' + (from.left - to.left) + 'px, ' + (from.top - to.top) + 'px) scale(' + from.width / to.width + ')';
+    void flash.offsetWidth;
+    flash.style.transition = '';
+    flash.style.transform = '';
+    setTimeout(function () { flash.classList.add('bf-held-weg'); }, 1300);
+    setTimeout(function () { flash.remove(); }, 1800);
+
+    if (k.sch) {
+      block += k.sch;
+      popup(player.el, '+' + k.sch + ' Block', 'bf-pop-info');
+    }
+    if (k.hei) {
+      player.heal(k.hei);
+      popup(player.el, '+' + k.hei, 'bf-pop-heal');
+    }
+    if (e.selbst) {
+      player.damage(e.selbst);
+      popup(player.el, '−' + e.selbst, 'bf-pop-player');
+    }
+    if (e.fluch) fluch.push({ schaden: e.fluch.schaden, runden: e.fluch.runden });
+    var dmg = (k.ang || 0) * (e.hinterhalt && vorher > 0 ? e.hinterhalt : 1);
+    if (dmg && e.verzoegert) verzoegert.push(dmg);
+    else if (dmg) bossSchaden(dmg, k.fx, flash, e.treffer);
+    updateStatus();
+  }
+
+  // Rundenbeginn: Nachladen schlägt ein, Flüche ticken
+  function rundenBeginn() {
+    var anker = gearEl;
+    verzoegert.splice(0).forEach(function (n) { bossSchaden(n, 'feuer', anker); });
+    fluch.forEach(function (f) {
+      bossSchaden(f.schaden, 'nekro', anker);
+      f.runden--;
+    });
+    fluch = fluch.filter(function (f) { return f.runden > 0; });
+  }
+
   // ---------- Runden ----------
   var round = 1;
   function endRound() {
     if (over || laufend) return;
     endBtn.disabled = true;
-    // Boss schlägt zu; jeder Schild nimmt seinen Anteil weg und zählt einen Treffer
+    // Boss schlägt zu; jeder Schild nimmt seinen Anteil weg und zählt einen Treffer, danach fängt der Block ab
     var hit = BOSS_HIT[0] + Math.floor(Math.random() * (BOSS_HIT[1] - BOSS_HIT[0] + 1));
     var shields = gear.filter(function (g) { return g.card.kampf.typ === 'schild'; });
     var pct = Math.min(90, shields.reduce(function (s, g) { return s + (g.card.kampf.schutz || 0); }, 0));
     var dmg = Math.round((hit * (100 - pct)) / 100);
+    var geblockt = Math.min(block, dmg);
+    dmg -= geblockt;
+    block = 0;
     document.body.classList.add('bf-boss-attack');
     var avatar = document.querySelector('.bf-avatar');
-    if (window.bossfightFx && avatar) window.bossfightFx.bossAngriff(avatar, pct > 0);
+    if (window.bossfightFx && avatar) window.bossfightFx.bossAngriff(avatar, pct > 0 || geblockt > 0);
     setTimeout(function () {
       document.body.classList.remove('bf-boss-attack');
       player.damage(dmg);
-      popup(player.el, '−' + dmg + (pct ? ' (' + hit + ' − ' + pct + ' %)' : ''), 'bf-pop-player');
+      var details = [];
+      if (pct) details.push('−' + pct + ' %');
+      if (geblockt) details.push(geblockt + ' geblockt');
+      popup(player.el, '−' + dmg + (details.length ? ' (' + hit + ', ' + details.join(', ') + ')' : ''), 'bf-pop-player');
       shields.forEach(function (g) {
         var max = g.card.kampf.haltbarkeit;
         if (!max) return;
@@ -311,14 +428,19 @@
         g.used = false;
         gearLabel(g);
       });
+      energie = ENERGIE;
+      gespielt = 0;
       draw(1);
       endBtn.disabled = false;
+      rundenBeginn();
+      updateStatus();
     }, 450);
   }
   if (endBtn) endBtn.addEventListener('click', endRound);
 
   window.addEventListener('resize', layout);
   updateDeck();
+  updateStatus();
 
   // Zuletzt geändertes Deck laden, Karten nach Anzahl auffächern und mischen
   fetch('/api/deck', { headers: { Accept: 'application/json' } })

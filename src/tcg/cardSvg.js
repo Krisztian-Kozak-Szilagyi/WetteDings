@@ -70,9 +70,10 @@ function statsSvg(frame, values, base) {
   return frame.stats
     .map((s) => {
       const v = values[s.key];
+      const shown = frame.dash && !v ? '–' : v; // Helden-Karten: ungenutzter Wert als Strich
       return (
         `<text x="${s.x}" y="${s.y - 18}" text-anchor="middle" font-size="16" font-weight="700" letter-spacing="3" fill="${c.label}" stroke-width="3" ${textAttrs(c)}>${s.label}</text>` +
-        `<text x="${s.x}" y="${s.y + 26}" text-anchor="middle" font-size="${v >= 100 ? 36 : 42}" font-weight="700" fill="${colorFor(v, base[s.key], c)}" stroke-width="4" ${textAttrs(c)}>${v}</text>` +
+        `<text x="${s.x}" y="${s.y + 26}" text-anchor="middle" font-size="${v >= 100 ? 36 : 42}" font-weight="700" fill="${colorFor(v, base[s.key], c)}" stroke-width="4" ${textAttrs(c)}>${shown}</text>` +
         arrow(s.x + 39, s.y - 24, v, base[s.key], c)
       );
     })
@@ -92,6 +93,14 @@ function speedSvg(frame, value, base) {
     `<text x="${p.x + p.w * 0.62}" y="${cy + 12}" text-anchor="middle" font-size="34" font-weight="700" fill="${colorFor(value, base, c)}" stroke-width="3" ${textAttrs(c)}>${value}</text>` +
     arrow(p.x + p.w + 14, cy, value, base, c, 9)
   );
+}
+
+// Kartenname im leeren Namensbalken (Helden-Karten); lange Namen werden kleiner, bis sie passen
+function nameSvg(frame, name) {
+  const n = frame.name;
+  const c = frame.colors;
+  const size = Math.max(n.minSize, Math.min(n.size, Math.floor(n.w / (String(name).length * CHAR_EM * 1.15))));
+  return `<text x="${n.x}" y="${n.y}" text-anchor="middle" dominant-baseline="middle" font-size="${size}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(name)}</text>`;
 }
 
 // title = Name der Fähigkeit (fett, über dem Text); der Text passt sich dem restlichen Platz an
@@ -121,13 +130,15 @@ function abilitySvg(frame, text, title) {
 function render(card, values = {}) {
   const frame = FRAMES[card.frame];
   if (!frame) throw new Error(`Unbekannter Kartenrahmen: ${card.frame}`);
-  const base = card.stats || { speed: 0, fia: 0, fis: 0, bwl: 0 };
-  const v = Object.fromEntries(STAT_KEYS.map((k) => [k, Number.isInteger(values[k]) ? values[k] : base[k]]));
+  // Rahmen mit eigenen Werten (Helden-Karten: Kampfwerte) – dort gibt es keine abweichenden Werte
+  const base = frame.values ? frame.values(card) : card.stats || { speed: 0, fia: 0, fis: 0, bwl: 0 };
+  const v = frame.values ? base : Object.fromEntries(STAT_KEYS.map((k) => [k, Number.isInteger(values[k]) ? values[k] : base[k]]));
   const { width: w, height: h } = frame;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
+    (frame.name ? nameSvg(frame, card.name) : '') +
     (frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +

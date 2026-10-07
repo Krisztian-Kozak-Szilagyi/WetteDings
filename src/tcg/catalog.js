@@ -151,7 +151,7 @@ function cardImage(card, values = {}) {
   } catch {
     // Datei fehlt – ohne Bildversion
   }
-  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, mtime])).digest('hex').slice(0, 10);
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, card.kampf || null, mtime])).digest('hex').slice(0, 10);
   const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }

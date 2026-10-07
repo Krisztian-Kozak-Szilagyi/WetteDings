@@ -44,3 +44,21 @@ module.exports = {
     },
   },
 };
+
+// Helden-Karten für den Bosskampf (720 × 1008): Fenster wie gilded, aber leerer Namensbalken (Name per Code) und
+// Kampfwerte statt FIA/FIS/BWL – ANG = Schaden am Boss, SCH = Block gegen den nächsten Boss-Angriff, HEI = Heilung.
+// Die Plakette oben rechts zeigt die Energiekosten. Werte kommen aus card.kampf (values), 0 erscheint als „–“.
+module.exports.held = {
+  ...module.exports.gilded,
+  stats: [
+    { key: 'ang', label: 'ANG', x: 111, y: 432 },
+    { key: 'sch', label: 'SCH', x: 111, y: 563 },
+    { key: 'hei', label: 'HEI', x: 111, y: 691 },
+  ],
+  name: { x: 251, y: 71, w: 400, size: 38, minSize: 24 }, // Mitte des Namensbalkens (bei allen Bildern gleich breit genug)
+  dash: true,
+  values: (card) => {
+    const k = card.kampf || {};
+    return { speed: k.kosten || 0, ang: k.ang || 0, sch: k.sch || 0, hei: k.hei || 0 };
+  },
+};
