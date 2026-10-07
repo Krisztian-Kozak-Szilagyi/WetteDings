@@ -243,11 +243,15 @@
     }
   }
 
-  // ---------- Album: direkt zu einer Karte (#karte-<id>, z. B. „Im Album ansehen“ im Dashboard) ----------
-  // Weich hinscrollen, dann leuchtet die Karte kurz in der Farbe ihrer Seltenheit auf (CSS: .is-spotlight).
-  var jump = /^#karte-(.+)$/.exec(window.location.hash);
-  if (jump && window.location.pathname === '/tcg/album') {
-    var target = $('[data-album-card="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
+  // ---------- Direkt zu einer Karte springen und sie aufleuchten lassen ----------
+  // Album: #karte-<id> („Im Album ansehen“ im Dashboard). TCG-Seite: #favorit-<key> (gerade als Favorit gewählt –
+  // zeigt die Karte an ihrem neuen Platz). Weich hinscrollen, dann leuchtet die Karte kurz in der Farbe ihrer
+  // Seltenheit auf (CSS: .is-spotlight).
+  var JUMPS = { '/tcg/album': [/^#karte-(.+)$/, 'data-album-card'], '/tcg': [/^#favorit-(.+)$/, 'data-fav-key'] };
+  var jumpRule = JUMPS[window.location.pathname];
+  var jump = jumpRule && jumpRule[0].exec(window.location.hash);
+  if (jump) {
+    var target = $('[' + jumpRule[1] + '="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
     if (target) {
       history.replaceState(null, '', window.location.pathname + window.location.search); // Neuladen springt nicht erneut
       var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
