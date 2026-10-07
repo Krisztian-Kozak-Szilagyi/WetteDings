@@ -47,6 +47,11 @@ test('MK Coin: mehr Zuwachs als in den Vortagen = Trend nach oben, weniger = nac
   assert.equal(tenfold.mu, tv.MAX_DRIFT); // begrenzt
 });
 
+test('MK Coin: ein Ausreißer-Tag in den Vortagen drückt normale Tage nicht nach unten (Median)', () => {
+  const spike = tv.driftFrom(series(8, (k) => (k === 3 ? 8000 : 1000)), NOW);
+  assert.ok(Math.abs(spike.mu) < 0.02, `normaler Tag nach Ausreißer ${spike.mu}`);
+});
+
 test('MK Coin: ohne Vortag oder ohne aktuellen Abruf kein Trend', () => {
   assert.equal(tv.driftFrom(series(0.5, () => 1000).slice(-12), NOW).mu, 0); // erst ein halber Tag
   assert.equal(tv.driftFrom(series(1, () => 1000), NOW).mu, 0); // heute ja, aber kein ganzer Vortag

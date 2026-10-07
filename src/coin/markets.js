@@ -48,10 +48,27 @@ const SYMBOLS = LIST.map((e) => e.SYMBOL);
 /** Engine zu einem Symbol (nur aus der festen Liste) oder null */
 const get = (symbol) => LIST.find((e) => e.SYMBOL === symbol) || null;
 
+// Einmalige Kurssprünge (Krisztian): jeder Schlüssel läuft genau einmal, auch über Neustarts hinweg (Merker im CoinState)
+const ONE_TIME_JUMPS = [{ key: 'mia-median-2026-10-07', symbol: 'MIA', change: 0.75 }];
+
+async function oneTimeJumps() {
+  const { CoinState } = require('../models/Coin');
+  for (const j of ONE_TIME_JUMPS) {
+    const e = get(j.symbol);
+    if (!e || !e.isRunning()) continue;
+    // Merker zuerst setzen: lieber ein Sprung verloren als zwei
+    const res = await CoinState.updateOne({ _id: j.symbol, oneTimeJumps: { $ne: j.key } }, { $addToSet: { oneTimeJumps: j.key } }, { strict: false });
+    if (!res.modifiedCount) continue;
+    const { before, after } = await e.jump(Math.log1p(j.change), tagViews.now().sentiment);
+    console.log(`${e.NAME}: einmaliger Sprung (${j.key}) ${before.toFixed(4)} € → ${after.toFixed(4)} €`);
+  }
+}
+
 async function start() {
   await buoy.start(); // Wetterdaten zuerst – der 51101 Coin braucht sie schon beim Nachsimulieren
   await tagViews.start(); // ebenso die Aufrufzahlen für den MK Coin
   for (const e of LIST) await e.start();
+  await oneTimeJumps().catch((err) => console.error('Einmaliger Kurssprung:', err.message));
 }
 
 async function stop() {
