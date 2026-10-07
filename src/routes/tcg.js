@@ -97,16 +97,17 @@ router.post('/tcg/oeffnen', async (req, res) => {
   res.redirect('/inventar#packs');
 });
 
-/** Aktion ausführen, Meldung setzen, zurück ins Album */
-async function albumAction(req, res, fn) {
+/** Aktion ausführen, Meldung setzen, zurück ins Album (to: anderes Ziel, erst nach der Aktion bestimmt) */
+async function albumAction(req, res, fn, to = () => '/tcg/album') {
   try {
     req.flash('success', await fn());
     await tcg.pruneCardLists(req.user); // verkaufte Karten sind keine Favoriten/geschützten Karten mehr
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
+    return res.redirect('/tcg/album');
   }
-  res.redirect('/tcg/album');
+  res.redirect(to());
 }
 
 const cardName = (id) => {
@@ -152,10 +153,18 @@ router.post('/tcg/favorit', async (req, res) => {
     }
     return;
   }
-  return albumAction(req, res, async () => {
-    const on = await tcg.toggleFavorite({ user: req.user, cardId });
-    return on ? `${cardName(cardId)} ist jetzt ein Favorit.` : `${cardName(cardId)} ist kein Favorit mehr.`;
-  });
+  // Neuer Favorit: direkt zu den Favoriten auf der TCG-Seite, dort leuchtet er an seinem Platz auf (public/js/tcg.js).
+  // Entfernen (oder ein Fehler): zurück ins Album wie bei den anderen Album-Aktionen.
+  let on = false;
+  return albumAction(
+    req,
+    res,
+    async () => {
+      on = await tcg.toggleFavorite({ user: req.user, cardId });
+      return on ? `${cardName(cardId)} ist jetzt ein Favorit.` : `${cardName(cardId)} ist kein Favorit mehr.`;
+    },
+    () => (on ? `/tcg#favorit-${encodeURIComponent(cardId)}` : '/tcg/album')
+  );
 });
 
 module.exports = router;
