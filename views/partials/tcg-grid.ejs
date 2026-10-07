@@ -91,7 +91,8 @@
         </div>
       <% } %>
     <% } else { %>
-      <div class="tcg-slot tcg-locked r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.unreleased ? 'Noch nicht erhältlich' : 'Noch nicht gezogen' %>">
+      <%# Unveröffentlicht: eine Farbe für alle (.tcg-soon), Seltenheit nicht verraten %>
+      <div class="tcg-slot tcg-locked <%= c.unreleased ? 'tcg-soon' : 'r-' + c.rarity %>" data-rarity="<%= c.unreleased ? 'soon' : c.rarity %>" title="<%= c.unreleased ? 'Noch nicht erhältlich' : 'Noch nicht gezogen' %>">
         <div class="tcg-locked-inner"><span>?</span></div>
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden || c.unreleased ? '???' : r.label %></span>
       </div>

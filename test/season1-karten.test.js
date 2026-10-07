@@ -20,7 +20,7 @@ test('Mark Suntouched: vier Seltenheiten in Season 1, ohne Werte', () => {
 test('unveröffentlichte Karten sind nirgends erhältlich', () => {
   for (const id of MARK) {
     assert.ok(!catalog.CARDS.some((c) => c.id === id), id);
-    assert.ok(!catalog.cardById[id], id);
+    assert.ok(catalog.cardById[id], id); // bekannt (vergebene Exemplare), aber in keiner Liste
   }
   for (const list of Object.values(catalog.cardsByRarity)) assert.ok(!list.some((c) => c.unreleased));
   for (const list of Object.values(catalog.cardsBySeason)) assert.ok(!list.some((c) => c.unreleased));
@@ -48,4 +48,14 @@ test('Album: unveröffentlichte Karte erscheint als „?“ mit verdeckter Selte
   assert.match(html, /Noch nicht erhältlich/);
   assert.match(html, /\?\?\?/);
   assert.doesNotMatch(html, /Mark Suntouched|<img/);
+});
+
+test('Album: alle unveröffentlichten Karten in einer Farbe, ohne Seltenheits-Klasse', () => {
+  const ejs = require('ejs');
+  const path = require('path');
+  const file = path.join(__dirname, '..', 'views', 'partials', 'tcg-grid.ejs');
+  const cards = catalog.UNRELEASED_CARDS.filter((c) => MARK.includes(c.id));
+  const html = ejs.render(require('fs').readFileSync(file, 'utf8'), { mode: 'album', cards, counts: {}, rarityByKey: catalog.rarityByKey, protectedIds: new Set() }, { filename: file });
+  assert.strictEqual((html.match(/tcg-soon/g) || []).length, 4);
+  assert.doesNotMatch(html, /r-(gold|holo|footman|arcane)|data-rarity="(gold|holo|footman|arcane)"/);
 });
