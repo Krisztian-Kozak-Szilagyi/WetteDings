@@ -9,8 +9,9 @@
   const zoomAttrs = (c) => `data-dg-zoom data-image="${escAttr(c.image)}" data-name="${escAttr(c.name)}" data-rarity="${escAttr(c.rarity)}" data-rarity-label="${escAttr(rarityByKey[c.rarity].label)}" data-meta="${escAttr(statLine(c))}"`;
 %>
 
-<div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
-<% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
+<%# Mage Tower: kein Termin – kein Countdown, der Leiter startet (data-start leer) %>
+<div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= tower ? '' : new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
+<% if (tower ? towerClosedForOthers : closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <%# Bild des Dungeons im Querformat – darin Titel, Termin bzw. der laufende Kampf %>
 <div class="dg-hero-wrap">
@@ -18,14 +19,18 @@
     <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1983" height="793">
     <div class="dg-hero-shade"></div>
     <div class="dg-hero-text">
-      <span class="kicker">Dungeon<%= phase === 'laeuft' ? ' · läuft' : '' %></span>
+      <span class="kicker"><%= tower ? 'Mage Tower' : 'Dungeon' %><%= phase === 'laeuft' ? ' · läuft' : '' %></span>
       <h1><% if (dg.story) { %><a class="dg-hero-title" href="/dungeon/geschichte/<%= dg.key %>" title="Ganze Geschichte lesen"><%= dg.title %></a><% } else { %><%= dg.title %><% } %></h1>
       <% if (phase === 'laeuft') { %>
         <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
-        <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
+        <% if (tower) { %>
+          <p class="dg-when">Ein Versuch pro Tag · startet, sobald <%= isLeader ? 'du' : 'der Gruppenleiter' %> den Turm <%= isLeader ? 'betrittst' : 'betritt' %></p>
+        <% } else { %>
+          <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
+        <% } %>
       <% } %>
     </div>
   </section>
@@ -34,8 +39,13 @@
     <%# Unter dem Bild: links die Kampf-Stationen, darunter Fortschritt und Deadline %>
     <div class="dg-under">
       <div class="dg-under-top">
-      <ol class="dg-steps" aria-label="Kämpfe">
-        <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
+      <ol class="dg-steps" aria-label="<%= tower ? 'Runde' : 'Kämpfe' %>">
+        <% if (tower) { %>
+          <%# Turm: nur die aktuelle Runde – wie viele es werden, verrät die Seite nicht %>
+          <li class="is-active" data-dg-round>Runde 1</li>
+        <% } else { %>
+          <% dg.fights.forEach((f, i) => { %><li data-dg-step="<%= i %>"><%= f.boss ? 'Boss' : 'Kampf ' + (i + 1) %></li><% }) %>
+        <% } %>
       </ol>
       <p class="dg-next" data-dg-next hidden></p>
       </div>
@@ -61,13 +71,28 @@
     <form method="post" action="/dungeon/beitreten" class="dg-invitation">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="party" value="<%= inv.id %>">
-      <span class="dg-invitation-text"><span class="kicker">Einladung</span><strong><%= inv.leader %></strong> lädt dich in die Gruppe ein <span class="muted">(<%= inv.members.join(', ') %>)</span></span>
+      <span class="dg-invitation-text"><span class="kicker">Einladung<%= inv.tower ? ' · Mage Tower' : '' %></span><strong><%= inv.leader %></strong> lädt dich in die Gruppe ein<%= inv.tower ? ' – der Start verbraucht deinen Turm-Versuch für heute' : '' %> <span class="muted">(<%= inv.members.join(', ') %>)</span></span>
       <span class="dg-invitation-btns">
         <button class="btn btn-primary" type="submit">Beitreten</button>
         <button class="btn btn-ghost" type="submit" formaction="/dungeon/ablehnen">Ablehnen</button>
       </span>
     </form>
   <% }) %>
+  <%# Mage Tower: einmal am Tag, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
+  <% if (towerShown) { %>
+    <form method="post" action="/dungeon/turm/anmelden" class="dg-tower-entry">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <span class="dg-tower-text">
+        <span class="kicker">Mage Tower · einmal am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>
+        <strong><%= towerTitle %></strong>
+        <span class="muted"><%= towerPlayed ? 'Du warst heute schon oben – ab Mitternacht geht es wieder.' : 'Runde für Runde schwerer, bis ihr scheitert. Je höher ihr kommt, desto besser die Beute.' %></span>
+      </span>
+      <span class="dg-tower-btns">
+        <button class="btn btn-primary" type="submit" name="mode" value="solo" <%= towerPlayed ? 'disabled' : '' %>>Allein</button>
+        <button class="btn btn-ghost" type="submit" name="mode" value="gruppe" <%= towerPlayed ? 'disabled' : '' %>>Mit Gruppe</button>
+      </span>
+    </form>
+  <% } %>
 <% } %>
 
 <%# Tisch: drei Plätze nebeneinander (vor dem Beitritt: Solo/Party-Kacheln), rechts Chat bzw. Anleitung %>
@@ -143,8 +168,13 @@
         </div>
       <% } else { %>
         <div class="dg-slot is-empty">
-          <div class="dg-slot-card dg-slot-placeholder"><span><%= s.solo ? 'Wird beim Start zugelost' : 'Freier Platz' %></span></div>
-          <span class="dg-slot-name muted"><%= s.solo ? 'Mitspieler oder Bot' : '–' %></span>
+          <% if (tower) { %>
+            <div class="dg-slot-card dg-slot-placeholder"><span><%= s.solo ? 'Übernimmt ein Bot' : 'Freier Platz' %></span></div>
+            <span class="dg-slot-name muted"><%= s.solo ? 'Bot' : 'sonst ein Bot' %></span>
+          <% } else { %>
+            <div class="dg-slot-card dg-slot-placeholder"><span><%= s.solo ? 'Wird beim Start zugelost' : 'Freier Platz' %></span></div>
+            <span class="dg-slot-name muted"><%= s.solo ? 'Mitspieler oder Bot' : '–' %></span>
+          <% } %>
         </div>
       <% } %>
     <% }) %>
@@ -188,7 +218,16 @@
       <% if (meSlot && meSlot.choosing && !lockedIn) { %>
         <p class="dg-lobby-warn"><strong>Wähle deinen Charakter</strong> – klick oben auf deinen Platz. Ohne Charakter bist du beim Start nicht dabei.</p>
       <% } %>
-      <% if (phase === 'solo') { %>
+      <% if (tower) { %>
+        <% if (phase === 'solo') { %>
+          <p class="muted">Mage Tower allein: Die beiden anderen Plätze übernehmen Bots. Betritt den Turm, sobald du deine Karten gewählt hast.</p>
+        <% } else if (isLeader) { %>
+          <p class="muted">Du bist <strong>Gruppenleiter</strong>. Lade bis zu zwei Mitglieder ein und betritt den Turm, sobald alle gewählt haben – freie Plätze übernehmen Bots.</p>
+        <% } else { %>
+          <p class="muted">Du bist in der Gruppe von <strong><%= (party.members.find((m) => String(m.user) === String(party.leader)) || {}).name %></strong>. Der Gruppenleiter betritt den Turm, sobald alle gewählt haben.</p>
+        <% } %>
+        <p class="muted small">Der Start verbraucht den heutigen Turm-Versuch aller Mitglieder.</p>
+      <% } else if (phase === 'solo') { %>
         <p class="muted">Solo Queue: Beim Start wirst du mit anderen Einzelspielern zusammengelost – fehlende Plätze übernehmen Bots.</p>
       <% } else if (isLeader) { %>
         <p class="muted">Du bist <strong>Gruppenleiter</strong>. Lade bis zu zwei Mitglieder ein – freie Plätze übernehmen beim Start Bots.</p>
@@ -200,13 +239,24 @@
       <% if (phase === 'gruppe' && isLeader && !lockedIn && slots.some((s) => s.empty)) { %>
         <form method="post" action="/dungeon/einladen" class="dg-invite">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <input type="text" name="name" placeholder="Name des Mitglieds" required maxlength="40" autocomplete="off" aria-label="Name des Mitglieds">
+          <%# Vorschläge beim Hineinklicken: nur wer gerade beitreten kann (public/js/dungeon.js, GET /dungeon/einladbar) %>
+          <span class="dg-invite-field" data-dg-invite>
+            <input type="text" name="name" placeholder="Name des Mitglieds" required maxlength="40" autocomplete="off" aria-label="Name des Mitglieds"
+              role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="dg-invite-list">
+            <ul class="dg-suggest" id="dg-invite-list" role="listbox" aria-label="Verfügbare Mitglieder" hidden></ul>
+          </span>
           <button class="btn btn-primary" type="submit">Einladen</button>
+        </form>
+      <% } %>
+      <% if (tower && (isLeader || phase === 'solo')) { %>
+        <form method="post" action="/dungeon/turm/starten">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-primary" type="submit" <%= towerReady ? '' : 'disabled' %> title="<%= towerReady ? 'Das Ergebnis wird sofort ausgewürfelt' : 'Erst wenn alle einen Charakter gewählt haben' %>">Turm betreten</button>
         </form>
       <% } %>
       <form method="post" action="/dungeon/verlassen" data-dg-leave>
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="btn btn-ghost" type="submit" <%= canLeave ? '' : 'disabled' %> title="Bis <%= lockSeconds %> Sekunden vor dem Start möglich"><%= phase === 'solo' ? 'Abmelden' : 'Gruppe verlassen' %></button>
+        <button class="btn btn-ghost" type="submit" <%= canLeave ? '' : 'disabled' %> title="<%= tower ? 'Bis der Turm betreten wird' : 'Bis ' + lockSeconds + ' Sekunden vor dem Start möglich' %>"><%= phase === 'solo' ? 'Abmelden' : 'Gruppe verlassen' %></button>
       </form>
     </div>
   </section>
@@ -302,8 +352,12 @@
 <%# Beute: nach dem Ende einmal als Fenster – Spieler für Spieler aufgedeckt %>
 <% if (loot) { %>
   <dialog class="dg-loot" data-dg-loot aria-labelledby="dg-loot-title">
-    <span class="kicker">Beute</span>
-    <h2 id="dg-loot-title"><%= loot.success ? 'Boss besiegt!' : 'Rückzug' %></h2>
+    <span class="kicker"><%= loot.tower ? 'Mage Tower · Beute' : 'Beute' %></span>
+    <% if (loot.tower) { %>
+      <h2 id="dg-loot-title"><%= loot.result[0].toUpperCase() + loot.result.slice(1) %>!</h2>
+    <% } else { %>
+      <h2 id="dg-loot-title"><%= loot.success ? 'Boss besiegt!' : 'Rückzug' %></h2>
+    <% } %>
     <ul class="dg-loot-list">
       <% loot.players.forEach((p) => { %>
         <% const items = []; %>

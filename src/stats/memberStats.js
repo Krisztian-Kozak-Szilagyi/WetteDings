@@ -131,7 +131,7 @@ async function member(p, now, { user }) {
       title: 'Vermögen',
       question: `Wie steht ${user.username} da – und woher kommt das Geld?`,
       kpis: [
-        { id: 'm-rang', label: 'Rang', value: row.team ? 'Team' : index >= 0 ? `${index + 1}. von ${ranked.length}` : '–', unit: 'text', hint: row.team ? 'Admin und Devs sind nicht in der Wertung' : 'nach Gesamtvermögen (jetzt)' },
+        { id: 'm-rang', label: 'Rang', value: row.team ? 'Team' : index >= 0 ? `${index + 1}. von ${ranked.length}` : '–', unit: 'text', hint: row.team ? 'Das Team (Admin, Devs und Mods) ist nicht in der Wertung' : 'nach Gesamtvermögen (jetzt)' },
         { id: 'm-vermoegen', label: 'Gesamtvermögen', value: row.total, unit: 'euro', hint: 'Guthaben + offene Einsätze + Coins + Karten und Packs (jetzt)' },
         { id: 'm-guthaben', label: 'Guthaben', value: row.balance, unit: 'euro', hint: 'jetzt' },
         { id: 'm-zufluss', label: 'Guthaben-Veränderung', value: Object.values(dayNet).reduce((a, v) => a + v, 0), unit: 'euro', signed: true, compare: true, hint: 'Veränderung des Guthabens im Zeitraum' },

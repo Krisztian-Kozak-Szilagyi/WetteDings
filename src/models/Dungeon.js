@@ -14,9 +14,13 @@ const chatSchema = new Schema({ user: { type: Schema.Types.ObjectId, ref: 'User'
 
 // Anmeldung für den nächsten Dungeon: allein (solo, wird beim Start zugelost) oder als Gruppe mit Einladungen.
 // Beim Start wird daraus ein DungeonRun, die Anmeldung samt Chat verschwindet.
+// Modus: 'dungeon' (Start zum Termin) oder 'tower' (Mage Tower: einmal am Tag, der Leiter startet sofort)
+const MODES = ['dungeon', 'tower'];
+
 const partySchema = new Schema(
   {
-    slot: { type: Date, required: true }, // Startzeit des Dungeons
+    mode: { type: String, enum: MODES, default: 'dungeon' },
+    slot: { type: Date, required: true }, // Startzeit des Dungeons (Turm: Anmeldezeit, startet erst auf Knopfdruck)
     solo: { type: Boolean, default: false },
     leader: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     members: { type: [new Schema({ ...memberFields, card: { type: String, default: null }, joinedAt: { type: Date, default: Date.now } }, { _id: false })], default: [] },
@@ -37,8 +41,13 @@ const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, 
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.
 const runSchema = new Schema(
   {
+    mode: { type: String, enum: MODES, default: 'dungeon' },
     slot: { type: Date, required: true },
-    dungeon: { type: String, required: true }, // Schlüssel aus src/dungeon/dungeons.js
+    dungeon: { type: String, required: true }, // Schlüssel aus src/dungeon/dungeons.js (Turm: 'mage-tower')
+    rounds: { type: Number, default: null }, // Turm: geschaffte Runden
+    // Turm: Wiedergabe je Runde und Pause (echte Sekunden) zum Startzeitpunkt – Dungeon: Standardwerte
+    fightSeconds: { type: Number, default: null },
+    pause: { type: Number, default: null },
     members: {
       type: [
         new Schema(
@@ -78,7 +87,7 @@ const runSchema = new Schema(
       ],
       default: [],
     },
-    success: { type: Boolean, required: true }, // Boss besiegt
+    success: { type: Boolean, required: true }, // Boss besiegt (Turm: mindestens eine Runde geschafft)
     startedAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     status: { type: String, enum: ['laeuft', 'fertig'], default: 'laeuft' },
@@ -102,13 +111,27 @@ const settingsSchema = new Schema(
     foilChance: Number,
     cardChance: Number,
     botWeights: Schema.Types.Mixed,
+    tower: Schema.Types.Mixed, // Mage Tower (siehe dungeonService.DEFAULTS.tower)
     updatedByName: String,
   },
   { timestamps: true }
 );
 
+// Mage Tower: ein Versuch pro Spieler und Tag (deutsche Zeit). Der eindeutige Index macht es atomar –
+// ein Index auf DungeonRun ginge nicht, dort stehen Bots mit user: null.
+const towerAttemptSchema = new Schema(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    day: { type: String, required: true }, // "YYYY-MM-DD"
+    run: { type: Schema.Types.ObjectId, ref: 'DungeonRun', default: null },
+  },
+  { timestamps: true }
+);
+towerAttemptSchema.index({ user: 1, day: 1 }, { unique: true });
+
 module.exports = {
   DungeonParty: model('DungeonParty', partySchema),
   DungeonRun: model('DungeonRun', runSchema),
   DungeonSettings: model('DungeonSettings', settingsSchema),
+  TowerAttempt: model('TowerAttempt', towerAttemptSchema),
 };

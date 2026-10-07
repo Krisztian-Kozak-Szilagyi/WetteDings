@@ -13,16 +13,18 @@ const MAX_GAP_MS = 5 * 60 * 1000; // längere Pausen (Neustart, Ausfall) zählen
 const FRESH_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// ---------- Team (Admin und Devs) ----------
+// ---------- Team (Admin, Devs und Mods) ----------
 // Das Team spielt mit, zählt aber nicht in der Rangliste und nicht in der Wirtschaft (Statistik): Seine Konten
 // entstehen durch Tests und Vergaben und würden Platzierungen, Geldmenge und Verteilung verfälschen.
+// Mods gehören seit #126 dazu – dieselbe Logik wie für Devs.
+const TEAM_ROLES = ['dev', 'mod'];
 
 /** Gehört das Konto zum Team? (braucht role und usernameLower) */
-const isTeam = (user) => !!user && (user.role === 'dev' || config.adminUsernames.includes(user.usernameLower));
+const isTeam = (user) => !!user && (TEAM_ROLES.includes(user.role) || config.adminUsernames.includes(user.usernameLower));
 /** Filter für Konten außerhalb des Teams */
-const notTeam = () => ({ role: { $ne: 'dev' }, usernameLower: { $nin: config.adminUsernames } });
+const notTeam = () => ({ role: { $nin: TEAM_ROLES }, usernameLower: { $nin: config.adminUsernames } });
 /** IDs aller Team-Konten (auch gelöschte) – zum Ausschließen ihrer Buchungen */
-const teamIds = () => User.distinct('_id', { $or: [{ role: 'dev' }, { usernameLower: { $in: config.adminUsernames } }] });
+const teamIds = () => User.distinct('_id', { $or: [{ role: { $in: TEAM_ROLES } }, { usernameLower: { $in: config.adminUsernames } }] });
 
 /**
  * Alle Mitglieder nach Gesamtvermögen, bestes zuerst – ohne das Team; mit team: true auch das Team (Feld team). Gesamtvermögen = Kontostand + offene Einsätze + Wert der
@@ -89,7 +91,7 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
     { $addFields: { total: { $add: ['$balance', '$inPlay', '$coinValue', '$cardValue', '$shopValue'] }, fresh: { $ifNull: [{ $first: '$cards.fresh' }, 0] } } },
     { $addFields: { rankTotal: { $subtract: ['$total', '$fresh'] } } },
     { $sort: { rankTotal: -1, createdAt: 1 } },
-    { $project: { username: 1, avatar: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, fresh: 1, rankTotal: 1, team: { $or: [{ $eq: ['$role', 'dev'] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
+    { $project: { username: 1, avatar: 1, balance: 1, inPlay: 1, coinValue: 1, cardValue: 1, shopValue: 1, total: 1, fresh: 1, rankTotal: 1, team: { $or: [{ $in: [{ $ifNull: ['$role', null] }, TEAM_ROLES] }, { $in: ['$usernameLower', config.adminUsernames] }] } } },
   ];
   if (limit) pipeline.push({ $limit: limit });
   return User.aggregate(pipeline);
@@ -155,4 +157,4 @@ function top1Text(seconds) {
   return parts.join(' ');
 }
 
-module.exports = { ranking, isTeam, notTeam, teamIds, trackTop1, recordStint, top1Text, TICK_MS, FRESH_DAYS };
+module.exports = { TEAM_ROLES, ranking, isTeam, notTeam, teamIds, trackTop1, recordStint, top1Text, TICK_MS, FRESH_DAYS };

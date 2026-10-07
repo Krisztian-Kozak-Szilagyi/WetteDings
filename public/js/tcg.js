@@ -136,6 +136,8 @@
       var noBank = d.noBank === '1'; // Boss-Karten: die Bank kauft sie nicht, Schutz vor dem Duplikat-Verkauf ist überflüssig
 
       var former = d.former === '1';
+      var note = $('[data-tcg-modal-note]', modal);
+      if (note) note.hidden = true; // Meldung gilt nur direkt nach einer Aktion (siehe unten, #131)
       tilt.className = 'tcg-zoom r-' + d.rarity + (former ? ' is-former' : '');
       $('[data-tcg-modal-img]', modal).src = d.image;
       $('[data-tcg-modal-img]', modal).alt = d.name + ' (' + d.rarityLabel + ')';
@@ -193,6 +195,52 @@
     modal.addEventListener('click', function (e) {
       if (e.target === modal) closeModal();
     });
+  }
+
+  // ---------- Album: nach Favorit, Schützen oder Verkaufen an derselben Stelle weiter (#131) ----------
+  // Die Aktionen sind Formulare und laden das Album neu – vorher merken wir uns Scroll-Position und Karte.
+  // Danach: gleiche Stelle, das Kartenfenster wieder offen und die Meldung darin (sonst unten als kurzer Hinweis).
+  if (window.location.pathname === '/tcg/album') {
+    var BACK_KEY = 'tcg-album-back';
+    var session = {
+      get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
+      set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
+      clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
+    };
+    // app.js fragt vorher nach (data-confirm) – wer abbricht, bleibt einfach hier
+    document.addEventListener('submit', function (e) {
+      var f = e.target;
+      if (e.defaultPrevented || !/^\/tcg\/(favorit|schuetzen|verkaufen)$/.test(new URL(f.action, window.location.href).pathname)) return;
+      var input = f.closest('[data-tcg-modal]') && f.querySelector('input[name="card"]');
+      session.set({ y: window.scrollY, card: input ? input.value : null, at: Date.now() });
+    });
+
+    var back = session.get();
+    session.clear();
+    if (back && Date.now() - back.at < 30000) {
+      // Erfolg zeigt die Seite selbst (grüne Meldungen nur für Admins, middleware/flash) – ein Fehler kommt als Meldung.
+      // Sie verlässt zuerst ihren Platz oben, sonst verschöbe sie die Seite nach dem Zurückscrollen um ihre Höhe.
+      var flash = $('[data-flash-area] .flash');
+      var slot = back.card && modal && $('[data-tcg-card="' + back.card.replace(/["\\]/g, '') + '"]');
+      var message = flash ? { text: $('span', flash).textContent, error: flash.classList.contains('flash-error') } : null;
+      if (flash && slot) flash.remove();
+      else if (flash) {
+        flash.classList.add('flash-toast');
+        setTimeout(function () { flash.classList.add('is-gone'); }, 4500);
+        setTimeout(function () { flash.remove(); }, 5000);
+      }
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      window.scrollTo(0, back.y);
+      if (slot) {
+        slot.click(); // öffnet das Kartenfenster mit dem neuen Stand
+        var note = $('[data-tcg-modal-note]', modal);
+        if (message && note) {
+          note.textContent = message.text;
+          note.className = 'tcg-modal-note ' + (message.error ? 'is-error' : 'is-success');
+          note.hidden = false;
+        }
+      }
+    }
   }
 
   // ---------- Pack öffnen ----------
