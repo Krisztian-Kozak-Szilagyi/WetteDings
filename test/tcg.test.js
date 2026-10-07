@@ -52,8 +52,8 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 104); // davon 13 Test-Karten (Bosskampf: 6 Items, 7 Helden)
-  assert.equal(catalog.cardsByRarity['test-item'].length, 13);
+  assert.equal(catalog.CARDS.length, 114); // davon 23 Test-Karten (Bosskampf: 6 Items, 17 Helden)
+  assert.equal(catalog.cardsByRarity['test-item'].length, 23);
   assert.equal(catalog.cardsBySeason['pre-season'].length, 90);
   assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
   assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
