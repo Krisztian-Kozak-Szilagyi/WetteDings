@@ -137,7 +137,7 @@
             <% } %>
             <span class="dg-pop-layer" data-dg-pops></span>
           </div>
-          <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %></span>
+          <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %><% if (s.banned) { %> <span class="dg-ban-tag is-inline" title="Gesperrt bis zum Balance-Patch – bitte eine andere Karte wählen">Gesperrt</span><% } %></span>
           <span class="dg-slot-stats"><%= s.card ? statLine(s.card) : '' %></span>
           <%# Boost-Karte: eigener kleiner Kartenplatz unter dem Charakter, für alle Spieler gleich %>
           <div class="dg-boost<%= s.boost ? ' r-' + s.boost.rarity : ' is-none' %>">
@@ -283,10 +283,12 @@
           <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
         </label>
       <% } %>
-      <% list.forEach((c, i) => { const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; %>
-        <label class="dg-pick r-<%= c.rarity %>" data-dg-item data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>" title="<%= label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %>">
-          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %>>
+      <% list.forEach((c, i) => { const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); %>
+        <%# Gesperrte Karten (Kartensperren): sichtbar, aber nicht wählbar %>
+        <label class="dg-pick r-<%= c.rarity %><%= banned ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>" title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %>">
+          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= banned ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
+          <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } %>
           <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>

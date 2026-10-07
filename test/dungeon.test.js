@@ -108,7 +108,7 @@ test('Start (#111): nur wer in der Lobby einen Charakter gewählt hat, ist dabei
   assert.deepEqual(players.map((m) => m.user), ['a']);
   assert.equal(players[0].joinedAt, at); // Anmeldezeit bleibt im Durchlauf (Manipulationserkennung)
   assert.deepEqual(dropped, ['b', 'c']);
-  assert.deepEqual(d.splitPlayers([]), { players: [], dropped: [] });
+  assert.deepEqual(d.splitPlayers([]), { players: [], dropped: [], banned: [] });
 });
 
 test('Wiedergabe: gewonnene Kämpfe enden früher, verlorene dauern die volle Zeit', () => {
@@ -165,4 +165,34 @@ test('Seltene Beute: nur echte Spieler mit Folie oder Boss-Karte, aktuelle Namen
   assert.equal(list[1].card.rarity, card('st-ivan-boss').rarity);
   // unbekannter Dungeon ohne Boss-Karte: nur die Folie zählt
   assert.deepEqual(d.lootEntries([{ dungeon: 'weg', endsAt: at, members: [{ user: 'u9', name: 'x', foil: false, bossCard: true }] }]), []);
+});
+
+test('Kartensperren: gesperrte Karte fällt beim Start heraus, Bots nehmen sie nicht', () => {
+  const banned = new Set(['x']);
+  const party = { members: [
+    { user: 'a', name: 'A', card: 'x', boost: null },
+    { user: 'b', name: 'B', card: 'z', boost: 'x' }, // nur als Boost gewählt
+    { user: 'c', name: 'C', card: 'z', boost: null },
+  ] };
+  const r = d.splitPlayers([party], banned);
+  assert.deepEqual(r.players.map((m) => m.user), ['c']);
+  assert.deepEqual(r.banned, ['a', 'b']);
+  assert.deepEqual(r.dropped, []);
+  const chars = catalog.CARDS.filter((c) => c.isCharacter).map((c) => c.id);
+  const one = new Set([chars[0]]);
+  for (let i = 0; i < 100; i++) assert.notEqual(d.botCard(Math.random, undefined, one).id, chars[0]);
+  // alles gesperrt: Bots finden trotzdem eine Karte
+  for (let i = 0; i < 20; i++) assert.ok(d.botCard(Math.random, undefined, new Set(chars)).isCharacter);
+  assert.equal(d.botBoost(Math.random, undefined, new Set(catalog.CARDS.map((c) => c.id))), null);
+});
+
+test('Kartensperren: nur bekannte Modi, Text', () => {
+  const cardBans = require('../src/tcg/cardBans');
+  assert.deepEqual(cardBans.pickModes(['tower', 'ihk', 'dungeon', 'constructor']), ['dungeon', 'tower']);
+  assert.deepEqual(cardBans.pickModes('tower'), ['tower']);
+  assert.deepEqual(cardBans.pickModes(undefined), []);
+  assert.equal(cardBans.modesText(['dungeon', 'tower']), 'Dungeon und Mage Tower');
+  assert.equal(cardBans.isBanned('krisz-3-gold', 'dungeon'), false);
+  assert.equal(d.modeOf({ mode: 'tower' }), 'tower');
+  assert.equal(d.modeOf({}), 'dungeon');
 });
