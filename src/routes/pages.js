@@ -22,7 +22,7 @@ const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
 // Rangliste zeigt Mitgliedernamen und Kontostände – nur für angemeldete Nutzer.
-// Das Team (Admin + Devs) hat darunter eine eigene Rangliste mit eigenen Plätzen.
+// Das Team (Admin, Devs und Mods) hat darunter eine eigene Rangliste mit eigenen Plätzen.
 router.get('/rangliste', requireLogin, async (req, res) => {
   const all = await rankService.ranking({ team: true });
   const players = all.filter((u) => !u.team);
