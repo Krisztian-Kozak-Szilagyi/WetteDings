@@ -6,7 +6,7 @@
 const TOWER = {
   key: 'mage-tower',
   title: 'Mage Tower',
-  image: '/img/dungeon/placeholder.svg', // wie dungeons.PLACEHOLDER, bis es ein eigenes Bild gibt
+  image: '/img/dungeon/st-ivan-dungeon-banner.webp', // vorerst das St.-Ivan-Banner, bis der Turm ein eigenes Bild hat
   intro: 'Ein Turm ohne Dach: Jedes Stockwerk prüft euch härter als das letzte. Wie weit kommt ihr heute?',
   bossCard: 'st-ivan-boss', // bis der Turm eine eigene Karte hat
   floors: [
