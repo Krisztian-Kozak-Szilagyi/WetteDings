@@ -150,6 +150,8 @@ const can = {
    */
   moveThread: (user, from, fromParent, to, toParent) =>
     !!user.canModerate && String(from._id) !== String(to._id) && can.manageCategory(user, from, fromParent) && can.manageCategory(user, to, toParent),
+  /** Bereiche samt Inhalt löschen: nur Admin/Dev */
+  deleteCategory: (user) => !!user.isStaff,
   /** Einen Bereich zum Team-Bereich machen (oder das zurücknehmen): nur Admin/Dev */
   setStaffOnly: (user) => !!user.isStaff,
   editPost(user, post, thread) {
@@ -221,6 +223,7 @@ const MODLOG_LABELS = {
   loeschen: 'Beitrag gelöscht',
   meldung: 'Meldung erledigt',
   umfrage: 'Umfrage entfernt',
+  bereich_loeschen: 'Bereich gelöscht',
 };
 
 /** Eintrag ins Mod-Log. Wirft nie: Die eigentliche Aktion ist dann schon geschehen. */
@@ -381,6 +384,31 @@ async function moveThread({ user, threadId, categoryId }) {
   return { thread, to };
 }
 
+/**
+ * Bereich löschen (nur Admin/Dev) – samt Unterbereichen. Die Themen darin gelten danach als entfernt (wie bei
+ * "entfernen" durch die Moderation) und erscheinen nirgends mehr. Bereiche, die die Seite braucht (key: Patchnotes,
+ * Börsenbericht, eSports …), bleiben geschützt – auch als Unterbereich eines zu löschenden Bereichs.
+ * Gibt { cat, subs, threads } zurück (subs/threads = Anzahl).
+ */
+async function deleteCategory({ user, categoryId }) {
+  if (!can.deleteCategory(user)) throw new UserError('Bereiche löschen nur Admin und Devs.');
+  const cat = mongoose.isValidObjectId(categoryId) ? await ForumCategory.findById(categoryId).lean() : null;
+  if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
+  if (cat.key) throw new UserError('Dieser Bereich wird von der Seite gebraucht und kann nicht gelöscht werden.');
+  const subs = await ForumCategory.find({ parent: cat._id }).select('_id key title').lean();
+  const fixed = subs.find((c) => c.key);
+  if (fixed) throw new UserError(`Der Unterbereich „${fixed.title}“ darin wird von der Seite gebraucht – lösch die anderen Unterbereiche einzeln.`);
+  const ids = [cat._id, ...subs.map((c) => c._id)];
+  // erst die Bereiche, dann die Themen: so bleibt kaum ein Fenster für ein gleichzeitig eröffnetes Thema
+  await ForumCategory.deleteMany({ _id: { $in: ids } });
+  const res = await ForumThread.updateMany({ category: { $in: ids }, deleted: false }, { $set: { deleted: true } });
+  const threads = res.modifiedCount || 0;
+  await modLog(user, 'bereich_loeschen', {
+    detail: `${cat.parent ? 'Unterbereich' : 'Bereich'} „${cat.title}“${subs.length ? `, ${subs.length} Unterbereich(e)` : ''}, ${threads} Thema/Themen`,
+  });
+  return { cat, subs: subs.length, threads };
+}
+
 // ---------- Reaktionen ----------
 /** Reaktion setzen oder (beim zweiten Klick) zurücknehmen. Gibt { post, thread, on } zurück. */
 async function toggleReaction({ user, postId, reaction }) {
@@ -534,6 +562,7 @@ module.exports = {
   migratePatchnotes,
   patchnotesCategory,
   can,
+  deleteCategory,
   createThread,
   reply,
   loadPost,

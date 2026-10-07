@@ -142,6 +142,7 @@ router.get('/forum/k/:id', async (req, res) => {
     canManage: forum.can.manageCategory(req.user, cat, parent),
     canAddSub: !cat.parent && forum.can.manage(req.user) && forum.can.manageCategory(req.user, cat, null),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
+    canDeleteCat: forum.can.deleteCategory(req.user) && !cat.key,
   });
 });
 
@@ -391,14 +392,6 @@ router.post('/forum/bereiche/:id', (req, res, next) => {
     if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
     const parent = cat.parent ? await ForumCategory.findById(cat.parent).lean() : null;
     if (!forum.can.manageCategory(req.user, cat, parent)) throw new UserError('Team-Bereiche können nur Admin und Devs ändern.');
-    if (req.body.action === 'loeschen') {
-      const [threads, subs] = await Promise.all([ForumThread.countDocuments({ category: cat._id, deleted: false }), ForumCategory.countDocuments({ parent: cat._id })]);
-      if (cat.key) throw new UserError('Dieser Bereich wird von der Seite gebraucht und kann nicht gelöscht werden.');
-      if (threads || subs) throw new UserError('Nur leere Bereiche (ohne Themen und Unterbereiche) können gelöscht werden.');
-      await ForumCategory.deleteOne({ _id: cat._id });
-      req.flash('info', `Bereich „${cat.title}“ gelöscht.`);
-      return cat.parent ? `/forum/k/${cat.parent}` : '/forum';
-    }
     const data = categoryInput(req);
     if (!forum.can.setStaffOnly(req.user)) delete data.staffOnly; // Mods ändern den Team-Status nicht
     await ForumCategory.updateOne({ _id: cat._id }, { $set: data });
@@ -406,6 +399,15 @@ router.post('/forum/bereiche/:id', (req, res, next) => {
     return null;
   });
 });
+
+// Bereich samt Unterbereichen und Themen löschen: nur Admin/Dev, mit Passwort bestätigt
+router.post('/forum/bereiche/:id/loeschen', (req, res, next) => (forum.can.deleteCategory(req.user) ? next() : next('route')), requireReauth('/forum'), (req, res) =>
+  act(req, res, `/forum/k/${req.params.id}`, async () => {
+    const { cat, subs, threads } = await forum.deleteCategory({ user: req.user, categoryId: req.params.id });
+    req.flash('info', `${cat.parent ? 'Unterbereich' : 'Bereich'} „${cat.title}“ gelöscht${subs ? ` (mit ${subs} Unterbereich${subs === 1 ? '' : 'en'})` : ''}${threads ? `, ${threads} Thema/Themen entfernt` : ''}.`);
+    return cat.parent ? `/forum/k/${cat.parent}` : '/forum';
+  })
+);
 
 // Die alte Patchnotes-Seite führt jetzt in den Forum-Bereich
 router.get('/patchnotes', requireLogin, async (req, res) => {
