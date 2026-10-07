@@ -344,10 +344,58 @@
   var energie = ENERGIE;
   var gespielt = 0; // Karten, die in dieser Runde schon gespielt wurden (Hinterhalt)
   var block = 0; // fängt Schaden des nächsten Boss-Angriffs ab
-  var fluch = []; // { schaden, runden } – trifft den Boss zu Beginn jeder Runde
-  var verzoegert = []; // Schaden, der zu Beginn der nächsten Runde einschlägt (Nachladen)
+  var blockKarten = []; // Karten, von denen der Block stammt (Anzeige über dem Avatar)
+  var fluch = []; // { schaden, runden, max, card } – trifft den Boss zu Beginn jeder Runde
+  var verzoegert = []; // { schaden, card } – schlägt zu Beginn der nächsten Runde ein (Nachladen)
   var energieEl = document.querySelector('[data-bf-energy]');
   var statusEl = document.querySelector('[data-bf-status]');
+  var effekteEl = document.querySelector('[data-bf-effects]');
+
+  // Laufende Effekte über dem Avatar: Kreis mit dem Kartenbild, der Ring zeigt die verbleibenden Runden.
+  // Gleiche Effekte behalten ihr Element (Schlüssel), damit der Ring weich abnimmt statt neu zu starten.
+  var effektEls = new Map();
+  function effektListe() {
+    var list = [];
+    blockKarten.forEach(function (c, i) {
+      list.push({ key: 'block' + i + c.id, card: c, rest: 1, max: 1, text: c.name + ': Block ' + block + ' gegen den nächsten Boss-Angriff', zahl: block });
+    });
+    fluch.forEach(function (f) {
+      list.push({ key: 'fluch' + f.nr, card: f.card, rest: f.runden, max: f.max, text: f.card.name + ': Fluch, ' + f.schaden + ' Schaden pro Runde, noch ' + f.runden + ' Runde(n)', zahl: f.runden });
+    });
+    verzoegert.forEach(function (v) {
+      list.push({ key: 'lade' + v.nr, card: v.card, rest: 1, max: 1, text: v.card.name + ': ' + v.schaden + ' Schaden zu Beginn der nächsten Runde', zahl: v.schaden });
+    });
+    return list;
+  }
+  function renderEffekte() {
+    if (!effekteEl) return;
+    var list = effektListe();
+    var keep = new Set(list.map(function (e) { return e.key; }));
+    effektEls.forEach(function (el, key) {
+      if (keep.has(key)) return;
+      effektEls.delete(key);
+      el.classList.add('bf-eff-weg');
+      setTimeout(function () { el.remove(); }, 400);
+    });
+    list.forEach(function (e) {
+      var el = effektEls.get(e.key);
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'bf-eff';
+        el.innerHTML = '<span class="bf-eff-bild"></span><b class="bf-eff-zahl"></b>';
+        el.querySelector('.bf-eff-bild').style.backgroundImage = 'url("' + e.card.image + '")';
+        effekteEl.appendChild(el);
+        effektEls.set(e.key, el);
+        el.style.setProperty('--p', 1);
+      }
+      el.title = e.text;
+      el.setAttribute('aria-label', e.text);
+      el.querySelector('.bf-eff-zahl').textContent = e.zahl;
+      void el.offsetWidth;
+      el.style.setProperty('--p', e.max ? e.rest / e.max : 1);
+    });
+  }
+  var effektNr = 0;
 
   function updateStatus() {
     if (energieEl) energieEl.textContent = '⚡ ' + energie + ' / ' + ENERGIE;
@@ -356,10 +404,11 @@
     if (block) teile.push('Block ' + block);
     var fl = fluch.reduce(function (s, f) { return s + f.schaden; }, 0);
     if (fl) teile.push('Fluch ' + fl + '/Runde');
-    var vz = verzoegert.reduce(function (s, n) { return s + n; }, 0);
+    var vz = verzoegert.reduce(function (s, v) { return s + v.schaden; }, 0);
     if (vz) teile.push('Nachladen ' + vz);
     statusEl.textContent = teile.join(' · ');
     statusEl.hidden = !teile.length;
+    renderEffekte();
   }
 
   // Schaden am Boss mit Effekt; treffer > 1 = nacheinander. Gibt ein Promise zurück (Ende des letzten Einschlags).
@@ -418,6 +467,7 @@
 
     if (k.sch) {
       block += k.sch;
+      blockKarten.push(el.card);
       popup(player.el, '+' + k.sch + ' Block', 'bf-pop-info');
     }
     if (k.hei) {
@@ -428,9 +478,9 @@
       player.damage(e.selbst);
       popup(player.el, '−' + e.selbst, 'bf-pop-player');
     }
-    if (e.fluch) fluch.push({ schaden: e.fluch.schaden, runden: e.fluch.runden });
+    if (e.fluch) fluch.push({ nr: ++effektNr, schaden: e.fluch.schaden, runden: e.fluch.runden, max: e.fluch.runden, card: el.card });
     var dmg = (k.ang || 0) * (e.hinterhalt && vorher > 0 ? e.hinterhalt : 1);
-    if (dmg && e.verzoegert) verzoegert.push(dmg);
+    if (dmg && e.verzoegert) verzoegert.push({ nr: ++effektNr, schaden: dmg, card: el.card });
     else if (dmg) bossSchaden(dmg, k.fx, flash, e.treffer);
     updateStatus();
   }
@@ -438,7 +488,7 @@
   // Rundenbeginn: Nachladen schlägt ein, Flüche ticken
   function rundenBeginn() {
     var anker = gearEl;
-    verzoegert.splice(0).forEach(function (n) { bossSchaden(n, 'feuer', anker); });
+    verzoegert.splice(0).forEach(function (v) { bossSchaden(v.schaden, 'feuer', anker); });
     fluch.forEach(function (f) {
       bossSchaden(f.schaden, 'nekro', anker);
       f.runden--;
@@ -459,6 +509,7 @@
     var geblockt = Math.min(block, dmg);
     dmg -= geblockt;
     block = 0;
+    blockKarten = [];
     document.body.classList.add('bf-boss-attack');
     var avatar = document.querySelector('.bf-avatar');
     if (window.bossfightFx && avatar) window.bossfightFx.bossAngriff(avatar, pct > 0 || geblockt > 0);
@@ -514,7 +565,8 @@
       d.cards.forEach(function (e) {
         var c = byId.get(e.card);
         if (!c) return;
-        for (var k = 0; k < e.n; k++) deck.push(c);
+        // ältere Decks können noch mehr Exemplare haben, als heute erlaubt (Items nur 1-mal)
+        for (var k = 0; k < Math.min(e.n, c.limit || e.n); k++) deck.push(c);
       });
       shuffle(deck);
       updateDeck();

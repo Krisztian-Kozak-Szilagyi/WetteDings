@@ -130,18 +130,19 @@ async function migrate() {
 }
 
 /**
- * Bosskampf-Test: Admins (ADMIN_USERNAMES) haben jede Test-Item-Karte immer 2-mal (so oft, wie sie ins Deck darf).
- * Fehlende Exemplare kommen bei jedem Start dazu.
+ * Bosskampf-Test: Admins (ADMIN_USERNAMES) haben jede Test-Karte so oft, wie sie ins Deck darf (Items 1-mal,
+ * Helden 2-mal – src/game/deck.js). Fehlende Exemplare kommen bei jedem Start dazu, überzählige bleiben.
  */
-async function grantTestItems(copies = 2) {
+async function grantTestItems() {
   const catalog = require('./tcg/catalog');
+  const { copyLimit } = require('./game/deck');
   const items = catalog.CARDS.filter((c) => c.rarity === 'test-item');
   if (!items.length || !config.adminUsernames.length) return;
   const admins = await User.find({ usernameLower: { $in: config.adminUsernames } }).select('_id').lean();
   let added = 0;
   for (const { _id: user } of admins) {
     const have = new Map((await TcgCard.aggregate([{ $match: { user, rarity: 'test-item' } }, { $group: { _id: '$card', n: { $sum: 1 } } }])).map((r) => [r._id, r.n]));
-    const docs = items.flatMap((c) => Array.from({ length: Math.max(0, copies - (have.get(c.id) || 0)) }, () => ({ user, card: c.id, rarity: c.rarity })));
+    const docs = items.flatMap((c) => Array.from({ length: Math.max(0, copyLimit(c) - (have.get(c.id) || 0)) }, () => ({ user, card: c.id, rarity: c.rarity })));
     if (!docs.length) continue;
     await TcgCard.insertMany(docs);
     await User.updateOne({ _id: user, tcgSeen: { $exists: true } }, { $addToSet: { tcgSeen: { $each: items.map((c) => c.id) } } });
