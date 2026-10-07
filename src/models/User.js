@@ -8,6 +8,7 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true },
     // Kontostand in Cent
     balance: { type: Number, required: true, min: 0 },
+    debt: { type: Number, default: 0, min: 0 }, // offene Schulden in Cent (z. B. eSports-Konkurs), getilgt aus jeder Einnahme (debtService)
     // Tag (deutsche Zeit, "YYYY-MM-DD"), an dem zuletzt der Tagesbonus geprüft/gutgeschrieben wurde
     lastBonusDay: { type: String, default: null },
     // Zeitpunkt des letzten Besuchs der Handelsseite (für das Markt-Abzeichen im Menü)

@@ -7,7 +7,7 @@
  *  - Ab TEAM_SIZE Mitgliedern wird der Team-ETF im Broker gehandelt (Start bei START_PRICE €).
  *  - Fällt ein gehandeltes Team unter TEAM_SIZE, friert es ein (kein Kauf, kein Sprung, kein Rauschen).
  *    Füllt es sich nicht binnen FREEZE_DAYS wieder auf: Konkurs – die Anleger bekommen den Wert zum letzten Kurs
- *    ausgezahlt, jedes übrige Mitglied zahlt BANKRUPT_FEE.
+ *    ausgezahlt, jedes übrige Mitglied zahlt BANKRUPT_FEE (was das Guthaben nicht deckt, wird Schuld: debtService).
  *  - Austritt aus einem gehandelten Team kostet LEAVE_FEE (geht an die übrigen Mitglieder), aus einem eingefrorenen
  *    BANKRUPT_FEE (wer das sinkende Schiff verlässt, zahlt wie beim Konkurs). Rauswurf kostet den Rausgeworfenen nichts.
  *  - Sonntags um REPORT_TIME: Wochenbericht – jedes gehandelte Team (schon vor der Woche gehandelt) springt nach
@@ -22,6 +22,7 @@ const { DungeonRun } = require('../models/Dungeon');
 const { CoinHolding, CoinTrade } = require('../models/Coin');
 const { ForumCategory } = require('../models/Forum');
 const { inTransaction } = require('../services/betService');
+const debts = require('../services/debtService');
 const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
 const { toZonedLocalInput, parseZonedLocal } = require('../lib/time');
@@ -256,7 +257,7 @@ async function kick({ user, userId }) {
 
 /**
  * Mitglied entfernen. fee: Austritt (Gebühr je nach Status) – beim Rauswurf zahlt niemand.
- * Gebühren nur bis zum vorhandenen Guthaben (das Guthaben kann nicht ins Minus).
+ * Reicht das Guthaben nicht, wird der Rest zur Schuld und von allen künftigen Einnahmen getilgt.
  */
 async function removeMember(team, userId, { fee }) {
   const rest = team.members.filter((m) => !m.user.equals(userId));
@@ -266,12 +267,10 @@ async function removeMember(team, userId, { fee }) {
     const t = await EsportsTeam.findOneAndUpdate({ _id: team._id, 'members.user': userId }, { $pull: { members: { user: userId } }, $set: { captain } }, { new: true, session }).lean();
     if (!t) throw new UserError('Die Mitgliedschaft hat sich gerade geändert – bitte lade die Seite neu.');
     if (cost) {
-      const u = await User.findById(userId).select('balance').session(session).lean();
-      const take = Math.min(cost, Math.max(0, u ? u.balance : 0));
+      // Was das Guthaben nicht deckt, wird Schuld (debtService) – Ausgeben vorher hilft also nicht
+      const { paid: take } = await debts.charge(userId, cost, { type: team.status === 'aktiv' ? 'esports_austritt' : 'esports_konkurs', title: team.name }, session);
       if (take) {
-        await User.updateOne({ _id: userId }, { $inc: { balance: -take } }, { session });
-        await Ledger.create([{ user: userId, type: team.status === 'aktiv' ? 'esports_austritt' : 'esports_konkurs', amount: -take, betTitle: team.name }], { session });
-        // Austritt aus einem gehandelten Team: die Gebühr geht an die übrigen Mitglieder
+        // Austritt aus einem gehandelten Team: der sofort bezahlte Teil geht an die übrigen Mitglieder
         if (team.status === 'aktiv' && t.members.length) {
           const shares = league.splitFee(take, t.members.length);
           for (const [i, m] of t.members.entries()) {
@@ -328,13 +327,7 @@ async function close(team, { reason }) {
       await Ledger.create([{ user: h.user, type: 'esports_auszahlung', amount: cents, betTitle: team.name }], { session });
     }
     if (reason === 'konkurs') {
-      for (const m of t.members) {
-        const u = await User.findById(m.user).select('balance').session(session).lean();
-        const take = Math.min(league.BANKRUPT_FEE, Math.max(0, u ? u.balance : 0));
-        if (!take) continue;
-        await User.updateOne({ _id: m.user }, { $inc: { balance: -take } }, { session });
-        await Ledger.create([{ user: m.user, type: 'esports_konkurs', amount: -take, betTitle: team.name }], { session });
-      }
+      for (const m of t.members) await debts.charge(m.user, league.BANKRUPT_FEE, { type: 'esports_konkurs', title: team.name }, session);
     }
     return t;
   });
