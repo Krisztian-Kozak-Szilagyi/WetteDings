@@ -63,6 +63,8 @@ test('Rechte: bearbeiten, löschen, Team-Bereiche, geschlossene Themen', () => {
   assert.ok(can.manageCategory(mod, normal, null) && can.manageCategory(mod, normal, normal));
   assert.ok(!can.manageCategory(mod, team, null) && !can.manageCategory(mod, normal, team));
   assert.ok(can.manageCategory(dev, team, null) && !can.manageCategory(member, normal, null));
+  // Bereiche samt Inhalt löschen: nur Admin/Dev, keine Mods
+  assert.ok(can.deleteCategory(dev) && !can.deleteCategory(mod) && !can.deleteCategory(member));
   assert.ok(can.setStaffOnly(dev) && !can.setStaffOnly(mod));
 });
 
