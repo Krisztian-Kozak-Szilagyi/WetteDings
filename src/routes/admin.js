@@ -197,7 +197,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
-    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    // noch nicht erhältliche Karten (z. B. Mark Suntouched) nur für Admins
+    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.concat(isAdmin ? tcgCatalog.UNRELEASED_CARDS : []).filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     reasonMin: giftService.REASON_MIN,
     reasonMax: giftService.REASON_MAX,
@@ -685,7 +686,8 @@ router.post('/admin/tcg/bless', requireStaff, requireReauth(GRANT_URL), async (r
 async function grantCardTo(req) {
   const reason = grantReason(req);
   if (!reason) return req.flash('error', REASON_ERROR);
-  const card = tcgCatalog.cardById[str(req.body.card)];
+  const found = tcgCatalog.cardById[str(req.body.card)];
+  const card = found && found.unreleased && !req.user.isAdmin ? null : found; // unveröffentlicht: nur Admins
   const target = str(req.body.user);
   const count = Number.parseInt(str(req.body.count), 10);
   const toAll = target === 'alle';
