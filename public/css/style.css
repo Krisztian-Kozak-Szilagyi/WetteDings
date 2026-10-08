@@ -5895,3 +5895,12 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .ihk-lock-tag.is-full { top: 42%; transform: translate(-50%, -50%); font-size: 11px; color: #ff4d5e; }
 .ihk-pick-card[data-blocked] { cursor: var(--cur-zoom-in); }
 .ihk-pick-card[data-blocked] img { filter: grayscale(1) brightness(.6); }
+
+/* Folierte Karte im Album: Menü unter der Karte wie bei normalen Karten – Wert, Favorit, Schützen, Verkaufen (foil-modal.ejs) */
+.foil-modal-menu { width: min(360px, calc(100vw - 32px)); margin: 0 auto; padding: 0 0 24px; text-align: center; }
+.foil-modal-menu[hidden] { display: none; }
+.foil-modal-menu .tcg-modal-status { margin: 0 0 10px; color: var(--color-neutral-300); font-size: 13px; }
+.foil-modal-menu .tcg-modal-status[hidden] { display: none; }
+.foil-modal-menu .foil-modal-actions { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
+.foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions a[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
+.foil-modal-menu .foil-modal-actions p { margin: 0; }
