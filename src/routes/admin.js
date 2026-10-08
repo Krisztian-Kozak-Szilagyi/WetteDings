@@ -205,7 +205,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
     // noch nicht erhältliche Karten (z. B. Mark Suntouched) nur für Admins
-    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.concat(isAdmin ? tcgCatalog.UNRELEASED_CARDS : []).filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.concat(isAdmin ? [...tcgCatalog.UNRELEASED_CARDS, ...tcgCatalog.TEST_CARDS] : []).filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     reasonMin: giftService.REASON_MIN,
     reasonMax: giftService.REASON_MAX,
