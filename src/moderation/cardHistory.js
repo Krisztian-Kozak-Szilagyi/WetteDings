@@ -172,7 +172,7 @@ async function historyOf(docId) {
   const opening = copy && copy.opening ? await TcgOpening.findById(copy.opening).select('user username type source cost createdAt').lean() : null;
   if (opening) {
     const pack = (catalog.packTypeByKey[opening.type] || {}).label || 'Booster Pack';
-    const SOURCE = { kauf: 'gekauft', quest: 'aus einer IHK-Quest', admin: 'vom Team geschenkt', lotto: 'aus der Lotterie' };
+    const SOURCE = { kauf: 'gekauft', quest: 'aus einer IHK-Quest', admin: 'vom Team geschenkt', lotto: 'aus der Lotterie', esports: 'als eSports-Trophäe' };
     events.push({ at: opening.createdAt, type: 'entstanden', order: -1, who: opening.user, text: `Aus einem ${pack} gezogen (Pack ${SOURCE[opening.source] || 'unbekannter Herkunft'})` });
   } else if (copy) {
     const [grants, runs, markets] = await Promise.all([

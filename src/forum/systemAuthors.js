@@ -10,9 +10,9 @@ const ALL = [BOERSE, WOCHENRUECKBLICK];
 const TEAM_AVATAR = '/img/avatars/logo-silber.svg';
 let teams = new Map(); // Name → Verfasser
 
-/** eSports-Teams als Verfasser bekanntgeben ([{ id, name }]) – ersetzt die bisherige Liste */
+/** eSports-Teams als Verfasser bekanntgeben ([{ id, name, avatar? }]) – ersetzt die bisherige Liste */
 function register(list) {
-  teams = new Map(list.map((t) => [t.name, { id: t.id, name: t.name, avatar: TEAM_AVATAR }]));
+  teams = new Map(list.map((t) => [t.name, { id: t.id, name: t.name, avatar: t.avatar || TEAM_AVATAR }]));
 }
 
 /** System-Verfasser zu einem Namen oder null */

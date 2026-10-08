@@ -28,6 +28,14 @@ const teamSchema = new Schema(
     lastRank: { type: Number, default: null }, // Platz im letzten Wochenbericht
     lastOf: { type: Number, default: null },
     lastChange: { type: Number, default: null },
+    // Profil (bearbeitet der Kapitän): Text, Motto, Farbe, Teambild (Avatar-Schlüssel aus dem Kosmetik-Shop)
+    bio: { type: String, default: '' },
+    motto: { type: String, default: '' },
+    color: { type: String, default: null },
+    avatar: { type: String, default: null },
+    cosmetics: { type: [String], default: [] }, // gekaufte Avatare des Teams ("avatar:<key>")
+    // Trophäen: Platz 1–3 eines Wochenberichts (week = Datum des Sonntags)
+    trophies: { type: [new Schema({ week: String, place: Number, score: Number }, { _id: false })], default: [] },
   },
   { timestamps: true }
 );
@@ -47,7 +55,19 @@ const weekSchema = new Schema(
   { timestamps: true }
 );
 
+// Admin-Einstellungen (ein Dokument, _id 'esports'): Preise je Trophäe und Mindestzahl der Teams mit Punkten
+const settingsSchema = new Schema(
+  {
+    _id: { type: String, default: 'esports' },
+    prizes: { type: [new Schema({ cash: Number, packs: Number }, { _id: false })], default: undefined },
+    minTeams: Number,
+    updatedByName: String,
+  },
+  { timestamps: true }
+);
+
 module.exports = {
+  EsportsSettings: model('EsportsSettings', settingsSchema),
   EsportsTeam: model('EsportsTeam', teamSchema),
   EsportsWeek: model('EsportsWeek', weekSchema),
 };
