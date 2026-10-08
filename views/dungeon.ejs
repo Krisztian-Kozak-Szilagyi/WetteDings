@@ -10,7 +10,7 @@
 %>
 
 <%# Mage Tower: kein Termin – kein Countdown, der Leiter startet (data-start leer) %>
-<div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= tower ? '' : new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
+<div class="dg-page<%= chaosTheme ? ' is-chaos' : '' %>" data-dg-page data-rev="<%= rev %>" data-start="<%= tower ? '' : new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
 <% if (tower ? towerClosedForOthers : closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <%# Bild des Dungeons im Querformat – darin Titel, Termin bzw. der laufende Kampf %>
@@ -24,7 +24,7 @@
       <% if (phase === 'laeuft') { %>
         <%# Chaos-Event: Meldung vom neuen Teilnehmer, bevor der Dungeon wechselt (public/js/dungeon.js) %>
         <p class="dg-event-alert" data-dg-event-alert role="status" hidden></p>
-        <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
+        <p class="dg-stage-title<%= chaosTheme ? ' is-binary' : '' %>" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
@@ -359,8 +359,8 @@
 
 <%# Beute: nach dem Ende einmal als Fenster – Spieler für Spieler aufgedeckt %>
 <% if (loot) { %>
-  <dialog class="dg-loot" data-dg-loot aria-labelledby="dg-loot-title">
-    <span class="kicker"><%= loot.tower ? 'Mage Tower · Beute' : loot.chaos ? 'Chaos Dungeon · Beute' : 'Beute' %></span>
+  <dialog class="dg-loot<%= loot.chaos ? ' is-chaos' : '' %>" data-dg-loot aria-labelledby="dg-loot-title">
+    <span class="kicker"><%= loot.tower ? 'Mage Tower · Beute' : loot.chaos ? 'Chaos & Demise · Beute' : 'Beute' %></span>
     <% if (loot.tower) { %>
       <h2 id="dg-loot-title"><%= loot.result[0].toUpperCase() + loot.result.slice(1) %>!</h2>
     <% } else { %>

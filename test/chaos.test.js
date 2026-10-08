@@ -23,6 +23,15 @@ test('Chaos Dungeon: drei Kämpfe wie ein normaler Dungeon, der letzte ist der B
   assert.equal(new Set(CHAOS.fights.map((f) => f.key)).size, 3);
 });
 
+test('„Chaos & Demise“: Flavour-Texte nur aus 0, 1 und ? – lesbar bleiben Name, Meldung und Kampfnamen', () => {
+  assert.equal(CHAOS.title, 'Chaos & Demise');
+  const binary = /^[01?]+( [01?]+)*$/;
+  const texts = [CHAOS.intro, ...CHAOS.fights.flatMap((f) => [f.text, f.success, f.fail])];
+  for (const t of texts) assert.match(t, binary);
+  assert.ok(texts.every((t) => t.includes('?') && t.includes('0') && t.includes('1')));
+  assert.doesNotMatch(CHAOS.arrival, binary);
+});
+
 test('Chaos-Boss-Karte: einziger Weg ist der Chaos Dungeon – nicht im Black Market, nicht beim Turm', () => {
   assert.ok(CHAOS.bossCard);
   assert.ok(!DUNGEONS.some((x) => x.bossCard === CHAOS.bossCard));

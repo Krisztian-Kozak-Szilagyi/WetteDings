@@ -157,6 +157,8 @@ router.get('/dungeon', async (req, res) => {
     // Chaos-Event vor der Enthüllung: Bild und Titel des verdrängten Dungeons (die Kämpfe sind schon die neuen)
     dg: running ? (eventHidden(running, now) ? { ...defOf(running.event), fights: runDungeon.fights } : runDungeon) : tower ? TOWER : next,
     tower,
+    // „Chaos & Demise“ schon enthüllt: lila Optik gleich beim Laden (sonst setzt public/js/dungeon.js sie beim Wechsel)
+    chaosTheme: !!running && !!running.event && !eventHidden(running, now),
     // Turm-Kacheln vor dem Beitritt: verfügbar? heute schon gespielt? Startet der Leiter erst, wenn alle gewählt haben
     towerShown: dungeon.towerOpen(req.user),
     towerTitle: TOWER.title,

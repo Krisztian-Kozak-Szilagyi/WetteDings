@@ -644,10 +644,10 @@
     if (stage === 2) {
       if (heroImg && ev.to.image) heroImg.src = ev.to.image;
       if (heroTitle) heroTitle.textContent = ev.to.title;
-      if (titleEl && starts.length && t < starts[0]) titleEl.textContent = ev.to.intro;
+      if (titleEl && starts.length && t < starts[0]) { titleEl.textContent = ev.to.intro; titleEl.classList.add('is-binary'); }
       page.classList.add('is-chaos');
       if (fresh) flash(page, 'is-chaos-reveal');
-      log(ev.from.title + ' ist verschwunden – der ' + ev.to.title + ' beginnt!', 'is-head');
+      log(ev.from.title + ' ist verschwunden – „' + ev.to.title + '“ beginnt!', 'is-head');
     }
   }
 
@@ -691,6 +691,7 @@
       if (t < t0 + f.seconds) {
         active = i;
         titleEl.textContent = f.title;
+        titleEl.classList.remove('is-binary');
         textEl.textContent = f.text;
         setBars(f, done, game);
       } else {
@@ -713,6 +714,7 @@
       } else {
         const f = pb.fights[after];
         const last = after === pb.fights.length - 1;
+        titleEl.classList.remove('is-binary');
         titleEl.textContent = f.success ? f.title + ': besiegt!' : f.title + ': Zeit abgelaufen – Rückzug!';
         textEl.textContent = f.success ? f.successText : f.failText;
         if (!last) nextEl.textContent = (pb.tower ? 'Runde ' + (after + 2) + ' beginnt in ' : 'Nächster Kampf in ') + secs(starts[after + 1] - t);

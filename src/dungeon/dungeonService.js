@@ -123,7 +123,7 @@ async function saveSettings({ open, intervalHours, required, rewards, foilChance
   if (!validTower(tower)) {
     throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s und Pause 0–30 s je Runde.');
   }
-  if (!validChaos(chaos)) throw new UserError('Chaos Dungeon: Chancen 0–100 %, Ziel-Punkte 1–100000 und gültiger Lohn je Kampf.');
+  if (!validChaos(chaos)) throw new UserError('Chaos & Demise: Chancen 0–100 %, Ziel-Punkte 1–100000 und gültiger Lohn je Kampf.');
   const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower, chaos };
   await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { ...next, updatedByName: admin.username } }, { upsert: true });
   const before = JSON.parse(JSON.stringify(settings));
@@ -901,7 +901,7 @@ async function grantPendingBossCards() {
     if (!done || !winners.length) continue;
     granted += winners.length;
     const d = defOf(r.dungeon);
-    await notify(winners, { area: 'TCG', href: '/tcg/album', text: `Deine Boss-Karte aus dem ${d ? d.title : 'Dungeon'} ist da: „${card.name}“.` }).catch((err) => console.error('Boss-Karten-Hinweis fehlgeschlagen:', err.message));
+    await notify(winners, { area: 'TCG', href: '/tcg/album', text: `Deine Boss-Karte aus „${d ? d.title : 'Dungeon'}“ ist da: „${card.name}“.` }).catch((err) => console.error('Boss-Karten-Hinweis fehlgeschlagen:', err.message));
   }
   return granted;
 }
