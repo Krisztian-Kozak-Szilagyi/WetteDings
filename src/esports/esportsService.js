@@ -3,7 +3,7 @@
  * Die Rechnung (Rangliste, Sprünge, Kurswirkung) steht in league.js, hier nur Speichern, Geld und Forum.
  *
  * Ablauf eines Teams:
- *  - Gründung kostet FOUND_COST; der Gründer ist Kapitän. Im Forum entsteht unter „eSports“ ein Unterbereich.
+ *  - Gründung kostet foundCost() (Admin, Startwert FOUND_COST); der Gründer ist Kapitän. Im Forum entsteht unter „eSports“ ein Unterbereich.
  *  - Ab TEAM_SIZE Mitgliedern wird der Team-ETF im Broker gehandelt (Start bei START_PRICE €).
  *  - Fällt ein gehandeltes Team unter TEAM_SIZE, friert es ein (kein Kauf, kein Sprung, kein Rauschen).
  *    Füllt es sich nicht binnen FREEZE_DAYS wieder auf: Konkurs – die Anleger bekommen den Wert zum letzten Kurs
@@ -11,13 +11,22 @@
  *  - Austritt aus einem gehandelten Team kostet LEAVE_FEE (geht an die übrigen Mitglieder), aus einem eingefrorenen
  *    BANKRUPT_FEE (wer das sinkende Schiff verlässt, zahlt wie beim Konkurs). Rauswurf kostet den Rausgeworfenen nichts.
  *  - Sonntags um REPORT_TIME: Wochenbericht – jedes gehandelte Team (schon vor der Woche gehandelt) springt nach
- *    seinem Platz und postet im eigenen Unterbereich.
+ *    seinem Platz und postet im eigenen Unterbereich. Platz 1–3 bekommen eine Trophäe (Gold, Silber, Bronze) fürs
+ *    Teamprofil; jedes Mitglied (schon vor der Woche im Team) bekommt den Preis des Platzes (Geld + Booster Packs, Admin).
+ *  - Profil (/esports/team/<kürzel>): Text, Motto, Farbe und Teambild bearbeitet der Kapitän. Das Teambild ist ein
+ *    Avatar aus dem Kosmetik-Shop zum halben Preis, bezahlt mit dem Konfetti des Kapitäns, und gehört dem Team.
  */
 const mongoose = require('mongoose');
 const config = require('../config');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { EsportsTeam, EsportsWeek } = require('../models/Esports');
+const { EsportsTeam, EsportsWeek, EsportsSettings } = require('../models/Esports');
+const { TcgPack } = require('../models/Tcg');
+const tcgCatalog = require('../tcg/catalog');
+const cosmetics = require('../cosmetics/cosmeticService');
+const cosmeticCatalog = require('../cosmetics/catalog');
+const avatars = require('../profile/avatars');
+const { logSettingsChange } = require('../stats/settingsLog');
 const { DungeonRun } = require('../models/Dungeon');
 const { CoinHolding, CoinTrade } = require('../models/Coin');
 const { ForumCategory } = require('../models/Forum');
@@ -86,9 +95,45 @@ function engineFor(team) {
 }
 
 async function registerAuthors() {
-  const all = await EsportsTeam.find({}).select('name').lean();
-  systemAuthors.register(all.map((t) => ({ id: t._id, name: t.name })));
+  const all = await EsportsTeam.find({}).select('name avatar').lean();
+  systemAuthors.register(all.map((t) => ({ id: t._id, name: t.name, avatar: t.avatar ? avatars.urlOf(t.avatar) : null })));
 }
+
+// ---------- Einstellungen (Admin): Preise der Trophäen ----------
+
+const SETTINGS_ID = 'esports';
+const settings = { prizes: league.DEFAULT_PRIZES.map((p) => ({ ...p })), minTeams: league.DEFAULT_MIN_TEAMS, foundCost: league.FOUND_COST };
+
+function applySettings(doc) {
+  if (!doc) return;
+  const prizes = Array.isArray(doc.prizes) ? doc.prizes.map((p) => ({ cash: p.cash, packs: p.packs })) : settings.prizes;
+  const minTeams = Number.isInteger(doc.minTeams) ? doc.minTeams : settings.minTeams;
+  if (Number.isInteger(doc.foundCost) && !league.foundCostError(doc.foundCost)) settings.foundCost = doc.foundCost;
+  if (league.prizesError(prizes, minTeams)) return; // kaputte Werte: Startwerte behalten
+  settings.prizes = prizes;
+  settings.minTeams = minTeams;
+}
+
+/** Gründungskosten in Cent (Admin-Panel) */
+const foundCost = () => settings.foundCost;
+
+async function loadSettings() {
+  applySettings(await EsportsSettings.findById(SETTINGS_ID).lean());
+}
+
+/** Admin: Gründungskosten, Preis je Platz (Geld in Cent, Packs) und Mindestzahl der Teams mit Punkten speichern */
+async function saveSettings({ admin, prizes, minTeams, foundCost: cost }) {
+  const err = league.foundCostError(cost) || league.prizesError(prizes, minTeams);
+  if (err) throw new UserError(err);
+  const before = { foundCost: settings.foundCost, prizes: settings.prizes.map((p) => ({ ...p })), minTeams: settings.minTeams };
+  const clean = { foundCost: cost, prizes: prizes.map((p) => ({ cash: p.cash, packs: p.packs })), minTeams };
+  await EsportsSettings.updateOne({ _id: SETTINGS_ID }, { $set: { ...clean, updatedByName: admin.username } }, { upsert: true });
+  applySettings(clean);
+  await logSettingsChange({ area: 'esports', before, after: clean, by: admin });
+}
+
+/** Preise je Platz mit Bezeichnung (für Seite, Regeln und Admin) */
+const prizeList = () => league.PLACES.map((p, i) => ({ ...p, ...settings.prizes[i] }));
 
 /** Beim Serverstart (nach markets.start): Forum-Verfasser und die Engines aller gehandelten Teams */
 async function start() {
@@ -138,6 +183,88 @@ async function list() {
     .sort((a, b) => order[a.status] - order[b.status] || (a.lastRank ?? 999) - (b.lastRank ?? 999) || a.createdAt - b.createdAt);
 }
 
+/** Team zum Kürzel (aus der Adresse) – auch aufgelöste, für das Profil */
+async function byTicker(raw) {
+  const ticker = league.cleanTicker(raw);
+  if (!ticker) return null;
+  const t = await EsportsTeam.findOne({ ticker }).lean();
+  if (!t) return null;
+  const e = LISTED.includes(t.status) ? markets.get(t.ticker) : null;
+  return { ...t, price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
+}
+
+/** Wochenberichte eines Teams (neueste zuerst): [{ week, rank, of, score, change }] */
+async function historyOf(teamId, limit = 12) {
+  const weeks = await EsportsWeek.find({ status: 'fertig', 'rows.team': teamId }).sort({ _id: -1 }).limit(limit).lean();
+  return weeks.map((w) => {
+    const r = w.rows.find((x) => String(x.team) === String(teamId));
+    return { week: w._id, rank: r.rank, of: r.of, score: r.score, change: r.change };
+  });
+}
+
+/** Avatare für das Teambild: halber Preis, Besitz des Teams markiert */
+function teamAvatars(team) {
+  const owned = team.cosmetics || [];
+  return cosmetics.avatars().map((a) => ({ ...a, price: league.teamAvatarPrice(a.price), owned: owned.includes(cosmeticCatalog.ownedKey('avatar', a.key)), worn: team.avatar === a.key }));
+}
+
+// ---------- Profil (nur der Kapitän) ----------
+
+async function captainTeam(user) {
+  const team = await loadOwnTeam(user);
+  if (!team.captain.equals(user._id)) throw new UserError('Nur der Kapitän kann das Teamprofil bearbeiten.');
+  return team;
+}
+
+/** Text, Motto und Farbe speichern; gibt das Team zurück */
+async function updateProfile({ user, bio, motto, color }) {
+  const team = await captainTeam(user);
+  const c = color ? league.findColor(color) : null;
+  if (color && !c) throw new UserError('Diese Farbe gibt es nicht.');
+  await EsportsTeam.updateOne({ _id: team._id, captain: user._id }, { $set: { bio: league.cleanBio(bio), motto: league.cleanMotto(motto), color: c ? c.key : null } });
+  return team;
+}
+
+/** Avatar fürs Team kaufen (halber Preis, Konfetti des Kapitäns) und gleich als Teambild setzen */
+async function buyAvatar({ user, key }) {
+  const team = await captainTeam(user);
+  const it = cosmetics.item('avatar', key);
+  if (!it) throw new UserError('Diesen Avatar gibt es nicht.');
+  const owned = cosmeticCatalog.ownedKey('avatar', it.key);
+  const price = league.teamAvatarPrice(it.price);
+  await inTransaction(async (session) => {
+    const t = await EsportsTeam.updateOne({ _id: team._id, captain: user._id, status: { $in: LIVE }, cosmetics: { $ne: owned } }, { $addToSet: { cosmetics: owned }, $set: { avatar: it.key } }, { session });
+    if (!t.modifiedCount) throw new UserError('Das Team besitzt diesen Avatar schon.');
+    const paid = await User.updateOne({ _id: user._id, deletedAt: null, konfetti: { $gte: price } }, { $inc: { konfetti: -price } }, { session });
+    if (!paid.modifiedCount) throw new UserError(`Dafür reicht dein ${cosmetics.currencyName()} nicht.`);
+    await Ledger.create([{ user: user._id, type: 'kosmetik_kauf', amount: 0, betTitle: `${it.name} (Team ${team.name})`, meta: { kind: 'avatar', item: it.key, konfetti: -price, team: team._id } }], { session });
+  });
+  await registerAuthors();
+  return team;
+}
+
+/** Gekauften Team-Avatar als Teambild setzen */
+async function wearAvatar({ user, key }) {
+  const team = await captainTeam(user);
+  const it = cosmetics.item('avatar', key);
+  if (!it || !(team.cosmetics || []).includes(cosmeticCatalog.ownedKey('avatar', it.key))) throw new UserError('Diesen Avatar besitzt das Team nicht.');
+  await EsportsTeam.updateOne({ _id: team._id, captain: user._id }, { $set: { avatar: it.key } });
+  await registerAuthors();
+  return team;
+}
+
+/** Kapitänsrolle an ein anderes Mitglied abgeben */
+async function transferCaptain({ user, userId }) {
+  const team = await captainTeam(user);
+  if (!mongoose.isValidObjectId(userId) || String(userId) === String(user._id)) throw new UserError('Dieses Mitglied gibt es nicht.');
+  const target = team.members.find((m) => m.user.equals(userId));
+  if (!target) throw new UserError('Dieses Mitglied gibt es nicht.');
+  const res = await EsportsTeam.updateOne({ _id: team._id, captain: user._id, 'members.user': target.user }, { $set: { captain: target.user } });
+  if (!res.modifiedCount) throw new UserError('Das Team hat sich gerade geändert – bitte lade die Seite neu.');
+  await notify(target.user, { area: 'eSports', href: `/esports/team/${team.ticker.toLowerCase()}`, text: `${user.username} hat dich zum Kapitän von „${team.name}“ gemacht.` });
+  return team;
+}
+
 /** Offene Einladungen an einen Spieler */
 const invitesFor = (userId) => EsportsTeam.find({ 'invites.user': userId, status: { $in: LIVE } }).select('name ticker members').lean();
 
@@ -160,10 +287,11 @@ async function found({ user, name: rawName, ticker: rawTicker }) {
   let team;
   try {
     team = await inTransaction(async (session) => {
-      const paid = await User.updateOne({ _id: user._id, balance: { $gte: league.FOUND_COST } }, { $inc: { balance: -league.FOUND_COST } }, { session });
+      const cost = foundCost();
+      const paid = cost ? await User.updateOne({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { session }) : { modifiedCount: 1 };
       if (!paid.modifiedCount) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
       const [t] = await EsportsTeam.create([{ name, nameLower: name.toLowerCase(), ticker, captain: user._id, members: [{ user: user._id, name: user.username }] }], { session });
-      await Ledger.create([{ user: user._id, type: 'esports_gruendung', amount: -league.FOUND_COST, betTitle: name }], { session });
+      if (cost) await Ledger.create([{ user: user._id, type: 'esports_gruendung', amount: -cost, betTitle: name }], { session });
       return t;
     });
   } catch (err) {
@@ -394,6 +522,8 @@ async function publish(day, from, to) {
     : [];
   const rows = league.rankWeek(teams.map((t) => ({ id: String(t._id), prevRank: t.lastRank, rounds: runs.filter((r) => r.esportsTeam.equals(t._id)).map((r) => r.rounds || 0) })));
   const out = [];
+  const won = new Map(league.trophies(rows, settings.minTeams).map((t) => [t.id, t.place]));
+  const prizes = prizeList();
   const [y, m, d] = day.split('-');
   const forumService = require('../forum/forumService'); // erst hier laden: zieht viele Module nach sich
   for (const row of rows) {
@@ -402,8 +532,10 @@ async function publish(day, from, to) {
     if (!engine || !engine.isRunning()) continue;
     const jump = await engine.jump(row.log, Math.max(-1, Math.min(1, row.log / 0.2)));
     await EsportsTeam.updateOne({ _id: team._id }, { $set: { lastRank: row.rank, lastOf: row.of, lastChange: row.change } });
-    out.push({ team: team._id, name: team.name, ticker: team.ticker, rank: row.rank, of: row.of, score: row.score, change: row.change, priceBefore: jump.before, priceAfter: jump.after });
-    const text = league.reportText(team, row, `${d}.${m}.${y}`);
+    const place = won.get(row.id) || null;
+    if (place) await awardTrophy(team, { day, from, place, score: row.score, prize: prizes[place - 1] }).catch((err) => console.error(`eSports-Trophäe ${team.ticker}:`, err.message));
+    out.push({ team: team._id, name: team.name, ticker: team.ticker, rank: row.rank, of: row.of, score: row.score, change: row.change, priceBefore: jump.before, priceAfter: jump.after, trophy: place });
+    const text = league.reportText(team, row, `${d}.${m}.${y}`, place);
     await forumService
       .systemThread({ author: { id: team._id, name: team.name }, categoryKey: categoryKey(team), title: text.title, body: text.body })
       .catch((err) => console.error(`eSports-Bericht ${team.ticker}:`, err.message));
@@ -411,6 +543,34 @@ async function publish(day, from, to) {
   await EsportsWeek.updateOne({ _id: day }, { $set: { status: 'fertig', rows: out } });
   if (out.length) console.log(`eSports-Wochenbericht ${day}: ${out.length} Teams`);
   return out;
+}
+
+/**
+ * Trophäe ins Teamprofil und Preis an jedes Mitglied, das schon vor der Woche im Team war – alles in einer
+ * Transaktion; die Trophäe je Woche gibt es nur einmal (ein wiederholter Bericht zahlt nicht doppelt).
+ */
+async function awardTrophy(team, { day, from, place, score, prize }) {
+  const winners = league.prizeMembers(team.members, from);
+  const label = league.placeInfo(place).label;
+  const paid = await inTransaction(async (session) => {
+    const t = await EsportsTeam.updateOne({ _id: team._id, 'trophies.week': { $ne: day } }, { $push: { trophies: { week: day, place, score } } }, { session });
+    if (!t.modifiedCount) return false;
+    for (const m of winners) {
+      if (prize.cash) {
+        await User.updateOne({ _id: m.user }, { $inc: { balance: prize.cash } }, { session });
+        await Ledger.create([{ user: m.user, type: 'esports_preis', amount: prize.cash, betTitle: `${team.name} · ${label}`, meta: { week: day, place, packs: prize.packs } }], { session });
+      }
+      if (prize.packs) await TcgPack.insertMany(Array.from({ length: prize.packs }, () => ({ user: m.user, type: tcgCatalog.DEFAULT_PACK, source: 'esports', cost: 0 })), { session });
+    }
+    return true;
+  });
+  if (!paid || !winners.length) return;
+  const parts = [prize.cash ? euroText(prize.cash) + ' €' : '', prize.packs ? `${prize.packs} Booster ${prize.packs === 1 ? 'Pack' : 'Packs'}` : ''].filter(Boolean).join(' und ');
+  await notify(winners.map((m) => m.user), {
+    area: 'eSports',
+    href: `/esports/team/${team.ticker.toLowerCase()}`,
+    text: `„${team.name}“ holt die ${label}-Trophäe der Woche!${parts ? ` Dein Preis: ${parts}.` : ''}`,
+  });
 }
 
 const lastWeek = () => EsportsWeek.findOne({ status: 'fertig' }).sort({ _id: -1 }).lean();
@@ -424,6 +584,18 @@ module.exports = {
   teamsOf,
   towerTeam,
   list,
+  byTicker,
+  historyOf,
+  teamAvatars,
+  updateProfile,
+  buyAvatar,
+  wearAvatar,
+  transferCaptain,
+  loadSettings,
+  saveSettings,
+  prizeList,
+  foundCost,
+  settings,
   invitesFor,
   found,
   invite,
@@ -434,6 +606,7 @@ module.exports = {
   kick,
   close,
   closeExpired,
+  awardTrophy,
   runDue,
   lastWeek,
 };

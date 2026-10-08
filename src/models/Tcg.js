@@ -29,7 +29,7 @@ const packSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, required: true }, // Pack-Art aus dem Katalog (PACK_TYPES)
-    source: { type: String, enum: ['kauf', 'quest', 'admin', 'lotto', 'einladung'], required: true },
+    source: { type: String, enum: ['kauf', 'quest', 'admin', 'lotto', 'einladung', 'esports'], required: true },
     cost: { type: Number, default: 0 }, // bezahlter Preis in Cent (0 = geschenkt)
   },
   { timestamps: true }
@@ -68,7 +68,7 @@ const openingSchema = new Schema(
     },
     best: { type: Number, required: true }, // Rang der seltensten Karte (0 = Crumpled … 5 = Glitch)
     type: { type: String, default: null }, // Pack-Art (ältere Öffnungen: null)
-    source: { type: String, default: null }, // Herkunft des Packs: kauf | quest | admin | lotto | einladung (ältere Öffnungen: null)
+    source: { type: String, default: null }, // Herkunft des Packs: kauf | quest | admin | lotto | einladung | esports (ältere Öffnungen: null)
   },
   { timestamps: true }
 );

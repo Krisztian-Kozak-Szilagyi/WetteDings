@@ -27,6 +27,9 @@ router.get('/esports', async (req, res) => {
     invites,
     week,
     rules: league,
+    prizes: esports.prizeList(),
+    minTeams: esports.settings.minTeams,
+    foundCost: esports.foundCost(),
     nextReport: new Date(esports.weekStart().getTime() + 7 * 24 * 60 * 60 * 1000),
   });
 });
@@ -58,6 +61,44 @@ router.post('/esports/austreten', (req, res) =>
     await esports.leave({ user: req.user });
   })
 );
+// Teamprofil: Mitglieder, Trophäen, Wochen, ETF – der Kapitän bearbeitet Text, Motto, Farbe und Teambild
+router.get('/esports/team/:ticker', async (req, res) => {
+  const team = await esports.byTicker(req.params.ticker);
+  if (!team) return res.status(404).render('error', { title: 'eSports', status: 404, message: 'Dieses Team gibt es nicht.' });
+  const isCaptain = team.status !== 'aufgeloest' && team.captain.equals(req.user._id);
+  const history = await esports.historyOf(team._id);
+  res.render('esports-team', {
+    title: team.name,
+    team,
+    history,
+    isCaptain,
+    isMember: team.members.some((m) => m.user.equals(req.user._id)),
+    teamAvatars: isCaptain ? esports.teamAvatars(team) : null,
+    konfetti: req.user.konfetti || 0,
+    prizes: esports.prizeList(),
+    rules: league,
+  });
+});
+
+/** Aktion des Kapitäns, zurück auf das Profil des eigenen Teams (Adresse aus der Datenbank, Anker aus fester Liste) */
+async function handleProfile(req, res, anchor, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  const team = await esports.teamOfUser(req.user._id);
+  res.redirect(team ? `/esports/team/${team.ticker.toLowerCase()}${anchor === 'teambild' ? '#teambild' : ''}` : '/esports');
+}
+
+router.post('/esports/profil', (req, res) =>
+  handleProfile(req, res, '', () => esports.updateProfile({ user: req.user, bio: str(req.body.bio), motto: str(req.body.motto), color: str(req.body.color) }))
+);
+router.post('/esports/teambild/kaufen', (req, res) => handleProfile(req, res, 'teambild', () => esports.buyAvatar({ user: req.user, key: str(req.body.key) })));
+router.post('/esports/teambild/setzen', (req, res) => handleProfile(req, res, 'teambild', () => esports.wearAvatar({ user: req.user, key: str(req.body.key) })));
+router.post('/esports/kapitaen', (req, res) => handleProfile(req, res, '', () => esports.transferCaptain({ user: req.user, userId: str(req.body.user) })));
+
 router.post('/esports/entfernen', (req, res) => handle(req, res, () => esports.kick({ user: req.user, userId: str(req.body.user) })));
 
 module.exports = router;

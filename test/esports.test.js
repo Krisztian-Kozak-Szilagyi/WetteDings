@@ -132,3 +132,67 @@ test('eSports: über der Obergrenze gehen die zuletzt Beigetretenen, nie der Kap
   // Kapitän ist zuletzt beigetreten: er bleibt, dafür geht der Nächstjüngere
   assert.deepEqual(league.overflow(members, 'u6').map((m) => m.user), ['u5', 'u4']);
 });
+
+test('eSports: Trophäen für Platz 1–3, nur mit Punkten und genug Teams', () => {
+  const rows = league.rankWeek([
+    { id: 'a', rounds: [10], prevRank: null },
+    { id: 'b', rounds: [8], prevRank: null },
+    { id: 'c', rounds: [8], prevRank: null },
+    { id: 'd', rounds: [3], prevRank: null },
+    { id: 'e', rounds: [], prevRank: null },
+  ]);
+  // Gleichstand b/c teilt Silber, danach kommt Platz 4 – also kein Bronze
+  assert.deepEqual(league.trophies(rows, 3), [{ id: 'a', place: 1 }, { id: 'b', place: 2 }, { id: 'c', place: 2 }]);
+  // zu wenige Teams mit Punkten: keine Trophäe
+  assert.deepEqual(league.trophies(rows, 5), []);
+  const two = league.rankWeek([{ id: 'a', rounds: [5], prevRank: null }, { id: 'b', rounds: [], prevRank: null }]);
+  assert.deepEqual(league.trophies(two, 1), [{ id: 'a', place: 1 }]);
+  assert.deepEqual(league.trophies(two, 2), []);
+});
+
+test('eSports: Preis nur für Mitglieder, die vor der Woche dabei waren', () => {
+  const since = new Date('2026-10-04T18:00:00Z');
+  const members = [
+    { user: 'a', joinedAt: new Date('2026-09-01') },
+    { user: 'b', joinedAt: since },
+    { user: 'c', joinedAt: new Date('2026-10-06') },
+  ];
+  assert.deepEqual(league.prizeMembers(members, since).map((m) => m.user), ['a', 'b']);
+});
+
+test('eSports: Admin-Preise prüfen, Startwerte gültig', () => {
+  assert.equal(league.prizesError(league.DEFAULT_PRIZES, league.DEFAULT_MIN_TEAMS), null);
+  assert.deepEqual(league.DEFAULT_PRIZES, [{ cash: 150000, packs: 10 }, { cash: 100000, packs: 7 }, { cash: 100000, packs: 5 }]);
+  assert.ok(league.prizesError(league.DEFAULT_PRIZES.slice(0, 2), 3));
+  assert.ok(league.prizesError([{ cash: -1, packs: 0 }, { cash: 0, packs: 0 }, { cash: 0, packs: 0 }], 3));
+  assert.ok(league.prizesError([{ cash: NaN, packs: 0 }, { cash: 0, packs: 0 }, { cash: 0, packs: 0 }], 3));
+  assert.ok(league.prizesError([{ cash: 0, packs: 51 }, { cash: 0, packs: 0 }, { cash: 0, packs: 0 }], 3));
+  assert.ok(league.prizesError(league.DEFAULT_PRIZES, 0));
+});
+
+test('eSports: Teamprofil – Text, Motto, Farbe, halber Avatarpreis', () => {
+  assert.equal(league.teamAvatarPrice(250), 125);
+  assert.equal(league.teamAvatarPrice(101), 51);
+  assert.equal(league.teamAvatarPrice(0), 0);
+  assert.equal(league.cleanBio('  Hallo\r\n\r\n\r\n\r\nWelt   da  '), 'Hallo\n\nWelt da');
+  assert.equal(league.cleanBio('x'.repeat(400)).length, league.BIO_MAX);
+  assert.equal(league.cleanBio(undefined), '');
+  assert.equal(league.cleanMotto('Wir\nsind   da'), 'Wir sind da');
+  assert.equal(league.cleanMotto('y'.repeat(100)).length, league.MOTTO_MAX);
+  assert.equal(league.findColor('gold').hex, '#d9a441');
+  assert.equal(league.findColor('__proto__'), null);
+});
+
+test('eSports: Wochenbericht nennt die Trophäe', () => {
+  const row = { rank: 1, of: 3, best: [5, 4], score: 9, held: false, change: 0.25 };
+  assert.match(league.reportText({ ticker: 'ABC' }, row, '04.10.2026', 1).body, /Gold-Trophäe/);
+  assert.doesNotMatch(league.reportText({ ticker: 'ABC' }, row, '04.10.2026').body, /Trophäe/);
+});
+
+test('eSports: Gründungskosten prüfen (Admin)', () => {
+  assert.equal(league.foundCostError(league.FOUND_COST), null);
+  assert.equal(league.foundCostError(0), null);
+  assert.ok(league.foundCostError(-1));
+  assert.ok(league.foundCostError(NaN));
+  assert.ok(league.foundCostError(10000001));
+});

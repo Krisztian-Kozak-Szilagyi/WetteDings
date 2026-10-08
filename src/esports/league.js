@@ -18,13 +18,45 @@ const START_PRICE = 50;
 const TOP_CHANGE = 0.25; // Platz 1
 const BOTTOM_CHANGE = -0.2; // letzter Platz
 const HOLD_BONUS = 0.045; // Platz gehalten oder verbessert
-const FOUND_COST = 100000; // Cent: Gründung 1.000 €
+const FOUND_COST = 100000; // Cent: Gründung 1.000 € (Startwert, Admin: Spielwerte → eSports)
+const MAX_FOUND_COST = 10000000; // Cent: höchstens 100.000 €
 const LEAVE_FEE = 25000; // Cent: Austritt aus einem gehandelten Team 250 € (geht an die übrigen Mitglieder)
 const BANKRUPT_FEE = 100000; // Cent: Konkurs je Mitglied 1.000 € (auch ins Minus)
 const FREEZE_DAYS = 14; // so lange darf ein Team unter TEAM_SIZE Mitgliedern bleiben, dann Konkurs
 // Kurswirkung von Käufen/Verkäufen: je 100 € 0,05 % (Log), höchstens 2 % je Auftrag
 const IMPACT_PER_EURO = 0.000005;
 const IMPACT_MAX = 0.02;
+
+// Trophäen: Platz 1–3 der Woche (Gold, Silber, Bronze) – nur mit Punkten und nur, wenn genug Teams Punkte haben
+// (sonst holt ein einzelnes Team jede Woche Gold). Preise je Mitglied stellt der Admin ein; hier die Startwerte.
+const PLACES = [
+  { place: 1, key: 'gold', label: 'Gold' },
+  { place: 2, key: 'silber', label: 'Silber' },
+  { place: 3, key: 'bronze', label: 'Bronze' },
+];
+const DEFAULT_PRIZES = [
+  { cash: 150000, packs: 10 },
+  { cash: 100000, packs: 7 },
+  { cash: 100000, packs: 5 },
+];
+const DEFAULT_MIN_TEAMS = 3;
+const MAX_PRIZE_CASH = 10000000; // Cent: 100.000 €
+const MAX_PRIZE_PACKS = 50;
+// Profil: Teambild = Avatar aus dem Kosmetik-Shop, für Teams zum halben Preis (zahlt der Kapitän)
+const TEAM_AVATAR_FACTOR = 0.5;
+const BIO_MAX = 300;
+const MOTTO_MAX = 60;
+const COLORS = [
+  { key: 'gold', label: 'Gold', hex: '#d9a441' },
+  { key: 'karmesin', label: 'Karmesin', hex: '#b3322b' },
+  { key: 'smaragd', label: 'Smaragd', hex: '#2f9e6b' },
+  { key: 'saphir', label: 'Saphir', hex: '#3a6fd8' },
+  { key: 'violett', label: 'Violett', hex: '#8a55d6' },
+  { key: 'tuerkis', label: 'Türkis', hex: '#25a8b5' },
+  { key: 'orange', label: 'Orange', hex: '#e07a2e' },
+  { key: 'rosa', label: 'Rosa', hex: '#d65a9a' },
+  { key: 'silber', label: 'Silber', hex: '#9aa4b2' },
+];
 
 const LOG_TOP = Math.log1p(TOP_CHANGE);
 const LOG_BOTTOM = Math.log1p(BOTTOM_CHANGE);
@@ -111,8 +143,50 @@ function overflow(members, captain, max = MAX_MEMBERS) {
 
 const pct = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
 
-/** Text des Wochenberichts eines Teams (Forum, im Namen des Teams) */
-function reportText(team, row, dateText) {
+/**
+ * Trophäen der Woche aus der Rangliste (rankWeek): Platz 1–3 mit Punkten, Gleichstand teilt die Trophäe.
+ * Nur wenn mindestens minTeams Teams Punkte haben. → [{ id, place }]
+ */
+function trophies(rows, minTeams = DEFAULT_MIN_TEAMS) {
+  const scored = rows.filter((r) => r.score > 0);
+  if (scored.length < Math.max(1, minTeams)) return [];
+  return scored.filter((r) => r.rank <= PLACES.length).map((r) => ({ id: r.id, place: r.rank }));
+}
+
+const placeInfo = (place) => PLACES.find((p) => p.place === place) || null;
+
+/** Wer bekommt den Preis? Mitglieder, die schon vor Beginn der Woche im Team waren (wie bei den Läufen) */
+const prizeMembers = (members, since) => members.filter((m) => new Date(m.joinedAt).getTime() <= new Date(since).getTime());
+
+/** Admin-Werte prüfen: prizes = [{ cash, packs }] je Platz, minTeams → Fehlertext oder null */
+function prizesError(prizes, minTeams) {
+  if (!Array.isArray(prizes) || prizes.length !== PLACES.length) return 'Für jeden Platz fehlt ein Preis.';
+  for (const [i, p] of prizes.entries()) {
+    const label = PLACES[i].label;
+    if (!Number.isInteger(p.cash) || p.cash < 0 || p.cash > MAX_PRIZE_CASH) return `${label}: Geld 0 bis ${(MAX_PRIZE_CASH / 100).toLocaleString('de-DE')} €.`;
+    if (!Number.isInteger(p.packs) || p.packs < 0 || p.packs > MAX_PRIZE_PACKS) return `${label}: Booster Packs 0 bis ${MAX_PRIZE_PACKS}.`;
+  }
+  if (!Number.isInteger(minTeams) || minTeams < 1 || minTeams > 20) return 'Mindestzahl der Teams: 1 bis 20.';
+  return null;
+}
+
+/** Gründungskosten (Cent) prüfen → Fehlertext oder null */
+const foundCostError = (cents) =>
+  Number.isInteger(cents) && cents >= 0 && cents <= MAX_FOUND_COST ? null : `Gründungskosten: 0 bis ${(MAX_FOUND_COST / 100).toLocaleString('de-DE')} €.`;
+
+/** Preis eines Avatars fürs Team (aufgerundet) */
+const teamAvatarPrice = (price) => Math.ceil(price * TEAM_AVATAR_FACTOR);
+
+const cleanText = (v, max) => (typeof v === 'string' ? v.replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max) : '');
+/** Profiltext (mehrzeilig, höchstens BIO_MAX Zeichen) */
+const cleanBio = (v) => cleanText(v, BIO_MAX);
+/** Motto (eine Zeile, höchstens MOTTO_MAX Zeichen) */
+const cleanMotto = (v) => cleanText(typeof v === 'string' ? v.replace(/\s+/g, ' ') : v, MOTTO_MAX);
+/** Teamfarbe nur aus der festen Liste */
+const findColor = (key) => COLORS.find((c) => c.key === key) || null;
+
+/** Text des Wochenberichts eines Teams (Forum, im Namen des Teams); place = gewonnene Trophäe (1–3) oder null */
+function reportText(team, row, dateText, place = null) {
   const runs = row.best.length ? row.best.map((r) => `${r} ${r === 1 ? 'Stockwerk' : 'Stockwerke'}`).join(' und ') : 'keinen gültigen Lauf';
   const lines = [
     `# Wochenbericht vom ${dateText}`,
@@ -121,6 +195,7 @@ function reportText(team, row, dateText) {
     '',
     row.best.length ? `Unsere besten Läufe der Woche: ${runs} – zusammen **${row.score} Punkte**.` : 'Diese Woche haben wir keinen gültigen Lauf als volles Team geschafft.',
     row.held ? 'Wir haben unseren Platz gehalten.' : '',
+    place && placeInfo(place) ? `🏆 Dafür gibt es die **${placeInfo(place).label}-Trophäe** der Woche.` : '',
     '',
     `Kursbewegung des ${team.ticker}: **${pct(row.change)}**.`,
   ];
@@ -149,4 +224,20 @@ module.exports = {
   splitFee,
   overflow,
   reportText,
+  PLACES,
+  DEFAULT_PRIZES,
+  DEFAULT_MIN_TEAMS,
+  MAX_PRIZE_PACKS,
+  BIO_MAX,
+  MOTTO_MAX,
+  COLORS,
+  trophies,
+  placeInfo,
+  prizeMembers,
+  prizesError,
+  foundCostError,
+  teamAvatarPrice,
+  cleanBio,
+  cleanMotto,
+  findColor,
 };

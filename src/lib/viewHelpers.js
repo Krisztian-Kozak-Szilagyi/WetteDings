@@ -145,6 +145,7 @@ const ledgerLabels = {
   esports_anteil: 'eSports: Anteil an einer Austrittsgebühr',
   esports_konkurs: 'eSports: Konkurs',
   esports_auszahlung: 'eSports: Auszahlung nach Auflösung',
+  esports_preis: 'eSports: Trophäe der Woche',
   schuld_tilgung: 'Schulden getilgt',
   team_gutschrift: 'Gutschrift vom Team',
   team_abzug: 'Abzug durch das Team',

@@ -23,6 +23,7 @@ async function main() {
   await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?
   await require('./src/items/foil').loadSettings(); // Folie: Fundchance und Wertsteigerung
   await require('./src/cosmetics/cosmeticService').loadSettings(); // Kosmetik: Währungsname, Preise und Effekte
+  await require('./src/esports/esportsService').loadSettings(); // eSports: Preise der Trophäen
   await require('./src/services/lotteryService').loadSettings(); // Wochen-/Monats-Lotterie: Lospreis und Bank-Gewinn
   await require('./src/stats/settingsLog').logConfigOnStart(); // geänderte .env-Werte im Einstellungs-Verlauf vermerken
   await require('./src/forum/forumService').seed(); // Forum: Bereiche beim ersten Start

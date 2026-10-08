@@ -223,6 +223,28 @@
   </section>
 <% } %>
 
+  <% if (sub === 'esports' && esportsAdmin) { %>
+  <section class="stats-block" id="esports">
+    <%- blockHead('eSports', 'Gründungskosten zahlt der Gründer eines Teams (0 = kostenlos). Sonntags im Wochenbericht: Platz 1–3 (nur mit Punkten) bekommen Gold, Silber oder Bronze fürs Teamprofil. Jedes Mitglied, das schon vor der Woche im Team war, bekommt den Preis des Platzes. Gleichstand teilt den Platz – dann bekommen beide Teams den Preis. Änderungen gelten ab dem nächsten Bericht.') %>
+    <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/esports" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field"><span>Gründungskosten in €</span><input type="text" name="foundCost" inputmode="decimal" value="<%= cents(esportsAdmin.foundCost) %>" required></label>
+        <% esportsAdmin.prizes.forEach((p) => { %>
+          <h4><%= p.place %>. Platz · <%= p.label %></h4>
+          <div class="admin-gr-grid">
+            <label class="field"><span>Geld je Mitglied in €</span><input type="text" name="cash_<%= p.place %>" inputmode="decimal" value="<%= cents(p.cash) %>" required></label>
+            <label class="field"><span>Booster Packs je Mitglied</span><input type="number" name="packs_<%= p.place %>" min="0" max="<%= esportsAdmin.maxPacks %>" step="1" value="<%= p.packs %>" required></label>
+          </div>
+        <% }) %>
+        <label class="field"><span>Trophäen nur, wenn so viele Teams Punkte haben</span><input type="number" name="minTeams" min="1" max="20" step="1" value="<%= esportsAdmin.minTeams %>" required></label>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+<% } %>
+
   <% if (sub === 'lotterie') { %>
   <section class="stats-block" id="lotterie">
     <%- blockHead('Lotterien', 'Der Gewinner bekommt alle Einsätze plus den Bank-Gewinn (Geld, Booster Packs, Folien). Ohne verkaufte Lose verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die laufende Runde.') %>
