@@ -211,6 +211,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     reasonMax: giftService.REASON_MAX,
     // Pop-ups (#132): Nachrichten mit Lesestand; Ablaufdatum frühestens jetzt (deutsche Zeit, für datetime-local)
     devMessages,
+    popupSent: needs('popups') && takeOnce(req.session, 'popupSent'),
     devMessageLimits: { titleMax: devMessageService.TITLE_MAX, textMin: devMessageService.TEXT_MIN, textMax: devMessageService.TEXT_MAX },
     devMessageMinExpiry: toZonedLocalInput(new Date(Date.now() + 5 * 60000), config.timezone),
     packLogNew: counts.packLogNew,
@@ -502,6 +503,12 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
 });
 
 // ---------- Pop-ups (#132): Nachricht an alle Mitglieder, erscheint als Fenster bis „Gelesen“ ----------
+/** Merker aus der Sitzung lesen und gleich löschen (nur einmal anzeigen) */
+function takeOnce(session, key) {
+  const v = !!session[key];
+  delete session[key];
+  return v;
+}
 const POPUP_URL = panelUrl('popups');
 router.post('/admin/popups', requireStaff, requireReauth(POPUP_URL), async (req, res) => {
   // Gültigkeit: bis gelesen (kein Ablauf) oder mit Ablaufdatum (deutsche Zeit aus datetime-local)
@@ -509,7 +516,8 @@ router.post('/admin/popups', requireStaff, requireReauth(POPUP_URL), async (req,
   const expiresAt = withExpiry ? parseZonedLocal(str(req.body.expiresAt), config.timezone) || new Date(NaN) : null;
   try {
     await devMessageService.create({ title: req.body.title, text: req.body.text, expiresAt, author: req.user });
-    req.flash('success', 'Pop-up veröffentlicht – alle Mitglieder sehen es jetzt oder beim nächsten Besuch.');
+    // Statt des normalen Hinweises oben: kurze Bestätigung unten, die nach 3 Sekunden verschwindet (views/admin/popups.ejs)
+    req.session.popupSent = true;
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

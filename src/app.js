@@ -154,7 +154,7 @@ function createApp() {
   app.get('/entwickler-nachrichten/neu', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (!req.user) return res.status(401).json({ popup: null });
-    res.json({ popup: devMessageService.popup(await devMessageService.nextUnseen(req.user._id)) });
+    res.json({ popup: devMessageService.popup(await devMessageService.nextUnseen(req.user)) });
   });
   app.use(require('./moderation/requestSignals').trackSignals); // Manipulationserkennung: Herkunft und Merkmale jeder Spiel-Aktion
   app.use(require('./moderation/requestSignals').trap); // Manipulationserkennung: unsichtbarer Link als Falle
@@ -190,7 +190,7 @@ function createApp() {
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
         giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
-        devMessageService.nextUnseen(u._id).then(devMessageService.popup), // Nachricht vom Entwickler-Team: Fenster, bis „Gelesen“
+        devMessageService.nextUnseen(u).then(devMessageService.popup), // Nachricht vom Entwickler-Team: Fenster, bis „Gelesen“
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,

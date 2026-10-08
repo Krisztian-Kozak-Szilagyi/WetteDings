@@ -41,6 +41,13 @@ test('Pop-up: aktiv bis beendet bzw. bis zum Ablauf, ohne Ablauf bis gelesen', (
   assert.equal(dm.isActive({ endedAt: new Date(now.getTime() - 1), expiresAt: null }, now), false);
 });
 
+test('Pop-up: der Admin bekommt keine, alle anderen schon (auch Devs)', () => {
+  assert.equal(dm.receives({ _id: 'a', isAdmin: true, isStaff: true }), false);
+  assert.equal(dm.receives({ _id: 'd', isAdmin: false, isStaff: true }), true);
+  assert.equal(dm.receives({ _id: 'u', isAdmin: false }), true);
+  assert.equal(dm.receives(null), false);
+});
+
 test('Pop-up: Daten fürs Fenster', () => {
   assert.equal(dm.popup(null), null);
   const p = dm.popup({ _id: 'abc', title: 'T', text: 'Zeile 1\nZeile 2', byName: 'dev', createdAt: now, left: 3 });

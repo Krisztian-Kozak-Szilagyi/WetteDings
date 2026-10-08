@@ -59,8 +59,9 @@
     </dialog>
   <% } %>
   <%# Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): geht erst mit „Gelesen“ zu, Esc schließt nicht.
-      Ist gerade ein anderes Fenster offen (Erfolg, Geschenk), kommt die Nachricht danach (public/js/app.js). %>
-  <% if (currentUser) { const dp = typeof devPopup !== 'undefined' && devPopup ? devPopup : null; %>
+      Ist gerade ein anderes Fenster offen (Erfolg, Geschenk), kommt die Nachricht danach (public/js/app.js).
+      Der Admin bekommt keine Pop-ups (devMessageService.receives) – für ihn gibt es das Fenster gar nicht. %>
+  <% if (currentUser && !currentUser.isAdmin) { const dp = typeof devPopup !== 'undefined' && devPopup ? devPopup : null; %>
     <dialog class="dg-loot ach-pop dev-pop" data-dev-pop<%= dp ? ' data-open' : '' %> aria-labelledby="dev-pop-title" aria-describedby="dev-pop-text">
       <span class="kicker">Nachricht vom Entwickler-Team</span>
       <h2 id="dev-pop-title" data-dev-title><%= dp ? dp.title : '' %></h2>

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { DevMessage, DevMessageSeen } = require('../models/DevMessage');
 const { UserError } = require('../lib/util');
+const config = require('../config');
 const { date } = require('../lib/viewHelpers');
 
 // Pop-up-Nachrichten vom Entwickler-Team (#132): Devs und Admin schreiben sie im Panel (Reiter „Pop-ups“),
@@ -46,10 +47,18 @@ async function create({ title, text, expiresAt = null, author, now = new Date() 
   return DevMessage.create({ ...clean, by: author._id, byName: author.username });
 }
 
-/** Älteste aktive Nachricht, die dieses Mitglied noch nicht gelesen hat (mit Zahl der wartenden) oder null */
-async function nextUnseen(userId, now = new Date()) {
+/** Bekommt dieses Mitglied überhaupt Pop-ups? Der Admin nicht – er sieht im Panel, was verschickt wurde. */
+const receives = (user) => !!user && !user.isAdmin;
+
+/**
+ * Älteste aktive Nachricht, die dieses Mitglied noch nicht gelesen hat (mit Zahl der wartenden) oder null.
+ * Der Admin bekommt keine, der Verfasser nicht seine eigene.
+ */
+async function nextUnseen(user, now = new Date()) {
+  if (!receives(user)) return null;
+  const userId = user._id;
   // Meist gibt es keine aktive Nachricht – dann bleibt es bei dieser einen kleinen Abfrage
-  const active = await DevMessage.find(activeFilter(now)).sort({ createdAt: 1 }).select('_id').lean();
+  const active = await DevMessage.find({ ...activeFilter(now), by: { $ne: userId } }).sort({ createdAt: 1 }).select('_id').lean();
   if (!active.length) return null;
   const seen = new Set((await DevMessageSeen.find({ user: userId, message: { $in: active.map((m) => m._id) } }).select('message').lean()).map((s) => String(s.message)));
   const open = active.filter((m) => !seen.has(String(m._id)));
@@ -73,21 +82,34 @@ async function markSeen(userId, id) {
   });
 }
 
-/** Für das Panel: die letzten Nachrichten mit Status und wie viele Mitglieder sie gelesen haben */
+/**
+ * Für das Panel: die letzten Nachrichten mit Status und wie viele Empfänger sie gelesen haben.
+ * Empfänger = alle Mitglieder außer dem Admin und dem Verfasser (beide bekommen das Fenster nicht).
+ */
 async function list(limit = 30, now = new Date()) {
-  const [messages, members] = await Promise.all([DevMessage.find().sort({ createdAt: -1 }).limit(limit).lean(), User.countDocuments({ deletedAt: null })]);
+  const admins = config.adminUsernames;
+  const [messages, receivers, authors] = await Promise.all([
+    DevMessage.find().sort({ createdAt: -1 }).limit(limit).lean(),
+    User.countDocuments({ deletedAt: null, usernameLower: { $nin: admins } }),
+    // Verfasser, die selbst Empfänger wären (Devs, nicht gelöscht) – für sie zählt ein Empfänger weniger
+    DevMessage.distinct('by').then((ids) => User.find({ _id: { $in: ids }, deletedAt: null, usernameLower: { $nin: admins } }).select('_id').lean()),
+  ]);
+  const authorReceives = new Set(authors.map((u) => String(u._id)));
   const counts = messages.length
     ? await DevMessageSeen.aggregate([{ $match: { message: { $in: messages.map((m) => m._id) } } }, { $group: { _id: '$message', n: { $sum: 1 } } }])
     : [];
   const seenBy = new Map(counts.map((c) => [String(c._id), c.n]));
-  return messages.map((m) => ({
-    ...m,
-    id: String(m._id),
-    active: isActive(m, now),
-    status: m.endedAt ? 'beendet' : m.expiresAt && new Date(m.expiresAt) <= now ? 'abgelaufen' : 'aktiv',
-    seen: Math.min(seenBy.get(String(m._id)) || 0, members),
-    members,
-  }));
+  return messages.map((m) => {
+    const members = receivers - (authorReceives.has(String(m.by)) ? 1 : 0);
+    return {
+      ...m,
+      id: String(m._id),
+      active: isActive(m, now),
+      status: m.endedAt ? 'beendet' : m.expiresAt && new Date(m.expiresAt) <= now ? 'abgelaufen' : 'aktiv',
+      seen: Math.min(seenBy.get(String(m._id)) || 0, members),
+      members,
+    };
+  });
 }
 
 /** Vorzeitig beenden: erscheint danach niemandem mehr */
@@ -97,4 +119,4 @@ async function end({ id, author }) {
   if (!r.matchedCount) throw new UserError('Diese Nachricht ist schon beendet oder existiert nicht.');
 }
 
-module.exports = { TITLE_MAX, TEXT_MIN, TEXT_MAX, cleanTitle, cleanText, isActive, validate, create, nextUnseen, popup, markSeen, list, end };
+module.exports = { TITLE_MAX, TEXT_MIN, TEXT_MAX, cleanTitle, cleanText, isActive, receives, validate, create, nextUnseen, popup, markSeen, list, end };

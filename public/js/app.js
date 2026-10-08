@@ -931,6 +931,17 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   });
 
+  // Kurze Bestätigung, die von selbst verschwindet: data-auto-hide="<Millisekunden>" (z. B. „Nachricht an alle versendet“)
+  onReady(function () {
+    document.querySelectorAll('[data-auto-hide]').forEach(function (el) {
+      var ms = Number(el.getAttribute('data-auto-hide')) || 3000;
+      setTimeout(function () {
+        el.classList.add('is-gone');
+        setTimeout(function () { el.remove(); }, 450); // nach dem Ausblenden (CSS: .flash-toast.is-gone)
+      }, ms);
+    });
+  });
+
   // Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): wie das Geschenk-Fenster. Erscheint bei allen, die gerade
   // online sind (Abfrage alle 15 Sekunden), sonst beim nächsten Seitenaufruf. Schließt nur mit „Gelesen“ – nicht mit Esc.
   onReady(function () {

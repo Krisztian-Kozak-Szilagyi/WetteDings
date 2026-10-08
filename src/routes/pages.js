@@ -183,7 +183,7 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
 router.post('/entwickler-nachrichten/gesehen', requireLogin, async (req, res) => {
   await devMessageService.markSeen(req.user._id, str(req.body.id));
   if (req.accepts(['html', 'json']) === 'json') {
-    return res.json({ next: devMessageService.popup(await devMessageService.nextUnseen(req.user._id)) });
+    return res.json({ next: devMessageService.popup(await devMessageService.nextUnseen(req.user)) });
   }
   res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
 });
