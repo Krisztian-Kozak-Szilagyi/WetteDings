@@ -8,6 +8,7 @@ const settings = require('../tcg/settings');
 const { itemInventory } = require('../items/itemService');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
+const cosmetics = require('../cosmetics/cosmeticService');
 
 const router = express.Router();
 router.use('/tcg', requireLogin);
@@ -69,6 +70,7 @@ router.get('/tcg/album', async (req, res) => {
     // schon einmal besessene Karten: durchsichtig statt "?"
     seenIds: new Set(req.user.tcgSeen || []),
     maxFavorites: tcg.MAX_FAVORITES,
+    konfetti: req.user.konfetti || 0,
   });
 });
 
@@ -132,6 +134,24 @@ router.post('/tcg/duplikate-verkaufen', (req, res) =>
   albumAction(req, res, async () => {
     const r = await tcg.sellAllDuplicates({ user: req.user });
     return `${r.count} doppelte ${r.count === 1 ? 'Karte' : 'Karten'} für ${euro(r.proceeds)} verkauft. Geschützte Karten wurden nicht angefasst.`;
+  })
+);
+
+// Zerkleinern: Karten gegen Konfetti (Kosmetik-Shop) statt Geld
+const konfettiText = (n) => `${n.toLocaleString('de-DE')} ${cosmetics.currencyName()}`;
+
+router.post('/tcg/zerkleinern', (req, res) =>
+  albumAction(req, res, async () => {
+    const cardId = str(req.body.card);
+    const r = await tcg.shredCards({ user: req.user, cardId, keepOne: str(req.body.mode) === 'duplikate' });
+    return `${r.count}× ${cardName(cardId)} zerkleinert: +${konfettiText(r.konfetti)}.`;
+  })
+);
+
+router.post('/tcg/duplikate-zerkleinern', (req, res) =>
+  albumAction(req, res, async () => {
+    const r = await tcg.shredAllDuplicates({ user: req.user });
+    return `${r.count} doppelte ${r.count === 1 ? 'Karte' : 'Karten'} zerkleinert: +${konfettiText(r.konfetti)}. Geschützte Karten wurden nicht angefasst.`;
   })
 );
 

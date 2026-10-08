@@ -5904,3 +5904,55 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .foil-modal-menu .foil-modal-actions { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
 .foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions a[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
 .foil-modal-menu .foil-modal-actions p { margin: 0; }
+
+/* ---------- Kosmetik-Shop (/kosmetik) und Avatar-Effekte ---------- */
+.album-dupes form { margin: 0; }
+.album-konfetti { font-size: 13px; color: var(--color-neutral-300, inherit); text-decoration: none; white-space: nowrap; }
+.album-konfetti:hover { text-decoration: underline; }
+.pf-bild-shop { margin: 16px 0 0; text-align: center; }
+.cos-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+.cos-head h1 { margin: 0 0 6px; }
+.cos-head p { margin: 0; max-width: 560px; }
+.cos-balance { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 10px 16px; border-radius: var(--radius-md); box-shadow: 0 0 0 1px var(--color-divider); color: inherit; text-decoration: none; }
+.cos-balance-label { font-size: 12px; opacity: .7; }
+.cos-balance strong { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cos-section { margin-bottom: 40px; }
+.cos-section h2 { margin: 0 0 16px; }
+.cos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.cos-item { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-divider); }
+.cos-item.is-worn { box-shadow: 0 0 0 2px var(--color-accent); }
+.cos-item form { margin: 0; }
+.cos-img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.cos-name { margin: 0; font-size: 14px; font-weight: 500; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .cos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } .cos-balance { align-items: flex-start; } }
+
+/* Effekte (Admin: Spielwerte → Kosmetik). Nur große Bilder bekommen sie (Shop, Profil, Podest) – Listen und Forum bleiben ruhig */
+.cos-fx { border-radius: 8px; }
+.cos-fx-glitch { animation: tcg-glitch 2.6s infinite; }
+.cos-fx-gold { animation: cos-gold 3s ease-in-out infinite; }
+.cos-fx-holo { animation: cos-holo 4s linear infinite; }
+.cos-fx-glow { animation: cos-glow 2.4s ease-in-out infinite; }
+.cos-fx-arcane { animation: cos-arcane 3.2s ease-in-out infinite; }
+@keyframes cos-gold {
+  0%, 100% { box-shadow: 0 0 0 2px #e7b84a, 0 0 10px 1px rgba(231, 184, 74, .35); filter: none; }
+  50% { box-shadow: 0 0 0 2px #fff3c4, 0 0 22px 5px rgba(231, 184, 74, .6); filter: brightness(1.08) saturate(1.1); }
+}
+@keyframes cos-holo {
+  0% { box-shadow: 0 0 0 2px #ff4fd8, 0 0 16px 2px rgba(255, 79, 216, .45); }
+  33% { box-shadow: 0 0 0 2px #45d9ff, 0 0 16px 2px rgba(69, 217, 255, .45); }
+  66% { box-shadow: 0 0 0 2px #fde047, 0 0 16px 2px rgba(253, 224, 71, .45); }
+  100% { box-shadow: 0 0 0 2px #ff4fd8, 0 0 16px 2px rgba(255, 79, 216, .45); }
+}
+@keyframes cos-glow {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(170, 220, 255, .3); }
+  50% { box-shadow: 0 0 26px 7px rgba(200, 235, 255, .55); }
+}
+@keyframes cos-arcane {
+  0%, 100% { box-shadow: 0 0 0 2px #a99cf0, 0 0 0 5px rgba(74, 64, 120, .6), 0 0 18px 4px rgba(169, 156, 240, .4); }
+  50% { box-shadow: 0 0 0 2px #efedff, 0 0 0 7px rgba(169, 156, 240, .45), 0 0 30px 9px rgba(140, 110, 255, .55); }
+}
+@media (prefers-reduced-motion: reduce) { .cos-fx { animation: none !important; } }
+.admin-cos-currency { max-width: 280px; }
+.admin-cos-img { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
+.admin-cos-table input[type="text"] { width: 100%; min-width: 90px; }
+.admin-cos-table td.num input { max-width: 100px; text-align: right; }
