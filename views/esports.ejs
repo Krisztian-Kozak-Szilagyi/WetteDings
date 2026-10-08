@@ -5,6 +5,8 @@
   const pctText = (x) => x === null || x === undefined ? '–' : signedPercent(x);
   const live = teams.filter((t) => t.status !== 'aufgeloest');
   const closed = teams.filter((t) => t.status === 'aufgeloest');
+  const teamHref = (t) => `/esports/team/${t.ticker.toLowerCase()}`;
+  const teamPic = (t) => t.avatar ? `<img class="es-mini-avatar" src="${avatarUrl({ avatar: t.avatar })}?v=${assetVersion}" alt="" width="28" height="28" loading="lazy">` : `<span class="es-mini-avatar es-tp-initials" aria-hidden="true">${t.ticker.slice(0, 3)}</span>`;
 %>
 <div class="page-head">
   <h1>eSports</h1>
@@ -38,7 +40,7 @@
         <div class="es-team-head">
           <div>
             <span class="kicker">Dein Team</span>
-            <h2><%= mine.name %> <span class="es-ticker"><%= mine.ticker %></span></h2>
+            <h2><a class="es-team-link" href="<%= teamHref(mine) %>"><%= mine.name %></a> <span class="es-ticker"><%= mine.ticker %></span></h2>
           </div>
           <span class="es-status is-<%= mine.status %>"><%= statusLabel[mine.status] %></span>
         </div>
@@ -108,7 +110,7 @@
               <% live.forEach((t) => { %>
                 <tr class="<%= mine && String(mine._id) === String(t._id) ? 'is-mine' : '' %>">
                   <td class="num"><%= t.lastRank || '–' %></td>
-                  <td><strong><%= t.name %></strong></td>
+                  <td><a class="es-team-link es-team-cell" href="<%= teamHref(t) %>"><%- teamPic(t) %><strong><%= t.name %></strong><% if (t.trophies && t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %></a></td>
                   <td><% if (t.path) { %><a href="<%= t.path %>"><%= t.ticker %></a><% } else { %><span class="muted"><%= t.ticker %></span><% } %></td>
                   <td class="num"><%= t.price !== null ? coinPrice(t.price) : '–' %></td>
                   <td class="num hide-sm"><%= pctText(t.lastChange) %></td>
@@ -121,7 +123,7 @@
         </div>
       <% } %>
       <% if (closed.length) { %>
-        <p class="muted small">Aufgelöst: <%= closed.map((t) => t.name).join(', ') %></p>
+        <p class="muted small">Aufgelöst: <% closed.forEach((t, i) => { %><%= i ? ', ' : '' %><a href="<%= teamHref(t) %>"><%= t.name %></a><% }) %></p>
       <% } %>
     </section>
   </div>
@@ -133,6 +135,12 @@
       <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
       <li>Für die Liga zählen nur Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind (schon vor Beginn der Woche). Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
       <li>Jeden Sonntag wird ausgewertet: Euer Ergebnis entscheidet, in welche Richtung sich der Wert eures ETFs bewegt.</li>
+      <li>Die besten drei Teams der Woche bekommen eine Trophäe fürs Teamprofil – und jedes Mitglied, das schon vor der Woche dabei war, einen Preis:
+        <ul class="es-prizes">
+          <% prizes.forEach((p) => { %><li><strong><%= p.label %>:</strong> <%= [p.cash ? eur(p.cash) : '', p.packs ? p.packs + ' Booster ' + (p.packs === 1 ? 'Pack' : 'Packs') : ''].filter(Boolean).join(' + ') || '–' %></li><% }) %>
+        </ul>
+        <span class="muted small">Trophäen gibt es nur, wenn mindestens <%= minTeams %> <%= minTeams === 1 ? 'Team' : 'Teams' %> in der Woche Punkte geholt <%= minTeams === 1 ? 'hat' : 'haben' %>.</span></li>
+      <li>Der Kapitän gestaltet das Teamprofil: Text, Motto, Farbe und Teambild (Avatare aus dem Kosmetik-Shop zum halben Preis). Er kann die Kapitänsrolle auch abgeben.</li>
       <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
       <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>. Reicht das Guthaben nicht, bleibt der Rest als Schuld und wird von jeder Einnahme abgezogen.</li>
     </ul>

@@ -24,6 +24,60 @@
 .es-leave label { display: flex; align-items: center; gap: 6px; }
 .es-table tr.is-mine td { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .es-rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: .9rem; }
+/* Teamliste: Name mit Teambild als Link zum Profil */
+.es-team-link { color: inherit; text-decoration: none; }
+.es-team-link:hover strong, a.es-team-link:hover { text-decoration: underline; }
+.es-team-cell { display: inline-flex; align-items: center; gap: 8px; }
+.es-mini-avatar { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; flex: none; }
+.es-cup-count { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+.es-prizes { margin: 6px 0 4px; padding-left: 16px; gap: 2px !important; }
+
+/* Teamprofil (/esports/team/<kürzel>) */
+.es-back { margin: 0 0 12px; }
+.es-back a { color: var(--muted); text-decoration: none; }
+.es-tp-head { --es-team: var(--color-accent); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; box-shadow: inset 4px 0 0 var(--es-team); }
+.es-tp-avatar { width: 112px; height: 112px; border-radius: 8px; object-fit: cover; flex: none; }
+.es-tp-initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: .04em; color: var(--es-team, var(--color-accent)); background: color-mix(in srgb, var(--es-team, var(--color-accent)) 16%, transparent); }
+.es-tp-avatar.es-tp-initials { font-size: 1.5rem; }
+.es-mini-avatar.es-tp-initials { font-size: .6rem; }
+.es-tp-title { flex: 1 1 260px; min-width: 0; }
+.es-tp-title h1 { margin: 2px 0 4px; }
+.es-tp-title p { margin: 4px 0 0; }
+.es-tp-motto { font-style: italic; color: var(--es-team); }
+.es-tp-cups { display: flex; gap: 14px; }
+.es-tp-cup { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.es-tp-cup.is-empty { opacity: .35; }
+.es-trophy { width: 28px; height: 28px; display: block; }
+.es-table .es-trophy { width: 18px; height: 18px; }
+.es-trophy.is-gold { color: #d9a441; }
+.es-trophy.is-silber { color: #b8c0cc; }
+.es-trophy.is-bronze { color: #c07a45; }
+.es-tp-bio { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.es-tp-shelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.es-tp-award { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 8px; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.es-tp-award .es-trophy { width: 36px; height: 36px; }
+.es-tp-award-label { font-weight: 600; font-size: .85rem; }
+.es-tp-price { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; font-variant-numeric: tabular-nums; }
+.es-tp-facts { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: .9rem; }
+.es-tp-facts dt { color: var(--muted); }
+.es-tp-facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.es-tp-form { display: flex; flex-direction: column; gap: 12px; }
+.es-tp-form textarea { resize: vertical; }
+.es-tp-pics { margin-top: 28px; }
+.es-color-gold { --es-team: #d9a441; }
+.es-color-karmesin { --es-team: #b3322b; }
+.es-color-smaragd { --es-team: #2f9e6b; }
+.es-color-saphir { --es-team: #3a6fd8; }
+.es-color-violett { --es-team: #8a55d6; }
+.es-color-tuerkis { --es-team: #25a8b5; }
+.es-color-orange { --es-team: #e07a2e; }
+.es-color-rosa { --es-team: #d65a9a; }
+.es-color-silber { --es-team: #9aa4b2; }
+
 @media (max-width: 860px) {
   .es-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .es-tp-avatar { width: 80px; height: 80px; }
+  .es-tp-cups { width: 100%; justify-content: flex-start; }
 }

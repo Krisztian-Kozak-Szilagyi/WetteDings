@@ -59,7 +59,7 @@ const LOGS = [
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
-const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung' };
+const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung', esports: 'eSports-Trophäe' };
 const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'black_market'];
 const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft' };
 
@@ -488,7 +488,7 @@ async function registrationLog(query, { player = null, all = false } = {}) {
 
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
-const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', kosmetik: 'Kosmetik', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
 const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function settingsRow(c) {

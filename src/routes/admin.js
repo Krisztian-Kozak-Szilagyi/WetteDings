@@ -28,6 +28,8 @@ const devMessageService = require('../services/devMessageService');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const foil = require('../items/foil');
 const cosmetics = require('../cosmetics/cosmeticService');
+const esportsService = require('../esports/esportsService');
+const esportsLeague = require('../esports/league');
 const cosmeticCatalog = require('../cosmetics/catalog');
 const lotteryService = require('../services/lotteryService');
 const taxService = require('../services/taxService');
@@ -78,6 +80,7 @@ const SUBTABS = {
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
     { key: 'dungeon', label: 'Dungeon' },
+    { key: 'esports', label: 'eSports' },
   ],
 };
 
@@ -207,6 +210,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Kosmetik: Währungsname und je Avatar Preis, Effekt, Name
     cosmeticAdmin: needsSub('spielwerte', 'kosmetik') && isAdmin ? { currency: cosmetics.currencyName(), avatars: cosmetics.avatars(), effects: cosmeticCatalog.EFFECTS, expectedPack: tcgCatalog.expectedPackValue(), defaults: Object.fromEntries(cosmeticCatalog.AVATARS.map((a) => [a.key, a])) } : null,
     lottoSettings: lotteryService.settings,
+    // eSports: Preis je Trophäe (Geld + Packs) und Mindestzahl der Teams mit Punkten
+    esportsAdmin: needsSub('spielwerte', 'esports') && isAdmin ? { prizes: esportsService.prizeList(), minTeams: esportsService.settings.minTeams, maxPacks: esportsLeague.MAX_PRIZE_PACKS } : null,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
     // noch nicht erhältliche Karten (z. B. Mark Suntouched) nur für Admins
@@ -706,6 +711,21 @@ router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spiel
     }
   }
   res.redirect(subUrl('spielwerte', 'lotterie'));
+});
+
+// ---------- eSports: Preise der Trophäen (Platz 1–3 im Wochenbericht) ----------
+router.post('/admin/esports', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const count = (v) => (/^\d{1,3}$/.test(str(v).trim()) ? Number(str(v).trim()) : NaN);
+  // Felder je Platz: cash_<n>, packs_<n> (n nur aus der festen Liste)
+  const prizes = esportsLeague.PLACES.map((p) => ({ cash: parseEuro(str(req.body[`cash_${p.place}`])) ?? NaN, packs: count(req.body[`packs_${p.place}`]) }));
+  try {
+    await esportsService.saveSettings({ admin: req.user, prizes, minTeams: count(req.body.minTeams) });
+    req.flash('success', 'eSports-Preise gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'esports'));
 });
 
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------

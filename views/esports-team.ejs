@@ -1,0 +1,192 @@
+<%- include('partials/head') %>
+<%# Teamprofil (/esports/team/<kürzel>): Mitglieder, Trophäen, Wochenberichte, ETF. Der Kapitän bearbeitet Text,
+    Motto, Farbe und Teambild (Avatare aus dem Kosmetik-Shop zum halben Preis) und kann die Kapitänsrolle abgeben. %>
+<%
+  const statusLabel = { offen: 'Sucht Mitglieder', aktiv: 'Gehandelt', eingefroren: 'Eingefroren', aufgeloest: 'Aufgelöst' };
+  const pctText = (x) => x === null || x === undefined ? '–' : signedPercent(x);
+  const weekText = (day) => { const [y, m, d] = day.split('-'); return `${d}.${m}.${y}`; };
+  const color = rules.findColor(team.color);
+  const counts = rules.PLACES.map((p) => ({ ...p, n: team.trophies.filter((t) => t.place === p.place).length }));
+  const trophies = team.trophies.slice().sort((a, b) => (a.week < b.week ? 1 : -1));
+  const best = history.length ? Math.min(...history.map((h) => h.rank)) : null;
+  const trophyIcon = (key) => `<svg class="es-trophy is-${key}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V17h3v2H8v-2h3v-2.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3Zm0 4H6v1a2 2 0 0 0 1 1.7V7Zm10 0v2.7A2 2 0 0 0 18 8V7h-1ZM7 20h10v2H7v-2Z"/></svg>`;
+%>
+<p class="es-back"><a href="/esports">← eSports</a></p>
+
+<section class="card es-tp-head<%= color ? ' es-color-' + color.key : '' %>">
+  <% if (team.avatar) { %>
+    <img class="es-tp-avatar<%= avatarFx({ avatar: team.avatar }) %>" src="<%= avatarUrl({ avatar: team.avatar }) %>?v=<%= assetVersion %>" alt="" width="112" height="112">
+  <% } else { %>
+    <span class="es-tp-avatar es-tp-initials" aria-hidden="true"><%= team.ticker %></span>
+  <% } %>
+  <div class="es-tp-title">
+    <span class="kicker">eSports-Team</span>
+    <h1><%= team.name %> <span class="es-ticker"><%= team.ticker %></span></h1>
+    <% if (team.motto) { %><p class="es-tp-motto">„<%= team.motto %>“</p><% } %>
+    <p class="muted small">Gegründet am <%= dayDate(team.createdAt) %> · <span class="es-status is-<%= team.status %>"><%= statusLabel[team.status] %></span></p>
+  </div>
+  <div class="es-tp-cups" aria-label="Trophäen">
+    <% counts.forEach((c) => { %>
+      <span class="es-tp-cup<%= c.n ? '' : ' is-empty' %>" title="<%= c.label %>-Trophäen"><%- trophyIcon(c.key) %><strong><%= c.n %></strong></span>
+    <% }) %>
+  </div>
+</section>
+
+<div class="es-grid">
+  <div class="es-main">
+    <section class="card es-card">
+      <h2>Über uns</h2>
+      <% if (team.bio) { %><p class="es-tp-bio"><%= team.bio %></p><% } else { %><p class="muted">Noch keine Beschreibung.</p><% } %>
+    </section>
+
+    <section class="card es-card">
+      <h2>Mitglieder <span class="muted small"><%= team.members.length %>/<%= rules.MAX_MEMBERS %></span></h2>
+      <% if (!team.members.length) { %>
+        <p class="muted">Keine Mitglieder mehr.</p>
+      <% } else { %>
+        <ul class="es-list">
+          <% team.members.forEach((m) => { const cap = String(m.user) === String(team.captain); %>
+            <li class="es-row">
+              <span><%- userLink(m.name) %><% if (cap) { %> <span class="es-tag">Kapitän</span><% } %></span>
+              <span class="muted small">seit <%= dayDate(m.joinedAt) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="card es-card">
+      <h2>Trophäen</h2>
+      <% if (!trophies.length) { %>
+        <p class="muted">Noch keine Trophäe. Platz 1 bis 3 im Wochenbericht bringt Gold, Silber oder Bronze.</p>
+      <% } else { %>
+        <ul class="es-tp-shelf">
+          <% trophies.forEach((t) => { const p = rules.placeInfo(t.place); %>
+            <li class="es-tp-award" title="<%= p.label %> · <%= t.score %> Punkte">
+              <%- trophyIcon(p.key) %>
+              <span class="es-tp-award-label"><%= p.label %></span>
+              <span class="muted small"><%= weekText(t.week) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <section class="card es-card">
+      <h2>Wochenberichte</h2>
+      <% if (!history.length) { %>
+        <p class="muted">Noch kein Wochenbericht.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table es-table">
+            <thead><tr><th>Woche</th><th class="num">Platz</th><th class="num">Punkte</th><th class="num">Kurs</th><th></th></tr></thead>
+            <tbody>
+              <% history.forEach((h) => { const t = team.trophies.find((x) => x.week === h.week); %>
+                <tr>
+                  <td><%= weekText(h.week) %></td>
+                  <td class="num"><%= h.rank %> / <%= h.of %></td>
+                  <td class="num"><%= h.score %></td>
+                  <td class="num"><%= pctText(h.change) %></td>
+                  <td><%- t ? trophyIcon(rules.placeInfo(t.place).key) : '' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </div>
+
+  <aside class="es-main">
+    <section class="card es-card">
+      <h2>Team-ETF</h2>
+      <% if (team.price !== null) { %>
+        <p class="es-tp-price"><%= coinPrice(team.price) %></p>
+        <p class="muted small">Letzte Woche: <%= pctText(team.lastChange) %><% if (team.status === 'eingefroren') { %> · eingefroren<% } %></p>
+        <a class="btn btn-ghost btn-sm" href="<%= team.path %>">Im Broker ansehen</a>
+      <% } else if (team.status === 'offen') { %>
+        <p class="muted small">Ab <%= rules.TEAM_SIZE %> Mitgliedern wird der ETF im Broker gehandelt.</p>
+      <% } else { %>
+        <p class="muted small">Nicht mehr gehandelt.</p>
+      <% } %>
+      <dl class="es-tp-facts">
+        <dt>Bester Platz</dt><dd><%= best ? best + '.' : '–' %></dd>
+        <dt>Wochen gewertet</dt><dd><%= history.length %></dd>
+      </dl>
+    </section>
+
+    <% if (isCaptain) { %>
+      <section class="card es-card">
+        <h2>Profil bearbeiten</h2>
+        <form class="form es-tp-form" method="post" action="/esports/profil">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field"><span>Motto</span><input type="text" name="motto" value="<%= team.motto %>" maxlength="<%= rules.MOTTO_MAX %>"></label>
+          <label class="field"><span>Über uns</span><textarea name="bio" rows="5" maxlength="<%= rules.BIO_MAX %>"><%= team.bio %></textarea></label>
+          <label class="field"><span>Teamfarbe</span>
+            <select name="color">
+              <option value="">Keine</option>
+              <% rules.COLORS.forEach((c) => { %><option value="<%= c.key %>"<%= team.color === c.key ? ' selected' : '' %>><%= c.label %></option><% }) %>
+            </select>
+          </label>
+          <button class="btn btn-primary" type="submit">Speichern</button>
+        </form>
+      </section>
+
+      <% if (team.members.length > 1) { %>
+        <section class="card es-card">
+          <h2>Kapitän übergeben</h2>
+          <form class="form es-tp-form" method="post" action="/esports/kapitaen" data-confirm="Kapitänsrolle wirklich abgeben?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="field"><span>Neuer Kapitän</span>
+              <select name="user" required>
+                <% team.members.filter((m) => String(m.user) !== String(team.captain)).forEach((m) => { %><option value="<%= m.user %>"><%= m.name %></option><% }) %>
+              </select>
+            </label>
+            <button class="btn btn-ghost" type="submit">Übergeben</button>
+          </form>
+        </section>
+      <% } %>
+    <% } %>
+  </aside>
+</div>
+
+<% if (isCaptain && teamAvatars) { %>
+  <section class="cos-section es-tp-pics" id="teambild">
+    <div class="cos-head">
+      <div>
+        <h2>Teambild</h2>
+        <p class="muted">Alle Avatare aus dem <a href="/kosmetik">Kosmetik-Shop</a> zum halben Preis. Du bezahlst mit deinem <%= konfettiName() %>, das Bild gehört dem Team.</p>
+      </div>
+      <span class="cos-balance">
+        <span class="cos-balance-label"><%= konfettiName() %></span>
+        <strong><%= konfetti.toLocaleString('de-DE') %></strong>
+      </span>
+    </div>
+    <div class="cos-grid">
+      <% teamAvatars.forEach((it) => { %>
+        <article class="cos-item<%= it.owned ? ' is-owned' : '' %><%= it.worn ? ' is-worn' : '' %>">
+          <img class="cos-img<%= it.effect ? ' cos-fx cos-fx-' + it.effect : '' %>" src="<%= it.url %>?v=<%= assetVersion %>" alt="" width="152" height="152" loading="lazy">
+          <h3 class="cos-name"><%= it.name %></h3>
+          <% if (it.worn) { %>
+            <button class="btn btn-ghost btn-sm btn-block" type="button" disabled>Teambild</button>
+          <% } else if (it.owned) { %>
+            <form method="post" action="/esports/teambild/setzen">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="key" value="<%= it.key %>">
+              <button class="btn btn-ghost btn-sm btn-block" type="submit">Verwenden</button>
+            </form>
+          <% } else { %>
+            <form method="post" action="/esports/teambild/kaufen" data-confirm="<%= it.name %> für <%= it.price.toLocaleString('de-DE') %> <%= konfettiName() %> fürs Team kaufen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="key" value="<%= it.key %>">
+              <button class="btn btn-primary btn-sm btn-block" type="submit" <%= konfetti >= it.price ? '' : 'disabled' %>><%= it.price ? it.price.toLocaleString('de-DE') + ' ' + konfettiName() : 'Gratis' %></button>
+            </form>
+          <% } %>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+<% } %>
+
+<link rel="stylesheet" href="/css/esports.css?v=<%= assetVersion %>">
+<%- include('partials/foot') %>
