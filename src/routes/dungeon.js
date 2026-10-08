@@ -103,7 +103,7 @@ router.get('/dungeon', async (req, res) => {
   // Start-Kacheln (wie "Zum Album"): eigene Charaktere als Fächer, fehlende als graue Beispielkarten
   const samples = catalog.CARDS.filter((c) => c.isCharacter && !(catalog.rarityByKey[c.rarity] || {}).hidden);
   const fanOf = (n) => {
-    const own = (cards ? cards.characters : []).slice(0, n).map((card) => ({ card, sample: false }));
+    const own = (cards ? cards.characters.filter((c) => cards.counts[c.id] > 0) : []).slice(0, n).map((card) => ({ card, sample: false }));
     for (let i = 0; own.length < n && i < samples.length; i++) if (!own.some((f) => f.card.id === samples[i].id)) own.push({ card: samples[i], sample: true });
     return own;
   };
