@@ -5859,3 +5859,13 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .pick-freq-btn { flex: none; }
 .pick-freq-btn[aria-pressed="true"] { color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent-300); }
 .ihk-pick-tools { flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+
+/* Pop-up vom Entwickler-Team (#132): wie das Geschenk-Fenster, Text mit Zeilenumbrüchen, bei langen Texten scrollbar */
+.dev-pop-text {
+  margin: 4px auto 10px; max-width: 46ch; max-height: min(50vh, 420px); overflow-y: auto; text-align: left;
+  white-space: pre-line; overflow-wrap: anywhere; line-height: 1.55; color: var(--color-neutral-200);
+}
+.dev-pop-by { margin: 0 0 14px; }
+/* Dev-Panel → Pop-ups: Ablaufdatum nur bei „Mit Ablaufdatum“ (ohne :has-Unterstützung bleibt das Feld einfach sichtbar) */
+.popup-form:has(input[name="gueltig"][value="gelesen"]:checked) .popup-expiry { display: none; }
+.popup-log-text { min-width: 220px; max-width: 420px; white-space: pre-line; overflow-wrap: anywhere; }

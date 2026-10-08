@@ -12,6 +12,7 @@ const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 const achievementService = require('../achievements/achievementService');
 const giftService = require('../services/giftService');
+const devMessageService = require('../services/devMessageService');
 const achievementLogic = require('../achievements/logic');
 const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
@@ -174,6 +175,15 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
   await giftService.markSeen(req.user._id, str(req.body.id));
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: giftService.popup(await giftService.nextUnseen(req.user._id)) });
+  }
+  res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
+});
+
+// Fenster "Nachricht vom Entwickler-Team" mit Gelesen bestätigt (#132)
+router.post('/entwickler-nachrichten/gesehen', requireLogin, async (req, res) => {
+  await devMessageService.markSeen(req.user._id, str(req.body.id));
+  if (req.accepts(['html', 'json']) === 'json') {
+    return res.json({ next: devMessageService.popup(await devMessageService.nextUnseen(req.user)) });
   }
   res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
 });
