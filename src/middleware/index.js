@@ -5,6 +5,7 @@ const { maybeGrantDailyBonus } = require('../services/bonusService');
 const { date } = require('../lib/viewHelpers');
 const deviceLogic = require('../device/deviceLogic');
 const deviceService = require('../device/deviceService');
+const passwordReset = require('../services/passwordReset');
 
 const DEVICE_COOKIE_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
@@ -29,7 +30,7 @@ async function loadUser(req, res, next) {
   res.locals.currentUser = null;
   res.locals.currentPath = req.path;
   if (req.session.userId) {
-    const user = await User.findById(req.session.userId).select('-passwordHash').lean();
+    const user = await User.findById(req.session.userId).select('-passwordHash -resetHash').lean();
     if (user && !user.deletedAt) {
       user.isAdmin = config.adminUsernames.includes(user.usernameLower);
       user.isDev = user.role === 'dev';
@@ -103,6 +104,13 @@ async function dailyBonus(req, res, next) {
   next();
 }
 
+/** Nach der Anmeldung mit einem Einmal-Code: bis zum neuen Passwort nur die Seite „Neues Passwort“ */
+function forcePasswordChange(req, res, next) {
+  if (!req.user || !req.user.mustChangePassword || passwordReset.allowedWhileForced(req.path)) return next();
+  if (req.method === 'GET' && req.accepts(['html', 'json']) === 'html') return res.redirect(passwordReset.CHANGE_PATH);
+  res.status(403).json({ error: 'Bitte wähle zuerst ein neues Passwort.' });
+}
+
 function requireLogin(req, res, next) {
   if (req.user) return next();
   if (req.method === 'GET') {
@@ -144,4 +152,4 @@ function requireStaff(req, res, next) {
   next();
 }
 
-module.exports = { flash, keepsFlash, loadUser, device, dailyBonus, requireLogin, requireAdmin, requireStaff, csrf };
+module.exports = { flash, keepsFlash, loadUser, device, dailyBonus, forcePasswordChange, requireLogin, requireAdmin, requireStaff, csrf };
