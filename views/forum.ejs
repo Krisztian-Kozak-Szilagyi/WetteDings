@@ -34,7 +34,12 @@
           <div class="forum-group-head">
             <h2><a href="/forum/k/<%= root._id %>"><%= root.title %></a></h2>
             <% if (root.staffOnly) { %><span class="forum-team">Team</span><% } %>
-            <% if (addSub) { %><button type="button" class="forum-add-sub" data-dialog-open="sub-<%= root._id %>">+ Unterbereich</button><% } %>
+            <% if (addSub || deletable.includes(String(root._id))) { %>
+              <div class="forum-head-tools">
+                <% if (addSub) { %><button type="button" class="forum-add-sub" data-dialog-open="sub-<%= root._id %>">+ Unterbereich</button><% } %>
+                <% if (deletable.includes(String(root._id))) { %><form method="post" action="/forum/bereiche/<%= root._id %>/loeschen" class="forum-del-form" data-reauth data-confirm="Bereich „<%= root.title %>“ samt Unterbereichen und allen Themen löschen? Das kann nicht rückgängig gemacht werden."><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="forum-cat-del">Löschen</button></form><% } %>
+              </div>
+            <% } %>
           </div>
           <ul class="forum-rows">
             <% [root, ...root.subs].forEach((c, i) => { const s = c.stats; if (i === 0 && !s.threads && root.subs.length) return; %>
@@ -42,7 +47,7 @@
                 <span class="forum-crow-icon"><%- include('partials/forum-icon', { name: i > 0 ? 'folder' : 'chat', size: 18 }) %></span>
                 <span class="forum-trow-main">
                   <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= i === 0 ? (root.subs.length ? 'Themen direkt in „' + c.title + '“' : 'Themen') : c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
-
+                  <% if (i > 0 && deletable.includes(String(c._id))) { %><form method="post" action="/forum/bereiche/<%= c._id %>/loeschen" class="forum-del-form forum-del-row" data-reauth data-confirm="Unterbereich „<%= c.title %>“ mit allen Themen löschen? Das kann nicht rückgängig gemacht werden."><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="forum-cat-del">Löschen</button></form><% } %>
                 </span>
                 <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
                 <span class="forum-crow-last">

@@ -84,6 +84,11 @@ function startJobs() {
   setTimeout(boerse, 45 * 1000).unref();
   setInterval(boerse, 60 * 1000).unref();
 
+  // Wochenrückblick: jede Minute prüfen, ob der Rückblick (freitags 11:30 Uhr) fällig ist
+  const weekly = () => require('./stats/weeklyReviewService').runDue().catch((err) => console.error('Wochenrückblick-Fehler:', err));
+  setTimeout(weekly, 55 * 1000).unref();
+  setInterval(weekly, 60 * 1000).unref();
+
   // eSports: Wochenbericht (sonntags) und Konkurs eingefrorener Teams – jede Minute bzw. stündlich prüfen
   const esports = require('./esports/esportsService');
   const league = () => esports.runDue().catch((err) => console.error('eSports-Bericht-Fehler:', err));

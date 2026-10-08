@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const PatchNote = require('../models/PatchNote');
-const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReaction, ForumPoll, ForumPollVote } = require('../models/Forum');
+const { ForumCategory, ForumThread, ForumPost, ForumRead, ForumReport, ForumModLog, ForumReaction, ForumPoll, ForumPollVote, ForumRemovedKey } = require('../models/Forum');
 const { tagsFor, tagsIn, sanitizeTags, parseMentions } = require('./render');
 const { mentionedUsers } = require('./embeds');
 const { CATEGORIES, STARTERS } = require('./starters');
@@ -21,6 +21,10 @@ const PATCHNOTES_KEY = 'patchnotes';
 const REASON_MAX = 300;
 const MENTIONS_MAX = 20; // so viele Erwähnte pro Beitrag werden benachrichtigt
 const MODLOG_PER_PAGE = 100;
+// Bereiche, in die die Seite selbst schreibt – nicht löschbar (eSports-Teams: "esports-<Team-ID>")
+const PROTECTED_KEYS = [PATCHNOTES_KEY, 'boersenbericht', 'wochenrueckblick', 'esports'];
+/** Braucht die Seite diesen Bereich? */
+const isProtected = (cat) => !!cat && !!cat.key && (PROTECTED_KEYS.includes(cat.key) || cat.key.startsWith('esports-'));
 
 /** Rolle eines angemeldeten Nutzers im Forum: 'admin' | 'dev' | 'mod' | null */
 const roleOfUser = (user) => (user.isAdmin ? 'admin' : user.isDev ? 'dev' : user.isMod ? 'mod' : null);
@@ -48,7 +52,9 @@ async function seed() {
  */
 async function ensureDefaults() {
   const byKey = {};
+  const removed = new Set(await ForumRemovedKey.distinct('_id'));
   for (const def of CATEGORIES) {
+    if (removed.has(def.key)) continue; // von Admin/Dev gelöscht: nicht wieder anlegen
     let cat = await ForumCategory.findOne({ key: def.key }).lean();
     const parent = def.parent ? byKey[def.parent] : null;
     if (!cat && (!def.parent || parent)) {
@@ -386,19 +392,22 @@ async function moveThread({ user, threadId, categoryId }) {
 
 /**
  * Bereich löschen (nur Admin/Dev) – samt Unterbereichen. Die Themen darin gelten danach als entfernt (wie bei
- * "entfernen" durch die Moderation) und erscheinen nirgends mehr. Bereiche, die die Seite braucht (key: Patchnotes,
- * Börsenbericht, eSports …), bleiben geschützt – auch als Unterbereich eines zu löschenden Bereichs.
+ * "entfernen" durch die Moderation) und erscheinen nirgends mehr. Bereiche, in die die Seite selbst schreibt
+ * (PROTECTED_KEYS: Patchnotes, Börsenbericht, Wochenrückblick, eSports …), bleiben geschützt – auch als Unterbereich
+ * eines zu löschenden Bereichs. Gelöschte Standard-Bereiche (key) werden gemerkt und beim Start nicht neu angelegt.
  * Gibt { cat, subs, threads } zurück (subs/threads = Anzahl).
  */
 async function deleteCategory({ user, categoryId }) {
   if (!can.deleteCategory(user)) throw new UserError('Bereiche löschen nur Admin und Devs.');
   const cat = mongoose.isValidObjectId(categoryId) ? await ForumCategory.findById(categoryId).lean() : null;
   if (!cat) throw new UserError('Diesen Bereich gibt es nicht.');
-  if (cat.key) throw new UserError('Dieser Bereich wird von der Seite gebraucht und kann nicht gelöscht werden.');
+  if (isProtected(cat)) throw new UserError('Dieser Bereich wird von der Seite gebraucht und kann nicht gelöscht werden.');
   const subs = await ForumCategory.find({ parent: cat._id }).select('_id key title').lean();
-  const fixed = subs.find((c) => c.key);
+  const fixed = subs.find(isProtected);
   if (fixed) throw new UserError(`Der Unterbereich „${fixed.title}“ darin wird von der Seite gebraucht – lösch die anderen Unterbereiche einzeln.`);
   const ids = [cat._id, ...subs.map((c) => c._id)];
+  const keys = [cat, ...subs].map((c) => c.key).filter(Boolean);
+  if (keys.length) await ForumRemovedKey.bulkWrite(keys.map((k) => ({ updateOne: { filter: { _id: k }, update: { $setOnInsert: { at: new Date() } }, upsert: true } })));
   // erst die Bereiche, dann die Themen: so bleibt kaum ein Fenster für ein gleichzeitig eröffnetes Thema
   await ForumCategory.deleteMany({ _id: { $in: ids } });
   const res = await ForumThread.updateMany({ category: { $in: ids }, deleted: false }, { $set: { deleted: true } });
@@ -562,6 +571,7 @@ module.exports = {
   migratePatchnotes,
   patchnotesCategory,
   can,
+  isProtected,
   deleteCategory,
   createThread,
   reply,
