@@ -17,7 +17,7 @@
   <% if (team.avatar) { %>
     <img class="es-tp-avatar<%= avatarFx({ avatar: team.avatar }) %>" src="<%= avatarUrl({ avatar: team.avatar }) %>?v=<%= assetVersion %>" alt="" width="112" height="112">
   <% } else { %>
-    <span class="es-tp-avatar es-tp-initials" aria-hidden="true"><%= team.ticker %></span>
+    <span class="es-tp-avatar es-monogram" aria-hidden="true"><%= Array.from(team.name)[0].toUpperCase() %></span>
   <% } %>
   <div class="es-tp-title">
     <span class="kicker">eSports-Team</span>
