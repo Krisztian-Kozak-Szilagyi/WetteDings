@@ -190,6 +190,39 @@
   </section>
 <% } %>
 
+  <% if (sub === 'kosmetik' && cosmeticAdmin) { %>
+  <section class="stats-block" id="kosmetik">
+    <%- blockHead('Kosmetik', 'Avatare kauft man im Kosmetik-Shop mit der Währung aus zerkleinerten Karten (1 je 1 € Bankwert, auch Boss-Karten; folierte nicht). Gekauftes bleibt am Konto. Effekte zeigen sich im Shop, im Profil und auf dem Podest der Rangliste.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/kosmetik" class="form panel-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field admin-cos-currency"><span>Name der Währung</span><input type="text" name="waehrung" value="<%= cosmeticAdmin.currency %>" maxlength="20" required></label>
+        <div class="table-wrap">
+          <table class="table admin-cos-table">
+            <thead><tr><th>Avatar</th><th>Name</th><th class="num">Preis</th><th>Effekt</th></tr></thead>
+            <tbody>
+              <% cosmeticAdmin.avatars.forEach((a) => { const d = cosmeticAdmin.defaults[a.key]; %>
+                <tr>
+                  <td><img class="admin-cos-img<%= a.effect ? ' cos-fx cos-fx-' + a.effect : '' %>" src="<%= a.url %>?v=<%= assetVersion %>" alt="" width="48" height="48" loading="lazy"></td>
+                  <td><input type="text" name="name_<%= a.key %>" value="<%= a.name %>" maxlength="30" aria-label="Name" placeholder="<%= d.name %>"></td>
+                  <td class="num"><input type="text" name="preis_<%= a.key %>" value="<%= a.price %>" inputmode="numeric" pattern="[0-9]{1,7}" aria-label="Preis" title="Startwert: <%= d.price %>" required></td>
+                  <td>
+                    <select name="effekt_<%= a.key %>" aria-label="Effekt">
+                      <% cosmeticAdmin.effects.forEach((e) => { %><option value="<%= e.key %>"<%= a.effect === e.key ? ' selected' : '' %>><%= e.label %></option><% }) %>
+                    </select>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted small">Alle Avatare zusammen kosten <%= cosmeticAdmin.avatars.reduce((s, a) => s + a.price, 0).toLocaleString('de-DE') %> <%= cosmeticAdmin.currency %>. Zum Vergleich: Ein Booster Pack bringt zerkleinert im Schnitt etwa <%= Math.round(cosmeticAdmin.expectedPack / 100).toLocaleString('de-DE') %>.</p>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
+<% } %>
+
   <% if (sub === 'lotterie') { %>
   <section class="stats-block" id="lotterie">
     <%- blockHead('Lotterien', 'Der Gewinner bekommt alle Einsätze plus den Bank-Gewinn (Geld, Booster Packs, Folien). Ohne verkaufte Lose verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die laufende Runde.') %>
