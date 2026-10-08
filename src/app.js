@@ -23,7 +23,7 @@ const notifyService = require('./services/notifyService');
 const achievementService = require('./achievements/achievementService');
 const giftService = require('./services/giftService');
 const devMessageService = require('./services/devMessageService');
-const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
+const { flash, loadUser, device, dailyBonus, forcePasswordChange, csrf } = require('./middleware');
 
 function createApp() {
   const app = express();
@@ -145,6 +145,7 @@ function createApp() {
   app.use(dailyBonus);
   app.use(require('./services/debtService').collectMiddleware); // offene Schulden zuerst tilgen – vor jeder Aktion
   app.use(csrf);
+  app.use(forcePasswordChange); // nach der Anmeldung mit einem Einmal-Code zuerst ein neues Passwort
   // Neuer Erfolg? app.js fragt alle paar Sekunden – deshalb vor Statistik und Menü-Abzeichen (nur eine kleine Abfrage)
   app.get('/erfolge/neu', async (req, res) => {
     res.set('Cache-Control', 'no-store');

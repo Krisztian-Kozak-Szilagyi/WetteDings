@@ -196,6 +196,8 @@ router.post('/konto/passwort', requireLogin, async (req, res) => {
     req.flash('error', error);
   } else {
     user.passwordHash = await bcrypt.hash(password, 12);
+    user.resetHash = null; // ein offener Einmal-Code vom Admin ist damit erledigt
+    user.resetExpires = null;
     await user.save();
     req.flash('success', 'Dein Passwort wurde geändert.');
   }

@@ -38,6 +38,8 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
+const passwordReset = require('../services/passwordReset');
+const bcrypt = require('bcryptjs');
 const suspicionService = require('../moderation/suspicionService');
 const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
@@ -55,7 +57,7 @@ const PANEL_SECTIONS = [
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'popups', label: 'Pop-ups', icon: 'message', description: 'Nachrichten, die allen Mitgliedern als Fenster erscheinen, bis sie gelesen sind.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Kosmetik, Lotterie, IHK und Dungeon.' },
-  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
+  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods, Passwort zurücksetzen.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
@@ -152,7 +154,7 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log, devMessages] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log, devMessages, openResets] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
@@ -166,7 +168,12 @@ router.get('/admin', requireStaff, async (req, res) => {
     // gewählter Log; unbekannter Spieler: nichts laden
     needs('protokolle') && !(player.q && !player.user) ? logs.loadLog(req.query, { player: player.user, seenAt: me.suspiciousSeenAt }) : null,
     needs('popups') ? devMessageService.list() : [],
+    // Passwort zurücksetzen (nur Admin): offene Einmal-Codes
+    needs('team') && isAdmin ? User.find({ deletedAt: null, resetExpires: { $gt: new Date() } }).select('username resetExpires').sort({ resetExpires: 1 }).lean() : [],
   ]);
+  // Gerade erzeugter Einmal-Code: wird genau einmal angezeigt
+  const resetShown = needs('team') && isAdmin && req.session.resetShown ? req.session.resetShown : null;
+  if (resetShown) delete req.session.resetShown;
   // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
   const newSuspicious = log && log.key === 'handel' ? counts.suspicious : 0;
   if (newSuspicious) {
@@ -204,6 +211,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Devs bannen befristet (höchstens 7 Tage), der Admin auch dauerhaft
     maxBanHours: isAdmin ? MAX_BAN_HOURS : DEV_MAX_BAN_HOURS,
     users,
+    openResets,
+    resetShown,
     packTypes: tcgCatalog.PACK_TYPES,
     itemTypes: itemService.ITEM_TYPES,
     foilSettings: foil.settings,
@@ -1078,6 +1087,32 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
     req.flash('success', on ? `${user.username} ist jetzt ${ROLE_LABEL[role]}.` : `${user.username} ist kein ${ROLE_LABEL[role]} mehr.`);
   }
   res.redirect(panelUrl('team', role === 'mod' ? 'mods' : 'devs'));
+});
+
+// ---------- Passwort zurücksetzen (nur Admin) ----------
+// Erzeugt einen Einmal-Code für ein Mitglied. Der Code steht nur als Hash in der Datenbank und wird dem Admin
+// genau einmal angezeigt. Mit ihm meldet sich das Mitglied an und muss sofort ein neues Passwort wählen.
+const RESET_URL = panelUrl('team', 'passwort');
+router.post('/admin/passwort-reset', requireAdmin, requireReauth(RESET_URL), async (req, res) => {
+  const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  const user = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower').lean() : null;
+  if (!user) req.flash('error', 'Bitte ein Mitglied auswählen.');
+  else if (config.adminUsernames.includes(user.usernameLower)) req.flash('error', 'Das Passwort des Admins lässt sich hier nicht zurücksetzen.');
+  else {
+    const code = passwordReset.makeCode();
+    const expiresAt = new Date(Date.now() + passwordReset.VALID_MS);
+    await User.updateOne({ _id: user._id }, { $set: { resetHash: await bcrypt.hash(code, 12), resetExpires: expiresAt } });
+    req.session.resetShown = { username: user.username, code: passwordReset.formatCode(code), expiresAt: expiresAt.toISOString() };
+  }
+  res.redirect(RESET_URL);
+});
+
+router.post('/admin/passwort-reset/:id/zurueckziehen', requireAdmin, async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const user = await User.findOneAndUpdate({ _id: req.params.id }, { $set: { resetHash: null, resetExpires: null } }).select('username').lean();
+    if (user) req.flash('success', `Der Einmal-Code von ${user.username} gilt nicht mehr.`);
+  }
+  res.redirect(RESET_URL);
 });
 
 // ---------- Einladungen: Registrierungscodes (Admin und Devs) ----------
