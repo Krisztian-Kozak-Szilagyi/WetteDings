@@ -5876,5 +5876,5 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .foil-modal-menu .tcg-modal-status { margin: 0 0 10px; color: var(--color-neutral-300); font-size: 13px; }
 .foil-modal-menu .tcg-modal-status[hidden] { display: none; }
 .foil-modal-menu .foil-modal-actions { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
-.foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
+.foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions a[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
 .foil-modal-menu .foil-modal-actions p { margin: 0; }

@@ -52,7 +52,7 @@
           <span class="inv-item-icon"><% if (it.key === 'folie') { %><%- foilIcon %><% } else { %><img src="<%= it.image %>" alt="" width="22" height="22"><% } %></span>
           <div class="inv-item-text">
             <strong><%= it.label %> <span class="inv-count"><%= it.count %></span><% if (it.inTrade) { %> <span class="muted small">davon <%= it.inTrade %> im Handel</span><% } %></strong>
-            <span class="muted small"><%= it.key === 'folie' ? 'Schweißt eine deiner Karten ein. Folierte Karten steigen sofort um ' + pct(foilSettings.bonusPercent) + ' % und danach jeden Tag im Wert. Im Album lassen sie sich einzeln zu diesem Wert an die Bank verkaufen, auf Quests geschickt werden können sie nicht.' : it.text %></span>
+            <span class="muted small"><%= it.key === 'folie' ? 'Schweißt eine deiner Karten ein. Folierte Karten steigen sofort um ' + pct(foilSettings.bonusPercent) + ' % und danach jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.' : it.text %></span>
           </div>
         </div>
         <% const free = it.count - it.inTrade; %>

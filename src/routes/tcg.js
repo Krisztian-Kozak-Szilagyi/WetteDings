@@ -122,11 +122,6 @@ const cardName = (id) => {
 router.post('/tcg/verkaufen', (req, res) =>
   albumAction(req, res, async () => {
     const cardId = str(req.body.card);
-    // foliertes Exemplar ("f:<id>"): einzeln zum Folienwert
-    if (tcg.isFoilFav(cardId)) {
-      const f = await tcg.sellFoiled({ user: req.user, copyId: cardId });
-      return `${f.card ? f.card.name : 'Karte'} (foliert) für ${euro(f.proceeds)} verkauft.`;
-    }
     const keepOne = str(req.body.mode) === 'duplikate';
     const r = await tcg.sellCards({ user: req.user, cardId, count: 1, keepOne });
     return `${r.count}× ${cardName(cardId)} für ${euro(r.proceeds)} verkauft.`;
@@ -145,7 +140,6 @@ router.post('/tcg/schuetzen', (req, res) =>
   albumAction(req, res, async () => {
     const cardId = str(req.body.card);
     const on = await tcg.toggleProtected({ user: req.user, cardId });
-    if (tcg.isFoilFav(cardId)) return on ? 'Die folierte Karte ist jetzt geschützt – sie lässt sich nicht verkaufen.' : 'Schutz der folierten Karte aufgehoben.';
     return on ? `${cardName(cardId)} ist jetzt geschützt – ihre Duplikate werden nicht mitverkauft.` : `Schutz für ${cardName(cardId)} aufgehoben.`;
   })
 );

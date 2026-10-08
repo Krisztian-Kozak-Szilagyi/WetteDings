@@ -30,7 +30,7 @@ const ITEM_TYPES = [
     tradable: true,
     sell: 1000,
     image: '/img/items/folie.svg',
-    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen im Wert und lassen sich im Album einzeln zu diesem Wert an die Bank verkaufen – auf Quests geschickt werden können sie nicht.',
+    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.',
   },
 ];
 

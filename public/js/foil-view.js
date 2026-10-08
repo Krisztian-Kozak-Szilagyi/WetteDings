@@ -9,11 +9,10 @@
   if (!modal || !modal.showModal) return;
   var stage = modal.querySelector('[data-foil-stage]');
   var favForm = modal.querySelector('[data-foil-fav]');
-  // Album-Menü (views/partials/foil-modal.ejs mit favForm): Wert, Favorit, Schützen, Verkaufen zum Folienwert.
-  // Auf Dashboard und TCG-Seite (Favoriten) nur der Favorit – Schützen und Verkaufen gibt es nur im Album (data-album-foil).
+  // Album-Menü (views/partials/foil-modal.ejs mit favForm): Wert, Favorit, „Im Handel anbieten“ (die Bank kauft folierte Karten nicht).
+  // Auf Dashboard und TCG-Seite (Favoriten) nur der Favorit – Wert und Handel gibt es nur im Album (data-album-foil).
   var menu = modal.querySelector('[data-foil-menu]');
-  var protectForm = modal.querySelector('[data-foil-protect]');
-  var sellForm = modal.querySelector('[data-foil-sell]');
+  var sellLink = modal.querySelector('[data-foil-sell]');
   var statusEl = modal.querySelector('[data-foil-status]');
   var noteEl = modal.querySelector('[data-foil-note]');
   var tradeBox = modal.querySelector('[data-foil-trade]');
@@ -115,21 +114,15 @@
     if (menu) {
       menu.hidden = !d.fav;
       var album = 'albumFoil' in d;
-      var prot = d.protectOn === '1';
-      protectForm.hidden = !album;
-      sellForm.hidden = !album || prot || !!d.sellOff;
+      sellLink.hidden = !album || !!d.sellOff;
       statusEl.hidden = !album;
       if (album) {
-        // wie bei normalen Karten: Seltenheit, Wert (Folienwert, normaler Preis zum Vergleich), Schutz
-        statusEl.textContent = d.rarityLabel + ' · foliert · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '') + (prot ? ' · geschützt' : '');
-        protectForm.querySelector('input[name="card"]').value = d.fav;
-        protectForm.querySelector('button').textContent = prot ? 'Schutz aufheben' : 'Schützen (Schloss)';
-        sellForm.querySelector('input[name="card"]').value = d.fav;
-        sellForm.querySelector('[data-foil-sell-text]').textContent = d.sellText;
-        sellForm.setAttribute('data-confirm', d.name + ' (' + d.rarityLabel + ', foliert) wirklich für ' + d.sellText + ' an die Bank verkaufen? Die Folie ist danach weg.');
+        // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
+        statusEl.textContent = d.rarityLabel + ' · foliert · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
+        sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
       }
-      noteEl.hidden = !album || !(prot || d.sellOff);
-      noteEl.textContent = prot ? 'Geschützt: Dieses Exemplar lässt sich nicht verkaufen, bis du den Schutz aufhebst.' : d.sellOff || '';
+      noteEl.hidden = !album || !d.sellOff;
+      noteEl.textContent = d.sellOff || '';
     }
     // Fremde Sammlung: Tausch für dieses Exemplar vorschlagen
     if (tradeBox) {
