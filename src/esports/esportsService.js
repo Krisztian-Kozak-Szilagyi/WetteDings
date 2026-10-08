@@ -171,6 +171,9 @@ async function towerTeam(userIds, now = Date.now()) {
   return ok ? team._id : null;
 }
 
+/** Profilfelder mit Startwerten – ältere Teams (vor dem Teamprofil gegründet) haben sie nicht, und .lean() füllt nichts auf */
+const withProfile = (t) => ({ ...t, bio: t.bio || '', motto: t.motto || '', color: t.color || null, avatar: t.avatar || null, cosmetics: t.cosmetics || [], trophies: t.trophies || [] });
+
 /** Alle Teams für die Übersicht (aufgelöste zuletzt) samt Kurs */
 async function list() {
   const teams = await EsportsTeam.find({}).sort({ status: 1, lastRank: 1, createdAt: 1 }).lean();
@@ -178,7 +181,7 @@ async function list() {
   return teams
     .map((t) => {
       const e = LISTED.includes(t.status) ? markets.get(t.ticker) : null;
-      return { ...t, price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
+      return { ...withProfile(t), price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
     })
     .sort((a, b) => order[a.status] - order[b.status] || (a.lastRank ?? 999) - (b.lastRank ?? 999) || a.createdAt - b.createdAt);
 }
@@ -190,7 +193,7 @@ async function byTicker(raw) {
   const t = await EsportsTeam.findOne({ ticker }).lean();
   if (!t) return null;
   const e = LISTED.includes(t.status) ? markets.get(t.ticker) : null;
-  return { ...t, price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
+  return { ...withProfile(t), price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
 }
 
 /** Wochenberichte eines Teams (neueste zuerst): [{ week, rank, of, score, change }] */
@@ -317,7 +320,7 @@ async function createCategory(team) {
 async function loadOwnTeam(user) {
   const team = await teamOfUser(user._id);
   if (!team) throw new UserError('Du bist in keinem Team.');
-  return team;
+  return withProfile(team);
 }
 
 async function invite({ user, username }) {

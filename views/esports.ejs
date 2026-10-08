@@ -6,7 +6,7 @@
   const live = teams.filter((t) => t.status !== 'aufgeloest');
   const closed = teams.filter((t) => t.status === 'aufgeloest');
   const teamHref = (t) => `/esports/team/${t.ticker.toLowerCase()}`;
-  const teamPic = (t) => t.avatar ? `<img class="es-mini-avatar" src="${avatarUrl({ avatar: t.avatar })}?v=${assetVersion}" alt="" width="28" height="28" loading="lazy">` : `<span class="es-mini-avatar es-tp-initials" aria-hidden="true">${t.ticker.slice(0, 3)}</span>`;
+
 %>
 <div class="page-head">
   <h1>eSports</h1>
@@ -110,7 +110,7 @@
               <% live.forEach((t) => { %>
                 <tr class="<%= mine && String(mine._id) === String(t._id) ? 'is-mine' : '' %>">
                   <td class="num"><%= t.lastRank || '–' %></td>
-                  <td><a class="es-team-link es-team-cell" href="<%= teamHref(t) %>"><%- teamPic(t) %><strong><%= t.name %></strong><% if (t.trophies && t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %></a></td>
+                  <td><a class="es-team-link es-team-cell" href="<%= teamHref(t) %>"><% if (t.avatar) { %><img class="es-mini-avatar" src="<%= avatarUrl({ avatar: t.avatar }) %>?v=<%= assetVersion %>" alt="" width="40" height="40" loading="lazy"><% } else { %><span class="es-mini-avatar es-monogram<%= rules.findColor(t.color) ? ' es-color-' + t.color : '' %>" aria-hidden="true"><%= Array.from(t.name)[0].toUpperCase() %></span><% } %><strong><%= t.name %></strong><% if (t.trophies && t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %></a></td>
                   <td><% if (t.path) { %><a href="<%= t.path %>"><%= t.ticker %></a><% } else { %><span class="muted"><%= t.ticker %></span><% } %></td>
                   <td class="num"><%= t.price !== null ? coinPrice(t.price) : '–' %></td>
                   <td class="num hide-sm"><%= pctText(t.lastChange) %></td>
