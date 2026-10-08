@@ -27,6 +27,11 @@ const suspicionAlertSchema = new Schema(
     // Die vollständige Kopie samt Kennzahlen steht im Urteils-Protokoll (models/SuspicionVerdict).
     verdictLevel: { type: Number, default: null },
     verdictSummary: { type: String, default: null },
+    // Beurteilter Hinweis (ohne höhere Stufe) mit neuen Belegen: er öffnet sich nicht wieder, sondern zählt hier mit.
+    // Offen für die Anzeige, solange repeatLastAt nach repeatSeenAt (Knopf "Gesehen") und nach dem Urteil liegt.
+    repeatLastAt: { type: Date, default: null },
+    repeatSeenAt: { type: Date, default: null },
+    repeatCount: { type: Number, default: 0 }, // Auswertungen mit neuen Belegen seit dem Urteil
   },
   { timestamps: true }
 );

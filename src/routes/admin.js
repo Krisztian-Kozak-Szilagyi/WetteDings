@@ -313,9 +313,19 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(D
   res.redirect(DISPUTE_URL);
 });
 
-// ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
-router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
+// ---------- Mehrfach-Konten: Hinweise beurteilen oder abhaken (Admin und Devs) ----------
+// Ohne Passwortabfrage (häufige Entscheidungen): im Browser bestätigt ein zweites Fenster (data-confirm-dialog)
+router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    try {
+      if (verdict) await deviceService.setAlertVerdict(req.params.id, verdict, req.user);
+      else await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
+  }
   res.redirect(subUrl('moderation', 'geraete'));
 });
 
@@ -324,19 +334,31 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
 
 // Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
-router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/gruppe', requireStaff, async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
   const verdict = verdictOf(req.body.action);
-  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
-  else await suspicionService.setDoneMany(ids, true, req.user);
+  try {
+    if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen(ids);
+    else if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
+    else await suspicionService.setDoneMany(ids, true, req.user);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
-router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/:id', requireStaff, async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) {
     const verdict = verdictOf(req.body.action);
-    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
-    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    try {
+      if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen([req.params.id]);
+      else if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+      else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
   }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });

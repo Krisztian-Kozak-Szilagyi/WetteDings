@@ -86,9 +86,45 @@
     return true;
   }
 
+  // Zweite Bestätigung ohne Passwort (Formulare mit data-confirm-dialog): Fenster mit dem Text aus data-confirm.
+  // Ohne Text (z. B. "Gesehen") wird direkt abgeschickt; ohne Fenster im Dokument greift window.confirm.
+  var confirmBox = document.querySelector('[data-confirm-dialog-box]');
+  var confirmTarget = null;
+  if (confirmBox) {
+    confirmBox.querySelector('[data-confirm-dialog-cancel]').addEventListener('click', function () { confirmBox.close(); });
+    confirmBox.querySelector('[data-confirm-dialog-form]').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var form = confirmTarget;
+      confirmBox.close();
+      if (!form) return;
+      form.dataset.confirmOk = '1';
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    });
+  }
+
   // Sicherheitsabfragen vor unumkehrbaren Aktionen (delegiert, damit sie auch nach Live-Updates greifen)
   document.addEventListener('submit', function (e) {
     var form = e.target;
+    if (form.hasAttribute('data-confirm-dialog')) {
+      if (form.dataset.confirmOk === '1') {
+        delete form.dataset.confirmOk; // bestätigt: jetzt wirklich absenden
+        return;
+      }
+      var text = form.getAttribute('data-confirm');
+      if (text) {
+        e.preventDefault();
+        if (confirmBox) {
+          confirmTarget = form;
+          confirmBox.querySelector('[data-confirm-dialog-text]').textContent = text;
+          confirmBox.showModal();
+          confirmBox.querySelector('[data-confirm-dialog-ok]').focus();
+        } else if (window.confirm(text)) {
+          form.dataset.confirmOk = '1';
+          if (form.requestSubmit) form.requestSubmit(); else form.submit();
+        }
+      }
+      return;
+    }
     if (form.hasAttribute('data-reauth')) {
       if (form.dataset.reauthOk === '1') {
         delete form.dataset.reauthOk; // Passwort ist eingetragen: jetzt wirklich absenden
