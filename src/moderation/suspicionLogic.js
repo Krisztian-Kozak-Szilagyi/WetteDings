@@ -81,7 +81,8 @@ const MARKET_SKIP = new Set(['zusammenlegung', 'aufteilung']); // Splits sind ke
 
 const DUNGEON_MIN_RUNS = 6; // so viele Durchläufe braucht es für eine Aussage
 const DUNGEON_JOIN_MS = MIN; // Median: angemeldet so kurz, nachdem die Anmeldung für den Termin aufging
-const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts)
+const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts) …
+const DUNGEON_STREAK_MIN = 6; // … und an mindestens so vielen Terminen (sonst genügten bei langem Termin-Abstand zwei)
 const DUNGEON_UNSEEN_SHARE = 0.8; // Beute so oft nie angeschaut (die Seite meldet das beim Ansehen)
 const DUNGEON_NIGHT = 2; // so viele Termine zwischen 0 und 6 Uhr machen schnelles Anmelden wahrscheinlich
 
@@ -643,7 +644,7 @@ function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
     else cur = { from: slotMs[i], to: slotMs[i], count: 1 };
     if (cur.count > best.count) best = { ...cur };
   }
-  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS;
+  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS && best.count >= DUNGEON_STREAK_MIN;
 
   const finished = list.filter((r) => r.finished);
   const unseen = finished.filter((r) => !r.seen);
@@ -654,7 +655,9 @@ function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
     const h = hourIn(t, timeZone);
     return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
   }).length;
-  const strong = streakHit || (joinHit && (night >= DUNGEON_NIGHT || unseenHit));
+  // Die Serie allein ist nur möglich: ein engagierter Dauerspieler mit Wecker schafft sie auch von Hand (Fehlalarme Dio, oemer).
+  // Wahrscheinlich erst, wenn die Anmeldung sofort kam oder die Beute nie angesehen wurde.
+  const strong = (joinHit && (night >= DUNGEON_NIGHT || unseenHit)) || (streakHit && unseenHit);
   const parts = [];
   if (streakHit) parts.push(`${best.count} Termine in Folge ohne Lücke (${hoursText(best.to - best.from)})`);
   if (joinHit) parts.push(`im Schnitt ${seconds(joinMs)} nach Öffnen der Anmeldung angemeldet`);
@@ -1045,12 +1048,15 @@ function factsOf(kind, details = {}) {
 }
 
 const VERDICT_EVENTS = new Set(['bestaetigt', 'fehlalarm', 'zurueckgenommen']);
+/** Urteil eines Betroffenen über den eigenen Fall – ohne Aussagekraft (Altdaten: der Name steht im Protokoll) */
+const isSelfVerdict = (e) => !!e.byName && Array.isArray(e.names) && e.names.some((n) => String(n).toLowerCase() === String(e.byName).toLowerCase());
 const rateOf = (c) => ({ ...c, rate: c.confirmed + c.falseAlarms ? c.confirmed / (c.confirmed + c.falseAlarms) : null });
 
 /**
  * Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (models/SuspicionVerdict).
  * events: [{ key, event, kind, level, createdAt }] in beliebiger Reihenfolge. Je Hinweis zählt nur sein letztes Urteil,
  * mit der Stufe, die er dabei hatte; ein zurückgenommenes Urteil zählt nicht, "neue_belege" ändert nichts.
+ * Urteile, die ein Betroffener über sich selbst gefällt hat (byName steht in names), zählen nicht.
  * counts: Map kind → Zahl der aktuellen Hinweise (Spalte "Hinweise").
  * Liefert [{ kind, label, total, confirmed, falseAlarms, rate, levels: { 1: {...}, 2: {...} } }], rate =
  * bestätigt ÷ (bestätigt + Fehlalarm) bzw. null ohne Urteil. Muster mit Urteilen zuerst, dann nach Zahl der Hinweise.
@@ -1059,6 +1065,7 @@ function precisionRows(events, counts = new Map()) {
   const last = new Map(); // key → letztes Urteil
   for (const e of events) {
     if (!VERDICT_EVENTS.has(e.event)) continue;
+    if (isSelfVerdict(e)) continue;
     const prev = last.get(e.key);
     if (!prev || toMs(e.createdAt) >= toMs(prev.createdAt)) last.set(e.key, e);
   }

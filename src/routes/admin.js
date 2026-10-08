@@ -318,16 +318,28 @@ const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? acti
 router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
   const verdict = verdictOf(req.body.action);
-  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
-  else await suspicionService.setDoneMany(ids, true, req.user);
+  try {
+    if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen(ids);
+    else if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
+    else await suspicionService.setDoneMany(ids, true, req.user);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
 router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) {
     const verdict = verdictOf(req.body.action);
-    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
-    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    try {
+      if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen([req.params.id]);
+      else if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+      else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
   }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });

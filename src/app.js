@@ -107,6 +107,7 @@ function createApp() {
     deviceAlerts: 0, // Konten mit gemeinsamem Gerät (nur Admin)
     tradeAlerts: 0, // Geschäfte zwischen Mehrfach-Konten (Admin und Devs)
     suspicionAlerts: 0, // Spieler mit Gesamtbewertung ab "Verdacht" (Manipulationserkennung, Admin und Devs)
+    suspicionRepeats: 0, // beurteilte Fälle, die erneut aufgetreten sind und noch nicht auf "Gesehen" stehen (dezentes Abzeichen)
     bellNotes: [], // Glocke: Benachrichtigungen (ungelesene und die neuesten gelesenen)
     bellUnread: 0,
     deviceProbe: false,
@@ -164,7 +165,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET' && require('./stats/activity').isPageRequest(req)) {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, bell, achPopup, giftPopup] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, suspicionRepeats, bell, achPopup, giftPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -180,6 +181,7 @@ function createApp() {
         u.isStaff ? deviceService.alertCount() : 0, // Admin und Devs: Konten, die sich ein Gerät teilen
         u.isStaff ? deviceService.suspiciousTradeCount(u) : 0, // Admin und Devs: Handel zwischen Mehrfach-Konten
         u.isStaff ? suspicionService.openCount() : 0, // Admin und Devs: Spieler mit Verdacht auf Skript oder Wertverschiebung
+        u.isStaff ? suspicionService.repeatCount() : 0, // … und beurteilte Fälle, die erneut aufgetreten sind
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
         giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
@@ -200,6 +202,7 @@ function createApp() {
         deviceAlerts,
         tradeAlerts,
         suspicionAlerts,
+        suspicionRepeats,
         bellNotes: bell.list,
         bellUnread: bell.unread,
         achPopup,

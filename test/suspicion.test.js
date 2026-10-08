@@ -222,6 +222,17 @@ test('Dungeon: jeder Termin rund um die Uhr, sofort angemeldet, Beute nie angesc
   // sofort angemeldet, aber tagsüber und Beute angeschaut: nur möglich
   const quick = human.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 20e3) }));
   assert.equal(s.dungeonFinding(quick, opts).level, LEVEL.moeglich);
+  // Dauerspieler mit Wecker: 13 Termine in Folge, aber erst 40 Min. nach Öffnen angemeldet, Beute angeschaut: nur möglich
+  const alarm = bot.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 40 * 60e3), seen: true }));
+  const af = s.dungeonFinding(alarm, opts);
+  assert.equal(af.level, LEVEL.moeglich);
+  assert.equal(af.streak, 13);
+  // Serie mit nie angeschauter Beute bleibt wahrscheinlich
+  assert.equal(s.dungeonFinding(alarm.map((r) => ({ ...r, seen: false })), opts).level, LEVEL.wahrscheinlich);
+  // langer Termin-Abstand (24 Std.): erst ab 6 Terminen in Folge eine Serie, und auch dann nur möglich
+  const daily = (n) => Array.from({ length: n }, (_, i) => ({ slot: new Date(start + i * 24 * H), joinedAt: null, seen: true, finished: true }));
+  assert.equal(s.dungeonFinding(daily(5), { ...opts, intervalMs: 24 * H }), null);
+  assert.equal(s.dungeonFinding(daily(6), { ...opts, intervalMs: 24 * H }).level, LEVEL.moeglich);
   // zu wenige Durchläufe
   assert.equal(s.dungeonFinding(bot.slice(0, 5), opts), null);
 });
