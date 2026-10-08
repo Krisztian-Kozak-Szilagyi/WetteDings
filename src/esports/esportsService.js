@@ -93,6 +93,7 @@ async function registerAuthors() {
 /** Beim Serverstart (nach markets.start): Forum-Verfasser und die Engines aller gehandelten Teams */
 async function start() {
   await registerAuthors();
+  await trimTeams();
   const teams = await EsportsTeam.find({ status: { $in: LISTED } }).lean();
   for (const t of teams) {
     if (t.status === 'eingefroren') frozen.add(t.ticker);
@@ -285,6 +286,22 @@ async function removeMember(team, userId, { fee }) {
   });
   await afterChange(updated);
   return updated;
+}
+
+/**
+ * Teams über MAX_MEMBERS (nach dem Senken der Obergrenze): die zuletzt Beigetretenen verlassen das Team,
+ * ohne Gebühr wie beim Rauswurf; der Kapitän bleibt. Läuft beim Start, danach verhindert invite/accept zu große Teams.
+ */
+async function trimTeams() {
+  const teams = await EsportsTeam.find({ status: { $in: LIVE }, [`members.${league.MAX_MEMBERS}`]: { $exists: true } }).lean();
+  for (const team of teams) {
+    let current = team;
+    for (const m of league.overflow(team.members, team.captain)) {
+      current = await removeMember(current, m.user, { fee: false });
+      await notify(m.user, { area: 'eSports', href: '/esports', text: `eSports-Teams haben jetzt höchstens ${league.MAX_MEMBERS} Mitglieder. Du warst unter den zuletzt Beigetretenen und bist nicht mehr im Team „${team.name}“ – ohne Gebühr.` });
+      console.log(`eSports: ${m.name} aus „${team.name}“ entfernt (höchstens ${league.MAX_MEMBERS} Mitglieder).`);
+    }
+  }
 }
 
 /** Nach jeder Änderung der Mitglieder: ETF starten, einfrieren, auftauen oder das leere Team auflösen */
