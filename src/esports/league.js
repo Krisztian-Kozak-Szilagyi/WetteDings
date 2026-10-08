@@ -18,7 +18,8 @@ const START_PRICE = 50;
 const TOP_CHANGE = 0.25; // Platz 1
 const BOTTOM_CHANGE = -0.2; // letzter Platz
 const HOLD_BONUS = 0.045; // Platz gehalten oder verbessert
-const FOUND_COST = 100000; // Cent: Gründung 1.000 €
+const FOUND_COST = 100000; // Cent: Gründung 1.000 € (Startwert, Admin: Spielwerte → eSports)
+const MAX_FOUND_COST = 10000000; // Cent: höchstens 100.000 €
 const LEAVE_FEE = 25000; // Cent: Austritt aus einem gehandelten Team 250 € (geht an die übrigen Mitglieder)
 const BANKRUPT_FEE = 100000; // Cent: Konkurs je Mitglied 1.000 € (auch ins Minus)
 const FREEZE_DAYS = 14; // so lange darf ein Team unter TEAM_SIZE Mitgliedern bleiben, dann Konkurs
@@ -169,6 +170,10 @@ function prizesError(prizes, minTeams) {
   return null;
 }
 
+/** Gründungskosten (Cent) prüfen → Fehlertext oder null */
+const foundCostError = (cents) =>
+  Number.isInteger(cents) && cents >= 0 && cents <= MAX_FOUND_COST ? null : `Gründungskosten: 0 bis ${(MAX_FOUND_COST / 100).toLocaleString('de-DE')} €.`;
+
 /** Preis eines Avatars fürs Team (aufgerundet) */
 const teamAvatarPrice = (price) => Math.ceil(price * TEAM_AVATAR_FACTOR);
 
@@ -230,6 +235,7 @@ module.exports = {
   placeInfo,
   prizeMembers,
   prizesError,
+  foundCostError,
   teamAvatarPrice,
   cleanBio,
   cleanMotto,

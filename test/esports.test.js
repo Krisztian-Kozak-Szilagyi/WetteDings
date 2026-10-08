@@ -188,3 +188,11 @@ test('eSports: Wochenbericht nennt die Trophäe', () => {
   assert.match(league.reportText({ ticker: 'ABC' }, row, '04.10.2026', 1).body, /Gold-Trophäe/);
   assert.doesNotMatch(league.reportText({ ticker: 'ABC' }, row, '04.10.2026').body, /Trophäe/);
 });
+
+test('eSports: Gründungskosten prüfen (Admin)', () => {
+  assert.equal(league.foundCostError(league.FOUND_COST), null);
+  assert.equal(league.foundCostError(0), null);
+  assert.ok(league.foundCostError(-1));
+  assert.ok(league.foundCostError(NaN));
+  assert.ok(league.foundCostError(10000001));
+});

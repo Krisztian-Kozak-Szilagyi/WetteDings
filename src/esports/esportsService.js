@@ -3,7 +3,7 @@
  * Die Rechnung (Rangliste, Sprünge, Kurswirkung) steht in league.js, hier nur Speichern, Geld und Forum.
  *
  * Ablauf eines Teams:
- *  - Gründung kostet FOUND_COST; der Gründer ist Kapitän. Im Forum entsteht unter „eSports“ ein Unterbereich.
+ *  - Gründung kostet foundCost() (Admin, Startwert FOUND_COST); der Gründer ist Kapitän. Im Forum entsteht unter „eSports“ ein Unterbereich.
  *  - Ab TEAM_SIZE Mitgliedern wird der Team-ETF im Broker gehandelt (Start bei START_PRICE €).
  *  - Fällt ein gehandeltes Team unter TEAM_SIZE, friert es ein (kein Kauf, kein Sprung, kein Rauschen).
  *    Füllt es sich nicht binnen FREEZE_DAYS wieder auf: Konkurs – die Anleger bekommen den Wert zum letzten Kurs
@@ -102,27 +102,31 @@ async function registerAuthors() {
 // ---------- Einstellungen (Admin): Preise der Trophäen ----------
 
 const SETTINGS_ID = 'esports';
-const settings = { prizes: league.DEFAULT_PRIZES.map((p) => ({ ...p })), minTeams: league.DEFAULT_MIN_TEAMS };
+const settings = { prizes: league.DEFAULT_PRIZES.map((p) => ({ ...p })), minTeams: league.DEFAULT_MIN_TEAMS, foundCost: league.FOUND_COST };
 
 function applySettings(doc) {
   if (!doc) return;
   const prizes = Array.isArray(doc.prizes) ? doc.prizes.map((p) => ({ cash: p.cash, packs: p.packs })) : settings.prizes;
   const minTeams = Number.isInteger(doc.minTeams) ? doc.minTeams : settings.minTeams;
+  if (Number.isInteger(doc.foundCost) && !league.foundCostError(doc.foundCost)) settings.foundCost = doc.foundCost;
   if (league.prizesError(prizes, minTeams)) return; // kaputte Werte: Startwerte behalten
   settings.prizes = prizes;
   settings.minTeams = minTeams;
 }
 
+/** Gründungskosten in Cent (Admin-Panel) */
+const foundCost = () => settings.foundCost;
+
 async function loadSettings() {
   applySettings(await EsportsSettings.findById(SETTINGS_ID).lean());
 }
 
-/** Admin: Preis je Platz (Geld in Cent, Packs) und Mindestzahl der Teams mit Punkten speichern */
-async function saveSettings({ admin, prizes, minTeams }) {
-  const err = league.prizesError(prizes, minTeams);
+/** Admin: Gründungskosten, Preis je Platz (Geld in Cent, Packs) und Mindestzahl der Teams mit Punkten speichern */
+async function saveSettings({ admin, prizes, minTeams, foundCost: cost }) {
+  const err = league.foundCostError(cost) || league.prizesError(prizes, minTeams);
   if (err) throw new UserError(err);
-  const before = { prizes: settings.prizes.map((p) => ({ ...p })), minTeams: settings.minTeams };
-  const clean = { prizes: prizes.map((p) => ({ cash: p.cash, packs: p.packs })), minTeams };
+  const before = { foundCost: settings.foundCost, prizes: settings.prizes.map((p) => ({ ...p })), minTeams: settings.minTeams };
+  const clean = { foundCost: cost, prizes: prizes.map((p) => ({ cash: p.cash, packs: p.packs })), minTeams };
   await EsportsSettings.updateOne({ _id: SETTINGS_ID }, { $set: { ...clean, updatedByName: admin.username } }, { upsert: true });
   applySettings(clean);
   await logSettingsChange({ area: 'esports', before, after: clean, by: admin });
@@ -283,10 +287,11 @@ async function found({ user, name: rawName, ticker: rawTicker }) {
   let team;
   try {
     team = await inTransaction(async (session) => {
-      const paid = await User.updateOne({ _id: user._id, balance: { $gte: league.FOUND_COST } }, { $inc: { balance: -league.FOUND_COST } }, { session });
+      const cost = foundCost();
+      const paid = cost ? await User.updateOne({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { session }) : { modifiedCount: 1 };
       if (!paid.modifiedCount) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
       const [t] = await EsportsTeam.create([{ name, nameLower: name.toLowerCase(), ticker, captain: user._id, members: [{ user: user._id, name: user.username }] }], { session });
-      await Ledger.create([{ user: user._id, type: 'esports_gruendung', amount: -league.FOUND_COST, betTitle: name }], { session });
+      if (cost) await Ledger.create([{ user: user._id, type: 'esports_gruendung', amount: -cost, betTitle: name }], { session });
       return t;
     });
   } catch (err) {
@@ -589,6 +594,7 @@ module.exports = {
   loadSettings,
   saveSettings,
   prizeList,
+  foundCost,
   settings,
   invitesFor,
   found,
