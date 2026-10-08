@@ -623,7 +623,61 @@
       ratioEl.className = pack > 0 && ev >= pack ? 'neg' : 'pos';
       tcgAdmin.querySelector('[data-tcg-warn]').hidden = !(pack > 0 && ev >= pack);
     };
-    tcgAdmin.addEventListener('input', recalc);
+    // #102: Chancen ausgleichen – festgehaltene (Schloss) bleiben, die übrigen teilen sich den Rest auf 100 %
+    // im Verhältnis zueinander. Wer eine Chance ändert, hält sie damit fest. Gerechnet wird in Hundertstel-Prozent
+    // (wie gespeichert) vom Stand zu Beginn der Eingabe aus – so summieren sich beim Tippen keine Rundungsfehler.
+    var weightInputs = Array.prototype.slice.call(tcgAdmin.querySelectorAll('input[name^="weight_"]'));
+    var lockOf = function (inp) { return tcgAdmin.querySelector('[data-tcg-lock="' + inp.name.slice(7) + '"]'); };
+    var hundredths = function (inp) { var v = num(inp.value); return isFinite(v) ? Math.round(v * 100) : NaN; };
+    var overEl = tcgAdmin.querySelector('[data-tcg-over]');
+    var base = null; // Stand der nicht festgehaltenen Chancen zu Beginn der Eingabe
+    var snapshot = function () {
+      base = {};
+      weightInputs.forEach(function (inp) { var h = hundredths(inp); base[inp.name] = isFinite(h) && h > 0 ? h : 0; });
+    };
+    var rebalance = function () {
+      var fixed = 0;
+      var free = [];
+      for (var i = 0; i < weightInputs.length; i++) {
+        var inp = weightInputs[i];
+        if (lockOf(inp).checked) {
+          var h = hundredths(inp);
+          if (!isFinite(h) || h < 0) return; // halbe Eingabe ("2,"): noch nicht ausgleichen
+          fixed += h;
+        } else free.push({ inp: inp, w: base ? base[inp.name] : Math.max(0, hundredths(inp) || 0) });
+      }
+      var rest = 10000 - fixed;
+      overEl.hidden = rest >= 0;
+      if (rest < 0 || !free.length) return;
+      var total = free.reduce(function (s, f) { return s + f.w; }, 0);
+      if (!total) { // alle übrigen auf 0: nach den Standardwerten verteilen, notfalls gleichmäßig
+        free.forEach(function (f) { f.w = Number(f.inp.getAttribute('data-default')) || 0; });
+        total = free.reduce(function (s, f) { return s + f.w; }, 0);
+      }
+      if (!total) { free.forEach(function (f) { f.w = 1; }); total = free.length; }
+      // abrunden, die übrigen Hundertstel an die größten Reste – zusammen genau 100,00 %
+      var given = 0;
+      free.forEach(function (f) { var exact = (rest * f.w) / total; f.h = Math.floor(exact); f.r = exact - f.h; given += f.h; });
+      free.slice().sort(function (a, b) { return b.r - a.r; }).slice(0, rest - given).forEach(function (f) { f.h++; });
+      free.forEach(function (f) { f.inp.value = (f.h / 100).toFixed(2).replace('.', ','); });
+    };
+    tcgAdmin.addEventListener('focusin', function (e) { if (weightInputs.indexOf(e.target) >= 0) snapshot(); });
+    tcgAdmin.addEventListener('input', function (e) {
+      if (weightInputs.indexOf(e.target) >= 0) {
+        lockOf(e.target).checked = true; // geänderte Chance festhalten
+        if (!base) snapshot();
+        rebalance();
+      }
+      recalc();
+    });
+    // Schloss gelöst oder gesetzt: ab hier vom jetzigen Stand aus ausgleichen
+    tcgAdmin.addEventListener('change', function (e) { if (e.target.hasAttribute('data-tcg-lock')) { snapshot(); overEl.hidden = true; } });
+    var unlockAll = tcgAdmin.querySelector('[data-tcg-unlock-all]');
+    if (unlockAll) unlockAll.addEventListener('click', function () {
+      tcgAdmin.querySelectorAll('[data-tcg-lock]').forEach(function (c) { c.checked = false; });
+      snapshot();
+      overEl.hidden = true;
+    });
     recalc();
   }
 
