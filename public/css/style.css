@@ -1750,6 +1750,15 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .admin-tcg-table input { width: 100%; max-width: 140px; }
 .panel-form .btn[type="submit"] { margin-top: 12px; align-self: flex-start; }
 .admin-tcg-summary { margin: 14px 0 0; }
+/* #102: Schloss je Chance – offen blass, festgehalten in der Akzentfarbe */
+.admin-tcg-table .admin-lock { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--color-neutral-600); cursor: var(--cur-pointer); transition: color .15s ease, background .15s ease; }
+.admin-tcg-table .admin-lock input { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; opacity: 0; cursor: inherit; }
+.admin-tcg-table .admin-lock:hover { color: var(--text); background: var(--surface-2); }
+.admin-tcg-table .admin-lock:has(input:checked) { color: var(--color-accent-300); background: color-mix(in srgb, var(--color-accent) 16%, transparent); }
+.admin-tcg-table .admin-lock .admin-lock-on, .admin-tcg-table .admin-lock:has(input:checked) .admin-lock-off { display: none; }
+.admin-tcg-table .admin-lock:has(input:checked) .admin-lock-on { display: block; }
+.admin-tcg-table .admin-lock:has(input:focus-visible) { outline: 2px solid var(--color-accent-300); outline-offset: 2px; }
+.admin-tcg-hint { margin: 10px 0 0; }
 .tcg-odds { font-size: 13px; font-variant-numeric: tabular-nums; }
 .tcg-odds th, .tcg-odds td { padding: 9px 4px; }
 .tcg-odds td:first-child { font-weight: 500; white-space: nowrap; }
