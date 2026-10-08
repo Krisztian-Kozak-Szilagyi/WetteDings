@@ -10,7 +10,6 @@ const catalog = require('./catalog');
 const settings = require('./settings');
 const foil = require('../items/foil');
 const { centerShift } = require('../grading/condition');
-const { konfettiFor } = require('../cosmetics/logic');
 
 const packType = (type) => {
   const t = catalog.packTypeByKey[type || catalog.DEFAULT_PACK];
@@ -234,37 +233,28 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
 }
 
 /**
- * Alle Duplikate eines Mitglieds (für „Alle Duplikate verkaufen“ und „… zerkleinern“): von jeder Karte bleibt eine.
- * Folierte, gesperrte und geschützte Karten (user.tcgProtected) sowie Boss-Karten bleiben komplett.
- */
-async function allDuplicates(user, session) {
-  // folierte Exemplare bleiben immer (die Bank kauft sie nicht)
-  const owned = await TcgCard.find({ user: user._id, foiledAt: null }).sort({ createdAt: 1, _id: 1 }).select('_id card rarity').session(session).lean();
-  const byCard = new Map();
-  for (const c of owned) {
-    if (!byCard.has(c.card)) byCard.set(c.card, []);
-    byCard.get(c.card).push(c);
-  }
-  // Gesperrte Exemplare bleiben; von jeder Karte bleibt eins (siehe pickDuplicates)
-  const locked = await lockedDocs(user._id, session);
-  const keep = new Set(user.tcgProtected || []);
-  const list = [];
-  for (const [cardId, copies] of byCard) {
-    if (keep.has(cardId)) continue;
-    if ((catalog.rarityByKey[copies[0].rarity] || {}).noBank) continue; // Boss-Karten kauft die Bank nicht
-    list.push(...pickDuplicates(copies, locked));
-  }
-  return list;
-}
-
-/**
  * Alle Duplikate auf einmal verkaufen: von jeder Karte bleibt genau eine (die neueste) übrig.
  * Geschützte Karten (user.tcgProtected) werden komplett ausgelassen.
  * Eine Buchung im Kontoauszug über den Gesamtbetrag.
  */
 async function sellAllDuplicates({ user }) {
   return inTransaction(async (session) => {
-    const toSell = await allDuplicates(user, session);
+    // folierte Exemplare bleiben immer (die Bank kauft sie nicht)
+    const owned = await TcgCard.find({ user: user._id, foiledAt: null }).sort({ createdAt: 1, _id: 1 }).select('_id card rarity').session(session).lean();
+    const byCard = new Map();
+    for (const c of owned) {
+      if (!byCard.has(c.card)) byCard.set(c.card, []);
+      byCard.get(c.card).push(c);
+    }
+    // Gesperrte Exemplare bleiben; von jeder Karte bleibt eins (siehe pickDuplicates)
+    const locked = await lockedDocs(user._id, session);
+    const keep = new Set(user.tcgProtected || []);
+    const toSell = [];
+    for (const [cardId, list] of byCard) {
+      if (keep.has(cardId)) continue;
+      if ((catalog.rarityByKey[list[0].rarity] || {}).noBank) continue; // Boss-Karten kauft die Bank nicht
+      toSell.push(...pickDuplicates(list, locked));
+    }
     if (!toSell.length) throw new UserError('Du hast keine doppelten Karten, die verkauft werden können.');
 
     const proceeds = toSell.reduce((s, c) => s + (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);
@@ -274,49 +264,6 @@ async function sellAllDuplicates({ user }) {
     const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { balance: proceeds } }, { new: true, session });
     if (proceeds > 0) await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta(toSell) }], { session });
     return { count: toSell.length, proceeds, balance: updated.balance };
-  });
-}
-
-// ---------- Zerkleinern: Karten gegen Konfetti (Kosmetik-Währung, src/cosmetics) statt Geld ----------
-// Gleiche Regeln wie beim Verkauf an die Bank (gesperrte, folierte und geschützte Karten bleiben),
-// nur Boss-Karten lassen sich einzeln zerkleinern (die Bank kauft sie nicht). Konfetti = Bankwert in ganzen Euro.
-// Buchung als tcg_zerkleinert mit 0 € (für Kontoauszug und Kartenhistorie), Konfetti steht in meta.konfetti.
-
-const konfettiOf = (docs) => docs.reduce((s, c) => s + konfettiFor(catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);
-
-async function creditKonfetti({ user, docs, session }) {
-  const konfetti = konfettiOf(docs);
-  const res = await TcgCard.deleteMany({ _id: { $in: docs.map((c) => c._id) }, user: user._id }, { session });
-  if (res.deletedCount !== docs.length) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
-  const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { konfetti } }, { new: true, session });
-  await Ledger.create([{ user: user._id, type: 'tcg_zerkleinert', amount: 0, meta: { ...soldMeta(docs), konfetti } }], { session });
-  return { count: docs.length, konfetti, total: updated.konfetti };
-}
-
-/** Eine Karte (oder mit keepOne alle Duplikate einer Karte) zerkleinern, die ältesten zuerst */
-async function shredCards({ user, cardId, keepOne = false }) {
-  if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu zerkleinern.');
-  return inTransaction(async (session) => {
-    const all = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id card rarity foiledAt').session(session).lean();
-    if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
-    const owned = all.filter((c) => !c.foiledAt);
-    if (!owned.length) throw new UserError('Folierte Karten lassen sich nicht zerkleinern.');
-    if (!konfettiOf(owned.slice(0, 1))) throw new UserError('Diese Karte lässt sich nicht zerkleinern.');
-    const locked = await lockedDocs(user._id, session);
-    const free = owned.filter((c) => !isLocked(locked, c));
-    const toShred = keepOne ? pickDuplicates(owned, locked) : free.slice(0, 1);
-    if (!free.length) throw new UserError('Diese Karte ist gerade auf einer IHK-Quest, im Handel oder im Duell und kann nicht zerkleinert werden.');
-    if (!toShred.length) throw new UserError('Du hast keine Duplikate dieser Karte.');
-    return creditKonfetti({ user, docs: toShred, session });
-  });
-}
-
-/** Alle Duplikate zerkleinern – dieselben Karten wie bei „Alle Duplikate verkaufen“ */
-async function shredAllDuplicates({ user }) {
-  return inTransaction(async (session) => {
-    const toShred = await allDuplicates(user, session);
-    if (!toShred.length) throw new UserError('Du hast keine doppelten Karten, die zerkleinert werden können.');
-    return creditKonfetti({ user, docs: toShred, session });
   });
 }
 
@@ -444,4 +391,4 @@ async function cardValueCents(userId) {
 }
 
 module.exports = {
-  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, shredCards, shredAllDuplicates, inventory, sellValueExpr, cardValueCents };
+  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

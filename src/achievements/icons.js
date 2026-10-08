@@ -134,15 +134,6 @@ const GLYPHS = {
     '<rect x="44" y="30" width="40" height="68" rx="7" fill="F"/>' +
     '<path d="M48 30 H80 M48 98 H80" stroke="D" stroke-width="3" opacity=".45"/><rect x="56" y="24" width="16" height="6" rx="2" fill="F"/>' +
     '<path d="M68 40 L54 66 H63 L57 88 L75 58 H66 L72 40Z" fill="D"/>',
-  // Profilbild: Kopf und Schultern im abgerundeten Rahmen
-  avatar:
-    '<rect x="32" y="30" width="64" height="68" rx="10" fill="none" stroke="S" stroke-width="5"/>' +
-    '<circle cx="64" cy="56" r="13" fill="F"/><path d="M40 92 C42 76 52 71 64 71 C76 71 86 76 88 92Z" fill="F"/>',
-  // Karte im Schredder: oben ein Kartenrest, unten die Streifen
-  shredder:
-    '<rect x="46" y="26" width="36" height="26" rx="4" fill="F"/>' +
-    '<rect x="30" y="50" width="68" height="16" rx="4" fill="S"/>' +
-    '<g fill="F"><rect x="48" y="70" width="5" height="26" rx="1.5"/><rect x="57" y="70" width="5" height="20" rx="1.5"/><rect x="66" y="70" width="5" height="28" rx="1.5"/><rect x="75" y="70" width="5" height="22" rx="1.5"/></g>',
   secret: '<text x="64" y="84" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="58" fill="F">?</text>',
   halo:
     '<path d="M42 34 a22 7 0 0 1 36 -5" fill="none" stroke="S" stroke-width="4" stroke-linecap="round"/>' +

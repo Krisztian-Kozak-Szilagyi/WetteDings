@@ -85,12 +85,6 @@ function createApp() {
     gradingOpen: () => require('./grading/gradingService').settings.open, // Grading-Shop für alle freigegeben?
     bonusTime: config.bonusTime,
     lotteryTicketPrice: () => require('./services/lotteryService').ticketPrice('taeglich'), // Admin-Panel
-    konfettiName: () => require('./cosmetics/cosmeticService').currencyName(), // Name der Kosmetik-Währung (Admin-Panel)
-    // Effekt des Profilbilds als Klasse (nur große Bilder: Profil, Podest), '' ohne Effekt
-    avatarFx: (user) => {
-      const fx = require('./cosmetics/cosmeticService').avatarEffect(user && user.avatar);
-      return fx ? ` cos-fx cos-fx-${fx}` : '';
-    },
     lotteryTime: config.lotteryTime,
     supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
@@ -243,7 +237,6 @@ function createApp() {
   app.use(require('./routes/lottery'));
   app.use(require('./routes/tcg'));
   app.use(require('./routes/inventar'));
-  app.use(require('./routes/kosmetik'));
   app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
   app.use(require('./routes/dungeon'));

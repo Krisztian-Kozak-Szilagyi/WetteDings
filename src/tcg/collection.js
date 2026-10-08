@@ -5,7 +5,6 @@ const catalog = require('./catalog');
 const foil = require('../items/foil');
 const { inventory } = require('./tcgService');
 const { gradeStats, centerShift } = require('../grading/condition');
-const { konfettiFor } = require('../cosmetics/logic');
 
 async function collection(user) {
   const [owned, locked, foiledDocs] = await Promise.all([
@@ -59,7 +58,6 @@ async function collection(user) {
     collectionValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
     dupCount: dups.reduce((s, o) => s + o.n - 1, 0),
     dupValue: dups.reduce((s, o) => s + sell(o) * (o.n - 1), 0),
-    dupKonfetti: dups.reduce((s, o) => s + konfettiFor(sell(o)) * (o.n - 1), 0), // dieselben Duplikate zerkleinert
   };
 }
 

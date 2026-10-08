@@ -149,7 +149,7 @@ function loadCards(dir = IMAGE_DIR) {
 // als "?", nur Admins können sie vergeben. cardById kennt sie, damit vergebene Exemplare überall funktionieren.
 // Veröffentlichen = unreleased in cardData.js entfernen.
 const LOADED = loadCards();
-// Test-Karten (Kampfmodus, test-item) ebenso: nur für Admins (Album-Abschnitt "Test", Deckbau, migrate.js), sonst nirgends
+// Test-Karten (Kampfmodus, test-item) ebenso: nur für Admins (Album-Abschnitt "Test", Deckbau, Vergabe, migrate.js), sonst nirgends
 const isTestCard = (c) => c.rarity === 'test-item';
 const CARDS = LOADED.filter((c) => !c.unreleased && !isTestCard(c));
 const UNRELEASED_CARDS = LOADED.filter((c) => c.unreleased);
