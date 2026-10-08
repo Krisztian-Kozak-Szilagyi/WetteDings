@@ -10,19 +10,21 @@
 %>
 
 <%# Mage Tower: kein Termin – kein Countdown, der Leiter startet (data-start leer) %>
-<div class="dg-page" data-dg-page data-rev="<%= rev %>" data-start="<%= tower ? '' : new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
+<div class="dg-page<%= chaosTheme ? ' is-chaos' : '' %>" data-dg-page data-rev="<%= rev %>" data-start="<%= tower ? '' : new Date(slot).toISOString() %>" data-lock="<%= lockSeconds %>" data-now="<%= Date.now() %>">
 <% if (tower ? towerClosedForOthers : closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <%# Bild des Dungeons im Querformat – darin Titel, Termin bzw. der laufende Kampf %>
 <div class="dg-hero-wrap">
   <section class="dg-hero">
-    <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1983" height="793">
+    <img class="dg-hero-img" src="<%= dg.image %>" alt="" width="1983" height="793" data-dg-hero-img>
     <div class="dg-hero-shade"></div>
     <div class="dg-hero-text">
       <span class="kicker"><%= tower ? 'Mage Tower' : 'Dungeon' %><%= phase === 'laeuft' ? ' · läuft' : '' %></span>
-      <h1><% if (dg.story) { %><a class="dg-hero-title" href="/dungeon/geschichte/<%= dg.key %>" title="Ganze Geschichte lesen"><%= dg.title %></a><% } else { %><%= dg.title %><% } %></h1>
+      <h1 data-dg-hero-title><% if (dg.story) { %><a class="dg-hero-title" href="/dungeon/geschichte/<%= dg.key %>" title="Ganze Geschichte lesen"><%= dg.title %></a><% } else { %><%= dg.title %><% } %></h1>
       <% if (phase === 'laeuft') { %>
-        <p class="dg-stage-title" data-dg-fight-title><%= dg.intro %></p>
+        <%# Chaos-Event: Meldung vom neuen Teilnehmer, bevor der Dungeon wechselt (public/js/dungeon.js) %>
+        <p class="dg-event-alert" data-dg-event-alert role="status" hidden></p>
+        <p class="dg-stage-title<%= chaosTheme ? ' is-binary' : '' %>" data-dg-fight-title><%= dg.intro %></p>
         <p class="dg-stage-text" data-dg-fight-text></p>
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
@@ -357,8 +359,8 @@
 
 <%# Beute: nach dem Ende einmal als Fenster – Spieler für Spieler aufgedeckt %>
 <% if (loot) { %>
-  <dialog class="dg-loot" data-dg-loot aria-labelledby="dg-loot-title">
-    <span class="kicker"><%= loot.tower ? 'Mage Tower · Beute' : 'Beute' %></span>
+  <dialog class="dg-loot<%= loot.chaos ? ' is-chaos' : '' %>" data-dg-loot aria-labelledby="dg-loot-title">
+    <span class="kicker"><%= loot.tower ? 'Mage Tower · Beute' : loot.chaos ? 'Chaos & Demise · Beute' : 'Beute' %></span>
     <% if (loot.tower) { %>
       <h2 id="dg-loot-title"><%= loot.result[0].toUpperCase() + loot.result.slice(1) %>!</h2>
     <% } else { %>
@@ -369,7 +371,7 @@
         <% const items = []; %>
         <% if (p.reward) items.push({ cls: 'is-money', text: euro(p.reward) }); %>
         <% if (p.foil) items.push({ cls: 'is-foil', text: 'Folie' }); %>
-        <% if (p.bossCard) items.push({ cls: 'is-card', text: loot.bossCard ? loot.bossCard.name : 'Boss-Karte' }); %>
+        <% if (p.bossCard) items.push({ cls: 'is-card', text: loot.bossCard ? loot.bossCard.name : loot.chaos ? 'Geheime Boss-Karte (wird nachgereicht)' : 'Boss-Karte' }); %>
         <% if (!items.length) items.push({ cls: 'is-none', text: 'keine Beute' }); %>
         <% items.forEach((it) => { %>
           <li class="dg-loot-row <%= it.cls %><%= p.me ? ' is-me' : '' %>" data-dg-loot-row>

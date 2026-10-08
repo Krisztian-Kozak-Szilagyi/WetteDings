@@ -45,6 +45,8 @@ const runSchema = new Schema(
     slot: { type: Date, required: true },
     dungeon: { type: String, required: true }, // Schlüssel aus src/dungeon/dungeons.js (Turm: 'mage-tower')
     rounds: { type: Number, default: null }, // Turm: geschaffte Runden
+    event: { type: String, default: null }, // Chaos-Event: Schlüssel des Dungeons, der verdrängt wurde ('st-ivan')
+    cardPending: { type: Boolean, default: false }, // Boss-Karte erbeutet, aber noch nicht im Katalog – wird nachgereicht
     esportsTeam: { type: Schema.Types.ObjectId, ref: 'EsportsTeam', default: null }, // Turm: Lauf zählt für dieses Team (Liga)
     // Turm: Wiedergabe je Runde und Pause (echte Sekunden) zum Startzeitpunkt – Dungeon: Standardwerte
     fightSeconds: { type: Number, default: null },
@@ -99,6 +101,7 @@ const runSchema = new Schema(
 runSchema.index({ 'members.user': 1, status: 1 });
 runSchema.index({ status: 1, endsAt: 1 });
 runSchema.index({ startedAt: -1 }); // Protokolle: alle Durchläufe, neueste zuerst
+runSchema.index({ cardPending: 1 }, { partialFilterExpression: { cardPending: true } }); // nachzureichende Boss-Karten
 runSchema.index({ 'members.user': 1, startedAt: -1 });
 runSchema.index({ esportsTeam: 1, startedAt: -1 }, { partialFilterExpression: { esportsTeam: { $type: 'objectId' } } }); // eSports-Liga
 
@@ -114,6 +117,7 @@ const settingsSchema = new Schema(
     cardChance: Number,
     botWeights: Schema.Types.Mixed,
     tower: Schema.Types.Mixed, // Mage Tower (siehe dungeonService.DEFAULTS.tower)
+    chaos: Schema.Types.Mixed, // Chaos-Event (siehe dungeonService.DEFAULTS.chaos)
     updatedByName: String,
   },
   { timestamps: true }

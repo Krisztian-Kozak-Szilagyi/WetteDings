@@ -21,13 +21,18 @@ const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
-const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
+const { defOf, dungeonForSlot, TOWER, CHAOS } = require('./dungeons');
 const cardBans = require('../tcg/cardBans');
 
 const TEAM_SIZE = 3;
 const LOCK_SECONDS = 10; // so lange vor dem Start kann man sich nicht mehr abmelden (und nicht mehr beitreten)
 // Wiedergabe (echte Sekunden): Einleitung, je Kampf, Pause dazwischen
 const INTRO_SECONDS = 8;
+// Chaos-Event: längere Einleitung – erst St. Ivan, dann die Meldung vom neuen Teilnehmer (EVENT_ALERT_SECONDS),
+// dann der Wechsel zum Chaos Dungeon (EVENT_REVEAL_SECONDS), danach der Countdown bis zum ersten Kampf
+const EVENT_INTRO_SECONDS = 16;
+const EVENT_ALERT_SECONDS = 4;
+const EVENT_REVEAL_SECONDS = 9;
 const FIGHT_SECONDS = 45; // volle Zeit eines Kampfes (IHK: 15 Sekunden)
 const PAUSE_SECONDS = 6; // Pause zwischen zwei Kämpfen
 const END_SECONDS = 2; // nach dem letzten Kampf, dann wird die Beute verteilt
@@ -59,6 +64,9 @@ const DEFAULTS = {
   // Bockhaber ~8, Glitch ~14 Runden, beste Kombination (St. Ivan + Glitch, Mauch/Sigrist/Lili) ~17. Der steile Anstieg
   // hält den Abstand klein – mit +8 % schaffte die beste Kombination 36 Runden (~3.500 € am Tag).
   tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4 },
+  // Chaos-Event (geheim): chance = Chance in %, dass ein St.-Ivan-Lauf zum Chaos Dungeon wird; required / rewards wie
+  // oben für dessen drei Kämpfe; foilChance / cardChance = Beute beim Boss (die Boss-Karte gibt es nur hier)
+  chaos: { chance: 3, required: [1950, 2100, 2400], rewards: [8000, 8000, 25000], foilChance: 5, cardChance: 3 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
 
@@ -80,6 +88,8 @@ const validTower = (t) =>
 
 const validTriple = (list, min) => Array.isArray(list) && list.length === 3 && list.every((v) => Number.isInteger(v) && v >= min);
 const validChance = (c) => Number.isFinite(c) && c >= 0 && c <= 100;
+const validChaos = (c) =>
+  !!c && validChance(c.chance) && validChance(c.foilChance) && validChance(c.cardChance) && validTriple(c.required, 1) && c.required.every((r) => r <= 100000) && validTriple(c.rewards, 0);
 const validInterval = (h) => Number.isInteger(h) && h >= 1 && h <= 24 && 24 % h === 0;
 function validWeights(w) {
   if (!w || typeof w !== 'object') return false;
@@ -101,9 +111,10 @@ async function loadSettings() {
   // Turm: fehlende Werte (neu hinzugekommen) vom Standard
   const tower = doc.tower ? Object.fromEntries(Object.keys(DEFAULTS.tower).map((k) => [k, doc.tower[k] ?? DEFAULTS.tower[k]])) : null;
   if (validTower(tower)) settings.tower = tower;
+  if (validChaos(doc.chaos)) settings.chaos = { chance: doc.chaos.chance, required: doc.chaos.required, rewards: doc.chaos.rewards, foilChance: doc.chaos.foilChance, cardChance: doc.chaos.cardChance };
 }
 
-async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower = settings.tower, admin }) {
+async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower = settings.tower, chaos = settings.chaos, admin }) {
   if (!validInterval(intervalHours)) throw new UserError('Der Abstand muss 1, 2, 3, 4, 6, 8, 12 oder 24 Stunden sein.');
   if (!validTriple(required, 1) || required.some((r) => r > 100000)) throw new UserError('Bitte für jeden Kampf gültige Ziel-Punkte angeben (1–100000).');
   if (!validTriple(rewards, 0)) throw new UserError('Bitte für jeden Kampf einen gültigen Lohn angeben.');
@@ -112,7 +123,8 @@ async function saveSettings({ open, intervalHours, required, rewards, foilChance
   if (!validTower(tower)) {
     throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s und Pause 0–30 s je Runde.');
   }
-  const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower };
+  if (!validChaos(chaos)) throw new UserError('Chaos & Demise: Chancen 0–100 %, Ziel-Punkte 1–100000 und gültiger Lohn je Kampf.');
+  const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower, chaos };
   await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { ...next, updatedByName: admin.username } }, { upsert: true });
   const before = JSON.parse(JSON.stringify(settings));
   Object.assign(settings, next);
@@ -289,7 +301,7 @@ function playDungeon(dungeon, members, rand = random, opts = settings) {
 }
 
 /** Wiedergabedauer in Sekunden: Einleitung, Kämpfe mit Pausen dazwischen, kurzer Abschluss */
-const runSeconds = (fights, pause = PAUSE_SECONDS) => INTRO_SECONDS + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * pause + END_SECONDS;
+const runSeconds = (fights, pause = PAUSE_SECONDS, intro = INTRO_SECONDS) => intro + fights.reduce((s, f) => s + f.seconds, 0) + Math.max(0, fights.length - 1) * pause + END_SECONDS;
 
 /** Karte, die der Boss dieses Dungeons (oder der Turm) fallen lässt (Katalogkarte), oder null */
 function bossCardOf(dungeonKey) {
@@ -672,20 +684,30 @@ function fillBots(players, mode = 'dungeon') {
 /** Mitglieder als Katalog-Karten für fight() */
 const teamCards = (members) => members.map((m) => ({ card: catalog.cardById[m.card], boost: m.boost ? catalog.cardById[m.boost] : null }));
 
+/**
+ * Chaos-Event: Wird aus diesem Dungeon der Chaos Dungeon? Nur der Dungeon, den CHAOS ersetzt (St. Ivan), mit der
+ * Chance aus dem Admin-Panel – je Team ausgewürfelt. Gibt { dungeon, opts, event } zurück.
+ */
+function rollChaos(base, rand = random, opts = settings) {
+  if (base.key !== CHAOS.replaces || !(rand() * 100 < opts.chaos.chance)) return { dungeon: base, opts, event: null };
+  return { dungeon: CHAOS, opts: opts.chaos, event: base.key };
+}
+
 /** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
 async function startTeam(slot, parties, players, chatLog, now) {
-  const dungeon = dungeonForSlot(slot, settings.intervalHours);
+  const { dungeon, opts, event } = rollChaos(dungeonForSlot(slot, settings.intervalHours));
   const members = fillBots(players, 'dungeon');
-  const fights = playDungeon(dungeon, teamCards(members));
+  const fights = playDungeon(dungeon, teamCards(members), random, opts);
   const leaderId = parties.length === 1 && !parties[0].solo ? String(parties[0].leader) : null;
-  const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot) }));
+  const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot, random, opts) }));
   const success = fights.length === dungeon.fights.length && fights[fights.length - 1].success;
+  const intro = event ? EVENT_INTRO_SECONDS : INTRO_SECONDS;
   await inTransaction(async (session) => {
     const ids = parties.map((p) => p._id);
     const del = await DungeonParty.deleteMany({ _id: { $in: ids } }, { session });
     if (del.deletedCount !== ids.length) throw new Error('Dungeon-Anmeldung wurde gleichzeitig verändert.');
     await DungeonRun.create(
-      [{ slot, dungeon: dungeon.key, members: runMembers, fights, success, startedAt: new Date(now), endsAt: new Date(now + runSeconds(fights) * 1000), chat: chatLog }],
+      [{ slot, dungeon: dungeon.key, event, members: runMembers, fights, success, startedAt: new Date(now), endsAt: new Date(now + runSeconds(fights, PAUSE_SECONDS, intro) * 1000), chat: chatLog }],
       { session }
     );
   });
@@ -833,14 +855,17 @@ async function finishDue({ now = Date.now() } = {}) {
           await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
           await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
         }
+        // Karte noch nicht gezeichnet (Chaos Dungeon): Beute merken, grantPendingBossCards reicht sie nach
+        if (!card && d && d.bossCard && r.members.some((x) => x.user && x.bossCard)) await DungeonRun.updateOne({ _id }, { $set: { cardPending: true } }, { session });
         if (foils.length) await grantItems({ userIds: foils, type: 'folie', source: 'dungeon', session });
         return r;
       });
       if (!run) continue;
       const d = defOf(run.dungeon);
       const card = bossCardOf(run.dungeon);
+      const pending = !card && d && d.bossCard ? 'die Boss-Karte (wird nachgereicht)' : null;
       for (const m of run.members.filter((x) => x.user)) {
-        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
+        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard ? (card ? `die Boss-Karte „${card.name}“` : pending) : null].filter(Boolean);
         let head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
         if (run.mode === 'tower') head = `Mage Tower: ${towerResultText(run.rounds)}.`;
         await notify([m.user], { area: 'Dungeon', href: '/dungeon', text: loot.length ? `${head} Beute: ${loot.join(', ')}.` : `${head} Diesmal ohne Beute.` });
@@ -852,6 +877,36 @@ async function finishDue({ now = Date.now() } = {}) {
 }
 
 /**
+ * Boss-Karten nachreichen, die erbeutet wurden, bevor es die Karte im Katalog gab (Chaos Dungeon, cardPending).
+ * Läuft regelmäßig (jobs.js) – sobald die Karte gezeichnet und eingespielt ist, bekommt jeder Gewinner sein Exemplar.
+ */
+async function grantPendingBossCards() {
+  const runs = await DungeonRun.find({ cardPending: true, status: 'fertig' }).select('dungeon members.user members.bossCard').lean();
+  let granted = 0;
+  for (const r of runs) {
+    const card = bossCardOf(r.dungeon);
+    if (!card) continue;
+    const ids = r.members.filter((m) => m.user && m.bossCard).map((m) => m.user);
+    // gelöschte Konten bekommen nichts mehr
+    const winners = ids.length ? (await User.find({ _id: { $in: ids }, deletedAt: null }).select('_id').lean()).map((u) => u._id) : [];
+    const done = await inTransaction(async (session) => {
+      const u = await DungeonRun.updateOne({ _id: r._id, cardPending: true }, { $set: { cardPending: false } }, { session });
+      if (!u.modifiedCount) return false;
+      if (winners.length) {
+        await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
+        await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
+      }
+      return true;
+    });
+    if (!done || !winners.length) continue;
+    granted += winners.length;
+    const d = defOf(r.dungeon);
+    await notify(winners, { area: 'TCG', href: '/tcg/album', text: `Deine Boss-Karte aus „${d ? d.title : 'Dungeon'}“ ist da: „${card.name}“.` }).catch((err) => console.error('Boss-Karten-Hinweis fehlgeschlagen:', err.message));
+  }
+  return granted;
+}
+
+/**
  * Seltene Beute aller Spieler (Folie, Boss-Karte) aus abgeschlossenen Durchläufen, neueste zuerst – für die Liste
  * unten auf der Dungeon-Seite (wie "Seltene Ziehungen" im TCG, #78). Namen sind die aktuellen (Umbenennungen).
  */
@@ -859,7 +914,8 @@ function lootEntries(runs, nameById = {}) {
   const out = [];
   for (const r of runs) {
     const d = defOf(r.dungeon);
-    const card = bossCardOf(r.dungeon);
+    // noch nicht gezeichnete Boss-Karte (Chaos Dungeon): schon erbeutet, nur ohne Namen
+    const card = bossCardOf(r.dungeon) || (d && d.bossCard ? { name: 'Geheime Boss-Karte', rarity: 'boss' } : null);
     for (const m of r.members) {
       if (!m.user || !(m.foil || (m.bossCard && card))) continue;
       out.push({
@@ -931,9 +987,14 @@ module.exports = {
   bossCardOf,
   LOCK_SECONDS,
   INTRO_SECONDS,
+  EVENT_INTRO_SECONDS,
+  EVENT_ALERT_SECONDS,
+  EVENT_REVEAL_SECONDS,
   FIGHT_SECONDS,
   PAUSE_SECONDS,
   CHAT_TEXT_MAX,
+  rollChaos,
+  grantPendingBossCards,
   DEFAULTS,
   settings,
   loadSettings,

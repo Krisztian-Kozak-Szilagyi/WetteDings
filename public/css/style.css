@@ -5859,3 +5859,35 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .pick-freq-btn { flex: none; }
 .pick-freq-btn[aria-pressed="true"] { color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent-300); }
 .ihk-pick-tools { flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+
+/* Chaos-Event „Chaos & Demise“ (geheim): dunkle, kräftige Lilatöne. Meldung vom neuen Teilnehmer, das Banner bebt –
+   dann flackert der Dungeon herein (public/js/dungeon.js: .is-chaos-alert, .is-chaos-reveal, danach dauerhaft .is-chaos).
+   Die Flavour-Texte sind Binärcode (src/dungeon/dungeons.js) – in Monospace, damit er wie zerfallener Code aussieht. */
+:root { --chaos-950: #12041f; --chaos-900: #1e0536; --chaos-800: #2e0a52; --chaos-700: #4c0d87; --chaos-600: #6b21a8; --chaos-500: #8b2fd6; --chaos-300: #c084fc; --chaos-100: #f3e8ff; }
+.dg-event-alert {
+  display: inline-block; margin: 8px 0 0; padding: 6px 12px; border-radius: 8px; font-weight: 600; letter-spacing: .02em;
+  color: var(--chaos-100); background: color-mix(in srgb, var(--chaos-800) 85%, transparent); box-shadow: 0 0 0 1px var(--chaos-500), 0 0 24px rgba(139, 47, 214, .5);
+  animation: chaos-pulse 1.2s ease-in-out infinite;
+}
+.dg-event-alert[hidden] { display: none; }
+.dg-page.is-chaos-alert .dg-hero { animation: chaos-quake .6s linear 3; }
+.dg-page.is-chaos-reveal .dg-hero-img { animation: chaos-flicker 1.4s steps(1) 1; }
+/* Bild in Lila getaucht (wirkt auch auf den Platzhalter, bis es ein eigenes Banner gibt) */
+.dg-page.is-chaos .dg-hero { background: var(--chaos-950); box-shadow: 0 0 0 1px var(--chaos-700), 0 0 48px rgba(107, 33, 168, .45); }
+.dg-page.is-chaos .dg-hero-img { filter: grayscale(1) sepia(1) hue-rotate(225deg) saturate(3) brightness(.7) contrast(1.15); }
+.dg-page.is-chaos .dg-hero-shade { background: linear-gradient(180deg, rgba(30, 5, 54, .2) 0%, rgba(30, 5, 54, .6) 55%, rgba(18, 4, 31, .95) 100%); }
+.dg-page.is-chaos .dg-hero .kicker { color: var(--chaos-300); }
+.dg-page.is-chaos .dg-hero h1 { color: var(--chaos-100); text-shadow: 0 0 18px rgba(139, 47, 214, .8), 0 0 2px var(--chaos-500); }
+.dg-page.is-chaos .dg-stage-text,
+.dg-page.is-chaos .dg-hero .dg-stage-title.is-binary { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; color: var(--chaos-300); text-shadow: 0 0 10px rgba(139, 47, 214, .6); }
+.dg-page.is-chaos .dg-bar.is-progress .dg-bar-fill { background: linear-gradient(90deg, var(--chaos-700), var(--chaos-500)); }
+.dg-page.is-chaos .dg-steps li.is-active { color: var(--chaos-100); box-shadow: 0 0 0 1px var(--chaos-500); }
+/* Beute-Fenster nach „Chaos & Demise“ */
+.dg-loot.is-chaos { background: radial-gradient(120% 70% at 50% 0%, var(--chaos-800), var(--chaos-950) 75%); box-shadow: 0 0 0 1px var(--chaos-600), 0 0 60px rgba(107, 33, 168, .5); }
+.dg-loot.is-chaos .kicker, .dg-loot.is-chaos h2 { color: var(--chaos-300); }
+@keyframes chaos-pulse { 0%, 100% { box-shadow: 0 0 0 1px var(--chaos-600), 0 0 18px rgba(139, 47, 214, .35); } 50% { box-shadow: 0 0 0 1px var(--chaos-300), 0 0 34px rgba(139, 47, 214, .75); } }
+@keyframes chaos-quake { 0%, 100% { transform: none; } 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-3px, -1px); } 80% { transform: translate(3px, 1px); } }
+@keyframes chaos-flicker { 0% { opacity: 1; } 10% { opacity: .2; } 20% { opacity: 1; } 35% { opacity: .1; filter: invert(1); } 50% { opacity: 1; } 65% { opacity: .3; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dg-event-alert, .dg-page.is-chaos-alert .dg-hero, .dg-page.is-chaos-reveal .dg-hero-img { animation: none; }
+}
