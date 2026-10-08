@@ -21,3 +21,22 @@
     </div>
   </form>
 </dialog>
+<%# Zweite Bestätigung ohne Passwort (Formulare mit data-confirm-dialog, Logik in public/js/app.js): Auffälligkeiten, Mehrfach-Konten %>
+<dialog class="reauth-dialog" data-confirm-dialog-box aria-labelledby="confirm-title">
+  <form method="dialog" class="form reauth-form" data-confirm-dialog-form>
+    <div class="reauth-head">
+      <span class="reauth-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.2" r=".6"/></svg>
+      </span>
+      <div>
+        <h2 id="confirm-title">Entscheidung bestätigen</h2>
+        <p class="muted small">Bitte bestätige die Entscheidung noch einmal.</p>
+      </div>
+    </div>
+    <p class="reauth-text" data-confirm-dialog-text></p>
+    <div class="reauth-actions">
+      <button type="button" class="btn btn-ghost" data-confirm-dialog-cancel>Abbrechen</button>
+      <button type="submit" class="btn btn-primary" data-confirm-dialog-ok>Bestätigen</button>
+    </div>
+  </form>
+</dialog>

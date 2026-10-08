@@ -165,7 +165,7 @@
 %>
 <%# Formular für einen Hinweis bzw. eine Gruppe (ids); action: erledigt, oeffnen, bestaetigt, fehlalarm %>
 <% const alertForm = (id, action, label, confirm, ids) => { %>
-  <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= ids ? 'gruppe' : id %>" data-confirm="<%= confirm %>">
+  <form method="post" data-confirm-dialog action="/admin/auffaelligkeiten/<%= ids ? 'gruppe' : id %>" data-confirm="<%= confirm %>">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <% if (ids) { %><input type="hidden" name="ids" value="<%= ids %>"><% } %>
     <input type="hidden" name="action" value="<%= action %>">
@@ -220,7 +220,7 @@
         <% if (own) { %>
           <span class="muted small" title="Hinweise zu deinem eigenen Konto kann jemand anderes beurteilen.">Eigener Fall</span>
         <% } else if (a.doneAt) { %>
-          <% if (a.repeatPending) alertForm(a._id, 'gesehen', 'Gesehen', 'Erneutes Auftreten als gesehen markieren? Das Urteil bleibt bestehen.') %>
+          <% if (a.repeatPending) alertForm(a._id, 'gesehen', 'Gesehen', '') %>
           <% alertForm(a._id, 'oeffnen', 'Wieder öffnen', 'Hinweis wieder öffnen?' + (a.verdict ? ' Das Urteil wird dabei zurückgenommen.' : '')) %>
         <% } else { %>
           <% alertForm(a._id, 'bestaetigt', 'Bestätigt', 'Als bestätigt markieren? Das Muster war tatsächlich Manipulation.') %>
@@ -252,7 +252,7 @@
             <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: 'gesamt', spieler: g.users[0].username }) %>">Alle Aktionen</a>
           <% } %>
           <% if (!isOwn(g.users) && repeatOf(g).length) { %>
-            <% alertForm(null, 'gesehen', 'Gesehen', 'Erneutes Auftreten als gesehen markieren? Die Urteile bleiben bestehen.', repeatOf(g).map((a) => a._id).join(',')) %>
+            <% alertForm(null, 'gesehen', 'Gesehen', '', repeatOf(g).map((a) => a._id).join(',')) %>
           <% } %>
           <% if (isOwn(g.users)) { %>
             <span class="muted small" title="Hinweise zu deinem eigenen Konto kann jemand anderes beurteilen.">Eigener Fall</span>
@@ -368,7 +368,7 @@
           <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
             <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
           <% }) %>
-          <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
+          <form method="post" data-confirm-dialog action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
             <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>

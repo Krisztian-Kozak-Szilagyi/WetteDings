@@ -305,7 +305,8 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(D
 });
 
 // ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
-router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+// Ohne Passwortabfrage (häufige Entscheidungen): im Browser bestätigt ein zweites Fenster (data-confirm-dialog)
+router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
   res.redirect(subUrl('moderation', 'geraete'));
 });
@@ -315,7 +316,7 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
 
 // Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
-router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/gruppe', requireStaff, async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
   const verdict = verdictOf(req.body.action);
   try {
@@ -329,7 +330,7 @@ router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admi
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
-router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/:id', requireStaff, async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) {
     const verdict = verdictOf(req.body.action);
     try {
