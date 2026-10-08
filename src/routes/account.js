@@ -161,14 +161,6 @@ router.post('/konto/name', requireLogin, async (req, res) => {
   res.redirect('/konto/einstellungen#name');
 });
 
-// Einwilligung für den Support-Chat widerrufen (Art. 7 Abs. 3 DSGVO); der Chat fragt danach erneut
-router.post('/konto/support-einwilligung/widerrufen', requireLogin, async (req, res) => {
-  await User.updateOne({ _id: req.user._id }, { $set: { supportConsentAt: null } });
-  req.session.supportChat = [];
-  req.flash('success', 'Deine Einwilligung für den Support-Chat wurde widerrufen und der Gesprächsverlauf gelöscht.');
-  res.redirect('/konto/einstellungen#datenschutz');
-});
-
 router.post('/konto/loeschen', requireLogin, async (req, res) => {
   try {
     if (req.body.confirm !== 'on') throw new UserError('Bitte bestätige, dass du dein Konto endgültig löschen möchtest.');

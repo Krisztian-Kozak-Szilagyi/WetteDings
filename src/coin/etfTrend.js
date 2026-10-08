@@ -12,7 +12,7 @@ const HOUR = 60 * 60 * 1000;
 const USER_HOUR_CAP = 30;
 
 // Nicht als Aktivität gezählt (erster Pfadteil bzw. ganze Pfade)
-const IGNORED_AREAS = new Set(['admin', 'konto', 'support', 'geraet', 'benachrichtigungen', 'abmelden', 'anmelden', 'registrieren']);
+const IGNORED_AREAS = new Set(['admin', 'konto', 'chat', 'geraet', 'benachrichtigungen', 'abmelden', 'anmelden', 'registrieren']);
 const IGNORED_PATHS = new Set(['/dungeon/beute-gesehen']);
 
 /** Zählt diese Anfrage als Aktivität? (POST eines angemeldeten Mitglieds, kein ausgenommener Bereich) */

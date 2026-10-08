@@ -45,6 +45,7 @@ const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
+const chatService = require('../chat/chatService');
 const { CODE_TTL_OPTIONS, ttlText, remainingText, parseTtl, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
@@ -67,6 +68,7 @@ const SUBTABS = {
   moderation: [
     { key: 'streit', label: 'Streitfälle' },
     { key: 'meldungen', label: 'Meldungen' },
+    { key: 'chat', label: 'Chat-Meldungen' },
     { key: 'bans', label: 'Bans' },
     { key: 'geraete', label: 'Mehrfach-Konten' },
     { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
@@ -127,21 +129,22 @@ router.get('/admin', requireStaff, async (req, res) => {
   const needs = (...tabs) => tabs.includes(tab);
 
   // Offene Aufgaben – für die Übersicht und die Zähler an den Reitern
-  const [reportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), deviceService.listBans()]);
+  const [reportCount, chatReportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans()]);
   const counts = {
     disputes: res.locals.betDisputes || 0,
     reports: reportCount,
+    chatReports: chatReportCount,
     deviceAlerts: res.locals.deviceAlerts || 0,
     suspicionAlerts: res.locals.suspicionAlerts || 0,
     suspicious: res.locals.tradeAlerts || 0,
     packLogNew: res.locals.packLogNew || 0,
     bans: bans.length,
   };
-  counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts + counts.suspicionAlerts;
+  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts;
   counts.vergaben = counts.packLogNew;
   counts.protokolle = counts.suspicious;
   // Zähler je Unterreiter
-  const subCounts = { streit: counts.disputes, meldungen: counts.reports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
 
   // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
   const subs = SUBTABS[tab] || null;
@@ -154,12 +157,13 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log, devMessages, openResets] = await Promise.all([
+  const [stats, disputes, reports, chatReports, deviceMatches, suspicions, precision, codes, grants, log, devMessages, openResets] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
     needsSub('moderation', 'streit') ? disputeList(me) : [],
     needsSub('moderation', 'meldungen') ? openReports() : [],
+    needsSub('moderation', 'chat') ? chatService.openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.precision() : [],
@@ -202,6 +206,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     noteMin: betService.NOTE_MIN,
     noteMax: betService.NOTE_MAX,
     reports,
+    chatReports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
     suspicionPrecision: precision, // Trefferquote je Muster (Urteile bestätigt/Fehlalarm)
@@ -415,6 +420,13 @@ router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=modera
 });
 
 // Kartensperre setzen, ändern oder aufheben (keine Modi angehakt = aufheben). Admin und Devs.
+// Chat-Meldung erledigt (eingreifen: Ban im Reiter „Bans“)
+router.post('/admin/chat-meldungen/:id/erledigt', requireStaff, requireReauth('/admin?bereich=moderation&teil=chat'), async (req, res) => {
+  const ok = await chatService.closeReport(req.params.id, req.user);
+  req.flash(ok ? 'info' : 'error', ok ? 'Meldung erledigt.' : 'Diese Meldung ist schon erledigt.');
+  res.redirect(subUrl('moderation', 'chat'));
+});
+
 const CARD_BAN_URL = subUrl('moderation', 'karten');
 router.post('/admin/kartensperre', requireStaff, requireReauth(CARD_BAN_URL), async (req, res) => {
   try {
@@ -1146,7 +1158,8 @@ router.post('/admin/codes/:id/loeschen', requireStaff, async (req, res) => {
 
 /** Reiterleiste des Panels für andere Seiten im Panel-Rahmen (Statistik): sichtbare Reiter und Zähler */
 async function panelNav(user, locals) {
-  const reports = await ForumReport.countDocuments({ done: false });
+  const [forumReports, chatReports] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount()]);
+  const reports = forumReports + chatReports;
   return {
     panelSections: sectionsFor(user),
     panelBadges: {

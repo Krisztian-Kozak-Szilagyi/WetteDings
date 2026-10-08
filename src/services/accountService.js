@@ -136,7 +136,7 @@ async function deleteAccount({ user, password }) {
           tcgSeen: [],
           tcgLooted: [],
         },
-        $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
+        $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '', chatBlocked: '' },
       },
       { ...opt, projection: { balance: 1 } }
     );
@@ -172,6 +172,8 @@ async function deleteAccount({ user, password }) {
       // abgeschlossene Ergebnisse nicht rückwirkend (wie bei den Spielverläufen oben)
       ForumReaction.deleteMany({ user: id }, opt),
       require('../models/Notification').deleteMany({ user: id }, opt),
+      // Chat: eigene Nachrichten, Gesprächsliste und Meldungen
+      require('../chat/chatService').deleteUserData(id, session),
       // Erfolge löschen – nur Einzelstücke bleiben an der neutralen Hülle, damit sie nie ein zweites Mal vergeben werden
       require('../models/Achievement').deleteMany({ user: id, key: { $nin: require('../achievements/list').SPECIAL.map(([k]) => k) } }, opt),
       // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus

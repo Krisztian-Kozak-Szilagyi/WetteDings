@@ -7,7 +7,7 @@
     </div>
     <p>Tippe in Safari unten auf <strong>Teilen</strong> und dann auf <strong>Zum Home-Bildschirm</strong>.</p>
   </dialog>
-  <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
+  <% if (currentUser) { %><%- include('chat') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
   <%# Neuer Erfolg: Fenster wie das Beute-Fenster. Steht für jedes angemeldete Mitglied bereit; ist schon ein Erfolg offen,
       öffnet app.js es sofort, sonst fragt app.js alle paar Sekunden nach (/erfolge/neu). Esc schließt nicht – erst „Weiter“. %>
