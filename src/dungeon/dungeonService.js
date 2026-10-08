@@ -16,7 +16,7 @@ const { notify } = require('../services/notifyService');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
-const { lockedDocs, isLocked, claim } = require('../tcg/locks');
+const { lockedDocs, isLocked, claim, copiesByCard, lockLabel } = require('../tcg/locks');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
@@ -384,18 +384,20 @@ const makeTeams = (entries, rand = random, teamOf = () => null) => {
 /** Freie Exemplare (nicht foliert, nicht gesperrt) – als Kartenliste für die Auswahl */
 /** ownDungeon: die eigenen, schon für den Dungeon gesperrten Karten zählen als frei (Karten tauschen vor dem Start) */
 /** mode: 'dungeon' | 'tower' – banned = dort gesperrte Karten (Kartensperren); sie stehen in der Liste, sind aber nicht wählbar */
+/** locks: gesperrte Exemplare je Karte ({ n, label }, z. B. „Auf Quest“) – Karten ohne freies Exemplar stehen markiert in der Liste, wählbar sind sie nicht */
 async function availableCards(userId, { ownDungeon = false, mode = 'dungeon' } = {}) {
-  const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
-  const free = (d) => !isLocked(locked, d) || (ownDungeon && locked.reasons.get(String(d._id)) === 'dungeon');
+  const copies = await copiesByCard(userId, { freeIf: (reason) => ownDungeon && reason === 'dungeon' });
   // counts: freie Exemplare je Karte – dieselbe Karte als Charakter UND Boost braucht zwei
   const counts = {};
-  docs.filter(free).forEach((d) => {
-    counts[d.card] = (counts[d.card] || 0) + 1;
-  });
+  const locks = {};
+  for (const [id, e] of Object.entries(copies)) {
+    counts[id] = e.free;
+    if (e.locked) locks[id] = { n: e.locked, label: lockLabel(e.reason) };
+  }
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
-  const all = Object.keys(counts).map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
+  const all = Object.keys(copies).map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
   // Boost: Items, Spells und Charaktere mit Boost-Fähigkeit (Ömer, Pascal, Lili)
-  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts, banned: cardBans.bannedIn(mode) };
+  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts, locks, banned: cardBans.bannedIn(mode) };
 }
 
 /** Mitglied ohne Karten – so tritt man bei, gewählt wird danach in der Lobby (#111) */

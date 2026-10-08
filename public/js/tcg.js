@@ -145,8 +145,11 @@
       $('[data-tcg-modal-dot]', modal).className = 'tcg-dot r-' + d.rarity;
       $('[data-tcg-modal-rarity]', modal).textContent = d.rarityLabel + (d.no ? ' · #' + d.no : '');
       var foiled = parseInt(d.foiled, 10) || 0;
+      // gesperrte Exemplare (Quest, Dungeon, Handel, Duell) zählen zum Besitz, lassen sich aber nicht verkaufen
+      var locked = parseInt(d.locked, 10) || 0;
+      var owned = count + locked;
       $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
-        : (count ? (count === 1 ? '1× im Besitz' : count + '× im Besitz') : '') + (foiled ? (count ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
+        : (owned ? owned + '× im Besitz' : '') + (locked ? ' · ' + locked + '× ' + d.lockLabel : '') + (foiled ? (owned ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
         + (noBank ? ' · Wert ' + d.sellText + ' (nur Handel, die Bank kauft sie nicht)' : '');
       $('[data-tcg-owned-actions]', modal).hidden = former;
       $('[data-tcg-former-action]', modal).hidden = !former;

@@ -40,7 +40,8 @@
     zoom.querySelector('[data-ihk-zoom-img]').src = el.dataset.zoom;
     zoom.querySelector('[data-ihk-zoom-title]').textContent = el.dataset.zoomTitle || '';
     zoom.querySelector('[data-ihk-zoom-text]').textContent = el.dataset.zoomText || '';
-    zoomEl = el.dataset.drag && pickFn ? el : null;
+    // data-blocked: kein freies Exemplar (Im Dungeon, Im Handel …) – nur ansehen, nicht wählen
+    zoomEl = el.dataset.drag && pickFn && !el.dataset.blocked ? el : null;
     zoomPick.hidden = !zoomEl;
     zoomBoost.hidden = !zoomEl || el.dataset.drag !== 'card' || !el.dataset.boostable;
     if (zoomEl) {
@@ -84,6 +85,7 @@
     var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2'; };
     // Charakterkarten nur in einen Boost-Slot, wenn ihre Fähigkeit dort wirkt
     var fits = function (slot, el) {
+      if (el.dataset.blocked) return false; // kein freies Exemplar
       if (slots[slot].classList.contains('is-disabled') || accepts[slot].indexOf(el.dataset.drag) === -1) return false;
       return !(isBoostSlot(slot) && el.dataset.drag === 'card' && !el.dataset.boostable);
     };
@@ -140,6 +142,7 @@
     };
 
     var assign = function (el, target) {
+      if (el.dataset.blocked) return; // kein freies Exemplar (Im Dungeon, Im Handel …)
       target = target || (el.dataset.drag === 'boost' ? 'boost' : el.dataset.drag);
       var value = el.dataset.value;
       if (isBoostSlot(target)) {

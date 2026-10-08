@@ -152,7 +152,12 @@
 <% } else if (sub === 'auffaelligkeiten') { %>
 <%
   const openGroups = suspicionGroups.filter((g) => g.open);
-  const doneGroups = suspicionGroups.filter((g) => !g.open);
+  // beurteilt, aber erneut aufgetreten und noch nicht auf "Gesehen": eigener Block statt im Erledigt-Archiv
+  const repeatOf = (g) => g.alerts.filter((a) => a.doneAt && a.repeatPending);
+  const repeatGroups = suspicionGroups.filter((g) => !g.open && repeatOf(g).length);
+  const doneGroups = suspicionGroups.filter((g) => !g.open && !repeatOf(g).length);
+  const meId = String(currentUser._id);
+  const isOwn = (users) => users.some((u) => String(u._id) === meId); // eigene Fälle beurteilt man nicht selbst
   const openAlertCount = openGroups.reduce((s, g) => s + g.open, 0);
   const stageAtLeast = (n) => openGroups.filter((g) => g.rating && g.rating.stage >= n).length;
   const AREA_LABEL = { verhalten: 'Spielverhalten', technik: 'Technik', ergebnis: 'Ergebnis' };
@@ -160,7 +165,7 @@
 %>
 <%# Formular für einen Hinweis bzw. eine Gruppe (ids); action: erledigt, oeffnen, bestaetigt, fehlalarm %>
 <% const alertForm = (id, action, label, confirm, ids) => { %>
-  <form method="post" data-reauth action="/admin/auffaelligkeiten/<%= ids ? 'gruppe' : id %>" data-confirm="<%= confirm %>">
+  <form method="post" data-confirm-dialog action="/admin/auffaelligkeiten/<%= ids ? 'gruppe' : id %>" data-confirm="<%= confirm %>">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <% if (ids) { %><input type="hidden" name="ids" value="<%= ids %>"><% } %>
     <input type="hidden" name="action" value="<%= action %>">
@@ -180,6 +185,7 @@
   <% } %>
 
   <% const finding = (a) => { %>
+    <% const own = isOwn(a.users); %>
     <li class="susp-finding susp-lvl-<%= a.doneAt ? 0 : a.level %>">
       <div class="susp-finding-body">
         <div class="susp-finding-title">
@@ -201,6 +207,7 @@
         <div class="susp-time" title="<%= (a.from ? dateSec(a.from) + ' – ' : '') + dateSec(a.evidenceAt) %>">
           <%= timeSpan(a.from, a.evidenceAt) %>
           <% if (a.doneAt) { %> · <%= a.verdict ? VERDICT_LABEL[a.verdict].toLowerCase() : 'erledigt' %> <%= date(a.doneAt) %><%= a.doneByName ? ' von ' + a.doneByName : '' %><% } %>
+          <% if (a.doneAt && a.repeatLastAt && new Date(a.repeatLastAt) > new Date(a.doneAt)) { %> · <span class="susp-repeat">erneut aufgetreten, zuletzt <%= relTime(a.repeatLastAt) %><%= a.repeatSeenAt && !a.repeatPending ? ' (gesehen)' : '' %></span><% } %>
         </div>
       </div>
       <div class="susp-finding-actions">
@@ -210,7 +217,10 @@
         <% a.users.forEach((u) => { %>
           <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: a.log, spieler: u.username }) %>">Protokoll<%= a.users.length > 1 ? ' ' + u.username : '' %></a>
         <% }) %>
-        <% if (a.doneAt) { %>
+        <% if (own) { %>
+          <span class="muted small" title="Hinweise zu deinem eigenen Konto kann jemand anderes beurteilen.">Eigener Fall</span>
+        <% } else if (a.doneAt) { %>
+          <% if (a.repeatPending) alertForm(a._id, 'gesehen', 'Gesehen', '') %>
           <% alertForm(a._id, 'oeffnen', 'Wieder öffnen', 'Hinweis wieder öffnen?' + (a.verdict ? ' Das Urteil wird dabei zurückgenommen.' : '')) %>
         <% } else { %>
           <% alertForm(a._id, 'bestaetigt', 'Bestätigt', 'Als bestätigt markieren? Das Muster war tatsächlich Manipulation.') %>
@@ -233,7 +243,7 @@
               <% g.users.forEach((u, i) => { %><%= i ? ' ↔ ' : '' %><strong><%- userLink(u.username, { realName: false }) %></strong><% if (u.banned) { %> <span class="badge badge-entschieden">gebannt</span><% } %><% }) %>
             </div>
             <div class="susp-group-sub">
-              <%= g.open ? g.open + (g.open === 1 ? ' offener Hinweis' : ' offene Hinweise') : 'alles erledigt' %> · zuletzt <%= relTime(g.lastAt) %>
+              <%= g.open ? g.open + (g.open === 1 ? ' offener Hinweis' : ' offene Hinweise') : repeatOf(g).length ? 'beurteilt, aber erneut aufgetreten' : 'alles erledigt' %> · zuletzt <%= relTime(g.lastAt) %>
             </div>
           </div>
         </div>
@@ -241,7 +251,12 @@
           <% if (g.users.length === 1) { %>
             <a class="btn btn-ghost btn-sm" href="<%= panelUrl('protokolle', 'protokoll', { log: 'gesamt', spieler: g.users[0].username }) %>">Alle Aktionen</a>
           <% } %>
-          <% if (openAlerts.length > 1) { %>
+          <% if (!isOwn(g.users) && repeatOf(g).length) { %>
+            <% alertForm(null, 'gesehen', 'Gesehen', '', repeatOf(g).map((a) => a._id).join(',')) %>
+          <% } %>
+          <% if (isOwn(g.users)) { %>
+            <span class="muted small" title="Hinweise zu deinem eigenen Konto kann jemand anderes beurteilen.">Eigener Fall</span>
+          <% } else if (openAlerts.length > 1) { %>
             <% const ids = openAlerts.map((a) => a._id).join(','); %>
             <% alertForm(null, 'bestaetigt', 'Alle bestätigt', `Alle ${openAlerts.length} offenen Hinweise als bestätigt markieren?`, ids) %>
             <% alertForm(null, 'erledigt', 'Alle erledigt', `Alle ${openAlerts.length} offenen Hinweise als erledigt markieren?`, ids) %>
@@ -277,6 +292,11 @@
   <div class="susp-groups">
     <% openGroups.forEach(groupCard) %>
   </div>
+  <% if (repeatGroups.length) { %>
+    <h3 class="susp-repeat-title">Erneut aufgetreten (<%= repeatGroups.length %>)</h3>
+    <p class="muted small">Bereits beurteilte Fälle, bei denen es seit dem Urteil neue Belege gibt. Sie öffnen sich nicht mehr von selbst, nur bei höherer Stufe. Mit „Gesehen“ verschwindet der Hinweis, bis es wieder neue Belege gibt.</p>
+    <div class="susp-groups"><% repeatGroups.forEach(groupCard) %></div>
+  <% } %>
   <% if (suspicionPrecision.some((r) => r.confirmed || r.falseAlarms)) { %>
     <div class="card susp-precision">
       <h3>Trefferquote je Muster</h3>
@@ -339,20 +359,32 @@
             </div>
             <div class="susp-group-sub">
               Konten erstellt: <%= a.users.map((u) => u.username + ' ' + dayDate(u.createdAt)).join(' · ') %>
-              <% if (a.doneAt) { %> · erledigt <%= date(a.doneAt) %><% } %>
+              <% if (a.doneAt) { %> · <%= a.verdict ? ({ bestaetigt: 'bestätigt', fehlalarm: 'Fehlalarm' }[a.verdict]) : 'erledigt' %> <%= date(a.doneAt) %><%= a.doneByName ? ' von ' + a.doneByName : '' %><% } %>
             </div>
           </div>
         </div>
         <div class="susp-group-actions">
-          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? 'Erledigt' : a.label %></span>
+          <span class="susp-pill susp-lvl-<%= a.doneAt ? 0 : a.level %>"><%= a.doneAt ? ({ bestaetigt: 'Bestätigt', fehlalarm: 'Fehlalarm' }[a.verdict] || 'Erledigt') : a.label %></span>
           <% a.users.filter((u) => !u.banned && bannable.some((b) => String(b._id) === String(u._id))).forEach((u) => { %>
             <a class="btn btn-danger btn-sm" href="<%= subUrl('moderation', 'bans', { ban: String(u._id) }) %>"><%= u.username %> bannen</a>
           <% }) %>
-          <form method="post" data-reauth action="/admin/geraete/<%= a._id %>" data-confirm="<%= a.doneAt ? 'Hinweis wieder öffnen?' : 'Hinweis als erledigt markieren?' %>">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="action" value="<%= a.doneAt ? 'oeffnen' : 'erledigt' %>">
-            <button class="btn btn-ghost btn-sm" type="submit"><%= a.doneAt ? 'Wieder öffnen' : 'Erledigt' %></button>
-          </form>
+          <%# Urteil (bestätigt/Fehlalarm) erledigt zugleich und steht im Protokoll "Erkennungs-Urteile"; eigene Fälle beurteilt man nicht selbst %>
+          <% const deviceForm = (action, label, confirm) => { %>
+            <form method="post" data-confirm-dialog action="/admin/geraete/<%= a._id %>" data-confirm="<%= confirm %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="action" value="<%= action %>">
+              <button class="btn btn-ghost btn-sm" type="submit"><%= label %></button>
+            </form>
+          <% } %>
+          <% if (a.users.some((u) => String(u._id) === String(currentUser._id))) { %>
+            <span class="muted small" title="Hinweise zu deinem eigenen Konto kann jemand anderes beurteilen.">Eigener Fall</span>
+          <% } else if (a.doneAt) { %>
+            <% deviceForm('oeffnen', 'Wieder öffnen', 'Hinweis wieder öffnen?' + (a.verdict ? ' Das Urteil wird dabei zurückgenommen.' : '')) %>
+          <% } else { %>
+            <% deviceForm('bestaetigt', 'Bestätigt', 'Als bestätigt markieren? Die Konten gehören tatsächlich zusammen (Mehrfach-Konto).') %>
+            <% deviceForm('fehlalarm', 'Fehlalarm', 'Als Fehlalarm markieren? Die Konten teilen sich das Gerät aus harmlosem Grund.') %>
+            <% deviceForm('erledigt', 'Erledigt', 'Ohne Urteil als erledigt markieren?') %>
+          <% } %>
         </div>
       </header>
       <% if (!a.shared.length) { %>

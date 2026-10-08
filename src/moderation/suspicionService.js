@@ -22,6 +22,7 @@ const achievements = require('../achievements/list');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
+const { KIND: deviceVerdictKind } = require('../device/deviceVerdictLog');
 const dungeonService = require('../dungeon/dungeonService');
 const gradingService = require('../grading/gradingService');
 const deviceLogic = require('../device/deviceLogic');
@@ -29,6 +30,7 @@ const logs = require('../stats/logs');
 const config = require('../config');
 const { euro } = require('../lib/viewHelpers');
 const { toZonedLocalInput } = require('../lib/time');
+const { UserError } = require('../lib/util');
 const logic = require('./suspicionLogic');
 
 const HOUR = 60 * 60 * 1000;
@@ -328,8 +330,9 @@ const pick = (obj, keys) => ({ details: Object.fromEntries(keys.map((k) => [k, o
 const base = (f) => ({ level: f.level, summary: f.summary, from: f.from, evidenceAt: f.to });
 
 /**
- * Hinweis anlegen bzw. auf den neuen Stand bringen. Ein erledigter Hinweis öffnet sich wieder, wenn es danach neue
- * Belege gibt oder die Stufe steigt – sonst bleibt er erledigt (wie bei den Mehrfach-Konten).
+ * Hinweis anlegen bzw. auf den neuen Stand bringen. Ein ohne Urteil erledigter Hinweis öffnet sich wieder, wenn es
+ * danach neue Belege gibt oder die Stufe steigt. Ein beurteilter Hinweis (bestätigt oder Fehlalarm) öffnet sich nur
+ * bei höherer Stufe; neue Belege zählt er still mit (repeatLastAt), das Panel zeigt sie als "erneut aufgetreten".
  */
 async function upsert(f) {
   const alert = await SuspicionAlert.findOne({ key: f.key });
@@ -340,16 +343,23 @@ async function upsert(f) {
     return;
   }
   const newer = new Date(f.evidenceAt) > new Date(alert.evidenceAt);
-  const reopen = alert.doneAt && ((newer && new Date(f.evidenceAt) > alert.doneAt) || f.level > alert.level);
+  const afterDone = newer && alert.doneAt && new Date(f.evidenceAt) > alert.doneAt;
+  const reopen = alert.doneAt && ((afterDone && !alert.verdict) || f.level > alert.level);
   if (!newer && f.level <= alert.level && !reopen) return; // nichts Neues
   Object.assign(alert, { summary: f.summary, details: f.details, level: Math.max(f.level, alert.level), evidenceAt: newer ? f.evidenceAt : alert.evidenceAt });
   if (newer && f.from) alert.from = f.from;
   if (reopen) {
     alert.doneAt = null;
     alert.doneByName = null;
+    alert.repeatLastAt = null;
+    alert.repeatSeenAt = null;
+    alert.repeatCount = 0;
+  } else if (afterDone) {
+    alert.repeatLastAt = f.evidenceAt;
+    alert.repeatCount = (alert.repeatCount || 0) + 1;
   }
   await alert.save();
-  // beurteilter Hinweis geht wieder auf: bestätigt und macht weiter, oder ein Fehlalarm wird doch stärker
+  // beurteilter Hinweis geht wieder auf, weil seine Stufe gestiegen ist (z. B. ein Fehlalarm wird doch stärker)
   if (reopen && alert.verdict) await logEvent(alert.toObject(), 'neue_belege');
 }
 
@@ -453,6 +463,28 @@ async function deviceLevels() {
   return out;
 }
 
+/** Beurteilte Hinweise, die seit dem Urteil erneut aufgetreten und noch nicht auf "Gesehen" gesetzt sind (Abzeichen, dezent) */
+const REPEAT_OPEN = { verdict: { $ne: null }, doneAt: { $ne: null }, repeatLastAt: { $ne: null } };
+const repeatPending = (a) => a.repeatLastAt && a.doneAt && new Date(a.repeatLastAt) > new Date(a.doneAt) && (!a.repeatSeenAt || new Date(a.repeatLastAt) > new Date(a.repeatSeenAt));
+
+/** Anzahl Spieler (bzw. Paare) mit erneut aufgetretenen, beurteilten Hinweisen, die noch nicht gesehen wurden */
+async function repeatCount() {
+  const alerts = await SuspicionAlert.find(REPEAT_OPEN).select('users doneAt repeatLastAt repeatSeenAt').lean();
+  return new Set(alerts.filter(repeatPending).map((a) => a.users.map(String).sort().join(':'))).size;
+}
+
+/** "Gesehen": erneut aufgetretene beurteilte Hinweise für jetzt abhaken (kein Urteil, keine Änderung der Trefferquote) */
+async function markRepeatSeen(ids) {
+  await SuspicionAlert.updateMany({ _id: { $in: ids }, ...REPEAT_OPEN }, { $set: { repeatSeenAt: new Date() } }, { timestamps: false });
+}
+
+/** Eigene Fälle beurteilt man nicht selbst: Sind die Konten des Hinweises dabei, bricht das Urteil bzw. Erledigen ab */
+function assertNotOwn(alerts, actor) {
+  if (!actor || !actor._id) return;
+  const me = String(actor._id);
+  if (alerts.some((a) => a.users.some((u) => String(u) === me))) throw new UserError('Hinweise zu deinem eigenen Konto kannst du nicht beurteilen oder erledigen.');
+}
+
 /** Spieler (bzw. Konten-Paare) mit Gesamtbewertung ab "Verdacht" – für das Abzeichen am Admin-Menüpunkt */
 async function openCount() {
   const alerts = await SuspicionAlert.find({ doneAt: null }).select('kind level users evidenceAt').lean();
@@ -486,6 +518,7 @@ async function list() {
             ? [{ href: `/admin/kartenhistorie/${a.key.split(':')[1]}`, label: 'Kartenhistorie' }]
             : ((a.details && a.details.cards) || []).map((c) => ({ href: `/admin/kartenhistorie/${c.doc}`, label: `Verlauf: ${c.label}` })),
         extras: logic.extrasOf(a.details),
+        repeatPending: !!repeatPending(a),
       };
     })
     .filter(Boolean);
@@ -499,16 +532,18 @@ async function listGroups() {
 
 /** Mehrere Hinweise auf einmal erledigen bzw. wieder öffnen ("Alle erledigt" je Spieler) */
 async function setDoneMany(ids, done, actor) {
+  assertNotOwn(await SuspicionAlert.find({ _id: { $in: ids } }).select('users').lean(), actor); // vorab, damit nichts halb erledigt wird
   for (const id of ids) await setDone(id, done, actor);
 }
 
 /** Erledigen bzw. wieder öffnen. Wieder öffnen nimmt auch ein Urteil zurück (es war wohl voreilig) – das wird protokolliert. */
 async function setDone(id, done, actor) {
+  assertNotOwn(await SuspicionAlert.find({ _id: id }).select('users').lean(), actor);
   const $set = { doneAt: done ? new Date() : null, doneByName: done && actor ? actor.username : null };
   if (!done) {
     const alert = await SuspicionAlert.findById(id).lean();
     if (alert && alert.verdict) await logEvent(alert, 'zurueckgenommen', actor ? actor.username : null, null);
-    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null, verdictSummary: null });
+    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null, verdictSummary: null, repeatLastAt: null, repeatSeenAt: null, repeatCount: 0 });
   }
   await SuspicionAlert.updateOne({ _id: id }, { $set }, { timestamps: false });
 }
@@ -521,6 +556,7 @@ async function setVerdictMany(ids, verdict, actor) {
   if (!VERDICTS.includes(verdict) || !ids.length) return;
   const alerts = await SuspicionAlert.find({ _id: { $in: ids } }).lean();
   if (!alerts.length) return;
+  assertNotOwn(alerts, actor);
   const rating = await ratingFor(alerts[0].users);
   const at = new Date();
   const by = actor ? actor.username : null;
@@ -528,7 +564,7 @@ async function setVerdictMany(ids, verdict, actor) {
     await logEvent(a, verdict, by, rating);
     await SuspicionAlert.updateOne(
       { _id: a._id },
-      { $set: { verdict, verdictAt: at, verdictByName: by, verdictLevel: a.level, verdictSummary: a.summary, doneAt: at, doneByName: by } },
+      { $set: { verdict, verdictAt: at, verdictByName: by, verdictLevel: a.level, verdictSummary: a.summary, doneAt: at, doneByName: by, repeatLastAt: null, repeatSeenAt: null, repeatCount: 0 } },
       { timestamps: false }
     );
   }
@@ -539,13 +575,15 @@ const setVerdict = (id, verdict, actor) => setVerdictMany([id], verdict, actor);
 /** Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (logic.precisionRows) */
 async function precision() {
   const [events, counts] = await Promise.all([
-    SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt').lean(),
+    SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt byName names').lean(),
     SuspicionAlert.aggregate([{ $group: { _id: '$kind', n: { $sum: 1 } } }]),
   ]);
-  return logic.precisionRows(events, new Map(counts.map((c) => [c._id, c.n])));
+  const byKind = new Map(counts.map((c) => [c._id, c.n]));
+  byKind.set(deviceVerdictKind, await DeviceAlert.countDocuments()); // Mehrfach-Konten stehen in einer eigenen Sammlung
+  return logic.precisionRows(events, byKind);
 }
 
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen, das Urteils-Protokoll anonymisieren */
 const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId }), anonymizeVerdicts(userId)]);
 
-module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, listGroups, setDone, setDoneMany, setVerdict, setVerdictMany, precision, anonymizeVerdicts, forgetUser };
+module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, repeatCount, markRepeatSeen, list, listGroups, setDone, setDoneMany, setVerdict, setVerdictMany, precision, anonymizeVerdicts, forgetUser };

@@ -9,6 +9,12 @@
   if (!modal || !modal.showModal) return;
   var stage = modal.querySelector('[data-foil-stage]');
   var favForm = modal.querySelector('[data-foil-fav]');
+  // Album-Menü (views/partials/foil-modal.ejs mit favForm): Wert, Favorit, „Im Handel anbieten“ (die Bank kauft folierte Karten nicht).
+  // Auf Dashboard und TCG-Seite (Favoriten) nur der Favorit – Wert und Handel gibt es nur im Album (data-album-foil).
+  var menu = modal.querySelector('[data-foil-menu]');
+  var sellLink = modal.querySelector('[data-foil-sell]');
+  var statusEl = modal.querySelector('[data-foil-status]');
+  var noteEl = modal.querySelector('[data-foil-note]');
   var tradeBox = modal.querySelector('[data-foil-trade]');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
@@ -97,13 +103,26 @@
     stage.appendChild(card);
     view = { card: card, inner: card.querySelector('.foil-inner'), rx: foiling ? 0 : -8, ry: foiling ? 0 : 14, vx: 0, vy: 0, tween: null };
 
-    // Album: als Favorit zeigen / entfernen
+    // Album (und Favoriten): als Favorit zeigen / entfernen
     if (favForm) {
       favForm.hidden = !d.fav;
       if (d.fav) {
         favForm.querySelector('input[name="card"]').value = d.fav;
         favForm.querySelector('button').textContent = d.favOn === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
       }
+    }
+    if (menu) {
+      menu.hidden = !d.fav;
+      var album = 'albumFoil' in d;
+      sellLink.hidden = !album || !!d.sellOff;
+      statusEl.hidden = !album;
+      if (album) {
+        // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
+        statusEl.textContent = d.rarityLabel + ' · foliert · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
+        sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
+      }
+      noteEl.hidden = !album || !d.sellOff;
+      noteEl.textContent = d.sellOff || '';
     }
     // Fremde Sammlung: Tausch für dieses Exemplar vorschlagen
     if (tradeBox) {

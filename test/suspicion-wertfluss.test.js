@@ -165,6 +165,24 @@ test('Trefferquote je Muster und Stufe aus dem Urteils-Protokoll', () => {
   assert.equal(s.precisionRows([{ key: 'netz:z', event: 'fehlalarm', kind: 'netz', level: 1, createdAt: at(1) }])[0].falseAlarms, 1);
 });
 
+test('Trefferquote: Urteile über den eigenen Fall zählen nicht', () => {
+  const at = (min) => new Date(t0 + min * MIN);
+  const events = [
+    // Dio beurteilt sich selbst als Fehlalarm, später bestätigt jemand anderes: das Urteil des Anderen gilt
+    { key: 'ertrag:dio', event: 'fehlalarm', kind: 'ertrag', level: 1, byName: 'Dio', names: ['Dio'], createdAt: at(1) },
+    { key: 'ertrag:dio', event: 'bestaetigt', kind: 'ertrag', level: 1, byName: 'St.Ivan', names: ['Dio'], createdAt: at(2) },
+    // nur ein Selbsturteil (ohne weiteres Urteil): zählt gar nicht, auch nicht in anderer Schreibweise
+    { key: 'dungeon:dio', event: 'fehlalarm', kind: 'dungeon', level: 2, byName: 'dio', names: ['Dio'], createdAt: at(3) },
+    // Konten-Paar: ein Dritter urteilt normal
+    { key: 'wert:a:b', event: 'bestaetigt', kind: 'wert', level: 2, byName: 'St.Ivan', names: ['A', 'B'], createdAt: at(4) },
+  ];
+  const rows = s.precisionRows(events);
+  assert.equal(rows.find((r) => r.kind === 'ertrag').confirmed, 1);
+  assert.equal(rows.find((r) => r.kind === 'ertrag').falseAlarms, 0);
+  assert.equal(rows.find((r) => r.kind === 'dungeon'), undefined); // gar keine Zeile: das einzige Urteil war ein Selbsturteil
+  assert.equal(rows.find((r) => r.kind === 'wert').confirmed, 1);
+});
+
 test('Urteils-Protokoll anonymisieren: Namen in allen Texten ersetzen', () => {
   const details = { count: 3, trades: ['05.10., 12:00 Anna → Ben (Handel)', 'Ben hielt sie 26 Std.'], nested: { who: 'Benjamin und Ben' }, at: new Date(t0) };
   const out = s.scrubNames(details, ['Ben']);

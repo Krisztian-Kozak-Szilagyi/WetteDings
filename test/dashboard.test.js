@@ -67,3 +67,20 @@ test('zufällige Favoriten: nur eigene, nicht folierte, keine geheimen, höchste
   assert.deepEqual(dash.randomFavorites({}, byId, rar, 4), []);
   assert.ok(dash.randomFavorites(plain, byId, rar, 4).every((f) => f.foiledAt === null));
 });
+
+test('Heute: ausgegraute Punkte (Tagesbonus während des Grading-Jobs bzw. Grading ohne Job) zählen nicht mit', () => {
+  const items = [
+    { key: 'bonus', done: false, off: true },
+    { key: 'ihk', done: true },
+    { key: 'grading', done: true },
+    { key: 'dungeon', done: true },
+    { key: 'lotto', done: true },
+  ];
+  assert.deepEqual({ done: dash.tally(items).done, total: dash.tally(items).total }, { done: 4, total: 4 });
+  // umgekehrt: Tagesbonus bekommen, Grading ohne Job ausgegraut
+  const other = items.map((i) => (i.key === 'bonus' ? { ...i, done: true, off: false } : i.key === 'grading' ? { ...i, done: false, off: true } : i));
+  assert.deepEqual({ done: dash.tally(other).done, total: dash.tally(other).total }, { done: 4, total: 4 });
+  // ein ausgegrauter Punkt, der als erledigt gilt, zählt trotzdem nicht
+  assert.equal(dash.tally([{ done: true, off: true }, { done: false }]).done, 0);
+  assert.equal(dash.tally([]).total, 0);
+});
