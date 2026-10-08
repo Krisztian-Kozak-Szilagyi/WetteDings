@@ -12,7 +12,7 @@
 const REPORT_DAY = 0; // Sonntag (Date.getDay)
 const REPORT_TIME = '20:00';
 const TEAM_SIZE = 3; // so viele Spieler hat ein Turm-Lauf; erst ab so vielen Mitgliedern wird der ETF gehandelt
-const MAX_MEMBERS = 6;
+const MAX_MEMBERS = 4;
 const TOP_RUNS = 2;
 const START_PRICE = 50;
 const TOP_CHANGE = 0.25; // Platz 1
@@ -97,6 +97,18 @@ function splitFee(cents, count) {
   return Array.from({ length: count }, (_, i) => each + (i < cents - each * count ? 1 : 0));
 }
 
+/**
+ * Mitglieder über der Obergrenze (z. B. nach dem Senken von MAX_MEMBERS): die zuletzt Beigetretenen müssen gehen,
+ * der Kapitän nie. Liefert die zu entfernenden Mitglieder, neueste zuerst.
+ */
+function overflow(members, captain, max = MAX_MEMBERS) {
+  if (members.length <= max) return [];
+  return members
+    .filter((m) => String(m.user) !== String(captain))
+    .sort((x, y) => new Date(y.joinedAt) - new Date(x.joinedAt))
+    .slice(0, members.length - max);
+}
+
 const pct = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
 
 /** Text des Wochenberichts eines Teams (Forum, im Namen des Teams) */
@@ -135,5 +147,6 @@ module.exports = {
   rankWeek,
   impactLog,
   splitFee,
+  overflow,
   reportText,
 };
