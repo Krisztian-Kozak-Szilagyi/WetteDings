@@ -122,3 +122,13 @@ test('eSports: Team-Kursmodell rauscht nur leicht (Tagesschwankung um 1–2 %)',
   const mean = daily.reduce((s, x) => s + x, 0) / daily.length;
   assert.ok(mean > 0.005 && mean < 0.025, `mittlere Tagesbewegung ${mean}`);
 });
+
+test('eSports: über der Obergrenze gehen die zuletzt Beigetretenen, nie der Kapitän', () => {
+  const members = [1, 2, 3, 4, 5, 6].map((i) => ({ user: `u${i}`, joinedAt: new Date(`2026-10-0${i}T12:00:00Z`) }));
+  assert.equal(league.MAX_MEMBERS, 4);
+  assert.deepEqual(league.overflow(members, 'u1').map((m) => m.user), ['u6', 'u5']);
+  assert.deepEqual(league.overflow(members.slice(0, 5), 'u1').map((m) => m.user), ['u5']);
+  assert.deepEqual(league.overflow(members.slice(0, 4), 'u1'), []);
+  // Kapitän ist zuletzt beigetreten: er bleibt, dafür geht der Nächstjüngere
+  assert.deepEqual(league.overflow(members, 'u6').map((m) => m.user), ['u5', 'u4']);
+});
