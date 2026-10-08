@@ -1,11 +1,11 @@
 const express = require('express');
 const { requireLogin } = require('../middleware');
-const { TcgCard } = require('../models/Tcg');
 const catalog = require('../tcg/catalog');
 const ihk = require('../ihk/ihkService');
 const { questById, difficulty, isHybrid } = require('../ihk/quests');
 const { canBoost } = require('../ihk/abilities');
 const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
+const { copiesByCard, lockLabel } = require('../tcg/locks');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -36,8 +36,11 @@ router.get('/ihk', async (req, res) => {
 
   const offers = running ? [] : (await ihk.getOffers(req.user._id)).map((o) => questView(o.quest, o.difficulty));
   const canReroll = !running && used < limit && (await ihk.canReroll(req.user._id));
-  // folierte Exemplare können nicht auf Quests
-  const owned = await TcgCard.distinct('card', { user: req.user._id, foiledAt: null });
+  // folierte Exemplare können nicht auf Quests. Gesperrte Exemplare (Dungeon, Handel, Duell) werden markiert –
+  // wählbar bleibt eine Karte, solange noch ein Exemplar frei ist (lockInfo: { cardId: { free, n, label } })
+  const copies = await copiesByCard(req.user._id);
+  const owned = Object.keys(copies);
+  const lockInfo = Object.fromEntries(Object.entries(copies).filter(([, e]) => e.locked).map(([id, e]) => [id, { free: e.free, n: e.locked, label: lockLabel(e.reason) }]));
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = owned.map((id) => catalog.cardById[id]).filter(Boolean);
   const cards = all.filter((c) => c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
@@ -50,6 +53,7 @@ router.get('/ihk', async (req, res) => {
   res.render('ihk', {
     title: 'IHK',
     shortcuts,
+    lockInfo,
     phase,
     run: running,
     quest: running ? questView(running.quest, running.difficulty) : null,

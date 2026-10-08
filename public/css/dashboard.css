@@ -111,6 +111,10 @@
 .dx-task-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dx-task-text strong { font-size: 13px; font-weight: 500; }
 .dx-task.is-done .dx-task-text strong { color: var(--color-neutral-400); }
+/* Ausgegraut: Tagesbonus während eines Grading-Jobs bzw. Grading ohne Job – zählt nicht zu den Punkten für heute */
+.dx-task.is-off { opacity: .45; }
+.dx-task.is-off .dx-check { box-shadow: inset 0 0 0 1.5px var(--color-neutral-700); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--color-neutral-800) 3px 5px); }
+.dx-task.is-off:hover { opacity: .7; }
 .dx-task-text small { font-size: 11px; color: var(--color-neutral-500); }
 .dx-task-progress { width: 44px; height: 3px; flex: none; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
 .dx-task-progress span { display: block; height: 100%; background: var(--color-accent); }

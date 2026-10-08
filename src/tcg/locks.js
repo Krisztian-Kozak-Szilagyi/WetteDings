@@ -36,6 +36,30 @@ async function lockedDocs(userId, session) {
 
 const isLocked = (locked, doc) => locked.reasons.has(String(doc._id || doc));
 
+/** Schild für gesperrte Exemplare (Album, IHK- und Dungeon-Kartenauswahl) */
+const LOCK_LABELS = { quest: 'Auf Quest', dungeon: 'Im Dungeon', handel: 'Im Handel', duell: 'Im Duell' };
+const lockLabel = (reason) => LOCK_LABELS[reason] || 'Gesperrt';
+
+/**
+ * Unfolierte Exemplare je Karte: { cardId: { total, free, locked, reason } } – reason = Grund des ersten gesperrten
+ * Exemplars. freeIf(reason): diese Sperre zählt als frei (z. B. die eigenen Dungeon-Karten beim Tauschen in der Lobby).
+ */
+async function copiesByCard(userId, { freeIf = () => false } = {}) {
+  const [docs, locked] = await Promise.all([TcgCard.find({ user: userId, foiledAt: null }).select('card').lean(), lockedDocs(userId)]);
+  const out = {};
+  for (const d of docs) {
+    const e = out[d.card] || (out[d.card] = { total: 0, free: 0, locked: 0, reason: null });
+    e.total += 1;
+    const reason = locked.reasons.get(String(d._id));
+    if (!reason || freeIf(reason)) e.free += 1;
+    else {
+      e.locked += 1;
+      if (!e.reason) e.reason = reason;
+    }
+  }
+  return out;
+}
+
 /**
  * Sperrt Exemplare innerhalb einer Transaktion, indem auf sie geschrieben wird. Ein gleichzeitiger
  * Verkauf, Handel oder Quest-Start derselben Karte kollidiert dadurch mit dieser Transaktion
@@ -48,4 +72,4 @@ async function claim(docs, userId, session) {
   if (res.matchedCount !== ids.length) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 }
 
-module.exports = { lockedDocs, isLocked, claim };
+module.exports = { lockedDocs, isLocked, claim, LOCK_LABELS, lockLabel, copiesByCard };

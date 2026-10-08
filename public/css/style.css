@@ -5870,3 +5870,14 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 /* Dev-Panel → Pop-ups: Ablaufdatum nur bei „Mit Ablaufdatum“ (ohne :has-Unterstützung bleibt das Feld einfach sichtbar) */
 .popup-form:has(input[name="gueltig"][value="gelesen"]:checked) .popup-expiry { display: none; }
 .popup-log-text { min-width: 220px; max-width: 420px; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Gesperrte Exemplare in der Kartenauswahl (IHK, Dungeon): Schild wie im Album. Ganz gesperrt = grau und nicht wählbar,
+   teilweise gesperrt = kleines Schild oben, Karte bleibt wählbar (src/tcg/locks.js copiesByCard) */
+.ihk-lock-tag, .dg-lock-tag {
+  position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 2; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; pointer-events: none;
+  color: #fecaca; background: rgba(14, 15, 26, .85); border: 1px solid color-mix(in srgb, #ff4d5e 55%, transparent);
+}
+.ihk-lock-tag.is-full { top: 42%; transform: translate(-50%, -50%); font-size: 11px; color: #ff4d5e; }
+.ihk-pick-card[data-blocked] { cursor: var(--cur-zoom-in); }
+.ihk-pick-card[data-blocked] img { filter: grayscale(1) brightness(.6); }
