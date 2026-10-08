@@ -51,12 +51,8 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
-    // Profilbild: ID aus src/profile/avatars.js (Logos nur Admin/Devs) oder ein gekaufter Avatar, null = Platzhalter
+    // Profilbild: ID aus src/profile/avatars.js, null = Platzhalter (wählen vorerst nur Admin und Devs)
     avatar: { type: String, default: null },
-    // Konfetti: Währung aus zerkleinerten Karten (ganze Einheiten, kein Geld), nur für Kosmetik
-    konfetti: { type: Number, default: 0, min: 0 },
-    // gekaufte Kosmetik, an das Konto gebunden: "avatar:anna" … (src/cosmetics/catalog.js)
-    cosmetics: { type: [String], default: [] },
     // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
     statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)

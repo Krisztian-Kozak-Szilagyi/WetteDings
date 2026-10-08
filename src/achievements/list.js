@@ -14,11 +14,8 @@ const { LotteryRound } = require('../models/Lottery');
 const { GradingJob } = require('../models/Grading');
 const { DungeonRun } = require('../models/Dungeon');
 const catalog = require('../tcg/catalog');
-const cosmetics = require('../cosmetics/catalog');
 
-const REWARD = 10000; // 100 € für jeden Erfolg (einmalig beim Freischalten), außer ein Eintrag hat eigenes reward
-/** Belohnung eines Erfolgs in Cent */
-const rewardOf = (a) => (a && Number.isInteger(a.reward) ? a.reward : REWARD);
+const REWARD = 10000; // 100 € für jeden Erfolg (einmalig beim Freischalten)
 
 /** Mitglieder mit mindestens `min` Treffern einer Aggregation (Gruppe nach `by`) */
 async function countAtLeast(model, match, min, by = '$user') {
@@ -28,13 +25,6 @@ async function countAtLeast(model, match, min, by = '$user') {
 
 /** Karten, die im Album zählen: sichtbare Seltenheiten (wie views/tcg-album.ejs) */
 const albumCardIds = () => catalog.CARDS.filter((c) => !(catalog.rarityByKey[c.rarity] || {}).hidden).map((c) => c.id);
-
-/** Mitglieder mit mindestens min Shop-Avataren (nur Einträge, die es im Shop gibt) */
-const avatarOwners = (min) => {
-  const keys = cosmetics.AVATARS.map((a) => cosmetics.ownedKey('avatar', a.key));
-  if (!min || min > keys.length) return [];
-  return User.distinct('_id', { deletedAt: null, $expr: { $gte: [{ $size: { $setIntersection: [{ $ifNull: ['$cosmetics', []] }, keys] } }, min] } });
-};
 
 const won = { payout: { $ne: null }, $expr: { $gt: ['$payout', '$amount'] } };
 
@@ -301,44 +291,6 @@ const ACHIEVEMENTS = [
       return rows.map((r) => r._id);
     },
   },
-  // ---- Kosmetik (Konfetti aus zerkleinerten Karten; Käufe sind an das Konto gebunden, also kein Zuschieben) ----
-  {
-    key: 'erster-avatar',
-    name: 'Erster Avatar',
-    text: 'Kaufe deinen ersten Avatar im Kosmetik-Shop.',
-    icon: { glyph: 'avatar', tone: 'violet', frame: 'bronze' },
-    holders: () => User.distinct('_id', { deletedAt: null, cosmetics: { $regex: /^avatar:/ } }),
-  },
-  {
-    key: 'avatar-sammler',
-    name: 'Sammler',
-    text: 'Besitze 5 Avatare aus dem Kosmetik-Shop.',
-    icon: { glyph: 'avatar', tone: 'blue', frame: 'silver' },
-    holders: () => avatarOwners(5),
-  },
-  {
-    key: 'avatar-galerie',
-    name: 'Die ganze Galerie',
-    text: 'Besitze alle Avatare aus dem Kosmetik-Shop.',
-    reward: 50000, // 500 € statt der üblichen 100 €
-    icon: { glyph: 'avatar', tone: 'gold', frame: 'gold' },
-    holders: () => avatarOwners(cosmetics.AVATARS.length),
-  },
-  {
-    key: 'schredder',
-    name: 'Schredder',
-    text: 'Zerkleinere insgesamt 500 Karten.',
-    icon: { glyph: 'shredder', tone: 'silver', frame: 'bronze' },
-    holders: async () => {
-      const rows = await Ledger.aggregate([
-        { $match: { type: 'tcg_zerkleinert' } },
-        { $unwind: '$meta.cards' },
-        { $group: { _id: '$user', n: { $sum: '$meta.cards.count' } } },
-        { $match: { n: { $gte: 500 } } },
-      ]);
-      return rows.map((r) => r._id);
-    },
-  },
 ];
 
 // Einzelstücke: Erfolg → Benutzername (klein geschrieben). Wird beim Start vergeben, sobald es das Konto gibt.
@@ -352,4 +304,4 @@ const byKey = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.key, a]));
 /** Erfolg zu einem (vom Nutzer gesendeten) Schlüssel – nur aus der festen Liste */
 const find = (key) => ACHIEVEMENTS.find((a) => a.key === key) || null;
 
-module.exports = { ACHIEVEMENTS, SPECIAL, REWARD, rewardOf, byKey, find };
+module.exports = { ACHIEVEMENTS, SPECIAL, REWARD, byKey, find };

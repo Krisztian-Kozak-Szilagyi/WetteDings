@@ -52,11 +52,8 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 91); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
-  assert.equal(catalog.TEST_CARDS.length, 23);
-  assert.equal(catalog.cardsByRarity['test-item'].length, 0);
-  assert.ok(catalog.cardById[catalog.TEST_CARDS[0].id]); // vergebene Exemplare funktionieren weiter
-  assert.ok(catalog.CARDS.every((c) => !c.unreleased && c.rarity !== 'test-item'));
+  assert.equal(catalog.CARDS.length, 114); // davon 23 Test-Karten (Bosskampf: 6 Items, 17 Helden)
+  assert.equal(catalog.cardsByRarity['test-item'].length, 23);
   assert.equal(catalog.cardsBySeason['pre-season'].length, 90);
   assert.equal(catalog.cardById['hermann-4-icon'].name, 'Hermann');
   assert.equal(catalog.cardById['mauch-4-icon'].rarity, 'icon');
@@ -65,7 +62,8 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.cardById['oliver-the-sigrist-sith'].rarity, 'sith');
   const pre = catalog.cardsBySeason['pre-season'];
   assert.equal(pre[pre.length - 1].id, 'oliver-the-sigrist-sith'); // letzter Platz der Pre-Season
-  assert.equal(catalog.CARDS[catalog.CARDS.length - 1].id, 'st-ivan-boss'); // Boss-Karten stehen ganz hinten
+  const real = catalog.CARDS.filter((c) => c.rarity !== 'test-item');
+  assert.equal(real[real.length - 1].id, 'st-ivan-boss'); // Boss-Karten stehen ganz hinten (nur noch Test-Items dahinter)
   assert.deepEqual(catalog.cardsByRarity.sith.map((c) => c.id), ['oliver-the-sigrist-sith']);
   assert.equal(catalog.cardById['aleks-5-bockhaber'].name, 'Aleks');
   assert.equal(catalog.cardById['seven-3-gold'].name, '7');
