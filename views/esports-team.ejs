@@ -58,7 +58,7 @@
     <section class="card es-card">
       <h2>Trophäen</h2>
       <% if (!trophies.length) { %>
-        <p class="muted">Noch keine Trophäe. Platz 1 bis 3 im Wochenbericht bringt Gold, Silber oder Bronze.</p>
+        <p class="muted">Noch keine Trophäe.</p>
       <% } else { %>
         <ul class="es-tp-shelf">
           <% trophies.forEach((t) => { const p = rules.placeInfo(t.place); %>
