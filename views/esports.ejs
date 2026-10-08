@@ -93,7 +93,7 @@
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label class="field"><span>Teamname</span><input type="text" name="name" minlength="3" maxlength="24" required></label>
           <label class="field es-ticker-field"><span>Kürzel im Broker</span><input type="text" name="ticker" minlength="3" maxlength="5" pattern="[A-Za-z]{3,5}" required></label>
-          <button class="btn btn-primary" type="submit"<%= currentUser.balance < rules.FOUND_COST ? ' disabled' : '' %>>Gründen · <%= eur(rules.FOUND_COST) %></button>
+          <button class="btn btn-primary" type="submit"<%= currentUser.balance < foundCost ? ' disabled' : '' %>>Gründen<%= foundCost ? ' · ' + eur(foundCost) : '' %></button>
         </form>
       </section>
     <% } %>
@@ -131,7 +131,7 @@
   <aside class="card es-card es-rules">
     <h2>So funktioniert's</h2>
     <ul>
-      <li>Gründen kostet <%= eur(rules.FOUND_COST) %>. Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
+      <li><%= foundCost ? 'Gründen kostet ' + eur(foundCost) + '.' : 'Gründen ist kostenlos.' %> Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
       <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
       <li>Für die Liga zählen nur Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind (schon vor Beginn der Woche). Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
       <li>Jeden Sonntag wird ausgewertet: Euer Ergebnis entscheidet, in welche Richtung sich der Wert eures ETFs bewegt.</li>

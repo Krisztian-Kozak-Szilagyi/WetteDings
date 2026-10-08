@@ -61,6 +61,7 @@ const settingsSchema = new Schema(
     _id: { type: String, default: 'esports' },
     prizes: { type: [new Schema({ cash: Number, packs: Number }, { _id: false })], default: undefined },
     minTeams: Number,
+    foundCost: Number, // Cent
     updatedByName: String,
   },
   { timestamps: true }

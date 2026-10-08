@@ -225,11 +225,12 @@
 
   <% if (sub === 'esports' && esportsAdmin) { %>
   <section class="stats-block" id="esports">
-    <%- blockHead('eSports-Trophäen', 'Sonntags im Wochenbericht: Platz 1–3 (nur mit Punkten) bekommen Gold, Silber oder Bronze fürs Teamprofil. Jedes Mitglied, das schon vor der Woche im Team war, bekommt den Preis des Platzes. Gleichstand teilt den Platz – dann bekommen beide Teams den Preis. Änderungen gelten ab dem nächsten Bericht.') %>
+    <%- blockHead('eSports', 'Gründungskosten zahlt der Gründer eines Teams (0 = kostenlos). Sonntags im Wochenbericht: Platz 1–3 (nur mit Punkten) bekommen Gold, Silber oder Bronze fürs Teamprofil. Jedes Mitglied, das schon vor der Woche im Team war, bekommt den Preis des Platzes. Gleichstand teilt den Platz – dann bekommen beide Teams den Preis. Änderungen gelten ab dem nächsten Bericht.') %>
     <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
     <div class="card">
       <form method="post" data-reauth action="/admin/esports" class="form panel-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="field"><span>Gründungskosten in €</span><input type="text" name="foundCost" inputmode="decimal" value="<%= cents(esportsAdmin.foundCost) %>" required></label>
         <% esportsAdmin.prizes.forEach((p) => { %>
           <h4><%= p.place %>. Platz · <%= p.label %></h4>
           <div class="admin-gr-grid">

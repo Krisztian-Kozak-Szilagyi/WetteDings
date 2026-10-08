@@ -29,6 +29,7 @@ router.get('/esports', async (req, res) => {
     rules: league,
     prizes: esports.prizeList(),
     minTeams: esports.settings.minTeams,
+    foundCost: esports.foundCost(),
     nextReport: new Date(esports.weekStart().getTime() + 7 * 24 * 60 * 60 * 1000),
   });
 });
