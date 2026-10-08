@@ -5,6 +5,7 @@ const catalog = require('../tcg/catalog');
 const ihk = require('../ihk/ihkService');
 const { questById, difficulty, isHybrid } = require('../ihk/quests');
 const { canBoost } = require('../ihk/abilities');
+const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
@@ -42,8 +43,13 @@ router.get('/ihk', async (req, res) => {
   const cards = all.filter((c) => c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
   const items = all.filter((c) => !c.isCharacter && canBoost(c)).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
 
+  // Favoriten oben; ohne Favoriten ein Knopf mit den am häufigsten gespielten Karten
+  const usage = phase === 'offer' ? await usedCards(req.user._id, 'ihk') : { card: [], boost: [] };
+  const shortcuts = { card: pickShortcuts(cards, req.user.tcgFavorites, usage.card), boost: pickShortcuts(items, req.user.tcgFavorites, usage.boost) };
+
   res.render('ihk', {
     title: 'IHK',
+    shortcuts,
     phase,
     run: running,
     quest: running ? questView(running.quest, running.difficulty) : null,
