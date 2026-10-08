@@ -155,7 +155,7 @@ router.post('/profil/anheften', requireLogin, async (req, res) => {
 
 // Rücksprung nach "Weiter" im Erfolg-/Geschenk-Fenster (nur ohne JavaScript): nur auf einen dieser Bereiche,
 // nie auf eine frei übergebene Adresse (CodeQL #74–#76). Das Ziel kommt aus der Liste, nicht aus der Anfrage.
-const BACK_PAGES = ['/', '/wetten', '/duell', '/rangliste', '/broker', '/lotterie', '/tcg', '/inventar', '/handel', '/ihk', '/dungeon', '/grading', '/forum', '/patchnotes', '/benachrichtigungen', '/konto', '/regeln', '/support', '/admin'];
+const BACK_PAGES = ['/', '/wetten', '/duell', '/rangliste', '/broker', '/lotterie', '/tcg', '/inventar', '/handel', '/ihk', '/dungeon', '/grading', '/forum', '/patchnotes', '/benachrichtigungen', '/konto', '/regeln', '/admin'];
 /** Bereich der Seite, auf der das Fenster erschien (erster Pfadteil), sonst das Dashboard; Profile → eigenes Profil */
 function popupBack(req) {
   const first = '/' + (str(req.session.popupBack).split(/[?#]/)[0].split('/')[1] || '');

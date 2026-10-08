@@ -36,8 +36,8 @@ const userSchema = new Schema(
     tcgLooted: { type: [String], default: undefined },
     // Letzte Namensänderung (Wartezeit bis zur nächsten)
     usernameChangedAt: { type: Date, default: null },
-    // Einwilligung in die Übermittlung der Chat-Nachrichten an den KI-Dienst (Support-Chat)
-    supportConsentAt: { type: Date, default: null },
+    // Chat: Mitglieder, die einem nicht schreiben dürfen (und man ihnen nicht)
+    chatBlocked: { type: [Schema.Types.ObjectId], default: [] },
     // Echter Name (freiwillig) – erscheint in Klammern neben dem Benutzernamen
     realName: { type: String, default: null },
     // Registrierung: benutzter Einladungscode und wer ihn erzeugt hat (für das Registrierungs-Protokoll).

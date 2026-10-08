@@ -44,6 +44,39 @@
     <% } %>
   </div>
 </section>
+<% } else if (sub === 'chat') { %>
+<section class="stats-block" id="chat-meldungen">
+  <%- blockHead('Chat-Meldungen', 'Hier steht nur die gemeldete Nachricht (hervorgehoben) und die fünf davor – private Gespräche sind sonst nicht einsehbar. Greif bei Bedarf über „Bans“ ein und markiere die Meldung dann als erledigt. Meldungen werden nach 180 Tagen gelöscht.') %>
+  <div class="card">
+    <% if (!chatReports.length) { %>
+      <p class="muted">Keine offenen Meldungen.</p>
+    <% } else { %>
+      <ul class="code-list">
+        <% chatReports.forEach((r) => { %>
+          <li class="code-item">
+            <div class="code-main">
+              <span>Gemeldet von <%- userLink(r.byName, { realName: false }) %> · <%= dateSec(r.createdAt) %> · <%= r.team ? 'Team-Chat' : 'Privat' %></span>
+            </div>
+            <div class="code-meta small">
+              <% if (r.reason) { %><div><strong>Grund:</strong> <%= r.reason %></div><% } %>
+              <ol class="chat-report-log">
+                <% r.context.forEach((c) => { %>
+                  <li<% if (c.reported) { %> class="is-reported"<% } %>><strong><%= c.from %></strong> <span class="muted"><%= dateSec(c.at) %></span><br><%= c.text %></li>
+                <% }) %>
+              </ol>
+            </div>
+            <div class="code-actions">
+              <form method="post" data-reauth action="/admin/chat-meldungen/<%= r.id %>/erledigt" data-confirm="Meldung von <%= r.byName %> als erledigt markieren?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-primary btn-sm" type="submit">Erledigt</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
 <% } else if (sub === 'bans') { %>
 <section class="stats-block" id="ban">
   <%- blockHead('Bannen', 'Das Mitglied wird sofort abgemeldet. Der Ban gilt auch für alle Geräte des Kontos: von dort ist weder eine Anmeldung mit einem anderen Konto noch eine Registrierung möglich. Guthaben, Karten, Wetten und Angebote bleiben unverändert.' + (currentUser.isAdmin ? '' : '<br><br>Als Dev bannst du für 1 bis ' + maxBanHours + ' Stunden, nicht den Admin und keine anderen Devs, und änderst keinen laufenden Ban eines anderen.')) %>

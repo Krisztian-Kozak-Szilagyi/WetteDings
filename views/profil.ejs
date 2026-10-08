@@ -46,7 +46,7 @@
       <span class="ach-count ach-count-lg t-<%= tier %>"><span><%= achievementCount %></span></span>
     </a>
     <div class="pf-actions">
-      <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/duell/neu?gegen=<%= encodeURIComponent(profile.username) %>">Herausfordern</a><% } %>
+      <% if (!isMe) { %><a class="btn btn-primary btn-sm" href="/duell/neu?gegen=<%= encodeURIComponent(profile.username) %>">Herausfordern</a><button type="button" class="btn btn-ghost btn-sm" data-chat-with="<%= profile.username %>">Nachricht</button><% } %>
       <% if (currentUser.isStaff) { %><a class="btn btn-ghost btn-sm" href="/admin/statistik?bereich=mitglied&amp;spieler=<%= encodeURIComponent(profile.username) %>">Statistik</a><a class="btn btn-ghost btn-sm" href="/admin?bereich=protokolle&amp;spieler=<%= encodeURIComponent(profile.username) %>#protokoll">Logs</a><% } %>
       <% if (canBan) { %>
         <details class="mod-menu" data-dropdown>
