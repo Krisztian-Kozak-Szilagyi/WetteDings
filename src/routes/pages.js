@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
 const { str } = require('../lib/util');
-const { requireLogin, requireStaff } = require('../middleware');
+const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
 const rankService = require('../services/rankService');
@@ -18,6 +18,8 @@ const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
 const { profileStats } = require('../stats/profileStats');
 const avatars = require('../profile/avatars');
+const cosmetics = require('../cosmetics/cosmeticService');
+const cosmeticLogic = require('../cosmetics/logic');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -96,8 +98,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     pinnedChosen: pinnedKeys.length > 0,
     pinnedKeys,
     playmates,
-    // Profilbild wählen: vorerst nur Admin und Devs im eigenen Profil
-    avatarChoices: isMe && req.user.isStaff ? avatars.AVATARS : null,
+    // Profilbild wählen (eigenes Profil): gekaufte Avatare, für Admin und Devs auch die Logos
+    avatarChoices: isMe ? [...(req.user.isStaff ? avatars.AVATARS : []), ...cosmetics.avatars().filter((a) => cosmeticLogic.ownsAvatar(req.user.cosmetics, a.key)).map((a) => ({ id: a.key, name: a.name, url: a.url }))] : null,
     countTier: achievementLogic.countTier,
     shareText: achievementLogic.shareText,
     bioMax: achievementLogic.BIO_MAX,
@@ -125,10 +127,11 @@ router.post('/profil/statistik', requireLogin, async (req, res) => {
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}#statistik`);
 });
 
-// Profilbild wählen (vorerst nur Admin und Devs); leer oder unbekannt = Platzhalter
-router.post('/profil/bild', requireStaff, async (req, res) => {
+// Profilbild wählen: gekaufter Avatar, Logo (nur Admin und Devs); leer oder unbekannt = Platzhalter
+router.post('/profil/bild', requireLogin, async (req, res) => {
   const id = str(req.body.bild);
-  await User.updateOne({ _id: req.user._id }, { $set: { avatar: avatars.has(id) ? id : null } });
+  const ok = cosmeticLogic.ownsAvatar(req.user.cosmetics, id) || (req.user.isStaff && avatars.has(id));
+  await User.updateOne({ _id: req.user._id }, { $set: { avatar: ok ? id : null } });
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
 });
 

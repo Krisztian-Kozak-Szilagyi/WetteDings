@@ -113,7 +113,7 @@ async function historyOf(docId) {
     Bet.find({ 'duel.cards.doc': id }).select('title status outcome creator duel.opponent duel.cards resolvedAt createdAt').lean(),
     IhkRun.find({ $or: [{ cardDoc: id }, { boostDoc: id }, { boost2Doc: id }] }).select('user quest card cardDoc createdAt endsAt success status').lean(),
     DungeonRun.find({ $or: [{ 'members.cardDoc': id }, { 'members.boostDoc': id }] }).select('dungeon startedAt status success members.user members.name members.card members.cardDoc members.boostDoc').lean(),
-    Ledger.findOne({ type: 'tcg_verkauf', 'meta.docs.doc': id }).lean(),
+    Ledger.findOne({ type: { $in: ['tcg_verkauf', 'tcg_zerkleinert'] }, 'meta.docs.doc': id }).lean(),
     PackGrant.findOne({ kind: 'entzug', docs: id }).lean(),
   ]);
 
@@ -192,7 +192,7 @@ async function historyOf(docId) {
 
   // Ende: an die Bank verkauft oder vom Team entfernt – gespeichert oder aus den Buchungen erschlossen
   let gone = !copy;
-  if (sale) events.push({ at: sale.createdAt, type: 'verkauft', who: sale.user, amount: bankValue(cardId) });
+  if (sale) events.push({ at: sale.createdAt, type: sale.type === 'tcg_zerkleinert' ? 'zerkleinert' : 'verkauft', who: sale.user, amount: sale.type === 'tcg_zerkleinert' ? 0 : bankValue(cardId) });
   else if (revoke) events.push({ at: revoke.createdAt, type: 'entzogen', who: revoke.to, by: revoke.byName });
   else if (!copy) {
     const { owner, events: ordered } = timeline(events, firstOwner);
@@ -236,6 +236,8 @@ async function historyOf(docId) {
         return `Foliert${e.grade !== null && e.grade !== undefined ? ` – Note ${e.grade}` : ''}`;
       case 'verkauft':
         return `${e.guess ? 'Vermutlich a' : 'A'}n die Bank verkauft von ${name(e.who)} für ${euro(e.amount)}` + (e.guess ? ' (erschlossen aus seinen Buchungen: eine Karte dieser Art verkauft)' : '');
+      case 'zerkleinert':
+        return `Zerkleinert von ${name(e.who)} (Konfetti für den Kosmetik-Shop)`;
       case 'entzogen':
         return `Vom Team aus der Sammlung von ${name(e.who)} entfernt (${e.by})`;
       case 'verschwunden':
@@ -244,7 +246,7 @@ async function historyOf(docId) {
         return e.type;
     }
   };
-  const ICON = { entstanden: '✦', handel: '⇄', duell: '⚔', 'duell-einsatz': '⚔', ihk: '💼', dungeon: '🕸', folie: '✨', verkauft: '🏦', entzogen: '✖', verschwunden: '?' };
+  const ICON = { entstanden: '✦', handel: '⇄', duell: '⚔', 'duell-einsatz': '⚔', ihk: '💼', dungeon: '🕸', folie: '✨', verkauft: '🏦', zerkleinert: '✂', entzogen: '✖', verschwunden: '?' };
   const c = catalog.cardById[cardId];
   return {
     id: String(id),
