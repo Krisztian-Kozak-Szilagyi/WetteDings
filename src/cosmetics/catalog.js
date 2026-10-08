@@ -22,8 +22,8 @@ const DRAWN = 250;
 
 const AVATARS = [
   { key: 'anna', name: 'Anna', ext: 'webp', price: DRAWN },
-  { key: 'bolond-gomba', name: 'Verrückter Pilz', ext: 'svg', price: SIMPLE },
-  { key: 'bolond-gomba-2', name: 'Verrückter Pilz II', ext: 'svg', price: SIMPLE },
+  { key: 'bolond-gomba', name: 'Verrückter Pilz', ext: 'webp', price: SIMPLE },
+  { key: 'bolond-gomba-2', name: 'Verrückter Pilz II', ext: 'webp', price: SIMPLE },
   { key: 'dog-1', name: 'Wuschel', ext: 'webp', price: DRAWN },
   { key: 'face', name: 'Der Blick', ext: 'svg', price: SIMPLE },
   { key: 'face2', name: 'Der Schrei', ext: 'svg', price: SIMPLE },
