@@ -4,7 +4,9 @@
 const mongoose = require('mongoose');
 
 const BOERSE = { id: new mongoose.Types.ObjectId('000000000000000000b0e250'), name: 'Börse', avatar: '/img/avatars/logo-silber.svg' };
-const ALL = [BOERSE];
+// Wochenrückblick (stats/weeklyReviewService.js), freitags 11:30 Uhr
+const WOCHENRUECKBLICK = { id: new mongoose.Types.ObjectId('000000000000000000b0e251'), name: 'Wochenrückblick', avatar: '/img/avatars/logo-klassisch.svg' };
+const ALL = [BOERSE, WOCHENRUECKBLICK];
 const TEAM_AVATAR = '/img/avatars/logo-silber.svg';
 let teams = new Map(); // Name → Verfasser
 
@@ -16,4 +18,4 @@ function register(list) {
 /** System-Verfasser zu einem Namen oder null */
 const systemAuthor = (name) => ALL.find((a) => a.name === name) || teams.get(name) || null;
 
-module.exports = { BOERSE, systemAuthor, register };
+module.exports = { BOERSE, WOCHENRUECKBLICK, systemAuthor, register };
