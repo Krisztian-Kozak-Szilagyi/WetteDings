@@ -10,12 +10,19 @@
     </div>
     <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
-  <form class="album-dupes" method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett."
-    title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht verkauft – auch ihre Duplikate nicht.">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <%# Duplikate: an die Bank verkaufen (Geld) oder zerkleinern (Konfetti für den Kosmetik-Shop) – dieselben Karten %>
+  <div class="album-dupes" title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht angefasst – auch ihre Duplikate nicht.">
     <span><%= dupCount ? dupCount + (dupCount === 1 ? ' Duplikat' : ' Duplikate') : 'Keine Duplikate' %><% if (dupCount) { %> · <strong><%= euro(dupValue) %></strong><% } %></span>
-    <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
-  </form>
+    <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
+    </form>
+    <form method="post" action="/tcg/duplikate-zerkleinern" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> zu <%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %> zerkleinern? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-ghost btn-sm" type="submit" <%= dupCount && dupKonfetti ? '' : 'disabled' %>>Zerkleinern<% if (dupKonfetti) { %> · +<%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %><% } %></button>
+    </form>
+    <a class="album-konfetti" href="/kosmetik" title="Zum Kosmetik-Shop"><%= konfetti.toLocaleString('de-DE') %> <%= konfettiName() %></a>
+  </div>
 </div>
 
 <div class="album-body" id="sammlung">
@@ -79,6 +86,19 @@
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" name="card" value="">
           <input type="hidden" name="mode" value="duplikate">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <%# Zerkleinern (Konfetti): auch Boss-Karten, nur folierte nicht %>
+        <form method="post" action="/tcg/zerkleinern" data-tcg-shred-dupes>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="duplikate">
+          <button class="btn btn-ghost btn-block" type="submit"></button>
+        </form>
+        <form method="post" action="/tcg/zerkleinern" data-tcg-shred-one data-konfetti-name="<%= konfettiName() %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <input type="hidden" name="mode" value="eins">
           <button class="btn btn-ghost btn-block" type="submit"></button>
         </form>
         <form method="post" action="/tcg/verkaufen" data-tcg-sell-one>

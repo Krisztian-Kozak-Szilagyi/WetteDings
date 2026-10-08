@@ -125,6 +125,9 @@
     var protectForm = $('[data-tcg-protect]', modal);
     var favoriteForm = $('[data-tcg-favorite]', modal);
     var protectNote = $('[data-tcg-protect-note]', modal);
+    var shredOne = $('[data-tcg-shred-one]', modal);
+    var shredDupes = $('[data-tcg-shred-dupes]', modal);
+    var konfettiName = shredOne ? shredOne.getAttribute('data-konfetti-name') : 'Konfetti';
 
     document.addEventListener('click', function (e) {
       var slot = e.target.closest('[data-tcg-card]');
@@ -183,6 +186,21 @@
         sellDupes.querySelector('input[name="card"]').value = d.tcgCard;
         sellDupes.querySelector('button').textContent = 'Duplikate verkaufen (' + (count - 1) + '×) · ' + total;
         sellDupes.setAttribute('data-confirm', (count - 1) + '× ' + d.name + ' verkaufen und eine behalten?');
+      }
+
+      // Zerkleinern: Konfetti = Bankwert in ganzen Euro; Boss-Karten auch (nur nicht folierte Exemplare)
+      var konfetti = Math.floor(sell / 100);
+      var kText = function (n) { return '+' + (n * konfetti).toLocaleString('de-DE') + ' ' + konfettiName; };
+      shredOne.hidden = count < 1 || konfetti < 1;
+      shredOne.querySelector('input[name="card"]').value = d.tcgCard;
+      shredOne.querySelector('button').textContent = '1 zerkleinern · ' + kText(1);
+      if (rank >= RARE_RANK || noBank) shredOne.setAttribute('data-confirm', d.name + ' (' + d.rarityLabel + ') wirklich zu ' + (konfetti).toLocaleString('de-DE') + ' ' + konfettiName + ' zerkleinern? Die Karte ist danach weg.');
+      else shredOne.removeAttribute('data-confirm');
+      shredDupes.hidden = count < 2 || isProtected || konfetti < 1;
+      if (!shredDupes.hidden) {
+        shredDupes.querySelector('input[name="card"]').value = d.tcgCard;
+        shredDupes.querySelector('button').textContent = 'Duplikate zerkleinern (' + (count - 1) + '×) · ' + kText(count - 1);
+        shredDupes.setAttribute('data-confirm', (count - 1) + '× ' + d.name + ' zerkleinern und eine behalten?');
       }
 
       if (typeof modal.showModal === 'function') modal.showModal();
