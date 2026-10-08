@@ -27,6 +27,8 @@ const giftService = require('../services/giftService');
 const devMessageService = require('../services/devMessageService');
 const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const foil = require('../items/foil');
+const cosmetics = require('../cosmetics/cosmeticService');
+const cosmeticCatalog = require('../cosmetics/catalog');
 const lotteryService = require('../services/lotteryService');
 const taxService = require('../services/taxService');
 const { DIFFICULTIES } = require('../ihk/quests');
@@ -50,7 +52,7 @@ const PANEL_SECTIONS = [
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'popups', label: 'Pop-ups', icon: 'message', description: 'Nachrichten, die allen Mitgliedern als Fenster erscheinen, bis sie gelesen sind.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Kosmetik, Lotterie, IHK und Dungeon.' },
   { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
@@ -72,6 +74,7 @@ const SUBTABS = {
     { key: 'bonus', label: 'Tagesbonus' },
     { key: 'grading', label: 'Grading' },
     { key: 'folie', label: 'Folie' },
+    { key: 'kosmetik', label: 'Kosmetik' },
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
     { key: 'dungeon', label: 'Dungeon' },
@@ -201,6 +204,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     packTypes: tcgCatalog.PACK_TYPES,
     itemTypes: itemService.ITEM_TYPES,
     foilSettings: foil.settings,
+    // Kosmetik: Währungsname und je Avatar Preis, Effekt, Name
+    cosmeticAdmin: needsSub('spielwerte', 'kosmetik') && isAdmin ? { currency: cosmetics.currencyName(), avatars: cosmetics.avatars(), effects: cosmeticCatalog.EFFECTS, expectedPack: tcgCatalog.expectedPackValue(), defaults: Object.fromEntries(cosmeticCatalog.AVATARS.map((a) => [a.key, a])) } : null,
     lottoSettings: lotteryService.settings,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
@@ -637,6 +642,25 @@ router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte
     req.flash('success', `TCG-Einstellungen gespeichert. Ein Pack ist im Schnitt ${euro(ev)} wert (${ratio} % vom Preis ${euro(packCents)}).`);
   }
   res.redirect(subUrl('spielwerte', 'tcg'));
+});
+
+// ---------- Kosmetik: Name der Währung, Preise und Effekte der Avatare ----------
+router.post('/admin/kosmetik', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  // Felder je Avatar: preis_<key>, effekt_<key>, name_<key> (Schlüssel nur aus der festen Liste)
+  const entries = Object.fromEntries(
+    cosmeticCatalog.AVATARS.map((a) => {
+      const raw = str(req.body[`preis_${a.key}`]).trim();
+      return [a.key, { price: /^[0-9]{1,7}$/.test(raw) ? Number(raw) : NaN, effect: str(req.body[`effekt_${a.key}`]), name: str(req.body[`name_${a.key}`]) }];
+    })
+  );
+  try {
+    await cosmetics.saveSettings({ admin: req.user, currency: str(req.body.waehrung), entries });
+    req.flash('success', 'Kosmetik gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'kosmetik'));
 });
 
 // ---------- Folie: Fundchance im Grading-Shop und Wertsteigerung ----------

@@ -128,7 +128,12 @@
           <tr>
             <td class="nowrap"><%= date(l.createdAt) %></td>
             <td><%= ledgerLabels[l.type] %><% if (l.bet) { %> · <a href="/wetten/<%= l.bet %>"><%= l.betTitle %></a><% } else if (l.betTitle) { %> · <span class="muted"><%= l.betTitle %></span><% } else if (l.type === 'coin_kauf' || l.type === 'coin_verkauf') { %> · <span class="muted">Samantha Coin</span><% } %></td>
-            <td class="num <%= l.amount > 0 ? 'pos' : 'neg' %>"><%= l.amount > 0 ? '+' : '' %><%= euro(l.amount) %></td>
+            <% if (!l.amount && l.meta && l.meta.konfetti) { %>
+              <%# Zerkleinern und Kosmetik-Käufe: kein Geld, nur Konfetti %>
+              <td class="num <%= l.meta.konfetti > 0 ? 'pos' : 'neg' %>"><%= l.meta.konfetti > 0 ? '+' : '−' %><%= Math.abs(l.meta.konfetti).toLocaleString('de-DE') %> <%= konfettiName() %></td>
+            <% } else { %>
+              <td class="num <%= l.amount > 0 ? 'pos' : 'neg' %>"><%= l.amount > 0 ? '+' : '' %><%= euro(l.amount) %></td>
+            <% } %>
           </tr>
         <% }) %>
       </tbody>

@@ -5,13 +5,13 @@
 <section class="pf-hero">
   <div class="pf-id">
     <% if (avatarChoices) { %>
-      <%# Profilbild wählen (vorerst nur Admin und Devs): beim Draufzeigen erscheint „Ändern“, Klick öffnet die Auswahl %>
+      <%# Profilbild wählen (eigenes Profil): beim Draufzeigen erscheint „Ändern“, Klick öffnet die Auswahl (gekaufte Avatare) %>
       <button type="button" class="pf-avatar-pick" data-dialog-open="pf-bild" aria-label="Profilbild ändern">
-        <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+        <img class="pf-avatar<%= avatarFx(profile) %>" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
         <span class="pf-avatar-hint" aria-hidden="true">Ändern</span>
       </button>
     <% } else { %>
-      <img class="pf-avatar" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
+      <img class="pf-avatar<%= avatarFx(profile) %>" src="<%= avatarUrl(profile) %>?v=<%= assetVersion %>" alt="" width="152" height="152">
     <% } %>
     <div class="pf-id-text">
       <h1 class="pf-name"><%= profile.username %><%- roleBadge(profile.username) %></h1>
@@ -326,6 +326,7 @@
       <img src="/img/avatar-placeholder.svg?v=<%= assetVersion %>" alt="Standardbild" width="96" height="96">
     </button>
   </form>
+  <p class="pf-bild-shop"><a class="btn btn-ghost btn-sm" href="/kosmetik">Mehr Avatare im Kosmetik-Shop</a></p>
 </dialog>
 <% } %>
 

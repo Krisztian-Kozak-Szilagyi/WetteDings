@@ -9,7 +9,7 @@ const Ledger = require('../models/Ledger');
 const { DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
 const { inTransaction } = require('../services/betService');
-const { ACHIEVEMENTS, SPECIAL, REWARD, byKey, find } = require('./list');
+const { ACHIEVEMENTS, SPECIAL, rewardOf, byKey, find } = require('./list');
 
 const isDuplicate = (err) => err && (err.code === 11000 || /E11000/.test(err.message || ''));
 
@@ -18,13 +18,14 @@ async function grant(userId, key) {
   if (!byKey[key] || !mongoose.isValidObjectId(userId)) return false;
   const id = new mongoose.Types.ObjectId(String(userId));
   if (await Achievement.exists({ user: id, key })) return false;
+  const reward = rewardOf(byKey[key]);
   let granted = null;
   try {
     granted = await inTransaction(async (session) => {
-      const user = await User.findOneAndUpdate({ _id: id, deletedAt: null }, { $inc: { balance: REWARD } }, { session, new: true, projection: { username: 1 } });
+      const user = await User.findOneAndUpdate({ _id: id, deletedAt: null }, { $inc: { balance: reward } }, { session, new: true, projection: { username: 1 } });
       if (!user) return null; // gelöschtes oder unbekanntes Konto
-      await Achievement.create([{ user: id, key, reward: REWARD, earnedAt: new Date() }], { session });
-      await Ledger.create([{ user: id, type: 'erfolg', amount: REWARD, betTitle: byKey[key].name, meta: { achievement: key } }], { session });
+      await Achievement.create([{ user: id, key, reward, earnedAt: new Date() }], { session });
+      await Ledger.create([{ user: id, type: 'erfolg', amount: reward, betTitle: byKey[key].name, meta: { achievement: key } }], { session });
       return user.username;
     });
   } catch (err) {
