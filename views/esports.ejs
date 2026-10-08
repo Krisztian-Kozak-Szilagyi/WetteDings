@@ -3,8 +3,7 @@
   const statusLabel = { offen: 'Sucht Mitglieder', aktiv: 'Gehandelt', eingefroren: 'Eingefroren', aufgeloest: 'Aufgelöst' };
   const eur = (c) => euro(c);
   const pctText = (x) => x === null || x === undefined ? '–' : signedPercent(x);
-  const live = teams.filter((t) => t.status !== 'aufgeloest');
-  const closed = teams.filter((t) => t.status === 'aufgeloest');
+  const live = teams; // aufgelöste Teams zeigt die Seite nirgends
   const teamHref = (t) => `/esports/team/${t.ticker.toLowerCase()}`;
 
 %>
@@ -103,27 +102,26 @@
       <% if (!live.length) { %>
         <p class="muted">Noch kein Team gegründet.</p>
       <% } else { %>
-        <div class="table-wrap">
-          <table class="table es-table">
-            <thead><tr><th class="num">Platz</th><th>Team</th><th>Kürzel</th><th class="num">Kurs</th><th class="num hide-sm">Letzte Woche</th><th class="num">Mitglieder</th><th class="hide-sm">Status</th></tr></thead>
-            <tbody>
-              <% live.forEach((t) => { %>
-                <tr class="<%= mine && String(mine._id) === String(t._id) ? 'is-mine' : '' %>">
-                  <td class="num"><%= t.lastRank || '–' %></td>
-                  <td><a class="es-team-link es-team-cell" href="<%= teamHref(t) %>"><% if (t.avatar) { %><img class="es-mini-avatar" src="<%= avatarUrl({ avatar: t.avatar }) %>?v=<%= assetVersion %>" alt="" width="40" height="40" loading="lazy"><% } else { %><span class="es-mini-avatar es-monogram<%= rules.findColor(t.color) ? ' es-color-' + t.color : '' %>" aria-hidden="true"><%= Array.from(t.name)[0].toUpperCase() %></span><% } %><strong><%= t.name %></strong><% if (t.trophies && t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %></a></td>
-                  <td><% if (t.path) { %><a href="<%= t.path %>"><%= t.ticker %></a><% } else { %><span class="muted"><%= t.ticker %></span><% } %></td>
-                  <td class="num"><%= t.price !== null ? coinPrice(t.price) : '–' %></td>
-                  <td class="num hide-sm"><%= pctText(t.lastChange) %></td>
-                  <td class="num"><%= t.members.length %>/<%= rules.MAX_MEMBERS %></td>
-                  <td class="hide-sm"><span class="es-status is-<%= t.status %>"><%= statusLabel[t.status] %></span></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="es-team-grid">
+          <% live.forEach((t) => { const pic = t.avatar; %>
+            <a class="es-tc<%= mine && String(mine._id) === String(t._id) ? ' is-mine' : '' %>" href="<%= teamHref(t) %>">
+              <div class="es-tc-head">
+                <% if (pic) { %><img class="es-tc-pic" src="<%= avatarUrl({ avatar: t.avatar }) %>?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy"><% } else { %><span class="es-tc-pic es-monogram<%= rules.findColor(t.color) ? ' es-color-' + t.color : '' %>" aria-hidden="true"><%= Array.from(t.name)[0].toUpperCase() %></span><% } %>
+                <span class="es-tc-name"><strong><%= t.name %></strong><span class="es-ticker"><%= t.ticker %></span></span>
+                <% if (t.lastRank) { %><span class="es-tc-rank" title="Platz in der letzten Woche"><%= t.lastRank %>.</span><% } %>
+              </div>
+              <dl class="es-tc-stats">
+                <div><dt>Kurs</dt><dd><%= t.price !== null ? coinPrice(t.price) : '–' %></dd></div>
+                <div><dt>Letzte Woche</dt><dd><%= pctText(t.lastChange) %></dd></div>
+                <div><dt>Mitglieder</dt><dd><%= t.members.length %>/<%= rules.MAX_MEMBERS %></dd></div>
+              </dl>
+              <div class="es-tc-foot">
+                <span class="es-status is-<%= t.status %>"><%= statusLabel[t.status] %></span>
+                <% if (t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %>
+              </div>
+            </a>
+          <% }) %>
         </div>
-      <% } %>
-      <% if (closed.length) { %>
-        <p class="muted small">Aufgelöst: <% closed.forEach((t, i) => { %><%= i ? ', ' : '' %><a href="<%= teamHref(t) %>"><%= t.name %></a><% }) %></p>
       <% } %>
     </section>
   </div>
