@@ -45,13 +45,31 @@ const slotView = (m, me, leaderId, banMode = null) => {
   };
 };
 
+/**
+ * Chaos-Event in der Wiedergabe: erst der verdrängte Dungeon (from), nach `alert` Sekunden die Meldung vom neuen
+ * Teilnehmer, nach `reveal` Sekunden Bild, Titel und Einleitung des Chaos Dungeons (to)
+ */
+const eventView = (run, d) => {
+  const from = defOf(run.event) || {};
+  return {
+    alert: dungeon.EVENT_ALERT_SECONDS,
+    reveal: dungeon.EVENT_REVEAL_SECONDS,
+    text: d.arrival || '',
+    from: { title: from.title, image: from.image, intro: from.intro },
+    to: { title: d.title, image: d.image, intro: d.intro },
+  };
+};
+/** Läuft noch die Einleitung vor der Enthüllung? Dann zeigt die Seite weiter den verdrängten Dungeon. */
+const eventHidden = (run, now) => !!run.event && now < new Date(run.startedAt).getTime() + dungeon.EVENT_REVEAL_SECONDS * 1000;
+
 /** Daten für die Wiedergabe im Browser (public/js/dungeon.js). Turm: Runden ohne Gesamtzahl, Texte je Begegnung. */
 const playback = (run, d, now) => ({
   now,
   tower: run.mode === 'tower',
   startedAt: new Date(run.startedAt).getTime(),
   endsAt: new Date(run.endsAt).getTime(),
-  intro: dungeon.INTRO_SECONDS,
+  intro: run.event ? dungeon.EVENT_INTRO_SECONDS : dungeon.INTRO_SECONDS,
+  event: run.event ? eventView(run, d) : null,
   fightSeconds: run.fightSeconds || dungeon.FIGHT_SECONDS, // volle Zeit eines Kampfes in echten Sekunden (Zeit-Balken)
   names: run.members.map((m) => m.name),
   // je Platz: Kartenbilder mit geänderten Werten (Boost/Debuff) – nur Rahmen-Karten; base = Grundbild
@@ -117,6 +135,7 @@ router.get('/dungeon', async (req, res) => {
         id: String(unseen._id),
         success: unseen.success,
         tower: lootTower,
+        chaos: !!unseen.event,
         rounds: unseen.rounds || 0,
         result: lootTower ? dungeon.towerResultText(unseen.rounds || 0) : null,
         bossCard: dungeon.bossCardOf(unseen.dungeon),
@@ -135,7 +154,8 @@ router.get('/dungeon', async (req, res) => {
     slotTime: toZonedLocalInput(new Date(slot), config.timezone).slice(11, 16),
     lockSeconds: dungeon.LOCK_SECONDS,
     lockedIn: party ? dungeon.partyLocked(party, now) : false,
-    dg: running ? runDungeon : tower ? TOWER : next,
+    // Chaos-Event vor der Enthüllung: Bild und Titel des verdrängten Dungeons (die Kämpfe sind schon die neuen)
+    dg: running ? (eventHidden(running, now) ? { ...defOf(running.event), fights: runDungeon.fights } : runDungeon) : tower ? TOWER : next,
     tower,
     // Turm-Kacheln vor dem Beitritt: verfügbar? heute schon gespielt? Startet der Leiter erst, wenn alle gewählt haben
     towerShown: dungeon.towerOpen(req.user),

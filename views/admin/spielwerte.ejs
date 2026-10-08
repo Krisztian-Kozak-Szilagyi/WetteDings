@@ -340,6 +340,35 @@
             </tbody>
           </table>
         </div>
+        <% const ch = dungeon.settings.chaos; const chd = dungeon.defaults.chaos; %>
+        <h3 class="admin-ihk-sub">Chaos Dungeon (geheimes Event)</h3>
+        <p class="muted small">Beim Start von „The Fall of St. Ivan“ erscheint mit dieser Chance ein neuer Teilnehmer: St. Ivan verschwindet und der Chaos Dungeon beginnt (je Gruppe ausgewürfelt). Nur hier gibt es seine Boss-Karte – solange sie noch nicht gezeichnet ist, wird sie den Gewinnern nachgereicht. Für Spieler steht das Event nirgends beschrieben.</p>
+        <label class="field admin-tcg-pack">
+          <span>Chance, dass ein St.-Ivan-Lauf zum Chaos Dungeon wird (%) <span class="muted small">(Standard <%= dec(chd.chance) %>)</span></span>
+          <input type="text" name="chaosChance" inputmode="decimal" value="<%= dec(ch.chance) %>" required>
+        </label>
+        <div class="table-wrap">
+          <table class="table admin-tcg-table">
+            <thead><tr><th>Kampf</th><th>Ziel (Punkte)</th><th>Lohn pro Spieler (€)</th></tr></thead>
+            <tbody>
+              <% ['Kampf 1', 'Kampf 2', 'Boss'].forEach((label, i) => { %>
+                <tr>
+                  <td><%= label %> <span class="muted small hide-sm">(Standard <%= chd.required[i] %> / <%= euro(chd.rewards[i]) %>)</span></td>
+                  <td><input type="number" name="chaosRequired_<%= i %>" min="1" max="100000" step="1" value="<%= ch.required[i] %>" required aria-label="Chaos Dungeon: Ziel-Punkte <%= label %>"></td>
+                  <td><input type="text" name="chaosReward_<%= i %>" inputmode="decimal" value="<%= eur(ch.rewards[i]) %>" required aria-label="Chaos Dungeon: Lohn <%= label %>"></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <label class="field admin-tcg-pack">
+          <span>Boss: Chance auf eine Folie pro Spieler (%) <span class="muted small">(Standard <%= dec(chd.foilChance) %>)</span></span>
+          <input type="text" name="chaosFoilChance" inputmode="decimal" value="<%= dec(ch.foilChance) %>" required>
+        </label>
+        <label class="field admin-tcg-pack">
+          <span>Boss: Chance auf die Boss-Karte pro Spieler (%) <span class="muted small">(Standard <%= dec(chd.cardChance) %>)</span></span>
+          <input type="text" name="chaosCardChance" inputmode="decimal" value="<%= dec(ch.cardChance) %>" required>
+        </label>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

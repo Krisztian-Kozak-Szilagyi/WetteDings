@@ -483,6 +483,13 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
         fightSeconds: num(req.body.towerFightSeconds),
         pauseSeconds: num(req.body.towerPauseSeconds),
       },
+      chaos: {
+        chance: pct(req.body.chaosChance),
+        required: fights.map((i) => num(req.body[`chaosRequired_${i}`])),
+        rewards: fights.map((i) => euroOrZero(req.body[`chaosReward_${i}`])),
+        foilChance: pct(req.body.chaosFoilChance),
+        cardChance: pct(req.body.chaosCardChance),
+      },
       admin: req.user,
     });
     req.flash('success', 'Dungeon-Einstellungen gespeichert.');

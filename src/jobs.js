@@ -58,6 +58,10 @@ function startJobs() {
   const dungeon = () => dungeonService.tick().catch((err) => console.error('Dungeon-Fehler:', err));
   setTimeout(dungeon, 10 * 1000).unref();
   setInterval(dungeon, 5 * 1000).unref();
+  // Boss-Karten nachreichen, die vor ihrer Zeichnung erbeutet wurden (Chaos Dungeon) – kurz nach dem Start, dann stündlich
+  const pendingCards = () => dungeonService.grantPendingBossCards().catch((err) => console.error('Boss-Karten-Fehler:', err));
+  setTimeout(pendingCards, 40 * 1000).unref();
+  setInterval(pendingCards, 60 * 60 * 1000).unref();
 
   // Rangliste: jede Minute festhalten, wer gerade auf Platz 1 steht (Anzeige im Profil)
   const top1 = () => rankService.trackTop1().catch((err) => console.error('Rang-Fehler:', err));

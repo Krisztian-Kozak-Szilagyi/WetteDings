@@ -57,10 +57,52 @@ const DUNGEONS = [
 ];
 const dungeonByKey = Object.fromEntries(DUNGEONS.map((d) => [d.key, d]));
 
-/** Dungeon oder Mage Tower zu einem gespeicherten Schlüssel (DungeonRun.dungeon) – der Turm ist nicht in der Rotation */
-const defOf = (key) => dungeonByKey[key] || (key === TOWER.key ? TOWER : null);
+// Geheimes Event: Beim Start von St. Ivan erscheint mit etwas Glück (Chance im Admin-Panel) ein neuer Teilnehmer –
+// St. Ivan verschwindet und der Chaos Dungeon beginnt. Er steht nicht in der Rotation, hat keine Geschichten-Seite
+// und ist der einzige Weg an seine Boss-Karte (nicht im Black Market, der nur DUNGEONS kennt).
+// bossCard: die Season-1-Boss-Karte, die noch gezeichnet wird. Bis sie im Katalog steht, merkt sich der Lauf die
+// Beute (members.bossCard) – dungeonService.grantPendingBossCards reicht die Karte nach, sobald es sie gibt.
+const CHAOS = {
+  key: 'chaos',
+  title: 'Chaos Dungeon',
+  replaces: 'st-ivan',
+  bossCard: 'chaos-boss',
+  image: PLACEHOLDER,
+  intro: 'Der Tempel von St. Ivan zerfällt zu Staub. Wo eben noch der Altar stand, klafft ein Riss in der Wirklichkeit – und aus ihm tritt etwas, das niemand eingeladen hat.',
+  arrival: 'Ein neuer Teilnehmer ist erschienen …',
+  fights: [
+    {
+      key: 'chaos-riss',
+      title: 'Der Riss',
+      stat: 'fia',
+      text: 'Der Boden unter euren Füßen folgt keiner Logik mehr: Gänge enden in sich selbst, Treppen führen nach oben und kommen unten an. Nur wer das Muster dahinter erkennt, findet einen Weg hindurch.',
+      success: 'Das Muster ist entschlüsselt – eine Schleife ohne Abbruchbedingung. Ihr setzt sie, und der Riss gibt einen Pfad frei.',
+      fail: 'Der Gang führt euch zum hundertsten Mal an denselben Punkt. Erschöpft gebt ihr auf – Rückzug!',
+    },
+    {
+      key: 'chaos-schatten',
+      title: 'Die Schatten des Chaos',
+      stat: 'bwl',
+      text: 'Gestalten aus Rauch bieten euch Handel an: Gold gegen Erinnerungen, Macht gegen Zeit. Jeder Vertrag sieht gut aus – bis man das Kleingedruckte liest.',
+      success: 'Ihr rechnet jeden Vertrag durch und findet in allen denselben Haken. Die Schatten lösen sich auf, ihr Gold bleibt liegen.',
+      fail: 'Ein Vertrag zu viel unterschrieben. Die Schatten nehmen sich, was ihnen zusteht – Rückzug!',
+    },
+    {
+      key: 'der-fremde',
+      title: 'Der Fremde',
+      stat: 'fis',
+      boss: true,
+      text: 'Im Zentrum des Risses wartet der neue Teilnehmer. Er hat St. Ivan nicht besiegt – er hat ihn einfach ersetzt. Um ihn herum fallen Systeme aus, die es nie gab, und Leitungen glühen, die nirgendwohin führen.',
+      success: 'Netz für Netz, Dienst für Dienst bringt ihr Ordnung zurück. Der Fremde weicht in den Riss zurück, und was er zurücklässt, gehört jetzt euch.',
+      fail: 'Das Chaos frisst die letzte Leitung. Der Riss schließt sich – mit euch auf der falschen Seite. Ihr entkommt nur knapp.',
+    },
+  ],
+};
+
+/** Dungeon oder Mage Tower zu einem gespeicherten Schlüssel (DungeonRun.dungeon) – Turm und Chaos sind nicht in der Rotation */
+const defOf = (key) => dungeonByKey[key] || (key === TOWER.key ? TOWER : key === CHAOS.key ? CHAOS : null);
 
 /** Dungeon zu einer Startzeit: wechselt mit jedem Termin (hours = Abstand der Termine) */
 const dungeonForSlot = (slot, hours = 2) => DUNGEONS[Math.floor(new Date(slot).getTime() / 3600000 / Math.max(1, hours)) % DUNGEONS.length];
 
-module.exports = { DUNGEONS, dungeonByKey, dungeonForSlot, defOf, TOWER, PLACEHOLDER };
+module.exports = { DUNGEONS, dungeonByKey, dungeonForSlot, defOf, TOWER, CHAOS, PLACEHOLDER };

@@ -621,8 +621,39 @@
     timeLabel.textContent = left ? secs(timeLeft * pb.fightSeconds) : '–';
   }
 
+  // ---------- Chaos-Event: erst der alte Dungeon, dann die Meldung vom neuen Teilnehmer, dann der Wechsel ----------
+  const ev = pb.event;
+  const heroImg = page.querySelector('[data-dg-hero-img]');
+  const heroTitle = page.querySelector('[data-dg-hero-title]');
+  const alertEl = page.querySelector('[data-dg-event-alert]');
+  let evStage = -1;
+  function eventStage(t) {
+    const stage = t >= ev.reveal ? 2 : t >= ev.alert ? 1 : 0;
+    if (stage === evStage) return;
+    const fresh = evStage >= 0 || t - (stage === 2 ? ev.reveal : ev.alert) < 1; // live miterlebt (nicht nachgeladen)
+    evStage = stage;
+    if (alertEl) {
+      alertEl.textContent = ev.text;
+      alertEl.hidden = stage !== 1;
+    }
+    if (stage >= 1 && !page.dataset.dgEventLogged) {
+      page.dataset.dgEventLogged = '1';
+      log(ev.text, 'is-ability');
+    }
+    if (stage === 1 && fresh) flash(page, 'is-chaos-alert');
+    if (stage === 2) {
+      if (heroImg && ev.to.image) heroImg.src = ev.to.image;
+      if (heroTitle) heroTitle.textContent = ev.to.title;
+      if (titleEl && starts.length && t < starts[0]) titleEl.textContent = ev.to.intro;
+      page.classList.add('is-chaos');
+      if (fresh) flash(page, 'is-chaos-reveal');
+      log(ev.from.title + ' ist verschwunden – der ' + ev.to.title + ' beginnt!', 'is-head');
+    }
+  }
+
   function frame() {
     const t = elapsed();
+    if (ev) eventStage(t);
     let active = -1; // Kampf, der gerade läuft
     let after = -1; // zuletzt beendeter Kampf (in der Pause danach)
     pb.fights.forEach((f, i) => {
@@ -675,7 +706,9 @@
     barsEl.hidden = active < 0 && after < 0;
     nextEl.hidden = active >= 0;
     if (active < 0) {
-      if (after < 0) {
+      if (after < 0 && ev && t < ev.reveal) {
+        nextEl.textContent = 'Gleich geht es los …'; // die Dauer der Einleitung würde das Event verraten
+      } else if (after < 0) {
         nextEl.textContent = (pb.tower ? 'Runde 1 beginnt in ' : 'Der erste Kampf beginnt in ') + secs(pb.intro - t);
       } else {
         const f = pb.fights[after];
