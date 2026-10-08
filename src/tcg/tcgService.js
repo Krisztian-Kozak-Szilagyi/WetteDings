@@ -296,7 +296,43 @@ async function toggleCard(user, field, cardId, check) {
 }
 
 /** Schutz vor dem Duplikat-Verkauf umschalten */
-const toggleProtected = ({ user, cardId }) => toggleCard(user, 'tcgProtected', cardId);
+/** Schutz umschalten – bei Karten-IDs vor dem Duplikat-Verkauf, bei einem folierten Exemplar ("f:<id>") vor jedem Verkauf an die Bank */
+async function toggleProtected({ user, cardId }) {
+  if (!isFoilFav(cardId)) return toggleCard(user, 'tcgProtected', cardId);
+  if ((user.tcgProtected || []).includes(cardId)) {
+    await User.updateOne({ _id: user._id }, { $pull: { tcgProtected: cardId } });
+    return false;
+  }
+  if (!(await ownedFoilFavs(user._id, [cardId])).size) throw new UserError('Diese folierte Karte besitzt du nicht.');
+  await User.updateOne({ _id: user._id }, { $addToSet: { tcgProtected: cardId } });
+  return true;
+}
+
+/**
+ * Ein foliertes Exemplar ("f:<id>") an die Bank verkaufen – zum Folienwert (Verkaufspreis der Seltenheit plus
+ * Wertsteigerung, foil.cardValue). Nicht: Boss-Karten, geschützte Exemplare, Exemplare im Handel, auf Quest, im Duell.
+ * Gibt { card, proceeds, balance } zurück.
+ */
+async function sellFoiled({ user, copyId }) {
+  const docId = foilFavDoc(copyId);
+  if (!docId) throw new UserError('Diese folierte Karte gibt es nicht.');
+  if ((user.tcgProtected || []).includes(copyId)) throw new UserError('Diese folierte Karte ist geschützt. Hebe den Schutz auf, um sie zu verkaufen.');
+  return inTransaction(async (session) => {
+    const doc = await TcgCard.findOne({ _id: docId, user: user._id, foiledAt: { $ne: null } }).select('_id card rarity foiledAt').session(session).lean();
+    if (!doc) throw new UserError('Diese folierte Karte besitzt du nicht (mehr).');
+    const rarity = catalog.rarityByKey[doc.rarity];
+    if (!rarity || rarity.noBank) throw new UserError('Diese Karte kauft die Bank nicht. Du kannst sie im Handel anbieten.');
+    // gesperrt ist ein foliertes Exemplar immer ('folie') – verkaufen nur, wenn es nicht zusätzlich im Handel, auf Quest oder im Duell steckt
+    const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
+    if (reason && reason !== 'folie') throw new UserError('Diese folierte Karte ist gerade im Handel, auf einer Quest oder im Duell und kann nicht verkauft werden.');
+    const res = await TcgCard.deleteOne({ _id: doc._id, user: user._id }, { session });
+    if (res.deletedCount !== 1) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
+    const proceeds = foil.cardValue(rarity.sell, doc.foiledAt);
+    const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { balance: proceeds }, $pull: { tcgFavorites: copyId, tcgProtected: copyId } }, { new: true, session });
+    await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta([{ _id: doc._id, card: doc.card, rarity: doc.rarity }]) }], { session });
+    return { card: catalog.cardById[doc.card] || null, proceeds, balance: updated.balance };
+  });
+}
 
 /**
  * Favoriten und geschützte Karten, die man nicht mehr besitzt (verkauft, getauscht), aus den Listen entfernen.
@@ -391,4 +427,4 @@ async function cardValueCents(userId) {
 }
 
 module.exports = {
-  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };
+  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, sellFoiled, isFoilFav, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, inventory, sellValueExpr, cardValueCents };

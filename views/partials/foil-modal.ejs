@@ -1,17 +1,34 @@
 <%#
   Großansicht folierter Karten (public/js/foil-view.js) – einmal pro Seite einbinden.
-  favForm: true im Album – dann lässt sich die Karte als Favorit zeigen.
+  favForm: true im Album – dann hat die Karte dasselbe Menü wie normale Karten: Wert, Favorit, Schützen und
+    Verkaufen zum Folienwert (Formulare wie im Album-Fenster, Ziel "f:<Exemplar>").
   trade: true in fremden Sammlungen – dann führt "Angebot machen" ins Handelsfenster (data-trade-href).
 %>
 <dialog class="foil-modal" data-foil-modal aria-label="Folierte Karte ansehen">
   <button type="button" class="tcg-close" data-foil-close aria-label="Schließen">×</button>
   <div class="foil-modal-stage" data-foil-stage></div>
   <% if (locals.favForm) { %>
-    <form method="post" action="/tcg/favorit" class="foil-modal-actions" data-foil-fav hidden>
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <input type="hidden" name="card" value="">
-      <button class="btn btn-primary" type="submit">☆ Als Favorit zeigen</button>
-    </form>
+    <div class="foil-modal-menu" data-foil-menu hidden>
+      <p class="tcg-modal-status" data-foil-status></p>
+      <div class="foil-modal-actions">
+        <form method="post" action="/tcg/favorit" data-foil-fav>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit">☆ Als Favorit zeigen</button>
+        </form>
+        <form method="post" action="/tcg/schuetzen" data-foil-protect>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-ghost btn-block" type="submit">Schützen (Schloss)</button>
+        </form>
+        <form method="post" action="/tcg/verkaufen" data-foil-sell>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="card" value="">
+          <button class="btn btn-primary btn-block" type="submit">Verkaufen · <span data-foil-sell-text></span></button>
+        </form>
+        <p class="muted small" data-foil-note hidden></p>
+      </div>
+    </div>
   <% } %>
   <% if (locals.trade) { %>
     <div class="foil-modal-actions" data-foil-trade hidden>

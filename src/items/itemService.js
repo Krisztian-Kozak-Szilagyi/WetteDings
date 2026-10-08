@@ -2,8 +2,8 @@
 // Gegenstands-Arten stehen in ./types.js (neue Art = ein Eintrag dort). Jede Bewegung läuft über addItems/takeItems,
 // die je nach Art (storage 'stueck' / 'stapel') das richtige Modell benutzen und ins ItemLog schreiben –
 // nie direkt Item/ItemStack anfassen.
-// Eine folierte Karte gewinnt mit der Zeit an Wert, kann aber weder an die Bank verkauft noch auf Quests
-// (oder künftige Dungeons) geschickt werden – nur behalten oder im Handel weitergeben (siehe tcg/locks).
+// Eine folierte Karte gewinnt mit der Zeit an Wert und lässt sich nur einzeln (Album, tcgService.sellFoiled) zum Folienwert an die Bank verkaufen. Auf Quests
+// (oder in Dungeons) kann sie nicht, im Handel lässt sie sich weitergeben (siehe tcg/locks).
 const crypto = require('crypto');
 const { Item, ItemStack, ItemLog } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');

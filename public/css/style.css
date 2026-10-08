@@ -5869,3 +5869,12 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 /* Dev-Panel → Pop-ups: Ablaufdatum nur bei „Mit Ablaufdatum“ (ohne :has-Unterstützung bleibt das Feld einfach sichtbar) */
 .popup-form:has(input[name="gueltig"][value="gelesen"]:checked) .popup-expiry { display: none; }
 .popup-log-text { min-width: 220px; max-width: 420px; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Folierte Karte im Album: Menü unter der Karte wie bei normalen Karten – Wert, Favorit, Schützen, Verkaufen (foil-modal.ejs) */
+.foil-modal-menu { width: min(360px, calc(100vw - 32px)); margin: 0 auto; padding: 0 0 24px; text-align: center; }
+.foil-modal-menu[hidden] { display: none; }
+.foil-modal-menu .tcg-modal-status { margin: 0 0 10px; color: var(--color-neutral-300); font-size: 13px; }
+.foil-modal-menu .tcg-modal-status[hidden] { display: none; }
+.foil-modal-menu .foil-modal-actions { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
+.foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
+.foil-modal-menu .foil-modal-actions p { margin: 0; }
