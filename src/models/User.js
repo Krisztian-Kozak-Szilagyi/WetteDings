@@ -6,6 +6,11 @@ const userSchema = new Schema(
     usernameLower: { type: String, required: true, unique: true },
     email: { type: String, required: true, lowercase: true, trim: true, unique: true },
     passwordHash: { type: String, required: true },
+    // Passwort zurücksetzen (Admin-Panel → Team): Hash des Einmal-Codes und sein Ablauf (services/passwordReset.js).
+    // mustChangePassword: nach der Anmeldung mit dem Code ist nur die Seite „Neues Passwort“ erreichbar.
+    resetHash: { type: String, default: null },
+    resetExpires: { type: Date, default: null },
+    mustChangePassword: { type: Boolean, default: false },
     // Kontostand in Cent
     balance: { type: Number, required: true, min: 0 },
     debt: { type: Number, default: 0, min: 0 }, // offene Schulden in Cent (z. B. eSports-Konkurs), getilgt aus jeder Einnahme (debtService)

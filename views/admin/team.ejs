@@ -126,3 +126,50 @@
   </section>
 <% }) %>
 <% } %>
+
+<% if (currentUser.isAdmin) { %>
+<section class="stats-block" id="passwort">
+  <%- blockHead('Passwort zurücksetzen', 'Hat ein Mitglied sein Passwort vergessen, erzeugst du hier einen <strong>Einmal-Code</strong> (24 Stunden gültig) und schickst ihn der Person. Sie meldet sich mit ihrem Namen und dem Code statt des Passworts an und muss sofort ein neues Passwort wählen. Der Code wird nur <strong>einmal</strong> angezeigt; das alte Passwort gilt weiter, bis ein neues gesetzt ist. Ein neuer Code ersetzt den alten.') %>
+  <div class="card">
+    <% if (resetShown) { %>
+      <div class="code-item code-item-single">
+        <div class="code-main">
+          <span>Einmal-Code für <strong><%= resetShown.username %></strong>:</span>
+          <code class="code-value"><%= resetShown.code %></code>
+          <span class="badge badge-offen">Gültig bis <%= date(new Date(resetShown.expiresAt)) %></span>
+        </div>
+        <div class="code-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-copy="<%= resetShown.code %>">Kopieren</button>
+        </div>
+      </div>
+      <p class="muted small">Jetzt kopieren – nach dem Neuladen ist der Code nicht mehr zu sehen.</p>
+    <% } %>
+    <form method="post" data-reauth action="/admin/passwort-reset" class="form panel-inline-form" data-confirm="Für dieses Mitglied einen Einmal-Code erzeugen?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label class="field">
+        <span>Mitglied</span>
+        <select name="user" required>
+          <option value="">– auswählen –</option>
+          <% users.filter((u) => u._id.toString() !== currentUser._id.toString()).forEach((u) => { %><option value="<%= u._id %>"><%= u.username %></option><% }) %>
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Einmal-Code erzeugen</button>
+    </form>
+    <% if (openResets.length) { %>
+      <ul class="code-list">
+        <% openResets.forEach((u) => { %>
+          <li class="code-item code-item-single">
+            <div class="code-main"><strong><%- userLink(u.username, { realName: false }) %></strong> <span class="muted small">Code offen · läuft ab <%= date(u.resetExpires) %></span></div>
+            <div class="code-actions">
+              <form method="post" action="/admin/passwort-reset/<%= u._id %>/zurueckziehen" data-confirm="Den Einmal-Code von <%= u.username %> ungültig machen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-danger btn-sm" type="submit">Zurückziehen</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
+<% } %>
