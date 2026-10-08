@@ -169,7 +169,7 @@ async function migrate() {
 async function grantTestItems() {
   const catalog = require('./tcg/catalog');
   const { copyLimit } = require('./game/deck');
-  const items = catalog.CARDS.filter((c) => c.rarity === 'test-item');
+  const items = catalog.TEST_CARDS;
   if (!items.length || !config.adminUsernames.length) return;
   const admins = await User.find({ usernameLower: { $in: config.adminUsernames } }).select('_id').lean();
   let added = 0;
