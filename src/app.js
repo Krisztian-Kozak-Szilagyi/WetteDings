@@ -22,6 +22,7 @@ const suspicionService = require('./moderation/suspicionService');
 const notifyService = require('./services/notifyService');
 const achievementService = require('./achievements/achievementService');
 const giftService = require('./services/giftService');
+const devMessageService = require('./services/devMessageService');
 const { flash, loadUser, device, dailyBonus, csrf } = require('./middleware');
 
 function createApp() {
@@ -149,6 +150,12 @@ function createApp() {
     if (!req.user) return res.status(401).json({ popup: null });
     res.json({ popup: giftService.popup(await giftService.nextUnseen(req.user._id)) });
   });
+  // Pop-up vom Entwickler-Team (#132)? Gleiches Prinzip – so erscheint eine neue Nachricht auch bei allen, die gerade online sind
+  app.get('/entwickler-nachrichten/neu', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!req.user) return res.status(401).json({ popup: null });
+    res.json({ popup: devMessageService.popup(await devMessageService.nextUnseen(req.user._id)) });
+  });
   app.use(require('./moderation/requestSignals').trackSignals); // Manipulationserkennung: Herkunft und Merkmale jeder Spiel-Aktion
   app.use(require('./moderation/requestSignals').trap); // Manipulationserkennung: unsichtbarer Link als Falle
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
@@ -164,7 +171,7 @@ function createApp() {
   app.use(async (req, res, next) => {
     if (req.user && req.method === 'GET' && require('./stats/activity').isPageRequest(req)) {
       const u = req.user;
-      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, bell, achPopup, giftPopup] = await Promise.all([
+      const [incoming, deals, marketNew, newPacks, newItems, patchNew, votePending, betNew, forumNew, disputes, packLogNew, deviceAlerts, tradeAlerts, suspicionAlerts, bell, achPopup, giftPopup, devPopup] = await Promise.all([
         tradeService.incomingCount(u._id), // Angebote an mich
         tradeService.newDealsCount(u), // abgeschlossene Geschäfte, von denen ich noch nichts weiß
         tradeService.marketNewCount(u), // neue Markt-Angebote seit dem letzten Besuch
@@ -183,6 +190,7 @@ function createApp() {
         notifyService.forBell(u._id), // Glocke
         achievementService.nextUnseen(u._id), // neuer Erfolg: Fenster, bis es mit OK bestätigt ist
         giftService.nextUnseen(u._id).then(giftService.popup), // Geschenk vom Team: Fenster mit Inhalt und Grund
+        devMessageService.nextUnseen(u._id).then(devMessageService.popup), // Nachricht vom Entwickler-Team: Fenster, bis „Gelesen“
       ]);
       Object.assign(res.locals, {
         tradeIncoming: incoming + deals,
@@ -204,10 +212,11 @@ function createApp() {
         bellUnread: bell.unread,
         achPopup,
         giftPopup,
+        devPopup,
       });
-      // Ohne JavaScript führt "Weiter" im Erfolgs-/Geschenk-Fenster auf diese Seite zurück. Das Ziel steht in der
+      // Ohne JavaScript führt "Weiter" im Erfolgs-/Geschenk-/Nachrichten-Fenster auf diese Seite zurück. Das Ziel steht in der
       // Sitzung statt in einem Formularfeld, damit niemand eine fremde Adresse unterschieben kann (CodeQL #74).
-      if ((achPopup || giftPopup) && req.method === 'GET') req.session.popupBack = req.originalUrl;
+      if ((achPopup || giftPopup || devPopup) && req.method === 'GET') req.session.popupBack = req.originalUrl;
     }
     next();
   });

@@ -931,6 +931,73 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   });
 
+  // Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): wie das Geschenk-Fenster. Erscheint bei allen, die gerade
+  // online sind (Abfrage alle 15 Sekunden), sonst beim nächsten Seitenaufruf. Schließt nur mit „Gelesen“ – nicht mit Esc.
+  onReady(function () {
+    var pop = document.querySelector('[data-dev-pop]');
+    if (!pop || !pop.showModal) return;
+    var form = pop.querySelector('[data-dev-form]');
+    var q = function (sel) { return pop.querySelector(sel); };
+    pop.addEventListener('cancel', function (e) { e.preventDefault(); });
+    var otherOpen = function () { return !!document.querySelector('dialog[open]:not([data-dev-pop])'); };
+
+    var fill = function (d) {
+      q('[data-dev-id]').value = d.id;
+      q('[data-dev-title]').textContent = d.title;
+      q('[data-dev-text]').textContent = d.text;
+      q('[data-dev-by]').textContent = d.byName;
+      q('[data-dev-at]').textContent = d.at;
+      var more = q('[data-dev-more]');
+      var left = (d.left || 1) - 1;
+      more.hidden = left < 1;
+      more.textContent = left === 1 ? 'Noch 1 weitere Nachricht wartet.' : 'Noch ' + left + ' weitere Nachrichten warten.';
+      pop.classList.remove('is-fresh');
+      void pop.offsetWidth;
+      pop.classList.add('is-fresh');
+    };
+    var pending = null;
+    var open = function (d) {
+      if (otherOpen()) { pending = d || pending; return; }
+      if (d) fill(d);
+      if (!pop.open) pop.showModal();
+    };
+    var initial = pop.hasAttribute('data-open');
+    // Ein anderes Fenster (Erfolg, Geschenk) wird geschlossen -> wartende Nachricht zeigen
+    document.querySelectorAll('dialog:not([data-dev-pop])').forEach(function (dlg) {
+      dlg.addEventListener('close', function () {
+        setTimeout(function () {
+          if (otherOpen() || pop.open) return; // gleich danach öffnet sich vielleicht schon das nächste Fenster
+          if (initial) { initial = false; open(null); return; }
+          if (pending) { var d = pending; pending = null; open(d); }
+        }, 0);
+      });
+    });
+    if (initial) setTimeout(function () { if (!otherOpen()) { initial = false; open(null); } }, 0);
+
+    var busy = false;
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: new URLSearchParams(new FormData(form)) })
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (res) { if (res.next) fill(res.next); else pop.close(); })
+        .catch(function () { form.submit(); })
+        .then(function () { busy = false; });
+    });
+
+    var poll = function () {
+      if (pop.open || document.hidden) return;
+      fetch('/entwickler-nachrichten/neu', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) { if (res && res.popup) open(res.popup); })
+        .catch(function () {});
+    };
+    setInterval(poll, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  });
+
   // Zeichenzähler für Textfelder: data-count="<id des Zählers>" (Emojis zählen als ein Zeichen)
   document.addEventListener('input', function (e) {
     var el = e.target;

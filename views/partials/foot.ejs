@@ -58,6 +58,22 @@
       <p class="muted small ach-pop-more" data-gift-more<%= gp && gp.left > 1 ? '' : ' hidden' %>><%= gp && gp.left > 1 ? 'Noch ' + (gp.left - 1) + (gp.left - 1 === 1 ? ' weiteres Geschenk wartet.' : ' weitere Geschenke warten.') : '' %></p>
     </dialog>
   <% } %>
+  <%# Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): geht erst mit „Gelesen“ zu, Esc schließt nicht.
+      Ist gerade ein anderes Fenster offen (Erfolg, Geschenk), kommt die Nachricht danach (public/js/app.js). %>
+  <% if (currentUser) { const dp = typeof devPopup !== 'undefined' && devPopup ? devPopup : null; %>
+    <dialog class="dg-loot ach-pop dev-pop" data-dev-pop<%= dp ? ' data-open' : '' %> aria-labelledby="dev-pop-title" aria-describedby="dev-pop-text">
+      <span class="kicker">Nachricht vom Entwickler-Team</span>
+      <h2 id="dev-pop-title" data-dev-title><%= dp ? dp.title : '' %></h2>
+      <p id="dev-pop-text" class="dev-pop-text" data-dev-text><%= dp ? dp.text : '' %></p>
+      <p class="dev-pop-by muted small">– <span data-dev-by><%= dp ? dp.byName : '' %></span>, <span data-dev-at><%= dp ? dp.at : '' %></span></p>
+      <form method="post" action="/entwickler-nachrichten/gesehen" data-dev-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" value="<%= dp ? dp.id : '' %>" data-dev-id>
+        <button class="btn btn-primary ach-pop-ok" type="submit">Gelesen</button>
+      </form>
+      <p class="muted small ach-pop-more" data-dev-more<%= dp && dp.left > 1 ? '' : ' hidden' %>><%= dp && dp.left > 1 ? 'Noch ' + (dp.left - 1) + (dp.left - 1 === 1 ? ' weitere Nachricht wartet.' : ' weitere Nachrichten warten.') : '' %></p>
+    </dialog>
+  <% } %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>
