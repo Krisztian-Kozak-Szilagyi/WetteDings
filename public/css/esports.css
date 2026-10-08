@@ -27,22 +27,26 @@
 /* Teamliste: Name mit Teambild als Link zum Profil */
 .es-team-link { color: inherit; text-decoration: none; }
 .es-team-link:hover strong, a.es-team-link:hover { text-decoration: underline; }
-/* Teamliste als Kartenraster: jede Karte ist der Link zum Teamprofil */
-.es-team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-.es-tc { display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: 12px; color: inherit; text-decoration: none; background: color-mix(in srgb, var(--text) 3%, transparent); box-shadow: 0 0 0 1px var(--color-divider); transition: box-shadow .15s, background .15s; }
+/* Teamliste: je Team eine Zeile über die ganze Breite (nach Platz sortiert), jede Zeile ist der Link zum Teamprofil */
+.es-team-grid { display: flex; flex-direction: column; gap: 12px; }
+.es-tc { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 28px; padding: 14px; border-radius: 12px; color: inherit; text-decoration: none; background: color-mix(in srgb, var(--text) 3%, transparent); box-shadow: 0 0 0 1px var(--color-divider); transition: box-shadow .15s, background .15s; }
 .es-tc:hover { background: color-mix(in srgb, var(--text) 6%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, var(--color-divider)); }
 .es-tc.is-mine { box-shadow: 0 0 0 1px var(--color-accent); }
-.es-tc-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.es-tc-head { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 180px; }
 .es-tc-pic { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; flex: none; }
 .es-tc-pic.es-monogram { font-size: 1.5rem; }
 .es-tc-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .es-tc-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .es-tc-name .es-ticker { margin-left: 0; }
-.es-tc-rank { font-weight: 700; font-size: 1.1rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.es-tc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.es-tc-rank { flex: none; width: 2.2em; text-align: center; font-weight: 700; font-size: 1.25rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.es-tc-stats { display: grid; grid-template-columns: repeat(3, 100px); gap: 8px 16px; margin: 0; }
 .es-tc-stats dt { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); white-space: nowrap; }
 .es-tc-stats dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.es-tc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.es-tc-foot { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 90px; }
+@media (max-width: 640px) {
+  .es-tc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1 1 100%; }
+  .es-tc-foot { flex-direction: row; align-items: center; justify-content: space-between; flex: 1 1 100%; }
+}
 .es-cup-count { font-size: .75rem; color: var(--muted); white-space: nowrap; }
 .es-prizes { margin: 6px 0 4px; padding-left: 16px; gap: 2px !important; }
 

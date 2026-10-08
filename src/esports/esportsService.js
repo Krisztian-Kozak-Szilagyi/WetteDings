@@ -175,7 +175,7 @@ async function towerTeam(userIds, now = Date.now()) {
 /** Profilfelder mit Startwerten – ältere Teams (vor dem Teamprofil gegründet) haben sie nicht, und .lean() füllt nichts auf */
 const withProfile = (t) => ({ ...t, bio: t.bio || '', motto: t.motto || '', color: t.color || null, avatar: t.avatar || null, cosmetics: t.cosmetics || [], trophies: t.trophies || [] });
 
-/** Alle bestehenden Teams für die Übersicht samt Kurs – aufgelöste zeigt die Seite nirgends */
+/** Alle bestehenden Teams für die Übersicht samt Kurs, nach Platz der letzten Woche (ohne Platz zuletzt) – aufgelöste zeigt die Seite nirgends */
 async function list() {
   const teams = await EsportsTeam.find({ status: { $in: LIVE } }).lean();
   const order = { aktiv: 0, eingefroren: 1, offen: 2, aufgeloest: 3 };
@@ -184,7 +184,7 @@ async function list() {
       const e = LISTED.includes(t.status) ? markets.get(t.ticker) : null;
       return { ...withProfile(t), price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
     })
-    .sort((a, b) => order[a.status] - order[b.status] || (a.lastRank ?? 999) - (b.lastRank ?? 999) || a.createdAt - b.createdAt);
+    .sort((a, b) => (a.lastRank ?? 999) - (b.lastRank ?? 999) || order[a.status] - order[b.status] || a.createdAt - b.createdAt);
 }
 
 /** Team zum Kürzel (aus der Adresse) für das Profil – aufgelöste gibt es nicht mehr */
