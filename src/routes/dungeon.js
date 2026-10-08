@@ -9,6 +9,7 @@ const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
 const cardBans = require('../tcg/cardBans');
+const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
 
 const router = express.Router();
 
@@ -93,6 +94,12 @@ router.get('/dungeon', async (req, res) => {
   // Kartenauswahl in der Lobby (eigene Dungeon-Karten zählen als frei); vor dem Beitritt nur für die Start-Kacheln
   const mine = party ? party.members.find((m) => same(m.user, me)) : null;
   const cards = phase === 'laeuft' ? null : await dungeon.availableCards(me, { ownDungeon: !!party, mode: dungeon.modeOf(party) });
+  // Favoriten oben; ohne Favoriten ein Knopf mit den am häufigsten gespielten Karten (je Modus)
+  let shortcuts = null;
+  if (cards && party) {
+    const usage = await usedCards(me, dungeon.modeOf(party));
+    shortcuts = { card: pickShortcuts(cards.characters, req.user.tcgFavorites, usage.card), boost: pickShortcuts(cards.boosts, req.user.tcgFavorites, usage.boost) };
+  }
   // Start-Kacheln (wie "Zum Album"): eigene Charaktere als Fächer, fehlende als graue Beispielkarten
   const samples = catalog.CARDS.filter((c) => c.isCharacter && !(catalog.rarityByKey[c.rarity] || {}).hidden);
   const fanOf = (n) => {
@@ -145,6 +152,7 @@ router.get('/dungeon', async (req, res) => {
     playback: running && runDungeon ? playback(running, runDungeon, now) : null,
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
+    shortcuts,
     startFans,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
     loot,

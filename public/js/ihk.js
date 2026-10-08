@@ -541,8 +541,17 @@
   var empty = pick.querySelector('[data-ihk-empty]');
   var boostHead = pick.querySelector('[data-ihk-boost-head]');
   var rarity = 'all';
+  // Favoriten stehen fest oben; „Häufig verwendet“ (nur ohne Favoriten) holt die meistgespielten Karten per CSS nach vorn
+  var groups = Array.prototype.slice.call(pick.querySelectorAll('[data-pick-group]'));
+  var freqBtn = pick.querySelector('[data-ihk-freq]');
+  var freqOn = false;
   function apply() {
     var q = search ? search.value.trim().toLowerCase() : '';
+    groups.forEach(function (g) {
+      var kind = g.getAttribute('data-pick-group');
+      var hasFavs = !!g.parentNode.querySelector('[data-fav]');
+      g.hidden = !!(q || rarity !== 'all') || (kind === 'freq' && !freqOn) || (kind === 'rest' && !hasFavs && !freqOn);
+    });
     var shownCards = 0;
     var shownBoosts = 0;
     cards.forEach(function (c) {
@@ -564,4 +573,12 @@
     });
   });
   if (search) search.addEventListener('input', apply);
+  if (freqBtn) {
+    freqBtn.addEventListener('click', function () {
+      freqOn = !freqOn;
+      pick.classList.toggle('show-freq', freqOn);
+      freqBtn.setAttribute('aria-pressed', freqOn ? 'true' : 'false');
+      apply();
+    });
+  }
 })();

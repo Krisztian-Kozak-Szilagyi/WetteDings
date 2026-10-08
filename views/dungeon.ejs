@@ -267,10 +267,12 @@
     Ein Klick auf eine Karte übernimmt sie sofort (public/js/dungeon.js) – kein Bestätigen.
     --i: Reihenfolge für das Hereinfächern beim Öffnen %>
 <% let dgBarNo = 0; %>
-<% const pickList = (kind, list, sel) => { const rars = [...new Set(list.map((c) => c.rarity))].sort((a, b) => rarityByKey[a].rank - rarityByKey[b].rank); %>
+<%# Favoriten (tcgFavorites) stehen oben; ohne Favoriten gibt es den Knopf „Häufig verwendet“ (src/lib/pickShortcuts.js) %>
+<% const pickList = (kind, list, sel) => { const sc = shortcuts && shortcuts[kind] ? shortcuts[kind] : { list, favs: new Set(), freq: new Map() }; list = sc.list; const rars = [...new Set(list.map((c) => c.rarity))].sort((a, b) => rarityByKey[a].rank - rarityByKey[b].rank); const favCount = sc.favs.size; %>
   <div class="dg-picklist" data-dg-picklist>
     <% if (list.length) { %>
       <div class="dg-pick-head">
+        <% if (sc.freq.size) { %><button type="button" class="btn btn-ghost btn-sm pick-freq-btn" data-dg-freq aria-pressed="false">Häufig verwendet</button><% } %>
         <%# Suchen + Seltenheit (partials/mkt-bar); Zahl = wählbare Karten dieser Seltenheit %>
         <%- include('partials/mkt-bar', { name: 'dg-' + kind + '-' + (++dgBarNo), placeholder: (kind === 'card' ? 'Charakter' : 'Boost-Karte') + ' suchen', searchAttr: 'dg-search', groups: [{ attr: 'dg-rar', all: '', allCount: list.length, opts: Object.values(rarityByKey).filter((r) => !r.hidden || rars.includes(r.key)).sort((a, b) => a.rank - b.rank).map((r) => ({ key: r.key, label: r.label, count: list.filter((c) => c.rarity === r.key).length })) }] }) %>
       </div>
@@ -278,14 +280,16 @@
     <div class="dg-pick-grid" data-dg-grid>
       <% if (kind === 'boost') { %>
         <%# "Ohne Boost" steht vorn – nur ohne Suche und Filter %>
-        <label class="dg-pick dg-pick-none" data-dg-none style="--i: 0">
+        <label class="dg-pick dg-pick-none" data-dg-none style="--i: 0; order: -300">
           <input type="radio" name="boost" value="" <%= !sel || !sel.boost ? 'checked' : '' %>>
           <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
         </label>
       <% } %>
-      <% list.forEach((c, i) => { const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); %>
+      <% if (favCount) { %><h3 class="pick-group" data-pick-group="fav">★ Favoriten</h3><% } %>
+      <% if (sc.freq.size) { %><h3 class="pick-group" data-pick-group="freq" style="order: -101" hidden>Häufig verwendet</h3><% } %>
+      <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); %>
         <%# Gesperrte Karten (Kartensperren): sichtbar, aber nicht wählbar %>
-        <label class="dg-pick r-<%= c.rarity %><%= banned || taken ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned || taken ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>" title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %>">
+        <label class="dg-pick r-<%= c.rarity %><%= banned || taken ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned || taken ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %> title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
           <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= banned || taken ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
           <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } %>

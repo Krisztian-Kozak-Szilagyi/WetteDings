@@ -314,7 +314,7 @@
       const grid = dlg.querySelector('[data-dg-grid]');
       dlg.style.minHeight = '';
       if (!grid) return;
-      const first = [...grid.children].find((el) => !el.hidden);
+      const first = [...grid.children].find((el) => !el.hidden && el.matches('[data-dg-item]'));
       if (first) {
         const cs = getComputedStyle(grid);
         const gap = parseFloat(cs.rowGap) || 0;
@@ -435,9 +435,18 @@
     const search = box.querySelector('[data-dg-search]');
     const chips = [...box.querySelectorAll('[data-dg-rar]')];
     const empty = box.querySelector('[data-dg-empty]');
+    // Favoriten stehen fest oben; „Häufig verwendet“ (nur ohne Favoriten) holt die meistgespielten Karten per CSS nach vorn
+    const groups = [...box.querySelectorAll('[data-pick-group]')];
+    const freqBtn = box.querySelector('[data-dg-freq]');
+    const hasFavs = !!box.querySelector('[data-fav]');
     let rarity = '';
+    let freqOn = false;
     function render() {
       const q = search ? search.value.trim().toLowerCase() : '';
+      groups.forEach((g) => {
+        const kind = g.dataset.pickGroup;
+        g.hidden = !!(q || rarity) || (kind === 'freq' && !freqOn) || (kind === 'rest' && !hasFavs && !freqOn);
+      });
       let shown = 0;
       items.forEach((it) => {
         it.hidden = !((!rarity || it.dataset.rarity === rarity) && (!q || it.dataset.name.includes(q)));
@@ -450,6 +459,13 @@
     }
     grid.addEventListener('scroll', () => fadeEdges(grid), { passive: true });
     if (search) search.addEventListener('input', render);
+    if (freqBtn)
+      freqBtn.addEventListener('click', () => {
+        freqOn = !freqOn;
+        box.classList.toggle('show-freq', freqOn);
+        freqBtn.setAttribute('aria-pressed', freqOn ? 'true' : 'false');
+        render();
+      });
     chips.forEach((chip) =>
       chip.addEventListener('click', () => {
         rarity = chip.dataset.dgRar;
