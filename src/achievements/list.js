@@ -7,7 +7,7 @@ const Position = require('../models/Position');
 const Bet = require('../models/Bet');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { TcgOpening } = require('../models/Tcg');
+const { TcgOpening, TcgCard } = require('../models/Tcg');
 const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const { LotteryRound } = require('../models/Lottery');
@@ -22,6 +22,9 @@ async function countAtLeast(model, match, min, by = '$user') {
   const rows = await model.aggregate([{ $match: match }, { $group: { _id: by, n: { $sum: 1 } } }, { $match: { _id: { $ne: null }, n: { $gte: min } } }]);
   return rows.map((r) => r._id);
 }
+
+/** Karten, die im Album zählen: sichtbare Seltenheiten (wie views/tcg-album.ejs) */
+const albumCardIds = () => catalog.CARDS.filter((c) => !(catalog.rarityByKey[c.rarity] || {}).hidden).map((c) => c.id);
 
 const won = { payout: { $ne: null }, $expr: { $gt: ['$payout', '$amount'] } };
 
@@ -107,6 +110,14 @@ const ACHIEVEMENTS = [
 
   // ---- Lotterie & Broker ----
   {
+    key: 'erster-lottogewinn',
+    name: 'Erster Lotteriegewinn',
+    text: 'Gewinne zum ersten Mal eine Ziehung der Lotterie (täglich, wöchentlich oder monatlich) mit mindestens zwei Teilnehmern.',
+    icon: { glyph: 'ticket', tone: 'gold', frame: 'bronze' },
+    // allein gekaufte Lose zählen nicht – sonst wäre es ein gekaufter Erfolg
+    holders: () => LotteryRound.distinct('winner', { winner: { $ne: null }, participants: { $gte: 2 } }),
+  },
+  {
     key: 'glueckspilz',
     name: 'Glückspilz',
     text: 'Gewinne eine Ziehung der Lotterie mit mindestens drei Teilnehmern.',
@@ -130,6 +141,13 @@ const ACHIEVEMENTS = [
 
   // ---- TCG ----
   {
+    key: 'erste-holo',
+    name: 'Erste Holo',
+    text: 'Ziehe eine Holo-Karte oder etwas noch Selteneres aus einem Booster Pack.',
+    icon: { glyph: 'holo', tone: 'blue', frame: 'bronze' },
+    holders: () => TcgOpening.distinct('user', { best: { $gte: catalog.RARITIES.findIndex((r) => r.key === 'holo') } }),
+  },
+  {
     key: 'glitch',
     name: 'Glitch in der Matrix',
     text: 'Ziehe eine Glitch-Karte oder etwas noch Selteneres aus einem Booster Pack.',
@@ -147,6 +165,23 @@ const ACHIEVEMENTS = [
       const half = Math.ceil(ids.length / 2);
       if (!half) return [];
       return User.distinct('_id', { deletedAt: null, $expr: { $gte: [{ $size: { $setIntersection: [{ $ifNull: ['$tcgLooted', []] }, ids] } }, half] } });
+    },
+  },
+  {
+    key: 'album-komplett',
+    name: 'Album komplett',
+    text: 'Besitze gleichzeitig jede Karte des Albums – mindestens ein Exemplar von allen.',
+    icon: { glyph: 'album', tone: 'gold', frame: 'gold' },
+    // wie im Album gezählt: alle sichtbaren, erhältlichen Karten (ohne geheime, Test- und noch nicht erschienene Karten)
+    holders: async () => {
+      const ids = albumCardIds();
+      if (!ids.length) return [];
+      const rows = await TcgCard.aggregate([
+        { $match: { card: { $in: ids } } },
+        { $group: { _id: '$user', cards: { $addToSet: '$card' } } },
+        { $match: { $expr: { $gte: [{ $size: '$cards' }, ids.length] } } },
+      ]);
+      return rows.map((r) => r._id);
     },
   },
   {
@@ -182,6 +217,39 @@ const ACHIEVEMENTS = [
     icon: { glyph: 'loupe', tone: 'silver', frame: 'bronze' },
     holders: () => countAtLeast(GradingJob, { status: 'fertig', $expr: { $eq: ['$guess', '$grade'] } }, 10),
   },
+  {
+    key: 'grading-profi',
+    name: 'Grading-Profi',
+    text: 'Triff im Grading-Shop 50-mal genau die richtige Note.',
+    icon: { glyph: 'loupe50', tone: 'gold', frame: 'gold' },
+    holders: () => countAtLeast(GradingJob, { status: 'fertig', $expr: { $eq: ['$guess', '$grade'] } }, 50),
+  },
+  {
+    key: 'energy',
+    name: 'Attack your hearth, before it attacks you',
+    text: 'Setze 50-mal BFW Energy ein – in IHK-Quests, im Dungeon oder im Mage Tower, egal wo.',
+    icon: { glyph: 'can', tone: 'green', frame: 'silver' },
+    // jeder abgeschlossene Lauf, in dem eine BFW-Energy-Karte als Charakter oder Boost dabei war, zählt einmal
+    holders: async () => {
+      const ids = catalog.CARDS.filter((c) => c.name === 'BFW Energy').map((c) => c.id);
+      if (!ids.length) return [];
+      const [ihk, dungeon] = await Promise.all([
+        IhkRun.aggregate([
+          { $match: { status: 'fertig', $or: [{ card: { $in: ids } }, { boost: { $in: ids } }, { boost2: { $in: ids } }] } },
+          { $group: { _id: '$user', n: { $sum: 1 } } },
+        ]),
+        DungeonRun.aggregate([
+          { $match: { status: 'fertig' } },
+          { $unwind: '$members' },
+          { $match: { 'members.user': { $ne: null }, $or: [{ 'members.card': { $in: ids } }, { 'members.boost': { $in: ids } }] } },
+          { $group: { _id: '$members.user', n: { $sum: 1 } } },
+        ]),
+      ]);
+      const total = new Map();
+      for (const r of [...ihk, ...dungeon]) if (r._id) total.set(String(r._id), (total.get(String(r._id)) || 0) + r.n);
+      return [...total].filter(([, n]) => n >= 50).map(([id]) => id);
+    },
+  },
 
   // ---- Rangliste & Dungeon ----
   {
@@ -190,6 +258,22 @@ const ACHIEVEMENTS = [
     text: 'Stehe insgesamt 24 Stunden auf Platz 1 der Rangliste.',
     icon: { glyph: 'hourglass', tone: 'gold', frame: 'gold' },
     holders: () => User.distinct('_id', { deletedAt: null, top1Seconds: { $gte: 24 * 60 * 60 } }),
+  },
+  {
+    key: 'dungeon-10',
+    name: '10 Dungeons geschafft',
+    text: 'Schließe 10 Dungeon-Läufe erfolgreich ab (der Mage Tower zählt nicht).',
+    icon: { glyph: 'gate', tone: 'red', frame: 'silver' },
+    holders: async () => {
+      const rows = await DungeonRun.aggregate([
+        { $match: { mode: { $ne: 'tower' }, status: 'fertig', success: true } },
+        { $unwind: '$members' },
+        { $match: { 'members.user': { $ne: null } } },
+        { $group: { _id: '$members.user', n: { $sum: 1 } } },
+        { $match: { n: { $gte: 10 } } },
+      ]);
+      return rows.map((r) => r._id);
+    },
   },
   {
     key: 'st-ivan',

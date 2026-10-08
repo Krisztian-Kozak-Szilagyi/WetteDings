@@ -104,6 +104,36 @@ const GLYPHS = {
     '<path d="M40 34 H88 M40 96 H88" stroke="S" stroke-width="7" stroke-linecap="round"/>' +
     '<path d="M46 36 C46 56 61 59 61 65 C61 71 46 74 46 94 H82 C82 74 67 71 67 65 C67 59 82 56 82 36Z" fill="none" stroke="S" stroke-width="4"/>' +
     '<path d="M51 91 Q64 74 77 91Z M54 44 H74 Q64 57 54 44Z" fill="F"/><path d="M64 60 V80" stroke="F" stroke-width="2" stroke-dasharray="3 3"/>',
+  // Karte mit Regenbogen-Schimmer
+  holo:
+    '<rect x="42" y="30" width="44" height="64" rx="6" fill="F"/>' +
+    '<g opacity=".8"><path d="M46 62 L70 34 H78 L46 72Z" fill="#ff4fd8"/><path d="M46 76 L80 36 V44 L50 84 H46Z" fill="#45d9ff"/><path d="M58 90 L82 62 V70 L66 90Z" fill="#fde047"/></g>' +
+    '<rect x="42" y="30" width="44" height="64" rx="6" fill="none" stroke="D" stroke-width="2" opacity=".5"/>',
+  // Los mit Lochrand und Stern
+  ticket:
+    '<path d="M28 46 H100 V56 a8 8 0 0 0 0 16 V82 H28 V72 a8 8 0 0 0 0 -16Z" fill="F"/>' +
+    '<path d="M48 48 V80" stroke="D" stroke-width="2" stroke-dasharray="4 3" opacity=".6"/>' +
+    '<path d="M74 52 l3.4 7 7.6 1 -5.5 5.3 1.4 7.6 -6.9 -3.7 -6.9 3.7 1.4 -7.6 -5.5 -5.3 7.6 -1z" fill="D"/>',
+  // aufgeschlagenes Album mit Haken
+  album:
+    '<path d="M64 40 C54 33 40 32 28 34 V90 C40 88 54 89 64 96 C74 89 88 88 100 90 V34 C88 32 74 33 64 40Z" fill="F"/>' +
+    '<path d="M64 40 V96" stroke="D" stroke-width="2" opacity=".5"/>' +
+    '<g fill="D" opacity=".35"><rect x="35" y="44" width="10" height="14" rx="1.5"/><rect x="48" y="44" width="10" height="14" rx="1.5"/><rect x="35" y="63" width="10" height="14" rx="1.5"/><rect x="48" y="63" width="10" height="14" rx="1.5"/></g>' +
+    '<path d="M72 64 l7 7 l14 -16" stroke="D" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  loupe50:
+    '<circle cx="57" cy="57" r="23" fill="none" stroke="S" stroke-width="7"/><path d="M74 74 L96 96" stroke="S" stroke-width="11" stroke-linecap="round"/>' +
+    '<text x="57" y="65" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="22" fill="F">50</text>',
+  // Dungeon-Tor mit Fallgitter und „10“
+  gate:
+    '<path d="M32 98 V54 a32 32 0 0 1 64 0 V98Z" fill="F"/>' +
+    '<path d="M42 98 V56 a22 22 0 0 1 44 0 V98Z" fill="D"/>' +
+    '<g stroke="S" stroke-width="3" opacity=".75"><path d="M50 40 V98 M64 34 V98 M78 40 V98 M42 62 H86 M42 80 H86"/></g>' +
+    '<text x="64" y="76" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="20" fill="F" stroke="#171826" stroke-width="3" paint-order="stroke">10</text>',
+  // Energydrink-Dose mit Blitz
+  can:
+    '<rect x="44" y="30" width="40" height="68" rx="7" fill="F"/>' +
+    '<path d="M48 30 H80 M48 98 H80" stroke="D" stroke-width="3" opacity=".45"/><rect x="56" y="24" width="16" height="6" rx="2" fill="F"/>' +
+    '<path d="M68 40 L54 66 H63 L57 88 L75 58 H66 L72 40Z" fill="D"/>',
   secret: '<text x="64" y="84" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="58" fill="F">?</text>',
   halo:
     '<path d="M42 34 a22 7 0 0 1 36 -5" fill="none" stroke="S" stroke-width="4" stroke-linecap="round"/>' +
