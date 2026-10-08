@@ -1728,6 +1728,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 }
 .tcg-flip.flipped .tcg-new-badge { display: inline-block; }
 .tcg-in-exam { cursor: var(--cur-no); }
+button.tcg-in-exam { cursor: var(--cur-zoom-in); } /* im Album trotzdem öffnen: ansehen, schützen, Favorit */
 .tcg-in-exam img { filter: grayscale(1) brightness(.75); }
 .tcg-exam-badge {
   position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); white-space: nowrap;

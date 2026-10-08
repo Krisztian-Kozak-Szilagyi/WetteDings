@@ -3,7 +3,8 @@
   // mode: 'album' – Zoom-Dialog mit Verkaufen/Schützen/Favorit (public/js/tcg.js)
   //       'view'  – nur ansehen; mit linkFor(cardId) öffnet ein Klick die Großansicht mit "Angebot machen"
   // showMissing: fehlende Karten als "?" zeigen (Standard: ja)
-  // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten sind nicht anklickbar
+  // lockedByCard: gesperrte Exemplare; ganz gesperrte Karten tragen ein Schild (z. B. „Auf Quest“). Im Album lassen sie sich
+  //   trotzdem öffnen (ansehen, schützen, Favorit) – nur Verkaufen fehlt, weil kein freies Exemplar da ist.
   // c.unreleased: noch nicht erhältliche Karte – immer "?", Seltenheit verdeckt
   // seenIds: schon einmal besessene Karten – fehlen sie, werden sie grau statt als "?" gezeigt
   // data-album-card: eigene Karten (auch gesperrte) – Sprungziel für /tcg/album#karte-<id> (public/js/tcg.js)
@@ -28,10 +29,10 @@
   <% cards.forEach((c, idx) => { const r = rarityByKey[c.rarity]; %>
     <% const foiledN = foiledBy[c.id] || (foiledCopies[c.id] || []).length; const n = Math.max(0, (counts[c.id] || 0) - foiledN); %>
     <% if (!n && !showMissing && !(foiledCopies[c.id] || []).length) return; %>
-    <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : lk && lk.reason === 'duell' ? 'Im Duell' : 'Auf Quest'; %>
-    <% const freeN = n - lockedPlain; %>
+    <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : lk && lk.reason === 'duell' ? 'Im Duell' : lk && lk.reason === 'dungeon' ? 'Im Dungeon' : 'Auf Quest'; %>
+    <% const freeN = n - lockedPlain; const allLocked = n > 0 && freeN <= 0; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
-    <% if (n && freeN <= 0) { %>
+    <% if (allLocked && !isAlbum) { %>
       <div class="tcg-slot tcg-in-exam r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)">
         <span class="tcg-art">
           <img src="<%= c.image %>" alt="<%= c.name %>, <%= r.label %> – <%= lockLabel %>" loading="lazy" width="720" height="1008">
@@ -50,16 +51,20 @@
               <% if (fav) { %><span class="tcg-mark tcg-mark-fav" title="Favorit"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="m12 2 3 6.6 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.2l1.4-7L2 9.4l7-.8L12 2Z"/></svg></span><% } %>
             </span>
           <% } %>
+          <% if (allLocked) { %><span class="tcg-exam-badge"><%= lockLabel %></span><% } %>
           <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
         </span>
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
       <% } %>
       <% if (isAlbum) { %>
-        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
+        <%# data-count = freie Exemplare (Verkaufen), data-locked = gesperrte (Anzeige im Fenster, z. B. „1× Auf Quest“) %>
+        <button type="button" class="tcg-slot<%= allLocked ? ' tcg-in-exam' : '' %> r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
           data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
-          data-image="<%= c.image %>" data-count="<%= freeN %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
+          data-image="<%= c.image %>" data-count="<%= Math.max(0, freeN) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
           data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>"
-          aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">
+          <% if (lockedPlain) { %>data-locked="<%= lockedPlain %>" data-lock-label="<%= lockLabel %>"<% } %>
+          <% if (allLocked) { %>title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)"<% } %>
+          aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= lockedPlain ? ', ' + lockedPlain + ' davon ' + lockLabel : '' %><%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">
           <% inner() %>
         </button>
       <% } else if (locals.linkFor) { %>
