@@ -29,7 +29,7 @@ const avatars = require('../profile/avatars');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { DungeonRun } = require('../models/Dungeon');
 const { CoinHolding, CoinTrade } = require('../models/Coin');
-const { ForumCategory } = require('../models/Forum');
+const { ForumCategory, ForumThread } = require('../models/Forum');
 const { inTransaction } = require('../services/betService');
 const debts = require('../services/debtService');
 const { notify } = require('../services/notifyService');
@@ -138,6 +138,7 @@ const prizeList = () => league.PLACES.map((p, i) => ({ ...p, ...settings.prizes[
 /** Beim Serverstart (nach markets.start): Forum-Verfasser und die Engines aller gehandelten Teams */
 async function start() {
   await registerAuthors();
+  await removeClosedCategories();
   await trimTeams();
   const teams = await EsportsTeam.find({ status: { $in: LISTED } }).lean();
   for (const t of teams) {
@@ -174,9 +175,9 @@ async function towerTeam(userIds, now = Date.now()) {
 /** Profilfelder mit Startwerten – ältere Teams (vor dem Teamprofil gegründet) haben sie nicht, und .lean() füllt nichts auf */
 const withProfile = (t) => ({ ...t, bio: t.bio || '', motto: t.motto || '', color: t.color || null, avatar: t.avatar || null, cosmetics: t.cosmetics || [], trophies: t.trophies || [] });
 
-/** Alle Teams für die Übersicht (aufgelöste zuletzt) samt Kurs */
+/** Alle bestehenden Teams für die Übersicht samt Kurs – aufgelöste zeigt die Seite nirgends */
 async function list() {
-  const teams = await EsportsTeam.find({}).sort({ status: 1, lastRank: 1, createdAt: 1 }).lean();
+  const teams = await EsportsTeam.find({ status: { $in: LIVE } }).lean();
   const order = { aktiv: 0, eingefroren: 1, offen: 2, aufgeloest: 3 };
   return teams
     .map((t) => {
@@ -186,11 +187,11 @@ async function list() {
     .sort((a, b) => order[a.status] - order[b.status] || (a.lastRank ?? 999) - (b.lastRank ?? 999) || a.createdAt - b.createdAt);
 }
 
-/** Team zum Kürzel (aus der Adresse) – auch aufgelöste, für das Profil */
+/** Team zum Kürzel (aus der Adresse) für das Profil – aufgelöste gibt es nicht mehr */
 async function byTicker(raw) {
   const ticker = league.cleanTicker(raw);
   if (!ticker) return null;
-  const t = await EsportsTeam.findOne({ ticker }).lean();
+  const t = await EsportsTeam.findOne({ ticker, status: { $in: LIVE } }).lean();
   if (!t) return null;
   const e = LISTED.includes(t.status) ? markets.get(t.ticker) : null;
   return { ...withProfile(t), price: e && e.isRunning() ? e.getPrice() : null, path: e ? `/broker/${t.ticker.toLowerCase()}` : null };
@@ -482,11 +483,26 @@ async function close(team, { reason }) {
   if (!done) return null;
   frozen.delete(team.ticker);
   await markets.remove(team.ticker);
-  if (team.category) await ForumCategory.updateOne({ _id: team.category }, { $set: { title: `${team.name} (aufgelöst)` } }).catch(() => {});
+  await removeCategory(done).catch((err) => console.error(`eSports-Forum ${team.ticker}:`, err.message));
   const text = reason === 'konkurs' ? `„${team.name}“ ist in Konkurs gegangen.` : `„${team.name}“ hat sich aufgelöst.`;
   if (holders.length) await notify(holders.map((h) => h.user), { area: 'Broker', href: '/broker', text: `${text} Deine Anteile wurden zum letzten Kurs ausgezahlt.` });
   if (reason === 'konkurs') await notify(done.members.map((m) => m.user), { area: 'eSports', href: '/esports', text: `${text} Jedes Mitglied zahlt ${euroText(league.BANKRUPT_FEE)} €.` });
   return done;
+}
+
+/** Forum-Unterbereich eines aufgelösten Teams samt Themen entfernen (wie „Bereich löschen“ im Forum) */
+async function removeCategory(team) {
+  const cat = team.category || (await ForumCategory.findOne({ key: categoryKey(team) }).select('_id').lean())?._id;
+  if (!cat) return;
+  await ForumCategory.deleteOne({ _id: cat });
+  await ForumThread.updateMany({ category: cat, deleted: false }, { $set: { deleted: true } });
+  await EsportsTeam.updateOne({ _id: team._id }, { $set: { category: null } });
+}
+
+/** Beim Start: Forum-Bereiche schon aufgelöster Teams entfernen (früher blieben sie als „(aufgelöst)“ stehen) */
+async function removeClosedCategories() {
+  const closed = await EsportsTeam.find({ status: 'aufgeloest' }).select('_id category').lean();
+  for (const t of closed) await removeCategory(t).catch((err) => console.error('eSports-Forum:', err.message));
 }
 
 /** Job: eingefrorene Teams nach FREEZE_DAYS in den Konkurs schicken */
