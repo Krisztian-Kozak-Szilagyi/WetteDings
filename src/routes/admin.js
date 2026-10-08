@@ -24,6 +24,8 @@ const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const giftService = require('../services/giftService');
+const devMessageService = require('../services/devMessageService');
+const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const foil = require('../items/foil');
 const lotteryService = require('../services/lotteryService');
 const taxService = require('../services/taxService');
@@ -47,6 +49,7 @@ const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
+  { key: 'popups', label: 'Pop-ups', icon: 'message', description: 'Nachrichten, die allen Mitgliedern als Fenster erscheinen, bis sie gelesen sind.' },
   { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
   { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
@@ -143,7 +146,7 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log, devMessages] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
@@ -156,6 +159,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
     needs('protokolle') && !(player.q && !player.user) ? logs.loadLog(req.query, { player: player.user, seenAt: me.suspiciousSeenAt }) : null,
+    needs('popups') ? devMessageService.list() : [],
   ]);
   // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
   const newSuspicious = log && log.key === 'handel' ? counts.suspicious : 0;
@@ -205,6 +209,11 @@ router.get('/admin', requireStaff, async (req, res) => {
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     reasonMin: giftService.REASON_MIN,
     reasonMax: giftService.REASON_MAX,
+    // Pop-ups (#132): Nachrichten mit Lesestand; Ablaufdatum frühestens jetzt (deutsche Zeit, für datetime-local)
+    devMessages,
+    popupSent: needs('popups') && takeOnce(req.session, 'popupSent'),
+    devMessageLimits: { titleMax: devMessageService.TITLE_MAX, textMin: devMessageService.TEXT_MIN, textMax: devMessageService.TEXT_MAX },
+    devMessageMinExpiry: toZonedLocalInput(new Date(Date.now() + 5 * 60000), config.timezone),
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
@@ -491,6 +500,40 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
     req.flash('error', err.message);
   }
   res.redirect(subUrl('spielwerte', 'dungeon'));
+});
+
+// ---------- Pop-ups (#132): Nachricht an alle Mitglieder, erscheint als Fenster bis „Gelesen“ ----------
+/** Merker aus der Sitzung lesen und gleich löschen (nur einmal anzeigen) */
+function takeOnce(session, key) {
+  const v = !!session[key];
+  delete session[key];
+  return v;
+}
+const POPUP_URL = panelUrl('popups');
+router.post('/admin/popups', requireStaff, requireReauth(POPUP_URL), async (req, res) => {
+  // Gültigkeit: bis gelesen (kein Ablauf) oder mit Ablaufdatum (deutsche Zeit aus datetime-local)
+  const withExpiry = str(req.body.gueltig) === 'ablauf';
+  const expiresAt = withExpiry ? parseZonedLocal(str(req.body.expiresAt), config.timezone) || new Date(NaN) : null;
+  try {
+    await devMessageService.create({ title: req.body.title, text: req.body.text, expiresAt, author: req.user });
+    // Statt des normalen Hinweises oben: kurze Bestätigung unten, die nach 3 Sekunden verschwindet (views/admin/popups.ejs)
+    req.session.popupSent = true;
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(POPUP_URL);
+});
+
+router.post('/admin/popups/beenden', requireStaff, async (req, res) => {
+  try {
+    await devMessageService.end({ id: str(req.body.id), author: req.user });
+    req.flash('success', 'Pop-up beendet – es erscheint niemandem mehr.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(POPUP_URL);
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
