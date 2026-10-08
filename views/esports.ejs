@@ -106,9 +106,9 @@
           <% live.forEach((t) => { const pic = t.avatar; %>
             <a class="es-tc<%= mine && String(mine._id) === String(t._id) ? ' is-mine' : '' %>" href="<%= teamHref(t) %>">
               <div class="es-tc-head">
+                <span class="es-tc-rank" title="Platz in der letzten Woche"><%= t.lastRank ? t.lastRank + '.' : '–' %></span>
                 <% if (pic) { %><img class="es-tc-pic" src="<%= avatarUrl({ avatar: t.avatar }) %>?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy"><% } else { %><span class="es-tc-pic es-monogram<%= rules.findColor(t.color) ? ' es-color-' + t.color : '' %>" aria-hidden="true"><%= Array.from(t.name)[0].toUpperCase() %></span><% } %>
                 <span class="es-tc-name"><strong><%= t.name %></strong><span class="es-ticker"><%= t.ticker %></span></span>
-                <% if (t.lastRank) { %><span class="es-tc-rank" title="Platz in der letzten Woche"><%= t.lastRank %>.</span><% } %>
               </div>
               <dl class="es-tc-stats">
                 <div><dt>Kurs</dt><dd><%= t.price !== null ? coinPrice(t.price) : '–' %></dd></div>
