@@ -303,16 +303,8 @@
   <h2>Datenschutz</h2>
   <p class="muted">Was über dich gespeichert wird und was andere sehen, steht in der <a href="/datenschutz">Datenschutzerklärung</a>.</p>
 
-  <h3>Support-Chat</h3>
-  <% if (currentUser.supportConsentAt) { %>
-    <p>Du hast am <%= date(currentUser.supportConsentAt) %> eingewilligt, dass deine Chat-Nachrichten an den KI-Dienst Groq (USA) übermittelt werden.</p>
-    <form method="post" action="/konto/support-einwilligung/widerrufen">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn btn-ghost btn-sm" type="submit">Einwilligung widerrufen</button>
-    </form>
-  <% } else { %>
-    <p class="muted">Du hast der Übermittlung von Chat-Nachrichten an den KI-Dienst nicht zugestimmt. Der Support-Chat fragt dich danach, bevor du ihn nutzen kannst.</p>
-  <% } %>
+  <h3>Chat</h3>
+  <p class="muted">Chat-Nachrichten werden nach 180 Tagen automatisch gelöscht. Mitglieder blockierst und gibst du direkt im Chat frei (unten rechts).</p>
 
   <h3>Konto löschen</h3>
   <% if (currentUser.isAdmin) { %>

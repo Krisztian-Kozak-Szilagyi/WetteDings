@@ -92,7 +92,6 @@ function createApp() {
       return fx ? ` cos-fx cos-fx-${fx}` : '';
     },
     lotteryTime: config.lotteryTime,
-    supportEnabled: Boolean(config.groqApiKey),
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
     dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
     esportsOpen: (user) => !!user && require('./dungeon/dungeonService').towerOpen(user), // eSports hängt am Mage Tower
@@ -164,6 +163,8 @@ function createApp() {
     if (!req.user) return res.status(401).json({ popup: null });
     res.json({ popup: devMessageService.popup(await devMessageService.nextUnseen(req.user)) });
   });
+  // Chat: vor Statistik, Manipulationserkennung und Menü-Zählern – der Browser fragt alle paar Sekunden nach
+  app.use(require('./routes/chat'));
   app.use(require('./moderation/requestSignals').trackSignals); // Manipulationserkennung: Herkunft und Merkmale jeder Spiel-Aktion
   app.use(require('./moderation/requestSignals').trap); // Manipulationserkennung: unsichtbarer Link als Falle
   app.use(require('./stats/activity').trackActivity); // aktive Spieler und Bereichsnutzung für die Statistik
@@ -245,7 +246,6 @@ function createApp() {
   app.use(require('./routes/tcg'));
   app.use(require('./routes/inventar'));
   app.use(require('./routes/kosmetik'));
-  app.use(require('./routes/support'));
   app.use(require('./routes/ihk'));
   app.use(require('./routes/dungeon'));
   app.use(require('./routes/esports'));
