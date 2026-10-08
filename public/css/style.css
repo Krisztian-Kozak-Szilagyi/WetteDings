@@ -4174,6 +4174,17 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   background: transparent; color: var(--color-neutral-400); font: 500 12px var(--font); cursor: var(--cur-pointer, pointer);
 }
 .forum-add-sub:hover { color: var(--color-text); border-color: var(--color-accent); }
+/* Bereiche löschen (Admin/Dev): rechts im Kopf bzw. unter dem Namen des Unterbereichs */
+.forum-head-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.forum-head-tools .forum-add-sub { margin-left: 0; }
+.forum-del-form { margin: 0; }
+.forum-del-row { position: relative; z-index: 1; align-self: flex-start; }
+.forum-cat-del {
+  height: 28px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--color-neutral-700);
+  background: transparent; color: var(--color-neutral-400); font: 500 12px var(--font); cursor: var(--cur-pointer, pointer);
+}
+.forum-del-row .forum-cat-del { height: 22px; padding: 0 8px; font-size: 11px; }
+.forum-cat-del:hover { color: var(--nein); border-color: color-mix(in srgb, var(--nein) 70%, transparent); }
 .forum-crow { grid-template-columns: 22px minmax(0, 1fr) 140px minmax(0, 200px); }
 .forum-crow-icon { display: flex; color: var(--color-neutral-500); }
 .forum-crow.is-own .forum-crow-title { color: var(--color-neutral-300); font-weight: 400; }
