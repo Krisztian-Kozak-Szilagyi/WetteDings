@@ -22,6 +22,7 @@ const achievements = require('../achievements/list');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
+const { KIND: deviceVerdictKind } = require('../device/deviceVerdictLog');
 const dungeonService = require('../dungeon/dungeonService');
 const gradingService = require('../grading/gradingService');
 const deviceLogic = require('../device/deviceLogic');
@@ -577,7 +578,9 @@ async function precision() {
     SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt byName names').lean(),
     SuspicionAlert.aggregate([{ $group: { _id: '$kind', n: { $sum: 1 } } }]),
   ]);
-  return logic.precisionRows(events, new Map(counts.map((c) => [c._id, c.n])));
+  const byKind = new Map(counts.map((c) => [c._id, c.n]));
+  byKind.set(deviceVerdictKind, await DeviceAlert.countDocuments()); // Mehrfach-Konten stehen in einer eigenen Sammlung
+  return logic.precisionRows(events, byKind);
 }
 
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen, das Urteils-Protokoll anonymisieren */

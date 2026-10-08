@@ -304,10 +304,19 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(D
   res.redirect(DISPUTE_URL);
 });
 
-// ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
+// ---------- Mehrfach-Konten: Hinweise beurteilen oder abhaken (Admin und Devs) ----------
 // Ohne Passwortabfrage (häufige Entscheidungen): im Browser bestätigt ein zweites Fenster (data-confirm-dialog)
 router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    try {
+      if (verdict) await deviceService.setAlertVerdict(req.params.id, verdict, req.user);
+      else await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
+  }
   res.redirect(subUrl('moderation', 'geraete'));
 });
 

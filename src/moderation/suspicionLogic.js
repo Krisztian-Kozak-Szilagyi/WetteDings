@@ -158,6 +158,7 @@ const KIND_LABEL = {
   rang: 'Platz 1 mit geliehenem Wert',
   netz: 'Sammelkonto',
   markt: 'Reaktion auf Kurssprünge',
+  mehrfachkonto: 'Mehrfach-Konto', // aus der Geräte-Erkennung (device/deviceVerdictLog.js), nur im Urteils-Protokoll
 };
 
 // ---------- Hilfen ----------
