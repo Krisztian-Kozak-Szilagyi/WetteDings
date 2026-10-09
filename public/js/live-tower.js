@@ -18,7 +18,7 @@
   const TIPS = {
     boost: 'Alle Hauptkarten +20 %. Die 40 Sekunden starten mit dem nächsten Kampf und laufen in der Pause danach weiter – wer dort lange überlegt, verschenkt den Rest.',
     einzel: 'Nur eine Hauptkarte +20 %, 40 Sekunden ab dem nächsten Kampf. Schließt den Boost für alle aus.',
-    wechsel: 'Du tauschst deine Hauptkarte. Hast du keinen Bock mehr, startet die neue Karte mit 50 %.',
+    wechsel: 'Du tauschst deine Hauptkarte. Liegt dein Bock unter 50 %, startet die neue Karte mit 50 % – darüber bleibt er, wie er ist.',
     verl: 'Der nächste Kampf dauert einige Sekunden länger.',
   };
   const fmt = (n) => Math.round(n || 0).toLocaleString('de-DE');
@@ -57,6 +57,9 @@
 
   // ---------- Anzeige ----------
   function renderBar() {
+    // Pause: oben keine Statusleiste – Energie und Team stehen im Pause-Bereich
+    const bar = root.querySelector('.lt-bar');
+    bar.hidden = state.phase === 'pause';
     $('floor').textContent = state.phase === 'start' ? '1' : String(state.phase === 'pause' ? state.n + 1 : Math.max(1, state.n));
     const pips = $('pips');
     pips.textContent = '';
@@ -126,8 +129,7 @@
   function renderPlayers() {
     const box = $('players');
     box.textContent = '';
-    box.hidden = state.phase === 'pause';
-    if (box.hidden) return;
+    box.hidden = state.phase === 'ende';
     const f = state.fight;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const bock = f && state.phase === 'kampf' ? bockAt(f, sec) : state.players.map((p) => p.bock);
@@ -225,7 +227,7 @@
   const DESC = {
     boost: () => `+20 % für alle Hauptkarten, ${state.boostSeconds} s ab Kampfbeginn`,
     einzel: () => `+20 % für eine Hauptkarte, ${state.boostSeconds} s`,
-    wechsel: () => 'Deine Hauptkarte tauschen – ohne Bock startet die neue mit 50 %',
+    wechsel: () => 'Deine Hauptkarte tauschen – Bock unter 50 % steigt auf 50 %',
     verl: () => `+${state.extSeconds} s für den nächsten Boss`,
   };
 
