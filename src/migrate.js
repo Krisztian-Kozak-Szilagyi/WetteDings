@@ -27,8 +27,16 @@ async function migrate() {
   await LotteryRound.createIndexes();
   // Erfolge: der eindeutige Index (Mitglied + Erfolg) muss stehen, bevor der erste Erfolg vergeben wird
   await require('./models/Achievement').createIndexes();
-  // Mage Tower: ein Versuch pro Tag – der eindeutige Index muss vor dem ersten Turm-Start stehen
-  await require('./models/Dungeon').TowerAttempt.createIndexes();
+  // Mage Tower: mehrere Läufe pro Tag möglich – der alte Index (ein Versuch pro Tag) muss weg, alte Einträge sind Lauf 1;
+  // der neue eindeutige Index muss vor dem ersten Turm-Start stehen
+  const { TowerAttempt } = require('./models/Dungeon');
+  const towerIdx = await TowerAttempt.collection.indexes().catch(() => []);
+  if (towerIdx.some((i) => i.name === 'user_1_day_1')) {
+    await TowerAttempt.collection.dropIndex('user_1_day_1');
+    console.log('Migration: Mage-Tower-Index user_1_day_1 entfernt.');
+  }
+  await TowerAttempt.collection.updateMany({ n: { $exists: false } }, { $set: { n: 1, esports: false } });
+  await TowerAttempt.createIndexes();
   // eSports: ein Spieler in höchstens einem Team – eindeutiger Index vor dem ersten Beitritt
   await require('./models/Esports').EsportsTeam.createIndexes();
 

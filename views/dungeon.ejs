@@ -27,7 +27,7 @@
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
         <% if (tower) { %>
-          <p class="dg-when">Ein Versuch pro Tag · startet, sobald <%= isLeader ? 'du' : 'der Gruppenleiter' %> den Turm <%= isLeader ? 'betrittst' : 'betritt' %></p>
+          <p class="dg-when"><%= towerRuns === 1 ? 'Ein Versuch' : towerRuns + ' Versuche' %> pro Tag · startet, sobald <%= isLeader ? 'du' : 'der Gruppenleiter' %> den Turm <%= isLeader ? 'betrittst' : 'betritt' %></p>
         <% } else { %>
           <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
         <% } %>
@@ -78,14 +78,14 @@
       </span>
     </form>
   <% }) %>
-  <%# Mage Tower: einmal am Tag, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
+  <%# Mage Tower: Läufe pro Tag laut Admin-Panel, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
   <% if (towerShown) { %>
     <form method="post" action="/dungeon/turm/anmelden" class="dg-tower-entry">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <span class="dg-tower-text">
-        <span class="kicker">Mage Tower · einmal am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>
+        <span class="kicker">Mage Tower · <%= towerRuns === 1 ? 'einmal' : towerRuns + '×' %> am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>
         <strong><%= towerTitle %></strong>
-        <span class="muted"><%= towerPlayed ? 'Du warst heute schon oben – ab Mitternacht geht es wieder.' : 'Runde für Runde schwerer, bis ihr scheitert. Je höher ihr kommt, desto besser die Beute.' %></span>
+        <span class="muted"><%= towerPlayed ? 'Für heute bist du durch – ab Mitternacht geht es wieder.' : (towerRuns > 1 && towerLeft < towerRuns ? 'Heute noch ' + towerLeft + (towerLeft === 1 ? ' Lauf. ' : ' Läufe. ') : '') + 'Runde für Runde schwerer, bis ihr scheitert. Je höher ihr kommt, desto besser die Beute.' %></span>
       </span>
       <span class="dg-tower-btns">
         <button class="btn btn-primary" type="submit" name="mode" value="solo" <%= towerPlayed ? 'disabled' : '' %>>Allein</button>

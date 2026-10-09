@@ -365,7 +365,7 @@
           </table>
         </div>
         <% const tw = dungeon.settings.tower; const twd = dungeon.defaults.tower; const dec = (v) => String(v).replace('.', ','); const eur = (c) => (c / 100).toFixed(2).replace('.', ','); %>
-        <h3 class="admin-ihk-sub">Mage Tower (einmal am Tag)</h3>
+        <h3 class="admin-ihk-sub">Mage Tower</h3>
         <p class="muted small">Runde für Runde schwerer, bis die Gruppe scheitert. Ziel der Runde n = Ziel Runde 1 × (1 + Anstieg)<sup>n−1</sup>. Lohn und Beute-Chancen wachsen mit jeder geschafften Runde. Gilt ab dem nächsten Turm-Start.</p>
         <label class="check admin-ihk-open">
           <input type="checkbox" name="towerOpen" value="1" <%= tw.open ? 'checked' : '' %>>
@@ -386,6 +386,8 @@
                 ['towerCardMax', 'Boss-Karte: höchstens (%)', dec(tw.cardMax), dec(twd.cardMax)],
                 ['towerFightSeconds', 'Wiedergabe je Runde (Sekunden)', tw.fightSeconds, twd.fightSeconds, 'number'],
                 ['towerPauseSeconds', 'Pause zwischen Runden (Sekunden)', tw.pauseSeconds, twd.pauseSeconds, 'number'],
+                ['towerDailyRuns', 'Läufe pro Spieler und Tag', tw.dailyRuns, twd.dailyRuns, 'number'],
+                ['towerEsportsRuns', 'davon höchstens als eSports-Team', tw.esportsRuns, twd.esportsRuns, 'number'],
               ].forEach(([name, label, value, def, type]) => { %>
                 <tr>
                   <td><%= label %> <span class="muted small hide-sm">(Standard <%= def %>)</span></td>
@@ -395,7 +397,27 @@
             </tbody>
           </table>
         </div>
+        <p class="muted small">Ein eSports-Lauf zählt auch zu den Läufen pro Tag.</p>
         <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+
+      <h3 class="admin-ihk-sub" id="turm-texte">Mage Tower: Stockwerke</h3>
+      <p class="muted small">Name, Beschreibung (daraus erraten die Spieler den gesuchten Wert) und die Texte bei Sieg und Niederlage. Leeres Feld = Standardtext.</p>
+      <form method="post" data-reauth action="/admin/dungeon/turm-texte" class="form panel-form admin-floors">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% [['fia', 'FIA'], ['fis', 'FIS'], ['bwl', 'BWL']].forEach(([stat, label]) => { %>
+          <h4 class="admin-floor-stat"><%= label %></h4>
+          <% dungeon.floors.filter((fl) => fl.stat === stat).forEach((fl) => { const def = dungeon.floorDefaults[fl.key]; %>
+            <details class="admin-floor">
+              <summary><strong><%= fl.title %></strong><% if (fl.title !== def.title) { %> <span class="muted small">(Standard: <%= def.title %>)</span><% } %></summary>
+              <label class="field"><span>Name</span><input type="text" name="floor_<%= fl.key %>_title" maxlength="<%= dungeon.textMax.title %>" value="<%= fl.title %>"></label>
+              <label class="field"><span>Beschreibung</span><textarea name="floor_<%= fl.key %>_text" rows="3" maxlength="<%= dungeon.textMax.text %>"><%= fl.text %></textarea></label>
+              <label class="field"><span>Sieg</span><textarea name="floor_<%= fl.key %>_success" rows="2" maxlength="<%= dungeon.textMax.success %>"><%= fl.success %></textarea></label>
+              <label class="field"><span>Niederlage</span><textarea name="floor_<%= fl.key %>_fail" rows="2" maxlength="<%= dungeon.textMax.fail %>"><%= fl.fail %></textarea></label>
+            </details>
+          <% }) %>
+        <% }) %>
+        <button class="btn btn-primary" type="submit">Texte speichern</button>
       </form>
     </div>
   </section>

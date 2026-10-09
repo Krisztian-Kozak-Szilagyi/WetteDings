@@ -114,22 +114,26 @@ const settingsSchema = new Schema(
     cardChance: Number,
     botWeights: Schema.Types.Mixed,
     tower: Schema.Types.Mixed, // Mage Tower (siehe dungeonService.DEFAULTS.tower)
+    towerTexts: Schema.Types.Mixed, // geänderte Stockwerk-Texte { key: { title, text, success, fail } } (tower.cleanFloorTexts)
     updatedByName: String,
   },
   { timestamps: true }
 );
 
-// Mage Tower: ein Versuch pro Spieler und Tag (deutsche Zeit). Der eindeutige Index macht es atomar –
-// ein Index auf DungeonRun ginge nicht, dort stehen Bots mit user: null.
+// Mage Tower: ein Eintrag je Lauf, Spieler und Tag (deutsche Zeit); n = der wievielte Lauf des Tages. Der eindeutige
+// Index (user, day, n) macht es atomar: zwei gleichzeitige Starts bekommen dasselbe n, einer bricht ab.
+// Ein Index auf DungeonRun ginge nicht, dort stehen Bots mit user: null.
 const towerAttemptSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     day: { type: String, required: true }, // "YYYY-MM-DD"
+    n: { type: Number, default: 1 },
+    esports: { type: Boolean, default: false }, // zählte als eSports-Lauf (Kontingent tower.esportsRuns)
     run: { type: Schema.Types.ObjectId, ref: 'DungeonRun', default: null },
   },
   { timestamps: true }
 );
-towerAttemptSchema.index({ user: 1, day: 1 }, { unique: true });
+towerAttemptSchema.index({ user: 1, day: 1, n: 1 }, { unique: true });
 
 module.exports = {
   DungeonParty: model('DungeonParty', partySchema),

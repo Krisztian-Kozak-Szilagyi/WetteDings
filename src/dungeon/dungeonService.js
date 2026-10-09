@@ -3,7 +3,7 @@
 // und eigenem Chat. Karten wählt man erst in der Lobby (#111) – wer zum Start keinen Charakter hat, ist nicht dabei.
 // Ablauf wie bei der IHK: Die Kämpfe (2× Trash, 1× Boss) werden beim Start mit den
 // Kartenwerten und Fähigkeiten ausgewürfelt und danach abgespielt; am Ende gibt es Lohn und Beute.
-// Mage Tower (mode 'tower'): einmal am Tag, der Leiter startet sofort. Runde für Runde schwerer, Fähigkeit zufällig,
+// Mage Tower (mode 'tower'): Läufe pro Tag laut Admin-Panel (tower.dailyRuns), der Leiter startet sofort. Runde für Runde schwerer, Fähigkeit zufällig,
 // bis eine Runde verloren geht – die geschafften Runden bestimmen Lohn und Beute-Chancen. Auch das steht beim Start fest.
 const crypto = require('crypto');
 const config = require('../config');
@@ -22,6 +22,7 @@ const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk
 const { grantItems } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
+const { cleanFloorTexts, applyFloorTexts, towerQuota } = require('./tower');
 const cardBans = require('../tcg/cardBans');
 
 const TEAM_SIZE = 3;
@@ -44,7 +45,8 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 // botWeights = Gewicht je Seltenheit für die Karte eines Bots
 // tower = Mage Tower: open (zusätzlich zu open), Ziel-Punkte der ersten Runde und Anstieg pro Runde (%), Lohn pro Spieler
 // für Runde 1 und Zuwachs je weitere Runde (Cent), Beute-Chance pro geschaffter Runde und ihre Obergrenze (%),
-// Wiedergabe je Runde und Pause (echte Sekunden)
+// Wiedergabe je Runde und Pause (echte Sekunden), Läufe pro Spieler und Tag (dailyRuns) und davon höchstens esportsRuns als
+// eSports-Lauf (gemeinsames Kontingent: ein eSports-Lauf zählt auch zu dailyRuns)
 const DEFAULTS = {
   open: false,
   intervalHours: 2,
@@ -58,7 +60,7 @@ const DEFAULTS = {
   // Simulation (2026-10-07, strategische Gruppen: stärkste Charaktere der Seltenheit + beste Boosts): Gold ~6, Holo ~7,
   // Bockhaber ~8, Glitch ~14 Runden, beste Kombination (St. Ivan + Glitch, Mauch/Sigrist/Lili) ~17. Der steile Anstieg
   // hält den Abstand klein – mit +8 % schaffte die beste Kombination 36 Runden (~3.500 € am Tag).
-  tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4 },
+  tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4, dailyRuns: 1, esportsRuns: 1 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
 
@@ -74,6 +76,8 @@ const TOWER_LIMITS = {
   cardMax: [0, 100, false],
   fightSeconds: [5, 120, true],
   pauseSeconds: [0, 30, true],
+  dailyRuns: [1, 10, true],
+  esportsRuns: [1, 10, true],
 };
 const validTower = (t) =>
   !!t && typeof t.open === 'boolean' && Object.entries(TOWER_LIMITS).every(([k, [min, max, int]]) => Number.isFinite(t[k]) && t[k] >= min && t[k] <= max && (!int || Number.isInteger(t[k])));
@@ -101,6 +105,8 @@ async function loadSettings() {
   // Turm: fehlende Werte (neu hinzugekommen) vom Standard
   const tower = doc.tower ? Object.fromEntries(Object.keys(DEFAULTS.tower).map((k) => [k, doc.tower[k] ?? DEFAULTS.tower[k]])) : null;
   if (validTower(tower)) settings.tower = tower;
+  const { texts } = cleanFloorTexts(doc.towerTexts);
+  if (texts) applyFloorTexts(texts);
 }
 
 async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower = settings.tower, admin }) {
@@ -110,13 +116,23 @@ async function saveSettings({ open, intervalHours, required, rewards, foilChance
   if (!validChance(foilChance) || !validChance(cardChance)) throw new UserError('Die Chancen müssen zwischen 0 und 100 % liegen.');
   if (!validWeights(botWeights)) throw new UserError('Bot-Karten: ganze Zahlen von 0 bis 10000, mindestens eine Seltenheit mit Charakterkarten über 0.');
   if (!validTower(tower)) {
-    throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s und Pause 0–30 s je Runde.');
+    throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s, Pause 0–30 s je Runde und 1–10 Läufe pro Tag.');
   }
   const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower };
   await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { ...next, updatedByName: admin.username } }, { upsert: true });
   const before = JSON.parse(JSON.stringify(settings));
   Object.assign(settings, next);
   await logSettingsChange({ area: 'dungeon', before, after: settings, by: admin });
+}
+
+/** Mage Tower: Namen und Texte der Stockwerke speichern. input = { key: { title, text, success, fail } }, leer = Startwert */
+async function saveTowerTexts({ input, admin }) {
+  const { texts, error } = cleanFloorTexts(input);
+  if (error) throw new UserError(error);
+  const before = await DungeonSettings.findById('dungeon').select('towerTexts').lean();
+  await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { towerTexts: texts, updatedByName: admin.username } }, { upsert: true });
+  applyFloorTexts(texts);
+  await logSettingsChange({ area: 'dungeon', before: { towerTexts: (before && before.towerTexts) || {} }, after: { towerTexts: texts }, by: admin });
 }
 
 // ---------- Termine ----------
@@ -140,7 +156,7 @@ const isLockedIn = (slot, now = Date.now()) => new Date(slot).getTime() - now <=
 /** Anmeldung kurz vor dem Start gesperrt? Der Turm hat keinen Termin – er ist bis zum Knopfdruck offen. */
 const partyLocked = (party, now = Date.now()) => party.mode !== 'tower' && isLockedIn(party.slot, now);
 
-/** Tag in deutscher Zeit ("YYYY-MM-DD") – ein Turm-Versuch pro Tag */
+/** Tag in deutscher Zeit ("YYYY-MM-DD") – das Turm-Kontingent gilt je Tag */
 const towerDay = (now = Date.now()) => toZonedLocalInput(new Date(now), config.timezone).slice(0, 10);
 
 // ---------- Zufall ----------
@@ -450,8 +466,23 @@ function checkTowerOpen(user) {
   if (!towerOpen(user)) throw new UserError('Der Mage Tower ist derzeit nicht verfügbar.');
 }
 
-/** War dieser Spieler heute schon im Turm? */
-const playedTowerToday = async (userId, now = Date.now()) => !!(await TowerAttempt.exists({ user: userId, day: towerDay(now) }));
+/** Bisherige Turm-Läufe heute je Spieler: Map(userId -> { total, esports }); ohne ids alle Spieler */
+async function towerCounts(userIds, now = Date.now()) {
+  const match = { day: towerDay(now) };
+  if (userIds) match.user = { $in: userIds };
+  const rows = await TowerAttempt.aggregate([{ $match: match }, { $group: { _id: '$user', total: { $sum: 1 }, esports: { $sum: { $cond: ['$esports', 1, 0] } } } }]);
+  return new Map(rows.map((r) => [String(r._id), { total: r.total, esports: r.esports }]));
+}
+
+/** Wie viele Turm-Läufe hat dieser Spieler heute noch? */
+const towerRunsLeft = async (userId, now = Date.now()) => towerQuota((await towerCounts([userId], now)).get(String(userId)), settings.tower).left;
+
+/** Hat dieser Spieler heute keinen Turm-Lauf mehr? */
+const towerDoneToday = async (userId, now = Date.now()) => (await towerRunsLeft(userId, now)) <= 0;
+
+/** Hinweis, wenn das Tages-Kontingent aufgebraucht ist */
+const towerDoneText = () =>
+  settings.tower.dailyRuns === 1 ? 'Du warst heute schon im Mage Tower – ab Mitternacht geht es wieder.' : `Du hattest heute schon ${settings.tower.dailyRuns} Läufe im Mage Tower – ab Mitternacht geht es wieder.`;
 
 const duplicate = (err) => {
   if (err.code === 11000) throw new UserError('Du bist schon für einen Dungeon angemeldet.');
@@ -471,7 +502,7 @@ async function registerTower({ user, solo }) {
   checkTowerOpen(user);
   if (await runningRunOf(user._id)) throw new UserError('Du bist gerade in einem Dungeon.');
   if (await partyOf(user._id)) throw new UserError('Du bist schon für einen Dungeon angemeldet.');
-  if (await playedTowerToday(user._id)) throw new UserError('Du warst heute schon im Mage Tower – ab Mitternacht geht es wieder.');
+  if (await towerDoneToday(user._id)) throw new UserError(towerDoneText());
   return DungeonParty.create({ mode: 'tower', slot: new Date(), solo: !!solo, leader: user._id, members: [emptyMember(user)] }).catch(duplicate);
 }
 
@@ -486,7 +517,7 @@ async function invite({ user, name }) {
   if (party.members.some((m) => m.user && m.user.equals(target._id))) throw new UserError(`${target.username} ist schon in deiner Gruppe.`);
   if (party.invites.some((i) => i.user.equals(target._id))) throw new UserError(`${target.username} ist schon eingeladen.`);
   const tower = party.mode === 'tower';
-  if (tower && (await playedTowerToday(target._id))) throw new UserError(`${target.username} war heute schon im Mage Tower.`);
+  if (tower && (await towerDoneToday(target._id))) throw new UserError(`${target.username} hat heute keinen Lauf im Mage Tower mehr.`);
   // Filter macht es atomar: höchstens drei Plätze (Mitglieder + offene Einladungen)
   const res = await DungeonParty.updateOne(
     { _id: party._id, leader: user._id, 'invites.user': { $ne: target._id }, $expr: { $lt: [{ $add: [{ $size: '$members' }, { $size: '$invites' }] }, TEAM_SIZE] } },
@@ -511,10 +542,11 @@ async function invitablePlayers(user, now = Date.now()) {
     User.find({ deletedAt: null, $or: [{ bannedUntil: null }, { bannedUntil: { $lte: new Date(now) } }] }).select('username usernameLower').sort({ usernameLower: 1 }).lean(),
     DungeonParty.find({}).select('members.user').lean(),
     DungeonRun.find({ status: 'laeuft' }).select('members.user').lean(),
-    tower ? TowerAttempt.find({ day: towerDay(now) }).select('user').lean() : [],
+    tower ? towerCounts(null, now) : new Map(),
   ]);
   const open = tower ? settings.open && settings.tower.open : settings.open;
-  const busy = new Set([String(user._id), ...party.members.map((m) => String(m.user)), ...party.invites.map((i) => String(i.user)), ...played.map((a) => String(a.user))]);
+  const busy = new Set([String(user._id), ...party.members.map((m) => String(m.user)), ...party.invites.map((i) => String(i.user))]);
+  for (const [id, c] of played) if (towerQuota(c, settings.tower).left <= 0) busy.add(id);
   runs.forEach((r) => r.members.forEach((m) => m.user && busy.add(String(m.user))));
   const registered = new Set();
   for (const p of parties) {
@@ -541,7 +573,7 @@ async function accept({ user, partyId }) {
   if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Beitreten ist nicht mehr möglich.');
   if (party.mode === 'tower') {
     checkTowerOpen(user);
-    if (await playedTowerToday(user._id)) throw new UserError('Du warst heute schon im Mage Tower – ab Mitternacht geht es wieder.');
+    if (await towerDoneToday(user._id)) throw new UserError(towerDoneText());
   }
   const res = await DungeonParty.updateOne(
     { _id: party._id, 'invites.user': user._id, [`members.${TEAM_SIZE - 1}`]: { $exists: false } },
@@ -710,15 +742,19 @@ async function startTower({ user, now = Date.now() }) {
   if (blocked.length) throw new UserError(`Gesperrte Karte im Mage Tower – bitte tauschen: ${blocked.map((m) => m.name).join(', ')}.`);
   const day = towerDay(now);
   const humans = party.members.filter((m) => m.user);
-  const already = await TowerAttempt.find({ user: { $in: humans.map((m) => m.user) }, day }).select('user').lean();
-  if (already.length) {
-    const names = humans.filter((m) => already.some((a) => a.user.equals(m.user))).map((m) => m.name);
-    throw new UserError(`${names.join(', ')} ${names.length > 1 ? 'waren' : 'war'} heute schon im Mage Tower.`);
-  }
-
   const opts = { ...settings.tower };
+  const counts = await towerCounts(humans.map((m) => m.user), now);
+  const quota = (m) => towerQuota(counts.get(String(m.user)), opts);
+  const done = humans.filter((m) => quota(m).left <= 0).map((m) => m.name);
+  if (done.length) throw new UserError(`${done.join(', ')} ${done.length > 1 ? 'haben' : 'hat'} heute keinen Lauf im Mage Tower mehr.`);
+
   // eSports: zählt für die Liga nur, wenn alle drei Spieler schon vor dieser Woche im selben Team waren
   const esportsTeam = humans.length === TEAM_SIZE ? await esports().towerTeam(humans.map((m) => m.user), now).catch(() => null) : null;
+  if (esportsTeam) {
+    const out = humans.filter((m) => quota(m).esportsLeft <= 0).map((m) => m.name);
+    const runs = opts.esportsRuns === 1 ? 'einen eSports-Lauf' : `${opts.esportsRuns} eSports-Läufe`;
+    if (out.length) throw new UserError(`Als eSports-Team geht es heute nicht mehr: ${out.join(', ')} ${out.length > 1 ? 'hatten' : 'hatte'} heute schon ${runs}.`);
+  }
   const members = fillBots(party.members, 'tower');
   const fights = playTower(teamCards(members), random, opts);
   const rounds = fights.filter((f) => f.success).length;
@@ -746,11 +782,11 @@ async function startTower({ user, now = Date.now() }) {
         }],
         { session }
       );
-      // eindeutiger Index (user, day): ein zweiter Versuch am selben Tag bricht die ganze Transaktion ab
-      await TowerAttempt.insertMany(humans.map((m) => ({ user: m.user, day, run: run._id })), { session });
+      // eindeutiger Index (user, day, n): ein gleichzeitiger zweiter Start bekommt dasselbe n und bricht die ganze Transaktion ab
+      await TowerAttempt.insertMany(humans.map((m) => ({ user: m.user, day, n: ((counts.get(String(m.user)) || {}).total || 0) + 1, esports: !!esportsTeam, run: run._id })), { session });
     });
   } catch (err) {
-    if (err.code === 11000) throw new UserError('Ein Mitglied war heute schon im Mage Tower.');
+    if (err.code === 11000) throw new UserError('Ein Mitglied ist gerade schon in den Mage Tower gestartet – bitte lade die Seite neu.');
     throw err;
   }
   const others = humans.filter((m) => !m.user.equals(user._id)).map((m) => m.user);
@@ -958,7 +994,9 @@ module.exports = {
   towerDay,
   towerOpen,
   partyLocked,
-  playedTowerToday,
+  towerRunsLeft,
+  towerDoneToday,
+  saveTowerTexts,
   towerRequired,
   towerReward,
   towerChances,
