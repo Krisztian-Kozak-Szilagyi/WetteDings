@@ -6008,3 +6008,56 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .dg-ready.is-ready { background: var(--ja); color: #10241a; box-shadow: none; }
 .dg-supply-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 8px; }
 .dg-supply-form .field { margin: 0; }
+
+/* Arcane: magische Variante des Glitch-Effekts – Runenkreis dreht sich, Funken steigen auf, alle 5 s läuft eine
+   Mana-Welle vom Herz der Karte nach außen (Echo-Bild) und Runen + Rand leuchten auf. Album, Großansicht, Pack-Öffnung. */
+.r-arcane { --arc-ring: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20200%20200%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23eadcff%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%27100%27%20r%3D%2794%27%20stroke-width%3D%271.2%27%2F%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%27100%27%20r%3D%2789%27%20stroke-width%3D%27.5%27%20stroke-dasharray%3D%272%204%27%2F%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%27100%27%20r%3D%2770%27%20stroke-width%3D%271.2%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28179.5%20100%29%20rotate%2890%29%27%20d%3D%27M0%20-6V6M0%20-6L4%20-2M0%200L4%204%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28174.7%20127.2%29%20rotate%28110%29%27%20d%3D%27M-3.5%206L0%20-6L3.5%206M-2%201.5H2%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28160.9%20151.1%29%20rotate%28130%29%27%20d%3D%27M0%20-6V6M-4%20-6L4%206%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28139.8%20168.8%29%20rotate%28150%29%27%20d%3D%27M-3.5%20-6L3.5%200L-3.5%206M3.5%20-6V6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28113.8%20178.3%29%20rotate%28170%29%27%20d%3D%27M-4%20-6H4L0%206Z%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2886.2%20178.3%29%20rotate%28190%29%27%20d%3D%27M0%20-6V6M-4%20-2H4M-4%202H4%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2860.3%20168.8%29%20rotate%28210%29%27%20d%3D%27M-4%206V-6L4%206V-6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2839.1%20151.1%29%20rotate%28230%29%27%20d%3D%27M-4%20-6L0%200L4%20-6M0%200V6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2825.3%20127.2%29%20rotate%28250%29%27%20d%3D%27M-3%20-6A4%204%200%201%201%20-3%201L3%206%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2820.5%20100%29%20rotate%28270%29%27%20d%3D%27M0%20-6V6M0%20-6L4%20-2M0%200L4%204%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2825.3%2072.8%29%20rotate%28290%29%27%20d%3D%27M-3.5%206L0%20-6L3.5%206M-2%201.5H2%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2839.1%2048.9%29%20rotate%28310%29%27%20d%3D%27M0%20-6V6M-4%20-6L4%206%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2860.2%2031.2%29%20rotate%28330%29%27%20d%3D%27M-3.5%20-6L3.5%200L-3.5%206M3.5%20-6V6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%2886.2%2021.7%29%20rotate%28350%29%27%20d%3D%27M-4%20-6H4L0%206Z%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28113.8%2021.7%29%20rotate%28370%29%27%20d%3D%27M0%20-6V6M-4%20-2H4M-4%202H4%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28139.8%2031.2%29%20rotate%28390%29%27%20d%3D%27M-4%206V-6L4%206V-6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28160.9%2048.9%29%20rotate%28410%29%27%20d%3D%27M-4%20-6L0%200L4%20-6M0%200V6%27%2F%3E%3Cpath%20stroke-width%3D%271.3%27%20transform%3D%27translate%28174.7%2072.8%29%20rotate%28430%29%27%20d%3D%27M-3%20-6A4%204%200%201%201%20-3%201L3%206%27%2F%3E%3Cpath%20stroke-width%3D%27.8%27%20d%3D%27M100%2034L157.2%20133L42.8%20133Z%20M100%20166L42.8%2067L157.2%2067Z%27%2F%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%27100%27%20r%3D%2733%27%20stroke-width%3D%27.8%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"); --arc-sparks: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27120%27%20height%3D%27180%27%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.43%27%20cx%3D%276%27%20cy%3D%2781.1%27%20r%3D%271.1%27%2F%3E%3Cpath%20fill%3D%27%239ff3ff%27%20opacity%3D%270.68%27%20d%3D%27M50.1%2089.8Q50.1%2092.9%2053.2%2092.9Q50.1%2092.9%2050.1%2096Q50.1%2092.9%2047%2092.9Q50.1%2092.9%2050.1%2089.8Z%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.63%27%20cx%3D%2729.6%27%20cy%3D%27125.9%27%20r%3D%270.8%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.53%27%20cx%3D%2795.3%27%20cy%3D%2770.3%27%20r%3D%270.8%27%2F%3E%3Cpath%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.54%27%20d%3D%27M70%2096Q70%2099.2%2073.2%2099.2Q70%2099.2%2070%20102.4Q70%2099.2%2066.8%2099.2Q70%2099.2%2070%2096Z%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.75%27%20cx%3D%2792%27%20cy%3D%278%27%20r%3D%270.9%27%2F%3E%3Cpath%20fill%3D%27%239ff3ff%27%20opacity%3D%270.71%27%20d%3D%27M7.5%2065.9Q7.5%2070.5%2012.1%2070.5Q7.5%2070.5%207.5%2075.1Q7.5%2070.5%202.9%2070.5Q7.5%2070.5%207.5%2065.9Z%27%2F%3E%3Ccircle%20fill%3D%27%239ff3ff%27%20opacity%3D%270.94%27%20cx%3D%2771.9%27%20cy%3D%27167.1%27%20r%3D%271.1%27%2F%3E%3Cpath%20fill%3D%27%239ff3ff%27%20opacity%3D%270.57%27%20d%3D%27M83.5%20137Q83.5%20141.8%2088.3%20141.8Q83.5%20141.8%2083.5%20146.6Q83.5%20141.8%2078.7%20141.8Q83.5%20141.8%2083.5%20137Z%27%2F%3E%3C%2Fsvg%3E"), url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27170%27%20height%3D%27250%27%3E%3Cpath%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.58%27%20d%3D%27M6%20195.2Q6%20199.9%2010.7%20199.9Q6%20199.9%206%20204.6Q6%20199.9%201.3%20199.9Q6%20199.9%206%20195.2Z%27%2F%3E%3Cpath%20fill%3D%27%239ff3ff%27%20opacity%3D%270.82%27%20d%3D%27M61.3%2088.8Q61.3%2092.7%2065.2%2092.7Q61.3%2092.7%2061.3%2096.6Q61.3%2092.7%2057.4%2092.7Q61.3%2092.7%2061.3%2088.8Z%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.40%27%20cx%3D%2725.2%27%20cy%3D%2721%27%20r%3D%270.8%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.47%27%20cx%3D%2763.1%27%20cy%3D%27116.3%27%20r%3D%271%27%2F%3E%3Ccircle%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.99%27%20cx%3D%2722.9%27%20cy%3D%27224.1%27%20r%3D%270.8%27%2F%3E%3Cpath%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.44%27%20d%3D%27M50.4%20159.8Q50.4%20164.7%2055.3%20164.7Q50.4%20164.7%2050.4%20169.6Q50.4%20164.7%2045.5%20164.7Q50.4%20164.7%2050.4%20159.8Z%27%2F%3E%3Cpath%20fill%3D%27%23f2e8ff%27%20opacity%3D%270.63%27%20d%3D%27M69.1%2027.1Q69.1%2030.7%2072.7%2030.7Q69.1%2030.7%2069.1%2034.3Q69.1%2030.7%2065.5%2030.7Q69.1%2030.7%2069.1%2027.1Z%27%2F%3E%3C%2Fsvg%3E"); }
+.r-arcane { --rar: #a77bff; }
+/* Träger: im Album .tcg-fx-arcane (+ Echo-Bild), in der Großansicht und beim Pack-Öffnen der Glanz-Layer */
+.tcg-fx-arcane, .tcg-zoom.r-arcane .tcg-shine, .tcg-flip.r-arcane .tcg-front .tcg-shine {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none; opacity: 1; mix-blend-mode: normal;
+  background: linear-gradient(165deg, transparent 18%, rgba(150, 95, 255, .26) 38%, rgba(90, 225, 255, .16) 52%, transparent 72%);
+  background-size: 100% 260%; animation: arcaneDrift 9s ease-in-out infinite alternate, arcaneEdge 5s ease-in-out infinite;
+}
+/* Runenkreis um das Herz der Karte */
+.tcg-fx-arcane::before, .tcg-zoom.r-arcane .tcg-shine::before, .tcg-flip.r-arcane .tcg-front .tcg-shine::before {
+  content: ''; position: absolute; left: 50%; top: 44%; width: 112%; aspect-ratio: 1; translate: -50% -50%;
+  background: var(--arc-ring) center / contain no-repeat; mix-blend-mode: screen; opacity: .16;
+  filter: drop-shadow(0 0 4px #b48cff) drop-shadow(0 0 10px #7c4dff);
+  animation: arcaneSpin 30s linear infinite, arcaneRing 5s ease-in-out infinite;
+}
+/* aufsteigende Funken in zwei Ebenen (verschiedene Geschwindigkeit), flackern leicht */
+.tcg-fx-arcane::after, .tcg-zoom.r-arcane .tcg-shine::after, .tcg-flip.r-arcane .tcg-front .tcg-shine::after {
+  content: ''; position: absolute; inset: 0; background-image: var(--arc-sparks); background-size: 120px 180px, 170px 250px;
+  mix-blend-mode: screen; animation: arcaneRise 14s linear infinite, arcaneTwinkle 2.6s ease-in-out infinite alternate;
+}
+/* Mana-Welle: helles Echo-Bild, das als Kreis vom Herz nach außen läuft */
+.tcg-slot .tcg-art img.tcg-arcane-echo {
+  filter: brightness(1.7) saturate(1.8) hue-rotate(-18deg) blur(1px); mix-blend-mode: screen; opacity: 0;
+  clip-path: circle(0% at 50% 44%); animation: arcaneWave 5s ease-out infinite;
+}
+.tcg-zoom.r-arcane .tcg-card-3d img, .tcg-flip.r-arcane.flipped .tcg-front img { animation: arcaneFlare 5s ease-in-out infinite; }
+.tcg-flip.r-arcane .tcg-aura { box-shadow: 0 0 26px 6px rgba(160, 110, 255, .5), 0 0 70px 18px rgba(80, 220, 255, .18); }
+.tcg-flip.r-arcane:hover .tcg-aura { animation: tcg-aura-ether 3s ease-in-out infinite; }
+@keyframes arcaneDrift { from { background-position: 0 0%; } to { background-position: 0 100%; } }
+@keyframes arcaneEdge {
+  0%, 62%, 100% { box-shadow: inset 0 0 0 1px rgba(190, 150, 255, .25), inset 0 0 18px rgba(124, 77, 255, .18); }
+  72% { box-shadow: inset 0 0 0 1px rgba(225, 205, 255, .8), inset 0 0 34px rgba(150, 100, 255, .55), inset 0 0 70px rgba(80, 220, 255, .18); }
+}
+@keyframes arcaneSpin { to { rotate: 360deg; } }
+@keyframes arcaneRing { 0%, 60%, 100% { opacity: .16; scale: 1; } 70% { opacity: .75; scale: 1.04; } 82% { opacity: .3; scale: 1.01; } }
+@keyframes arcaneRise { from { background-position: 0 0, 60px 0; } to { background-position: 0 -540px, 60px -500px; } }
+@keyframes arcaneTwinkle { from { opacity: .45; } to { opacity: .95; } }
+@keyframes arcaneWave {
+  0%, 62% { opacity: 0; clip-path: circle(0% at 50% 44%); }
+  66% { opacity: .75; clip-path: circle(8% at 50% 44%); }
+  84% { opacity: .3; clip-path: circle(70% at 50% 44%); }
+  100% { opacity: 0; clip-path: circle(100% at 50% 44%); }
+}
+@keyframes arcaneFlare { 0%, 60%, 100% { filter: none; } 70% { filter: brightness(1.25) saturate(1.3) drop-shadow(0 0 6px rgba(170, 120, 255, .8)); } }
+@media (prefers-reduced-motion: reduce) {
+  .tcg-fx-arcane, .tcg-fx-arcane::before, .tcg-fx-arcane::after, .tcg-zoom.r-arcane .tcg-shine, .tcg-zoom.r-arcane .tcg-shine::before,
+  .tcg-zoom.r-arcane .tcg-shine::after, .tcg-flip.r-arcane .tcg-front .tcg-shine, .tcg-flip.r-arcane .tcg-front .tcg-shine::before,
+  .tcg-flip.r-arcane .tcg-front .tcg-shine::after, .tcg-zoom.r-arcane .tcg-card-3d img, .tcg-flip.r-arcane .tcg-front img { animation: none !important; }
+  .tcg-art img.tcg-arcane-echo { display: none; }
+}
