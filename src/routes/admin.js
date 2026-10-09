@@ -19,6 +19,7 @@ const cardBans = require('../tcg/cardBans');
 const { canBoost } = require('../ihk/abilities');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
+const towerTexts = require('../dungeon/tower');
 const bonusService = require('../services/bonusService');
 const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
@@ -261,7 +262,7 @@ router.get('/admin', requireStaff, async (req, res) => {
           }
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
-    dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
+    dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
@@ -544,10 +545,26 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
         cardMax: pct(req.body.towerCardMax),
         fightSeconds: num(req.body.towerFightSeconds),
         pauseSeconds: num(req.body.towerPauseSeconds),
+        dailyRuns: num(req.body.towerDailyRuns),
+        esportsRuns: num(req.body.towerEsportsRuns),
       },
       admin: req.user,
     });
     req.flash('success', 'Dungeon-Einstellungen gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'dungeon'));
+});
+
+// Mage Tower: Namen und Texte der Stockwerke (feste Liste der Stockwerke, Feldnamen floor_<key>_<feld>)
+router.post('/admin/dungeon/turm-texte', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const field = (key, name) => (typeof req.body[`floor_${key}_${name}`] === 'string' ? req.body[`floor_${key}_${name}`] : '');
+  const input = Object.fromEntries(towerTexts.TOWER.floors.map((fl) => [fl.key, Object.fromEntries(Object.keys(towerTexts.TEXT_FIELDS).map((name) => [name, field(fl.key, name)]))]));
+  try {
+    await dungeonService.saveTowerTexts({ input, admin: req.user });
+    req.flash('success', 'Texte der Stockwerke gespeichert.');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

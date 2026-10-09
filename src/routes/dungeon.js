@@ -71,7 +71,7 @@ router.get('/dungeon', async (req, res) => {
   const me = req.user._id;
   const now = Date.now();
   await dungeon.finishOwnDue(me);
-  const [{ party, invitations, run, unseen, rev }, rareLoot, towerPlayed] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot(), dungeon.playedTowerToday(me)]);
+  const [{ party, invitations, run, unseen, rev }, rareLoot, towerLeft] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot(), dungeon.towerRunsLeft(me)]);
   const running = run && run.status === 'laeuft' ? run : null;
   // Mage Tower: eigene Anmeldung ohne Termin (der Leiter startet) – oder ein laufender Turm-Durchlauf
   const tower = running ? running.mode === 'tower' : !!party && party.mode === 'tower';
@@ -140,7 +140,9 @@ router.get('/dungeon', async (req, res) => {
     // Turm-Kacheln vor dem Beitritt: verfügbar? heute schon gespielt? Startet der Leiter erst, wenn alle gewählt haben
     towerShown: dungeon.towerOpen(req.user),
     towerTitle: TOWER.title,
-    towerPlayed,
+    towerPlayed: towerLeft <= 0,
+    towerLeft,
+    towerRuns: dungeon.settings.tower.dailyRuns,
     towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost)),
     // Mage Tower: Karten, die Mitspieler schon gewählt haben (jede Karte nur einmal im Team)
     teamTaken: tower && party ? dungeon.teamTaken(party.members, me) : new Set(),

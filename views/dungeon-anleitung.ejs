@@ -35,7 +35,7 @@
     <% const tw = settings.tower; const pct = (v) => String(v).replace('.', ','); %>
     <div class="card">
       <h2>Mage Tower</h2>
-      <p>Der zweite Modus, <strong>einmal am Tag</strong> (neuer Versuch ab Mitternacht). Es gibt keinen Termin: Du betrittst den Turm allein (die anderen Plätze übernehmen Bots) oder mit einer Gruppe, sobald alle ihre Karten gewählt haben.</p>
+      <p>Der zweite Modus, <strong><%= settings.tower.dailyRuns === 1 ? 'einmal am Tag' : settings.tower.dailyRuns + '-mal am Tag' %></strong> (neue Versuche ab Mitternacht). Es gibt keinen Termin: Du betrittst den Turm allein (die anderen Plätze übernehmen Bots) oder mit einer Gruppe, sobald alle ihre Karten gewählt haben.</p>
       <ul>
         <li><strong>Kein festes Ende:</strong> Ihr kämpft Runde für Runde, bis ihr eine nicht schafft. Jede Runde ist <%= pct(tw.growth) %> % schwerer als die vorige.</li>
         <li><strong>Zufällige Prüfungen:</strong> Welche Fachrichtung eine Runde braucht, wird jedes Mal neu ausgewürfelt – wie im Dungeon verrät es nur der Text.</li>

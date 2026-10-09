@@ -593,6 +593,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
 /* Admin-Panel */
 .admin-ihk-sub { margin: 18px 0 8px; font-size: 1rem; }
+/* Admin: Texte der Mage-Tower-Stockwerke */
+.admin-floor-stat { margin: 16px 0 4px; font-size: .85rem; letter-spacing: .06em; color: var(--muted); }
+.admin-floor { border-top: 1px solid var(--border); padding: 6px 0; }
+.admin-floor summary { cursor: pointer; padding: 6px 0; }
+.admin-floor .field { margin-top: 8px; }
+.admin-floor textarea { width: 100%; box-sizing: border-box; }
 .stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
 .stats-3 .card { margin: 0; }
 .admin-generate { margin: 0 0 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
