@@ -15,12 +15,13 @@
   const foiledCopies = locals.foiledCopies || {};
   const favoriteIds = locals.favoriteIds || new Set();
   const isAlbum = mode === 'album';
-  // Effekte je Seltenheit: Glanzstreifen, Regenbogen, Glitch
-  const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch' })[rarity] || '';
+  // Effekte je Seltenheit: Glanzstreifen, Regenbogen, Glitch, Arcane (Mana-Welle als Echo-Bild)
+  const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch', arcane: 'arcane' })[rarity] || '';
   const art = (c, extra) => {
     const fx = fxFor(c.rarity);
     let h = '<img src="' + c.image + '" alt="' + (extra && extra.alt ? extra.alt : '') + '" loading="lazy" width="720" height="1008">';
     if (fx === 'glitch') h += '<img class="tcg-glitch-a" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008"><img class="tcg-glitch-b" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008">';
+    if (fx === 'arcane') h += '<img class="tcg-arcane-echo" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008">';
     if (fx) h += '<span class="tcg-fx tcg-fx-' + fx + '"></span>';
     return h;
   };
