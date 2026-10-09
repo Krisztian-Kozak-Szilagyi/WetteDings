@@ -1,86 +1,115 @@
-// eSports Deep Dive (views/esports-guide.ejs): Folien wie eine Präsentation. „Weiter“ geht erst durch die Schritte der
-// Folie (hebt die passende Stelle im Nachbau hervor), dann zur nächsten Folie. Pfeiltasten, Punkte und #folie-n gehen auch.
+// eSports Deep Dive (views/esports-guide.ejs): Präsentation mit ganzen Seiten.
+// Jede Folie hat versteckt ihre Schritte (<ol data-gd-steps>, erster Eintrag ohne data-gd-step = Einleitung).
+// „Weiter“ läuft alle Schritte aller Folien der Reihe nach durch. Pro Schritt: Erklärung oben (bleibt stehen),
+// die passende Stelle [data-gd="n"] wird ausgeleuchtet (Spot mit Abdunklung drumherum) und in die Mitte gescrollt.
 (() => {
   const root = document.querySelector('[data-gd-root]');
   if (!root) return;
+  const $ = (sel) => root.querySelector(`[data-gd-${sel}]`);
   const slides = [...root.querySelectorAll('[data-gd-slide]')];
-  const dots = root.querySelector('[data-gd-dots]');
-  const title = root.querySelector('[data-gd-title]');
-  const count = root.querySelector('[data-gd-count]');
-  const prev = root.querySelector('[data-gd-prev]');
-  const next = root.querySelector('[data-gd-next]');
+  const caption = $('caption');
+  const prev = $('prev');
+  const next = $('next');
+  const dots = $('dots');
+
+  // alle Schritte als flache Liste: { slide, n (0 = Einleitung), title, text }
+  const steps = [];
+  slides.forEach((s, si) => {
+    s.querySelectorAll('[data-gd-steps] > li').forEach((li) => {
+      steps.push({ si, n: Number(li.dataset.gdStep || 0), title: li.dataset.title || '', text: li.textContent.trim() });
+    });
+  });
+  const firstOf = (si) => steps.findIndex((x) => x.si === si);
   let cur = 0;
-  let step = 0; // 0 = Überblick ohne Hervorhebung
 
-  const stepsOf = (s) => [...s.querySelectorAll('[data-gd-step]')];
-
-  slides.forEach((s, i) => {
+  slides.forEach((s, si) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'gd-dot';
-    b.setAttribute('aria-label', `Folie ${i + 1}: ${s.dataset.title}`);
-    b.addEventListener('click', () => go(i, 0));
+    b.setAttribute('aria-label', `Folie ${si + 1}: ${s.dataset.title}`);
+    b.addEventListener('click', () => go(firstOf(si)));
     dots.appendChild(b);
-    stepsOf(s).forEach((btn) => btn.addEventListener('click', () => go(i, Number(btn.dataset.gdStep) === step ? 0 : Number(btn.dataset.gdStep))));
   });
 
-  function focus(s, n) {
-    s.classList.toggle('is-guiding', n > 0);
-    s.querySelectorAll('[data-gd]').forEach((el) => el.classList.remove('is-focus', 'is-parent'));
-    stepsOf(s).forEach((btn) => btn.classList.toggle('is-active', Number(btn.dataset.gdStep) === n));
-    if (!n) return;
-    s.querySelectorAll(`[data-gd="${n}"]`).forEach((el) => {
-      el.classList.add('is-focus');
-      // eine hervorgehobene Stelle in einer anderen: die äußere nicht abdunkeln
-      let p = el.parentElement.closest('[data-gd]');
-      while (p && s.contains(p)) {
-        p.classList.add('is-parent');
-        p = p.parentElement.closest('[data-gd]');
-      }
+  /** Spot über alle Stellen mit data-gd="n" legen → Rechteck (Seitenkoordinaten) oder null */
+  function spot(slide, n) {
+    const screen = slide.querySelector('.gd-screen');
+    let el = screen.querySelector('.gd-spot');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'gd-spot';
+      el.setAttribute('aria-hidden', 'true');
+      screen.appendChild(el);
+    }
+    const targets = n ? [...screen.querySelectorAll(`[data-gd="${n}"]`)] : [];
+    screen.classList.toggle('is-dim', targets.length > 0);
+    if (!targets.length) {
+      el.hidden = true;
+      return null;
+    }
+    const base = screen.getBoundingClientRect();
+    const rs = targets.map((t) => t.getBoundingClientRect());
+    const pad = 8;
+    const left = Math.min(...rs.map((r) => r.left)) - base.left - pad;
+    const top = Math.min(...rs.map((r) => r.top)) - base.top - pad;
+    const right = Math.max(...rs.map((r) => r.right)) - base.left + pad;
+    const bottom = Math.max(...rs.map((r) => r.bottom)) - base.top + pad;
+    el.hidden = false;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${right - left}px`;
+    el.style.height = `${bottom - top}px`;
+    return { top: base.top + window.scrollY + top, height: bottom - top };
+  }
+
+  /** Stelle mittig in den freien Bereich unter der Erklärung scrollen */
+  function scrollTo(rect, slide) {
+    const capBottom = caption.getBoundingClientRect().bottom;
+    const free = window.innerHeight - capBottom;
+    let y;
+    if (rect) y = rect.top - capBottom - Math.max(16, (free - rect.height) / 2);
+    else y = slide.getBoundingClientRect().top + window.scrollY - capBottom - 16;
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  }
+
+  function go(i, { scroll = true } = {}) {
+    cur = Math.max(0, Math.min(steps.length - 1, i));
+    const st = steps[cur];
+    slides.forEach((s, si) => {
+      s.hidden = si !== st.si;
     });
+    const slide = slides[st.si];
+    const inSlide = steps.filter((x) => x.si === st.si);
+    const pos = inSlide.indexOf(st);
+    $('kicker').textContent = `Folie ${st.si + 1} von ${slides.length} · ${slide.dataset.title}`;
+    $('count').textContent = pos > 0 ? `Schritt ${pos} von ${inSlide.length - 1}` : '';
+    $('ctitle').textContent = st.title;
+    $('ctext').textContent = st.text;
+    [...dots.children].forEach((d, k) => d.classList.toggle('is-on', k === st.si));
+    prev.disabled = cur === 0;
+    next.textContent = cur === steps.length - 1 ? 'Zurück zu eSports' : 'Weiter';
+    const rect = spot(slide, st.n);
+    if (scroll) scrollTo(rect, slide);
+    history.replaceState(null, '', `#schritt-${cur + 1}`);
   }
 
-  function go(i, n = 0) {
-    cur = Math.max(0, Math.min(slides.length - 1, i));
-    step = n;
-    slides.forEach((s, k) => {
-      s.hidden = k !== cur;
-    });
-    const s = slides[cur];
-    focus(s, step);
-    title.textContent = s.dataset.title;
-    count.textContent = `${cur + 1} / ${slides.length}`;
-    [...dots.children].forEach((d, k) => d.classList.toggle('is-on', k === cur));
-    prev.disabled = cur === 0 && step === 0;
-    const last = cur === slides.length - 1 && step >= stepsOf(s).length;
-    next.textContent = last ? 'Zurück zu eSports' : 'Weiter';
-    if (window.location.hash !== `#folie-${cur + 1}`) history.replaceState(null, '', `#folie-${cur + 1}`);
-  }
-
-  function forward() {
-    const total = stepsOf(slides[cur]).length;
-    if (step < total) return go(cur, step + 1);
-    if (cur < slides.length - 1) return go(cur + 1, 0);
-    window.location.assign('/esports');
-  }
-  function back() {
-    if (step > 0) return go(cur, step - 1);
-    if (cur > 0) go(cur - 1, stepsOf(slides[cur - 1]).length);
-  }
-
-  next.addEventListener('click', forward);
-  prev.addEventListener('click', back);
+  next.addEventListener('click', () => (cur === steps.length - 1 ? window.location.assign('/esports') : go(cur + 1)));
+  prev.addEventListener('click', () => go(cur - 1));
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      forward();
+      next.click();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      back();
+      go(cur - 1);
     }
   });
+  // Spot bei geänderter Fenstergröße und nach dem Laden der Bilder neu anlegen
+  const refresh = () => spot(slides[steps[cur].si], steps[cur].n);
+  window.addEventListener('resize', refresh);
+  window.addEventListener('load', refresh);
 
-  const m = /^#folie-(\d+)$/.exec(window.location.hash);
-  go(m ? Number(m[1]) - 1 : 0, 0);
+  const m = /^#schritt-(\d+)$/.exec(window.location.hash);
+  go(m ? Number(m[1]) - 1 : 0, { scroll: !!m });
 })();
