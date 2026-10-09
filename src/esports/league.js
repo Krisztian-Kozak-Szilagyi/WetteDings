@@ -44,7 +44,7 @@ const MAX_PRIZE_CASH = 10000000; // Cent: 100.000 €
 const MAX_PRIZE_PACKS = 50;
 // Profil: Teambild = Avatar aus dem Kosmetik-Shop, für Teams zum halben Preis (zahlt der Kapitän)
 const TEAM_AVATAR_FACTOR = 0.5;
-const BIO_MAX = 300;
+const BIO_MAX = 2000;
 const MOTTO_MAX = 60;
 const COLORS = [
   { key: 'gold', label: 'Gold', hex: '#d9a441' },

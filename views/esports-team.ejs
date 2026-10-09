@@ -121,7 +121,7 @@
         <form class="form es-tp-form" method="post" action="/esports/profil">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label class="field"><span>Motto</span><input type="text" name="motto" value="<%= team.motto %>" maxlength="<%= rules.MOTTO_MAX %>"></label>
-          <label class="field"><span>Über uns</span><textarea name="bio" rows="5" maxlength="<%= rules.BIO_MAX %>"><%= team.bio %></textarea></label>
+          <label class="field"><span>Über uns</span><textarea name="bio" rows="10" maxlength="<%= rules.BIO_MAX %>"><%= team.bio %></textarea></label>
           <label class="field"><span>Teamfarbe</span>
             <select name="color">
               <option value="">Keine</option>
