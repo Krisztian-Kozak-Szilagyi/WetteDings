@@ -1188,6 +1188,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .chat-msg.is-me { align-self: flex-end; align-items: flex-end; }
 .chat-msg.is-other { align-self: flex-start; }
 .chat-msg-from { font-size: .72rem; font-weight: 700; color: var(--color-accent); padding: 0 4px; }
+a.chat-msg-from { text-decoration: none; }
+a.chat-msg-from:hover { text-decoration: underline; }
 .chat-msg-text { padding: 8px 12px; border-radius: 14px; font-size: .92rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-msg.is-other .chat-msg-text { background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .chat-msg.is-me .chat-msg-text { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
@@ -1206,6 +1208,10 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 }
 .chat-form textarea:focus, .chat-new input:focus { outline: none; border-color: var(--primary); }
 .chat-form .btn { min-height: 40px; }
+/* iPhone zoomt in Felder unter 16px hinein und bleibt danach gezoomt (#188) */
+@media (pointer: coarse) {
+  .chat-form textarea, .chat-new input { font-size: 16px; }
+}
 @media (max-width: 520px) {
   .chat-fab { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
   .chat-panel { position: fixed; inset: auto 8px calc(8px + env(safe-area-inset-bottom)) 8px; width: auto; height: min(78dvh, 620px); }
