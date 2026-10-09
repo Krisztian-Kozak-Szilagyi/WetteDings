@@ -160,16 +160,13 @@ async function teamsOf(userIds) {
 }
 
 /**
- * Für welches Team zählt ein Mage-Tower-Lauf? Nur wenn alle Spieler Mitglieder desselben gehandelten Teams sind –
- * und zwar schon vor Beginn der laufenden Woche (kein schneller Einkauf starker Spieler vor dem Bericht).
+ * Für welches Team zählt ein Mage-Tower-Lauf (eSports-Live-Turm)? Wenn alle Spieler Mitglieder desselben gehandelten
+ * Teams sind. Seit 2026-10-09 (Krisztian) ohne Wartezeit – auch ein frisch beigetretenes Mitglied spielt sofort mit.
  */
-async function towerTeam(userIds, now = Date.now()) {
+async function towerTeam(userIds) {
   if (userIds.length !== league.TEAM_SIZE) return null;
-  const team = await EsportsTeam.findOne({ status: 'aktiv', 'members.user': { $all: userIds } }).select('members').lean();
-  if (!team) return null;
-  const since = weekStart(now);
-  const ok = userIds.every((id) => team.members.some((m) => m.user.equals(id) && m.joinedAt <= since));
-  return ok ? team._id : null;
+  const team = await EsportsTeam.findOne({ status: 'aktiv', 'members.user': { $all: userIds } }).select('_id').lean();
+  return team ? team._id : null;
 }
 
 /** Wertung eines Laufs: Runden und gesammelte Punkte (alle Kämpfe, auch der verlorene) */
@@ -529,7 +526,9 @@ async function closeExpired(now = Date.now()) {
 async function runDue(now = Date.now()) {
   const last = lastDue(now);
   if (!last || zoned(now).day !== last.day) return null; // nur am Sonntag selbst nachholen
-  const from = new Date(last.due.getTime() - 7 * DAY);
+  if (last.due.getTime() <= league.LEAGUE_START.getTime()) return null; // vor dem Liga-Start kein Bericht
+  // erste Woche: Läufe erst ab dem Liga-Start
+  const from = new Date(Math.max(last.due.getTime() - 7 * DAY, league.LEAGUE_START.getTime()));
   try {
     await EsportsWeek.create({ _id: last.day, from, to: last.due });
   } catch (err) {
