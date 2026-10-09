@@ -7,6 +7,7 @@ const { DUNGEONS, defOf, dungeonForSlot, TOWER } = require('../dungeon/dungeons'
 const { floorByKey } = require('../dungeon/tower');
 const LIVE = require('../dungeon/liveTower');
 const liveTower = require('../dungeon/liveTowerService');
+const { EsportsTeam } = require('../models/Esports');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
@@ -116,7 +117,9 @@ router.get('/dungeon', async (req, res) => {
   };
   const startFans = phase === 'frei' ? { solo: fanOf(1), gruppe: fanOf(3) } : null;
   // eSports-Team in der Turm-Lobby: Live-Lauf mit Vorrat (Kaffee, Energy) und Bereit
-  const esLobby = tower && party && !party.solo && phase === 'gruppe' ? !!(await dungeon.esportsLobby(party, now)) : false;
+  const esTeamId = tower && party && !party.solo && phase === 'gruppe' ? await dungeon.esportsLobby(party, now) : null;
+  const esLobby = !!esTeamId;
+  const esTeam = esTeamId ? await EsportsTeam.findById(esTeamId).select('name ticker').lean() : null;
   const coffeeChoices = esLobby && cards ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: cards.counts[id] || 0 })).filter((c) => c.card) : [];
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
@@ -154,6 +157,8 @@ router.get('/dungeon', async (req, res) => {
     towerLeft,
     towerRuns: dungeon.settings.tower.dailyRuns,
     esLobby,
+    esTeam,
+    coffeePct: LIVE.COFFEE,
     coffeeChoices,
     energyFree: esLobby && cards ? cards.counts[LIVE.ENERGY_CARD] || 0 : 0,
     allReady: !!party && party.members.every((m) => m.ready),
