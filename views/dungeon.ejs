@@ -95,6 +95,10 @@
   <% } %>
 <% } %>
 
+<% if (esLobby) { %>
+  <%# eSports-Team: eigene Vorbereitung (Design „1 · Vorbereitung“) statt Tisch und Lobby-Leiste %>
+  <%- include('partials/es-prep') %>
+<% } else { %>
 <%# Tisch: drei Plätze nebeneinander (vor dem Beitritt: Solo/Party-Kacheln), rechts Chat bzw. Anleitung %>
 <section class="dg-table<%= hasChat || phase === 'frei' ? '' : ' no-chat' %>" id="dg-tisch">
   <% if (phase === 'frei') { %>
@@ -294,6 +298,8 @@
       </form>
     </div>
   </section>
+<% } %>
+
 <% } %>
 
 <%# Kartenauswahl in der Lobby (#114): ein zentriertes Fenster je Platz (Charakter, Boost) – oben Suche und Filter,

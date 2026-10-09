@@ -1,0 +1,162 @@
+<%# eSports-Live-Turm: Vorbereitung (Design „1 · Vorbereitung“). Drei Spieler: Hauptkarte und Boost per Klick (Auswahlfenster
+    aus dungeon.ejs, data-dg-open), Kaffee/Energy im Fenster #es-vorrat, „Ich bin bereit“, der Kapitän startet.
+    Erwartet: slots, esTeam, coffeeChoices, energyFree, coffeePct, isLeader, towerReady, allReady, rarityByKey, csrfToken. %>
+<%
+  const readyCount = slots.filter((s) => s.ready).length;
+  const all = readyCount === slots.length && slots.length === 3;
+  const meSlot = slots.find((s) => s.me) || {};
+  const rarityLabel = (c) => (rarityByKey[c.rarity] || {}).label || c.rarity;
+%>
+<link rel="stylesheet" href="/css/live-tower.css?v=<%= assetVersion %>">
+<div class="lt-page lt-prep" id="dg-tisch">
+  <header class="lt-prep-head">
+    <div>
+      <span class="lt-label">Mage Tower · eSports-Lauf</span>
+      <h1 class="lt-prep-title"><%= esTeam ? esTeam.name : 'eSports-Team' %><% if (esTeam && esTeam.ticker) { %> <span class="muted">[<%= esTeam.ticker %>]</span><% } %></h1>
+    </div>
+    <span class="lt-chip">Alle eSports-Teams bekommen diese Woche dieselben Bosse</span>
+  </header>
+
+  <section class="lt-prep-players">
+    <% slots.forEach((s) => { %>
+      <article class="lt-prep-card<%= s.ready ? ' is-ready' : '' %>">
+        <div class="lt-prep-top">
+          <div>
+            <div class="lt-prep-name"><%= s.name %></div>
+            <div class="muted small"><%= s.leader ? 'Kapitän' : 'Mitglied' %><%= s.me ? ' · du' : '' %></div>
+          </div>
+          <% if (s.ready) { %>
+            <span class="lt-pill is-ready"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Bereit</span>
+          <% } else { %>
+            <span class="lt-pill">wählt noch …</span>
+          <% } %>
+        </div>
+
+        <div class="lt-prep-row">
+          <% if (s.me) { %>
+            <button type="button" class="lt-prep-main r-<%= s.card ? s.card.rarity : 'none' %>" data-dg-open="card" title="Anklicken zum Ändern" aria-label="Hauptkarte ändern">
+              <% if (s.card) { %><img src="<%= s.card.image %>" alt="<%= s.card.name %>" width="720" height="1008" loading="lazy"><% } else { %><span class="lt-prep-empty">+ Hauptkarte</span><% } %>
+            </button>
+          <% } else { %>
+            <div class="lt-prep-main r-<%= s.card ? s.card.rarity : 'none' %>">
+              <% if (s.card) { %><img src="<%= s.card.image %>" alt="<%= s.card.name %>" width="720" height="1008" loading="lazy"><% } else { %><span class="lt-prep-empty">wählt noch …</span><% } %>
+            </div>
+          <% } %>
+          <div class="lt-prep-info">
+            <span class="lt-label">Hauptkarte</span>
+            <div class="lt-prep-stats">
+              <% [['SPD', 'speed'], ['FIA', 'fia'], ['FIS', 'fis'], ['BWL', 'bwl']].forEach(([label, key]) => { %>
+                <div><span><%= label %></span><strong><%= s.card && s.card.stats ? s.card.stats[key] : '–' %></strong></div>
+              <% }) %>
+            </div>
+            <% const boostInner = () => { %>
+              <span class="lt-prep-mini r-<%= s.boost ? s.boost.rarity : 'none' %>"><% if (s.boost) { %><img src="<%= s.boost.image %>" alt="" width="720" height="1008" loading="lazy"><% } %></span>
+              <span class="lt-prep-boost-text">
+                <span class="muted small">Boost-Karte</span>
+                <strong><%= s.boost ? s.boost.name : (s.me ? '+ Boost wählen' : 'kein Boost') %></strong>
+                <% if (s.boost) { %><span class="lt-rar r-<%= s.boost.rarity %>"><%= rarityLabel(s.boost) %></span><% } %>
+              </span>
+            <% } %>
+            <% if (s.me) { %>
+              <button type="button" class="lt-prep-boost r-<%= s.boost ? s.boost.rarity : 'none' %>" data-dg-open="boost" title="Anklicken zum Ändern"><% boostInner() %></button>
+            <% } else { %>
+              <div class="lt-prep-boost r-<%= s.boost ? s.boost.rarity : 'none' %>"><% boostInner() %></div>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="lt-prep-supply">
+          <span class="muted small">Wird beim Benutzen verbraucht</span>
+          <% const rows = [
+               s.coffee ? { name: 'Kaffee · ' + rarityLabel(s.coffee), effect: '+' + (coffeePct[s.coffee.id] || 0) + ' % Bock', cls: 'r-' + s.coffee.rarity } : { name: s.me ? '+ Kaffee' : 'kein Kaffee', effect: '', cls: 'is-empty' },
+               s.energy ? { name: 'BfW Energy', effect: '1× fürs Team', cls: 'r-gold' } : { name: s.me ? '+ BfW Energy' : 'kein Energy', effect: '', cls: 'is-empty' },
+             ]; %>
+          <% rows.forEach((r) => { %>
+            <% if (s.me) { %>
+              <button type="button" class="lt-slot <%= r.cls %>" data-dialog-open="es-vorrat"><span class="lt-slot-bar"></span><span class="lt-slot-name"><%= r.name %></span><span class="lt-slot-effect"><%= r.effect %></span></button>
+            <% } else { %>
+              <div class="lt-slot <%= r.cls %>"><span class="lt-slot-bar"></span><span class="lt-slot-name"><%= r.name %></span><span class="lt-slot-effect"><%= r.effect %></span></div>
+            <% } %>
+          <% }) %>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="lt-prep-bottom">
+    <div class="lt-panel lt-prep-rules">
+      <strong class="lt-panel-title">Was ihr im Lauf habt</strong>
+      <div class="lt-prep-rules-top">
+        <div>
+          <span class="lt-next-kicker">Team-Energie zum Start</span>
+          <div class="lt-pips"><% for (let i = 0; i < 8; i++) { %><span class="lt-pip is-big is-on"></span><% } %></div>
+          <span class="small"><strong>8</strong> Energie · nach jedem Stockwerk nutzbar</span>
+        </div>
+        <div>
+          <span class="lt-next-kicker">BfW Energy</span>
+          <span class="small">Einmal pro Lauf fürs ganze Team: Team-Energie auffüllen <em>oder</em> eine Karte retten.</span>
+        </div>
+      </div>
+      <div class="lt-tiles is-four">
+        <% [
+             ['Boost · alle', 3, '+20 % für alle, 40 s', 'Alle Hauptkarten +20 %. Die 40 Sekunden starten mit dem nächsten Kampf und laufen in der Pause danach weiter – wer dort lange überlegt, verschenkt den Rest des Boosts.'],
+             ['Boost · eine Karte', 1, '+20 % für eine Karte', 'Nur eine Hauptkarte +20 %, 40 Sekunden ab dem nächsten Kampf. Schließt den Boost für alle aus.'],
+             ['Kartenwechsel', 2, 'neue Hauptkarte', 'Ein Spieler tauscht seine Hauptkarte. Hat er keinen Bock mehr (0 %), startet die neue Karte mit 50 %. Ab Stockwerk 2 seht ihr, welchen Wert der nächste Boss will.'],
+             ['Verlängerung', 3, '+7 s am nächsten Boss', 'Der nächste Kampf dauert 7 Sekunden länger. Jede weitere Fähigkeit in derselben Pause kostet +1 Energie.'],
+           ].forEach(([name, cost, short, tipText]) => { %>
+          <button type="button" class="lt-tile is-info">
+            <span class="lt-tile-head"><span class="lt-tile-name"><%= name %></span><span class="lt-tile-cost is-accent"><%= cost %></span></span>
+            <span class="lt-tile-desc"><%= short %></span>
+            <span class="lt-tip"><%= tipText %></span>
+          </button>
+        <% }) %>
+      </div>
+      <p class="lt-note">Bosse nehmen zufälligen Spielern 17,5 % Bock.</p>
+    </div>
+
+    <div class="lt-panel lt-prep-ready">
+      <div>
+        <strong class="lt-panel-title"><%= all ? 'Alle bereit – los geht\'s!' : readyCount + ' von 3 bereit' %></strong>
+        <p class="lt-note">Der Kapitän startet, sobald alle bereit sind.</p>
+      </div>
+      <form method="post" action="/dungeon/turm/bereit">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="lt-btn <%= meSlot.ready ? 'is-grey' : 'is-accent' %>"><%= meSlot.ready ? 'Doch nicht bereit' : 'Ich bin bereit' %></button>
+      </form>
+      <% if (isLeader) { %>
+        <form method="post" action="/dungeon/turm/starten">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="lt-btn <%= towerReady && allReady ? 'is-go' : 'is-grey' %>" <%= towerReady && allReady ? '' : 'disabled' %>>Turm starten</button>
+        </form>
+      <% } %>
+      <form method="post" action="/dungeon/verlassen">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="lt-link">Gruppe verlassen</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<%# Kaffee und Energy wählen (Fenster, app.js: data-dialog-open / data-dialog-close) %>
+<dialog class="dialog lt-supply-dialog" id="es-vorrat" aria-labelledby="es-vorrat-title">
+  <form method="post" action="/dungeon/turm/vorrat" class="lt-supply-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <h2 id="es-vorrat-title" class="lt-panel-title">Mitnehmen</h2>
+    <p class="lt-note">Je ein Platz. Was ihr benutzt, ist danach weg.</p>
+    <fieldset class="lt-supply-group">
+      <legend class="lt-next-kicker">Kaffee (nur in der Pause)</legend>
+      <label class="lt-supply-opt"><input type="radio" name="coffee" value="" <%= meSlot.coffee ? '' : 'checked' %>><span>kein Kaffee</span></label>
+      <% coffeeChoices.forEach((c) => { %>
+        <label class="lt-supply-opt<%= c.free ? '' : ' is-off' %>"><input type="radio" name="coffee" value="<%= c.id %>" <%= meSlot.coffee && meSlot.coffee.id === c.id ? 'checked' : '' %> <%= c.free ? '' : 'disabled' %>><span class="lt-slot-bar r-<%= c.card.rarity %>"></span><span><%= c.card.name %></span><span class="muted small">+<%= c.pct %> % Bock<%= c.free ? '' : ' · keiner frei' %></span></label>
+      <% }) %>
+    </fieldset>
+    <fieldset class="lt-supply-group">
+      <legend class="lt-next-kicker">BfW Energy (nur eines pro Lauf nutzbar)</legend>
+      <label class="lt-supply-opt<%= energyFree || meSlot.energy ? '' : ' is-off' %>"><input type="checkbox" name="energy" value="1" <%= meSlot.energy ? 'checked' : '' %> <%= energyFree || meSlot.energy ? '' : 'disabled' %>><span class="lt-slot-bar r-gold"></span><span>BfW Energy mitnehmen</span><span class="muted small"><%= energyFree || meSlot.energy ? 'Team-Energie oder Bock 100 %' : 'keines frei' %></span></label>
+    </fieldset>
+    <div class="lt-supply-actions">
+      <button type="button" class="lt-btn is-grey" data-dialog-close>Abbrechen</button>
+      <button type="submit" class="lt-btn is-accent">Übernehmen</button>
+    </div>
+  </form>
+</dialog>

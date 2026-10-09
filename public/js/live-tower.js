@@ -220,43 +220,77 @@
     return state.costs[key] + extra;
   }
 
-  function abilityButton(key) {
+  const DESC = {
+    boost: () => `+20 % für alle Hauptkarten, ${state.boostSeconds} s ab Kampfbeginn`,
+    einzel: () => `+20 % für eine Hauptkarte, ${state.boostSeconds} s`,
+    wechsel: () => 'Deine Hauptkarte tauschen – ohne Bock startet die neue mit 50 %',
+    verl: () => `+${state.extSeconds} s für den nächsten Boss`,
+  };
+
+  /** Tooltip-Blase (zeigt sich beim Darüberfahren oder Fokus, nur CSS) */
+  const tip = (key) => el('span', 'lt-tip', TIPS[key]);
+
+  /** Kachel einer Fähigkeit wie im Design: ganze Kachel klickbar, Name + Kosten, Beschreibung, Status */
+  function abilityTile(key) {
     const chosen = state.chosen;
     const pick = chosen.find((c) => c.key === key && (key !== 'wechsel' || c.by === state.me));
+    const anyPick = chosen.filter((c) => c.key === key);
     const rival = key === 'boost' ? 'einzel' : key === 'einzel' ? 'boost' : null;
     const rest = rival ? chosen.filter((c) => c.key !== rival) : chosen;
-    const cost = pick ? costOf(key, chosen) : costOf(key, rest);
+    const extra = (pick ? chosen.indexOf(pick) : rest.length) > 0;
+    const cost = state.costs[key] + (extra ? state.overload : 0);
     const refund = rival && chosen.some((c) => c.key === rival) ? costOf(rival, chosen) : 0;
     const canPay = !!pick || state.energy + refund >= cost;
-    const tile = el('div', `lt-ability${pick ? ' is-on' : ''}${canPay ? '' : ' is-off'}`);
-    tile.title = TIPS[key];
-    const head = el('div', 'lt-ability-head');
-    head.appendChild(el('strong', '', NAMES[key]));
-    head.appendChild(el('span', 'lt-cost', `${cost}${!pick && rest.length ? ' (+1)' : ''}`));
-    tile.appendChild(head);
+    const who = anyPick.map((c) => (c.by === state.me ? 'dir' : c.byName)).join(', ');
+    let stateText;
+    if (anyPick.length) stateText = `Gewählt von ${who}${key === 'einzel' ? ` · ${state.players[anyPick[0].target].name}` : ''}${key === 'wechsel' ? '' : ' – nochmal tippen zum Abwählen'}`;
+    else if (!canPay) stateText = 'Zu wenig Energie';
+    else if (extra) stateText = `Überladung: +${state.overload} Energie`;
+    else stateText = key === 'einzel' ? 'Karte antippen' : key === 'wechsel' ? 'Antippen und Karte wählen' : 'Antippen zum Wählen';
+    const mine = anyPick.some((c) => c.by === state.me);
+    const cls = `lt-tile${anyPick.length ? ' is-on' : ''}${canPay ? '' : ' is-off'}`;
+    const head = el('span', 'lt-tile-head');
+    head.appendChild(el('span', 'lt-tile-name', NAMES[key]));
+    head.appendChild(el('span', 'lt-tile-cost', extra ? `${cost} (+${state.overload})` : String(cost)));
+    const status = el('span', `lt-tile-state${anyPick.length ? (mine ? ' is-mine' : ' is-other') : ''}`, stateText);
+
     if (key === 'einzel') {
-      const row = el('div', 'lt-targets');
+      const tile = el('div', cls);
+      tile.appendChild(head);
+      const row = el('span', 'lt-targets');
       state.players.forEach((p, i) => {
-        const b = el('button', `lt-target${pick && pick.target === i ? ' is-on' : ''}`, p.name);
+        const on = !!(pick && pick.target === i);
+        const b = el('button', `lt-target${on ? ' is-on' : ''}`, p.name);
         b.type = 'button';
-        b.disabled = !canPay && !(pick && pick.target === i);
-        b.setAttribute('aria-pressed', String(!!(pick && pick.target === i)));
+        b.disabled = !canPay && !on;
+        b.setAttribute('aria-pressed', String(on));
         b.addEventListener('click', () => send('waehlen', { key, target: i }));
         row.appendChild(b);
       });
       tile.appendChild(row);
-    } else {
-      const b = el('button', 'lt-ability-btn');
-      b.type = 'button';
-      b.disabled = !canPay || (key === 'wechsel' && !!pick);
-      b.setAttribute('aria-pressed', String(!!pick));
-      b.textContent = key === 'wechsel' ? (pick ? 'Gewechselt' : 'Meine Karte wechseln') : pick ? 'Abwählen' : 'Wählen';
-      b.addEventListener('click', () => (key === 'wechsel' ? openSwitch() : send('waehlen', { key })));
-      tile.appendChild(b);
+      tile.appendChild(status);
+      tile.appendChild(tip(key));
+      return tile;
     }
-    const by = chosen.filter((c) => c.key === key);
-    tile.appendChild(el('span', `lt-ability-state${by.some((c) => c.by !== state.me) ? ' is-other' : ''}`, by.length ? `Gewählt von ${by.map((c) => (c.by === state.me ? 'dir' : c.byName)).join(', ')}${key === 'einzel' && by[0] ? ` · ${state.players[by[0].target].name}` : ''}` : canPay ? '' : 'Zu wenig Energie'));
+    const tile = el('button', cls);
+    tile.type = 'button';
+    tile.disabled = !canPay || (key === 'wechsel' && !!pick);
+    tile.setAttribute('aria-pressed', String(!!pick));
+    tile.appendChild(head);
+    tile.appendChild(el('span', 'lt-tile-desc', DESC[key]()));
+    tile.appendChild(status);
+    tile.appendChild(tip(key));
+    tile.addEventListener('click', () => (key === 'wechsel' ? openSwitch() : send('waehlen', { key })));
     return tile;
+  }
+
+  function renderCountdown() {
+    const left = (state.phaseEndsAt - serverNow()) / 1000;
+    const box = $('countdown-box');
+    $('countdown').textContent = clock(left);
+    $('countdown-bar').style.width = `${Math.max(0, Math.min(100, (left / state.pauseSeconds) * 100))}%`;
+    box.classList.toggle('is-low', left <= 15 && left > 5);
+    box.classList.toggle('is-crit', left <= 5);
   }
 
   function renderPause() {
@@ -265,11 +299,8 @@
     if (box.hidden) return;
     const f = state.fight;
     $('pause-title').textContent = f ? `Stockwerk ${f.n} geschafft` : '';
-    const left = (state.phaseEndsAt - serverNow()) / 1000;
-    $('countdown').textContent = clock(left);
-    $('countdown-bar').style.width = `${Math.max(0, Math.min(100, (left / state.pauseSeconds) * 100))}%`;
-    $('countdown-box').classList.toggle('is-low', left <= 15);
-    $('countdown-box').classList.toggle('is-crit', left <= 5);
+    $('pause-sub').textContent = `${f ? `${fmt(f.total)} Punkte · ` : ''}weiter geht's, sobald alle „Weiter“ drücken – spätestens nach ${state.pauseSeconds} s.`;
+    renderCountdown();
 
     // nächster Boss
     const nx = $('next');
@@ -277,60 +308,75 @@
     const n = state.next;
     if (n) {
       const l = el('div', 'lt-next-left');
-      l.appendChild(el('span', 'lt-label', `Als Nächstes · Stockwerk ${n.n}`));
+      l.appendChild(el('span', 'lt-next-kicker', `Als Nächstes · Stockwerk ${n.n}`));
       const chips = el('div', 'lt-chips');
-      chips.appendChild(el('span', `lt-stat is-${n.stat || 'none'}`, n.hidden ? '?' : STAT[n.stat]));
-      if (n.trait) chips.appendChild(el('span', 'lt-trait', `${n.trait.label}: ${n.trait.text}`));
-      if (n.hidden) chips.appendChild(el('span', 'muted small', 'Nebel – diesmal keine Vorschau'));
+      chips.appendChild(el('span', `lt-stat is-big is-${n.stat || 'none'}`, n.hidden ? '?' : STAT[n.stat]));
+      if (n.trait) chips.appendChild(el('span', 'lt-trait is-big', `${n.trait.label}: ${n.trait.text}`));
+      if (n.hidden) chips.appendChild(el('span', 'lt-trait is-big', n.n === 1 ? 'Findet selbst heraus, was er will' : 'Nebel – diesmal keine Vorschau'));
       l.appendChild(chips);
-      if (n.title) l.appendChild(el('strong', '', n.title));
+      if (n.title) l.appendChild(el('span', 'muted small', n.title));
       nx.appendChild(l);
       if (n.required) {
         const r = el('div', 'lt-next-right');
-        r.appendChild(el('span', 'lt-label', 'Ziel'));
+        r.appendChild(el('span', 'lt-next-kicker', 'Ziel'));
         r.appendChild(el('strong', '', fmt(n.required)));
         nx.appendChild(r);
       }
     }
 
+    // Fähigkeiten
     $('energy-after').textContent = String(state.energy);
+    const pp = $('pause-pips');
+    pp.textContent = '';
+    for (let i = 1; i <= state.energyMax; i++) {
+      const p = el('span', 'lt-pip is-big');
+      if (i <= state.energy) p.classList.add('is-on');
+      else if (i <= state.energyStart) p.classList.add('is-pending');
+      pp.appendChild(p);
+    }
     const ab = $('abilities');
     ab.textContent = '';
-    ['boost', 'einzel', 'wechsel', 'verl'].forEach((k) => ab.appendChild(abilityButton(k)));
+    ['boost', 'einzel', 'wechsel', 'verl'].forEach((k) => ab.appendChild(abilityTile(k)));
 
-    // BfW Energy
+    // BfW Energy: Team-Energie oder Bock eines beliebigen Spielers
     const dp = $('drinks');
     dp.textContent = '';
     $('drink-panel').hidden = !state.drink.available;
     if (state.drink.available) {
-      const opts = [{ mode: 'team', name: 'Team-Energie auffüllen', text: `${state.energy} → ${state.energyMax}` }].concat(
-        state.players.map((p, i) => ({ mode: 'bock', target: i, name: `Bock für ${p.name}`, text: `${p.bock <= 0 ? '0 %' : pctText(p.bock)} → 100 %` }))
+      const opts = [{ mode: 'team', name: 'Team-Energie auffüllen', text: `${state.energy} → ${state.energyMax} Energie`, off: state.energy >= state.energyMax }].concat(
+        state.players.map((p, i) => ({ mode: 'bock', target: i, name: `Bock für ${p.name}`, text: `${p.bock <= 0 ? '0 %' : pctText(p.bock)} → 100 %${p.bock <= 0 ? ', ohne Kartenwechsel' : ''}`, off: p.bock >= 100 }))
       );
       opts.forEach((o) => {
         const b = el('button', 'lt-drink-opt');
         b.type = 'button';
-        b.appendChild(el('strong', '', o.name));
-        b.appendChild(el('span', 'muted small', o.text));
+        b.disabled = o.off;
+        b.appendChild(el('span', 'lt-drink-name', o.name));
+        b.appendChild(el('span', 'lt-drink-text', o.text));
         b.addEventListener('click', () => send('energy', { mode: o.mode, target: o.target === undefined ? '' : o.target }));
         dp.appendChild(b);
       });
     }
 
-    // Team-Status + Weiter
+    // Team: Bock und wer schon „Weiter“ gedrückt hat
     const team = $('team');
     team.textContent = '';
-    team.appendChild(el('strong', '', 'Team'));
+    team.appendChild(el('strong', 'lt-side-head', 'Team'));
     state.players.forEach((p) => {
       const row = el('div', 'lt-team-row');
       const top = el('div', 'lt-team-top');
-      top.appendChild(el('span', '', `${p.name} · ${p.card ? p.card.name : ''}`));
-      top.appendChild(el('span', p.weiter ? 'lt-weiter-on' : 'muted small', p.weiter ? '✓ Weiter' : 'überlegt …'));
+      const nm = el('span', 'lt-team-name', p.name);
+      if (p.card) nm.appendChild(el('span', 'lt-team-card', ` · ${p.card.name}`));
+      top.appendChild(nm);
+      top.appendChild(el('span', p.weiter ? 'lt-weiter-on' : 'lt-weiter-off', p.weiter ? '✓ Weiter' : 'überlegt …'));
       row.appendChild(top);
-      const track = el('div', 'lt-track');
+      const bar = el('div', 'lt-team-bar');
+      const track = el('div', 'lt-track is-mid');
       const fill = el('span', `lt-fill ${bockColor(p.bock)}`);
       fill.style.width = `${Math.max(0, Math.min(100, p.bock))}%`;
       track.appendChild(fill);
-      row.appendChild(track);
+      bar.appendChild(track);
+      bar.appendChild(el('span', `lt-team-pct ${bockColor(p.bock)}`, p.bock <= 0 ? 'Kein Bock' : pctText(p.bock)));
+      row.appendChild(bar);
       team.appendChild(row);
     });
 
@@ -338,14 +384,16 @@
     const cf = $('coffee');
     cf.hidden = !(me && me.coffee);
     if (me && me.coffee) {
-      $('coffee-text').textContent = `Dein Kaffee: ${me.coffee.name} +${me.coffee.pct} % Bock`;
+      const t = $('coffee-text');
+      t.textContent = 'Dein Kaffee: ';
+      t.appendChild(el('strong', '', `${me.coffee.name.replace('Casino-Kaffee', '').trim() || 'Kaffee'} +${me.coffee.pct} % Bock`));
       $('coffee-go').textContent = `Kaffee trinken (${me.bock <= 0 ? '0 %' : pctText(me.bock)} → ${pctText(Math.min(100, me.bock + me.coffee.pct))})`;
       $('coffee-go').disabled = me.bock >= 100;
     }
     const w = $('weiter');
-    w.textContent = me && me.weiter ? 'Warte auf die anderen … (zurücknehmen)' : 'Weiter';
-    w.classList.toggle('btn-primary', !(me && me.weiter));
-    w.classList.toggle('btn-ghost', !!(me && me.weiter));
+    const waiting = state.players.filter((p) => !p.weiter && !p.me).map((p) => p.name);
+    w.textContent = me && me.weiter ? `Warte auf ${waiting.join(', ') || 'die anderen'} … (zurücknehmen)` : 'Weiter';
+    w.classList.toggle('is-pressed', !!(me && me.weiter));
   }
 
   function renderStart() {
@@ -491,12 +539,6 @@
       renderPlayers();
       renderLog();
     }
-    if (state.phase === 'pause') {
-      const left = (state.phaseEndsAt - serverNow()) / 1000;
-      $('countdown').textContent = clock(left);
-      $('countdown-bar').style.width = `${Math.max(0, Math.min(100, (left / state.pauseSeconds) * 100))}%`;
-      $('countdown-box').classList.toggle('is-low', left <= 15);
-      $('countdown-box').classList.toggle('is-crit', left <= 5);
-    }
+    if (state.phase === 'pause') renderCountdown();
   }, 250);
 })();
