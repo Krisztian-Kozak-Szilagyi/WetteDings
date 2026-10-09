@@ -4,7 +4,8 @@
  *
  * Woche: Jeden Sonntag um REPORT_TIME wertet die Liga die Mage-Tower-Läufe der vergangenen sieben Tage aus.
  * Es zählen nur Läufe, in denen alle drei Spieler Mitglieder desselben Teams waren (schon vor Beginn der Woche).
- * Punkte eines Teams = Summe der Runden seiner TOP_RUNS besten Läufe; bei Gleichstand teilen sich Teams den Platz.
+ * Wertung eines Teams = Summe der Runden (Stockwerke) seiner TOP_RUNS besten Läufe; bei Gleichstand entscheiden die
+ * gesammelten Punkte dieser Läufe (auch die des verlorenen Stockwerks), erst danach teilen sich Teams den Platz.
  * Sprung: Platz 1 → +25 %, letzter Platz → −20 % (im Log-Maß linear dazwischen, die Mitte ±0);
  * wer seinen Platz der Vorwoche hält oder verbessert, bekommt HOLD_BONUS dazu.
  */
@@ -77,28 +78,32 @@ function cleanTicker(value) {
   return TICKER_PATTERN.test(t) ? t : null;
 }
 
-/** Punkte eines Teams aus den Runden seiner Läufe: Summe der TOP_RUNS besten */
-function scoreOf(rounds) {
-  const best = [...rounds].sort((a, b) => b - a).slice(0, TOP_RUNS);
-  return { score: best.reduce((s, r) => s + r, 0), best };
+/**
+ * Wertung aus den Läufen: runs = Zahlen (Runden) oder { rounds, points }. Die TOP_RUNS besten Läufe (Runden, dann Punkte)
+ * → { score: Summe der Runden, points: Summe ihrer Punkte, best: Runden der besten Läufe }
+ */
+function scoreOf(runs) {
+  const list = runs.map((r) => (typeof r === 'number' ? { rounds: r, points: 0 } : { rounds: r.rounds || 0, points: r.points || 0 }));
+  const best = list.sort((a, b) => b.rounds - a.rounds || b.points - a.points).slice(0, TOP_RUNS);
+  return { score: best.reduce((s, r) => s + r.rounds, 0), points: best.reduce((s, r) => s + r.points, 0), best: best.map((r) => r.rounds) };
 }
 
 /**
  * Rangliste und Sprünge der Woche.
- * @param {{id: string, rounds: number[], prevRank: number|null}[]} teams  alle gehandelten Teams der Woche
+ * @param {{id: string, runs?: {rounds: number, points: number}[], rounds?: number[], prevRank: number|null}[]} teams  alle gehandelten Teams der Woche
  * @returns {{id: string, score: number, best: number[], rank: number, of: number, held: boolean, log: number, change: number}[]}
  *          sortiert nach Platz. rank beginnt bei 1; Teams mit gleichen Punkten teilen sich den Platz und den Sprung.
  */
 function rankWeek(teams) {
-  const rows = teams.map((t) => ({ id: t.id, prevRank: t.prevRank ?? null, ...scoreOf(t.rounds || []) }));
-  rows.sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));
+  const rows = teams.map((t) => ({ id: t.id, prevRank: t.prevRank ?? null, ...scoreOf(t.runs || t.rounds || []) }));
+  rows.sort((a, b) => b.score - a.score || b.points - a.points || String(a.id).localeCompare(String(b.id)));
   const n = rows.length;
   // Log-Sprung für die Position i (0 = oben): linear von LOG_TOP bis LOG_BOTTOM; ein einzelnes Team bleibt bei 0
   const posLog = (i) => (n < 2 ? 0 : LOG_TOP + ((LOG_BOTTOM - LOG_TOP) * i) / (n - 1));
   const out = [];
   for (let i = 0; i < n; ) {
     let j = i;
-    while (j + 1 < n && rows[j + 1].score === rows[i].score) j++;
+    while (j + 1 < n && rows[j + 1].score === rows[i].score && rows[j + 1].points === rows[i].points) j++;
     // Gleichstand: Durchschnitt der Positionen i … j
     let base = 0;
     for (let k = i; k <= j; k++) base += posLog(k);
@@ -109,7 +114,7 @@ function rankWeek(teams) {
       // Bonus nur mit Punkten: ein Team ohne gültigen Lauf hält keinen Platz
       const held = r.score > 0 && r.prevRank !== null && rank <= r.prevRank;
       const log = base + (held ? LOG_HOLD : 0);
-      out.push({ id: r.id, score: r.score, best: r.best, rank, of: n, held, log, change: Math.expm1(log) });
+      out.push({ id: r.id, score: r.score, points: r.points, best: r.best, rank, of: n, held, log, change: Math.expm1(log) });
     }
     i = j + 1;
   }
@@ -193,7 +198,7 @@ function reportText(team, row, dateText, place = null) {
     '',
     `**Platz ${row.rank} von ${row.of}** in der Mage-Tower-Liga.`,
     '',
-    row.best.length ? `Unsere besten Läufe der Woche: ${runs} – zusammen **${row.score} Punkte**.` : 'Diese Woche haben wir keinen gültigen Lauf als volles Team geschafft.',
+    row.best.length ? `Unsere besten Läufe der Woche: ${runs} – zusammen **${row.score} ${row.score === 1 ? 'Stockwerk' : 'Stockwerke'}**${row.points ? ` und ${row.points.toLocaleString('de-DE')} Punkte` : ''}.` : 'Diese Woche haben wir keinen gültigen Lauf als volles Team geschafft.',
     row.held ? 'Wir haben unseren Platz gehalten.' : '',
     place && placeInfo(place) ? `🏆 Dafür gibt es die **${placeInfo(place).label}-Trophäe** der Woche.` : '',
     '',

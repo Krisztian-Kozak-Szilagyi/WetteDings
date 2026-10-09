@@ -9,6 +9,10 @@ const memberFields = {
   cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
   boost: { type: String, default: null },
   boostDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+  // Live-Turm (eSports): mitgenommener Kaffee (Karten-ID + Exemplar) und BfW Energy – werden beim Benutzen verbraucht
+  coffee: { type: String, default: null },
+  coffeeDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+  energyDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
 };
 const chatSchema = new Schema({ user: { type: Schema.Types.ObjectId, ref: 'User' }, name: String, text: String, at: { type: Date, default: Date.now } }, { _id: false });
 
@@ -23,7 +27,7 @@ const partySchema = new Schema(
     slot: { type: Date, required: true }, // Startzeit des Dungeons (Turm: Anmeldezeit, startet erst auf Knopfdruck)
     solo: { type: Boolean, default: false },
     leader: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    members: { type: [new Schema({ ...memberFields, card: { type: String, default: null }, joinedAt: { type: Date, default: Date.now } }, { _id: false })], default: [] },
+    members: { type: [new Schema({ ...memberFields, card: { type: String, default: null }, joinedAt: { type: Date, default: Date.now }, ready: { type: Boolean, default: false } }, { _id: false })], default: [] },
     invites: { type: [new Schema({ user: { type: Schema.Types.ObjectId, ref: 'User' }, name: String, at: { type: Date, default: Date.now } }, { _id: false })], default: [] },
     chat: { type: [chatSchema], default: [] },
   },
@@ -35,7 +39,7 @@ partySchema.index({ 'invites.user': 1 });
 partySchema.index({ slot: 1 });
 
 // st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate
-const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
+const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, boost: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
 
 // Ein Dungeon-Durchlauf (drei Spieler, Bots füllen auf). Alle Kämpfe werden beim Start ausgewürfelt und
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.
@@ -82,6 +86,12 @@ const runSchema = new Schema(
             total: Number,
             success: Boolean,
             doneAt: Number,
+            // Live-Turm: Boss-Eigenschaft, gesuchter Wert, Bock-Treffer und Kampfbeginn (ms)
+            trait: { type: String, default: undefined },
+            stat: { type: String, default: undefined },
+            drains: { type: [new Schema({ m: Number, t: Number, amount: Number, bock: Number }, { _id: false })], default: undefined },
+            startAt: { type: Number, default: undefined },
+            bockBefore: { type: [Number], default: undefined },
           },
           { _id: false }
         ),
@@ -93,6 +103,8 @@ const runSchema = new Schema(
     endsAt: { type: Date, required: true },
     status: { type: String, enum: ['laeuft', 'fertig'], default: 'laeuft' },
     chat: { type: [chatSchema], default: [] },
+    // Live-Turm (eSports): Zustand des laufenden Laufs (src/dungeon/liveTowerService.js), null = normaler Lauf
+    live: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

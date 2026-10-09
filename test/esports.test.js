@@ -10,9 +10,9 @@ const model = require('../src/coin/model');
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
 
 test('eSports: Punkte = Summe der zwei besten Läufe', () => {
-  assert.deepEqual(league.scoreOf([3, 7, 5, 1]), { score: 12, best: [7, 5] });
-  assert.deepEqual(league.scoreOf([4]), { score: 4, best: [4] });
-  assert.deepEqual(league.scoreOf([]), { score: 0, best: [] });
+  assert.deepEqual(league.scoreOf([3, 7, 5, 1]), { score: 12, points: 0, best: [7, 5] });
+  assert.deepEqual(league.scoreOf([4]), { score: 4, points: 0, best: [4] });
+  assert.deepEqual(league.scoreOf([]), { score: 0, points: 0, best: [] });
 });
 
 test('eSports: Platz 1 +25 %, letzter −20 %, Mitte ±0', () => {
@@ -95,7 +95,7 @@ test('eSports: Bericht nennt Platz und Kursbewegung', () => {
   const [row] = league.rankWeek([{ id: 'a', rounds: [7, 4], prevRank: null }, { id: 'b', rounds: [1], prevRank: null }]);
   const t = league.reportText({ ticker: 'DREI', name: 'Die Drei' }, row, '11.10.2026');
   assert.match(t.title, /Platz 1 von 2/);
-  assert.match(t.body, /11 Punkte/);
+  assert.match(t.body, /11 Stockwerke/);
   assert.match(t.body, /DREI.*\+25 %/);
 });
 

@@ -153,6 +153,14 @@
               <span class="dg-boost-name muted">kein Boost</span>
             <% } %>
           </div>
+          <% if (esLobby) { %>
+            <%# eSports-Live-Turm: Vorrat (wird beim Benutzen verbraucht) und Bereit %>
+            <div class="dg-supply">
+              <span class="dg-supply-row<%= s.coffee ? '' : ' is-empty' %>"><span class="dg-supply-dot r-<%= s.coffee ? s.coffee.rarity : 'none' %>"></span><%= s.coffee ? s.coffee.name : 'kein Kaffee' %></span>
+              <span class="dg-supply-row<%= s.energy ? '' : ' is-empty' %>"><span class="dg-supply-dot <%= s.energy ? 'r-gold' : 'r-none' %>"></span><%= s.energy ? 'BfW Energy' : 'kein Energy' %></span>
+              <span class="dg-ready<%= s.ready ? ' is-ready' : '' %>"><%= s.ready ? 'Bereit' : 'wählt noch …' %></span>
+            </div>
+          <% } %>
         </div>
       <% } else if (s.invited) { %>
         <div class="dg-slot is-empty is-invited">
@@ -218,7 +226,21 @@
       <% if (meSlot && meSlot.choosing && !lockedIn) { %>
         <p class="dg-lobby-warn"><strong>Wähle deinen Charakter</strong> – klick oben auf deinen Platz. Ohne Charakter bist du beim Start nicht dabei.</p>
       <% } %>
-      <% if (tower) { %>
+      <% if (esLobby) { %>
+        <p class="muted"><strong>eSports-Lauf live:</strong> Nach jedem Stockwerk habt ihr eine kurze Pause für Team-Fähigkeiten. Wählt eure Karten, nehmt Kaffee oder BfW Energy mit (geht beim Benutzen verloren) – <%= isLeader ? 'du startest' : 'der Kapitän startet' %>, sobald alle bereit sind.</p>
+        <% const meParty = party.members.find((m) => String(m.user) === String(currentUser._id)) || {}; %>
+        <form method="post" action="/dungeon/turm/vorrat" class="dg-supply-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field"><span>Kaffee</span>
+            <select name="coffee">
+              <option value="">keiner</option>
+              <% coffeeChoices.forEach((c) => { %><option value="<%= c.id %>" <%= meParty.coffee === c.id ? 'selected' : '' %> <%= c.free ? '' : 'disabled' %>><%= c.card.name %> · +<%= c.pct %> % Bock<%= c.free ? '' : ' (keine frei)' %></option><% }) %>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="energy" value="1" <%= meParty.energyDoc ? 'checked' : '' %> <%= energyFree || meParty.energyDoc ? '' : 'disabled' %>> <span>BfW Energy mitnehmen</span></label>
+          <button class="btn btn-ghost btn-sm" type="submit">Übernehmen</button>
+        </form>
+      <% } else if (tower) { %>
         <% if (phase === 'solo') { %>
           <p class="muted">Mage Tower allein: Die beiden anderen Plätze übernehmen Bots. Betritt den Turm, sobald du deine Karten gewählt hast.</p>
         <% } else if (isLeader) { %>
@@ -248,7 +270,19 @@
           <button class="btn btn-primary" type="submit">Einladen</button>
         </form>
       <% } %>
-      <% if (tower && (isLeader || phase === 'solo')) { %>
+      <% if (esLobby) { %>
+        <% const meReady = (party.members.find((m) => String(m.user) === String(currentUser._id)) || {}).ready; %>
+        <form method="post" action="/dungeon/turm/bereit">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn <%= meReady ? 'btn-ghost' : 'btn-primary' %>" type="submit"><%= meReady ? 'Doch nicht bereit' : 'Ich bin bereit' %></button>
+        </form>
+        <% if (isLeader) { %>
+          <form method="post" action="/dungeon/turm/starten">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary" type="submit" <%= towerReady && allReady ? '' : 'disabled' %>>Turm starten</button>
+          </form>
+        <% } %>
+      <% } else if (tower && (isLeader || phase === 'solo')) { %>
         <form method="post" action="/dungeon/turm/starten">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button class="btn btn-primary" type="submit" <%= towerReady ? '' : 'disabled' %> title="<%= towerReady ? 'Das Ergebnis wird sofort ausgewürfelt' : 'Erst wenn alle einen Charakter gewählt haben' %>">Turm betreten</button>

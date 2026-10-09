@@ -172,6 +172,17 @@ async function towerTeam(userIds, now = Date.now()) {
   return ok ? team._id : null;
 }
 
+/** Wertung eines Laufs: Runden und gesammelte Punkte (alle Kämpfe, auch der verlorene) */
+const runScore = (r) => ({ rounds: r.rounds || 0, points: (r.fights || []).reduce((s, f) => s + (f.total || 0), 0) });
+
+/** Läufe eines Teams in der laufenden Woche (für die Ergebnis-Ansicht des Live-Turms – nur das eigene Team) */
+async function teamWeekRuns(teamId, now = Date.now()) {
+  const runs = await DungeonRun.find({ mode: 'tower', esportsTeam: teamId, startedAt: { $gte: weekStart(now) } }).select('rounds fights.total startedAt status').sort({ startedAt: 1 }).lean();
+  const list = runs.filter((r) => r.status === 'fertig' || r.rounds).map((r) => ({ at: r.startedAt, ...runScore(r) }));
+  const best = new Set([...list].sort((a, b) => b.rounds - a.rounds || b.points - a.points).slice(0, league.TOP_RUNS));
+  return list.map((r) => ({ ...r, counts: best.has(r) }));
+}
+
 /** Profilfelder mit Startwerten – ältere Teams (vor dem Teamprofil gegründet) haben sie nicht, und .lean() füllt nichts auf */
 const withProfile = (t) => ({ ...t, bio: t.bio || '', motto: t.motto || '', color: t.color || null, avatar: t.avatar || null, cosmetics: t.cosmetics || [], trophies: t.trophies || [] });
 
@@ -537,9 +548,9 @@ async function publish(day, from, to) {
   // Nur Teams, die schon die ganze Woche gehandelt wurden; eingefrorene setzen aus
   const teams = await EsportsTeam.find({ status: 'aktiv', listedAt: { $lte: from } }).lean();
   const runs = teams.length
-    ? await DungeonRun.find({ mode: 'tower', esportsTeam: { $in: teams.map((t) => t._id) }, startedAt: { $gte: from, $lt: to } }).select('esportsTeam rounds').lean()
+    ? await DungeonRun.find({ mode: 'tower', esportsTeam: { $in: teams.map((t) => t._id) }, startedAt: { $gte: from, $lt: to } }).select('esportsTeam rounds fights.total').lean()
     : [];
-  const rows = league.rankWeek(teams.map((t) => ({ id: String(t._id), prevRank: t.lastRank, rounds: runs.filter((r) => r.esportsTeam.equals(t._id)).map((r) => r.rounds || 0) })));
+  const rows = league.rankWeek(teams.map((t) => ({ id: String(t._id), prevRank: t.lastRank, runs: runs.filter((r) => r.esportsTeam.equals(t._id)).map(runScore) })));
   const out = [];
   const won = new Map(league.trophies(rows, settings.minTeams).map((t) => [t.id, t.place]));
   const prizes = prizeList();
@@ -602,6 +613,7 @@ module.exports = {
   teamOfUser,
   teamsOf,
   towerTeam,
+  teamWeekRuns,
   list,
   byTicker,
   historyOf,

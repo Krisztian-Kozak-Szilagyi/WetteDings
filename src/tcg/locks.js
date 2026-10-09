@@ -27,7 +27,7 @@ async function lockedDocs(userId, session) {
   foiled.forEach((d) => reasons.set(String(d._id), 'folie'));
   if (run) [run.cardDoc, run.boostDoc, run.boost2Doc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
   [party, dungeon].filter(Boolean).forEach((d) =>
-    d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
+    d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc, m.coffeeDoc, m.energyDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
   );
   trades.forEach((t) => lockedFor(t, userId).forEach((id) => reasons.set(String(id), 'handel')));
   duels.forEach((b) => b.duel.cards.filter((c) => String(c.user) === String(userId)).forEach((c) => reasons.set(String(c.doc), 'duell')));
