@@ -50,3 +50,16 @@
   .gd-flow, .gd-traits { grid-template-columns: 1fr; }
   .gd-screen { padding: 12px; }
 }
+
+/* Handy: Erklärung als kompakte Leiste unten, die Seite darüber bleibt frei für den Spot */
+@media (max-width: 700px) {
+  .gd { padding-bottom: 70vh; }
+  .gd-caption { position: fixed; top: auto; bottom: calc(8px + env(safe-area-inset-bottom)); left: 8px; right: 8px; z-index: 60; padding: 12px 14px; gap: 4px; }
+  .gd-caption-top { font-size: 11px; }
+  .gd-caption-title { font-size: 16px; }
+  .gd-caption-text { font-size: 14px; line-height: 1.45; min-height: 0; max-height: 6.6em; overflow-y: auto; }
+  .gd-caption-nav { gap: 8px; margin-top: 4px; }
+  .gd-dots { display: none; }
+  .gd-nav-btn { flex: 1; min-width: 0; padding: 0 12px; }
+  .gd-screen { padding: 8px; }
+}

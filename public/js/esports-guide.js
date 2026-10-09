@@ -62,13 +62,20 @@
     return { top: base.top + window.scrollY + top, height: bottom - top };
   }
 
-  /** Stelle mittig in den freien Bereich unter der Erklärung scrollen */
+  /**
+   * Stelle mittig in den freien Bereich scrollen: am PC zwischen Erklärung (oben) und Fensterende, am Handy
+   * zwischen Kopfzeile und Erklärung (dort unten als Leiste).
+   */
   function scrollTo(rect, slide) {
-    const capBottom = caption.getBoundingClientRect().bottom;
-    const free = window.innerHeight - capBottom;
+    const cap = caption.getBoundingClientRect();
+    const bar = document.querySelector('.topbar');
+    const atBottom = cap.top > window.innerHeight / 2;
+    const top = atBottom ? (bar ? bar.getBoundingClientRect().bottom : 0) : cap.bottom;
+    const bottom = atBottom ? cap.top : window.innerHeight;
+    const free = bottom - top;
     let y;
-    if (rect) y = rect.top - capBottom - Math.max(16, (free - rect.height) / 2);
-    else y = slide.getBoundingClientRect().top + window.scrollY - capBottom - 16;
+    if (rect) y = rect.top - top - Math.max(12, (free - rect.height) / 2);
+    else y = slide.getBoundingClientRect().top + window.scrollY - top - 12;
     window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
   }
 
