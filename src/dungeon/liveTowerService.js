@@ -251,7 +251,7 @@ function drink({ user, mode, target }) {
   });
 }
 
-/** Kartenwechsel (nur die eigene Karte): neue Hauptkarte; ohne Bock startet sie mit SWITCH_BOCK */
+/** Kartenwechsel (nur die eigene Karte): neue Hauptkarte; Bock unter SWITCH_BOCK wird auf SWITCH_BOCK gehoben, darüber bleibt er */
 function switchCard({ user, cardId }) {
   return act(user, async (run, i, session) => {
     const card = catalog.cardById[cardId];
@@ -269,7 +269,7 @@ function switchCard({ user, cardId }) {
     await claim([doc], m.user, session);
     run.members[i] = { ...m, card: card.id, cardDoc: doc._id };
     run.live.chosen = r.chosen;
-    if (run.live.bock[i] <= 0) run.live.bock[i] = L.SWITCH_BOCK;
+    run.live.bock[i] = Math.max(run.live.bock[i], L.SWITCH_BOCK);
   });
 }
 
