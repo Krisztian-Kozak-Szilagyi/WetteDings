@@ -1,0 +1,142 @@
+<%- include('partials/head') %>
+<%# Live-Turm (eSports): Gerüst – public/js/live-tower.js füllt alles aus dem Zustand (data-state) und fragt jede Sekunde nach.
+    Phasen: start (Countdown) → kampf → pause → … → ende. Fähigkeiten nur in der Pause, jeder im Team darf sie wählen. %>
+<% const fmt = (n) => Number(n || 0).toLocaleString('de-DE'); %>
+<div class="lt-page" data-live-root data-state="<%= JSON.stringify(state) %>">
+  <form data-live-csrf hidden><input type="hidden" name="_csrf" value="<%= csrfToken %>"></form>
+
+  <%# Statusleiste: immer sichtbar %>
+  <div class="lt-bar">
+    <div class="lt-floor"><span class="lt-label">Stockwerk</span><strong data-live-floor>–</strong></div>
+    <div class="lt-energy">
+      <div class="lt-energy-head"><span class="lt-label">Team-Energie</span><strong data-live-energy-text>–</strong></div>
+      <div class="lt-pips" data-live-pips></div>
+    </div>
+    <div class="lt-boost" data-live-boost hidden>
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="16" fill="none" class="lt-ring-bg" stroke-width="5"></circle>
+        <circle cx="20" cy="20" r="16" fill="none" class="lt-ring" stroke-width="5" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="0" transform="rotate(-90 20 20)" data-live-boost-ring></circle>
+      </svg>
+      <span class="lt-boost-text"><strong>Boost +20 %</strong><span data-live-boost-text></span></span>
+    </div>
+    <div class="lt-drink" data-live-drink></div>
+  </div>
+
+  <%# Start: kurzer Countdown vor dem ersten Stockwerk %>
+  <section class="lt-panel lt-start" data-live-start hidden>
+    <span class="lt-label">Mage Tower · eSports-Lauf</span>
+    <h1>Gleich geht's los</h1>
+    <p class="muted">Was der erste Boss will, findet ihr selbst heraus. Danach seht ihr in jeder Pause, was als Nächstes kommt.</p>
+    <div class="lt-big" data-live-start-count>5</div>
+  </section>
+
+  <%# Boss des laufenden (oder zuletzt gespielten) Stockwerks %>
+  <section class="lt-panel lt-boss" data-live-boss hidden>
+    <div class="lt-boss-head">
+      <div class="lt-boss-title">
+        <div class="lt-chips"><span class="lt-stat" data-live-stat></span><span class="lt-trait" data-live-trait hidden></span></div>
+        <h2 data-live-title></h2>
+        <p class="lt-boss-text muted" data-live-text></p>
+      </div>
+      <div class="lt-time"><span class="lt-label">Zeit</span><strong data-live-time>0:00</strong></div>
+    </div>
+    <div class="lt-meter">
+      <div class="lt-meter-head"><span class="lt-label">Punkte</span><span><strong data-live-points>0</strong> / <span data-live-required>0</span></span></div>
+      <div class="lt-track is-big"><span class="lt-fill" data-live-points-bar></span></div>
+    </div>
+    <div class="lt-meter">
+      <div class="lt-meter-head"><span class="lt-label">Deadline</span><span class="lt-label" data-live-deadline-note></span></div>
+      <div class="lt-track"><span class="lt-fill is-time" data-live-time-bar></span></div>
+    </div>
+    <p class="lt-outcome" data-live-outcome hidden></p>
+  </section>
+
+  <%# Spieler: Hauptkarte, Boost-Karte, Bock %>
+  <section class="lt-players" data-live-players></section>
+
+  <%# Taktische Pause %>
+  <section class="lt-pause" data-live-pause hidden>
+    <div class="lt-pause-top">
+      <div class="lt-panel lt-pause-head">
+        <span class="lt-label">Taktische Pause</span>
+        <strong class="lt-pause-title" data-live-pause-title></strong>
+        <span class="muted small">Weiter geht's, sobald alle „Weiter“ drücken – spätestens nach <%= state.pauseSeconds %> Sekunden.</span>
+      </div>
+      <div class="lt-panel lt-countdown" data-live-countdown-box>
+        <strong class="lt-big" data-live-countdown>0:40</strong>
+        <div class="lt-countdown-side">
+          <div class="lt-track"><span class="lt-fill" data-live-countdown-bar></span></div>
+          <span class="muted small" data-live-boost-left></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lt-pause-grid">
+      <div class="lt-pause-main">
+        <div class="lt-panel lt-next" data-live-next></div>
+
+        <div class="lt-panel">
+          <div class="lt-panel-head"><strong>Team-Fähigkeiten</strong><span>Energie <strong data-live-energy-after>0</strong> <span class="muted">/ <%= state.energyMax %></span></span></div>
+          <div class="lt-abilities" data-live-abilities></div>
+          <p class="muted small">Jeder im Team kann wählen und abwählen – sprecht euch ab. Jede weitere Fähigkeit in derselben Pause kostet +<%= state.overload %>.</p>
+          <div class="lt-switch" data-live-switch hidden>
+            <label class="field"><span>Neue Hauptkarte</span><select data-live-switch-select></select></label>
+            <button type="button" class="btn btn-primary btn-sm" data-live-switch-go>Wechseln</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-live-switch-cancel>Abbrechen</button>
+          </div>
+          <p class="lt-error" data-live-error hidden></p>
+        </div>
+
+        <div class="lt-panel" data-live-drink-panel>
+          <div class="lt-panel-head"><strong>BfW Energy</strong><span class="muted small">einmal pro Lauf fürs Team</span></div>
+          <div class="lt-drinks" data-live-drinks></div>
+        </div>
+      </div>
+
+      <aside class="lt-pause-side">
+        <div class="lt-panel" data-live-team></div>
+        <div class="lt-panel" data-live-coffee hidden>
+          <span class="muted small" data-live-coffee-text></span>
+          <button type="button" class="btn btn-ghost" data-live-coffee-go>Kaffee trinken</button>
+        </div>
+        <button type="button" class="btn btn-primary lt-weiter" data-live-weiter>Weiter</button>
+      </aside>
+    </div>
+  </section>
+
+  <%# Verlauf des Kampfs %>
+  <section class="lt-log" data-live-log-box hidden>
+    <span class="lt-label">Verlauf</span>
+    <ol data-live-log></ol>
+  </section>
+
+  <%# Ergebnis und eigene Woche (nur das eigene Team) %>
+  <section class="lt-panel lt-result" data-live-result hidden>
+    <span class="lt-label">Lauf beendet</span>
+    <h1 data-live-result-title></h1>
+    <div class="lt-result-stats">
+      <div><span class="lt-label">Stockwerke</span><strong data-live-result-rounds>0</strong></div>
+      <div><span class="lt-label">Punkte gesamt</span><strong data-live-result-points>0</strong></div>
+    </div>
+    <div class="lt-strip" data-live-strip></div>
+    <p class="muted small">Auch die Punkte des letzten Stockwerks zählen – bei gleich vielen Stockwerken entscheiden sie.</p>
+    <% if (week.length) { %>
+      <h2 class="lt-week-head">Eure Woche</h2>
+      <ol class="lt-week">
+        <% week.forEach((r) => { %>
+          <li class="<%= r.counts ? 'is-counted' : '' %>">
+            <span><%= new Date(r.at).toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'Europe/Berlin' }) %></span>
+            <strong><%= r.rounds %> <%= r.rounds === 1 ? 'Stockwerk' : 'Stockwerke' %></strong>
+            <span class="muted"><%= fmt(r.points) %> Punkte</span>
+            <span class="lt-counts"><%= r.counts ? 'zählt' : '' %></span>
+          </li>
+        <% }) %>
+      </ol>
+      <p class="muted small">Eure Platzierung erfahrt ihr im Wochenbericht am Sonntag – wie die anderen Teams spielen, bleibt geheim.</p>
+    <% } %>
+    <a class="btn btn-primary" href="/dungeon">Zum Dungeon</a>
+  </section>
+</div>
+<link rel="stylesheet" href="/css/live-tower.css?v=<%= assetVersion %>">
+<script src="/js/live-tower.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

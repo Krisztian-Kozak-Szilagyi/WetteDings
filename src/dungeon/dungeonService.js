@@ -164,6 +164,8 @@ const random = () => crypto.randomInt(1000000) / 1000000;
 
 // erst bei Bedarf laden (eSports braucht seinerseits die Dungeon-Modelle)
 const esports = () => require('../esports/esportsService');
+const live = () => require('./liveTowerService');
+const LIVE = require('./liveTower');
 
 function shuffle(list, rand = random) {
   const a = [...list];
@@ -604,7 +606,7 @@ async function changeCards({ user, cardId, boostId }) {
     const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party) });
     const res = await DungeonParty.updateOne(
       { _id: party._id, 'members.user': user._id },
-      { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc } },
+      { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc, 'members.$.ready': false } },
       { session }
     );
     if (!res.matchedCount) throw new UserError('Du bist für keinen Dungeon angemeldet.');
@@ -635,6 +637,52 @@ async function markLootSeen(runId, userId) {
 }
 
 /** Abmelden bzw. Gruppe verlassen (bis kurz vor dem Start). Der Leiter gibt die Leitung weiter. */
+// ---------- Live-Turm (eSports): Vorrat und Bereit in der Lobby ----------
+/**
+ * Ist diese Turm-Anmeldung ein eSports-Live-Lauf? Drei Mitglieder desselben Teams (schon vor der Woche dabei).
+ * → Team-ID oder null
+ */
+async function esportsLobby(party, now = Date.now()) {
+  if (!party || modeOf(party) !== 'tower' || party.members.length !== TEAM_SIZE || party.members.some((m) => !m.user)) return null;
+  return esports().towerTeam(party.members.map((m) => m.user), now).catch(() => null);
+}
+
+/** Kaffee (eine der LIVE.COFFEE-Karten oder keiner) und BfW Energy (ja/nein) mitnehmen – setzt „bereit“ zurück */
+async function setSupplies({ user, coffee, energy }) {
+  const party = await partyOf(user._id);
+  if (!party || modeOf(party) !== 'tower') throw new UserError('Du bist für keinen Mage Tower angemeldet.');
+  const coffeeId = coffee ? Object.keys(LIVE.COFFEE).find((k) => k === coffee) : null;
+  if (coffee && !coffeeId) throw new UserError('Diese Karte ist kein Kaffee für den Turm.');
+  await inTransaction(async (session) => {
+    const fresh = await DungeonParty.findById(party._id).session(session).lean();
+    const me = fresh && fresh.members.find((m) => m.user && m.user.equals(user._id));
+    if (!me) throw new UserError('Du bist für keinen Mage Tower angemeldet.');
+    const locked = await lockedDocs(user._id, session);
+    // die eigenen Vorrats-Exemplare sind wieder wählbar
+    [me.coffeeDoc, me.energyDoc].filter(Boolean).forEach((id) => locked.reasons.delete(String(id)));
+    const freeDoc = async (id, except) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d) && !(except && d._id.equals(except)));
+    const coffeeDoc = coffeeId ? await freeDoc(coffeeId) : null;
+    if (coffeeId && !coffeeDoc) throw new UserError('Dieser Kaffee ist nicht frei (Quest, Handel, Folie oder schon im Turm).');
+    const energyDoc = energy ? await freeDoc(LIVE.ENERGY_CARD, coffeeDoc && coffeeId === LIVE.ENERGY_CARD ? coffeeDoc._id : null) : null;
+    if (energy && !energyDoc) throw new UserError('Du hast kein freies BfW Energy.');
+    await claim([coffeeDoc, energyDoc], user._id, session);
+    await DungeonParty.updateOne(
+      { _id: party._id, 'members.user': user._id },
+      { $set: { 'members.$.coffee': coffeeId, 'members.$.coffeeDoc': coffeeDoc ? coffeeDoc._id : null, 'members.$.energyDoc': energyDoc ? energyDoc._id : null, 'members.$.ready': false } },
+      { session }
+    );
+  });
+}
+
+/** Bereit / nicht bereit (Live-Turm) – nur mit gewählter Karte */
+async function toggleReady({ user }) {
+  const party = await partyOf(user._id);
+  const me = party && party.members.find((m) => m.user && m.user.equals(user._id));
+  if (!me || modeOf(party) !== 'tower') throw new UserError('Du bist für keinen Mage Tower angemeldet.');
+  if (!me.card && !me.ready) throw new UserError('Wähle zuerst deine Hauptkarte.');
+  await DungeonParty.updateOne({ _id: party._id, 'members.user': user._id }, { $set: { 'members.$.ready': !me.ready } });
+}
+
 async function leave({ user }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
@@ -755,11 +803,17 @@ async function startTower({ user, now = Date.now() }) {
     const runs = opts.esportsRuns === 1 ? 'einen eSports-Lauf' : `${opts.esportsRuns} eSports-Läufe`;
     if (out.length) throw new UserError(`Als eSports-Team geht es heute nicht mehr: ${out.join(', ')} ${out.length > 1 ? 'hatten' : 'hatte'} heute schon ${runs}.`);
   }
-  const members = fillBots(party.members, 'tower');
-  const fights = playTower(teamCards(members), random, opts);
+  // eSports-Team: Live-Turm – alle müssen bereit sein, gekämpft wird erst nach und nach (liveTowerService)
+  if (esportsTeam) {
+    const notReady = humans.filter((m) => !m.ready).map((m) => m.name);
+    if (notReady.length) throw new UserError(`Noch nicht bereit: ${notReady.join(', ')}.`);
+  }
+  const members = esportsTeam ? party.members.map((m) => ({ ...m, bot: false })) : fillBots(party.members, 'tower');
+  const fights = esportsTeam ? [] : playTower(teamCards(members), random, opts);
   const rounds = fights.filter((f) => f.success).length;
   const leaderId = party.solo ? null : String(party.leader);
-  const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...towerRewardsFor(fights, bot, random, opts) }));
+  const runMembers = members.map(({ bot, ready, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...(esportsTeam ? { reward: 0, foil: false, bossCard: false } : towerRewardsFor(fights, bot, random, opts)) }));
+  const liveFields = esportsTeam ? live().newRunFields(runMembers, opts, now) : {};
   try {
     await inTransaction(async (session) => {
       const del = await DungeonParty.deleteOne({ _id: party._id, mode: 'tower' }, { session });
@@ -779,6 +833,7 @@ async function startTower({ user, now = Date.now() }) {
           startedAt: new Date(now),
           endsAt: new Date(now + runSeconds(fights, opts.pauseSeconds) * 1000),
           chat: party.chat || [],
+          ...liveFields,
         }],
         { session }
       );
@@ -793,7 +848,7 @@ async function startTower({ user, now = Date.now() }) {
   if (others.length) {
     await notify(others, { area: 'Dungeon', href: '/dungeon', text: `${user.username} hat eure Gruppe in den Mage Tower geführt.` }).catch((err) => console.error('Turm-Hinweis fehlgeschlagen:', err.message));
   }
-  return { rounds };
+  return { rounds, live: !!esportsTeam };
 }
 
 /** Fällige Anmeldungen starten (force: alle sofort – Admin-Knopf zum Testen). Den Turm startet nur sein Leiter. */
@@ -931,6 +986,7 @@ async function finishOwnDue(userId) {
 
 async function tick() {
   await startDue();
+  await live().advanceAll();
   await finishDue();
 }
 
@@ -1018,6 +1074,9 @@ module.exports = {
   decline,
   leave,
   changeCards,
+  esportsLobby,
+  setSupplies,
+  toggleReady,
   markLootSeen,
   chat,
   startDue,
