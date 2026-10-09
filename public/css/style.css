@@ -593,6 +593,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 
 /* Admin-Panel */
 .admin-ihk-sub { margin: 18px 0 8px; font-size: 1rem; }
+/* Admin: Texte der Mage-Tower-Stockwerke */
+.admin-floor-stat { margin: 16px 0 4px; font-size: .85rem; letter-spacing: .06em; color: var(--muted); }
+.admin-floor { border-top: 1px solid var(--border); padding: 6px 0; }
+.admin-floor summary { cursor: pointer; padding: 6px 0; }
+.admin-floor .field { margin-top: 8px; }
+.admin-floor textarea { width: 100%; box-sizing: border-box; }
 .stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
 .stats-3 .card { margin: 0; }
 .admin-generate { margin: 0 0 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -5989,3 +5995,16 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .admin-cos-img { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
 .admin-cos-table input[type="text"] { width: 100%; min-width: 90px; }
 .admin-cos-table td.num input { max-width: 100px; text-align: right; }
+
+/* Mage Tower – eSports-Lobby: Vorrat (Kaffee, Energy) und Bereit unter jedem Platz */
+.dg-supply { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: .82rem; }
+.dg-supply-row { display: flex; align-items: center; gap: 8px; }
+.dg-supply-row.is-empty { color: var(--muted); }
+.dg-supply-dot { width: 8px; height: 12px; border-radius: 2px; background: var(--border); flex: none; }
+.dg-supply-dot.r-crumpled { background: var(--r-crumpled); }
+.dg-supply-dot.r-bfwler { background: var(--r-bfwler); }
+.dg-supply-dot.r-gold { background: var(--r-gold); }
+.dg-ready { align-self: flex-start; margin-top: 4px; padding: 3px 10px; border-radius: 999px; box-shadow: 0 0 0 1px var(--color-neutral-700); color: var(--color-neutral-400); font-weight: 600; }
+.dg-ready.is-ready { background: var(--ja); color: #10241a; box-shadow: none; }
+.dg-supply-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.dg-supply-form .field { margin: 0; }
