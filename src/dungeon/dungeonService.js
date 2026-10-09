@@ -639,7 +639,7 @@ async function markLootSeen(runId, userId) {
 /** Abmelden bzw. Gruppe verlassen (bis kurz vor dem Start). Der Leiter gibt die Leitung weiter. */
 // ---------- Live-Turm (eSports): Vorrat und Bereit in der Lobby ----------
 /**
- * Ist diese Turm-Anmeldung ein eSports-Live-Lauf? Drei Mitglieder desselben Teams (schon vor der Woche dabei).
+ * Ist diese Turm-Anmeldung ein eSports-Live-Lauf? Drei Mitglieder desselben gehandelten Teams.
  * → Team-ID oder null
  */
 async function esportsLobby(party, now = Date.now()) {
@@ -796,7 +796,7 @@ async function startTower({ user, now = Date.now() }) {
   const done = humans.filter((m) => quota(m).left <= 0).map((m) => m.name);
   if (done.length) throw new UserError(`${done.join(', ')} ${done.length > 1 ? 'haben' : 'hat'} heute keinen Lauf im Mage Tower mehr.`);
 
-  // eSports: zählt für die Liga nur, wenn alle drei Spieler schon vor dieser Woche im selben Team waren
+  // eSports: Live-Turm und Liga, wenn alle drei Spieler Mitglieder desselben gehandelten Teams sind
   const esportsTeam = humans.length === TEAM_SIZE ? await esports().towerTeam(humans.map((m) => m.user), now).catch(() => null) : null;
   if (esportsTeam) {
     const out = humans.filter((m) => quota(m).esportsLeft <= 0).map((m) => m.name);
