@@ -1,5 +1,5 @@
 <%# eSports-Live-Turm: Vorbereitung (Design „1 · Vorbereitung“). Drei Spieler: Hauptkarte und Boost per Klick (Auswahlfenster
-    aus dungeon.ejs, data-dg-open), Kaffee/Energy im Fenster #es-vorrat, „Ich bin bereit“, der Kapitän startet.
+    aus dungeon.ejs, data-dg-open), Kaffee im Fenster #es-kaffee, Energy in #es-energy, „Ich bin bereit“, der Kapitän startet.
     Erwartet: slots, esTeam, coffeeChoices, energyFree, coffeePct, isLeader, towerReady, allReady, rarityByKey, csrfToken. %>
 <%
   const readyCount = slots.filter((s) => s.ready).length;
@@ -68,12 +68,12 @@
         <div class="lt-prep-supply">
           <span class="muted small">Wird beim Benutzen verbraucht</span>
           <% const rows = [
-               s.coffee ? { name: 'Kaffee · ' + rarityLabel(s.coffee), effect: '+' + (coffeePct[s.coffee.id] || 0) + ' % Bock', cls: 'r-' + s.coffee.rarity } : { name: s.me ? '+ Kaffee' : 'kein Kaffee', effect: '', cls: 'is-empty' },
-               s.energy ? { name: 'BfW Energy', effect: '1× fürs Team', cls: 'r-gold' } : { name: s.me ? '+ BfW Energy' : 'kein Energy', effect: '', cls: 'is-empty' },
+               s.coffee ? { name: 'Kaffee · ' + rarityLabel(s.coffee), effect: '+' + (coffeePct[s.coffee.id] || 0) + ' % Bock', cls: 'r-' + s.coffee.rarity, dlg: 'es-kaffee' } : { name: s.me ? '+ Kaffee' : 'kein Kaffee', effect: '', cls: 'is-empty', dlg: 'es-kaffee' },
+               s.energy ? { name: 'BfW Energy', effect: '1× fürs Team', cls: 'r-gold', dlg: 'es-energy' } : { name: s.me ? '+ BfW Energy' : 'kein Energy', effect: '', cls: 'is-empty', dlg: 'es-energy' },
              ]; %>
           <% rows.forEach((r) => { %>
             <% if (s.me) { %>
-              <button type="button" class="lt-slot <%= r.cls %>" data-dialog-open="es-vorrat"><span class="lt-slot-bar"></span><span class="lt-slot-name"><%= r.name %></span><span class="lt-slot-effect"><%= r.effect %></span></button>
+              <button type="button" class="lt-slot <%= r.cls %>" data-dialog-open="<%= r.dlg %>"><span class="lt-slot-bar"></span><span class="lt-slot-name"><%= r.name %></span><span class="lt-slot-effect"><%= r.effect %></span></button>
             <% } else { %>
               <div class="lt-slot <%= r.cls %>"><span class="lt-slot-bar"></span><span class="lt-slot-name"><%= r.name %></span><span class="lt-slot-effect"><%= r.effect %></span></div>
             <% } %>
@@ -137,23 +137,38 @@
   </section>
 </div>
 
-<%# Kaffee und Energy wählen (Fenster, app.js: data-dialog-open / data-dialog-close) %>
-<dialog class="dialog lt-supply-dialog" id="es-vorrat" aria-labelledby="es-vorrat-title">
+<%# Kaffee und Energy: je ein eigenes Fenster (app.js: data-dialog-open / data-dialog-close). Das jeweils andere bleibt,
+    wie es ist (verstecktes Feld). %>
+<dialog class="dialog lt-supply-dialog" id="es-kaffee" aria-labelledby="es-kaffee-title">
   <form method="post" action="/dungeon/turm/vorrat" class="lt-supply-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <h2 id="es-vorrat-title" class="lt-panel-title">Mitnehmen</h2>
-    <p class="lt-note">Je ein Platz. Was ihr benutzt, ist danach weg.</p>
-    <fieldset class="lt-supply-group">
-      <legend class="lt-next-kicker">Kaffee (nur in der Pause)</legend>
-      <label class="lt-supply-opt"><input type="radio" name="coffee" value="" <%= meSlot.coffee ? '' : 'checked' %>><span>kein Kaffee</span></label>
-      <% coffeeChoices.forEach((c) => { %>
-        <label class="lt-supply-opt<%= c.free ? '' : ' is-off' %>"><input type="radio" name="coffee" value="<%= c.id %>" <%= meSlot.coffee && meSlot.coffee.id === c.id ? 'checked' : '' %> <%= c.free ? '' : 'disabled' %>><span class="lt-slot-bar r-<%= c.card.rarity %>"></span><span><%= c.card.name %></span><span class="muted small">+<%= c.pct %> % Bock<%= c.free ? '' : ' · keiner frei' %></span></label>
+    <% if (meSlot.energy) { %><input type="hidden" name="energy" value="1"><% } %>
+    <h2 id="es-kaffee-title" class="lt-panel-title">Kaffee mitnehmen</h2>
+    <p class="lt-note">Nur in der Pause trinkbar, nur für dich. Danach ist die Karte weg.</p>
+    <div class="lt-supply-group">
+      <label class="lt-supply-opt"><input type="radio" name="coffee" value="" <%= meSlot.coffee ? '' : 'checked' %>><span class="lt-slot-bar is-empty"></span><span>kein Kaffee</span></label>
+      <% coffeeChoices.forEach((c) => { const mineNow = meSlot.coffee && meSlot.coffee.id === c.id; const ok = c.free > 0 || mineNow; %>
+        <label class="lt-supply-opt<%= ok ? '' : ' is-off' %>"><input type="radio" name="coffee" value="<%= c.id %>" <%= mineNow ? 'checked' : '' %> <%= ok ? '' : 'disabled' %>><span class="lt-slot-bar r-<%= c.card.rarity %>"></span><span><%= c.card.name %></span><span class="muted small">+<%= c.pct %> % Bock<%= ok ? '' : (c.asBoost ? ' · steckt als Boost-Karte' : ' · keiner frei') %></span></label>
       <% }) %>
-    </fieldset>
-    <fieldset class="lt-supply-group">
-      <legend class="lt-next-kicker">BfW Energy (nur eines pro Lauf nutzbar)</legend>
-      <label class="lt-supply-opt<%= energyFree || meSlot.energy ? '' : ' is-off' %>"><input type="checkbox" name="energy" value="1" <%= meSlot.energy ? 'checked' : '' %> <%= energyFree || meSlot.energy ? '' : 'disabled' %>><span class="lt-slot-bar r-gold"></span><span>BfW Energy mitnehmen</span><span class="muted small"><%= energyFree || meSlot.energy ? 'Team-Energie oder Bock 100 %' : 'keines frei' %></span></label>
-    </fieldset>
+    </div>
+    <div class="lt-supply-actions">
+      <button type="button" class="lt-btn is-grey" data-dialog-close>Abbrechen</button>
+      <button type="submit" class="lt-btn is-accent">Übernehmen</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dialog lt-supply-dialog" id="es-energy" aria-labelledby="es-energy-title">
+  <form method="post" action="/dungeon/turm/vorrat" class="lt-supply-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="coffee" value="<%= meSlot.coffee ? meSlot.coffee.id : '' %>">
+    <h2 id="es-energy-title" class="lt-panel-title">BfW Energy mitnehmen</h2>
+    <p class="lt-note">Das ganze Team kann im Lauf ein BfW Energy trinken: Team-Energie auffüllen oder den Bock eines Spielers auf 100 %. Bringen mehrere eines mit, bleiben die anderen übrig.</p>
+    <% const energyOk = energyFree > 0 || meSlot.energy; %>
+    <div class="lt-supply-group">
+      <label class="lt-supply-opt"><input type="radio" name="energy" value="" <%= meSlot.energy ? '' : 'checked' %>><span class="lt-slot-bar is-empty"></span><span>kein BfW Energy</span></label>
+      <label class="lt-supply-opt<%= energyOk ? '' : ' is-off' %>"><input type="radio" name="energy" value="1" <%= meSlot.energy ? 'checked' : '' %> <%= energyOk ? '' : 'disabled' %>><span class="lt-slot-bar r-gold"></span><span>BfW Energy</span><span class="muted small"><%= energyOk ? energyFree + ' frei' : (energyAsBoost ? 'deines steckt als Boost-Karte' : 'keines frei') %></span></label>
+    </div>
     <div class="lt-supply-actions">
       <button type="button" class="lt-btn is-grey" data-dialog-close>Abbrechen</button>
       <button type="submit" class="lt-btn is-accent">Übernehmen</button>
