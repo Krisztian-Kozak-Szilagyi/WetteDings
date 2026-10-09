@@ -2,6 +2,12 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const esports = require('../esports/esportsService');
 const league = require('../esports/league');
+const catalog = require('../tcg/catalog');
+const LIVE = require('../dungeon/liveTower');
+
+// Karten für den Fächer der Deep-Dive-Kachel und die Beispiele auf der Seite (Boss, Energy, Kaffee)
+const GUIDE_CARDS = ['st-ivan-boss', 'bfw-energy-gold', 'casino-kaffee-3-gold'];
+const guideCards = () => GUIDE_CARDS.map((id) => catalog.cardById[id]).filter(Boolean);
 const { str, UserError } = require('../lib/util');
 
 const router = express.Router();
@@ -21,6 +27,7 @@ router.get('/esports', async (req, res) => {
   const [teams, mine, invites, week] = await Promise.all([esports.list(), esports.teamOfUser(req.user._id), esports.invitesFor(req.user._id), esports.lastWeek()]);
   res.render('esports', {
     title: 'eSports',
+    guideFan: guideCards(),
     teams,
     mine,
     isCaptain: !!mine && mine.captain.equals(req.user._id),
@@ -100,5 +107,26 @@ router.post('/esports/teambild/setzen', (req, res) => handleProfile(req, res, 't
 router.post('/esports/kapitaen', (req, res) => handleProfile(req, res, '', () => esports.transferCaptain({ user: req.user, userId: str(req.body.user) })));
 
 router.post('/esports/entfernen', (req, res) => handle(req, res, () => esports.kick({ user: req.user, userId: str(req.body.user) })));
+
+// eSports Deep Dive: Tutorial wie eine Präsentation – jede Folie zeigt ein Fenster des Live-Turms (Nachbau mit
+// Beispieldaten und den echten Styles) und erklärt es Schritt für Schritt (public/js/esports-guide.js)
+router.get('/esports/deep-dive', (req, res) => {
+  const card = (id) => catalog.cardById[id] || null;
+  const dungeon = require('../dungeon/dungeonService');
+  res.render('esports-guide', {
+    title: 'eSports Deep Dive',
+    live: LIVE,
+    towerRuns: { daily: dungeon.settings.tower.dailyRuns, esports: dungeon.settings.tower.esportsRuns },
+    rules: league,
+    prizes: esports.prizeList(),
+    demo: {
+      main: [card('luca-6-glitch'), card('st-ivan-boss'), card('marcel-6-glitch')],
+      boost: [card('lili-6-glitch'), card('bfw-energy-gold'), card('mauch-3-glitch')],
+      coffee: card('casino-kaffee-2-bfwler'),
+      energy: card('bfw-energy-gold'),
+    },
+    rarityByKey: catalog.rarityByKey,
+  });
+});
 
 module.exports = router;
