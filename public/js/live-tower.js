@@ -90,7 +90,7 @@
   function renderBoss() {
     const f = state.fight;
     const box = $('boss');
-    box.hidden = !f || state.phase === 'ende';
+    box.hidden = !f || state.phase === 'ende' || state.phase === 'pause';
     if (!f) return;
     $('stat').textContent = STAT[f.stat] || '';
     $('stat').className = `lt-stat is-${f.stat}`;
@@ -126,6 +126,8 @@
   function renderPlayers() {
     const box = $('players');
     box.textContent = '';
+    box.hidden = state.phase === 'pause';
+    if (box.hidden) return;
     const f = state.fight;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const bock = f && state.phase === 'kampf' ? bockAt(f, sec) : state.players.map((p) => p.bock);
@@ -193,7 +195,7 @@
   function renderLog() {
     const f = state.fight;
     const box = $('log-box');
-    box.hidden = !f || state.phase === 'ende';
+    box.hidden = !f || state.phase === 'ende' || state.phase === 'pause';
     if (!f) return;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const items = [];
