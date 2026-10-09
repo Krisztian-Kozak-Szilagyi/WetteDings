@@ -175,7 +175,7 @@ test('eSports: Teamprofil – Text, Motto, Farbe, halber Avatarpreis', () => {
   assert.equal(league.teamAvatarPrice(101), 51);
   assert.equal(league.teamAvatarPrice(0), 0);
   assert.equal(league.cleanBio('  Hallo\r\n\r\n\r\n\r\nWelt   da  '), 'Hallo\n\nWelt da');
-  assert.equal(league.cleanBio('x'.repeat(400)).length, league.BIO_MAX);
+  assert.equal(league.cleanBio('x'.repeat(league.BIO_MAX + 100)).length, league.BIO_MAX);
   assert.equal(league.cleanBio(undefined), '');
   assert.equal(league.cleanMotto('Wir\nsind   da'), 'Wir sind da');
   assert.equal(league.cleanMotto('y'.repeat(100)).length, league.MOTTO_MAX);
