@@ -89,6 +89,7 @@ async function overview(user) {
 const toJson = (m, names, userId) => ({
   id: String(m._id),
   from: names.get(String(m.from)) || 'Gelöschtes Konto',
+  gone: !names.has(String(m.from)),
   me: String(m.from) === String(userId),
   text: m.text,
   at: m.createdAt,

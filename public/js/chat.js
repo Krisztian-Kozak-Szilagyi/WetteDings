@@ -131,7 +131,12 @@
   function messageEl(m, kind) {
     var row = el('div', 'chat-msg ' + (m.me ? 'is-me' : 'is-other'));
     row.setAttribute('data-id', m.id);
-    if (!m.me && kind === 'team') row.appendChild(el('span', 'chat-msg-from', m.from));
+    // Im Team-Chat führt der Name zum Profil (gelöschte Konten haben keins)
+    if (!m.me && kind === 'team') {
+      var from = el(m.gone ? 'span' : 'a', 'chat-msg-from', m.from);
+      if (!m.gone) from.href = '/profil/' + encodeURIComponent(m.from);
+      row.appendChild(from);
+    }
     row.appendChild(el('span', 'chat-msg-text', m.text));
     var meta = el('span', 'chat-msg-meta', time(m.at));
     if (!m.me) {
@@ -144,14 +149,20 @@
     return row;
   }
 
+  function toBottom() {
+    log.scrollTop = log.scrollHeight;
+    requestAnimationFrame(function () { log.scrollTop = log.scrollHeight; });
+  }
+
   function appendMessages(msgs, kind) {
-    var atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    // Unsichtbarer Verlauf (Höhe 0) gilt als "unten", damit er beim Öffnen nicht oben hängen bleibt
+    var atBottom = !log.clientHeight || log.scrollHeight - log.scrollTop - log.clientHeight < 60;
     msgs.forEach(function (m) {
       if (log.querySelector('[data-id="' + m.id + '"]')) return;
       log.appendChild(messageEl(m, kind));
       state.lastId = m.id;
     });
-    if (atBottom || msgs.some(function (m) { return m.me; })) log.scrollTop = log.scrollHeight;
+    if (atBottom || msgs.some(function (m) { return m.me; })) toBottom();
   }
 
   function moreButton() {
@@ -218,10 +229,11 @@
       if (data.more) log.appendChild(moreButton());
       if (!data.messages.length) log.appendChild(el('p', 'chat-empty muted', data.kind === 'team' ? 'Noch nichts los im Team-Chat.' : 'Schreib die erste Nachricht.'));
       appendMessages(data.messages, data.kind);
-      log.scrollTop = log.scrollHeight;
       renderConvHead();
       listView.hidden = true;
       convView.hidden = false;
+      // Erst wenn der Verlauf sichtbar ist, hat er eine Höhe – sonst bliebe er oben stehen (#186)
+      toBottom();
       if (!form.hidden) input.focus();
       state.v = '';
       schedule(300); // Zähler gleich neu holen (Gespräch ist jetzt gelesen)
