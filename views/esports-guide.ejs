@@ -1,0 +1,287 @@
+<%- include('partials/head') %>
+<%#
+  eSports Deep Dive: Präsentation, Folie für Folie. Jede Folie zeigt ein Fenster des Live-Turms als Nachbau mit
+  Beispieldaten und den echten Styles (live-tower.css). Die Schritte links heben die passende Stelle hervor:
+  [data-gd="n"] im Nachbau ↔ [data-gd-step="n"] in der Liste (public/js/esports-guide.js). Zahlen kommen aus dem Code.
+%>
+<%
+  const pct = (v) => String(v).replace('.', ',') + ' %';
+  const C = live.COSTS;
+  const coffee = (id) => live.COFFEE[id];
+  const img = (c, cls) => c ? `<img src="${c.image}" alt="" width="720" height="1008" loading="lazy"${cls ? ` class="${cls}"` : ''}>` : '';
+  const mark = (n) => `<span class="gd-mark" aria-hidden="true">${n}</span>`;
+  const [m0, m1, m2] = demo.main;
+  const [b0, b1, b2] = demo.boost;
+%>
+<link rel="stylesheet" href="/css/live-tower.css?v=<%= assetVersion %>">
+<link rel="stylesheet" href="/css/esports-guide.css?v=<%= assetVersion %>">
+
+<div class="gd" data-gd-root>
+  <header class="gd-head">
+    <div>
+      <span class="lt-label">eSports Deep Dive</span>
+      <h1 class="gd-title" data-gd-title>Willkommen im eSports</h1>
+    </div>
+    <span class="gd-count" data-gd-count>1 / 7</span>
+  </header>
+
+  <div class="gd-deck">
+
+    <%# ---------- Folie 1: Überblick ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Willkommen im eSports" id="folie-1">
+      <div class="gd-text">
+        <p class="gd-intro">eSports ist der Wettkampf der Teams im Mage Tower. Ihr spielt als Team, sammelt Stockwerke und Punkte – und jeden Sonntag wird abgerechnet.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Team</strong>Gründen oder beitreten – höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Team-ETF</strong>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team im Broker gehandelt.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Live-Turm</strong>Drei Mitglieder zusammen im Mage Tower = eSports-Lauf, live mit Pausen und Team-Fähigkeiten.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>Wochenbericht</strong>Sonntag um <%= rules.REPORT_TIME %> Uhr: Platzierung, Trophäen und Preise.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="gd-flow">
+          <div class="lt-panel gd-flow-box" data-gd="1"><%- mark(1) %><span class="lt-label">Schritt 1</span><strong class="gd-flow-title">Team</strong><span class="muted small">Kapitän + Mitglieder, Teamprofil, Teambild</span></div>
+          <div class="lt-panel gd-flow-box" data-gd="2"><%- mark(2) %><span class="lt-label">Schritt 2</span><strong class="gd-flow-title">Team-ETF</strong><span class="muted small">Im Broker kaufen und verkaufen – auch ihr selbst</span></div>
+          <div class="lt-panel gd-flow-box" data-gd="3"><%- mark(3) %><span class="lt-label">Schritt 3</span><strong class="gd-flow-title">Live-Turm</strong><span class="muted small">Gemeinsam Stockwerk für Stockwerk nach oben</span></div>
+          <div class="lt-panel gd-flow-box" data-gd="4"><%- mark(4) %><span class="lt-label">Schritt 4</span><strong class="gd-flow-title">Sonntag</strong><span class="muted small">Die 2 besten Läufe der Woche zählen</span></div>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 2: Vorbereitung ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Vorbereitung" id="folie-2" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Sind drei Mitglieder eures Teams in derselben Mage-Tower-Gruppe, erscheint statt der normalen Lobby die eSports-Vorbereitung.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Hauptkarte</strong>Anklicken zum Ändern. Ihr Wert für FIA, FIS oder BWL bringt die Punkte.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Boost-Karte</strong>Wie im normalen Turm: verstärkt eure Hauptkarten mit ihrer Fähigkeit.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Kaffee</strong>Ein Platz pro Spieler: Crumpled +<%= coffee('casino-kaffee-1-crumpled') %> %, BfW-ler +<%= coffee('casino-kaffee-2-bfwler') %> %, Gold +<%= coffee('casino-kaffee-3-gold') %> % Bock. Wird beim Trinken verbraucht.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>BfW Energy</strong>Jeder darf eines mitnehmen, im Lauf kann das Team aber nur eines trinken – die anderen bleiben euch.</span></button></li>
+          <li><button type="button" data-gd-step="5"><span class="gd-num">5</span><span><strong>Bereit &amp; Start</strong>Alle drücken „Ich bin bereit“, dann startet der Kapitän den Turm. Ab dann sind die Karten gesperrt.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="gd-prep">
+          <article class="lt-prep-card">
+            <div class="lt-prep-top">
+              <div><div class="lt-prep-name">Szkep</div><div class="muted small">Kapitän · du</div></div>
+              <span class="lt-pill">wählt noch …</span>
+            </div>
+            <div class="lt-prep-row">
+              <div class="lt-prep-main r-<%= m0 ? m0.rarity : 'none' %>" data-gd="1"><%- mark(1) %><%- img(m0) %></div>
+              <div class="lt-prep-info">
+                <span class="lt-label">Hauptkarte</span>
+                <div class="lt-prep-stats">
+                  <% [['SPD', 'speed'], ['FIA', 'fia'], ['FIS', 'fis'], ['BWL', 'bwl']].forEach(([l, k]) => { %><div><span><%= l %></span><strong><%= m0 && m0.stats ? m0.stats[k] : '–' %></strong></div><% }) %>
+                </div>
+                <div class="lt-prep-boost r-<%= b0 ? b0.rarity : 'none' %>" data-gd="2"><%- mark(2) %>
+                  <span class="lt-prep-mini r-<%= b0 ? b0.rarity : 'none' %>"><%- img(b0) %></span>
+                  <span class="lt-prep-boost-text"><span class="muted small">Boost-Karte</span><strong><%= b0 ? b0.name : '' %></strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="lt-prep-supply">
+              <span class="muted small">Wird beim Benutzen verbraucht</span>
+              <div class="lt-slot r-bfwler" data-gd="3"><%- mark(3) %><span class="lt-slot-bar"></span><span class="lt-slot-name">Kaffee · BfW-ler</span><span class="lt-slot-effect">+<%= coffee('casino-kaffee-2-bfwler') %> % Bock</span></div>
+              <div class="lt-slot is-empty" data-gd="4"><%- mark(4) %><span class="lt-slot-bar"></span><span class="lt-slot-name">+ BfW Energy</span><span class="lt-slot-effect"></span></div>
+            </div>
+          </article>
+          <div class="lt-panel lt-prep-ready" data-gd="5"><%- mark(5) %>
+            <div><strong class="lt-panel-title">2 von 3 bereit</strong><p class="lt-note">Der Kapitän startet, sobald alle bereit sind.</p></div>
+            <span class="lt-btn is-accent gd-fake-btn">Ich bin bereit</span>
+            <span class="lt-btn is-grey gd-fake-btn">Turm starten</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 3: Kampf ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Der Kampf" id="folie-3" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Jedes Stockwerk ist ein Kampf gegen einen Boss. Alle drei Hauptkarten sammeln gemeinsam Punkte, bis das Ziel erreicht ist – oder die Zeit abläuft.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Stockwerk &amp; Team-Energie</strong>Ihr startet mit <%= live.ENERGY %> Energie für Fähigkeiten in den Pausen.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Boost-Uhr</strong>Ein Boost läuft <%= live.BOOST_SECONDS %> Sekunden ab Kampfbeginn – auch in der Pause danach weiter.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Was der Boss will</strong>FIA, FIS oder BWL – und seine Eigenschaft. Beim ersten Stockwerk müsst ihr es aus dem Text erraten.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>Punkte &amp; Deadline</strong>Voller Balken vor Ablauf der Zeit = Stockwerk geschafft. Sonst ist der Lauf vorbei.</span></button></li>
+          <li><button type="button" data-gd-step="5"><span class="gd-num">5</span><span><strong>Bock</strong>Am Kampfbeginn und zur Halbzeit nimmt der Boss einem Spieler <%= pct(live.DRAIN) %> Bock. Bei 0 % pausiert dessen Karte.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="gd-col">
+          <div class="lt-bar">
+            <div class="lt-floor" data-gd="1"><%- mark(1) %><span class="lt-label">Stockwerk</span><strong>9</strong></div>
+            <div class="lt-energy">
+              <div class="lt-energy-head"><span class="lt-label">Team-Energie</span><strong>5 / <%= live.ENERGY %></strong></div>
+              <div class="lt-pips"><% for (let i = 1; i <= live.ENERGY; i++) { %><span class="lt-pip<%= i <= 5 ? ' is-on' : '' %>"></span><% } %></div>
+            </div>
+            <div class="lt-boost" data-gd="2"><%- mark(2) %>
+              <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="none" class="lt-ring-bg" stroke-width="5"></circle><circle cx="20" cy="20" r="16" fill="none" class="lt-ring" stroke-width="5" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="62" transform="rotate(-90 20 20)"></circle></svg>
+              <span class="lt-boost-text"><strong>Boost +20 %</strong><span>noch 14 s · läuft in der Pause weiter</span></span>
+            </div>
+          </div>
+          <section class="lt-panel">
+            <div class="lt-boss-head">
+              <div class="lt-boss-title" data-gd="3"><%- mark(3) %>
+                <div class="lt-chips"><span class="lt-stat is-bwl">BWL</span><span class="lt-trait">Dieb: Nimmt dem stärksten Spieler Bock.</span></div>
+                <h2>Stockwerk 9 · Der Zinsdrache</h2>
+              </div>
+              <div class="lt-time"><span class="lt-label">Zeit</span><strong>0:07</strong></div>
+            </div>
+            <div class="gd-meters" data-gd="4"><%- mark(4) %>
+              <div class="lt-meter"><div class="lt-meter-head"><span class="lt-label">Punkte</span><span><strong>1.912</strong> / 2.580</span></div><div class="lt-track is-big"><span class="lt-fill" style="width: 74%"></span></div></div>
+              <div class="lt-meter"><div class="lt-meter-head"><span class="lt-label">Deadline</span><span class="lt-label">Halbzeit vorbei</span></div><div class="lt-track"><span class="lt-fill is-time" style="width: 35%"></span></div></div>
+            </div>
+          </section>
+          <article class="lt-player is-hit">
+            <div class="lt-player-top">
+              <div class="lt-card r-<%= m1 ? m1.rarity : 'none' %>"><%- img(m1) %></div>
+              <div class="lt-player-info">
+                <strong class="lt-player-name">Mira</strong>
+                <span class="muted small">BWL <%= m1 && m1.stats ? m1.stats.bwl : '' %> · Beitrag 804</span>
+                <span class="lt-hit">−<%= pct(live.DRAIN) %> Bock</span>
+              </div>
+            </div>
+            <div class="lt-bock" data-gd="5"><%- mark(5) %>
+              <div class="lt-bock-head"><span class="lt-label">Bock</span><strong class="lt-bock-value is-low">47,5 %</strong></div>
+              <div class="lt-track"><span class="lt-fill is-low" style="width: 47.5%"></span></div>
+              <span class="muted small">wird knapp</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 4: Taktische Pause ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Taktische Pause" id="folie-4" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Nach jedem geschafften Stockwerk habt ihr höchstens <%= live.PAUSE_SECONDS %> Sekunden. Hier entscheidet sich, wie weit ihr kommt.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Countdown</strong>Weiter geht's, sobald alle „Weiter“ drücken – spätestens nach <%= live.PAUSE_SECONDS %> Sekunden.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Nächster Boss</strong>Ab Stockwerk 2 seht ihr, welchen Wert er will und was er kann – außer nach einem Nebel-Boss.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Team-Fähigkeiten</strong>Boost alle (<%= C.boost %>), Boost eine Karte (<%= C.einzel %>), Kartenwechsel (<%= C.wechsel %>), Verlängerung (<%= C.verl %>, +<%= live.EXT_SECONDS %> s). Jede weitere in derselben Pause kostet +<%= live.OVERLOAD %>.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>Jeder darf wählen</strong>Alle im Team können wählen und abwählen. Wer was gewählt hat, steht auf der Kachel – sprecht euch ab!</span></button></li>
+          <li><button type="button" data-gd-step="5"><span class="gd-num">5</span><span><strong>Kaffee &amp; Weiter</strong>Den eigenen Kaffee trinkt man nur in der Pause. Danach „Weiter“ – je schneller, desto mehr vom Boost bleibt.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="gd-col">
+          <div class="lt-pause-top">
+            <div class="lt-panel lt-pause-head"><span class="lt-label">Taktische Pause</span><strong class="lt-pause-title">Stockwerk 9 geschafft</strong><span class="lt-pause-sub">2.580 Punkte · weiter geht's, sobald alle „Weiter“ drücken</span></div>
+            <div class="lt-panel lt-countdown is-low" data-gd="1"><%- mark(1) %><strong class="lt-count">0:12</strong><div class="lt-countdown-side"><div class="lt-track"><span class="lt-fill is-count" style="width: 30%"></span></div><span class="lt-countdown-note">Boost läuft weiter: noch 3 s</span></div></div>
+          </div>
+          <div class="lt-panel lt-next" data-gd="2"><%- mark(2) %>
+            <div class="lt-next-left"><span class="lt-next-kicker">Als Nächstes · Stockwerk 10</span><div class="lt-chips"><span class="lt-stat is-big is-fis">FIS</span><span class="lt-trait is-big">Wut: In der zweiten Hälfte läuft die Zeit schneller.</span></div></div>
+            <div class="lt-next-right"><span class="lt-next-kicker">Ziel</span><strong>3.096</strong></div>
+          </div>
+          <div class="lt-panel">
+            <div class="lt-panel-head"><strong class="lt-panel-title">Team-Fähigkeiten</strong><span>Energie <strong>2</strong> <span class="muted">/ <%= live.ENERGY %></span></span></div>
+            <div class="lt-tiles" data-gd="3"><%- mark(3) %>
+              <div class="lt-tile is-on"><span class="lt-tile-head"><span class="lt-tile-name">Boost · alle</span><span class="lt-tile-cost"><%= C.boost %></span></span><span class="lt-tile-desc">+20 % für alle Hauptkarten, <%= live.BOOST_SECONDS %> s</span><span class="lt-tile-state is-other" data-gd="4"><%- mark(4) %>Gewählt von Mira – nochmal tippen zum Abwählen</span></div>
+              <div class="lt-tile"><span class="lt-tile-head"><span class="lt-tile-name">Verlängerung</span><span class="lt-tile-cost"><%= C.verl + live.OVERLOAD %> (+<%= live.OVERLOAD %>)</span></span><span class="lt-tile-desc">+<%= live.EXT_SECONDS %> s für den nächsten Boss</span><span class="lt-tile-state">Überladung: +<%= live.OVERLOAD %> Energie</span></div>
+            </div>
+          </div>
+          <div class="gd-row">
+            <div class="lt-panel lt-coffee"><span class="lt-coffee-text">Dein Kaffee: <strong>BfW-ler +<%= coffee('casino-kaffee-2-bfwler') %> % Bock</strong></span><span class="lt-coffee-btn gd-fake-btn">Kaffee trinken (30 % → 65 %)</span></div>
+            <span class="lt-weiter gd-fake-btn" data-gd="5"><%- mark(5) %>Weiter</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 5: Bock & Hilfsmittel ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Bock &amp; Hilfsmittel" id="folie-5" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Bock ist die Ausdauer jedes Spielers. Wer ihn verliert, fehlt dem Team – also rechtzeitig nachlegen.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Grün, gelb, rot</strong>Über 50 % alles gut, bis 25 % wird es knapp, darunter kritisch.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Kein Bock</strong>Bei 0 % bringt die Karte keine Punkte mehr, bis ihr sie rettet.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Kaffee</strong>Nur für dich selbst, nur in der Pause, einmal pro Lauf.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>BfW Energy</strong>Einmal pro Lauf fürs ganze Team: Team-Energie wieder auf <%= live.ENERGY %> oder der Bock eines beliebigen Spielers auf 100 %.</span></button></li>
+          <li><button type="button" data-gd-step="5"><span class="gd-num">5</span><span><strong>Kartenwechsel</strong>Kostet <%= C.wechsel %> Energie. Liegt der Bock unter <%= live.SWITCH_BOCK %> %, startet die neue Karte mit <%= live.SWITCH_BOCK %> % – darüber bleibt er.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="gd-col">
+          <div class="lt-panel lt-team" data-gd="1"><%- mark(1) %>
+            <strong class="lt-side-head">Team</strong>
+            <% [['Szkep', 82.5, 'is-ok'], ['Mira', 47.5, 'is-low'], ['Jonas', 17.5, 'is-crit']].forEach(([n, v, cls]) => { %>
+              <div class="lt-team-row"><div class="lt-team-top"><span class="lt-team-name"><%= n %></span><span class="lt-weiter-off">überlegt …</span></div><div class="lt-team-bar"><div class="lt-track is-mid"><span class="lt-fill <%= cls %>" style="width: <%= v %>%"></span></div><span class="lt-team-pct <%= cls %>"><%= pct(v) %></span></div></div>
+            <% }) %>
+          </div>
+          <article class="lt-player is-out" data-gd="2"><%- mark(2) %>
+            <div class="lt-player-top"><div class="lt-card r-<%= m2 ? m2.rarity : 'none' %>"><%- img(m2) %></div><div class="lt-player-info"><strong class="lt-player-name">Jonas</strong><span class="muted small">FIS <%= m2 && m2.stats ? m2.stats.fis : '' %> · Beitrag 0</span></div></div>
+            <div class="lt-bock"><div class="lt-bock-head"><span class="lt-label">Bock</span><strong class="lt-bock-value is-zero">Kein Bock</strong></div><div class="lt-track"><span class="lt-fill" style="width: 0"></span></div><span class="muted small">Karte pausiert – in der Pause retten</span></div>
+          </article>
+          <div class="gd-row is-three">
+            <div class="lt-panel lt-coffee" data-gd="3"><%- mark(3) %><span class="lt-coffee-text">Kaffee: <strong>+<%= coffee('casino-kaffee-1-crumpled') %> / +<%= coffee('casino-kaffee-2-bfwler') %> / +<%= coffee('casino-kaffee-3-gold') %> %</strong></span><span class="gd-cardrow"><%- img(demo.coffee, 'gd-mini') %></span></div>
+            <div class="lt-panel lt-coffee" data-gd="4"><%- mark(4) %><span class="lt-coffee-text">BfW Energy: <strong>Energie voll oder Bock 100 %</strong></span><span class="gd-cardrow"><%- img(demo.energy, 'gd-mini') %></span></div>
+            <div class="lt-panel lt-coffee" data-gd="5"><%- mark(5) %><span class="lt-coffee-text">Kartenwechsel: <strong>Bock mind. <%= live.SWITCH_BOCK %> %</strong></span><span class="lt-tile-cost"><%= C.wechsel %> Energie</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 6: Boss-Eigenschaften ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Boss-Eigenschaften" id="folie-6" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Ab Stockwerk 2 hat jeder Boss eine Eigenschaft. Welche Boss welche bekommt, wird jede Woche neu gemischt – für alle Teams gleich.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Gegen eure Karten</strong>Dieb, Blutdurst und Fluch treffen eure Spieler.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Gegen eure Fähigkeiten</strong>Bannkreis und Zeitfresser schwächen Boost und Verlängerung.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Gegen die Zeit &amp; das Ziel</strong>Wut und Panzer machen den Kampf selbst härter.</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>Gegen die Planung</strong>Nach einem Nebel-Boss seht ihr nicht, was als Nächstes kommt.</span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <% const groups = { dieb: 1, blutdurst: 1, fluch: 1, bannkreis: 2, zeitfresser: 2, wut: 3, panzer: 3, nebel: 4 }; %>
+        <div class="gd-traits">
+          <% live.TRAITS.forEach((t) => { %>
+            <div class="lt-panel gd-trait" data-gd="<%= groups[t.key] || 1 %>"><span class="lt-trait is-big"><%= t.label %></span><span class="small"><%= t.text %></span></div>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+
+    <%# ---------- Folie 7: Ergebnis & Woche ---------- %>
+    <section class="gd-slide" data-gd-slide data-title="Ergebnis &amp; Wochenwertung" id="folie-7" hidden>
+      <div class="gd-text">
+        <p class="gd-intro">Nach dem Lauf seht ihr euer Ergebnis und eure Woche – nur eure. Wie die anderen Teams stehen, bleibt bis Sonntag geheim.</p>
+        <ol class="gd-steps">
+          <li><button type="button" data-gd-step="1"><span class="gd-num">1</span><span><strong>Stockwerke</strong>So weit seid ihr gekommen – das ist eure Wertung.</span></button></li>
+          <li><button type="button" data-gd-step="2"><span class="gd-num">2</span><span><strong>Punkte</strong>Alle gesammelten Punkte, auch die des letzten, verlorenen Stockwerks. Bei gleich vielen Stockwerken entscheiden sie.</span></button></li>
+          <li><button type="button" data-gd-step="3"><span class="gd-num">3</span><span><strong>Eure Woche</strong>Die <%= rules.TOP_RUNS %> besten Läufe zählen. Mehr Läufe = mehr Chancen (höchstens <%= Math.min(towerRuns.daily, towerRuns.esports) %> pro Tag als Team).</span></button></li>
+          <li><button type="button" data-gd-step="4"><span class="gd-num">4</span><span><strong>Sonntag <%= rules.REPORT_TIME %> Uhr</strong>Wochenbericht im Team-Forum, Kursbewegung eures ETFs, Trophäen und Preise für Platz 1–3:
+            <% prizes.forEach((p) => { %><br><%= p.label %>: <%= [p.cash ? euro(p.cash) : '', p.packs ? p.packs + ' Booster ' + (p.packs === 1 ? 'Pack' : 'Packs') : ''].filter(Boolean).join(' + ') || '–' %><% }) %></span></button></li>
+        </ol>
+      </div>
+      <div class="gd-stage">
+        <div class="lt-panel lt-result">
+          <span class="lt-label">Lauf beendet</span>
+          <h2 class="gd-result-title">Auf Stockwerk 14 gescheitert</h2>
+          <div class="lt-result-stats">
+            <div data-gd="1"><%- mark(1) %><span class="lt-label">Stockwerke</span><strong>13</strong></div>
+            <div data-gd="2"><%- mark(2) %><span class="lt-label">Punkte gesamt</span><strong>33.909</strong></div>
+          </div>
+          <div class="lt-strip"><% for (let i = 1; i <= 14; i++) { %><div class="lt-strip-cell"><span class="lt-strip-track"><span class="<%= i < 14 ? 'is-win' : 'is-lose' %>" style="width: <%= i < 14 ? 100 : 75 %>%"></span></span><span class="lt-strip-n"><%= i %></span></div><% } %></div>
+          <ol class="lt-week" data-gd="3"><%- mark(3) %>
+            <li class="is-counted"><span>Di</span><strong>14 Stockwerke</strong><span class="muted">38.637 Punkte</span><span class="lt-counts">zählt</span></li>
+            <li><span>Mi</span><strong>12 Stockwerke</strong><span class="muted">26.910 Punkte</span><span class="lt-counts"></span></li>
+            <li class="is-counted"><span>Do</span><strong>13 Stockwerke</strong><span class="muted">33.909 Punkte</span><span class="lt-counts">zählt</span></li>
+          </ol>
+          <p class="lt-note" data-gd="4"><%- mark(4) %>Eure Platzierung erfahrt ihr im Wochenbericht am Sonntag.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="gd-nav" aria-label="Folien">
+    <button type="button" class="lt-btn is-grey gd-nav-btn" data-gd-prev>Zurück</button>
+    <div class="gd-dots" data-gd-dots></div>
+    <button type="button" class="lt-btn is-accent gd-nav-btn" data-gd-next>Weiter</button>
+  </nav>
+  <p class="gd-hint muted small">Tipp: Pfeiltasten ← → oder die Schritte links anklicken.</p>
+</div>
+
+<script src="/js/esports-guide.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

@@ -126,8 +126,24 @@
     </section>
   </div>
 
-  <aside class="card es-card es-rules">
-    <h2>So funktioniert's</h2>
+  <aside class="es-side">
+  <%# Tutorial im Stil der Album-Kachel %>
+  <a class="tcg-album-tile es-guide-tile" href="/esports/deep-dive">
+    <span class="tcg-fan" aria-hidden="true">
+      <% guideFan.forEach((c) => { %><img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy"><% }) %>
+    </span>
+    <span class="tcg-album-foot">
+      <span class="tcg-album-text">
+        <span class="kicker">Tutorial</span>
+        <span class="tcg-album-title">eSports Deep Dive</span>
+        <span class="dg-help-hint">Live-Turm Fenster für Fenster erklärt</span>
+      </span>
+      <span class="tcg-album-arrow" aria-hidden="true">→</span>
+    </span>
+  </a>
+  <%# Regeln: zugeklappt, auf Klick ausklappbar %>
+  <details class="card es-card es-rules">
+    <summary><h2>So funktioniert's</h2></summary>
     <ul>
       <li><%= foundCost ? 'Gründen kostet ' + eur(foundCost) + '.' : 'Gründen ist kostenlos.' %> Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
       <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
@@ -142,8 +158,10 @@
       <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
       <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>. Reicht das Guthaben nicht, bleibt der Rest als Schuld und wird von jeder Einnahme abgezogen.</li>
     </ul>
+  </details>
   </aside>
 </div>
 
 <link rel="stylesheet" href="/css/esports.css?v=<%= assetVersion %>">
+<link rel="stylesheet" href="/css/esports-guide.css?v=<%= assetVersion %>">
 <%- include('partials/foot') %>
