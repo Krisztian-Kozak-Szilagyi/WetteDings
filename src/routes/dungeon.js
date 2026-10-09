@@ -120,7 +120,10 @@ router.get('/dungeon', async (req, res) => {
   const esTeamId = tower && party && !party.solo && phase === 'gruppe' ? await dungeon.esportsLobby(party, now) : null;
   const esLobby = !!esTeamId;
   const esTeam = esTeamId ? await EsportsTeam.findById(esTeamId).select('name ticker').lean() : null;
-  const coffeeChoices = esLobby && cards ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: cards.counts[id] || 0 })).filter((c) => c.card) : [];
+  // frei = eigene Exemplare ohne die als Haupt- oder Boost-Karte gewählten (die eigenen Vorrats-Exemplare zählen als frei)
+  const inUse = (id) => (mine ? [mine.card, mine.boost].filter((x) => x === id).length : 0);
+  const freeOf = (id) => (cards ? Math.max(0, (cards.counts[id] || 0) - inUse(id)) : 0);
+  const coffeeChoices = esLobby ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: freeOf(id), asBoost: !!mine && mine.boost === id })).filter((c) => c.card) : [];
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
@@ -160,7 +163,8 @@ router.get('/dungeon', async (req, res) => {
     esTeam,
     coffeePct: LIVE.COFFEE,
     coffeeChoices,
-    energyFree: esLobby && cards ? cards.counts[LIVE.ENERGY_CARD] || 0 : 0,
+    energyFree: esLobby ? freeOf(LIVE.ENERGY_CARD) : 0,
+    energyAsBoost: esLobby && !!mine && mine.boost === LIVE.ENERGY_CARD,
     allReady: !!party && party.members.every((m) => m.ready),
     towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost)),
     // Mage Tower: Karten, die Mitspieler schon gewählt haben (jede Karte nur einmal im Team)
