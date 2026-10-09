@@ -117,11 +117,14 @@ router.get('/esports/deep-dive', (req, res) => {
     title: 'eSports Deep Dive',
     live: LIVE,
     towerRuns: { daily: dungeon.settings.tower.dailyRuns, esports: dungeon.settings.tower.esportsRuns },
+    // Ziel-Punkte je Stockwerk wie im echten Turm (Admin: Ziel Runde 1, Anstieg)
+    req: (n) => dungeon.towerRequired(n),
+    banner: '/img/dungeon/st-ivan-dungeon-banner.webp',
     rules: league,
     prizes: esports.prizeList(),
     demo: {
       main: [card('luca-6-glitch'), card('st-ivan-boss'), card('marcel-6-glitch')],
-      boost: [card('lili-6-glitch'), card('bfw-energy-gold'), card('mauch-3-glitch')],
+      boost: [card('lili-6-glitch'), card('mauch-3-glitch'), null],
       coffee: card('casino-kaffee-2-bfwler'),
       energy: card('bfw-energy-gold'),
     },
