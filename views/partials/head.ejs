@@ -15,6 +15,8 @@
   <meta name="apple-mobile-web-app-title" content="<%= appName %>">
   <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
+  <%# Seiten-CSS im head (nicht am Ende des body) – sonst blitzt die Seite kurz ungestylt auf (Dashboard: schwarzes Vermögens-Diagramm) %>
+  <% (locals.pageCss || []).forEach((f) => { %><link rel="stylesheet" href="/css/<%= f %>.css?v=<%= assetVersion %>"><% }) %>
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
   <% if (deviceProbe) { %><script src="/js/device.js?v=<%= assetVersion %>" defer data-csrf="<%= csrfToken %>"></script><% } %>
   <% if (locals.actionToken) { %><meta name="bfw-at" content="<%= actionToken %>"><script src="/js/guard.js?v=<%= assetVersion %>" defer></script><% } %>

@@ -1,4 +1,4 @@
-<%- include('partials/head') %>
+<%- include('partials/head', { pageCss: ['dashboard'] }) %>
 <%
   // Redesign 2026-10 (Nocturne). Same data as before: dash = dashboardService.load(user)
   const d = dash;
@@ -216,7 +216,6 @@
 
 <%- include('partials/card-zoom', { favForm: true }) %>
 <%- include('partials/foil-modal', { favForm: true }) %>
-<link rel="stylesheet" href="/css/dashboard.css?v=<%= assetVersion %>">
 <%# tcg.js: 3D-Neigung der vergrößerten Karte (window.tcgBindTilt) – wie in der Dungeon-Lobby %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/favorites.js?v=<%= assetVersion %>" defer></script>
