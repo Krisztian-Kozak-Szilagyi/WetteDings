@@ -158,16 +158,22 @@ async function migrate() {
   const v3 = await cleanFreshConditionsV3();
   if (v3) console.log(`Migration: Zustand von ${v3} Karte(n) auf Version 3 gehoben (ohne Kratzer/Knick, wenn unfoliert).`);
 
-  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel)
-  const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null } };
+  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel).
+  // Nur alte Positionen ohne Feld slab (#204) – neue Folien sind Schutzhüllen, deren Note geheim bleibt
+  const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null, slab: { $exists: false } } };
   const trades = await Trade.find({ status: 'offen', $or: [{ give: missing }, { want: missing }] }).select('give want').lean();
   if (trades.length) {
     const ids = trades.flatMap((t) => [...t.give, ...t.want].filter((l) => l.foiledAt).map((l) => l.doc || l.copy).filter(Boolean));
     const grades = new Map((await TcgCard.find({ _id: { $in: ids } }).select('condition.grade').lean()).map((d) => [String(d._id), d.condition && d.condition.grade]));
     const withGrade = (l) => (l.foiledAt && l.grade == null ? { ...l, grade: grades.get(String(l.doc || l.copy)) || null } : l);
-    await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
+    // roh: über das Schema bekämen die Positionen slab: null und gälten danach als Schutzhülle (foilToSlab)
+    await Trade.collection.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
+
+  // #204: Folie wird Schutzhülle (Sleeve, ohne Note) – bisher folierte Karten zeigten ihre Note und werden BfW-Slabs
+  const slabbed = await foilToSlab();
+  if (slabbed.cards || slabbed.damaged || slabbed.trades) console.log(`Migration: ${slabbed.cards} folierte Karte(n) zu BfW-Slabs, ${slabbed.damaged} mit sichtbarem Schaden markiert, ${slabbed.trades} Angebot(e) ergänzt.`);
 
   // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN,
   // geteilte Netze wie das Schulnetz)
@@ -279,4 +285,43 @@ async function cleanFreshConditionsV3(batch = 1000) {
   }
 }
 
-module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3 };
+/** Sichtbarer Schaden aus den Mängeln (#204): mindestens ein Kratzer oder ein Knick */
+const isDamaged = (defects) => !!defects && ((defects.scratches || []).length > 0 || !!defects.crease);
+
+/**
+ * #204: Bisher folierte Karten zeigten ihre Note auf einem Etikett „BfW GRADING“ – sie werden BfW-Slabs (Note sichtbar,
+ * Wertsteigerung wie bisher). Ab jetzt ist eine neue Folie nur eine Schutzhülle ohne Note. Außerdem: damaged für alle
+ * Karten mit Kratzer oder Knick, und Handelspositionen mit foliertem Exemplar bekommen slab (aus ihrer Note).
+ * Idempotent: Karten mit Feld slab bzw. damaged und Positionen mit slab werden übersprungen. Läuft nach Version 3.
+ */
+async function foilToSlab(batch = 1000) {
+  const coll = TcgCard.collection; // roh: condition ist im Schema select: false
+  let cards = 0;
+  for (;;) {
+    const docs = await coll.find({ foiledAt: { $ne: null }, slab: { $exists: false } }).project({ foiledAt: 1, 'condition.grade': 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    const ops = docs.map((d) => ({ updateOne: { filter: { _id: d._id, slab: { $exists: false } }, update: { $set: { slab: { code: 'BfW', grade: (d.condition && d.condition.grade) || null, at: d.foiledAt } } } } }));
+    cards += (await coll.bulkWrite(ops, { ordered: false })).modifiedCount;
+    if (docs.length < batch) break;
+  }
+  // Neue Folien nach dieser Migration bekommen slab: null (Schema-Default) – nur Karten ohne das Feld sind alte
+  await coll.updateMany({ foiledAt: null, slab: { $exists: false } }, { $set: { slab: null } });
+  let damaged = 0;
+  for (;;) {
+    const docs = await coll.find({ damaged: { $exists: false } }).project({ 'condition.defects.scratches': 1, 'condition.defects.crease': 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    const ops = docs.map((d) => ({ updateOne: { filter: { _id: d._id, damaged: { $exists: false } }, update: { $set: { damaged: isDamaged(d.condition && d.condition.defects) } } } }));
+    await coll.bulkWrite(ops, { ordered: false });
+    damaged += docs.filter((d) => isDamaged(d.condition && d.condition.defects)).length;
+    if (docs.length < batch) break;
+  }
+  const noSlab = { $elemMatch: { foiledAt: { $ne: null }, slab: { $exists: false } } };
+  const trades = await Trade.collection.find({ $or: [{ give: noSlab }, { want: noSlab }] }).project({ give: 1, want: 1 }).toArray();
+  const withSlab = (l) => (l.foiledAt && l.slab === undefined ? { ...l, slab: { code: 'BfW', grade: l.grade == null ? null : l.grade } } : l);
+  if (trades.length) {
+    await Trade.collection.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: (t.give || []).map(withSlab), want: (t.want || []).map(withSlab) } } } })), { ordered: false });
+  }
+  return { cards, damaged, trades: trades.length };
+}
+
+module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged };

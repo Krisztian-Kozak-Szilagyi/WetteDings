@@ -15,10 +15,15 @@ const messageSchema = new Schema(
 const lineSchema = new Schema(
   {
     card: { type: String, required: true },
-    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // ein bestimmtes foliertes Exemplar wird verlangt
+    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // ein bestimmtes Exemplar wird verlangt (foliert, Slab oder beschädigt)
     doc: { type: Schema.Types.ObjectId, default: null }, // gesperrtes Exemplar (TcgCard bzw. Item), sobald der Besitzer zugesagt hat
     foiledAt: { type: Date, default: null }, // Exemplar ist foliert (seit) – zur Anzeige
-    grade: { type: Number, default: null }, // dessen Note auf der Folie (#73)
+    grade: { type: Number, default: null }, // Note auf dem Slab (#73, #204: eine Folie allein zeigt keine)
+    // Sichtbarer Zustand des Exemplars (#204) – zur Anzeige und für den Ø-Marktpreis (trade/marketPrice)
+    slab: { type: new Schema({ code: String, grade: Number }, { _id: false }), default: null },
+    damaged: { type: Boolean, default: false }, // Kratzer oder Knick
+    creased: { type: Boolean, default: false }, // davon: Knick
+    ironed: { type: Boolean, default: false }, // der Knick ist gebügelt
   },
   { _id: false }
 );

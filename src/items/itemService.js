@@ -11,7 +11,7 @@ const { Trade, openFilter } = require('../models/Trade');
 const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { lockedDocs, claim, lockLabel } = require('../tcg/locks');
+const { lockedDocs, claim, lockLabel, isStateLock } = require('../tcg/locks');
 const { inTransaction } = require('../services/betService');
 const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
@@ -183,10 +183,10 @@ async function revokeItems({ userId, type, count = 1 }) {
 /** Älterer Name von addItems (Admin-Vergabe, Dungeon, Grading, Lotto) */
 const grantItems = addItems;
 
-/** Folierte Karten eines Nutzers, neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
+/** Folierte Karten eines Nutzers (Sleeves und Slabs), neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
 async function foiledCards(userId, now = Date.now()) {
   const [docs, locked] = await Promise.all([
-    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('+condition').sort({ foiledAt: -1 }).lean(), // folierte Karten zeigen ihre Note
+    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('card rarity foiledAt slab condition.defects.centering').sort({ foiledAt: -1 }).lean(), // nur Slabs zeigen eine Note
     lockedDocs(userId),
   ]);
   return docs
@@ -200,13 +200,14 @@ async function foiledCards(userId, now = Date.now()) {
         card,
         rarity: r,
         foiledAt: d.foiledAt,
-        grade: d.condition ? d.condition.grade : null,
+        slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null,
+        grade: d.slab ? d.slab.grade : null, // Note nur auf dem Slab (#204)
         center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null, // sichtbarer Versatz (Zentrierung)
         days: foil.foilDays(d.foiledAt, now),
-        percent: foil.foilPercent(d.foiledAt, now),
+        percent: foil.foilPercent(foil.growthFrom(d), now),
         sell: r.sell,
-        value: foil.cardValue(r.sell, d.foiledAt, now),
-        lock: reason && reason !== 'folie' ? reason : null, // 'handel' | 'quest' | 'dungeon'
+        value: foil.cardValue(r.sell, foil.growthFrom(d), now),
+        lock: reason && reason !== 'folie' && reason !== 'slab' ? reason : null, // 'handel' | 'quest' | 'dungeon'
       };
     });
 }
@@ -227,35 +228,38 @@ async function foilableCards(userId) {
 }
 
 /**
- * Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar.
- * Gibt { copyId, grade } zurück – mit der Folie wird die Note des Exemplars sichtbar (#73).
+ * Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar – unbeschädigte zuerst,
+ * damit die Folie nicht an einer Karte mit Knick landet (#204). Die Folie ist eine Schutzhülle (Sleeve): Die Note bleibt
+ * geheim, nur ein Slab zeigt sie. Gibt { copyId, damaged } zurück.
  */
 async function foilCard({ user, cardId }) {
   const card = catalog.cardById[cardId];
   if (!card) throw new UserError('Bitte wähle eine Karte aus.');
   return inTransaction(async (session) => {
     const locked = await lockedDocs(user._id, session);
-    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id condition.grade').session(session).lean();
-    const doc = docs.find((d) => !locked.reasons.has(String(d._id)));
+    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id damaged').session(session).lean();
+    const free = docs.filter((d) => !locked.reasons.has(String(d._id)));
+    const doc = free.find((d) => !d.damaged) || free[0];
     if (!doc) throw new UserError(docs.length ? 'Alle unfolierten Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Du hast kein unfoliertes Exemplar dieser Karte.');
     // eine freie Folie (nicht im Handel) verbrauchen
     if (!(await freeCount(user._id, itemTypeByKey.folie, session))) throw new UserError('Du hast keine freie Folie mehr (oder sie steht im Handel).');
     await takeItems({ userId: user._id, type: 'folie', source: 'folieren', session, meta: { card: card.id } });
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: new Date() } }, { session });
-    return { copyId: String(doc._id), grade: doc.condition ? doc.condition.grade : null };
+    return { copyId: String(doc._id), damaged: !!doc.damaged };
   });
 }
 
 /** Folie abziehen: Die Karte ist danach wieder normal (Bankwert, Quests), die Folie ist kaputt. */
 async function unfoilCard({ user, copyId }) {
   return inTransaction(async (session) => {
-    const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card').session(session).lean();
+    const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card slab').session(session).lean();
     if (!doc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
+    if (doc.slab) throw new UserError('Ein Slab ist versiegelt – aufbrechen lässt er sich erst mit den Grading-Shops.');
     const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
     if (reason === 'handel') throw new UserError('Die Karte ist gerade im Handel. Zieh zuerst das Angebot zurück.');
     // Folierte Karten spielen mit (#204): unterwegs bleibt die Folie dran – sonst wäre die Karte beim Abschluss ungeschützt
-    if (reason && reason !== 'folie') throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Die Folie kannst du danach abziehen.`);
+    if (reason && !isStateLock(reason)) throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Die Folie kannst du danach abziehen.`);
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null } }, { session });
     return catalog.cardById[doc.card] || null;

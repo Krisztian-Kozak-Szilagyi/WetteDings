@@ -1,5 +1,6 @@
 // Gesperrte Karten-Exemplare: auf einer laufenden IHK-Quest, im Dungeon, in einem offenen Handelsangebot, als Einsatz
-// in einem offenen Duell oder foliert (die Folie allein sperrt nur Bank, Duell und Sammelhandel).
+// in einem offenen Duell, foliert (die Folie allein sperrt nur Bank, Duell und Sammelhandel) oder im Slab (#204: sperrt
+// zusätzlich Quest, Dungeon und Turm – versiegelte Karten spielen nicht mit; handeln lassen sie sich gezielt).
 // Gesperrte Exemplare können nicht verkauft, gehandelt oder auf eine Quest (oder einen künftigen Dungeon)
 // geschickt werden. Ausnahmen: Folierte Karten lassen sich gezielt im Handel anbieten (tradeService.create) und
 // spielen in Quest, Dungeon und Turm mit (#204, { foil: true }) – dort schützt die Folie vor Schaden.
@@ -11,10 +12,13 @@ const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
 const { UserError } = require('../lib/util');
 
-/** { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'duell'|'folie'> } – alle haben Vorrang vor 'folie' */
+/**
+ * { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'duell'|'slab'|'folie'> } – alle haben Vorrang vor
+ * 'slab' und 'folie' (die beiden sind nur der Zustand der Karte, keine laufende Verwendung)
+ */
 async function lockedDocs(userId, session) {
   const [foiled, run, trades, party, dungeon, duels] = await Promise.all([
-    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id').session(session || null).lean(),
+    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id slab').session(session || null).lean(),
     IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
     Trade.find({ ...openFilter(), $or: [{ seller: userId }, { to: userId }], lockDocs: { $exists: true } }).select('seller to give want lockDocs').session(session || null).lean(),
@@ -25,7 +29,7 @@ async function lockedDocs(userId, session) {
     Bet.find({ status: 'offen', 'duel.cards.user': userId }).select('duel.cards').session(session || null).lean(),
   ]);
   const reasons = new Map();
-  foiled.forEach((d) => reasons.set(String(d._id), 'folie'));
+  foiled.forEach((d) => reasons.set(String(d._id), d.slab ? 'slab' : 'folie'));
   if (run) [run.cardDoc, run.boostDoc, run.boost2Doc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
   [party, dungeon].filter(Boolean).forEach((d) =>
     d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc, m.coffeeDoc, m.energyDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
@@ -35,7 +39,7 @@ async function lockedDocs(userId, session) {
   return { docs: [...reasons.keys()], reasons };
 }
 
-/** Gesperrt? Mit foil: true zählt die Folie allein nicht als Sperre (Quest, Dungeon, Turm – #204) */
+/** Gesperrt? Mit foil: true zählt die Folie (Sleeve) allein nicht als Sperre (Quest, Dungeon, Turm – #204); ein Slab schon */
 function isLocked(locked, doc, { foil = false } = {}) {
   const reason = locked.reasons.get(String(doc._id || doc));
   return !!reason && !(foil && reason === 'folie');
@@ -54,7 +58,9 @@ function pickCopy(docs, locked, { foiled = false, except = null } = {}) {
 }
 
 /** Schild für gesperrte Exemplare (Album, IHK- und Dungeon-Kartenauswahl) */
-const LOCK_LABELS = { quest: 'Auf Quest', dungeon: 'Im Dungeon', handel: 'Im Handel', duell: 'Im Duell' };
+const LOCK_LABELS = { quest: 'Auf Quest', dungeon: 'Im Dungeon', handel: 'Im Handel', duell: 'Im Duell', slab: 'Im Slab' };
+/** Nur der Zustand der Karte (Folie, Slab), keine laufende Verwendung – zählt im Handel nicht als Sperre */
+const isStateLock = (reason) => reason === 'folie' || reason === 'slab';
 const lockLabel = (reason) => LOCK_LABELS[reason] || 'Gesperrt';
 
 /**
@@ -70,7 +76,7 @@ async function copiesByCard(userId, { freeIf = () => false, foil = false } = {})
     const e = out[d.card] || (out[d.card] = { total: 0, free: 0, locked: 0, reason: null, foiled: 0 });
     e.total += 1;
     const reason = locked.reasons.get(String(d._id));
-    if (d.foiledAt && (reason === 'folie' || (reason && freeIf(reason)))) e.foiled += 1;
+    if (d.foiledAt && (reason === 'folie' || (reason && reason !== 'slab' && freeIf(reason)))) e.foiled += 1;
     else if (!reason || freeIf(reason)) e.free += 1;
     else {
       e.locked += 1;
@@ -92,4 +98,4 @@ async function claim(docs, userId, session) {
   if (res.matchedCount !== ids.length) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 }
 
-module.exports = { lockedDocs, isLocked, pickCopy, claim, LOCK_LABELS, lockLabel, copiesByCard };
+module.exports = { lockedDocs, isLocked, isStateLock, pickCopy, claim, LOCK_LABELS, lockLabel, copiesByCard };

@@ -26,9 +26,20 @@ test('Folie: Wert steigt linear mit vollen Tagen', () => {
   assert.equal(foil.foilPercent(null, NOW, s), 0);
 });
 
+test('#204: Wertsteigerung nur im Slab – eine Folie (Schutzhülle) steigert den Wert nicht', () => {
+  const s = { bonusPercent: 10, dailyPercent: 0.9 };
+  const at = new Date(NOW - DAY);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: null }), null);
+  assert.equal(foil.growthFrom({ foiledAt: null, slab: null }), null);
+  assert.equal(foil.growthFrom(null), null);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), at);
+  assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: null }), NOW, s), 15000);
+  assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), NOW, s), 16635);
+});
+
 test('Folie: Ranglisten-Ausdruck rechnet mit den aktuellen Einstellungen', () => {
   const expr = JSON.stringify(foil.factorExpr());
-  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt'));
+  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt') && expr.includes('$slab'));
   assert.ok(expr.includes(`${foil.settings.bonusPercent}`) && expr.includes(`${foil.settings.dailyPercent}`));
 });
 

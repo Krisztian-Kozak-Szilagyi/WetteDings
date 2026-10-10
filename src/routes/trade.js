@@ -25,12 +25,12 @@ const cardInfo = (id) => {
 };
 /** Seltenheiten samt der Pseudo-Seltenheit "Gegenstand" */
 const tradeRarities = () => ({ ...catalog.rarityByKey, item: items.ITEM_RARITY });
-/** Kartenwert einer Position: Bankwert, bei folierten Karten mit Wertsteigerung */
+/** Kartenwert einer Position: Bankwert, bei Slabs mit Wertsteigerung */
 const lineValue = (l) => {
   const c = cardInfo(l.card);
   if (c.isItem) return c.sell;
   const r = catalog.rarityByKey[c.rarity];
-  return foil.cardValue(r ? r.sell : 0, l.foiledAt);
+  return foil.cardValue(r ? r.sell : 0, foil.growthFrom(l));
 };
 const linesValue = (list) => (list || []).reduce((s, l) => s + lineValue(l), 0);
 /** Art des Angebots als Wort */

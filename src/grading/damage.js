@@ -43,7 +43,8 @@ function dungeonSeverity(run) {
 
 /**
  * Würfelt für jedes Exemplar (unfoliert) Schaden aus und schreibt ihn – in der Transaktion des Abschlusses.
- * Mängel und Note in einem einzigen Update, damit sie nie auseinanderlaufen. Ein Knick ist danach sichtbar (creased).
+ * Mängel und Note in einem einzigen Update, damit sie nie auseinanderlaufen. Der Schaden ist danach sichtbar (damaged,
+ * bei einem Knick zusätzlich creased).
  * Gibt [{ card, kind }] zurück (für die Benachrichtigung), rand nur für Tests.
  */
 async function damageCards({ userId, docs, severity, session = null, rand }) {
@@ -58,7 +59,7 @@ async function damageCards({ userId, docs, severity, session = null, rand }) {
     const defects = addDamage(c.condition.defects, kind);
     const res = await TcgCard.updateOne(
       { _id: c._id, user: userId, foiledAt: null },
-      { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), 'condition.v': Math.max(c.condition.v || 0, CONDITION_VERSION), creased: !!defects.crease } },
+      { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), 'condition.v': Math.max(c.condition.v || 0, CONDITION_VERSION), creased: !!defects.crease, damaged: true } },
       { session }
     );
     if (res.modifiedCount) out.push({ card: c.card, kind: defects.crease && !c.condition.defects.crease ? 'knick' : 'kratzer' });

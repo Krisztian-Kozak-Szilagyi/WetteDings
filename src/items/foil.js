@@ -1,5 +1,7 @@
 // Folie: Wertberechnung folierter Karten und die Einstellungen dazu (ohne Abhängigkeit vom TCG-Service,
 // damit Rangliste und Sammlung sie ohne Kreisbezug nutzen können).
+// #204: Die Folie ist eine Schutzhülle (Sleeve) – sie steigert den Wert nicht mehr. Die Steigerung behalten nur Slabs
+// (die früher folierten Karten wurden zu BfW-Slabs, siehe migrate.foilToSlab); gerechnet ab foiledAt.
 const { ItemSettings } = require('../models/Item');
 const { logSettingsChange } = require('../stats/settingsLog');
 
@@ -35,6 +37,9 @@ async function saveSettings({ admin, gradingChance, bonusPercent, dailyPercent }
   await logSettingsChange({ area: 'folie', before, after: current(), by: admin });
 }
 
+/** Ab wann ein Exemplar ({ foiledAt, slab }) im Wert steigt: nur ein Slab, sonst null (Sleeve oder ohne Folie) */
+const growthFrom = (copy) => (copy && copy.slab && copy.foiledAt ? copy.foiledAt : null);
+
 /** Volle Tage seit dem Folieren (0 am ersten Tag) */
 function foilDays(foiledAt, now = Date.now()) {
   if (!foiledAt) return 0;
@@ -53,18 +58,18 @@ function cardValue(sell, foiledAt, now = Date.now(), s = settings) {
 }
 
 /**
- * MongoDB-Ausdruck: Faktor auf den Verkaufswert (1 ohne Folie, sonst 1 + Steigerung) – gleiche Rechnung wie
- * cardValue, für die Ranglisten-Aggregation. Fehlt das Feld (alte Karten), gilt die Karte als nicht foliert.
+ * MongoDB-Ausdruck: Faktor auf den Verkaufswert (1 ohne Slab, sonst 1 + Steigerung) – gleiche Rechnung wie
+ * cardValue(…, growthFrom(…)), für die Ranglisten-Aggregation. Fehlt das Feld (alte Karten), gilt die Karte als nicht foliert.
  */
-function factorExpr(field = '$foiledAt') {
+function factorExpr(field = '$foiledAt', slabField = '$slab') {
   const days = { $max: [0, { $floor: { $divide: [{ $subtract: ['$$NOW', field] }, DAY_MS] } }] };
   return {
     $cond: [
-      { $eq: [{ $type: field }, 'date'] },
+      { $and: [{ $eq: [{ $type: field }, 'date'] }, { $eq: [{ $type: slabField }, 'object'] }] },
       { $divide: [{ $add: [100, settings.bonusPercent, { $multiply: [settings.dailyPercent, days] }] }, 100] },
       1,
     ],
   };
 }
 
-module.exports = { DEFAULTS, settings, loadSettings, saveSettings, current, foilDays, foilPercent, cardValue, factorExpr };
+module.exports = { DEFAULTS, settings, loadSettings, saveSettings, current, growthFrom, foilDays, foilPercent, cardValue, factorExpr };

@@ -18,6 +18,14 @@ const cardSchema = new Schema(
     // Bewusst außerhalb des geheimen Zustands: man sieht einen Knick, nicht aber die Note
     creased: { type: Boolean, default: false },
     ironedAt: { type: Date, default: null },
+    // Sichtbarer Schaden (#204): mindestens ein Kratzer oder ein Knick – in der Großansicht zu sehen (die Lage lesen
+    // Seiten nur über condition.defects.scratches/.crease, siehe grading/condition.visibleMarks). Im Handel sind
+    // beschädigte Exemplare Einzelstücke; eine Position "Karte" belegt nur unbeschädigte.
+    damaged: { type: Boolean, default: false },
+    // Slab (#204): Die Karte ist von einem Grading-Shop versiegelt – Kürzel und Note stehen sichtbar auf dem Etikett.
+    // foiledAt ist dabei ebenfalls gesetzt (geschützt, nicht bei der Bank). Ohne Slab ist eine folierte Karte nur in
+    // einer Schutzhülle (Sleeve, Name im Spiel weiter "Folie") – ohne Note. Slabs spielen nicht mit.
+    slab: { type: new Schema({ code: String, grade: Number, at: Date }, { _id: false }), default: null },
     // Zuletzt per Handel bekommen (rankService.FRESH_DAYS): so lange zählt das Exemplar in der Rangliste höchstens mit
     // tradedCost, dem Anteil dessen, was der Empfänger dafür gegeben hat – eine geschenkte Karte bringt niemanden auf Platz 1
     tradedAt: { type: Date, default: undefined },
@@ -28,6 +36,7 @@ const cardSchema = new Schema(
 );
 cardSchema.index({ user: 1, card: 1, createdAt: 1 });
 cardSchema.index({ user: 1, creased: 1 }); // Grading-Shop: eigene Karten mit Knick zum Bügeln
+cardSchema.index({ user: 1, card: 1, damaged: 1 }); // Handel und Bank: unbeschädigte Exemplare einer Karte
 
 // Ein ungeöffnetes Booster Pack im Inventar (wird beim Öffnen gelöscht)
 const packSchema = new Schema(

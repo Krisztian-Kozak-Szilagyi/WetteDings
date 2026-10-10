@@ -50,7 +50,7 @@ async function act(req, res, fn) {
 
 router.post('/inventar/folieren', (req, res) =>
   act(req, res, async () => {
-    // die Note zeigt die Seite selbst: die neue Folie öffnet sich in 3D (Etikett mit Note, #73)
+    // die neue Folie öffnet sich in 3D – eine Schutzhülle ohne Note (#204: nur ein Slab zeigt sie)
     const { copyId } = await items.foilCard({ user: req.user, cardId: str(req.body.card) });
     return `/inventar?neu=${copyId}#folierte`;
   })

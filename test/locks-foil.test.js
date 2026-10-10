@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { isLocked, pickCopy } = require('../src/tcg/locks');
+const { isLocked, isStateLock, pickCopy } = require('../src/tcg/locks');
 
 // Exemplare einer Karte, neueste zuerst (wie TcgCard.find(…).sort({ createdAt: -1 }))
 const docs = [
@@ -33,4 +33,16 @@ test('#204: Exemplarwahl – ohne Schalter lieber unfoliert, mit Schalter nur fo
   assert.equal(pickCopy(docs, locked, { except: docs[2] })._id, 'a');
   assert.equal(pickCopy(docs, locked, { foiled: true, except: { _id: 'a' } }), null);
   assert.equal(pickCopy([], locked), null);
+});
+
+test('#204: Ein Slab spielt nie mit – auch nicht mit Schalter', () => {
+  const slabbed = { reasons: new Map([['s', 'slab'], ['f', 'folie']]) };
+  const copies = [{ _id: 's', foiledAt: new Date(), slab: { code: 'BfW', grade: 9 } }, { _id: 'f', foiledAt: new Date() }];
+  assert.equal(isLocked(slabbed, 's', { foil: true }), true);
+  assert.equal(isLocked(slabbed, 'f', { foil: true }), false);
+  assert.equal(pickCopy(copies, slabbed)._id, 'f');
+  assert.equal(pickCopy(copies, slabbed, { foiled: true })._id, 'f');
+  assert.equal(pickCopy([copies[0]], slabbed), null);
+  assert.equal(pickCopy([copies[0]], slabbed, { foiled: true }), null);
+  assert.equal(isStateLock('slab') && isStateLock('folie') && !isStateLock('handel') && !isStateLock(undefined), true);
 });

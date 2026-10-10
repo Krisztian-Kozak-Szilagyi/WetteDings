@@ -276,13 +276,13 @@ async function claimLines(list, ownerId, session) {
   if (goods.length) await claimItems(goods, ownerId, session);
 }
 
-/** Bankwert einer Position in Cent: Karte mit Folien-Steigerung (wie in der Rangliste), Gegenstand zum Bankpreis */
+/** Bankwert einer Position in Cent: Karte (Slab mit Wertsteigerung, wie in der Rangliste), Gegenstand zum Bankpreis */
 function lineValue(l) {
   const item = itemByCardId(l.card);
   if (item) return item.sell || 0;
   const card = catalog.cardById[l.card];
   const r = card && catalog.rarityByKey[card.rarity];
-  return r ? foil.cardValue(r.sell || 0, l.foiledAt) : 0;
+  return r ? foil.cardValue(r.sell || 0, foil.growthFrom(l)) : 0;
 }
 
 /** Was eine Seite beim Abschluss gibt: Bankwert ihrer Positionen plus das Geld, das sie zahlt (Cent) */

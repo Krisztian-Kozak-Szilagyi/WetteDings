@@ -1,6 +1,6 @@
 // Sammlung eines Nutzers mit allen Kennzahlen – für TCG-Seite, Album, Handel und fremde Sammlungen
 const { TcgCard } = require('../models/Tcg');
-const { lockedDocs } = require('./locks');
+const { lockedDocs, isStateLock } = require('./locks');
 const catalog = require('./catalog');
 const foil = require('../items/foil');
 const { inventory } = require('./tcgService');
@@ -11,7 +11,7 @@ async function collection(user) {
   const [owned, locked, foiledDocs] = await Promise.all([
     inventory(user._id),
     lockedDocs(user._id),
-    TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt condition.grade condition.defects.centering').sort({ foiledAt: 1 }).lean(),
+    TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt slab condition.defects.centering').sort({ foiledAt: 1 }).lean(),
   ]);
   // Folierte Exemplare je Karte – im Album und in fremden Sammlungen eigene Plätze: { cardId: [{ id, foiledAt }] }
   const foiledCopies = {};
@@ -21,10 +21,11 @@ async function collection(user) {
     (foiledCopies[d.card] = foiledCopies[d.card] || []).push({
       id: String(d._id),
       foiledAt: d.foiledAt,
-      grade: d.condition ? d.condition.grade : null, // Note auf der Folie (#73)
+      slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null, // Slab: Kürzel und Note auf dem Etikett; Sleeve: null (#204)
+      grade: d.slab ? d.slab.grade : null, // Note nur auf dem Slab – in der Schutzhülle bleibt sie geheim
       center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null, // sichtbarer Versatz
-      value: foil.cardValue(r ? r.sell : 0, d.foiledAt),
-      lock: lock && lock !== 'folie' ? lock : null, // 'handel' | 'quest'
+      value: foil.cardValue(r ? r.sell : 0, foil.growthFrom(d)),
+      lock: lock && !isStateLock(lock) ? lock : null, // 'handel' | 'quest'
     });
   }
   // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
@@ -34,7 +35,7 @@ async function collection(user) {
     const reason = locked.reasons.get(String(d._id));
     if ((reason === 'handel' || reason === 'duell') && !d.foiledAt) tradingByCard[d.card] = (tradingByCard[d.card] || 0) + 1;
     const e = (lockedByCard[d.card] = lockedByCard[d.card] || { n: 0, reason });
-    if (e.reason === 'folie' && reason !== 'folie') e.reason = reason; // Quest/Handel sind wichtiger als die Folie
+    if (isStateLock(e.reason) && !isStateLock(reason)) e.reason = reason; // Quest/Handel sind wichtiger als Folie und Slab
     e.n += 1;
   }
   const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
@@ -55,7 +56,7 @@ async function collection(user) {
     foiledByCard,
     creasedByCard,
     foiledCopies,
-    graded: gradeStats(foiledDocs.map((d) => d.condition && d.condition.grade)), // beste Note und Schnitt der folierten Karten
+    graded: gradeStats(foiledDocs.map((d) => d.slab && d.slab.grade)), // beste Note und Schnitt der Slabs
     protectedIds,
     uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
     cardCount: owned.reduce((s, o) => s + o.n, 0),

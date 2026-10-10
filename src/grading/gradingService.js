@@ -349,7 +349,7 @@ async function finishIroning({ user, smooth, burns }) {
     const defects = applyIron(doc.condition.defects, input, creaseLine(doc._id));
     await TcgCard.updateOne(
       { _id: doc._id, user: user._id, foiledAt: null, ironedAt: null },
-      { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), ironedAt: new Date() } },
+      { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), ironedAt: new Date(), damaged: true } },
       { session }
     );
     return { ...input, cap: ironCap(input.smooth), card: doc.card };
