@@ -248,8 +248,10 @@ function summary(lines, prices, ctx = null) {
 async function context() {
   const { GradingShop } = require('../models/Grading');
   const population = require('../tcg/population');
-  const [prices, pop, shops] = await Promise.all([all(), population.all(), GradingShop.find({ code: { $type: 'string' } }).select('code hits').lean()]);
-  return { prices, ratios: ratiosFrom(prices), population: pop, trust: new Map(shops.map((s) => [s.code, trustOf(s.hits)])) };
+  const [prices, pop, shops] = await Promise.all([all(), population.all(), GradingShop.find({ code: { $type: 'string' } }).select('code codeHistory hits').lean()]);
+  // frühere Kürzel eines Shops (ältere Slabs) bekommen dasselbe Vertrauen
+  const trust = new Map(shops.flatMap((s) => [s.code, ...(s.codeHistory || [])].map((c) => [c, trustOf(s.hits)])));
+  return { prices, ratios: ratiosFrom(prices), population: pop, trust };
 }
 
 /**

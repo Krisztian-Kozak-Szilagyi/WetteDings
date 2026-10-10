@@ -74,6 +74,7 @@ const SUBTABS = {
     { key: 'geraete', label: 'Mehrfach-Konten' },
     { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
     { key: 'karten', label: 'Kartensperren' },
+    { key: 'kuerzel', label: 'Kürzel-Anfragen' },
   ],
   spielwerte: [
     { key: 'tcg', label: 'TCG' },
@@ -130,7 +131,7 @@ router.get('/admin', requireStaff, async (req, res) => {
   const needs = (...tabs) => tabs.includes(tab);
 
   // Offene Aufgaben – für die Übersicht und die Zähler an den Reitern
-  const [reportCount, chatReportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans()]);
+  const [reportCount, chatReportCount, bans, codeRequestCount] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans(), grading.codeRequestCount()]);
   const counts = {
     disputes: res.locals.betDisputes || 0,
     reports: reportCount,
@@ -140,12 +141,13 @@ router.get('/admin', requireStaff, async (req, res) => {
     suspicious: res.locals.tradeAlerts || 0,
     packLogNew: res.locals.packLogNew || 0,
     bans: bans.length,
+    codeRequests: codeRequestCount,
   };
-  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts;
+  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts + counts.codeRequests;
   counts.vergaben = counts.packLogNew;
   counts.protokolle = counts.suspicious;
   // Zähler je Unterreiter
-  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans, kuerzel: counts.codeRequests };
 
   // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
   const subs = SUBTABS[tab] || null;
@@ -269,6 +271,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     // Kartensperren: wählbar sind Karten, die in einem Spielmodus etwas tun (Charakter oder Boost)
     cardBanModes: cardBans.MODES,
+    codeRequests: needsSub('moderation', 'kuerzel') ? await grading.codeRequests() : [], // Shop-Kürzel ändern (#204)
     cardBanList: needsSub('moderation', 'karten') ? cardBans.list().map((b) => ({ ...b, rarityLabel: (tcgCatalog.rarityByKey[b.card.rarity] || {}).label || '' })) : [],
     cardBanCards: needsSub('moderation', 'karten')
       ? tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key && (c.isCharacter || canBoost(c))) })).filter((g) => g.cards.length)
@@ -310,6 +313,20 @@ const DISPUTE_URL = subUrl('moderation', 'streit');
 
 // Frühere eigene Seite – jetzt ein Unterreiter der Moderation
 router.get('/admin/streitfaelle', requireStaff, (req, res) => res.redirect(DISPUTE_URL));
+
+// Grading-Shop: Kürzel-Anfrage freigeben oder ablehnen (#204) – Admin und Devs
+router.post('/admin/grading-kuerzel/:shop', requireStaff, requireReauth('/admin?bereich=moderation&teil=kuerzel'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.shop)) throw new UserError('Diese Anfrage gibt es nicht.');
+    const approve = req.body.decision === 'ok';
+    const r = await grading.decideCodeRequest({ actor: req.user, shopId: req.params.shop, approve });
+    req.flash('success', approve ? `Kürzel ${r.old} → ${r.code} freigegeben.` : `Anfrage abgelehnt – es bleibt bei ${r.code}.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/admin?bereich=moderation&teil=kuerzel');
+});
 
 router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(DISPUTE_URL), async (req, res) => {
   const outcome = str(req.body.outcome);

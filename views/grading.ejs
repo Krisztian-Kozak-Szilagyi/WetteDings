@@ -296,7 +296,8 @@
               <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" value="<%= shop.name %>" required></label>
               <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
               <button class="btn btn-sm" type="submit">Speichern</button>
-              <p class="muted small">Erledigte Aufträge behalten ihr altes Kürzel.</p>
+              <p class="muted small">Den Namen kannst du jederzeit ändern. Ein neues Kürzel muss ein Admin oder Dev freigeben – es steht auf deinen Slabs. Ältere Slabs behalten das alte.</p>
+              <% if (shop.codeRequest) { %><p class="small">Beantragt: <b><%= shop.codeRequest.code %></b> – wartet auf Freigabe.</p><% } %>
             </form>
           </details>
         <% } else { %>

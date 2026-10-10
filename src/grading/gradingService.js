@@ -243,15 +243,85 @@ function validShopName({ name, code }) {
   return { name: n, code: c };
 }
 
-/** Shop benennen (auch später umbenennen – erledigte Aufträge behalten ihr altes Kürzel) */
+/**
+ * Shop benennen. Der Name lässt sich jederzeit ändern; das Kürzel nur beim ersten Mal frei – danach wird eine Änderung
+ * zur Anfrage, die ein Admin oder Dev freigibt (#204: das Kürzel steht auf Slabs und trägt Reputation).
+ * Gibt { name, code, requested } zurück (requested = beantragtes neues Kürzel).
+ */
 async function setName({ user, name, code }) {
   const values = validShopName({ name, code });
+  const shop = await GradingShop.findById(user._id).select('active code').lean();
+  if (!shop || !shop.active) throw new UserError('Du arbeitest nicht im Grading-Shop.');
+  if (shop.code && values.code !== shop.code) {
+    await GradingShop.updateOne({ _id: user._id }, { $set: { name: values.name } });
+    await requestCode({ user, code: values.code });
+    return { name: values.name, code: shop.code, requested: values.code };
+  }
   const res = await GradingShop.updateOne({ _id: user._id, active: true }, { $set: values }).catch((err) => {
     if (err.code === 11000) throw new UserError(`Das Kürzel ${values.code} hat schon ein anderer Shop.`);
     throw err;
   });
   if (!res.matchedCount) throw new UserError('Du arbeitest nicht im Grading-Shop.');
   return values;
+}
+
+// ---------- Kürzel-Anfragen (#204) ----------
+/** Admins und Devs – bekommen die Anfragen als Benachrichtigung */
+async function staffIds() {
+  const config = require('../config');
+  const staff = await User.find({ deletedAt: null, $or: [{ role: 'dev' }, { usernameLower: { $in: config.adminUsernames } }] }).select('_id').lean();
+  return staff.map((u) => u._id);
+}
+
+/** Neues Kürzel beantragen (ersetzt eine offene Anfrage). Das Kürzel darf kein anderer Shop haben. */
+async function requestCode({ user, code }) {
+  const { code: c } = validShopName({ name: 'Anfrage', code });
+  const shop = await GradingShop.findById(user._id).select('code').lean();
+  if (!shop || !shop.code) throw new UserError('Gib deinem Shop zuerst einen Namen und ein Kürzel.');
+  if (c === shop.code) throw new UserError('Das ist schon dein Kürzel.');
+  if (await GradingShop.exists({ code: c })) throw new UserError(`Das Kürzel ${c} hat schon ein anderer Shop.`);
+  await GradingShop.updateOne({ _id: user._id }, { $set: { codeRequest: { code: c, at: new Date() } } });
+  for (const id of await staffIds()) {
+    await notify(id, { area: 'Grading', href: '/admin?bereich=moderation&teil=kuerzel', key: 'grading:kuerzel', text: `${user.username} möchte das Shop-Kürzel von ${shop.code} auf ${c} ändern.`, many: (n) => `${n} Anfragen für neue Shop-Kürzel.` });
+  }
+  return c;
+}
+
+/** Offene Kürzel-Anfragen (älteste zuerst): [{ shop, username, name, code, requested, at }] */
+async function codeRequests() {
+  const shops = await GradingShop.find({ 'codeRequest.code': { $type: 'string' } }).select('name code codeRequest').sort({ 'codeRequest.at': 1 }).lean();
+  const users = await User.find({ _id: { $in: shops.map((s) => s._id) } }).select('username').lean();
+  const names = new Map(users.map((u) => [String(u._id), u.username]));
+  return shops.map((s) => ({ shop: String(s._id), username: names.get(String(s._id)) || '?', name: s.name, code: s.code, requested: s.codeRequest.code, at: s.codeRequest.at }));
+}
+const codeRequestCount = () => GradingShop.countDocuments({ 'codeRequest.code': { $type: 'string' } });
+
+/**
+ * Anfrage entscheiden (Admin oder Dev): approve = neues Kürzel übernehmen (das alte kommt in codeHistory – ältere
+ * Slabs tragen es weiter), sonst ablehnen. Der Shop wird benachrichtigt.
+ */
+async function decideCodeRequest({ actor, shopId, approve }) {
+  const shop = await GradingShop.findById(shopId).select('code codeRequest').lean();
+  if (!shop || !shop.codeRequest) throw new UserError('Diese Anfrage gibt es nicht mehr.');
+  const wanted = shop.codeRequest.code;
+  if (approve) {
+    const res = await GradingShop.updateOne(
+      { _id: shopId, 'codeRequest.code': wanted },
+      { $set: { code: wanted, codeRequest: null }, ...(shop.code && { $addToSet: { codeHistory: shop.code } }) }
+    ).catch((err) => {
+      if (err.code === 11000) throw new UserError(`Das Kürzel ${wanted} hat inzwischen ein anderer Shop.`);
+      throw err;
+    });
+    if (!res.modifiedCount) throw new UserError('Diese Anfrage hat sich gerade geändert.');
+  } else {
+    await GradingShop.updateOne({ _id: shopId, 'codeRequest.code': wanted }, { $set: { codeRequest: null } });
+  }
+  await notify(shopId, {
+    area: 'Grading',
+    href: '/grading',
+    text: approve ? `Dein neues Shop-Kürzel ${wanted} ist freigegeben (von ${actor.username}).` : `Dein Wunsch-Kürzel ${wanted} wurde abgelehnt – es bleibt bei ${shop.code}.`,
+  });
+  return { code: approve ? wanted : shop.code, old: shop.code };
 }
 
 /** Nächste Ausbaustufe kaufen */
@@ -545,4 +615,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

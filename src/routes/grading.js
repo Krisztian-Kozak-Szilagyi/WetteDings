@@ -264,7 +264,8 @@ router.post('/grading/kuendigen', (req, res) =>
 
 router.post('/grading/name', (req, res) =>
   handle(req, res, async () => {
-    const { name, code } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
+    const { name, code, requested } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
+    if (requested) return `Dein Shop heißt jetzt „${name}“. Das neue Kürzel ${requested} ist beantragt – ein Admin oder Dev gibt es frei. Bis dahin bleibt ${code}.`;
     return `Dein Shop heißt jetzt „${name}“ – Kürzel ${code}.`;
   })
 );

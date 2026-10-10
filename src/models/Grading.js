@@ -25,6 +25,9 @@ const shopSchema = new Schema(
     quality: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Arbeitsqualität 0–100 je Auftrag
     hits: { type: new Schema({ exact: Number, n: Number }, { _id: false }), default: () => ({ exact: 0, n: 0 }) }, // Treffsicherheit (alle benoteten Aufträge)
     playerJobsDone: { type: Number, default: 0 },
+    // Kürzel ändern (#204): nach dem ersten Festlegen nur auf Anfrage, freigegeben von Admin oder Dev
+    codeRequest: { type: new Schema({ code: String, at: Date }, { _id: false }), default: null },
+    codeHistory: { type: [String], default: [] }, // frühere Kürzel (stehen noch auf älteren Slabs)
   },
   { timestamps: true }
 );
