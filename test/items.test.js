@@ -33,13 +33,14 @@ test('#204: Wertsteigerung nur im Slab – eine Folie (Schutzhülle) steigert de
   assert.equal(foil.growthFrom({ foiledAt: null, slab: null }), null);
   assert.equal(foil.growthFrom(null), null);
   assert.equal(foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), at);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: { code: 'TST', grade: 10 } }), null); // Slab aus einem Spieler-Shop: Wert macht der Markt
   assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: null }), NOW, s), 15000);
   assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), NOW, s), 16635);
 });
 
 test('Folie: Ranglisten-Ausdruck rechnet mit den aktuellen Einstellungen', () => {
   const expr = JSON.stringify(foil.factorExpr());
-  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt') && expr.includes('$slab'));
+  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt') && expr.includes('$slab.code') && expr.includes('"BfW"'));
   assert.ok(expr.includes(`${foil.settings.bonusPercent}`) && expr.includes(`${foil.settings.dailyPercent}`));
 });
 

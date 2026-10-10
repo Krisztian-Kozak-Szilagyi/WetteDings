@@ -187,8 +187,8 @@
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="admin-gr-grid">
           <label class="field"><span>Fundchance pro versiegelter Karte in %</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung von Slabs: sofort in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung von Slabs pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung alter BfW-Slabs: sofort in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung alter BfW-Slabs pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
         </div>
         <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
         <button class="btn btn-primary" type="submit">Speichern</button>

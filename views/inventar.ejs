@@ -113,7 +113,7 @@
             <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
             <strong><%= f.card.name %> <span class="tcg-badge r-<%= f.card.rarity %>"><%= f.rarity.label %></span></strong>
             <% if (f.slab) { %>
-            <span>Slab <b><%= f.slab.code %></b> · Note <b><%= f.slab.grade %></b> · Händlerpreis <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
+            <span>Slab <b><%= f.slab.code %></b> · Note <b><%= f.slab.grade %></b> · Händlerpreis <b><%= euro(f.value) %></b><% if (f.percent) { %> <span class="pos small">+<%= pct(f.percent) %> %</span><% } %></span>
             <span class="muted small">versiegelt seit <%= dayDate(f.foiledAt) %> · spielt nicht mit · <%= f.rarity.noBank ? 'Grundwert ' + euro(f.sell) + ' · die Bank kauft sie nicht' : 'Händlerpreis ohne Slab ' + euro(f.sell) %></span>
             <% } else { %>
             <span>In Folie · Händlerpreis <b><%= euro(f.value) %></b></span>
@@ -124,7 +124,7 @@
             <% } else { %>
               <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=f:<%= f.id %>">Handeln · Markt, Verkauf oder Tausch</a>
               <% if (f.lock !== 'vitrine') { %>
-              <form method="post" action="/inventar/folie-abziehen" data-confirm="<%= f.slab ? 'Slab von ' + f.card.name + ' aufbrechen? Kürzel ' + f.slab.code + ', Note ' + f.slab.grade + ' und die Wertsteigerung sind danach weg – die Note ist wieder geheim. Du kannst die Karte neu graden lassen.' : 'Folie von ' + f.card.name + ' abziehen? Die Folie geht dabei kaputt. Die Karte ist danach wieder ungeschützt.' %>">
+              <form method="post" action="/inventar/folie-abziehen" data-confirm="<%= f.slab ? 'Slab von ' + f.card.name + ' aufbrechen? Kürzel ' + f.slab.code + ', Note ' + f.slab.grade + (f.slab.code === 'BfW' ? ' und die Wertsteigerung' : '') + ' sind danach weg – die Note ist wieder geheim. Du kannst die Karte neu graden lassen.' : 'Folie von ' + f.card.name + ' abziehen? Die Folie geht dabei kaputt. Die Karte ist danach wieder ungeschützt.' %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="copy" value="<%= f.id %>">
                 <button class="btn btn-ghost btn-sm" type="submit"><%= f.slab ? 'Slab aufbrechen' : 'Folie abziehen' %></button>

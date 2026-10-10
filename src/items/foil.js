@@ -37,8 +37,11 @@ async function saveSettings({ admin, gradingChance, bonusPercent, dailyPercent }
   await logSettingsChange({ area: 'folie', before, after: current(), by: admin });
 }
 
-/** Ab wann ein Exemplar ({ foiledAt, slab }) im Wert steigt: nur ein Slab, sonst null (Sleeve oder ohne Folie) */
-const growthFrom = (copy) => (copy && copy.slab && copy.foiledAt ? copy.foiledAt : null);
+// Kürzel der alten Folien mit Etikett (migrate.foilToSlab). Shops können es nicht wählen (BFW ist reserviert, Kürzel
+// sind immer groß geschrieben) – so steigen nur diese Slabs im Wert; Slabs aus Spieler-Shops bewertet der Markt (#204)
+const LEGACY_SLAB = 'BfW';
+/** Ab wann ein Exemplar ({ foiledAt, slab }) im Wert steigt: nur ein alter BfW-Slab, sonst null */
+const growthFrom = (copy) => (copy && copy.slab && copy.slab.code === LEGACY_SLAB && copy.foiledAt ? copy.foiledAt : null);
 
 /** Volle Tage seit dem Folieren (0 am ersten Tag) */
 function foilDays(foiledAt, now = Date.now()) {
@@ -61,15 +64,15 @@ function cardValue(sell, foiledAt, now = Date.now(), s = settings) {
  * MongoDB-Ausdruck: Faktor auf den Verkaufswert (1 ohne Slab, sonst 1 + Steigerung) – gleiche Rechnung wie
  * cardValue(…, growthFrom(…)), für die Ranglisten-Aggregation. Fehlt das Feld (alte Karten), gilt die Karte als nicht foliert.
  */
-function factorExpr(field = '$foiledAt', slabField = '$slab') {
+function factorExpr(field = '$foiledAt', slabCodeField = '$slab.code') {
   const days = { $max: [0, { $floor: { $divide: [{ $subtract: ['$$NOW', field] }, DAY_MS] } }] };
   return {
     $cond: [
-      { $and: [{ $eq: [{ $type: field }, 'date'] }, { $eq: [{ $type: slabField }, 'object'] }] },
+      { $and: [{ $eq: [{ $type: field }, 'date'] }, { $eq: [slabCodeField, LEGACY_SLAB] }] },
       { $divide: [{ $add: [100, settings.bonusPercent, { $multiply: [settings.dailyPercent, days] }] }, 100] },
       1,
     ],
   };
 }
 
-module.exports = { DEFAULTS, settings, loadSettings, saveSettings, current, growthFrom, foilDays, foilPercent, cardValue, factorExpr };
+module.exports = { DEFAULTS, settings, loadSettings, saveSettings, current, LEGACY_SLAB, growthFrom, foilDays, foilPercent, cardValue, factorExpr };
