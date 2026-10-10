@@ -87,6 +87,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     maxBanHours: req.user.isAdmin ? deviceLogic.MAX_BAN_HOURS : deviceLogic.DEV_MAX_BAN_HOURS,
     // Zeit auf Platz 1 der Rangliste als Text; leer, wenn das Mitglied nie Erster war
     top1: rankService.top1Text(profile.top1Seconds),
+    profileIsTeam: rankService.isTeam(profile), // Team-Mitglieder sammeln die Zeit auf Platz 1 der Team-Wertung
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,
