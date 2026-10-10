@@ -4643,6 +4643,12 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 .cm-crease.is-ironed { opacity: .25; }
 /* Exemplar-Plätze (beschädigte Exemplare) im Album und in Sammlungen – ein Knick trägt sein Schild, Kratzer nicht */
 .hb-copy .hb-art { position: relative; }
+/* Ø-Marktpreis (#204): im Handelsfenster, auf der Markt-Kachel und je Position im Angebot */
+.hb-card-market { display: block; font-size: 11px; color: var(--color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-avg { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 12px; color: var(--color-neutral-400); }
+.mk-avg b { font-weight: 600; font-size: 11px; }
+.ng-line-market { white-space: nowrap; font-size: 11px; }
+.ng-lines li:has(.ng-line-market) { flex-wrap: wrap; }
 .hb-loupe { position: absolute; right: 6px; top: 6px; z-index: 3; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; font-size: 14px; line-height: 28px;
   background: rgba(14, 15, 26, .78); box-shadow: 0 0 0 1px var(--color-neutral-700); cursor: var(--cur-pointer, pointer); }
 .hb-loupe:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }

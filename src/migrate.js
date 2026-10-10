@@ -174,6 +174,9 @@ async function migrate() {
   // #204: Folie wird Schutzhülle (Sleeve, ohne Note) – bisher folierte Karten zeigten ihre Note und werden BfW-Slabs
   const slabbed = await foilToSlab();
   if (slabbed.cards || slabbed.damaged || slabbed.trades) console.log(`Migration: ${slabbed.cards} folierte Karte(n) zu BfW-Slabs, ${slabbed.damaged} mit sichtbarem Schaden markiert, ${slabbed.trades} Angebot(e) ergänzt.`);
+  // #204: Ø-Marktpreis – abgeschlossene Geschäfte bekommen ihren Preisbezug (nach foilToSlab: Positionen kennen slab)
+  const priced = await backfillPriceRefs();
+  if (priced) console.log(`Migration: Preisbezug für ${priced} abgeschlossene(s) Geschäft(e) nachgetragen.`);
 
   // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN,
   // geteilte Netze wie das Schulnetz)
@@ -324,4 +327,18 @@ async function foilToSlab(batch = 1000) {
   return { cards, damaged, trades: trades.length };
 }
 
-module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged };
+/** #204: priceRef für abgeschlossene Geschäfte ohne das Feld (null = kein sauberer Verkauf). Idempotent. Gibt die Zahl zurück. */
+async function backfillPriceRefs(batch = 1000) {
+  const { priceRefOf } = require('./trade/marketPrice');
+  const coll = Trade.collection;
+  let done = 0;
+  for (;;) {
+    const docs = await coll.find({ status: 'verkauft', priceRef: { $exists: false } }).project({ give: 1, want: 1, price: 1, extraFrom: 1 }).limit(batch).toArray();
+    if (!docs.length) return done;
+    await coll.bulkWrite(docs.map((t) => ({ updateOne: { filter: { _id: t._id, priceRef: { $exists: false } }, update: { $set: { priceRef: priceRefOf(t) || null } } } })), { ordered: false });
+    done += docs.length;
+    if (docs.length < batch) return done;
+  }
+}
+
+module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs };

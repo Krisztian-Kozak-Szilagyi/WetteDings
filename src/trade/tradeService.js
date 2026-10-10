@@ -16,6 +16,7 @@ const foil = require('../items/foil');
 const taxService = require('../services/taxService');
 const { notify } = require('../services/notifyService');
 const lines = require('./lines');
+const marketPrice = require('./marketPrice');
 
 const { cardName, otherRole, kindOf, lockDocsOf, termsText, lineLabel, costShares } = lines;
 
@@ -553,11 +554,13 @@ async function buy({ user, tradeId }) {
       tax: money ? money.tax : 0,
       closedAt: new Date(),
     });
+    trade.priceRef = marketPrice.priceRefOf(trade) || null; // Ø-Marktpreis (#204)
     await trade.save({ session });
     const closed = await closeCounters(trade, `${user.username} hat das Markt-Angebot angenommen – dieses Gegenangebot ist damit erledigt.`, session);
     return { trade, tax: money ? money.tax : 0, closed };
   });
   const { trade, closed } = result;
+  marketPrice.invalidate();
   const what = !trade.want.length ? `„${lineLabel(trade.give)}“ für ${euro(trade.price)} gekauft` : !trade.give.length ? `dir „${lineLabel(trade.want)}“ für ${euro(trade.price)} gegeben` : `dein Tauschangebot angenommen: ${termsText(trade)}`;
   await notify(trade.seller, { area: 'Handel', href: '/handel?reiter=verlauf', text: `${user.username} hat ${what}.` });
   const label = lineLabel(trade.give) || lineLabel(trade.want);
@@ -611,6 +614,7 @@ async function accept({ user, tradeId, version }) {
       tax: money ? money.tax : 0,
       closedAt: new Date(),
     });
+    trade.priceRef = marketPrice.priceRefOf(trade) || null; // Ø-Marktpreis (#204)
     await trade.save({ session });
     let closed = [];
     if (listing) {
@@ -621,6 +625,7 @@ async function accept({ user, tradeId, version }) {
     return { trade, money, role, closed };
   });
   const { trade, role, closed } = result;
+  marketPrice.invalidate();
   const other = role === 'to' ? trade.seller : trade.to;
   await notify(other, { area: 'Handel', href: offerHref(trade), text: `${user.username} hat dein Angebot angenommen: ${termsText(trade)}.` });
   for (const c of closed) await notify(c.to, { area: 'Handel', href: offerHref(c), text: `„${lineLabel(trade.give)}“ ging an jemand anderen – dein Gegenangebot ist erledigt.` });

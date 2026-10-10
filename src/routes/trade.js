@@ -7,6 +7,7 @@ const catalog = require('../tcg/catalog');
 const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const lines = require('../trade/lines');
+const marketPrice = require('../trade/marketPrice');
 const blackMarket = require('../tcg/blackMarket');
 const foil = require('../items/foil');
 const items = require('../items/itemService');
@@ -36,8 +37,17 @@ const linesValue = (list) => (list || []).reduce((s, l) => s + lineValue(l), 0);
 /** Art des Angebots als Wort */
 const offerLabel = (t) => (!t.to ? 'Markt' : t.listing ? 'Gegenangebot' : t.give.length && t.want.length ? 'Tausch' : t.give.length ? 'Verkauf' : 'Kaufanfrage');
 
-/** Helfer für alle Handels-Ansichten */
-const viewHelpers = () => ({
+/**
+ * Ø-Marktpreis als kurzer Text (#204): "Ø 12,50 € · 4 verkauft" bzw. "noch kein Marktpreis" – s aus marketPrice.summary
+ */
+const marketText = (s) => (!s ? '' : s.avg == null ? 'noch kein Marktpreis' : `Ø ${euro(s.avg)} · ${s.n} verkauft`);
+
+/** Helfer für alle Handels-Ansichten; prices = Ø-Marktpreise (marketPrice.all) */
+const viewHelpers = (prices = new Map()) => ({
+  // Ø-Marktpreis (#204) für Positionen einer Seite – nur wenn alle dieselbe Karte im selben Zustand sind
+  market: (list) => marketPrice.summary(list, prices),
+  marketText,
+  priceDays: marketPrice.DAYS,
   cardInfo,
   rarityByKey: tradeRarities(),
   lineValue,
@@ -159,7 +169,7 @@ router.get('/handel', async (req, res) => {
   res.render('handel', {
     title: 'Handel',
     ...data,
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.all()),
     coll,
     tab: TABS.includes(asked) ? asked : 'markt',
     rarities: catalog.visibleRarities(),
@@ -195,7 +205,7 @@ async function renderBuilder(req, res, { mode, partner = null, listing = null, o
   const theirs = partnerPool || (mode === 'neu' && !partner ? wishPool(mine.counts) : null);
   res.render('handel-neu', {
     title: mode === 'neu' ? 'Neuer Handel' : 'Gegenangebot',
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.all()),
     mode,
     partner,
     listing,
@@ -318,7 +328,7 @@ router.get('/handel/angebot/:id', async (req, res) => {
   const coll = await collection(req.user);
   res.render('handel-angebot', {
     title: t.to ? 'Verhandlung' : 'Markt-Angebot',
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.all()),
     t,
     role: n.role,
     counters: n.counters,

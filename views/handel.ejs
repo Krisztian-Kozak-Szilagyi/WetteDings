@@ -159,7 +159,7 @@
             <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
             <span class="mk-rarity">
               <span class="tcg-dot r-<%= c.rarity %>"></span><%= single ? r.label : 'bis ' + r.label %>
-              <% if (single && top.foiledAt) { %><span class="foil-tag" title="Foliert am <%= dayDate(top.foiledAt) %>">Foliert<%= top.grade ? ' · Note ' + top.grade : '' %></span><% } %>
+              <% const st = single ? stateLabel(top) : ''; if (st) { %><span class="foil-tag"<%- top.foiledAt ? ` title="Foliert am ${dayDate(top.foiledAt)}"` : '' %>><%= st %></span><% } %>
               <% if (kindKey !== 'wanted' && !c.isItem) { %>
                 <span class="own-tag<%= missing ? ' own-new' : '' %>"><%= single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz' %></span>
               <% } %>
@@ -178,6 +178,12 @@
               <span class="mk-price">
                 <strong><%= euro(t.price) %></strong>
                 <span class="<%= t.price < value ? 'pos' : '' %>">Wert <%= euro(value) %></span>
+              </span>
+            <% } %>
+            <% const ms = kindKey === 'swap' ? null : market(kindKey === 'wanted' ? t.want : t.give); if (ms) { const per = Math.floor(t.price / ms.count); %>
+              <span class="mk-avg" title="Ø-Marktpreis je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage">
+                <%= marketText(ms) %><% if (ms.avg != null && ms.count > 1) { %> · hier <%= euro(per) %> je Stück<% } %>
+                <% if (ms.avg != null && kindKey === 'sale') { %><b class="<%= per <= ms.avg ? 'pos' : 'neg' %>"><%= per <= ms.avg ? 'unter Ø' : 'über Ø' %></b><% } %>
               </span>
             <% } %>
             <span class="mk-seller">von <%- userLink(t.sellerName) %> · endet <%= relTime(t.expiresAt) %></span>

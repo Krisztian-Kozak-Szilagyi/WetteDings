@@ -60,6 +60,9 @@ const tradeSchema = new Schema(
     buyerName: { type: String, default: null },
     closedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // wer gekauft bzw. angenommen hat – die andere Seite wird benachrichtigt
     closedVia: { type: Schema.Types.ObjectId, ref: 'Trade', default: null }, // Markt-Angebot: über dieses Gegenangebot abgeschlossen
+    // Ø-Marktpreis (#204, trade/marketPrice): sauberer Verkauf einer Kartenart in einem Zustand – Schlüssel, Stückzahl,
+    // Stückpreis (Cent). Beim Abschluss gesetzt; null = kein sauberer Verkauf (Tausch, Paket, Gegenstand)
+    priceRef: { type: new Schema({ key: String, n: Number, unit: Number }, { _id: false }), default: undefined },
     taxPercent: { type: Number, default: 0 },
     tax: { type: Number, default: 0 }, // Cent
     closedAt: { type: Date, default: null },
@@ -71,6 +74,7 @@ tradeSchema.index({ to: 1, status: 1 });
 tradeSchema.index({ seller: 1, status: 1 });
 tradeSchema.index({ listing: 1, status: 1 });
 tradeSchema.index({ buyer: 1, closedAt: -1 }); // Protokolle: Geschäfte eines Spielers
+tradeSchema.index({ 'priceRef.key': 1, closedAt: -1 }, { partialFilterExpression: { 'priceRef.key': { $type: 'string' } } }); // Ø-Marktpreis
 // Ein Exemplar kann nur in einem offenen Angebot gesperrt sein
 tradeSchema.index({ lockDocs: 1 }, { unique: true, partialFilterExpression: { status: 'offen', lockDocs: { $exists: true } } });
 
