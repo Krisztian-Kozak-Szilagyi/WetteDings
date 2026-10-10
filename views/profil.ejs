@@ -172,31 +172,24 @@
       <div class="ach-progress" role="progressbar" aria-label="Freigeschaltete Erfolge" aria-valuemin="0" aria-valuemax="<%= achievementTotal %>" aria-valuenow="<%= achievementCount %>">
         <span style="--p: <%= achievementTotal ? Math.round((achievementCount / achievementTotal) * 100) : 0 %>%"></span>
       </div>
-      <ul class="ach-list">
-        <% achievements.forEach((a) => { const pinnedHere = pinnedKeys.includes(a.key); %>
-          <li class="ach-row<%= a.earned ? ' is-earned' : ' is-locked' %><%= a.unique ? ' is-unique' : '' %>">
-            <img class="ach-icon" src="/img/erfolge/<%= a.hidden ? 'geheim' : a.key %>.svg?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy">
-            <div class="ach-body">
-              <p class="ach-name"><%= a.name %><% if (a.unique) { %><span class="ach-tag">Einzigartig</span><% } %></p>
-              <p class="ach-text"><%= a.text %></p>
-              <p class="ach-meta">
-                <% if (a.earned) { %>Freigeschaltet am <%= dayDate(a.earnedAt) %><% } else { %>Noch nicht freigeschaltet<% } %>
-                <% if (!a.unique) { %> · <%= shareText(a.share) %> der Mitglieder<% } %>
-              </p>
-            </div>
-            <% if (isMe && a.earned) { %>
-              <form method="post" action="/profil/anheften" class="ach-pin-form">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="erfolg" value="<%= a.key %>">
-                <button type="submit" class="ach-pin<%= pinnedHere ? ' is-on' : '' %>" aria-pressed="<%= pinnedHere %>" title="<%= pinnedHere ? 'Nicht mehr im Profil oben zeigen' : 'Im Profil oben anheften (höchstens zwei)' %>">
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 3l6 6-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" fill="currentColor"/></svg>
-                  <span class="sr-only"><%= pinnedHere ? 'Lösen' : 'Anheften' %></span>
-                </button>
-              </form>
-            <% } %>
-          </li>
-        <% }) %>
-      </ul>
+      <%# Eingeklappt bleiben Fortschrittsbalken und die zwei angehefteten (bzw. neuesten) Erfolge sichtbar %>
+      <% if (pinnedAchievements.length) { %>
+        <ul class="ach-list">
+          <% pinnedAchievements.forEach((a) => { %><%- include('partials/ach-row', { a }) %><% }) %>
+        </ul>
+      <% } %>
+      <% if (achievementsRest.length) { %>
+        <details class="ach-fold">
+          <summary>
+            <span class="ach-fold-more">Alle Erfolge anzeigen (<%= achievementsRest.length %> weitere)</span>
+            <span class="ach-fold-less">Weniger anzeigen</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <ul class="ach-list">
+            <% achievementsRest.forEach((a) => { %><%- include('partials/ach-row', { a }) %><% }) %>
+          </ul>
+        </details>
+      <% } %>
     </div>
   </div>
 

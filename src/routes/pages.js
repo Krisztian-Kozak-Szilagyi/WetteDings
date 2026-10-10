@@ -66,6 +66,9 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
   const earnedRows = achievements.filter((a) => a.earned);
   const pinnedKeys = (profile.pinnedAchievements || []).filter((k) => earnedRows.some((a) => a.key === k));
   const pinned = pinnedKeys.length ? pinnedKeys.map((k) => earnedRows.find((a) => a.key === k)) : earnedRows.slice(0, achievementLogic.PIN_MAX);
+  // eigener Fortschritt bei den gesperrten Erfolgen (andere sehen nur, ob ein Erfolg da ist)
+  const progress = isMe ? await achievementService.progressOf(profile._id, earned.map((e) => e.key)) : {};
+  for (const a of achievements) a.progress = (!a.earned && progress[a.key]) || null;
   const has = new Set(owned.map((o) => o._id));
   res.render('profil', {
     title: profile.username,
@@ -92,6 +95,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln
     rarityByKey: catalog.rarityByKey,
     achievements,
+    // eingeklappte Liste: die angehefteten (bzw. neuesten) bleiben sichtbar, der Rest klappt auf
+    achievementsRest: achievements.filter((a) => !pinned.includes(a)),
     achievementCount: earnedRows.length,
     achievementTotal: achievements.filter((a) => !a.unique || a.earned).length,
     pinnedAchievements: pinned,
