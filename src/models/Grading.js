@@ -16,6 +16,15 @@ const shopSchema = new Schema(
     code: { type: String, default: null }, // Kürzel, z. B. "PSA" – steht auf den Slabs, eindeutig
     // Laufendes Bügeln einer eigenen Karte (#204): welches Exemplar, seit wann (Mindestzeit wie beim Putzen)
     ironing: { type: new Schema({ doc: Schema.Types.ObjectId, startedAt: Date }, { _id: false }), default: null },
+    // Multiplayer (#204, Etappe B): Preis für Spieler-Aufträge (Cent, null = Standardpreis aus den Einstellungen),
+    // ausgestellte Slabs (Vitrine), Reputation und Kennzahlen fürs Rating
+    price: { type: Number, default: null },
+    showcase: { type: [Schema.Types.ObjectId], default: [] },
+    reputation: { type: Number, default: 0 },
+    stars: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Kundenbewertungen 1–5
+    quality: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Arbeitsqualität 0–100 je Auftrag
+    hits: { type: new Schema({ exact: Number, n: Number }, { _id: false }), default: () => ({ exact: 0, n: 0 }) }, // Treffsicherheit (alle benoteten Aufträge)
+    playerJobsDone: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -42,6 +51,11 @@ const jobSchema = new Schema(
     foilFound: { type: Boolean, default: false }, // beim Versiegeln eine Folie gefunden
     iron: { type: new Schema({ smooth: Number, burns: Number }, { _id: false }), default: null }, // gebügelt (#204): geglättet in %, Brandflecken
     shopCode: { type: String, default: null }, // Kürzel des Shops beim Abschluss (steht auf dem Slab)
+    // Spieler-Auftrag (#204, Etappe B): die Karte eines Mitglieds statt eines NPC-Kunden – Mängel und Note kommen aus
+    // der echten Karte, das Ergebnis (Bügeln, Slab mit der Note des Shops) wirkt auf sie zurück
+    source: { type: String, enum: ['npc', 'spieler'], default: 'npc' },
+    order: { type: Schema.Types.ObjectId, ref: 'GradingOrder', default: null },
+    cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // das Exemplar (Lage des Knicks wie auf der Karte)
     doneAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -52,14 +66,58 @@ jobSchema.index({ user: 1, day: 1 });
 jobSchema.index({ createdAt: -1 }); // Protokolle: alle Aufträge
 jobSchema.index({ user: 1, createdAt: -1 });
 
-// Admin-Einstellungen (ein Dokument, _id "grading")
+// Spieler-Auftrag (#204, Etappe B): ein Mitglied reicht eine eigene Karte bei einem fremden Grading-Shop ein. Der Preis
+// wird beim Einreichen eingezogen und liegt beim Auftrag, bis der Shop die Karte als Slab zurückschickt (dann bekommt
+// der Shop ihn) oder der Auftrag abläuft bzw. storniert wird (dann zurück an den Kunden). Die Karte ist so lange gesperrt.
+const orderSchema = new Schema(
+  {
+    owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    ownerName: { type: String, required: true },
+    shop: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // = GradingShop._id
+    shopCode: { type: String, required: true },
+    shopName: { type: String, default: null },
+    doc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // das Exemplar
+    card: { type: String, required: true }, // Karten-ID (Anzeige)
+    price: { type: Number, required: true }, // Cent
+    status: { type: String, enum: ['wartet', 'in_arbeit', 'fertig', 'abgelaufen', 'storniert'], default: 'wartet' },
+    expiresAt: { type: Date, required: true }, // bis dahin muss der Shop anfangen bzw. fertig werden
+    startedAt: { type: Date, default: null },
+    doneAt: { type: Date, default: null },
+    job: { type: Schema.Types.ObjectId, ref: 'GradingJob', default: null },
+    result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number }, { _id: false }), default: null }, // grade = Note des Shops
+    stars: { type: Number, default: null }, // Bewertung des Kunden 1–5
+    ratedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+orderSchema.index({ shop: 1, status: 1, createdAt: 1 });
+orderSchema.index({ owner: 1, status: 1, createdAt: -1 });
+orderSchema.index({ status: 1, expiresAt: 1 });
+// Ein Exemplar kann nur in einem offenen Auftrag stecken
+orderSchema.index({ doc: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['wartet', 'in_arbeit'] } } });
+
+// Admin-Einstellungen (ein Dokument, _id "grading"). jobs = NPC-Aufträge pro Tag, playerJobs = Spieler-Aufträge pro Tag,
+// orderPrice = Preisrahmen der Spieler-Aufträge (Cent), orderDays = Frist, showcaseMax = Plätze in der Vitrine
 const settingsSchema = new Schema(
-  { _id: { type: String, default: 'grading' }, open: Boolean, jobs: Number, pay: { clean: Number, grade: Number, slab: Number, iron: Number }, costs: [Number], premium: Number, updatedByName: String },
+  {
+    _id: { type: String, default: 'grading' },
+    open: Boolean,
+    jobs: Number,
+    playerJobs: Number,
+    pay: { clean: Number, grade: Number, slab: Number, iron: Number },
+    costs: [Number],
+    premium: Number,
+    orderPrice: { min: Number, max: Number, def: Number },
+    orderDays: Number,
+    showcaseMax: Number,
+    updatedByName: String,
+  },
   { timestamps: true }
 );
 
 module.exports = {
   GradingShop: model('GradingShop', shopSchema),
   GradingJob: model('GradingJob', jobSchema),
+  GradingOrder: model('GradingOrder', orderSchema),
   GradingSettings: model('GradingSettings', settingsSchema),
 };

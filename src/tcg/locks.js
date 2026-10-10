@@ -1,6 +1,7 @@
 // Gesperrte Karten-Exemplare: auf einer laufenden IHK-Quest, im Dungeon, in einem offenen Handelsangebot, als Einsatz
 // in einem offenen Duell, foliert (die Folie allein sperrt nur Bank, Duell und Sammelhandel) oder im Slab (#204: sperrt
-// zusätzlich Quest, Dungeon und Turm – versiegelte Karten spielen nicht mit; handeln lassen sie sich gezielt).
+// zusätzlich Quest, Dungeon und Turm – versiegelte Karten spielen nicht mit; handeln lassen sie sich gezielt),
+// bei einem Grading-Shop eingereicht ('grading') oder in der Vitrine des eigenen Shops ausgestellt ('vitrine', #204).
 // Gesperrte Exemplare können nicht verkauft, gehandelt oder auf eine Quest (oder einen künftigen Dungeon)
 // geschickt werden. Ausnahmen: Folierte Karten lassen sich gezielt im Handel anbieten (tradeService.create) und
 // spielen in Quest, Dungeon und Turm mit (#204, { foil: true }) – dort schützt die Folie vor Schaden.
@@ -10,14 +11,15 @@ const { lockedFor } = require('../trade/lines');
 const { TcgCard } = require('../models/Tcg');
 const { DungeonParty, DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
+const { GradingOrder, GradingShop } = require('../models/Grading');
 const { UserError } = require('../lib/util');
 
 /**
- * { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'duell'|'slab'|'folie'> } – alle haben Vorrang vor
+ * { docs: [ObjectId], reasons: Map<docId, 'quest'|'dungeon'|'handel'|'duell'|'grading'|'vitrine'|'slab'|'folie'> } – alle haben Vorrang vor
  * 'slab' und 'folie' (die beiden sind nur der Zustand der Karte, keine laufende Verwendung)
  */
 async function lockedDocs(userId, session) {
-  const [foiled, run, trades, party, dungeon, duels] = await Promise.all([
+  const [foiled, run, trades, party, dungeon, duels, orders, shop] = await Promise.all([
     TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id slab').session(session || null).lean(),
     IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
@@ -27,6 +29,9 @@ async function lockedDocs(userId, session) {
     DungeonRun.findOne({ 'members.user': userId, status: 'laeuft' }).select('members').session(session || null).lean(),
     // Duell: eingesetzte Karte, solange das Duell offen ist (angefragt oder laufend)
     Bet.find({ status: 'offen', 'duel.cards.user': userId }).select('duel.cards').session(session || null).lean(),
+    // Grading (#204): eingereichte Karte, solange der Auftrag offen ist; ausgestellte Slabs in der eigenen Vitrine
+    GradingOrder.find({ owner: userId, status: { $in: ['wartet', 'in_arbeit'] } }).select('doc').session(session || null).lean(),
+    GradingShop.findById(userId).select('showcase').session(session || null).lean(),
   ]);
   const reasons = new Map();
   foiled.forEach((d) => reasons.set(String(d._id), d.slab ? 'slab' : 'folie'));
@@ -36,6 +41,9 @@ async function lockedDocs(userId, session) {
   );
   trades.forEach((t) => lockedFor(t, userId).forEach((id) => reasons.set(String(id), 'handel')));
   duels.forEach((b) => b.duel.cards.filter((c) => String(c.user) === String(userId)).forEach((c) => reasons.set(String(c.doc), 'duell')));
+  // Vitrine nur für Exemplare, die (noch) im Slab sind – die Liste wird beim Bearbeiten bereinigt
+  if (shop) (shop.showcase || []).filter((id) => reasons.get(String(id)) === 'slab').forEach((id) => reasons.set(String(id), 'vitrine'));
+  orders.forEach((o) => reasons.set(String(o.doc), 'grading'));
   return { docs: [...reasons.keys()], reasons };
 }
 
@@ -58,7 +66,7 @@ function pickCopy(docs, locked, { foiled = false, except = null } = {}) {
 }
 
 /** Schild für gesperrte Exemplare (Album, IHK- und Dungeon-Kartenauswahl) */
-const LOCK_LABELS = { quest: 'Auf Quest', dungeon: 'Im Dungeon', handel: 'Im Handel', duell: 'Im Duell', slab: 'Im Slab' };
+const LOCK_LABELS = { quest: 'Auf Quest', dungeon: 'Im Dungeon', handel: 'Im Handel', duell: 'Im Duell', slab: 'Im Slab', grading: 'Beim Grading', vitrine: 'In der Vitrine' };
 /** Nur der Zustand der Karte (Folie, Slab), keine laufende Verwendung – zählt im Handel nicht als Sperre */
 const isStateLock = (reason) => reason === 'folie' || reason === 'slab';
 const lockLabel = (reason) => LOCK_LABELS[reason] || 'Gesperrt';

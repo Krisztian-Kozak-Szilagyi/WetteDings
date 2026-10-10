@@ -616,6 +616,21 @@
   function showVerdict(guess, grade) {
     job.guess = guess;
     job.grade = grade;
+    // Karte eines Mitglieds (#204): keine Auflösung – die Note des Shops kommt auf den Slab, die echte bleibt geheim
+    if (grade == null) {
+      gradeBtns.forEach(function (x) {
+        x.disabled = true;
+        x.classList.toggle('is-on', Number(x.getAttribute('data-grade')) === guess);
+      });
+      gradeOk.hidden = true;
+      verdict.className = 'gr-verdict is-close';
+      verdict.innerHTML = '';
+      el('strong', '', verdict).textContent = 'Note ' + guess + ' vergeben.';
+      el('span', '', verdict).textContent = ' Sie kommt auf den Slab für ' + (job.customer || 'den Kunden') + ' – ob sie stimmt, zeigt sich, wenn jemand den Slab aufbricht. Deine Treffsicherheit zählt fürs Rating.';
+      verdict.hidden = false;
+      gradeNext.hidden = false;
+      return;
+    }
     gradeBtns.forEach(function (x) {
       var g = Number(x.getAttribute('data-grade'));
       x.disabled = true;

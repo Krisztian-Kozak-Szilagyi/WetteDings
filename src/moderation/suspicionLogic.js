@@ -136,7 +136,7 @@ const STAGE_LABEL = { 1: 'Beobachten', 2: 'Verdacht', 3: 'Starker Verdacht', 4: 
 const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
 const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
 const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
-const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
+const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', grading_einnahme: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
 
 const KIND_LABEL = {
   tempo: 'Tempo',

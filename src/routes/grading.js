@@ -59,13 +59,15 @@ router.get('/grading', async (req, res) => {
           centerScale: centeringScale.map(({ from, to, cap }) => ({ from, to, cap })), // fürs Messwerkzeug: Bereich → Höchstnote
           minMs: job.spots.length * grading.MS_PER_SPOT,
           // Bügeln (#204): Lage des Knicks, schon gebügelt? und wohin der Tisch das Ergebnis schickt
-          crease: job.defects && job.defects.crease ? creaseLine(job._id) : null,
+          crease: job.defects && job.defects.crease ? creaseLine(job.cardDoc || job._id) : null,
           iron: job.iron || null,
           ironUrl: '/grading/buegeln',
           startedAt: new Date(job.createdAt).getTime(),
-          // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen
+          // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen – bei Karten von Mitgliedern (#204)
+          // bleibt die echte Note geheim, auf den Slab kommt die Note des Shops
           guess: job.guess,
-          grade: job.guess !== null ? job.grade : null,
+          grade: job.guess !== null && !grading.isPlayerJob(job) ? job.grade : null,
+          player: grading.isPlayerJob(job),
         }
       : null,
     // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
@@ -204,6 +206,7 @@ router.post('/grading/zuruecksenden', (req, res) =>
     const clean = Number(str(req.body.clean));
     const seal = Number(str(req.body.seal));
     const job = await grading.finishJob({ user: req.user, clean, seal });
+    if (job.order) return `Slab ${job.shopCode} · Note ${job.guess} geht zurück an ${job.customer} – du bekommst ${euro(job.pay)}.`;
     let msg = `Zurück an ${job.customer} – ${euro(job.pay)} Lohn.`;
     if (job.clean < 100) msg += ` Die Karte war erst zu ${job.clean} % sauber – das hat Lohn gekostet.`;
     return msg;

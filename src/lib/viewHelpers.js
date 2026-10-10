@@ -184,6 +184,9 @@ const ledgerLabels = {
   black_market: 'Gekauft (Black Market)', // Karte oder Gegenstand – was genau, steht im Buchungstext
   konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
   grading_lohn: 'Grading-Auftrag erledigt',
+  grading_auftrag: 'Karte zum Grading eingereicht',
+  grading_einnahme: 'Grading-Auftrag eines Mitglieds erledigt',
+  grading_erstattung: 'Grading-Auftrag erstattet',
   grading_ausbau: 'Grading-Shop ausgebaut',
 };
 
