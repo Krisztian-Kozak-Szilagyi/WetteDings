@@ -14,7 +14,7 @@ const RankStint = require('../models/RankStint');
 const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const { DungeonRun } = require('../models/Dungeon');
-const { GradingJob } = require('../models/Grading');
+const { GradingJob, GradingOrder } = require('../models/Grading');
 const ScriptSignal = require('../models/ScriptSignal');
 const ActionTrace = require('../models/ActionTrace');
 const { DeviceAlert } = require('../models/Device');
@@ -32,6 +32,7 @@ const { euro } = require('../lib/viewHelpers');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const logic = require('./suspicionLogic');
+const marketPrice = require('../trade/marketPrice');
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -61,6 +62,17 @@ function groupByUser(docs, map = (d) => d) {
 }
 
 const times = (docs) => groupByUser(docs, (d) => d.createdAt);
+
+/**
+ * Wert einer Position für die Wertverschiebung (#204): der höhere aus Händlerpreis und gemessenem Marktpreis – so gilt
+ * ein Slab, der korrekt teuer verkauft wird, nicht als Geldverschiebung. prices aus trade/marketPrice.all().
+ */
+const valueWith = (prices) => (cardId, line) => {
+  const bank = valueOf(cardId);
+  if (!line || !prices) return bank;
+  const m = prices.get(marketPrice.keyOf(line));
+  return Math.max(bank, m ? m.avg : 0);
+};
 
 /** Bankwert einer Karte oder eines Gegenstands in Cent */
 function valueOf(cardId) {
@@ -114,7 +126,9 @@ async function findAll(now = new Date()) {
       { $match: { type: { $in: Object.keys(logic.INCOME_SOURCES) }, amount: { $gt: 0 }, createdAt: { $gt: since } } },
       { $group: { _id: { user: '$user', type: '$type' }, amount: { $sum: '$amount' }, from: { $min: '$createdAt' }, to: { $max: '$createdAt' } } },
     ]),
-    Trade.find({ status: 'verkauft', closedAt: { $gt: circSince } }).select('kind seller buyer to sellerName buyerName toName give.card give.doc want.card want.doc price extraFrom closedAt').lean(),
+    Trade.find({ status: 'verkauft', closedAt: { $gt: circSince } })
+      .select('kind seller buyer to sellerName buyerName toName give.card give.doc give.slab give.foiledAt give.grade give.damaged want.card want.doc want.slab want.foiledAt want.grade want.damaged price extraFrom closedAt')
+      .lean(),
     deviceService.flaggedPairs(),
     // Duelle mit Karten: die Karte des Verlierers geht an den Gewinner (betService)
     Bet.find({ status: 'entschieden', 'duel.cards.0': { $exists: true }, resolvedAt: { $gt: circSince } }).select('creator duel.opponent duel.cards outcome resolvedAt').lean(),
@@ -219,11 +233,15 @@ async function findAll(now = new Date()) {
   // Kartenkreislauf, Platz 1 mit geliehenem Wert, Sammelkonten
   found.push(...(await valueFlowFindings({ trades, duels, earned, stints, pairs, now })));
 
-  // Wertverschiebung (letzte 7 Tage), zusammengefasst je Konten-Paar
+  // Grading unter Bekannten (#204): Gefälligkeitsnoten und Aufträge zwischen Mehrfach-Konten
+  found.push(...(await gradingFindings({ since: circSince, pairs })));
+
+  // Wertverschiebung (letzte 7 Tage), zusammengefasst je Konten-Paar – Slabs und Exemplare zum Marktpreis (#204)
+  const valueAt = valueWith(await marketPrice.all());
   const byPair = new Map();
   const names = new Map();
   for (const t of trades.filter((x) => x.closedAt > valueSince)) {
-    const f = logic.valueFinding(t, valueOf);
+    const f = logic.valueFinding(t, valueAt);
     if (!f) continue;
     names.set(String(t.seller), t.sellerName);
     names.set(String(t.buyer || t.to), t.buyerName || t.toName);
@@ -238,6 +256,49 @@ async function findAll(now = new Date()) {
     // nur nennenswerte Karten (die Crumpled als Gegenleistung interessiert nicht)
     found1.details.cards = [...items].sort((x, y) => new Date(x.at) - new Date(y.at)).slice(-5).flatMap((i) => i.copies).filter((c) => valueOf(c.card) >= logic.VALUE_MIN_CENTS).slice(0, 8);
     found.push(found1);
+  }
+  return found;
+}
+
+/**
+ * Grading-Hinweise (#204, Etappe C): Gefälligkeitsnoten je Paar aus Shop und Kunde (Note des Shops ≥ 2 über der
+ * echten) und Aufträge zwischen Konten, die als Mehrfach-Konto erkannt sind.
+ */
+async function gradingFindings({ since, pairs }) {
+  const [jobs, orders] = await Promise.all([
+    GradingJob.find({ source: 'spieler', status: 'fertig', doneAt: { $gt: since } }).select('user card guess grade order doneAt').lean(),
+    GradingOrder.find({ createdAt: { $gt: since }, status: { $in: ['wartet', 'in_arbeit', 'fertig'] } }).select('owner ownerName shop card price createdAt').lean(),
+  ]);
+  const orderById = new Map(orders.map((o) => [String(o._id), o]));
+  const ids = new Set(orders.flatMap((o) => [String(o.owner), String(o.shop)]));
+  const users = ids.size ? await User.find({ _id: { $in: [...ids] } }).select('username').lean() : [];
+  const names = new Map(users.map((u) => [String(u._id), u.username]));
+  const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
+  const found = [];
+  // Gefälligkeitsnoten: je Paar (Shop, Kunde)
+  const byPair = new Map();
+  for (const j of jobs) {
+    const o = orderById.get(String(j.order));
+    if (!o) continue;
+    const key = deviceLogic.pairKey(o.shop, o.owner);
+    if (!byPair.has(key)) byPair.set(key, []);
+    byPair.get(key).push({ shop: o.shop, owner: o.owner, guess: j.guess, grade: j.grade, card: cardName(j.card), price: o.price, at: j.doneAt });
+  }
+  for (const [key, list] of byPair) {
+    const f = logic.favorFinding(list, names, pairs.has(key));
+    if (f) found.push({ key: `gefaellig:${key}`, kind: 'gefaellig', action: null, users: f.users, ...pick(f, ['count', 'total', 'jobs']), ...base(f) });
+  }
+  // Aufträge zwischen Mehrfach-Konten
+  const netPairs = new Map();
+  for (const o of orders) {
+    const key = deviceLogic.pairKey(o.shop, o.owner);
+    if (!pairs.has(key)) continue;
+    if (!netPairs.has(key)) netPairs.set(key, []);
+    netPairs.get(key).push({ shop: o.shop, owner: o.owner, price: o.price, at: o.createdAt, card: cardName(o.card) });
+  }
+  for (const [key, list] of netPairs) {
+    const f = logic.gradingNetFinding(list, names);
+    if (f) found.push({ key: `gradingnetz:${key}`, kind: 'gradingnetz', action: null, users: f.users, ...pick(f, ['count', 'total', 'jobs']), ...base(f) });
   }
   return found;
 }
@@ -499,7 +560,7 @@ async function list() {
   const ids = [...new Set(alerts.flatMap((a) => a.users.map(String)))];
   const users = await User.find({ _id: { $in: ids } }).select('username bannedUntil deletedAt').lean();
   const userById = new Map(users.map((u) => [String(u._id), u]));
-  const LOG_OF = { ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
+  const LOG_OF = { ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', gefaellig: 'grading', gradingnetz: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
   return alerts
     .map((a) => {
       const list = a.users.map((id) => userById.get(String(id)));
