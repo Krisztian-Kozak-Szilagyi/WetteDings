@@ -156,6 +156,7 @@
         <span class="muted small">Trophäen gibt es nur, wenn mindestens <%= minTeams %> <%= minTeams === 1 ? 'Team' : 'Teams' %> in der Woche Punkte geholt <%= minTeams === 1 ? 'hat' : 'haben' %>.</span></li>
       <li>Der Kapitän gestaltet das Teamprofil: Text, Motto, Farbe und Teambild (Avatare aus dem Kosmetik-Shop zum halben Preis). Er kann die Kapitänsrolle auch abgeben.</li>
       <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
+      <li><strong>Lil Dré's Bazaar:</strong> Ab <%= rules.TEAM_SIZE %> Mitgliedern öffnet im <a href="/handel#bazaar">Handel</a> euer eigener Team-Laden. Vier Plätze mit Casino-Kaffee (Crumpled, BfW-ler, Gold) und BFW Energy Gold – alles, was ihr im Live-Turm braucht – zum 1,5-fachen Bankpreis. Jeder Platz wird zufällig bestückt, dasselbe kann also mehrmals dabei sein. Kauft ein Mitglied etwas, ist es für das ganze Team weg. Jeden Tag um 00:00 gibt es neue Ware.</li>
       <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>. Reicht das Guthaben nicht, bleibt der Rest als Schuld und wird von jeder Einnahme abgezogen.</li>
     </ul>
   </details>
