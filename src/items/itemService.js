@@ -250,18 +250,22 @@ async function foilCard({ user, cardId }) {
   });
 }
 
-/** Folie abziehen: Die Karte ist danach wieder normal (Bankwert, Quests), die Folie ist kaputt. */
+/**
+ * Folie abziehen bzw. Slab aufbrechen (#204): Die Karte ist danach wieder ohne Hülle (Händlerpreis, Quests), die Folie
+ * ist kaputt bzw. der Slab mit Kürzel und Note weg.
+ */
 async function unfoilCard({ user, copyId }) {
   return inTransaction(async (session) => {
     const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card slab').session(session).lean();
     if (!doc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
-    if (doc.slab) throw new UserError('Ein Slab ist versiegelt – aufbrechen lässt er sich erst mit den Grading-Shops.');
     const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
     if (reason === 'handel') throw new UserError('Die Karte ist gerade im Handel. Zieh zuerst das Angebot zurück.');
+    if (reason === 'vitrine') throw new UserError('Der Slab steht in deiner Vitrine. Nimm ihn zuerst heraus.');
     // Folierte Karten spielen mit (#204): unterwegs bleibt die Folie dran – sonst wäre die Karte beim Abschluss ungeschützt
     if (reason && !isStateLock(reason)) throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Die Folie kannst du danach abziehen.`);
     await claim([doc], user._id, session);
-    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null } }, { session });
+    // Slab aufbrechen (#204): Kürzel, Note und Wertsteigerung sind weg – die Karte kann neu eingereicht werden
+    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null, slab: null } }, { session });
     return catalog.cardById[doc.card] || null;
   });
 }

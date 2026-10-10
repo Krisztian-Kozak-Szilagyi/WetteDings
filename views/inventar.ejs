@@ -123,12 +123,14 @@
               <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
             <% } else { %>
               <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=f:<%= f.id %>">Handeln · Markt, Verkauf oder Tausch</a>
-              <% if (!f.slab) { %>
-              <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt. Die Karte ist danach wieder ungeschützt.">
+              <% if (f.lock !== 'vitrine') { %>
+              <form method="post" action="/inventar/folie-abziehen" data-confirm="<%= f.slab ? 'Slab von ' + f.card.name + ' aufbrechen? Kürzel ' + f.slab.code + ', Note ' + f.slab.grade + ' und die Wertsteigerung sind danach weg – die Note ist wieder geheim. Du kannst die Karte neu graden lassen.' : 'Folie von ' + f.card.name + ' abziehen? Die Folie geht dabei kaputt. Die Karte ist danach wieder ungeschützt.' %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="copy" value="<%= f.id %>">
-                <button class="btn btn-ghost btn-sm" type="submit">Folie abziehen</button>
+                <button class="btn btn-ghost btn-sm" type="submit"><%= f.slab ? 'Slab aufbrechen' : 'Folie abziehen' %></button>
               </form>
+              <% } else { %>
+              <span class="small">Steht in deiner <a href="/grading#vitrine">Vitrine</a>.</span>
               <% } %>
             <% } %>
           </div>
