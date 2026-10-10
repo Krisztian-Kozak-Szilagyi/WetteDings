@@ -580,16 +580,19 @@
       res.textContent = q >= 90 ? 'Perfekt versiegelt! (' + q + ' %)' : q >= 60 ? 'Sauber versiegelt. (' + q + ' %)' : q > 0 ? 'Eine kleine Luftblase … (' + q + ' %)' : 'Schief eingeschweißt! (0 %)';
       res.className = 'gr-seal-result ' + (q >= 60 ? 'gr-ok' : 'gr-bad');
       var g = job.guess || 0;
+      // Kürzel des eigenen Shops (#204) statt des Hauses
+      var house = ((job.shop && job.shop.code) || 'BfW') + ' GRADING';
       label.innerHTML = '';
       var info = el('div', 'gr-slab-info', label);
-      el('strong', '', info).textContent = 'BfW GRADING';
+      el('strong', '', info).textContent = house;
       el('span', '', info).textContent = job.card ? job.card.name + ' · ' + job.card.rarityLabel : '';
       el('span', 'gr-slab-word', info).textContent = GRADE_NAMES[g] || '';
       el('div', 'gr-slab-grade', label).textContent = g || '–';
       // Rückseite: Zertifikat mit Nummer und Strichcode
       labelBack.innerHTML = '';
       var cert = el('div', 'gr-slab-cert', labelBack);
-      el('strong', '', cert).textContent = 'BfW GRADING';
+      el('strong', '', cert).textContent = house;
+      if (job.shop && job.shop.name) el('span', '', cert).textContent = job.shop.name;
       el('span', '', cert).textContent = 'Zertifikat Nr. ' + (job.cert || '');
       el('span', '', cert).textContent = 'Note ' + (g || '–') + ' · ' + (GRADE_NAMES[g] || '');
       el('div', 'gr-slab-barcode', labelBack);

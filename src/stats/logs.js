@@ -422,7 +422,7 @@ function gradingRow(j, name) {
     at: j.doneAt || j.createdAt,
     startedAt: j.createdAt,
     player: name || '–',
-    shop: level ? level.name : `Stufe ${j.level}`,
+    shop: (level ? level.name : `Stufe ${j.level}`) + (j.shopCode ? ` · ${j.shopCode}` : ''),
     card: cardLabel(j.card),
     customer: j.customer,
     done: j.status === 'fertig',
@@ -437,7 +437,7 @@ function gradingRow(j, name) {
 
 async function gradingLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound doneAt createdAt', all);
+  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound shopCode doneAt createdAt', all);
   const names = await namesOf(docs.map((j) => j.user));
   return { ...pg, rows: docs.map((j) => gradingRow(j, names.get(String(j.user)))) };
 }

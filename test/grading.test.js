@@ -93,3 +93,15 @@ test('#96: Shop-Wert im Vermögen = Hälfte der Ausbaukosten', () => {
   assert.equal(shopValue(undefined, costs), 0);
   assert.equal(shopValues().length, LEVELS.length);
 });
+
+test('#204: Shop-Name und Kürzel – vereinheitlicht, BFW reserviert', () => {
+  const { validShopName } = require('../src/grading/gradingService');
+  assert.deepEqual(validShopName({ name: '  Günthers   Kartenklinik ', code: ' gk k ' }), { name: 'Günthers Kartenklinik', code: 'GKK' });
+  assert.deepEqual(validShopName({ name: 'PSA', code: 'psa10' }), { name: 'PSA', code: 'PSA10' });
+  assert.throws(() => validShopName({ name: 'ab', code: 'AB' }), /3 bis 30/);
+  assert.throws(() => validShopName({ name: 'x'.repeat(31), code: 'AB' }), /3 bis 30/);
+  assert.throws(() => validShopName({ name: 'Shop', code: 'A' }), /2 bis 5/);
+  assert.throws(() => validShopName({ name: 'Shop', code: 'ABCDEF' }), /2 bis 5/);
+  assert.throws(() => validShopName({ name: 'Shop', code: 'Ä-1' }), /2 bis 5/);
+  assert.throws(() => validShopName({ name: 'Shop', code: 'bfw' }), /reserviert/);
+});

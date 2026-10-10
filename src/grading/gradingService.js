@@ -173,6 +173,32 @@ async function quit({ user }) {
   await GradingShop.updateOne({ _id: user._id }, { $set: { active: false } });
 }
 
+// ---------- Name und Kürzel (#204) ----------
+// Das Kürzel steht auf den Slabs (statt "BfW GRADING"). BFW gehört dem Haus.
+const CODE_RE = /^[A-Z0-9]{2,5}$/;
+const RESERVED_CODES = ['BFW'];
+
+/** Name und Kürzel prüfen und vereinheitlichen: { name, code } oder UserError */
+function validShopName({ name, code }) {
+  const n = String(name || '').replace(/\s+/g, ' ').trim();
+  const c = String(code || '').replace(/\s+/g, '').toUpperCase();
+  if (n.length < 3 || n.length > 30) throw new UserError('Der Name deines Shops braucht 3 bis 30 Zeichen.');
+  if (!CODE_RE.test(c)) throw new UserError('Das Kürzel besteht aus 2 bis 5 Buchstaben oder Ziffern.');
+  if (RESERVED_CODES.includes(c)) throw new UserError(`Das Kürzel ${c} ist reserviert.`);
+  return { name: n, code: c };
+}
+
+/** Shop benennen (auch später umbenennen – erledigte Aufträge behalten ihr altes Kürzel) */
+async function setName({ user, name, code }) {
+  const values = validShopName({ name, code });
+  const res = await GradingShop.updateOne({ _id: user._id, active: true }, { $set: values }).catch((err) => {
+    if (err.code === 11000) throw new UserError(`Das Kürzel ${values.code} hat schon ein anderer Shop.`);
+    throw err;
+  });
+  if (!res.matchedCount) throw new UserError('Du arbeitest nicht im Grading-Shop.');
+  return values;
+}
+
 /** Nächste Ausbaustufe kaufen */
 async function upgrade({ user }) {
   return inTransaction(async (session) => {
@@ -193,6 +219,7 @@ async function upgrade({ user }) {
 async function takeJob({ user }) {
   const { shop, info, open, used, limit } = await getState(user._id);
   if (!shop || !shop.active) throw new UserError('Nimm zuerst den Job im Grading-Shop an.');
+  if (!shop.code) throw new UserError('Gib deinem Shop zuerst einen Namen und ein Kürzel.');
   if (open) throw new UserError('Du hast noch einen offenen Auftrag.');
   if (used >= limit) throw new UserError('Für heute sind alle Aufträge erledigt – morgen kommen neue.');
   const defects = rollDefects();
@@ -244,7 +271,8 @@ async function finishJob({ user, clean, seal }) {
     const card = catalog.cardById[job.card];
     const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity });
     const foilFound = sealQ > 0 && (await rollGradingFoil({ userId: user._id, session }));
-    Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, foilFound, doneAt: new Date() });
+    const shop = await GradingShop.findById(user._id).select('code').session(session).lean();
+    Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, foilFound, shopCode: (shop && shop.code) || null, doneAt: new Date() });
     await job.save({ session });
     await User.updateOne({ _id: user._id }, { $inc: { balance: pay } }, { session });
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay } }, { session });
@@ -285,4 +313,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

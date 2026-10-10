@@ -46,6 +46,7 @@ router.get('/grading', async (req, res) => {
           steps: grading.levelInfo(job.level).steps,
           card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
           customer: job.customer,
+          shop: state.shop ? { name: state.shop.name, code: state.shop.code } : null, // Kürzel fürs Slab-Etikett (#204)
           cert: String(parseInt(String(job._id).slice(-7), 16) % 100000000).padStart(8, '0'), // Zertifikatsnummer fürs Slab-Etikett
           spots: job.spots,
           defects: job.defects,
@@ -89,6 +90,13 @@ router.post('/grading/kuendigen', (req, res) =>
   handle(req, res, async () => {
     await grading.quit({ user: req.user });
     return 'Du hast gekündigt. Ab dem nächsten Tag bekommst du wieder den Tagesbonus.';
+  })
+);
+
+router.post('/grading/name', (req, res) =>
+  handle(req, res, async () => {
+    const { name, code } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
+    return `Dein Shop heißt jetzt „${name}“ – Kürzel ${code}.`;
   })
 );
 
