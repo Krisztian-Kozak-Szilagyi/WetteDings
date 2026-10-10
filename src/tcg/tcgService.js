@@ -411,11 +411,24 @@ async function favoriteList(owner, counts) {
 /** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch des Inventars – für das Abzeichen im Menü */
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
-/** Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, v: Wert in Cent (mit Folie) }] */
+/**
+ * Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, creased: unfolierte mit Knick (#204),
+ * v: Wert in Cent (mit Folie) }]
+ */
 async function inventory(userId) {
+  const isFoiled = { $eq: [{ $type: '$foiledAt' }, 'date'] };
   const agg = await TcgCard.aggregate([
     { $match: { user: userId } },
-    { $group: { _id: '$card', n: { $sum: 1 }, rarity: { $first: '$rarity' }, foiled: { $sum: { $cond: [{ $eq: [{ $type: '$foiledAt' }, 'date'] }, 1, 0] } }, v: { $sum: sellValueExpr() } } },
+    {
+      $group: {
+        _id: '$card',
+        n: { $sum: 1 },
+        rarity: { $first: '$rarity' },
+        foiled: { $sum: { $cond: [isFoiled, 1, 0] } },
+        creased: { $sum: { $cond: [{ $and: [{ $eq: ['$creased', true] }, { $not: [isFoiled] }] }, 1, 0] } },
+        v: { $sum: sellValueExpr() },
+      },
+    },
   ]);
   return agg;
 }

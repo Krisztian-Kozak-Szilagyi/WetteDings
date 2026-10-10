@@ -12,6 +12,8 @@
   const showMissing = locals.showMissing !== false;
   const locks = locals.lockedByCard || {};
   const foiledBy = locals.foiledByCard || {};
+  // creasedByCard: unfolierte Exemplare mit Knick (#204) – Schild „Knick“, Bügeln im Grading-Shop
+  const creasedBy = locals.creasedByCard || {};
   const foiledCopies = locals.foiledCopies || {};
   const favoriteIds = locals.favoriteIds || new Set();
   const isAlbum = mode === 'album';
@@ -53,6 +55,7 @@
             </span>
           <% } %>
           <% if (allLocked) { %><span class="tcg-exam-badge"><%= lockLabel %></span><% } %>
+          <% if (creasedBy[c.id]) { %><span class="tcg-crease-tag" title="<%= creasedBy[c.id] %>× mit Knick – im Grading-Shop bügeln"><%= n > 1 ? creasedBy[c.id] + '× ' : '' %>Knick</span><% } %>
           <% if (n > 1) { %><span class="tcg-count">×<%= n %></span><% } %>
         </span>
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>

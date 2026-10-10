@@ -17,6 +17,7 @@ const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, pickCopy, claim, copiesByCard, lockLabel } = require('../tcg/locks');
+const { damageCards, dungeonSeverity, damageText } = require('../grading/damage');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
@@ -913,7 +914,9 @@ async function finishDue({ now = Date.now() } = {}) {
   const due = await DungeonRun.find({ status: 'laeuft', endsAt: { $lte: new Date(now) } }).select('_id').lean();
   for (const { _id } of due) {
     try {
+      const hits = new Map(); // Schaden je Mitglied (#204): userId → [{ card, kind }]
       const run = await inTransaction(async (session) => {
+        hits.clear(); // die Transaktion kann wiederholt werden
         const r = await DungeonRun.findOneAndUpdate({ _id, status: 'laeuft' }, { $set: { status: 'fertig', chat: [] } }, { new: true, session });
         if (!r) return null;
         const d = defOf(r.dungeon);
@@ -932,16 +935,28 @@ async function finishDue({ now = Date.now() } = {}) {
           await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
         }
         if (foils.length) await grantItems({ userIds: foils, type: 'folie', source: 'dungeon', session });
+        // Verloren: Charakter- und Boost-Karte (unfoliert) können Kratzer oder einen Knick abbekommen – Kaffee und
+        // Energy werden ohnehin verbraucht (#204)
+        if (!r.success) {
+          const severity = dungeonSeverity(r);
+          for (const m of r.members.filter((x) => x.user)) {
+            const got = await damageCards({ userId: m.user, docs: [m.cardDoc, m.boostDoc], severity, session });
+            if (got.length) hits.set(String(m.user), got);
+          }
+        }
         return r;
       });
       if (!run) continue;
       const d = defOf(run.dungeon);
       const card = bossCardOf(run.dungeon);
+      const where = run.mode === 'tower' ? 'Mage Tower' : d ? d.title : 'Dungeon';
       for (const m of run.members.filter((x) => x.user)) {
         const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
         let head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
         if (run.mode === 'tower') head = `Mage Tower: ${towerResultText(run.rounds)}.`;
         await notify([m.user], { area: 'Dungeon', href: '/dungeon', text: loot.length ? `${head} Beute: ${loot.join(', ')}.` : `${head} Diesmal ohne Beute.` });
+        const damage = damageText(hits.get(String(m.user)) || [], (id) => (catalog.cardById[id] || { name: id }).name, where);
+        if (damage) await notify([m.user], { area: 'Dungeon', href: '/tcg', text: damage });
       }
     } catch (err) {
       console.error('Dungeon-Abschluss fehlgeschlagen:', err.message);

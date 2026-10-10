@@ -40,6 +40,8 @@ async function collection(user) {
   const counts = Object.fromEntries(owned.map((o) => [o._id, o.n]));
   // Folierte Exemplare je Karte (Markierung im Album)
   const foiledByCard = Object.fromEntries(owned.filter((o) => o.foiled).map((o) => [o._id, o.foiled]));
+  // Unfolierte Exemplare mit Knick je Karte (#204) – ein Knick ist sichtbar, die Note bleibt geheim
+  const creasedByCard = Object.fromEntries(owned.filter((o) => o.creased).map((o) => [o._id, o.creased]));
   // Freie Exemplare je Karte (nicht auf Quest, nicht im Handel, nicht foliert)
   const free = Object.fromEntries(owned.map((o) => [o._id, o.n - (lockedByCard[o._id] ? lockedByCard[o._id].n : 0)]));
   const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
@@ -51,6 +53,7 @@ async function collection(user) {
     free,
     lockedByCard,
     foiledByCard,
+    creasedByCard,
     foiledCopies,
     graded: gradeStats(foiledDocs.map((d) => d.condition && d.condition.grade)), // beste Note und Schnitt der folierten Karten
     protectedIds,

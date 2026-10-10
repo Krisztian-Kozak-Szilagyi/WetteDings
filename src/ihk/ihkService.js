@@ -13,6 +13,8 @@ const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = requi
 const { resolveAll, who, canBoost, needsCoffee, isCoffee } = require('./abilities');
 const { lockedDocs, pickCopy, claim } = require('../tcg/locks');
 const { logSettingsChange } = require('../stats/settingsLog');
+const { damageCards, ihkSeverity, damageText } = require('../grading/damage');
+const { notify } = require('../services/notifyService');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
 // Anzahl Arbeitstakte = 10 + Speed/10 (Speed 10 → 11, 35 → 13,5, 99 → 19,9). Speed hilft also,
@@ -343,6 +345,7 @@ const rollsPack = (chance, rand = crypto.randomInt(1000000) / 1000000) => rand *
 
 /** Nach Ablauf: Belohnung gutschreiben, Karte freigeben, neue Quests anbieten */
 async function collect({ user }) {
+  let hits = [];
   const result = await inTransaction(async (session) => {
     const run = await IhkRun.findOneAndUpdate(
       { user: user._id, status: 'laeuft', endsAt: { $lte: new Date() } },
@@ -361,9 +364,13 @@ async function collect({ user }) {
       run.pack = type.key;
       await run.save({ session });
     }
+    // Verloren: die eingesetzten (unfolierten) Karten können Kratzer oder einen Knick abbekommen (#204)
+    if (!run.success) hits = await damageCards({ userId: user._id, docs: [run.cardDoc, run.boostDoc, run.boost2Doc], severity: ihkSeverity(run), session });
     return run;
   });
   await IhkState.updateOne({ _id: user._id }, { $set: { offers: generateOffers() } }, { upsert: true });
+  const text = damageText(hits, (id) => (catalog.cardById[id] || { name: id }).name, 'IHK');
+  if (text) await notify(user._id, { area: 'IHK', href: '/tcg', text });
   return result;
 }
 
