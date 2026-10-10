@@ -503,15 +503,25 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
   const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
-  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
+  // Spieler-Aufträge (#204, Etappe B)
+  const int = (k) => Number.parseInt(typeof req.body[k] === 'string' ? req.body[k] : '', 10);
+  const playerJobs = int('gr_player_jobs');
+  const orderPrice = { min: money(req.body.gr_price_min), max: money(req.body.gr_price_max), def: money(req.body.gr_price_def) };
+  const orderDays = int('gr_order_days');
+  const showcaseMax = int('gr_showcase');
+  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100 || !Number.isInteger(playerJobs) || playerJobs < 0 || playerJobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
+  } else if (Object.values(orderPrice).some(tooBig) || !(orderPrice.min <= orderPrice.def && orderPrice.def <= orderPrice.max)) {
+    req.flash('error', 'Preisrahmen: mindestens ≤ Standard ≤ höchstens (bis 100.000 €).');
+  } else if (!Number.isInteger(orderDays) || orderDays < 1 || orderDays > 30 || !Number.isInteger(showcaseMax) || showcaseMax < 0 || showcaseMax > 24) {
+    req.flash('error', 'Frist: 1 bis 30 Tage, Vitrine: 0 bis 24 Plätze.');
   } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
     req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
   } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
     req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
   } else {
-    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, pay, costs, premium, admin: req.user });
-    req.flash('success', `Gespeichert: Grading-Shop ${jobs} Aufträge pro Tag.`);
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, playerJobs, pay, costs, premium, orderPrice, orderDays, showcaseMax, admin: req.user });
+    req.flash('success', `Gespeichert: Grading-Shop ${jobs} NPC- und ${playerJobs} Mitglieder-Aufträge pro Tag.`);
   }
   res.redirect(subUrl('spielwerte', 'grading'));
 });

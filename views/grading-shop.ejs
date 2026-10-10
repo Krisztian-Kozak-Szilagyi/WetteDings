@@ -1,0 +1,44 @@
+<%- include('partials/head') %>
+<%# Öffentliche Seite eines Grading-Shops (#204, Etappe B): Kennzahlen, Preis und Vitrine – Slabs in 3D ansehen %>
+<% const r = shop.rating; %>
+<div class="gr-page">
+  <div class="gr-head">
+    <h1><%= shop.name %> <span class="gr-shop-code"><%= shop.code %></span></h1>
+    <a class="btn btn-ghost btn-sm" href="/grading/einreichen">Alle Shops</a>
+  </div>
+  <section class="gs-profile">
+    <p class="gr-rep"><b><%= r.tier.label %></b> · Reputation <%= Math.round(r.reputation) %> · Stufe <%= shop.level %> · von <%= shop.owner %></p>
+    <dl class="gr-facts">
+      <dt>Bewertung</dt><dd><%= r.stars != null ? '★ ' + r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' aus ' + r.starCount : 'noch keine' %></dd>
+      <dt>Arbeitsqualität</dt><dd><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></dd>
+      <dt>Treffsicherheit</dt><dd><%= r.hitRate != null ? Math.round(r.hitRate) + ' % exakt aus ' + r.graded : '–' %></dd>
+      <dt>Aufträge</dt><dd><%= shop.jobsDone %> erledigt, davon <%= shop.playerJobsDone %> für Mitglieder</dd>
+      <% if (shop.accepts) { %><dt>Preis</dt><dd><%= euro(shop.price) %> je Karte · <%= shop.queue ? shop.queue + ' in der Warteschlange' : 'keine Warteschlange' %></dd><% } %>
+      <dt>Vitrinen-Boost</dt><dd>+<%= Math.round(shop.boost * 100) %> % Reputation je Auftrag</dd>
+    </dl>
+    <% if (!own && shop.accepts) { %>
+      <a class="btn btn-primary" href="/grading/einreichen?shop=<%= shop.code %>">Karte bei <%= shop.code %> einreichen</a>
+    <% } else if (!shop.accepts) { %>
+      <p class="muted small">Dieser Shop nimmt gerade keine Karten von Mitgliedern an (erst ab Stufe 3).</p>
+    <% } %>
+  </section>
+
+  <section class="gr-done-wrap">
+    <h2>Vitrine</h2>
+    <% if (shop.showcase.length) { %>
+      <div class="tcg-grid gs-vitrine">
+        <% shop.showcase.forEach((x) => { const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
+          <button type="button" class="tcg-slot foil-slot r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> aria-label="<%= x.card.name %>, Slab <%= x.slab.code %> Note <%= x.slab.grade %> – ansehen">
+            <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
+            <span class="tcg-slot-label"><span class="tcg-dot"></span>Slab <%= x.slab.code %> · Note <%= x.slab.grade %></span>
+          </button>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="muted small">Noch nichts ausgestellt.</p>
+    <% } %>
+  </section>
+</div>
+
+<%- include('partials/foil-modal') %>
+<%- include('partials/foot') %>

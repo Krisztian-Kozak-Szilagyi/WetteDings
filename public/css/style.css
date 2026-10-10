@@ -6175,3 +6175,33 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .tcg-flip.r-arcane .tcg-front .tcg-shine::after, .tcg-zoom.r-arcane .tcg-card-3d img, .tcg-flip.r-arcane .tcg-front img { animation: none !important; }
   .tcg-art img.tcg-arcane-echo { display: none; }
 }
+
+/* ---------- Grading: Karten von Mitgliedern (#204, Etappe B) ---------- */
+.gr-submit-link { margin-left: auto; }
+.gr-rep { margin: 4px 0 2px; font-size: 14px; }
+.gr-price-form { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.gr-price-form .field { margin: 0; }
+.gr-vitrine-form { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.gr-vitrine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; width: 100%; }
+.gr-vitrine-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: var(--cur-pointer, pointer); text-align: center; }
+.gr-vitrine-item .foil-card { width: 92px; }
+.gr-vitrine-item.is-locked { opacity: .55; cursor: var(--cur-default); }
+.gr-vitrine-item:has(input:checked) .foil-card { box-shadow: 0 0 0 2px var(--color-accent-300); border-radius: 6px; }
+.gs-step { display: flex; flex-direction: column; gap: 12px; }
+.gs-step h2 { margin: 0; font-size: 18px; }
+.gs-form { display: flex; flex-direction: column; gap: 28px; }
+.gs-shops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.gs-shop { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); cursor: var(--cur-pointer, pointer); font-size: 13px; }
+.gs-shop input { position: absolute; top: 12px; right: 12px; }
+.gs-shop:has(input:checked) { box-shadow: 0 0 0 2px var(--color-accent-300); }
+.gs-shop-head { font-size: 15px; padding-right: 24px; }
+.gs-shop-tier, .gs-shop-facts { color: var(--color-neutral-400); }
+.gs-shop-showcase { display: flex; gap: 6px; margin: 4px 0; }
+.gs-shop-showcase .foil-card { width: 46px; }
+.gs-cards .gs-card { position: relative; cursor: var(--cur-pointer, pointer); padding: 0; border: 0; background: none; }
+.gs-card > input { position: absolute; top: 6px; left: 6px; z-index: 3; }
+.gs-card .tcg-art { position: relative; }
+.gs-card:has(input:checked) .tcg-art, .gs-card:has(input:checked) .foil-card { box-shadow: 0 0 0 2px var(--color-accent-300); border-radius: 8px; }
+.gs-order-actions form { margin: 0; }
+.gs-rate { display: flex; gap: 6px; align-items: center; }
+.gs-profile { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

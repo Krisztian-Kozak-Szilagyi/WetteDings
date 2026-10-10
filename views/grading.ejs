@@ -4,10 +4,12 @@
 <div class="gr-page">
 <div class="gr-head">
   <h1>Grading-Shop</h1>
+  <a class="btn btn-ghost btn-sm gr-submit-link" href="/grading/einreichen">Eigene Karte graden lassen →</a>
   <% if (active) { %>
     <div class="gr-today">
-      <span>Heute <b><%= used %> / <%= limit %></b></span>
+      <span>Heute NPC <b><%= used %> / <%= limit %></b></span>
       <span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="<%= i < used ? 'is-on' : '' %>"></span><% } %></span>
+      <% if (players) { %><span>Mitglieder <b><%= playerUsed %> / <%= playerLimit %></b></span><% } %>
     </div>
   <% } %>
 </div>
@@ -168,9 +170,13 @@
               <label class="field"><span>Kürzel <em>(2–5 Zeichen)</em></span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
               <button class="btn btn-primary btn-lg gr-glow" type="submit">Shop eröffnen</button>
             </form>
-          <% } else if (used < limit) { %>
+          <% } else if (used < limit || (waiting && playerUsed < playerLimit)) { %>
             <h2>Neuer Auftrag?</h2>
-            <p>Im Briefkasten warten noch <b><%= limit - used %></b> Karten auf dich.</p>
+            <% if (waiting && playerUsed < playerLimit) { %>
+              <p><b><%= waiting %></b> <%= waiting === 1 ? 'Karte eines Mitglieds wartet' : 'Karten von Mitgliedern warten' %> – sie kommen zuerst dran.</p>
+            <% } else { %>
+              <p>Im Briefkasten warten noch <b><%= limit - used %></b> Karten auf dich.</p>
+            <% } %>
             <form method="post" action="/grading/auftrag">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <button class="btn btn-primary btn-lg gr-glow" type="submit">Nächsten Auftrag annehmen</button>
@@ -178,6 +184,30 @@
           <% } else { %>
             <h2>Feierabend!</h2>
             <p>Alle <%= limit %> Aufträge für heute sind erledigt. Morgen ab <%= bonusTime %> Uhr kommen neue.</p>
+          <% } %>
+        </section>
+      <% } %>
+
+      <% if (players) { %>
+        <%# #204 Etappe B: Karten von Mitgliedern – Slab mit deinem Kürzel und deiner Note, der Kunde zahlt den Preis %>
+        <section class="gr-done-wrap gr-queue">
+          <h2>Karten von Mitgliedern</h2>
+          <% if (queue.length) { %>
+            <p class="muted small">Kommen vor den NPC-Aufträgen dran. Du hast je <%= orderDays %> Tage – sonst geht die Karte samt Geld zurück. Die echte Note bleibt geheim: auf den Slab kommt deine.</p>
+            <ul class="gr-done">
+              <% queue.forEach((o) => { %>
+                <li class="<%= o.cardInfo ? 'r-' + o.cardInfo.rarity : '' %>">
+                  <span class="gr-done-thumb"><% if (o.cardInfo) { %><img src="<%= o.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+                  <span class="gr-done-info">
+                    <span><b><%= o.cardInfo ? o.cardInfo.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %></span></span>
+                    <span class="gr-done-meta">bis <%= date(o.expiresAt) %></span>
+                  </span>
+                  <b class="gr-pay">+<%= euro(o.price) %></b>
+                </li>
+              <% }) %>
+            </ul>
+          <% } else { %>
+            <p class="muted small">Gerade wartet keine Karte. Mitglieder finden deinen Shop unter <a href="/grading/einreichen">Karte graden lassen</a> – Rating und Vitrine entscheiden mit.</p>
           <% } %>
         </section>
       <% } %>
@@ -227,6 +257,31 @@
           </ul>
         </section>
       <% } %>
+
+      <% if (shop.code) { %>
+        <%# #204 Etappe B: Vitrine – eigene Slabs ausstellen; Seltenheit × Note boostet die Reputation je Auftrag %>
+        <section class="gr-done-wrap gr-vitrine" id="vitrine">
+          <h2>Vitrine <span class="gr-dim"><%= showcase.filter((s) => s.shown).length %> / <%= showcaseMax %></span></h2>
+          <% if (showcase.length) { %>
+            <p class="muted small">Ausgestellte Slabs sehen alle auf deiner <a href="/grading/shop/<%= shop.code %>">Shop-Seite</a>. Je seltener und besser benotet, desto schneller wächst deine Reputation. Ausgestellt lassen sie sich nicht handeln.</p>
+            <form method="post" action="/grading/vitrine" class="gr-vitrine-form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div class="gr-vitrine-grid">
+                <% showcase.forEach((s) => { const r = rarityByKey[s.rarity] || { label: '' }; %>
+                  <label class="gr-vitrine-item r-<%= s.rarity %><%= s.lock ? ' is-locked' : '' %>">
+                    <input type="checkbox" name="doc" value="<%= s.id %>" <%= s.shown ? 'checked' : '' %> <%= s.lock ? 'disabled' : '' %>>
+                    <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: s.card, rarityLabel: r.label, slab: s.slab, id: s.id }) %></span>
+                    <span class="small"><%= s.card.name %><%= s.lock ? ' · gesperrt' : '' %></span>
+                  </label>
+                <% }) %>
+              </div>
+              <button class="btn btn-sm" type="submit">Vitrine speichern</button>
+            </form>
+          <% } else { %>
+            <p class="muted small">Du hast noch keinen Slab. Lass eine Karte bei einem anderen Shop graden – dann kannst du sie hier ausstellen.</p>
+          <% } %>
+        </section>
+      <% } %>
     </div>
 
     <aside class="gr-side">
@@ -247,12 +302,32 @@
         <% } else { %>
           <h2><%= info.name %></h2>
         <% } %>
+        <% if (rating && shop.code) { %>
+          <p class="gr-rep"><b><%= rating.tier.label %></b> · Reputation <%= Math.round(rating.reputation) %><% if (rating.tier.next) { %> <span class="gr-dim">/ <%= rating.tier.next %></span><% } %></p>
+          <p class="gr-dim small">
+            <%= rating.stars != null ? '★ ' + rating.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' (' + rating.starCount + ')' : 'noch keine Bewertung' %>
+            · Qualität <%= rating.quality != null ? Math.round(rating.quality) + ' %' : '–' %>
+            · Treffsicherheit <%= rating.hitRate != null ? Math.round(rating.hitRate) + ' %' : '–' %>
+          </p>
+          <a class="small" href="/grading/shop/<%= shop.code %>">Deine Shop-Seite ansehen →</a>
+        <% } %>
         <dl class="gr-facts">
-          <dt>Aufträge pro Tag</dt><dd><%= info.jobs %></dd>
+          <dt>NPC-Aufträge pro Tag</dt><dd><%= info.jobs %></dd>
+          <% if (players) { %><dt>Aufträge von Mitgliedern</dt><dd><%= playerLimit %> pro Tag</dd><% } %>
           <dt>Erledigt insgesamt</dt><dd><%= shop.jobsDone %></dd>
           <dt>Verdient insgesamt</dt><dd><%= euro(shop.earned) %></dd>
           <dt>Vertrag</dt><dd><%= locked ? 'bis ' + date(shop.lockedUntil) : 'kündbar' %></dd>
         </dl>
+        <% if (players) { %>
+          <form method="post" action="/grading/preis" class="form gr-price-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="field"><span>Preis je Karte eines Mitglieds <em>(<%= euro(orderPrice.min) %>–<%= euro(orderPrice.max) %>)</em></span>
+              <input type="text" name="price" inputmode="decimal" value="<%= (shopPrice / 100).toFixed(2).replace('.', ',') %>" required></label>
+            <button class="btn btn-sm" type="submit">Preis speichern</button>
+          </form>
+        <% } else if (shop.code) { %>
+          <p class="muted small">Ab Stufe <%= orderLevel %> (Slab-Werkstatt) schicken dir auch Mitglieder ihre Karten – zu deinem Preis.</p>
+        <% } %>
       </section>
 
       <section class="gr-tree-wrap">

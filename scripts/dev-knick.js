@@ -2,7 +2,7 @@
  * Testdaten fürs Bügeln (#204, nur für die lokale Entwicklung): Knicke entstehen sonst nur selten – bei Kunden-
  * aufträgen (6 %) und wenn man in Quest, Dungeon oder Turm verliert.
  * In der laufenden Dev-Datenbank (npm run dev) bekommt ein Spieler:
- *   - einen Grading-Shop ab Stufe 2 (mit Namen und Kürzel, falls noch keiner),
+ *   - einen Grading-Shop ab Stufe 3 (mit Namen und Kürzel, falls noch keiner) – nimmt auch Karten von Mitgliedern an,
  *   - einen offenen Kundenauftrag mit Knick (ein schon offener Auftrag bekommt den Knick, Bügeln und Note zurückgesetzt),
  *   - zwei eigene unfolierte Karten mit Knick (Grading-Shop → „Eigene Karten bügeln“, Album zeigt „Knick“),
  *   - eine eigene Karte mit zwei Kratzern (Album: eigener Platz, Kratzer in der Großansicht; Handel: einzelnes Exemplar),
@@ -45,7 +45,8 @@ async function main() {
   // Shop: angestellt, mindestens Stufe 2 (Bügeln), Name und Kürzel
   const now = new Date();
   const shop = (await GradingShop.findById(user._id).lean()) || {};
-  const level = Math.max(grading.IRON_LEVEL, shop.level || 1);
+  // Stufe 3: Bügeln und Karten von Mitgliedern (#204, Etappe B)
+  const level = Math.max(3, shop.level || 1);
   const naming = shop.code ? {} : { name: `${user.username}s Kartenklinik`, code: `K${user.username.slice(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}` };
   await GradingShop.updateOne(
     { _id: user._id },

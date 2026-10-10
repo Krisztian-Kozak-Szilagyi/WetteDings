@@ -111,7 +111,13 @@
           <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
         </label>
         <div class="admin-gr-grid">
-          <label class="field"><span>Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+          <label class="field"><span>NPC-Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+          <label class="field"><span>Aufträge von Mitgliedern pro Tag <em>(ab Stufe 3)</em></span><input type="number" name="gr_player_jobs" min="0" max="100" step="1" value="<%= gradingSettings.playerJobs %>" required></label>
+          <label class="field"><span>Preis je Mitglieder-Auftrag: mindestens in €</span><input type="text" name="gr_price_min" inputmode="decimal" value="<%= (gradingSettings.orderPrice.min / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>… höchstens in €</span><input type="text" name="gr_price_max" inputmode="decimal" value="<%= (gradingSettings.orderPrice.max / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>… Standardpreis neuer Shops in €</span><input type="text" name="gr_price_def" inputmode="decimal" value="<%= (gradingSettings.orderPrice.def / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Frist für Mitglieder-Aufträge in Tagen</span><input type="number" name="gr_order_days" min="1" max="30" step="1" value="<%= gradingSettings.orderDays %>" required></label>
+          <label class="field"><span>Plätze in der Vitrine</span><input type="number" name="gr_showcase" min="0" max="24" step="1" value="<%= gradingSettings.showcaseMax %>" required></label>
           <label class="field"><span>Lohn Putzen in €</span><input type="text" name="gr_pay_clean" inputmode="decimal" value="<%= (gradingSettings.pay.clean / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Benoten in €</span><input type="text" name="gr_pay_grade" inputmode="decimal" value="<%= (gradingSettings.pay.grade / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Versiegeln in €</span><input type="text" name="gr_pay_slab" inputmode="decimal" value="<%= (gradingSettings.pay.slab / 100).toFixed(2).replace('.', ',') %>" required></label>

@@ -4,6 +4,8 @@ const { requireLogin } = require('../middleware');
 const { GradingShop } = require('../models/Grading');
 const { TcgCard } = require('../models/Tcg');
 const grading = require('../grading/gradingService');
+const orders = require('../grading/orderService');
+const reputation = require('../grading/reputation');
 const catalog = require('../tcg/catalog');
 const { centerShift, centeringCap, CENTERING, creaseLine } = require('../grading/condition');
 
@@ -13,7 +15,7 @@ const centeringScale = CENTERING.map((c, i) => {
   const from = i === 0 ? 50 : CENTERING[i - 1].max + 1;
   return { from, to: c.max, fromLabel: ratio(from), toLabel: ratio(c.max), cap: c.cap };
 });
-const { str, UserError } = require('../lib/util');
+const { str, UserError, parseEuro } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 
 const router = express.Router();
@@ -30,7 +32,11 @@ function requireGrading(req, res, next) {
 router.use('/grading', requireLogin, requireGrading);
 
 router.get('/grading', async (req, res) => {
+  await orders.expireDue();
   const state = await grading.getState(req.user._id);
+  const players = !!state.shop && orders.acceptsOrders(state.shop);
+  // Spieler-Aufträge (#204): Warteschlange, Preis, Kennzahlen und Vitrine des eigenen Shops
+  const [queue, showcase] = await Promise.all([players ? orders.queueFor(req.user._id) : [], state.shop && state.shop.code ? orders.showcaseChoices(req.user._id) : []]);
   const job = state.open;
   const card = job ? catalog.cardById[job.card] : null;
   res.render('grading', {
@@ -74,6 +80,16 @@ router.get('/grading', async (req, res) => {
     shopCode: (state.shop && state.shop.code) || null, // Schaukarte mit dem eigenen Kürzel (#204)
     heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
     doneCards: state.done.map((j) => ({ ...j, cardInfo: catalog.cardById[j.card] || null })),
+    players,
+    orderLevel: orders.ORDER_LEVEL,
+    queue: queue.map((o) => ({ ...o, cardInfo: cardInfo(o.card) })),
+    shopPrice: state.shop ? orders.priceOf(state.shop) : grading.settings.orderPrice.def,
+    orderPrice: grading.settings.orderPrice,
+    orderDays: grading.settings.orderDays,
+    rating: state.shop ? reputation.ratingOf(state.shop) : null,
+    showcase,
+    showcaseMax: grading.settings.showcaseMax,
+    rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
     ironLevel: grading.IRON_LEVEL,
     ironable:
@@ -134,7 +150,7 @@ router.post('/grading/eigene/fertig', async (req, res) => {
   }
 });
 
-async function handle(req, res, fn) {
+async function handle(req, res, fn, target = '/grading') {
   try {
     const msg = await fn();
     if (msg) req.flash('success', msg);
@@ -142,8 +158,92 @@ async function handle(req, res, fn) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);
   }
-  res.redirect('/grading');
+  res.redirect(target);
 }
+
+// ---------- Spieler-Aufträge (#204, Etappe B) ----------
+// Karte bei einem Shop einreichen: Shop-Liste mit Rating und Vitrine, eigene Karten, eigene Aufträge
+router.get('/grading/einreichen', async (req, res) => {
+  await orders.expireDue();
+  const [shops, cards, mine] = await Promise.all([orders.shopsForOrders(), orders.submittable(req.user._id), orders.myOrders(req.user._id)]);
+  const pick = str(req.query.shop).toUpperCase();
+  res.render('grading-einreichen', {
+    title: 'Karte graden lassen',
+    shops: shops.map((s) => ({ ...s, own: s.id === String(req.user._id) })),
+    cards,
+    orders: mine,
+    pick,
+    orderDays: grading.settings.orderDays,
+    rateDays: orders.RATE_DAYS,
+    rarityByKey: catalog.rarityByKey,
+  });
+});
+
+router.post('/grading/einreichen', (req, res) =>
+  handle(
+    req,
+    res,
+    async () => {
+      const order = await orders.submit({ user: req.user, shopCode: str(req.body.shop), doc: str(req.body.doc) });
+      return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${grading.settings.orderDays} Tage Zeit.`;
+    },
+    '/grading/einreichen'
+  )
+);
+
+router.post('/grading/auftrag/:id/storno', (req, res) =>
+  handle(
+    req,
+    res,
+    async () => {
+      const o = await orders.cancel({ user: req.user, orderId: req.params.id });
+      return `Storniert – ${euro(o.price)} sind zurück auf deinem Konto.`;
+    },
+    '/grading/einreichen'
+  )
+);
+
+router.post('/grading/auftrag/:id/bewerten', (req, res) =>
+  handle(
+    req,
+    res,
+    async () => {
+      await orders.rate({ user: req.user, orderId: req.params.id, stars: Number.parseInt(str(req.body.stars), 10) });
+      return 'Danke für deine Bewertung!';
+    },
+    '/grading/einreichen'
+  )
+);
+
+// Öffentliche Seite eines Shops: Kennzahlen und Vitrine
+router.get('/grading/shop/:code', async (req, res) => {
+  const shop = await orders.shopByCode(req.params.code);
+  if (!shop) return res.status(404).render('error', { title: 'Grading-Shop', status: 404, message: 'Diesen Grading-Shop gibt es nicht.' });
+  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), rarityByKey: catalog.rarityByKey });
+});
+
+// Eigener Shop: Preis für Spieler-Aufträge und Vitrine
+router.post('/grading/preis', (req, res) =>
+  handle(req, res, async () => {
+    const price = parseEuro(str(req.body.price));
+    if (price === null) throw new UserError('Bitte gib einen gültigen Preis an.');
+    await orders.setPrice({ user: req.user, price });
+    return `Neuer Preis für Aufträge von Mitgliedern: ${euro(price)}.`;
+  })
+);
+
+router.post('/grading/vitrine', (req, res) =>
+  handle(
+    req,
+    res,
+    async () => {
+      const raw = req.body.doc;
+      await orders.setShowcase({ user: req.user, docs: (Array.isArray(raw) ? raw : raw ? [raw] : []).map(str) });
+      return 'Vitrine gespeichert.';
+    },
+    '/grading#vitrine'
+  )
+);
 
 router.post('/grading/annehmen', (req, res) =>
   handle(req, res, async () => {

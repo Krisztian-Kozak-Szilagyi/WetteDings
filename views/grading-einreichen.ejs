@@ -1,0 +1,114 @@
+<%- include('partials/head') %>
+<%#
+  Karte graden lassen (#204, Etappe B): Grading-Shops der Mitglieder mit Rating und Vitrine, eigene Karten zur Auswahl,
+  eigene Aufträge (stornieren, bewerten). Die Karte kommt als Slab mit Kürzel und Note des Shops zurück.
+%>
+<%
+  const STATUS = { wartet: 'Wartet', in_arbeit: 'In Arbeit', fertig: 'Zurück', abgelaufen: 'Abgelaufen – erstattet', storniert: 'Storniert – erstattet' };
+  const starText = (r) => (r.stars != null ? '★ ' + r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' (' + r.starCount + ')' : 'noch keine Bewertung');
+  const others = shops.filter((s) => !s.own);
+%>
+<div class="gr-page">
+  <div class="gr-head">
+    <h1>Karte graden lassen</h1>
+    <a class="btn btn-ghost btn-sm" href="/grading">Zum eigenen Shop</a>
+  </div>
+  <p class="muted">Schick eine Karte an den Grading-Shop eines Mitglieds. Er putzt sie, bügelt einen Knick und versiegelt sie in einem Slab – mit <b>seinem Kürzel und seiner Note</b>. Der Preis wird beim Einreichen abgebucht; arbeitet der Shop nicht innerhalb von <%= orderDays %> Tagen, bekommst du ihn zurück.</p>
+
+  <% if (orders.length) { %>
+    <section class="gr-done-wrap gs-orders">
+      <h2>Deine Aufträge</h2>
+      <ul class="gr-done">
+        <% orders.forEach((o) => { const c = o.cardInfo; %>
+          <li class="<%= c ? 'r-' + c.rarity : '' %>">
+            <span class="gr-done-thumb"><% if (c) { %><img src="<%= c.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+            <span class="gr-done-info">
+              <span><b><%= c ? c.name : o.card %></b> <span class="gr-dim">bei <a href="/grading/shop/<%= o.shopCode %>"><%= o.shopCode %></a> · <%= euro(o.price) %></span></span>
+              <span class="gr-done-meta">
+                <%= STATUS[o.status] || o.status %>
+                <% if (o.status === 'fertig' && o.result) { %> · Slab <b><%= o.shopCode %></b>, Note <b><%= o.result.grade %></b><% } %>
+                <% if (o.status === 'wartet' || o.status === 'in_arbeit') { %> · bis <%= date(o.expiresAt) %><% } %>
+                <% if (o.stars) { %> · deine Bewertung <%= '★'.repeat(o.stars) %><% } %>
+              </span>
+            </span>
+            <span class="gs-order-actions">
+              <% if (o.status === 'wartet') { %>
+                <form method="post" action="/grading/auftrag/<%= o._id %>/storno" data-confirm="Auftrag stornieren? Du bekommst <%= euro(o.price) %> zurück.">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="btn btn-ghost btn-sm" type="submit">Stornieren</button>
+                </form>
+              <% } else if (o.rateable) { %>
+                <form method="post" action="/grading/auftrag/<%= o._id %>/bewerten" class="gs-rate">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <select name="stars" aria-label="Sterne">
+                    <% for (let s = 5; s >= 1; s--) { %><option value="<%= s %>"><%= '★'.repeat(s) %></option><% } %>
+                  </select>
+                  <button class="btn btn-sm" type="submit">Bewerten</button>
+                </form>
+              <% } %>
+            </span>
+          </li>
+        <% }) %>
+      </ul>
+      <p class="muted small">Bewerten kannst du bis <%= rateDays %> Tage nach der Rückgabe – einmal je Auftrag.</p>
+    </section>
+  <% } %>
+
+  <% if (!others.length) { %>
+    <section class="gr-empty"><h2>Noch kein Shop offen</h2><p>Gerade nimmt kein Grading-Shop Karten von Mitgliedern an. Shops ab Stufe 3 (Slab-Werkstatt) erscheinen hier.</p></section>
+  <% } else { %>
+    <form method="post" action="/grading/einreichen" class="gs-form" data-confirm="Karte einreichen? Der Preis wird sofort abgebucht, die Karte ist bis zur Rückgabe gesperrt. Eine Folie geht dabei ab.">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <section class="gs-step">
+        <h2>1. Shop wählen</h2>
+        <div class="gs-shops">
+          <% others.forEach((s, i) => { const r = s.rating; %>
+            <label class="gs-shop">
+              <input type="radio" name="shop" value="<%= s.code %>" <%= (pick ? pick === s.code : i === 0) ? 'checked' : '' %> required>
+              <span class="gs-shop-head"><b><%= s.name %></b> <span class="gr-shop-code"><%= s.code %></span></span>
+              <span class="gs-shop-tier"><%= r.tier.label %> · Reputation <%= Math.round(r.reputation) %> · von <%= s.owner %></span>
+              <span class="gs-shop-facts"><%= starText(r) %> · Qualität <%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %> · Treffsicherheit <%= r.hitRate != null ? Math.round(r.hitRate) + ' %' : '–' %></span>
+              <span class="gs-shop-price"><b><%= euro(s.price) %></b> je Karte · <%= s.queue ? s.queue + ' in der Warteschlange' : 'keine Warteschlange' %></span>
+              <% if (s.showcase.length) { %>
+                <span class="gs-shop-showcase">
+                  <% s.showcase.slice(0, 4).forEach((x) => { %><span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: x.card, rarityLabel: (rarityByKey[x.rarity] || {}).label || '', slab: x.slab, id: x.id }) %></span><% }) %>
+                </span>
+              <% } %>
+              <a class="small" href="/grading/shop/<%= s.code %>">Shop ansehen →</a>
+            </label>
+          <% }) %>
+        </div>
+      </section>
+
+      <section class="gs-step">
+        <h2>2. Karte wählen</h2>
+        <% if (!cards.length) { %>
+          <p class="muted">Du hast gerade keine Karte, die sich einreichen lässt (Karten im Slab erst aufbrechen; Karten im Handel, auf Quest oder in der Vitrine sind gesperrt).</p>
+        <% } else { %>
+          <div class="tcg-grid gs-cards">
+            <% cards.forEach((c, i) => { const r = rarityByKey[c.rarity] || { label: '' }; %>
+              <label class="tcg-slot gs-card r-<%= c.rarity %>">
+                <input type="radio" name="doc" value="<%= c.id %>" <%= i === 0 ? 'checked' : '' %> required>
+                <% if (c.foiledAt) { %>
+                  <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c.card, rarityLabel: r.label }) %></span>
+                <% } else { %>
+                  <span class="tcg-art">
+                    <img src="<%= c.card.image %>" alt="" loading="lazy" width="720" height="1008">
+                    <% if (c.creased) { %><span class="tcg-crease-tag"><%= c.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+                    <% if (c.marks) { %><button type="button" class="hb-loupe"<%- copyViewAttrs(c.card, r.label, c.marks, { note: 'Exemplar' }) %> aria-label="<%= c.card.name %> genau ansehen" title="Genau ansehen">🔍</button><% } %>
+                  </span>
+                <% } %>
+                <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.foiledAt ? ' · Folie geht ab' : c.damaged ? ' · Spuren' : '' %></span>
+              </label>
+            <% }) %>
+          </div>
+          <button class="btn btn-primary btn-lg gr-glow" type="submit">Einreichen</button>
+        <% } %>
+      </section>
+    </form>
+  <% } %>
+</div>
+
+<%- include('partials/foil-modal') %>
+<%- include('partials/foot') %>
