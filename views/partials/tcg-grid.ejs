@@ -68,7 +68,7 @@
         <button type="button" class="tcg-slot<%= allLocked ? ' tcg-in-exam' : '' %> r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
           data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
           data-image="<%= c.image %>" data-count="<%= Math.max(0, freeN) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
-          data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>"
+          data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>" data-creased="<%= creasedBy[c.id] || 0 %>"
           <% if (lockedPlain) { %>data-locked="<%= lockedPlain %>" data-lock-label="<%= lockLabel %>"<% } %>
           <% if (allLocked) { %>title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)"<% } %>
           aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= lockedPlain ? ', ' + lockedPlain + ' davon ' + lockLabel : '' %><%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">

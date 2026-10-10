@@ -6,7 +6,6 @@ const User = require('../models/User');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const items = require('../items/itemService');
-const foil = require('../items/foil');
 const { str, UserError } = require('../lib/util');
 
 const router = express.Router();
@@ -29,7 +28,6 @@ router.get('/inventar', async (req, res) => {
     itemList,
     foiled,
     foilable,
-    foilSettings: foil.settings,
     // gerade foliertes Exemplar hervorheben (statt einer Erfolgsmeldung)
     highlight: foiled.some((f) => f.id === neu) ? neu : '',
     packImage: catalog.PACK_IMAGE,

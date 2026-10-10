@@ -3,7 +3,7 @@ const { TcgCard } = require('../models/Tcg');
 const { lockedDocs, isStateLock } = require('./locks');
 const catalog = require('./catalog');
 const foil = require('../items/foil');
-const { inventory } = require('./tcgService');
+const { inventory, bankPrice } = require('./tcgService');
 const { gradeStats, centerShift, visibleMarks } = require('../grading/condition');
 const { konfettiFor } = require('../cosmetics/logic');
 
@@ -41,7 +41,7 @@ async function collection(user) {
       marks: visibleMarks(d.condition && d.condition.defects, d._id, !!d.ironedAt),
       creased: !!d.creased,
       ironed: !!d.ironedAt,
-      value: r ? r.sell : 0,
+      value: bankPrice(r ? r.sell : 0, d), // Bankwert: ungebügelter Knick die Hälfte
       lock: lock || null, // 'handel' | 'quest' | 'dungeon' | 'duell'
     });
   }
@@ -65,6 +65,11 @@ async function collection(user) {
   const sell = (o) => (catalog.rarityByKey[o.rarity] ? catalog.rarityByKey[o.rarity].sell : 0);
   // Geschützte Karten und Boss-Karten (die Bank kauft sie nicht) zählen nicht zu den Duplikaten, die "Alle Duplikate verkaufen" verkauft, folierte Exemplare und solche im Handel auch nicht
   const protectedIds = new Set(user.tcgProtected || []);
+  // Wert der Duplikate einer Karte (n − 1 Stück): zuerst die mit ungebügeltem Knick (halber Preis), dann die übrigen
+  const dupWorth = (o, s, f = (v) => v) => {
+    const k = Math.min(o.creased || 0, o.n - 1);
+    return k * f(bankPrice(s, { creased: true })) + (o.n - 1 - k) * f(s);
+  };
   const dups = owned.filter((o) => !protectedIds.has(o._id) && !(catalog.rarityByKey[o.rarity] || {}).noBank).map((o) => ({ ...o, n: o.n - (o.foiled || 0) - (tradingByCard[o._id] || 0) })).filter((o) => o.n > 1);
   return {
     counts,
@@ -80,8 +85,9 @@ async function collection(user) {
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     collectionValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
     dupCount: dups.reduce((s, o) => s + o.n - 1, 0),
-    dupValue: dups.reduce((s, o) => s + sell(o) * (o.n - 1), 0),
-    dupKonfetti: dups.reduce((s, o) => s + konfettiFor(sell(o)) * (o.n - 1), 0), // dieselben Duplikate zerkleinert
+    // Knick-Exemplare gehen zuerst weg und bringen die Hälfte (tcgService.bankOrder/bankPrice, #204)
+    dupValue: dups.reduce((s, o) => s + dupWorth(o, sell(o)), 0),
+    dupKonfetti: dups.reduce((s, o) => s + dupWorth(o, sell(o), konfettiFor), 0), // dieselben Duplikate zerkleinert
   };
 }
 
