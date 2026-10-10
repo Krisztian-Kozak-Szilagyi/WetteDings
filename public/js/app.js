@@ -1070,7 +1070,7 @@
   var set = function (sel, text) { var el = box.querySelector(sel); if (el) el.textContent = text; };
   var recalc = function () {
     var jobs = val('gr_jobs');
-    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100 };
+    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100, iron: val('gr_pay_iron') * 100 };
     var premium = val('gr_premium');
     var ref = input.profiles[input.profiles.length - 1].key;
     var prev = null;
@@ -1079,6 +1079,7 @@
       var day = {};
       input.profiles.forEach(function (p) {
         var j = (pay.clean * p.clean) / 100;
+        if (l.steps.indexOf('iron') >= 0) j += (pay.iron * (input.creaseChance || 0) * (p.iron || 0)) / 100; // nur Karten mit Knick
         if (l.steps.indexOf('grade') >= 0) j += pay.grade * (p.exact + p.near / 2);
         if (l.steps.indexOf('slab') >= 0) j += (pay.slab * p.seal) / 100;
         j = j * (l.premium ? 1 + premium / 100 : 1) * input.factor;

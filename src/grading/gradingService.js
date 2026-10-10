@@ -11,21 +11,27 @@ const catalog = require('../tcg/catalog');
 const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
 const foil = require('../items/foil');
 const estimate = require('./estimate');
-const { rnd, chance, pick, weighted, rollDefects, gradeFor } = require('./condition');
+const { rnd, chance, pick, weighted, rollDefects, gradeFor, applyIron, creaseLine, ironCap, CREASE_SEGMENTS, PROFILES: CONDITION_PROFILES } = require('./condition');
 const { notify } = require('../services/notifyService');
 
 // ---------- Spielregeln (Demo-Werte) ----------
 const CONTRACT_DAYS = 10; // so lange kann man nach der Annahme nicht kündigen
 const MS_PER_SPOT = 800; // Mindestzeit pro Fleck (gegen automatisches "Fertig"-Senden)
+const MS_PER_SEGMENT = 300; // Mindestzeit pro geglättetem Stück Knick beim Bügeln (#204)
 
-// Arbeitsschritte: clean = Flecken entfernen, grade = Note bestimmen, slab = einschweißen.
-// Kosten, Lohn und Aufträge pro Tag stehen in den Einstellungen (Admin-Panel).
+// Arbeitsschritte: clean = Flecken entfernen, iron = Knick bügeln (nur Karten mit Knick, #204), grade = Note
+// bestimmen, slab = einschweißen. Kosten, Lohn und Aufträge pro Tag stehen in den Einstellungen (Admin-Panel).
 const LEVELS = [
   { level: 1, name: 'Putzstube', steps: ['clean'], perk: 'Karten reinigen und zurückschicken' },
-  { level: 2, name: 'Grading-Labor', steps: ['clean', 'grade'], perk: 'Karten benoten (1–10) – richtige Noten bringen Extra-Lohn' },
-  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'grade', 'slab'], perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
-  { level: 4, name: 'Premium-Labor', steps: ['clean', 'grade', 'slab'], premium: true, perk: 'Stammkunden zahlen besser – mehr Lohn' },
+  { level: 2, name: 'Grading-Labor', steps: ['clean', 'iron', 'grade'], perk: 'Knicke bügeln und Karten benoten (1–10) – richtige Noten bringen Extra-Lohn; auch eigene Karten bügeln' },
+  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'iron', 'grade', 'slab'], perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
+  { level: 4, name: 'Premium-Labor', steps: ['clean', 'iron', 'grade', 'slab'], premium: true, perk: 'Stammkunden zahlen besser – mehr Lohn' },
 ];
+// Ab dieser Stufe kann man bügeln – Kundenkarten und eigene Karten
+const IRON_LEVEL = 2;
+
+/** Arbeitsschritte eines Auftrags: Bügeln nur, wenn die Kundenkarte einen Knick hat */
+const stepsFor = (job) => levelInfo(job.level).steps.filter((s) => s !== 'iron' || !!(job.defects && job.defects.crease));
 
 // Karten der Kunden: erst ab Holo (wer schickt schon eine Crumpled zur Echtheitsprüfung?).
 // [Seltenheit, Gewicht, Lohn-Zuschlag in %] – je seltener, desto unwahrscheinlicher und desto mehr Lohn
@@ -44,9 +50,9 @@ const CUSTOMERS = ['Sammler Günther', 'Frau Hildebrandt', 'Kevin (12)', 'Onkel 
 
 // ---------- Einstellungen (Admin) ----------
 // jobs = Aufträge pro Tag (alle Stufen), pay = Lohn in Cent pro Schritt (clean: ganz sauber; grade: exakte Note,
-// ±1 = halb; slab: perfekt versiegelt), costs = Ausbaukosten in Cent für Stufe 2, 3, 4, premium = Lohn-Aufschlag
-// in % auf Stufe 4
-const DEFAULTS = { open: false, jobs: 10, pay: { clean: 2500, grade: 3000, slab: 3500 }, costs: [100000, 150000, 180000], premium: 30 };
+// ±1 = halb; slab: perfekt versiegelt; iron: Knick ganz glatt), costs = Ausbaukosten in Cent für Stufe 2, 3, 4,
+// premium = Lohn-Aufschlag in % auf Stufe 4
+const DEFAULTS = { open: false, jobs: 10, pay: { clean: 2500, grade: 3000, slab: 3500, iron: 2000 }, costs: [100000, 150000, 180000], premium: 30 };
 const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs] };
 const PAY = settings.pay; // gleiches Objekt – Änderungen im Admin-Panel gelten sofort
 const validCents = (v) => Number.isInteger(v) && v >= 0 && v <= 100000000;
@@ -104,10 +110,11 @@ function rollSpots() {
   return spots;
 }
 
-/** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %) */
-function payFor({ level, clean = 100, grade, guess, seal, rarity }) {
+/** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %), iron = wie glatt gebügelt (0–100 %) */
+function payFor({ level, clean = 100, grade, guess, seal, rarity, iron = null }) {
   const info = levelInfo(level);
   let pay = Math.round((PAY.clean * Math.max(0, Math.min(100, clean))) / 100);
+  if (info.steps.includes('iron') && Number.isFinite(iron)) pay += Math.round((PAY.iron * Math.max(0, Math.min(100, iron))) / 100);
   if (info.steps.includes('grade')) {
     const diff = Math.abs(grade - guess);
     if (diff === 0) pay += PAY.grade;
@@ -249,9 +256,43 @@ async function setGuess({ user, guess }) {
   const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
   if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
   if (!levelInfo(job.level).steps.includes('grade')) throw new UserError('Benoten kannst du erst ab Stufe 2.');
+  if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick – danach kannst du benoten.');
   const updated = await GradingJob.findOneAndUpdate({ _id: job._id, status: 'offen', guess: null }, { $set: { guess } }, { new: true }).lean();
   const final = updated || job; // schon benotet: die erste Note bleibt
   return { guess: final.guess, grade: final.grade };
+}
+
+// ---------- Bügeln (#204) ----------
+// Der Browser meldet, wie glatt der Knick wurde (smooth 0–100 %) und wie viele Brandflecken entstanden – wie beim
+// Putzen. Der Server klemmt die Werte und prüft, dass genug Zeit vergangen ist; die Folgen rechnet condition.applyIron.
+
+/** Mindestzeit fürs Bügeln in ms: je glatter, desto länger */
+const ironMinMs = (smooth) => (CREASE_SEGMENTS * MS_PER_SEGMENT * Math.max(0, Math.min(100, Number(smooth) || 0))) / 100;
+/** Werte vom Browser: { smooth: 0–100 ganzzahlig, burns: 0–CREASE_SEGMENTS } */
+const ironInput = ({ smooth, burns }) => ({
+  smooth: Math.round(Math.max(0, Math.min(100, Number.isFinite(smooth) ? smooth : 0))),
+  burns: Math.floor(Math.max(0, Math.min(CREASE_SEGMENTS, Number.isFinite(burns) ? burns : 0))),
+});
+
+/**
+ * Knick einer Kundenkarte bügeln (einmal, vor dem Benoten): neue Mängel und Note. Gibt { smooth, burns, cap,
+ * defects } zurück – die Mängel braucht der Arbeitstisch für die Auflösung nach dem Benoten.
+ */
+async function ironJob({ user, smooth, burns }) {
+  const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
+  if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
+  if (!stepsFor(job).includes('iron')) throw new UserError(levelInfo(job.level).steps.includes('iron') ? 'Diese Karte hat keinen Knick.' : `Bügeln kannst du erst ab Stufe ${IRON_LEVEL}.`);
+  if (job.iron) throw new UserError('Diese Karte ist schon gebügelt.');
+  const input = ironInput({ smooth, burns });
+  if (Date.now() - job.createdAt.getTime() < ironMinMs(input.smooth)) throw new UserError('So schnell kann niemand bügeln – versuch es noch einmal.');
+  const defects = applyIron(job.defects, input, creaseLine(job._id));
+  const updated = await GradingJob.findOneAndUpdate(
+    { _id: job._id, status: 'offen', iron: null, guess: null },
+    { $set: { iron: input, defects, grade: gradeFor(defects) } },
+    { new: true }
+  ).lean();
+  if (!updated) throw new UserError('Diese Karte ist schon gebügelt.');
+  return { ...input, cap: ironCap(input.smooth), defects: updated.defects };
 }
 
 /**
@@ -264,12 +305,14 @@ async function finishJob({ user, clean, seal }) {
     if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
     const info = levelInfo(job.level);
     const cleanQ = Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
-    // Putzen braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
-    if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
+    if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick.');
+    // Putzen (und Bügeln) braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
+    const ironMs = job.iron ? ironMinMs(job.iron.smooth) : 0;
+    if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100 + ironMs) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
     if (info.steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
     const sealQ = info.steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
     const card = catalog.cardById[job.card];
-    const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity });
+    const pay = payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
     const foilFound = sealQ > 0 && (await rollGradingFoil({ userId: user._id, session }));
     const shop = await GradingShop.findById(user._id).select('code').session(session).lean();
     Object.assign(job, { status: 'fertig', clean: cleanQ, seal: sealQ, pay, foilFound, shopCode: (shop && shop.code) || null, doneAt: new Date() });
@@ -292,6 +335,7 @@ function estimateInput() {
     factor: estimate.rarityFactor(CUSTOMER_RARITIES, (k) => (catalog.cardsByRarity[k] || []).length > 0),
     foilValue: ((foil.settings.gradingChance / 10000) * (folie ? folie.sell : 0)),
     profiles: estimate.PROFILES,
+    creaseChance: CONDITION_PROFILES.kunde.crease, // so viele Kundenkarten haben einen Knick (Bügeln, #204)
   };
 }
 
@@ -313,4 +357,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

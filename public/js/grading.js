@@ -9,8 +9,8 @@
   var zoomEl = bench.querySelector('[data-gr-zoom]');
   var obj = bench.querySelector('[data-gr-obj]');
   var hint = bench.querySelector('[data-gr-hint]');
-  var form = bench.querySelector('[data-gr-send]');
-  var csrf = form.elements._csrf.value;
+  var form = bench.querySelector('[data-gr-send]'); // fehlt beim Bügeln eigener Karten (nur ein Schritt, #204)
+  var csrf = form ? form.elements._csrf.value : bench.getAttribute('data-csrf');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var BRUSH = 16; // Radius des Putzlappens in Pixeln (zusätzlich zur Fleckgröße)
 
@@ -51,7 +51,19 @@
     if (n.side % 2 === 0) e.style.left = n.pos + '%';
     else e.style.top = n.pos + '%';
   });
-  if (d.crease) el('span', 'gr-crease', defects);
+  // Knick: eine Linie aus Stücken, die sich einzeln glatt bügeln lassen (#204); ohne Lage (alte Aufträge) wie bisher
+  var IRON_SEGMENTS = 10; // wie CREASE_SEGMENTS in src/grading/condition.js
+  var creaseEl = null;
+  var segs = [];
+  if (d.crease) {
+    creaseEl = el('span', 'gr-crease' + (job.crease ? ' is-line' : ''), defects);
+    if (job.crease) {
+      creaseEl.style.top = job.crease.y + '%';
+      creaseEl.style.transform = 'rotate(' + job.crease.angle + 'deg)';
+      for (var si = 0; si < IRON_SEGMENTS; si++) segs.push({ el: el('span', 'gr-crease-seg', creaseEl), flat: 0, heat: 0, burnt: false });
+    }
+    if (d.ironed || job.iron) creaseEl.classList.add('is-ironed');
+  }
   el('div', 'gr-glare', front);
 
   var back = el('div', 'gr-face gr-back', card);
@@ -143,6 +155,7 @@
       vx *= 0.9;
       vy *= 0.9;
     }
+    ironTick(now);
     render();
     requestAnimationFrame(loop);
   }
@@ -190,8 +203,8 @@
       var k = Number(btn.getAttribute('data-gr-zoom-step'));
       if (k) return setZoom(zoom * (k > 0 ? 1.25 : 1 / 1.25));
       setZoom(1);
-      // beim Messen und Ableuchten bleibt die Karte flach von vorn
-      if (mode === 'measure' || mode === 'uv') tweenTo(0, Math.round(ry / 360) * 360, 450);
+      // beim Messen, Ableuchten und Bügeln bleibt die Karte flach von vorn
+      if (mode === 'measure' || mode === 'uv' || mode === 'iron') tweenTo(0, Math.round(ry / 360) * 360, 450);
       else tweenTo(-10, Math.round(ry / 360) * 360 + 18, 450);
     });
   });
@@ -201,8 +214,9 @@
   var modeBtns = bench.querySelectorAll('[data-gr-mode]');
   var measureBtn = bench.querySelector('[data-gr-mode="measure"]');
   var uvBtn = bench.querySelector('[data-gr-mode="uv"]');
-  // Messen und UV-Lampe gibt es nur beim Benoten (Knopf sonst ausgeblendet)
-  var gradeTools = { measure: measureBtn, uv: uvBtn };
+  var ironBtn = bench.querySelector('[data-gr-mode="iron"]');
+  // Messen und UV-Lampe gibt es nur beim Benoten, das Bügeleisen nur beim Bügeln (Knopf sonst ausgeblendet)
+  var gradeTools = { measure: measureBtn, uv: uvBtn, iron: ironBtn };
   function setMode(m) {
     if (m in gradeTools && (!gradeTools[m] || gradeTools[m].hidden)) return;
     mode = m;
@@ -215,10 +229,11 @@
     stage.classList.toggle('mode-rotate', m === 'rotate');
     stage.classList.toggle('mode-measure', m === 'measure');
     stage.classList.toggle('mode-uv', m === 'uv');
+    stage.classList.toggle('mode-iron', m === 'iron');
     readout.hidden = m !== 'measure';
     if (m !== 'uv') uvOff();
-    if (m === 'measure' || m === 'uv') {
-      // Messen und Ableuchten gehen von vorn: Karte flach mit der Vorderseite zur Kamera legen
+    if (m === 'measure' || m === 'uv' || m === 'iron') {
+      // Messen, Ableuchten und Bügeln gehen von vorn: Karte flach mit der Vorderseite zur Kamera legen
       var front0 = Math.round(ry / 360) * 360;
       tweenTo(0, front0, 350);
       if (m === 'measure') renderGuides();
@@ -299,6 +314,66 @@
     return Math.round((sum / spots.length) * 100);
   }
 
+  // ---------- Bügeln (#204) ----------
+  // Das Bügeleisen glättet die Stücke des Knicks, die es berührt – und heizt sie dabei auf. Bleibt es zu lange auf
+  // derselben Stelle, brennt sie an (Brandfleck, einmal je Stück). Wegbewegen lässt die Stelle wieder abkühlen.
+  var IRON_R = 26; // Radius der Bügelfläche in Pixeln
+  var FLAT_RATE = 1.5; // Glätte pro Sekunde Kontakt (ein Stück braucht ≈ 0,7 s)
+  var HEAT_RATE = 0.9; // Hitze pro Sekunde Kontakt (Brandfleck nach ≈ 1,1 s am Stück)
+  var COOL_RATE = 0.6; // Abkühlen pro Sekunde ohne Kontakt
+  var ironAt = null; // Position des Bügeleisens, solange gedrückt
+  var ironLast = 0;
+  var ironDone = !!job.iron;
+  var ironBar = bench.querySelector('[data-gr-iron-bar]');
+  var ironGlow = el('div', 'gr-iron-glow', stage);
+  function ironTick(now) {
+    var dt = ironLast ? Math.min(0.05, (now - ironLast) / 1000) : 0;
+    ironLast = now;
+    if (!segs.length || ironDone) return;
+    var active = mode === 'iron' && step === 'iron' && ironAt && facingFront;
+    var hottest = 0;
+    segs.forEach(function (s) {
+      var hit = false;
+      if (active) {
+        var r = s.el.getBoundingClientRect();
+        var dx = ironAt.x - (r.left + r.width / 2);
+        var dy = ironAt.y - (r.top + r.height / 2);
+        hit = Math.sqrt(dx * dx + dy * dy) <= IRON_R + Math.max(r.width, r.height) / 2;
+      }
+      if (hit) {
+        s.flat = Math.min(1, s.flat + dt * FLAT_RATE);
+        s.heat += dt * HEAT_RATE;
+        if (s.heat >= 1 && !s.burnt) {
+          s.burnt = true;
+          el('span', 'gr-burn', s.el);
+        }
+        if (s.heat > hottest) hottest = s.heat;
+      } else s.heat = Math.max(0, s.heat - dt * COOL_RATE);
+      s.el.style.setProperty('--flat', s.flat.toFixed(3));
+      s.el.style.setProperty('--heat', Math.min(1, s.heat).toFixed(3));
+    });
+    if (ironBar) {
+      ironBar.style.width = Math.round(Math.min(1, hottest) * 100) + '%';
+      ironBar.parentNode.classList.toggle('is-hot', hottest > 0.7);
+    }
+  }
+  function ironMove(x, y) {
+    ironAt = { x: x, y: y };
+    var r = stage.getBoundingClientRect();
+    ironGlow.style.setProperty('--ix', x - r.left + 'px');
+    ironGlow.style.setProperty('--iy', y - r.top + 'px');
+    stage.classList.add('iron-on');
+  }
+  function ironUp() {
+    ironAt = null;
+    stage.classList.remove('iron-on');
+  }
+  /** Ergebnis fürs Server: geglättet in % und Zahl der Brandflecken */
+  function ironResult() {
+    var flat = segs.reduce(function (a, s) { return a + s.flat; }, 0);
+    return { smooth: segs.length ? Math.round((flat / segs.length) * 100) : 0, burns: segs.filter(function (s) { return s.burnt; }).length };
+  }
+
   // ---------- Messen (Zentrierung) ----------
   // Zwei Messlinien auf der Vorderseite (nur links/rechts – für die Note zählt nur die seitliche Zentrierung).
   // Wer sie an die Kanten des Kartenbilds zieht, liest die Ränder in mm (Kartenbreite 63 mm) und das Verhältnis ab –
@@ -374,6 +449,7 @@
       return;
     }
     if (mode === 'uv') return uvAt(e.clientX, e.clientY); // Ableuchten dreht die Karte nicht
+    if (mode === 'iron') return ironMove(e.clientX, e.clientY); // Bügeln auch nicht
     tween = null;
     if (mode === 'clean') rubAt(e.clientX, e.clientY, 6);
   });
@@ -389,6 +465,7 @@
       if (drag.guide) moveGuide(drag.guide, e.clientX);
       return;
     }
+    if (mode === 'iron') return ironMove(e.clientX, e.clientY);
     var dx = e.clientX - drag.x;
     var dy = e.clientY - drag.y;
     drag.x = e.clientX;
@@ -408,6 +485,7 @@
   function endDrag() {
     drag = null;
     stage.classList.remove('is-pressed');
+    ironUp();
   }
   stage.addEventListener('pointerup', endDrag);
   stage.addEventListener('pointercancel', endDrag);
@@ -421,6 +499,7 @@
     if (e.key === 'p' || e.key === 'P') return setMode('clean');
     if (e.key === 'm' || e.key === 'M') return setMode('measure');
     if (e.key === 'u' || e.key === 'U') return setMode('uv');
+    if (e.key === 'b' || e.key === 'B') return setMode('iron');
     if (mode === 'measure') {
       var stepV = e.shiftKey ? 0.01 : 0.001;
       var nudge = { ArrowLeft: -stepV, ArrowRight: stepV }[e.key];
@@ -436,10 +515,12 @@
 
 
   // ---------- Arbeitsschritte ----------
-  var steps = (job.steps || ['clean']).concat(['send']);
+  // Schon gebügelt (Seite neu geladen): der Schritt fällt weg. Eigene Karten haben nur den Schritt Bügeln.
+  var steps = (job.steps || ['clean']).filter(function (s) { return s !== 'iron' || !ironDone; }).concat(form ? ['send'] : []);
   var step = null;
   var HINTS = {
     clean: { clean: 'Putzen: mit gedrückter Maustaste über die Flecken reiben', rotate: 'Drehen: ziehen, um die Karte zu wenden · Mausrad = Zoom' },
+    iron: { iron: 'Bügeln: langsam über den Knick fahren – nicht stehen bleiben, sonst brennt es an · Mausrad = Zoom', rotate: 'Nimm das Bügeleisen (Taste B)' },
     grade: {
       clean: 'Putzen: mit gedrückter Maustaste reiben',
       rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom',
@@ -457,22 +538,65 @@
   function setStep(name) {
     step = name;
     bench.querySelectorAll('[data-gr-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-gr-panel') !== name; });
-    var idx = steps.indexOf(name);
+    // Schritte in der Leiste nach ihrem Namen (ein schon erledigtes Bügeln steht als erledigt da)
+    var order = [].slice.call(bench.querySelectorAll('[data-gr-steps] li')).map(function (li) { return li.getAttribute('data-step'); });
+    var idx = order.indexOf(name);
     bench.querySelectorAll('[data-gr-steps] li').forEach(function (li, i) {
-      li.classList.toggle('is-done', i < idx);
+      li.classList.toggle('is-done', i < idx || (ironDone && order[i] === 'iron'));
       li.classList.toggle('is-active', i === idx);
     });
-    // Messen und UV-Lampe gibt es nur beim Benoten
+    // Messen und UV-Lampe gibt es nur beim Benoten, das Bügeleisen nur beim Bügeln
     if (measureBtn) measureBtn.hidden = name !== 'grade';
     if (uvBtn) uvBtn.hidden = name !== 'grade';
-    setMode(name === 'clean' ? 'clean' : 'rotate');
+    if (ironBtn) ironBtn.hidden = name !== 'iron';
+    setMode(name === 'clean' ? 'clean' : name === 'iron' ? 'iron' : 'rotate');
     if (name === 'slab') startMeter();
   }
   function nextStep() {
     var i = steps.indexOf(step);
     if (i < steps.length - 1) setStep(steps[i + 1]);
   }
-  bench.querySelector('[data-gr-clean-ok]').addEventListener('click', nextStep);
+  var cleanOk = bench.querySelector('[data-gr-clean-ok]');
+  if (cleanOk) cleanOk.addEventListener('click', nextStep);
+
+  // Bügeln abschließen: Ergebnis an den Server (nur einmal), der antwortet mit der neuen Obergrenze und den Mängeln
+  var ironOk = bench.querySelector('[data-gr-iron-ok]');
+  var ironRes = bench.querySelector('[data-gr-iron-result]');
+  if (ironOk) {
+    ironOk.addEventListener('click', function () {
+      var r = ironResult();
+      ironOk.disabled = true;
+      fetch(job.ironUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ _csrf: csrf, smooth: String(r.smooth), burns: String(r.burns) }),
+        credentials: 'same-origin',
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (res) {
+          if (res.error) throw new Error(res.error);
+          ironDone = true;
+          ironUp();
+          if (res.defects) d = res.defects; // für die Auflösung nach dem Benoten
+          if (creaseEl) creaseEl.classList.add('is-ironed');
+          ironRes.className = 'gr-iron-result ' + (res.burns ? 'gr-bad' : 'gr-ok');
+          ironRes.textContent = 'Zu ' + res.smooth + ' % glatt – der Knick begrenzt die Note jetzt auf ' + res.cap + '.' + (res.burns ? ' ' + res.burns + ' Brandfleck' + (res.burns === 1 ? '' : 'e') + ' (je −1).' : '');
+          ironRes.hidden = false;
+          if (job.own) {
+            // eigene Karte: fertig – zurück zur Liste
+            if (job.backUrl) setTimeout(function () { window.location.href = job.backUrl; }, 2200);
+            return;
+          }
+          setTimeout(nextStep, 1300);
+        })
+        .catch(function (err) {
+          ironOk.disabled = false;
+          ironRes.className = 'gr-iron-result gr-bad';
+          ironRes.textContent = err.message || 'Das hat nicht geklappt – bitte noch einmal.';
+          ironRes.hidden = false;
+        });
+    });
+  }
 
   // Benoten: Die Note geht sofort an den Server (nur einmal möglich), danach zeigt der Tisch die Auflösung
   var chosen = null;
@@ -508,8 +632,9 @@
     var c = d.centering;
     var worst = c ? c.lr || 50 : 50; // nur links/rechts zählt
     if (worst > 55) card.classList.add('is-offcenter');
-    var capBy = d.crease && 4 <= job.centerCap ? 'Knick' : job.centerCap < 10 ? 'Zentrierung ' + worst + '/' + (100 - worst) : '';
-    var cap = d.crease ? Math.min(4, job.centerCap) : job.centerCap;
+    var creaseCap = d.creaseCap || 4; // gebügelt höher (#204)
+    var capBy = d.crease && creaseCap <= job.centerCap ? (d.ironed ? 'gebügelter Knick' : 'Knick') : job.centerCap < 10 ? 'Zentrierung ' + worst + '/' + (100 - worst) : '';
+    var cap = d.crease ? Math.min(creaseCap, job.centerCap) : job.centerCap;
     var count = (d.scratches || []).length + (d.corners || []).length + (d.edges || []).length;
     var calc = 'Obergrenze ' + cap + (capBy ? ' (' + capBy + ')' : '') + (count ? ' − ' + minus.join(', ') : '') + ' = Note ' + grade;
     verdict.className = 'gr-verdict ' + (diff === 0 ? 'is-right' : diff === 1 ? 'is-close' : 'is-wrong');
@@ -605,7 +730,7 @@
   }
 
   // Zurückschicken: Karte fliegt davon, dann wird das Formular abgeschickt
-  form.addEventListener('submit', function (e) {
+  if (form) form.addEventListener('submit', function (e) {
     if (sent) return;
     e.preventDefault();
     sent = true;

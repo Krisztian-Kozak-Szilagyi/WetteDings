@@ -115,6 +115,7 @@
           <label class="field"><span>Lohn Putzen in €</span><input type="text" name="gr_pay_clean" inputmode="decimal" value="<%= (gradingSettings.pay.clean / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Benoten in €</span><input type="text" name="gr_pay_grade" inputmode="decimal" value="<%= (gradingSettings.pay.grade / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Versiegeln in €</span><input type="text" name="gr_pay_slab" inputmode="decimal" value="<%= (gradingSettings.pay.slab / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Lohn Bügeln in € <em>(Knick ganz glatt)</em></span><input type="text" name="gr_pay_iron" inputmode="decimal" value="<%= (gradingSettings.pay.iron / 100).toFixed(2).replace('.', ',') %>" required></label>
           <% gradingLevels.slice(1).forEach((l, i) => { %>
             <label class="field"><span>Ausbau auf Stufe <%= l.level %> („<%= l.name %>“) in €</span><input type="text" name="gr_cost_<%= l.level %>" inputmode="decimal" value="<%= (gradingSettings.costs[i] / 100).toFixed(2).replace('.', ',') %>" required></label>
           <% }) %>
@@ -142,7 +143,7 @@
               </table>
             </div>
             <p class="muted small">Zum Vergleich: Tagesbonus <strong data-gc-bonus><%= euro(dailyBonus()) %></strong> pro Tag – entfällt, solange man im Grading-Shop arbeitet. „Mehr als Stufe davor“ und „Ausbau bezahlt nach“ (= Ausbaukosten ÷ Mehrverdienst) (Profil „<%= gc.input.profiles[gc.input.profiles.length - 1].label %>“).</p>
-            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt').join(' · ') %>.</p>
+            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt, ' + p.iron + ' % glatt gebügelt').join(' · ') %>. Gebügelt wird nur bei Kundenkarten mit Knick (<%= pct(gc.input.creaseChance) %>).</p>
             <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Folien)</h3>
             <% if (gc.actual.length) { %>
               <div class="table-wrap">

@@ -2,7 +2,7 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const grading = require('../grading/gradingService');
 const catalog = require('../tcg/catalog');
-const { centerShift, centeringCap, CENTERING } = require('../grading/condition');
+const { centerShift, centeringCap, CENTERING, creaseLine } = require('../grading/condition');
 
 // Zentrierungs-Bereiche fürs Benoten: { from, to, cap } in % der breiteren Seite, beide Grenzen eingeschlossen
 const ratio = (v) => `${v}/${100 - v}`;
@@ -43,7 +43,7 @@ router.get('/grading', async (req, res) => {
     centeringScale,
     jobData: job
       ? {
-          steps: grading.levelInfo(job.level).steps,
+          steps: grading.stepsFor(job), // Bügeln nur bei Karten mit Knick (#204)
           card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
           customer: job.customer,
           shop: state.shop ? { name: state.shop.name, code: state.shop.code } : null, // Kürzel fürs Slab-Etikett (#204)
@@ -55,6 +55,10 @@ router.get('/grading', async (req, res) => {
           centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
           centerScale: centeringScale.map(({ from, to, cap }) => ({ from, to, cap })), // fürs Messwerkzeug: Bereich → Höchstnote
           minMs: job.spots.length * grading.MS_PER_SPOT,
+          // Bügeln (#204): Lage des Knicks, schon gebügelt? und wohin der Tisch das Ergebnis schickt
+          crease: job.defects && job.defects.crease ? creaseLine(job._id) : null,
+          iron: job.iron || null,
+          ironUrl: '/grading/buegeln',
           startedAt: new Date(job.createdAt).getTime(),
           // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen
           guess: job.guess,
@@ -118,6 +122,16 @@ router.post('/grading/auftrag', (req, res) =>
 router.post('/grading/benoten', async (req, res) => {
   try {
     res.json(await grading.setGuess({ user: req.user, guess: Number.parseInt(str(req.body.grade), 10) }));
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Knick bügeln (vom Arbeitstisch per fetch, #204) – Antwort: neue Obergrenze und Mängel für die Auflösung
+router.post('/grading/buegeln', async (req, res) => {
+  try {
+    res.json(await grading.ironJob({ user: req.user, smooth: Number(str(req.body.smooth)), burns: Number(str(req.body.burns)) }));
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     res.status(400).json({ error: err.message });

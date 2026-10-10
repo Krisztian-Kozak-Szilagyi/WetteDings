@@ -501,7 +501,7 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   }
   const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
-  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab) };
+  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
   if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');

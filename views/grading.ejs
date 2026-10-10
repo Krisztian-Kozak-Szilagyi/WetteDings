@@ -75,6 +75,7 @@
             <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
               <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
               <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
+              <% if (jobData.steps.includes('iron')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="iron" title="Bügeln (Taste B)" hidden><span aria-hidden="true">♨️</span> Bügeln</button><% } %>
               <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
               <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode gr-mode-uv" role="radio" data-gr-mode="uv" title="UV-Lampe: Macken an Ecken und Kanten leuchten auf (Taste U)" hidden><span aria-hidden="true">🔦</span> UV-Lampe</button><% } %>
             </div>
@@ -88,6 +89,7 @@
 
           <ol class="gr-steps" data-gr-steps>
             <li data-step="clean">Reinigen</li>
+            <% if (jobData.steps.includes('iron')) { %><li data-step="iron">Bügeln</li><% } %>
             <% if (jobData.steps.includes('grade')) { %><li data-step="grade">Benoten</li><% } %>
             <% if (jobData.steps.includes('slab')) { %><li data-step="slab">Versiegeln</li><% } %>
             <li data-step="send">Zurückschicken</li>
@@ -101,6 +103,10 @@
             </div>
           </div>
 
+          <% if (jobData.steps.includes('iron')) { %>
+          <%- include('partials/grading-iron-panel', { pay }) %>
+          <% } %>
+
           <% if (jobData.steps.includes('grade')) { %>
           <div class="gr-panel" data-gr-panel="grade" hidden>
             <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an den linken und rechten Rand des Kartenbilds und liest die seitliche Zentrierung ab. Die <b>UV-Lampe</b> lässt bestoßene Ecken und Kantenmacken grün aufleuchten – fahr damit langsam am Rand entlang.</p>
@@ -111,7 +117,7 @@
                 <div class="gr-flow-body">
                   <span class="gr-flow-title">Obergrenze <small>der niedrigste Wert zählt</small></span>
                   <div class="gr-cap-row">
-                    <span class="gr-cap-crease"><span>Knick</span><b>4</b></span>
+                    <span class="gr-cap-crease" title="Gebügelt: höher – je glatter, desto mehr (höchstens 9)"><span>Knick</span><b>4</b><small>gebügelt bis 9</small></span>
                     <div class="gr-cap-center">
                       <small>Zentrierung <span>– Rand ungleich breit</span></small>
                       <ol class="gr-center-scale">

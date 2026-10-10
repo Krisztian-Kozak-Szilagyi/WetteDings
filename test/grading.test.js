@@ -105,3 +105,26 @@ test('#204: Shop-Name und Kürzel – vereinheitlicht, BFW reserviert', () => {
   assert.throws(() => validShopName({ name: 'Shop', code: 'Ä-1' }), /2 bis 5/);
   assert.throws(() => validShopName({ name: 'Shop', code: 'bfw' }), /reserviert/);
 });
+
+test('#204: Bügeln – nur ab Stufe 2 und nur bei Karten mit Knick; Lohn nach Glätte', () => {
+  const { stepsFor, ironInput, ironMinMs, MS_PER_SEGMENT, IRON_LEVEL } = require('../src/grading/gradingService');
+  const knick = { scratches: [], corners: [], edges: [], crease: true };
+  const glatt = { ...knick, crease: false };
+  assert.equal(IRON_LEVEL, 2);
+  assert.deepEqual(stepsFor({ level: 1, defects: knick }), ['clean']);
+  assert.deepEqual(stepsFor({ level: 2, defects: knick }), ['clean', 'iron', 'grade']);
+  assert.deepEqual(stepsFor({ level: 2, defects: glatt }), ['clean', 'grade']);
+  assert.deepEqual(stepsFor({ level: 4, defects: knick }), ['clean', 'iron', 'grade', 'slab']);
+  assert.deepEqual(stepsFor({ level: 3, defects: undefined }), ['clean', 'grade', 'slab']);
+  // Werte vom Browser werden geklemmt
+  assert.deepEqual(ironInput({ smooth: 150, burns: 99 }), { smooth: 100, burns: 10 });
+  assert.deepEqual(ironInput({ smooth: NaN, burns: -2 }), { smooth: 0, burns: 0 });
+  assert.deepEqual(ironInput({ smooth: 66.6, burns: 2.9 }), { smooth: 67, burns: 2 });
+  assert.equal(ironMinMs(100), 10 * MS_PER_SEGMENT);
+  assert.equal(ironMinMs(0), 0);
+  // Lohn: Bügeln nur ab Stufe 2 und nur, wenn gebügelt wurde
+  assert.equal(payFor({ level: 2, grade: 8, guess: 8, iron: 100 }), PAY.clean + PAY.grade + PAY.iron);
+  assert.equal(payFor({ level: 2, grade: 8, guess: 8, iron: 50 }), PAY.clean + PAY.grade + PAY.iron / 2);
+  assert.equal(payFor({ level: 2, grade: 8, guess: 8 }), PAY.clean + PAY.grade);
+  assert.equal(payFor({ level: 1, iron: 100 }), PAY.clean);
+});

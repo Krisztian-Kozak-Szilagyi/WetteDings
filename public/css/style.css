@@ -3907,6 +3907,36 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-mode-uv.is-on { border-color: #a855f7; background: color-mix(in srgb, #7c3aed 45%, rgba(10, 10, 20, .7)); box-shadow: 0 0 14px rgba(168, 85, 247, .55); }
 @media (prefers-reduced-motion: reduce) { .gr-uv-shade, .gr-uv-light, .gr-corner, .gr-nick { transition: none; } }
 
+/* Bügeln (#204): Knick als Linie aus Stücken – jedes wird mit --flat glatter und glüht mit --heat */
+.gr-crease.is-line { left: 0; width: 100%; height: 4px; transform-origin: 50% 50%; translate: 0 -50%; display: flex; opacity: 1; background: none; }
+.gr-crease-seg {
+  position: relative; flex: 1; height: 100%;
+  opacity: calc(.85 - var(--flat, 0) * .75);
+  background: linear-gradient(rgba(255, 255, 255, .6), rgba(0, 0, 0, .5));
+  box-shadow: 0 0 calc(var(--heat, 0) * 10px) rgba(255, 120, 30, var(--heat, 0));
+}
+.gr-crease.is-ironed .gr-crease-seg { --heat: 0; }
+.gr-burn {
+  position: absolute; left: 50%; top: 50%; width: 14px; height: 9px; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(60, 30, 10, .95) 0 35%, rgba(120, 60, 20, .6) 60%, transparent 75%);
+}
+.gr-card.is-revealed .gr-crease.is-line { background: none; }
+.gr-card.is-revealed .gr-crease-seg { background: #ef4444; opacity: calc(.95 - var(--flat, 0) * .6); }
+.gr-card.is-revealed .gr-burn { outline: 2px solid #ef4444; outline-offset: 1px; }
+/* Bügeleisen: warmer Schein unter dem Zeiger, solange gedrückt */
+.gr-stage.mode-iron { cursor: crosshair; }
+.gr-iron-glow {
+  position: absolute; z-index: 4; left: var(--ix, 50%); top: var(--iy, 50%); width: 52px; height: 52px; translate: -50% -50%;
+  border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity .15s ease;
+  background: radial-gradient(circle, rgba(255, 190, 120, .45) 0 30%, rgba(255, 120, 40, .2) 60%, transparent 72%);
+  box-shadow: 0 0 0 1px rgba(255, 200, 150, .5);
+}
+.gr-stage.mode-iron.iron-on .gr-iron-glow { opacity: 1; }
+.gr-iron-meter { height: 8px; margin: 12px 0 0; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--color-divider) 60%, transparent); }
+.gr-iron-meter span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #fbbf24, #f97316); transition: width .1s linear; }
+.gr-iron-meter.is-hot span { background: linear-gradient(90deg, #f97316, #ef4444); box-shadow: 0 0 10px #ef4444; }
+.gr-iron-result { margin: 10px 0 0; font-size: 14px; }
+
 /* Messen (Zentrierung): Messlinien auf der Vorderseite, Anzeige der Ränder unten auf der Bühne */
 .gr-stage.mode-measure { cursor: crosshair; }
 .gr-measure { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: none; }
