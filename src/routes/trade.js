@@ -45,6 +45,7 @@ const viewHelpers = () => ({
   offerLabel,
   perspective: lines.perspective,
   lineLabel: lines.lineLabel,
+  stateLabel: lines.stateLabel,
   countText: lines.countText,
   roleOf: trade.roleOf,
   canAccept: trade.canAccept,
@@ -83,7 +84,8 @@ function presetOf(list) {
 }
 
 /**
- * Was ein Mitglied in einem Angebot geben kann: freie Karten (unfoliert) je Karte, folierte Exemplare und Gegenstände.
+ * Was ein Mitglied in einem Angebot geben kann: freie Karten (unfoliert, unbeschädigt) je Karte, Exemplare (folierte,
+ * Slabs und beschädigte – #204: die wählt man einzeln) und Gegenstände.
  * own = eigene Sammlung (nur freie; Exemplare, die dieses Angebot selbst sperrt, zählen wieder als frei),
  * sonst fremde Sammlung (alles, was sie besitzt – gesperrt darf es sein, geprüft wird beim Annehmen).
  */
@@ -94,13 +96,23 @@ async function pickable(member, { own, keep = [] } = {}) {
   const keepItems = {};
   const keepCopies = new Set();
   for (const l of keep.filter((x) => x.doc)) {
-    if (l.foiledAt) keepCopies.add(String(l.doc));
+    if (l.copy || l.foiledAt) keepCopies.add(String(l.doc));
     else if (items.itemByCardId(l.card)) keepItems[l.card] = (keepItems[l.card] || 0) + 1;
     else keepCards[l.card] = (keepCards[l.card] || 0) + 1;
   }
+  // Beschädigte Exemplare zählen nicht als "Karte" – sie stehen einzeln in marked
+  const marked = Object.entries(coll.markedCopies || {})
+    .flatMap(([id, list]) => list.map((m) => ({ ...m, card: catalog.cardById[id], lock: keepCopies.has(m.id) ? null : m.lock })))
+    .filter((m) => m.card && (!own || !m.lock));
+  const damagedBy = {};
+  const damagedFree = {};
+  for (const [id, list] of Object.entries(coll.markedCopies || {})) {
+    damagedBy[id] = list.length;
+    damagedFree[id] = list.filter((m) => !m.lock).length;
+  }
   const cards = catalog.CARDS.map((c) => {
-    const plain = (coll.counts[c.id] || 0) - (coll.foiledByCard[c.id] || 0);
-    const max = own ? Math.max(0, (coll.free[c.id] || 0) + (keepCards[c.id] || 0)) : Math.max(0, plain);
+    const plain = (coll.counts[c.id] || 0) - (coll.foiledByCard[c.id] || 0) - (damagedBy[c.id] || 0);
+    const max = own ? Math.max(0, (coll.free[c.id] || 0) - (damagedFree[c.id] || 0) + (keepCards[c.id] || 0)) : Math.max(0, plain);
     return { card: c, max, owned: plain };
   }).filter((x) => x.max > 0);
   const foiled = Object.entries(coll.foiledCopies)
@@ -113,7 +125,7 @@ async function pickable(member, { own, keep = [] } = {}) {
       return { card: items.itemCard(it), max: own ? it.count - it.inTrade + (keepItems[id] || 0) : it.count };
     })
     .filter((x) => x.max > 0);
-  return { cards, foiled, goods, counts: coll.counts };
+  return { cards, foiled, marked, goods, counts: coll.counts };
 }
 
 /**
@@ -125,6 +137,7 @@ function wishPool(counts) {
   return {
     cards: catalog.CARDS.filter((c) => visible.has(c.rarity)).map((c) => ({ card: c, max: trade.MAX_LINES, owned: counts[c.id] || 0 })),
     foiled: [],
+    marked: [],
     goods: items.ITEM_TYPES.filter((t) => t.tradable).map((t) => ({ card: items.itemCard(t), max: trade.MAX_LINES })),
     counts,
   };

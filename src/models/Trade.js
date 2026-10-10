@@ -24,6 +24,8 @@ const lineSchema = new Schema(
     damaged: { type: Boolean, default: false }, // Kratzer oder Knick
     creased: { type: Boolean, default: false }, // davon: Knick
     ironed: { type: Boolean, default: false }, // der Knick ist gebügelt
+    // Sichtbare Spuren eines unfolierten Exemplars ({ s, c, i } aus grading/condition.visibleMarks) – Großansicht im Angebot
+    marks: { type: Schema.Types.Mixed, default: null },
   },
   { _id: false }
 );

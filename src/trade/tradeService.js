@@ -9,7 +9,8 @@ const { inTransaction } = require('../services/betService');
 const { UserError, str, parseEuro } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
-const { lockedDocs, isLocked, claim } = require('../tcg/locks');
+const { lockedDocs, isLocked, isStateLock, claim } = require('../tcg/locks');
+const { visibleMarks } = require('../grading/condition');
 const { markSeen } = require('../tcg/tcgService');
 const foil = require('../items/foil');
 const taxService = require('../services/taxService');
@@ -48,7 +49,7 @@ function validateOffer({ give = [], want = [], price, extraFrom = null, listing 
   const copies = [...give, ...want].map((l) => l.copy || l.doc).filter(Boolean).map(String);
   if (new Set(copies).size !== copies.length) throw new UserError('Ein Exemplar kann nur einmal im Angebot stehen.');
   if (!Number.isInteger(price) || price < 0 || price > MAX_PRICE) throw new UserError('Bitte gib einen gültigen Betrag an.');
-  if (listing && want.some((l) => l.copy)) throw new UserError('Auf dem Markt kannst du dir nur Karten wünschen, kein bestimmtes foliertes Exemplar.');
+  if (listing && want.some((l) => l.copy)) throw new UserError('Auf dem Markt kannst du dir nur Karten wünschen, kein bestimmtes Exemplar.');
   if (listing && !want.length && price < 1) throw new UserError('Bitte gib einen Preis an.');
   if (!price) {
     if (!give.length || !want.length) throw new UserError('Wer keine Karte gibt, muss etwas zahlen – bitte gib einen Betrag an.');
@@ -139,6 +140,39 @@ const sameLines = (a, b) => {
   return ka.length === kb.length && ka.every((k, i) => k === kb[i]);
 };
 
+// ---------- Exemplare (#204) ----------
+// Eine Position "Karte" ({ card }) bekommt ein unfoliertes, unbeschädigtes Exemplar. Alles, was man einem Exemplar ansieht,
+// wird gezielt als Exemplar gehandelt ({ copy }): in Folie, im Slab oder mit Kratzern bzw. Knick.
+/** Felder, mit denen ein Exemplar ins Angebot geht (zur Anzeige; beim Annehmen mit dem aktuellen Stand verglichen) */
+const COPY_FIELDS = '_id card foiledAt slab damaged creased ironedAt condition.defects.scratches condition.defects.crease';
+function copyFields(doc) {
+  const damaged = !!doc.damaged;
+  return {
+    foiledAt: doc.foiledAt || null,
+    slab: doc.slab ? { code: doc.slab.code, grade: doc.slab.grade } : null,
+    grade: doc.slab ? doc.slab.grade : null, // Note nur vom Slab
+    damaged,
+    creased: !!doc.creased,
+    ironed: !!(doc.creased && doc.ironedAt),
+    marks: damaged && !doc.foiledAt ? visibleMarks(doc.condition && doc.condition.defects, doc._id, !!doc.ironedAt) : null,
+  };
+}
+const NO_COPY = { foiledAt: null, slab: null, grade: null, damaged: false, creased: false, ironed: false, marks: null };
+/** Felder einer Position übernehmen (ohne Exemplar-Angaben: die einer Karte ohne Folie und Schaden) */
+const keepFields = (l) => ({ ...NO_COPY, ...Object.fromEntries(Object.keys(NO_COPY).filter((k) => l[k] != null).map((k) => [k, l[k]])) });
+/** Gezielt handelbares Exemplar? Folie, Slab oder sichtbarer Schaden – ein unbeschädigtes ist "eine Karte" */
+const isCopy = (doc) => !!doc && (!!doc.foiledAt || !!doc.damaged);
+/**
+ * Hat sich das Exemplar seit dem Angebot sichtbar verändert (Folie ab, neuer Kratzer, Knick, gebügelt)? Folierte
+ * Exemplare nehmen keinen Schaden – bei ihnen zählt nur, ob die Folie noch drauf ist.
+ */
+function changedCopy(line, now) {
+  if (!!line.foiledAt !== !!now.foiledAt) return true;
+  if (now.foiledAt) return false;
+  const scratches = (m) => (m && m.s ? m.s.length : 0);
+  return !!line.damaged !== !!now.damaged || !!line.creased !== !!now.creased || !!line.ironed !== !!now.ironed || scratches(line.marks) !== scratches(now.marks);
+}
+
 /**
  * Neue Positionen einer Seite mit den bisherigen abgleichen: Gleiche Karte (und gleiches verlangtes Exemplar)
  * behält ihr schon gesperrtes Exemplar. Jede alte Position wird höchstens einmal übernommen.
@@ -147,9 +181,9 @@ function carryLines(next, prev) {
   const pool = [...(prev || [])];
   return next.map((l) => {
     const i = pool.findIndex((p) => p.card === l.card && String(p.copy || '') === String(l.copy || '') && (!l.doc || String(p.doc) === String(l.doc)));
-    if (i === -1) return { card: l.card, copy: l.copy || null, doc: l.doc || null, foiledAt: l.foiledAt || null, grade: l.grade == null ? null : l.grade };
+    if (i === -1) return { card: l.card, copy: l.copy || null, doc: l.doc || null, ...keepFields(l) };
     const [p] = pool.splice(i, 1);
-    return { card: p.card, copy: p.copy || null, doc: p.doc || null, foiledAt: p.foiledAt || null, grade: p.grade == null ? null : p.grade };
+    return { card: p.card, copy: p.copy || null, doc: p.doc || null, ...keepFields(p) };
   });
 }
 
@@ -227,7 +261,8 @@ async function overview(user) {
 // ---------- Exemplare belegen, sperren, verschieben ----------
 /**
  * Positionen eines Besitzers mit Exemplaren belegen: Positionen mit doc bleiben, sonst das älteste freie
- * Exemplar (nicht gesperrt, nicht foliert), bei copy genau dieses folierte Exemplar, bei Gegenständen ein freies Stück.
+ * Exemplar (nicht gesperrt, nicht foliert, nicht beschädigt – #204), bei copy genau dieses Exemplar (Folie, Slab oder
+ * beschädigt; hat es sich seit dem Angebot sichtbar verändert, scheitert das Belegen), bei Gegenständen ein freies Stück.
  * Mehrere Positionen derselben Karte bekommen verschiedene Exemplare. who = Name für die Meldung (null = "du").
  */
 async function resolveLines(ownerId, list, session, who = null) {
@@ -237,8 +272,8 @@ async function resolveLines(ownerId, list, session, who = null) {
   const copyIds = list.filter((l) => !l.doc && l.copy).map((l) => l.copy);
   const [locked, docs, copies] = await Promise.all([
     lockedDocs(ownerId, session),
-    TcgCard.find({ user: ownerId, card: { $in: cardIdsNeeded }, foiledAt: null }).sort({ createdAt: 1 }).select('_id card condition.grade').session(session).lean(),
-    copyIds.length ? TcgCard.find({ _id: { $in: copyIds }, user: ownerId, foiledAt: { $ne: null } }).select('_id card foiledAt condition.grade').session(session).lean() : [],
+    TcgCard.find({ user: ownerId, card: { $in: cardIdsNeeded }, foiledAt: null, damaged: { $ne: true } }).sort({ createdAt: 1 }).select('_id card').session(session).lean(),
+    copyIds.length ? TcgCard.find({ _id: { $in: copyIds }, user: ownerId }).select(COPY_FIELDS).session(session).lean() : [],
   ]);
   const used = new Set(list.filter((l) => l.doc).map((l) => String(l.doc)));
   const itemPool = {};
@@ -256,14 +291,18 @@ async function resolveLines(ownerId, list, session, who = null) {
       if (!doc) throw lack(`keine freie ${item.label} mehr (oder sie steht schon im Handel).`);
     } else if (l.copy) {
       doc = copies.find((d) => String(d._id) === String(l.copy) && d.card === l.card);
-      if (!doc) throw lack(`die folierte ${cardName(l.card)} nicht mehr.`);
-      if (locked.reasons.get(String(doc._id)) !== 'folie') throw lack(`die folierte ${cardName(l.card)} gerade nicht frei (Handel, Quest oder Duell).`);
+      if (!doc || !isCopy(doc)) throw lack(`dieses Exemplar von ${cardName(l.card)} nicht mehr.`);
+      const reason = locked.reasons.get(String(doc._id));
+      if (reason && !isStateLock(reason)) throw lack(`das Exemplar von ${cardName(l.card)} gerade nicht frei (Handel, Quest oder Duell).`);
+      if (changedCopy(l, copyFields(doc))) {
+        throw new UserError(`Das Exemplar von ${cardName(l.card)} hat sich seit dem Angebot verändert – bitte schau es dir noch einmal an.`);
+      }
     } else {
       doc = docs.find((d) => d.card === l.card && !used.has(String(d._id)) && !isLocked(locked, d));
-      if (!doc) throw lack(`nicht genug freie Exemplare von ${cardName(l.card)} (Quest, Handel oder foliert).`);
+      if (!doc) throw lack(`nicht genug freie, unbeschädigte Exemplare von ${cardName(l.card)} (Quest, Handel, foliert oder mit Spuren).`);
     }
     used.add(String(doc._id));
-    out.push({ card: l.card, copy: l.copy || null, doc: doc._id, foiledAt: doc.foiledAt || null, grade: doc.foiledAt && doc.condition ? doc.condition.grade : null });
+    out.push({ card: l.card, copy: l.copy || null, doc: doc._id, ...(l.copy ? copyFields(doc) : NO_COPY) });
   }
   return out;
 }
@@ -321,26 +360,26 @@ async function moveLines(list, from, to, session, meta = null, paid = null) {
 }
 
 /**
- * Positionen aus dem Formular ({ card } bzw. { copy }) prüfen und vervollständigen: Bei folierten Exemplaren
- * ergibt sich die Karte aus dem Exemplar des Besitzers. Bei fremden Positionen (who gesetzt) muss der Besitzer
- * die Karten in genug Stück besitzen – gesperrt dürfen sie sein, geprüft wird beim Annehmen.
+ * Positionen aus dem Formular ({ card } bzw. { copy }) prüfen und vervollständigen: Bei Exemplaren (Folie, Slab,
+ * beschädigt) ergibt sich die Karte aus dem Exemplar des Besitzers. Bei fremden Positionen (who gesetzt) muss der
+ * Besitzer die Karten in genug unbeschädigten Stück besitzen – gesperrt dürfen sie sein, geprüft wird beim Annehmen.
  */
 async function prepareLines(list, ownerId, who = null) {
   const copyIds = list.filter((l) => l.copy).map((l) => l.copy);
-  if (copyIds.some((id) => !mongoose.isValidObjectId(id))) throw new UserError('Diese folierte Karte gibt es nicht.');
-  const copies = copyIds.length ? await TcgCard.find({ _id: { $in: copyIds }, user: ownerId, foiledAt: { $ne: null } }).select('card foiledAt condition.grade').lean() : [];
+  if (copyIds.some((id) => !mongoose.isValidObjectId(id))) throw new UserError('Dieses Exemplar gibt es nicht.');
+  const copies = copyIds.length ? await TcgCard.find({ _id: { $in: copyIds }, user: ownerId }).select(COPY_FIELDS).lean() : [];
   const out = list.map((l) => {
-    if (!l.copy) return { card: l.card, copy: null, doc: null, foiledAt: null, grade: null };
+    if (!l.copy) return { card: l.card, copy: null, doc: null, ...NO_COPY };
     const d = copies.find((c) => String(c._id) === String(l.copy));
-    if (!d) throw new UserError(who ? `${who} besitzt diese folierte Karte nicht (mehr).` : 'Diese folierte Karte besitzt du nicht (mehr).');
-    return { card: d.card, copy: d._id, doc: null, foiledAt: d.foiledAt, grade: d.condition ? d.condition.grade : null };
+    if (!d || !isCopy(d)) throw new UserError(who ? `${who} besitzt dieses Exemplar nicht (mehr).` : 'Dieses Exemplar besitzt du nicht (mehr).');
+    return { card: d.card, copy: d._id, doc: null, ...copyFields(d) };
   });
   if (who) {
     const need = {};
     for (const l of out) if (!l.copy) need[l.card] = (need[l.card] || 0) + 1;
     for (const [card, n] of Object.entries(need)) {
       const item = itemByCardId(card);
-      const have = item ? await Item.countDocuments({ user: ownerId, type: item.key }) : await TcgCard.countDocuments({ user: ownerId, card, foiledAt: null });
+      const have = item ? await Item.countDocuments({ user: ownerId, type: item.key }) : await TcgCard.countDocuments({ user: ownerId, card, foiledAt: null, damaged: { $ne: true } });
       if (have < n) throw new UserError(`${who} besitzt ${n > 1 ? n + '× ' : ''}${cardName(card)} nicht${have ? ` (nur ${have})` : ''}.`);
     }
   }
@@ -402,7 +441,7 @@ async function create({ user, toName = null, listingId = null, gives = [], gets 
   const mine = await prepareLines(gives, user._id);
   // Beim Gegenangebot auf dem Markt stehen die Karten des Verkäufers fest
   // Markt-Angebot: Wunschkarten aus allen Karten, belegt beim Tauschen von dem, der annimmt
-  const wished = () => gets.map((l) => ({ card: l.card, copy: l.copy || null, doc: null, foiledAt: null, grade: null }));
+  const wished = () => gets.map((l) => ({ card: l.card, copy: l.copy || null, doc: null, ...NO_COPY }));
   const theirs = listing ? listing.give.map((l) => l.toObject()) : other ? await prepareLines(gets, other._id, other.username) : wished();
   const [give, want] = role === 'seller' ? [mine, theirs] : [theirs, mine];
   const extraFrom = price > 0 ? (iPay ? role : otherRole(role)) : null;
@@ -740,6 +779,9 @@ module.exports = {
   taxOf,
   taxRates,
   validateOffer,
+  copyFields,
+  changedCopy,
+  isCopy,
   settlement,
   parseOfferForm,
   carryLines,
