@@ -16,7 +16,7 @@ const { notify } = require('../services/notifyService');
 const { toZonedLocalInput } = require('../lib/time');
 const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
-const { lockedDocs, isLocked, claim, copiesByCard, lockLabel } = require('../tcg/locks');
+const { lockedDocs, isLocked, pickCopy, claim, copiesByCard, lockLabel } = require('../tcg/locks');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
 const { grantItems } = require('../items/itemService');
@@ -403,19 +403,22 @@ const makeTeams = (entries, rand = random, teamOf = () => null) => {
 /** ownDungeon: die eigenen, schon für den Dungeon gesperrten Karten zählen als frei (Karten tauschen vor dem Start) */
 /** mode: 'dungeon' | 'tower' – banned = dort gesperrte Karten (Kartensperren); sie stehen in der Liste, sind aber nicht wählbar */
 /** locks: gesperrte Exemplare je Karte ({ n, label }, z. B. „Auf Quest“) – Karten ohne freies Exemplar stehen markiert in der Liste, wählbar sind sie nicht */
+/** foiled: freie folierte Exemplare je Karte – sie spielen mit und sind vor Schaden geschützt (#204) */
 async function availableCards(userId, { ownDungeon = false, mode = 'dungeon' } = {}) {
-  const copies = await copiesByCard(userId, { freeIf: (reason) => ownDungeon && reason === 'dungeon' });
-  // counts: freie Exemplare je Karte – dieselbe Karte als Charakter UND Boost braucht zwei
+  const copies = await copiesByCard(userId, { freeIf: (reason) => ownDungeon && reason === 'dungeon', foil: true });
+  // counts: freie Exemplare je Karte (folierte mitgezählt) – dieselbe Karte als Charakter UND Boost braucht zwei
   const counts = {};
   const locks = {};
+  const foiled = {};
   for (const [id, e] of Object.entries(copies)) {
-    counts[id] = e.free;
+    counts[id] = e.free + e.foiled;
+    if (e.foiled) foiled[id] = e.foiled;
     if (e.locked) locks[id] = { n: e.locked, label: lockLabel(e.reason) };
   }
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = Object.keys(copies).map((id) => catalog.cardById[id]).filter(Boolean).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
   // Boost: Items, Spells und Charaktere mit Boost-Fähigkeit (Ömer, Pascal, Lili)
-  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts, locks, banned: cardBans.bannedIn(mode) };
+  return { characters: all.filter((c) => c.isCharacter), boosts: all.filter((c) => canBoost(c)), counts, locks, foiled, banned: cardBans.bannedIn(mode) };
 }
 
 /** Mitglied ohne Karten – so tritt man bei, gewählt wird danach in der Lobby (#111) */
@@ -425,7 +428,7 @@ const emptyMember = (user) => ({ user: user._id, name: user.username, card: null
  * Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag.
  * Ohne cardId bleibt der Charakter offen (in der Lobby darf man zuerst den Boost wählen).
  */
-async function memberEntry(user, cardId, boostId, session, { ownDungeon = false, mode = 'dungeon' } = {}) {
+async function memberEntry(user, cardId, boostId, session, { ownDungeon = false, mode = 'dungeon', foiled = false } = {}) {
   const card = cardId ? catalog.cardById[cardId] : null;
   if (cardId && (!card || !card.isCharacter)) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   let boost = null;
@@ -443,13 +446,15 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false,
   // Karten tauschen: die bisher eingesetzten Exemplare sind wieder wählbar
   if (ownDungeon) [...locked.reasons].filter(([, r]) => r === 'dungeon').forEach(([id]) => locked.reasons.delete(id));
   // except: dieses Exemplar ist schon vergeben (dieselbe Karte als Charakter und Boost → zwei verschiedene Exemplare)
-  const freeDoc = async (id, except) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d) && !(except && d._id.equals(except._id)));
+  // foiled: folierte Exemplare einsetzen (#204, pickCopy) – sonst lieber unfolierte
+  const freeDoc = async (id, except) => pickCopy(await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id foiledAt').session(session).lean(), locked, { foiled, except });
+  const why = foiled ? 'kein freies foliertes Exemplar' : 'Quest, Handel oder schon im Dungeon';
   const doc = card ? await freeDoc(card.id) : null;
-  if (card && !doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+  if (card && !doc) throw new UserError(`Diese Karte ist nicht frei (${why}).`);
   const same = !!card && !!boost && boost.id === card.id;
   const boostDoc = boost ? await freeDoc(boost.id, same ? doc : null) : null;
   if (boost && !boostDoc) {
-    throw new UserError(same ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie Exemplare.` : 'Die Boost-Karte ist nicht frei (Quest, Handel, Folie oder schon im Dungeon).');
+    throw new UserError(same ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie${foiled ? ' folierte' : ''} Exemplare.` : `Die Boost-Karte ist nicht frei (${why}).`);
   }
   await claim([doc, boostDoc], user._id, session);
   return { user: user._id, name: user.username, card: card ? card.id : null, cardDoc: doc ? doc._id : null, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null };
@@ -589,7 +594,7 @@ async function decline({ user, partyId }) {
 }
 
 /** Karten in der Lobby wählen oder tauschen (bis kurz vor dem Start); ohne cardId bleibt der Charakter offen */
-async function changeCards({ user, cardId, boostId }) {
+async function changeCards({ user, cardId, boostId, foiled = false }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
@@ -603,7 +608,7 @@ async function changeCards({ user, cardId, boostId }) {
         throw new UserError(cardId === boostId ? `Im Mage Tower darf jede Karte nur einmal mitspielen – ${name} nicht als Charakter und Boost.` : `${name} ist schon in eurem Team – im Mage Tower darf jede Karte nur einmal mitspielen.`);
       }
     }
-    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party) });
+    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party), foiled });
     const res = await DungeonParty.updateOne(
       { _id: party._id, 'members.user': user._id },
       { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc, 'members.$.ready': false } },

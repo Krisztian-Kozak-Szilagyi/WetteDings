@@ -36,11 +36,12 @@ router.get('/ihk', async (req, res) => {
 
   const offers = running ? [] : (await ihk.getOffers(req.user._id)).map((o) => questView(o.quest, o.difficulty));
   const canReroll = !running && used < limit && (await ihk.canReroll(req.user._id));
-  // folierte Exemplare können nicht auf Quests. Gesperrte Exemplare (Dungeon, Handel, Duell) werden markiert –
-  // wählbar bleibt eine Karte, solange noch ein Exemplar frei ist (lockInfo: { cardId: { free, n, label } })
-  const copies = await copiesByCard(req.user._id);
+  // Gesperrte Exemplare (Dungeon, Handel, Duell) werden markiert – wählbar bleibt eine Karte, solange noch ein
+  // Exemplar frei ist (lockInfo: { cardId: { free, n, label } }). Folierte spielen mit (#204, foiled: freie folierte)
+  const copies = await copiesByCard(req.user._id, { foil: true });
   const owned = Object.keys(copies);
-  const lockInfo = Object.fromEntries(Object.entries(copies).filter(([, e]) => e.locked).map(([id, e]) => [id, { free: e.free, n: e.locked, label: lockLabel(e.reason) }]));
+  const lockInfo = Object.fromEntries(Object.entries(copies).filter(([, e]) => e.locked).map(([id, e]) => [id, { free: e.free + e.foiled, n: e.locked, label: lockLabel(e.reason) }]));
+  const foiled = Object.fromEntries(Object.entries(copies).filter(([, e]) => e.foiled).map(([id, e]) => [id, e.foiled]));
   const rank = (c) => catalog.rarityByKey[c.rarity].rank;
   const all = owned.map((id) => catalog.cardById[id]).filter(Boolean);
   const cards = all.filter((c) => c.isCharacter).sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'de'));
@@ -54,6 +55,7 @@ router.get('/ihk', async (req, res) => {
     title: 'IHK',
     shortcuts,
     lockInfo,
+    foiled,
     phase,
     run: running,
     quest: running ? questView(running.quest, running.difficulty) : null,
@@ -96,6 +98,7 @@ router.post('/ihk/start', (req, res) =>
       boostId: str(req.body.boost) || null,
       boost2Id: str(req.body.boost2) || null,
       offerIndex: Number.parseInt(str(req.body.offer), 10),
+      foiled: str(req.body.foil) === '1',
     });
     return null;
   })

@@ -1,0 +1,9 @@
+<%# Schalter für Quest, Dungeon und Turm (#204): folierte Exemplare einsetzen – geschützt vor Schaden bei einer
+    Niederlage. Nur sichtbar, wenn es freie folierte Exemplare gibt (foiled: { cardId: Anzahl }). Ohne Haken spielt
+    lieber ein unfoliertes Exemplar; hat eine Karte nur folierte, spielt das folierte. %>
+<% if (Object.keys(foiled || {}).length) { %>
+  <label class="check pick-foil-switch">
+    <input type="checkbox" name="foil" value="1"<%= typeof foilChecked !== 'undefined' && foilChecked ? ' checked' : '' %>>
+    <span><b>✦ Folierte Exemplare einsetzen</b> – geschützt: Bei einer Niederlage bekommen sie keine Kratzer oder Knicke.</span>
+  </label>
+<% } %>

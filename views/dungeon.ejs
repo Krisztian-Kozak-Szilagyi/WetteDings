@@ -334,6 +334,7 @@
           <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= off ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
           <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } else if (busy) { %><span class="dg-ban-tag"><%= lock.label %></span><% } else if (lock) { %><span class="dg-lock-tag"><%= lock.n %>× <%= lock.label %></span><% } %>
+          <% if (!off && cards.foiled[c.id]) { %><span class="pick-foil-tag" title="Foliertes Exemplar – geschützt vor Schaden">✦ foliert</span><% } %>
           <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>
@@ -351,8 +352,10 @@
           <h2 id="dg-picker-<%= kind %>"><%= title %></h2>
           <button type="button" class="dg-picker-close" data-dg-picker-close aria-label="Schließen">×</button>
         </div>
+        <%# Schalter nur einmal im Formular (im Charakter-Fenster) – er gilt für Charakter und Boost %>
+        <% if (kind === 'card') { %><%- include('partials/foil-switch', { foiled: cards.foiled, foilChecked }) %><% } %>
         <% if (kind === 'card' && !list.length) { %>
-          <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest, im Handel oder foliert können nicht mit.</p>
+          <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest oder im Handel können nicht mit.</p>
         <% } else { %>
           <% pickList(kind, list, current) %>
         <% } %>

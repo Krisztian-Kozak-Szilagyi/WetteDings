@@ -5957,6 +5957,14 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   color: #fecaca; background: rgba(14, 15, 26, .85); border: 1px solid color-mix(in srgb, #ff4d5e 55%, transparent);
 }
 .ihk-lock-tag.is-full { top: 42%; transform: translate(-50%, -50%); font-size: 11px; color: #ff4d5e; }
+/* Foliertes Exemplar in der Auswahl von Quest, Dungeon und Turm (#204) – unten, damit es das Sperr-Schild nicht verdeckt */
+.pick-foil-tag {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 2; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; pointer-events: none;
+  color: #e0f2fe; background: rgba(14, 15, 26, .85); border: 1px solid color-mix(in srgb, #7dd3fc 60%, transparent);
+}
+.pick-foil-switch { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; font-size: 13px; }
+.pick-foil-switch b { color: #7dd3fc; }
 .ihk-pick-card[data-blocked] { cursor: var(--cur-zoom-in); }
 .ihk-pick-card[data-blocked] img { filter: grayscale(1) brightness(.6); }
 

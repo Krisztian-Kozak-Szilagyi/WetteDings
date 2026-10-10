@@ -177,12 +177,13 @@
     <%# Gesperrte Exemplare (Im Dungeon, Im Handel, Im Duell): Schild auf der Karte. Ist kein Exemplar mehr frei, ist sie
         nicht wählbar (data-blocked, public/js/ihk.js) – sonst bleibt sie wählbar und zeigt klein, wie viele gesperrt sind. %>
     <% const lockMarks = (c) => { const l = lockInfo[c.id]; return l ? ' data-lock="' + l.label + '"' + (l.free ? '' : ' data-blocked="1"') : ''; }; %>
-    <% const lockBadge = (c) => { const l = lockInfo[c.id]; return l ? '<span class="ihk-lock-tag' + (l.free ? '' : ' is-full') + '">' + (l.free ? l.n + '× ' : '') + l.label + '</span>' : ''; }; %>
+    <% const lockBadge = (c) => { const l = lockInfo[c.id]; return (l ? '<span class="ihk-lock-tag' + (l.free ? '' : ' is-full') + '">' + (l.free ? l.n + '× ' : '') + l.label + '</span>' : '') + (foiled[c.id] ? '<span class="pick-foil-tag" title="Foliertes Exemplar – geschützt vor Schaden">✦ foliert</span>' : ''); }; %>
     <% const pickHeads = (sc, c, i) => (sc.favs.size && i === 0 ? '<h3 class="pick-group" data-pick-group="fav">★ Favoriten</h3>' : '') + (sc.favs.size && i === sc.favs.size ? '<h3 class="pick-group" data-pick-group="rest">Alle Karten</h3>' : '') + (!sc.favs.size && sc.freq.size && i === 0 ? '<h3 class="pick-group" data-pick-group="freq" style="order: -101" hidden>Häufig verwendet</h3><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3>' : ''); %>
     <div class="ihk-pick-tools">
       <% if (!hasFavs && (scCard.freq.size || scBoost.freq.size)) { %><button type="button" class="btn btn-ghost btn-sm pick-freq-btn" data-ihk-freq aria-pressed="false">Häufig verwendet</button><% } %>
       <%- include('partials/mkt-bar', { name: 'ihk', placeholder: 'Karte suchen …', searchAttr: 'ihk-search', groups: [{ attr: 'ihk-rar', allCount: ihkAll.length, opts: ihkRars.map((r) => ({ key: r.key, label: r.label, count: ihkAll.filter((c) => c.rarity === r.key).length })) }] }) %>
     </div>
+    <%- include('partials/foil-switch', { foiled }) %>
     <p class="muted" data-ihk-empty hidden>Keine Karte gefunden.</p>
     <div class="ihk-pick-grid">
       <% scCard.list.forEach((c, i) => { %>

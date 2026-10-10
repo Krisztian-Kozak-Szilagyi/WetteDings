@@ -30,7 +30,7 @@ const ITEM_TYPES = [
     tradable: true,
     sell: 1000,
     image: '/img/items/folie.svg',
-    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.',
+    text: 'Schweißt eine deiner Karten ein. Folierte Karten steigen im Wert und sind auf Quests, im Dungeon und im Turm vor Kratzern und Knicken geschützt. Verkaufen an die Bank und Duelle gehen nicht.',
   },
 ];
 

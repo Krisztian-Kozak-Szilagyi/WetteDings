@@ -2,8 +2,8 @@
 // Gegenstands-Arten stehen in ./types.js (neue Art = ein Eintrag dort). Jede Bewegung läuft über addItems/takeItems,
 // die je nach Art (storage 'stueck' / 'stapel') das richtige Modell benutzen und ins ItemLog schreiben –
 // nie direkt Item/ItemStack anfassen.
-// Eine folierte Karte gewinnt mit der Zeit an Wert, kann aber weder an die Bank verkauft noch auf Quests
-// (oder künftige Dungeons) geschickt werden – nur behalten oder im Handel weitergeben (siehe tcg/locks).
+// Eine folierte Karte gewinnt mit der Zeit an Wert und kann nicht an die Bank verkauft oder im Duell gesetzt werden.
+// Auf Quests, in den Dungeon und den Turm darf sie mit – dort schützt die Folie vor Schaden (#204, siehe tcg/locks).
 const crypto = require('crypto');
 const { Item, ItemStack, ItemLog } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
@@ -11,7 +11,7 @@ const { Trade, openFilter } = require('../models/Trade');
 const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { lockedDocs, claim } = require('../tcg/locks');
+const { lockedDocs, claim, lockLabel } = require('../tcg/locks');
 const { inTransaction } = require('../services/betService');
 const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
@@ -254,6 +254,8 @@ async function unfoilCard({ user, copyId }) {
     if (!doc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
     const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
     if (reason === 'handel') throw new UserError('Die Karte ist gerade im Handel. Zieh zuerst das Angebot zurück.');
+    // Folierte Karten spielen mit (#204): unterwegs bleibt die Folie dran – sonst wäre die Karte beim Abschluss ungeschützt
+    if (reason && reason !== 'folie') throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Die Folie kannst du danach abziehen.`);
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null } }, { session });
     return catalog.cardById[doc.card] || null;
