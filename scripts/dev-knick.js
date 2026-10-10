@@ -79,7 +79,9 @@ async function main() {
 
 main()
   .catch((err) => {
-    console.error('[dev:knick] Fehlgeschlagen:', err.message);
+    // häufigster Fall: die Dev-Datenbank läuft nicht – sie gehört zu npm run dev
+    const down = /ECONNREFUSED|Server selection timed out/i.test(err.message);
+    console.error('[dev:knick] Fehlgeschlagen:', down ? 'Keine Dev-Datenbank erreichbar – läuft „npm run dev“ in einem zweiten Terminal?' : err.message);
     process.exitCode = 1;
   })
   .finally(() => mongoose.disconnect());
