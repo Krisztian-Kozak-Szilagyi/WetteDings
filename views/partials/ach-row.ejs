@@ -1,0 +1,29 @@
+<%# Eine Zeile der Erfolge-Liste im Profil (views/profil.ejs) – a = Eintrag aus achievementLogic.profileList %>
+<% const pinnedHere = pinnedKeys.includes(a.key); %>
+<li class="ach-row<%= a.earned ? ' is-earned' : ' is-locked' %><%= a.unique ? ' is-unique' : '' %>">
+  <img class="ach-icon" src="/img/erfolge/<%= a.hidden ? 'geheim' : a.key %>.svg?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy">
+  <div class="ach-body">
+    <p class="ach-name"><%= a.name %><% if (a.unique) { %><span class="ach-tag">Einzigartig</span><% } %></p>
+    <p class="ach-text"><%= a.text %></p>
+    <% if (a.progress) { %>
+      <div class="ach-step">
+        <div class="ach-step-bar" role="progressbar" aria-label="Fortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= a.progress.pct %>"><span style="--p: <%= a.progress.pct %>%"></span></div>
+        <span class="ach-step-text"><%= a.progress.text %></span>
+      </div>
+    <% } %>
+    <p class="ach-meta">
+      <% if (a.earned) { %>Freigeschaltet am <%= dayDate(a.earnedAt) %><% } else { %>Noch nicht freigeschaltet<% } %>
+      <% if (!a.unique) { %> · <%= shareText(a.share) %> der Mitglieder<% } %>
+    </p>
+  </div>
+  <% if (isMe && a.earned) { %>
+    <form method="post" action="/profil/anheften" class="ach-pin-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="erfolg" value="<%= a.key %>">
+      <button type="submit" class="ach-pin<%= pinnedHere ? ' is-on' : '' %>" aria-pressed="<%= pinnedHere %>" title="<%= pinnedHere ? 'Nicht mehr im Profil oben zeigen' : 'Im Profil oben anheften (höchstens zwei)' %>">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 3l6 6-3 1-4 4 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 4-4z" fill="currentColor"/></svg>
+        <span class="sr-only"><%= pinnedHere ? 'Lösen' : 'Anheften' %></span>
+      </button>
+    </form>
+  <% } %>
+</li>

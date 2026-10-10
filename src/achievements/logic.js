@@ -73,6 +73,27 @@ function profileList(all, earnedDocs, counts = {}, members = 0) {
   return [...earned, ...rows.filter((r) => !r.earned)];
 }
 
+const num = (n, digits = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+/** Ein Wert eines Fortschritt-Teils als Text (kind wie in list.js: euro = Cent, hours = Sekunden, times = Faktor) */
+function amountText(v, kind) {
+  if (kind === 'euro') return `${num(Math.trunc(v / 100))} €`;
+  if (kind === 'hours') return `${num(Math.floor(v / 3600))} Std.`;
+  if (kind === 'times') return `${num(v, Number.isInteger(v) ? 0 : 1)}×`;
+  return num(v);
+}
+
+/**
+ * Fortschritt eines gesperrten Erfolgs für die Anzeige: pct = Mittel der (auf 0–100 % begrenzten) Teile,
+ * text z. B. "12 / 25 gewonnene Wetten" oder "3 / 5 Siege · 1 / 3 Gegner". Ohne gültige Teile: null.
+ */
+function progressView(parts) {
+  const list = (Array.isArray(parts) ? parts : []).filter((p) => p && Number.isFinite(p.have) && Number.isFinite(p.need) && p.need > 0);
+  if (!list.length) return null;
+  const pct = Math.floor((list.reduce((s, p) => s + Math.min(1, Math.max(0, p.have / p.need)), 0) / list.length) * 100);
+  const text = list.map((p) => `${amountText(p.have, p.kind)} / ${amountText(p.need, p.kind)}${p.label ? ` ${p.label}` : ''}`).join(' · ');
+  return { pct: Math.min(pct, 99), text }; // gesperrt = nie ganz voll (fertig zeigt erst die Vergabe)
+}
+
 /** Anteil als Text, z. B. "12 %", unter 1 % "< 1 %" */
 function shareText(share) {
   if (!share) return '0 %';
@@ -80,4 +101,4 @@ function shareText(share) {
   return p < 1 ? '< 1 %' : `${Math.round(p)} %`;
 }
 
-module.exports = { BIO_MAX, BIO_MAX_LINES, PIN_MAX, cleanBio, togglePin, countTier, profileList, shareText };
+module.exports = { BIO_MAX, BIO_MAX_LINES, PIN_MAX, cleanBio, togglePin, countTier, profileList, shareText, progressView };

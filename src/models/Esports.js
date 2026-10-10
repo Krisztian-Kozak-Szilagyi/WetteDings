@@ -34,8 +34,9 @@ const teamSchema = new Schema(
     color: { type: String, default: null },
     avatar: { type: String, default: null },
     cosmetics: { type: [String], default: [] }, // gekaufte Avatare des Teams ("avatar:<key>")
-    // Trophäen: Platz 1–3 eines Wochenberichts (week = Datum des Sonntags)
-    trophies: { type: [new Schema({ week: String, place: Number, score: Number }, { _id: false })], default: [] },
+    // Trophäen: Platz 1–3 eines Wochenberichts (week = Datum des Sonntags); members = wer den Preis bekam
+    // (schon vor der Woche im Team) – zählt für die eSports-Erfolge
+    trophies: { type: [new Schema({ week: String, place: Number, score: Number, members: { type: [Schema.Types.ObjectId], default: undefined } }, { _id: false })], default: [] },
   },
   { timestamps: true }
 );

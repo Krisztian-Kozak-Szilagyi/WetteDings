@@ -10,6 +10,7 @@ const { DungeonRun } = require('../models/Dungeon');
 const Bet = require('../models/Bet');
 const { inTransaction } = require('../services/betService');
 const { ACHIEVEMENTS, SPECIAL, rewardOf, byKey, find } = require('./list');
+const { progressView } = require('./logic');
 
 const isDuplicate = (err) => err && (err.code === 11000 || /E11000/.test(err.message || ''));
 
@@ -129,6 +130,28 @@ async function markSeen(userId, id) {
 /** Erfolge eines Mitglieds */
 const earnedOf = (userId) => Achievement.find({ user: userId }).select('key earnedAt').lean();
 
+/**
+ * Fortschritt der noch gesperrten Erfolge eines Mitglieds (nur fürs eigene Profil): { key: { pct, text } }.
+ * Geheime und Einzelstücke zeigen nichts; ein Fehler bei einem Erfolg lässt nur dessen Balken weg.
+ */
+async function progressOf(userId, earnedKeys = []) {
+  const id = new mongoose.Types.ObjectId(String(userId));
+  const have = new Set(earnedKeys);
+  const todo = ACHIEVEMENTS.filter((a) => a.progress && !a.secret && !a.unique && !have.has(a.key));
+  const rows = await Promise.all(
+    todo.map((a) =>
+      a.progress(id).then(
+        (parts) => [a.key, progressView(parts)],
+        (err) => {
+          console.error(`Fortschritt "${a.key}":`, err.message);
+          return [a.key, null];
+        }
+      )
+    )
+  );
+  return Object.fromEntries(rows.filter(([, v]) => v));
+}
+
 /** Wie viele Mitglieder jeden Erfolg haben, und Zahl der Mitglieder (für "x % der Spieler") */
 async function shares() {
   const [rows, members] = await Promise.all([Achievement.aggregate([{ $group: { _id: '$key', n: { $sum: 1 } } }]), User.countDocuments({ deletedAt: null })]);
@@ -179,4 +202,4 @@ async function playmates(userId, limit = 5) {
     .map((e) => ({ username: names.get(String(e.id)), avatar: pictures.get(String(e.id)), together: e.together, dungeons: e.dungeons, duels: e.duels, achievements: achievements.get(String(e.id)) || 0 }));
 }
 
-module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, popupJson, markSeen, earnedOf, shares, playmates, find, ACHIEVEMENTS };
+module.exports = { grant, grantSpecial, checkAll, soon, nextUnseen, popupJson, markSeen, earnedOf, progressOf, shares, playmates, find, ACHIEVEMENTS };
