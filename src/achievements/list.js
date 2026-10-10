@@ -288,7 +288,7 @@ const ACHIEVEMENTS = [
   {
     key: 'thronfolger',
     name: 'Thronfolger',
-    text: 'Stehe insgesamt 24 Stunden auf Platz 1 der Rangliste.',
+    text: 'Stehe insgesamt 24 Stunden auf Platz 1 der Rangliste (Team-Mitglieder: Platz 1 im Team).',
     icon: { glyph: 'hourglass', tone: 'gold', frame: 'gold' },
     holders: () => User.distinct('_id', { deletedAt: null, top1Seconds: { $gte: 24 * 60 * 60 } }),
   },

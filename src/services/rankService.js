@@ -23,8 +23,10 @@ const TEAM_ROLES = ['dev', 'mod'];
 const isTeam = (user) => !!user && (TEAM_ROLES.includes(user.role) || config.adminUsernames.includes(user.usernameLower));
 /** Filter für Konten außerhalb des Teams */
 const notTeam = () => ({ role: { $nin: TEAM_ROLES }, usernameLower: { $nin: config.adminUsernames } });
+/** Filter für Team-Konten */
+const teamFilter = () => ({ $or: [{ role: { $in: TEAM_ROLES } }, { usernameLower: { $in: config.adminUsernames } }] });
 /** IDs aller Team-Konten (auch gelöschte) – zum Ausschließen ihrer Buchungen */
-const teamIds = () => User.distinct('_id', { $or: [{ role: { $in: TEAM_ROLES } }, { usernameLower: { $in: config.adminUsernames } }] });
+const teamIds = () => User.distinct('_id', teamFilter());
 
 /**
  * Alle Mitglieder nach Gesamtvermögen, bestes zuerst – ohne das Team; mit team: true auch das Team (Feld team). Gesamtvermögen = Kontostand + offene Einsätze + Wert der
@@ -33,7 +35,7 @@ const teamIds = () => User.distinct('_id', { $or: [{ role: { $in: TEAM_ROLES } }
  * Sortiert wird nach rankTotal = total − fresh: fresh ist der Mehrwert frisch gehandelter Karten über dem, was dafür
  * gegeben wurde (FRESH_DAYS). Statistiken der Wirtschaft nutzen weiter total.
  */
-function ranking({ limit = 0, team = false, userId = null } = {}) {
+function ranking({ limit = 0, team = false, onlyTeam = false, userId = null } = {}) {
   // Cent je Einheit (1e-8) für jeden laufenden Broker-Wert
   const prices = markets.prices();
   const branches = Object.entries(prices).map(([sym, p]) => ({ case: { $eq: ['$$h.coin', sym] }, then: (p * 100) / 1e8 }));
@@ -43,7 +45,8 @@ function ranking({ limit = 0, team = false, userId = null } = {}) {
   const freshSince = new Date(Date.now() - FRESH_DAYS * DAY_MS);
   const pipeline = [
     // gelöschte Konten erscheinen nicht, das Team nur auf Wunsch; mit userId nur dieses Mitglied (Profil-Statistik)
-    { $match: { deletedAt: null, ...(team ? {} : notTeam()), ...(userId ? { _id: userId } : {}) } },
+    // onlyTeam: nur das Team (eigene Wertung für Platz 1 im Team)
+    { $match: { deletedAt: null, ...(onlyTeam ? teamFilter() : team ? {} : notTeam()), ...(userId ? { _id: userId } : {}) } },
     {
       $lookup: {
         from: 'positions',
@@ -115,15 +118,21 @@ function freshExcessExpr(since) {
 // ---------- Zeit auf Platz 1 ----------
 let lastTick = 0;
 
-/** Dem aktuellen Ersten die seit der letzten Prüfung vergangene Zeit gutschreiben */
+/**
+ * Dem aktuellen Ersten die seit der letzten Prüfung vergangene Zeit gutschreiben – den Spielern und, in eigener Wertung,
+ * dem Ersten des Teams (zählt ebenso für das Abzeichen „Platz 1“ und den Erfolg „Thronfolger“, Krisztian 2026-10-10).
+ * Die Abschnitte für die Manipulationserkennung (RankStint) gibt es nur für die Spieler-Rangliste.
+ */
 async function trackTop1(now = Date.now()) {
   const gap = now - lastTick;
   const first = !lastTick;
   lastTick = now;
   if (first || gap <= 0 || gap > MAX_GAP_MS) return;
-  const [top, second] = await ranking({ limit: 2 });
+  const [[top, second], [teamTop]] = await Promise.all([ranking({ limit: 2 }), ranking({ limit: 1, onlyTeam: true })]);
+  const seconds = Math.round(gap / 1000);
+  if (teamTop) await User.updateOne({ _id: teamTop._id }, { $inc: { top1Seconds: seconds } }, { timestamps: false });
   if (!top) return;
-  await User.updateOne({ _id: top._id }, { $inc: { top1Seconds: Math.round(gap / 1000) } }, { timestamps: false });
+  await User.updateOne({ _id: top._id }, { $inc: { top1Seconds: seconds } }, { timestamps: false });
   await recordStint(top, second, now);
 }
 
