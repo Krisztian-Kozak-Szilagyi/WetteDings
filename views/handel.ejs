@@ -82,6 +82,47 @@
 </<%= bm.open ? 'details' : 'section' %>>
 <% } %>
 
+<% if (bazaar) { const bz = bazaar; const bzLeft = bz.offers.filter((o) => !o.buyer).length; %>
+<%# Lil Dré's Bazaar: nur für spielfähige eSports-Teams; Plätze gelten fürs ganze Team, neue Ware täglich um 00:00 %>
+<details class="bm bz is-open" id="bazaar">
+  <summary class="bm-head bz-head">
+    <span class="bz-face" aria-hidden="true"><img src="/img/bazaar/lil-dre.webp" alt="" width="600" height="900"></span>
+    <div class="bm-title bz-title">
+      <div class="bm-title-row">
+        <h2>Lil Dré's Bazaar</h2>
+        <span class="bm-state bm-state-open"><span class="bm-dot"></span>Für <%= bz.team.name %> · noch <%= bzLeft %> von <%= bz.offers.length %></span>
+      </div>
+      <span class="bz-restock">Neue Ware in <strong data-countdown-parts="<%= bz.restockAt.getTime() %>"><span data-cd="h">–</span>:<span data-cd="m">–</span>:<span data-cd="s">–</span></strong></span>
+    </div>
+    <span class="bm-arrow" aria-hidden="true"></span>
+  </summary>
+  <div class="bm-grid">
+    <% bz.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; const n = coll.counts[c.id] || 0; %>
+      <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
+        <button type="button" class="bm-card r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
+          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= n %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+          <img src="<%= c.image %>" alt="" width="720" height="1008">
+          <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
+        </button>
+        <div class="bm-info">
+          <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' : 'Fehlt dir' %></span></span>
+          <span class="bm-price"><strong><%= euro(o.price) %></strong><span>Wert <%= euro(r.sell || 0) %></span></span>
+          <% if (sold) { %>
+            <span class="muted small">an <%- userLink(o.buyerName) %></span>
+          <% } else { %>
+            <form method="post" action="/handel/bazaar" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(o.price) %> kaufen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="index" value="<%= i %>">
+              <button class="bm-buy" type="submit" <%= bal < o.price ? 'disabled' : '' %>>Kaufen</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</details>
+<% } %>
+
 <div class="hx-tabs" role="tablist" aria-label="Bereiche im Handel" data-hx-tabs>
   <% tabs.forEach((x) => { %>
     <a class="hx-tab<%= tab === x.key ? ' active' : '' %>" href="/handel?reiter=<%= x.key %>" role="tab" aria-selected="<%= tab === x.key %>" aria-controls="hx-<%= x.key %>" data-hx-tab="<%= x.key %>">

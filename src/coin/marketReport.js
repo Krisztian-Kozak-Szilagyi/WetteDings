@@ -29,7 +29,7 @@ const METRICS = [
   { key: 'wetten', label: 'Wettgeschäft', unit: 'Einsätze', types: ['einsatz'] },
   { key: 'broker', label: 'Broker-Handel', unit: 'Orders', types: ['coin_kauf', 'coin_verkauf'] },
   { key: 'packs', label: 'Booster-Absatz', unit: 'Käufe', types: ['tcg_pack'] },
-  { key: 'handel', label: 'Kartenhandel', unit: 'Abschlüsse', types: ['handel_kauf', 'black_market'] },
+  { key: 'handel', label: 'Kartenhandel', unit: 'Abschlüsse', types: ['handel_kauf', 'black_market', 'bazaar_kauf'] },
   { key: 'lotterie', label: 'Lotterie', unit: 'Lose', types: ['lotto_los'] },
   { key: 'ihk', label: 'IHK-Aufträge', unit: 'Quests', types: ['ihk_lohn'] },
   { key: 'dungeon', label: 'Dungeon-Expeditionen', unit: 'Siege', types: ['dungeon_lohn'] },
