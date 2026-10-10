@@ -33,13 +33,33 @@
    * Große Karte. Slab (data-slab-code, #204): vorne Bild + Etikett (Kürzel, Name, Seltenheit, Zertifikat, Note), hinten
    * Zertifikat und Strichcode. Sleeve (Folie ohne Slab): nur die Schutzhülle – keine Note, hinten die Kartenrückseite.
    */
+  /** Kratzer und Knick eines unfolierten Exemplars (data-marks, #204) – dezent, man sieht sie beim genauen Hinschauen */
+  function marks(front, json) {
+    var m;
+    try { m = JSON.parse(json || '{}'); } catch (err) { return; }
+    var box = el('span', 'cm-marks', front);
+    (m.s || []).forEach(function (s) {
+      var e = el('span', 'cm-scratch', box);
+      e.style.left = s[0] + '%';
+      e.style.top = s[1] + '%';
+      e.style.width = s[2] + '%';
+      e.style.transform = 'rotate(' + s[3] + 'deg)';
+    });
+    if (m.c) {
+      var c = el('span', 'cm-crease' + (m.i ? ' is-ironed' : ''), box);
+      c.style.top = m.c.y + '%';
+      c.style.transform = 'rotate(' + m.c.angle + 'deg)';
+    }
+  }
+
   function build(d, foiling) {
     var slab = !!d.slabCode;
+    var bare = 'bare' in d; // unfoliertes Exemplar: keine Hülle, dafür sichtbare Spuren
     var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : '') + (d.season ? ' season-' + d.season : '')); // Rückseite je Season
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', d.name + ' – ziehen zum Drehen, antippen zum Umdrehen');
-    var inner = el('span', 'foil-inner ' + (slab ? 'is-slab' : 'is-sleeve'), card);
+    var inner = el('span', 'foil-inner ' + (bare ? 'is-bare' : slab ? 'is-slab' : 'is-sleeve'), card);
     // Versatz aus der Zentrierung (data-cx/-cy): der Rand um das Kartenbild ist ungleich breit
     if (d.cx) inner.style.setProperty('--cx', d.cx);
     if (d.cy) inner.style.setProperty('--cy', d.cy);
@@ -48,6 +68,7 @@
     img.src = d.image;
     img.alt = '';
     img.draggable = false;
+    if (bare) marks(front, d.marks);
     el('span', 'foil-sheen', front);
     var back = el('span', 'foil-face foil-back', inner);
     el('span', 'foil-back-art', back);
@@ -119,11 +140,16 @@
       }
     }
     if (menu) {
-      menu.hidden = !d.fav;
-      var album = 'albumFoil' in d;
+      // Exemplar mit Spuren (#204): eigener Link ins Handelsfenster, kein Favorit
+      var copy = !!d.offerHref;
+      menu.hidden = !d.fav && !copy;
+      var album = 'albumFoil' in d || copy;
       sellLink.hidden = !album || !!d.sellOff;
       statusEl.hidden = !album;
-      if (album) {
+      if (copy) {
+        statusEl.textContent = d.rarityLabel + (d.copyNote ? ' · ' + d.copyNote : '');
+        sellLink.href = d.offerHref;
+      } else if (album) {
         // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
         statusEl.textContent = d.rarityLabel + (d.slabCode ? ' · Slab ' + d.slabCode : ' · in Folie') + ' · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
         sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);

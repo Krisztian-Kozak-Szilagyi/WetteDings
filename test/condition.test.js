@@ -194,3 +194,16 @@ test('Bügeln (#204): je 20 % glatt eine Note mehr, höchstens 9; Brandflecken z
     assert.ok(l.y >= 30 && l.y <= 70 && Math.abs(l.angle) <= 12);
   }
 });
+
+test('#204: sichtbare Spuren – nur Kratzer und Knick, nie Note, Ecken, Kanten oder Zentrierung', () => {
+  const { visibleMarks, creaseLine } = require('../src/grading/condition');
+  const id = '6702a1b2c3d4e5f6a7b8c9d0';
+  const defects = { scratches: [{ x: 30.4, y: 40, len: 20, angle: -12 }], corners: [1, 2], edges: [{ side: 0, pos: 50 }], crease: true, centering: { lr: 70 } };
+  const m = visibleMarks(defects, id, false);
+  assert.deepEqual(m, { s: [[30, 40, 20, -12]], c: creaseLine(id), i: false });
+  assert.deepEqual(Object.keys(m).sort(), ['c', 'i', 's']);
+  assert.equal(visibleMarks(defects, id, true).i, true); // gebügelt
+  assert.deepEqual(visibleMarks({ scratches: [] }, id), { s: [], c: null, i: false });
+  assert.deepEqual(visibleMarks(undefined, id), { s: [], c: null, i: false });
+  assert.equal(visibleMarks({ crease: false }, id, true).i, false); // ohne Knick nichts gebügelt
+});

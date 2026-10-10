@@ -171,6 +171,22 @@ function applyIron(defects, { smooth, burns }, line = { y: 50, angle: 0 }) {
 }
 
 /**
+ * Sichtbare Spuren eines Exemplars (#204) – nur das, was man an der Karte sieht, wenn man genau hinschaut: Kratzer
+ * und Knick. Ecken, Kanten, Zentrierung und die Note bleiben geheim. defects darf unvollständig sein (geladen werden
+ * nur condition.defects.scratches und .crease). id legt die Lage des Knicks fest (creaseLine), ironed = gebügelt.
+ * Gibt { s: [[x, y, len, angle]], c: { y, angle } | null, i } zurück – kompakt für ein data-Attribut.
+ */
+function visibleMarks(defects, id, ironed = false) {
+  const d = defects || {};
+  const num = (v) => (Number.isFinite(v) ? Math.round(v) : 0);
+  return {
+    s: (d.scratches || []).map((x) => [num(x.x), num(x.y), num(x.len), num(x.angle)]),
+    c: d.crease ? creaseLine(id) : null,
+    i: !!(d.crease && (ironed || d.ironed)),
+  };
+}
+
+/**
  * Sichtbarer Versatz einer folierten Karte aus ihrer Zentrierung: { x, y } von −1 bis 1 (0 = mittig).
  * Gespeichert ist nur, wie schief (z. B. 62/38) – in welche Richtung, ergibt sich fest aus der Exemplar-ID,
  * damit dasselbe Exemplar immer gleich aussieht. Nur waagerecht (oben/unten zählt nicht), y ist immer 0.
@@ -202,4 +218,4 @@ function gradeStats(grades) {
   return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
-module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap, addDamage, conditionV3, CREASE_SEGMENTS, IRON_MAX_CAP, ironCap, creaseLine, applyIron };
+module.exports = { visibleMarks, CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap, addDamage, conditionV3, CREASE_SEGMENTS, IRON_MAX_CAP, ironCap, creaseLine, applyIron };

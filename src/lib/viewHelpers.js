@@ -45,6 +45,19 @@ function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false,
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
   return h;
 }
+/**
+ * Attribute für die Großansicht eines unfolierten Exemplars mit sichtbarem Schaden (#204) – dieselbe 3D-Ansicht wie
+ * bei folierten Karten (public/js/foil-view.js), nur ohne Hülle und mit Kratzern bzw. Knick (grading/condition.visibleMarks).
+ * offer: Link „Im Handel anbieten“ (eigenes Album), trade: „Angebot machen“ (fremde Sammlung), note: Zeile unter der Karte
+ */
+function copyViewAttrs(card, rarityLabel, marks, { offer = null, trade = null, note = '' } = {}) {
+  let h = ` data-foil-view data-bare data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}"`;
+  h += ` data-marks="${escAttr(JSON.stringify(marks || {}))}"`;
+  if (offer) h += ` data-offer-href="${escAttr(offer)}"`;
+  if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
+  if (note) h += ` data-copy-note="${escAttr(note)}"`;
+  return h;
+}
 /** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
 const dayDateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: config.timezone });
 const dayDate = (d) => (d ? dayDateFmt.format(new Date(d)) : '–');
@@ -201,6 +214,7 @@ module.exports = {
   date,
   dayDate,
   foilViewAttrs,
+  copyViewAttrs,
   gradeWord,
   slabCert,
   dateSec,

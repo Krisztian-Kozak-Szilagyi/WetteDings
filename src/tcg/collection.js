@@ -4,14 +4,16 @@ const { lockedDocs, isStateLock } = require('./locks');
 const catalog = require('./catalog');
 const foil = require('../items/foil');
 const { inventory } = require('./tcgService');
-const { gradeStats, centerShift } = require('../grading/condition');
+const { gradeStats, centerShift, visibleMarks } = require('../grading/condition');
 const { konfettiFor } = require('../cosmetics/logic');
 
 async function collection(user) {
-  const [owned, locked, foiledDocs] = await Promise.all([
+  const [owned, locked, foiledDocs, damagedDocs] = await Promise.all([
     inventory(user._id),
     lockedDocs(user._id),
     TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt slab condition.defects.centering').sort({ foiledAt: 1 }).lean(),
+    // nur die sichtbaren Spuren laden – Note und übrige Mängel bleiben auf dem Server (#204)
+    TcgCard.find({ user: user._id, foiledAt: null, damaged: true }).select('card rarity creased ironedAt condition.defects.scratches condition.defects.crease').sort({ createdAt: 1 }).lean(),
   ]);
   // Folierte Exemplare je Karte – im Album und in fremden Sammlungen eigene Plätze: { cardId: [{ id, foiledAt }] }
   const foiledCopies = {};
@@ -26,6 +28,21 @@ async function collection(user) {
       center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null, // sichtbarer Versatz
       value: foil.cardValue(r ? r.sell : 0, foil.growthFrom(d)),
       lock: lock && !isStateLock(lock) ? lock : null, // 'handel' | 'quest'
+    });
+  }
+  // Unfolierte Exemplare mit sichtbarem Schaden (#204) – eigene Plätze, in der Großansicht mit Kratzern und Knick:
+  // { cardId: [{ id, marks, creased, ironed, value, lock }] }
+  const markedCopies = {};
+  for (const d of damagedDocs) {
+    const r = catalog.rarityByKey[d.rarity];
+    const lock = locked.reasons.get(String(d._id));
+    (markedCopies[d.card] = markedCopies[d.card] || []).push({
+      id: String(d._id),
+      marks: visibleMarks(d.condition && d.condition.defects, d._id, !!d.ironedAt),
+      creased: !!d.creased,
+      ironed: !!d.ironedAt,
+      value: r ? r.sell : 0,
+      lock: lock || null, // 'handel' | 'quest' | 'dungeon' | 'duell'
     });
   }
   // Gesperrte Exemplare je Karte (Quest/Handel): { cardId: { n, reason } }
@@ -56,6 +73,7 @@ async function collection(user) {
     foiledByCard,
     creasedByCard,
     foiledCopies,
+    markedCopies,
     graded: gradeStats(foiledDocs.map((d) => d.slab && d.slab.grade)), // beste Note und Schnitt der Slabs
     protectedIds,
     uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
