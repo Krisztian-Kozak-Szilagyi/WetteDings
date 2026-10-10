@@ -582,7 +582,7 @@ async function awardTrophy(team, { day, from, place, score, prize }) {
   const winners = league.prizeMembers(team.members, from);
   const label = league.placeInfo(place).label;
   const paid = await inTransaction(async (session) => {
-    const t = await EsportsTeam.updateOne({ _id: team._id, 'trophies.week': { $ne: day } }, { $push: { trophies: { week: day, place, score } } }, { session });
+    const t = await EsportsTeam.updateOne({ _id: team._id, 'trophies.week': { $ne: day } }, { $push: { trophies: { week: day, place, score, members: winners.map((m) => m.user) } } }, { session });
     if (!t.modifiedCount) return false;
     for (const m of winners) {
       if (prize.cash) {

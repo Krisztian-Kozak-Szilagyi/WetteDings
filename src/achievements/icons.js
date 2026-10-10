@@ -149,6 +149,63 @@ const GLYPHS = {
     '<path d="M84 32 a22 7 0 0 1 -30 9" fill="none" stroke="S" stroke-width="4" stroke-linecap="round"/>' +
     '<path d="M64 46 V92" stroke="S" stroke-width="7" stroke-linecap="round"/><path d="M47 58 H81" stroke="S" stroke-width="6" stroke-linecap="round"/>' +
     '<path d="M57 92 L64 106 L71 92Z" fill="F"/><circle cx="64" cy="46" r="5" fill="F"/>',
+  // eingeschweißte Karte: Karte in Folie mit Glanzstreifen und Schweißnaht
+  foil:
+    '<rect x="38" y="26" width="52" height="74" rx="9" fill="none" stroke="S" stroke-width="3" stroke-dasharray="4 3"/>' +
+    '<rect x="45" y="33" width="38" height="60" rx="5" fill="F"/>' +
+    '<path d="M64 46 l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1z" fill="D" opacity=".75"/>' +
+    '<path d="M47 86 L81 40" stroke="#fff" stroke-width="5" opacity=".35" stroke-linecap="round"/><path d="M56 92 L83 55" stroke="#fff" stroke-width="2.5" opacity=".3" stroke-linecap="round"/>',
+  // Black Market: Maske
+  mask:
+    '<path d="M28 52 C28 44 40 40 64 40 C88 40 100 44 100 52 C100 70 90 80 78 80 C70 80 68 72 64 72 C60 72 58 80 50 80 C38 80 28 70 28 52Z" fill="F"/>' +
+    '<path d="M38 56 q8 -8 18 0 q-9 7 -18 0z M72 56 q10 -8 18 0 q-9 7 -18 0z" fill="D"/>' +
+    '<path d="M28 52 L16 46 M100 52 L112 46" stroke="S" stroke-width="3" stroke-linecap="round"/>',
+  // Ladenkette: Laden mit Markise und Stern
+  shop:
+    '<path d="M30 46 L36 30 H92 L98 46Z" fill="F"/>' +
+    '<path d="M30 46 q8.5 10 17 0 q8.5 10 17 0 q8.5 10 17 0 q8.5 10 17 0" fill="F"/>' +
+    '<path d="M47 46 q8.5 10 17 0 M81 46 q8.5 10 17 0" fill="none" stroke="D" stroke-width="1.5" opacity=".4"/>' +
+    '<rect x="35" y="56" width="58" height="40" rx="2" fill="F" opacity=".85"/>' +
+    '<rect x="42" y="64" width="20" height="32" rx="2" fill="D"/><rect x="68" y="64" width="18" height="16" rx="2" fill="D"/>' +
+    '<path d="M77 66 l2 4 4.5 .6 -3.3 3 .9 4.4 -4.1 -2.2 -4.1 2.2 .9 -4.4 -3.3 -3 4.5 -.6z" fill="F"/>',
+  // Turm mit Spitze und Sternen
+  tower:
+    '<path d="M64 18 L80 44 H48Z" fill="F"/>' +
+    '<rect x="50" y="44" width="28" height="56" fill="F"/>' +
+    '<path d="M50 62 H78 M50 80 H78" stroke="D" stroke-width="2" opacity=".45"/>' +
+    '<rect x="60" y="50" width="8" height="9" rx="4" fill="D"/><rect x="60" y="67" width="8" height="9" rx="4" fill="D"/><path d="M58 100 v-12 a6 6 0 0 1 12 0 v12z" fill="D"/>' +
+    '<path d="M32 34 l2 4 4 1 -4 1 -2 4 -2 -4 -4 -1 4 -1z M96 52 l2 4 4 1 -4 1 -2 4 -2 -4 -4 -1 4 -1z" fill="F"/>',
+  // Boss-Karte: Karte mit Krone und Totenkopf
+  bosscard:
+    '<rect x="42" y="30" width="44" height="66" rx="6" fill="F"/>' +
+    '<path d="M50 44 L54 34 L60 41 L64 31 L68 41 L74 34 L78 44Z" fill="D"/>' +
+    '<path d="M51 66 a13 13 0 0 1 26 0 v6 l-4 3 v6 h-18 v-6 l-4 -3z" fill="D"/>' +
+    '<circle cx="58" cy="65" r="3.6" fill="F"/><circle cx="70" cy="65" r="3.6" fill="F"/><path d="M62 81 v-4 M66 81 v-4" stroke="F" stroke-width="2"/>',
+  // eSports-Team: drei Köpfe
+  team:
+    '<circle cx="64" cy="44" r="11" fill="F"/><path d="M44 84 a20 20 0 0 1 40 0z" fill="F"/>' +
+    '<circle cx="38" cy="54" r="8.5" fill="F" opacity=".8"/><path d="M22 88 a16 16 0 0 1 32 0z" fill="F" opacity=".8"/>' +
+    '<circle cx="90" cy="54" r="8.5" fill="F" opacity=".8"/><path d="M74 88 a16 16 0 0 1 32 0z" fill="F" opacity=".8"/>',
+  // Bühne: Vorhang und Spotlicht
+  stage:
+    '<path d="M26 28 H102 V36 H26Z" fill="F"/>' +
+    '<path d="M28 36 C34 60 32 80 26 96 H44 C44 74 40 54 46 36Z M100 36 C94 60 96 80 102 96 H84 C84 74 88 54 82 36Z" fill="F" opacity=".85"/>' +
+    '<path d="M64 38 L50 92 H78Z" fill="#fff" opacity=".16"/>' +
+    '<rect x="40" y="92" width="48" height="6" rx="2" fill="F"/>' +
+    '<path d="M64 60 l3 6 6.5 1 -4.7 4.5 1.1 6.5 -5.9 -3.1 -5.9 3.1 1.1 -6.5 -4.7 -4.5 6.5 -1z" fill="F"/>',
+  // Treppchen 2 – 1 – 3
+  podium:
+    '<rect x="52" y="54" width="24" height="44" rx="2" fill="F"/><rect x="28" y="68" width="24" height="30" rx="2" fill="F" opacity=".8"/><rect x="76" y="76" width="24" height="22" rx="2" fill="F" opacity=".65"/>' +
+    '<text x="64" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="16" fill="D">1</text>' +
+    '<text x="40" y="88" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="13" fill="D">2</text>' +
+    '<text x="88" y="92" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="12" fill="D">3</text>' +
+    '<path d="M64 30 l3.5 7 7.7 1.1 -5.6 5.4 1.3 7.7 -6.9 -3.6 -6.9 3.6 1.3 -7.7 -5.6 -5.4 7.7 -1.1z" fill="F"/>',
+  // Pokal
+  trophy:
+    '<path d="M44 28 H84 V50 a20 20 0 0 1 -40 0Z" fill="F"/>' +
+    '<path d="M44 34 H32 v6 a14 14 0 0 0 14 14 M84 34 H96 v6 a14 14 0 0 1 -14 14" fill="none" stroke="S" stroke-width="5" stroke-linecap="round"/>' +
+    '<rect x="58" y="68" width="12" height="14" fill="F"/><rect x="46" y="82" width="36" height="8" rx="2" fill="F"/><rect x="40" y="90" width="48" height="8" rx="2" fill="F"/>' +
+    '<text x="64" y="54" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="18" fill="D">1</text>',
 };
 
 const DARK = '#171826';

@@ -5394,6 +5394,25 @@ a.bx-row:hover { background: color-mix(in srgb, var(--color-accent) 6%, transpar
 }
 .ach-pin:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); }
 .ach-pin.is-on { color: var(--color-accent-400); background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+/* Eigener Fortschritt bei gesperrten Erfolgen */
+.ach-step { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.ach-step-bar { flex: 0 1 160px; height: 5px; border-radius: 99px; background: var(--color-neutral-900); overflow: hidden; box-shadow: 0 0 0 1px var(--color-neutral-800); }
+.ach-step-bar > span { display: block; width: var(--p, 0%); height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--color-accent-600), #45d9ff); }
+.ach-step-text { font-size: .8rem; color: var(--color-neutral-300); font-variant-numeric: tabular-nums; min-width: 0; }
+/* Aufklappen: die übrigen Erfolge (angeheftete und Balken bleiben immer sichtbar) */
+.ach-fold { margin-top: 8px; }
+.ach-fold > summary {
+  list-style: none; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px;
+  border-radius: var(--radius-md); color: var(--color-neutral-300); font-size: .9rem; font-weight: 600; cursor: var(--cur-pointer);
+}
+.ach-fold > summary::-webkit-details-marker { display: none; }
+.ach-fold > summary:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ach-fold > summary svg { transition: transform .2s ease; }
+.ach-fold[open] > summary svg { transform: rotate(180deg); }
+.ach-fold .ach-fold-less, .ach-fold[open] .ach-fold-more { display: none; }
+.ach-fold[open] .ach-fold-less { display: inline; }
+.ach-fold[open] > .ach-list { margin-top: 8px; }
+@media (max-width: 560px) { .ach-step { flex-direction: column; align-items: stretch; gap: 4px; } .ach-step-bar { flex-basis: auto; } }
 
 /* Vitrine rechts: angeheftete Erfolge, darunter Abzeichen (nur wenn zutreffend) */
 .pf-showcase-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
