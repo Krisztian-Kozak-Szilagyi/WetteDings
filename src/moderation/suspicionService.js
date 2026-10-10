@@ -71,7 +71,7 @@ const valueWith = (prices) => (cardId, line) => {
   const bank = valueOf(cardId);
   if (!line || !prices) return bank;
   const m = prices.get(marketPrice.keyOf(line));
-  return Math.max(bank, m ? m.avg : 0);
+  return Math.max(bank, marketPrice.measured(m) ? m.avg : 0); // nur gemessene Preise, keine Einzelfälle
 };
 
 /** Bankwert einer Karte oder eines Gegenstands in Cent */

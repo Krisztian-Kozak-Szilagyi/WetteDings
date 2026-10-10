@@ -258,6 +258,20 @@ async function refundShop(shopId, session) {
   return out;
 }
 
+/**
+ * Konto gelöscht (#204): offene Aufträge dieses Kunden enden ohne Erstattung (die Karte verschwindet mit dem Konto,
+ * das Guthaben verfällt ohnehin); ein angefangener Job beim Shop wird gelöscht. In der Transaktion des Aufrufers –
+ * gibt die Aufträge zurück (zum Benachrichtigen der Shops).
+ */
+async function dropOwner(ownerId, session) {
+  const open = await GradingOrder.find({ owner: ownerId, status: { $in: OPEN } }).session(session).lean();
+  if (!open.length) return [];
+  await GradingOrder.updateMany({ _id: { $in: open.map((o) => o._id) }, status: { $in: OPEN } }, { $set: { status: 'storniert', doneAt: new Date() } }, { session });
+  const jobs = open.map((o) => o.job).filter(Boolean);
+  if (jobs.length) await GradingJob.deleteMany({ _id: { $in: jobs }, status: 'offen' }, { session });
+  return open;
+}
+
 /** Bewertung des Kunden: 1–5 Sterne, einmal, bis RATE_DAYS nach der Rückgabe – zählt fürs Rating und die Reputation */
 async function rate({ user, orderId, stars }) {
   if (!(Number.isInteger(stars) && stars >= 1 && stars <= 5)) throw new UserError('Bitte vergib 1 bis 5 Sterne.');
@@ -327,6 +341,7 @@ module.exports = {
   cancel,
   expireDue,
   refundShop,
+  dropOwner,
   closeWithRefund,
   rate,
   setShowcase,

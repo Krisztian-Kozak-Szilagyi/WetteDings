@@ -79,6 +79,11 @@ function startJobs() {
   setTimeout(suspicion, 30 * 1000).unref();
   setInterval(suspicion, 10 * 60 * 1000).unref();
 
+  // Grading (#204): abgelaufene Aufträge von Mitgliedern erstatten – auch wenn niemand die Grading-Seiten öffnet
+  const gradingOrders = () => require('./grading/orderService').expireDue().catch((err) => console.error('Grading-Aufträge-Fehler:', err));
+  setTimeout(gradingOrders, 35 * 1000).unref();
+  setInterval(gradingOrders, 5 * 60 * 1000).unref();
+
   // Börsenbericht: jede Minute prüfen, ob der Bericht des Tages (18:45 Uhr) fällig ist – danach springt der ETF
   const boerse = () => reportService.runDue().catch((err) => console.error('Börsenbericht-Fehler:', err));
   setTimeout(boerse, 45 * 1000).unref();

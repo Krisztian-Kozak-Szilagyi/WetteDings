@@ -56,28 +56,55 @@ test('#204 C: Kürzel bei Slab-Verkäufen und Ø je Shop', () => {
 });
 
 test('#204 C: Schätzung – Seltenheit, Verbreitung, Note, Population, Vertrauen', () => {
-  const { estimate, ratiosFrom, trustOf, GRADE_FACTOR } = require('../src/trade/marketPrice');
+  const { estimate, ratiosFrom, trustOf, GRADE_FACTOR, RARITY_RATIO } = require('../src/trade/marketPrice');
   const catalog = require('../src/tcg/catalog');
   const card = catalog.cardsByRarity.holo[0];
   const sell = catalog.rarityByKey.holo.sell;
+  const h = RARITY_RATIO.holo; // Startwert ohne eigene Daten (aus dem Protokoll: Holo ≈ 3 × Händlerpreis)
   // Verhältnis Markt/Händler erst ab 3 verkauften Stück
   assert.equal(ratiosFrom(new Map([[`${card.id}|lose`, { avg: sell * 2, n: 2 }]])).size, 0);
   const ratios = ratiosFrom(new Map([[`${card.id}|lose`, { avg: sell * 2, n: 3 }], [`${card.id}|lose#X`, { avg: 1, n: 99 }]]));
   assert.equal(ratios.get('holo|lose'), 2);
-  // ohne Daten: Händlerpreis
-  assert.equal(estimate({ card: card.id }), sell);
+  // ohne Daten: Händlerpreis × Startwert der Seltenheit; mit Daten das gemessene Verhältnis
+  assert.equal(estimate({ card: card.id }), Math.round(sell * h));
   assert.equal(estimate({ card: card.id }, { ratios }), sell * 2);
+  assert.equal(estimate({ card: card.id, damaged: true }), Math.round(sell * h * 0.75));
   // Verbreitung: niemand besitzt sie → ×1,5; alle → ×1
   const population = (share, slabs = {}) => ({ active: 10, spread: new Map([[card.id, { owners: 1, share }]]), pop: new Map([[card.id, { copies: 5, slabs, byCode: {} }]]) });
-  assert.equal(estimate({ card: card.id }, { population: population(0) }), Math.round(sell * 1.5));
-  assert.equal(estimate({ card: card.id }, { population: population(1) }), sell);
+  assert.equal(estimate({ card: card.id }, { population: population(0) }), Math.round(sell * h * 1.5));
+  assert.equal(estimate({ card: card.id }, { population: population(1) }), Math.round(sell * h));
   // Slab Note 10, keiner da: × 3 (Note) × 1,75 (Pop) × Vertrauen
   const slab = { card: card.id, foiledAt: new Date(), slab: { code: 'TST', grade: 10 } };
-  assert.equal(estimate(slab, { population: population(1) }), Math.round(sell * GRADE_FACTOR[10] * 1.75));
-  assert.equal(estimate(slab, { population: population(1, { 10: 3 }) }), Math.round(sell * 3));
-  assert.equal(estimate(slab, { population: population(1, { 10: 3 }), trust: new Map([['TST', 1.2]]) }), Math.round(sell * 3 * 1.2));
+  assert.equal(estimate(slab, { population: population(1) }), Math.round(sell * h * GRADE_FACTOR[10] * 1.75));
+  assert.equal(estimate(slab, { population: population(1, { 10: 3 }) }), Math.round(sell * h * 3));
+  assert.equal(estimate(slab, { population: population(1, { 10: 3 }), trust: new Map([['TST', 1.2]]) }), Math.round(sell * h * 3 * 1.2));
   assert.equal(estimate({ card: 'item:folie' }), null);
   assert.equal(trustOf({ exact: 5, n: 5 }), 1.2);
   assert.equal(trustOf({ exact: 0, n: 10 }), 0.8);
   assert.equal(trustOf({ exact: 0, n: 2 }), 1); // zu wenige Noten
+});
+
+test('#204 C: Marktpreis robust – Geschenke, Mehrfach-Konten, Ausreißer, mindestens zwei Handelspaare', () => {
+  const { aggregate, measured } = require('../src/trade/marketPrice');
+  const catalog = require('../src/tcg/catalog');
+  const card = catalog.cardsByRarity.glitch[0];
+  const sell = catalog.rarityByKey.glitch.sell;
+  const key = `${card.id}|lose`;
+  const row = (unit, pair, n = 1) => ({ key, n, unit, pair });
+  // drei Glitch-Karten für je 1 € (wie im Protokoll) sind Geschenke und zählen nicht
+  assert.equal(aggregate([row(100, 'a:b'), row(101, 'a:c'), row(100, 'a:d')]).get(key), undefined);
+  // ein Verkauf zwischen erkannten Mehrfach-Konten zählt nicht
+  const flagged = new Set(['a:x']);
+  const m = aggregate([row(sell * 2, 'a:x'), row(sell, 'a:b'), row(sell * 1.2, 'c:d')], flagged).get(key);
+  assert.deepEqual([m.avg, m.n, m.pairs], [sell * 1.1, 2, 2]);
+  // Ausreißer über dem 5-fachen Median fällt raus
+  assert.equal(aggregate([row(sell, 'a:b'), row(sell, 'c:d'), row(sell * 20, 'e:f')]).get(key).avg, sell);
+  // gemessen erst ab zwei Handelspaaren
+  const one = aggregate([row(sell, 'a:b'), row(sell, 'a:b')]).get(key);
+  assert.equal(measured(one), false);
+  assert.equal(measured(m), true);
+  const prices = new Map([[key, one]]);
+  const s = summary([{ card: card.id }], prices, {});
+  assert.equal(s.avg, null);
+  assert.equal(s.estimated, true);
 });
