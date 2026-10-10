@@ -82,7 +82,7 @@
 </<%= bm.open ? 'details' : 'section' %>>
 <% } %>
 
-<% if (bazaar) { const bz = bazaar; const bzLeft = bz.offers.filter((o) => !o.buyer).length; %>
+<% if (bazaar) { const bz = bazaar; %>
 <%# Lil Dré's Bazaar: nur für spielfähige eSports-Teams; Plätze gelten fürs ganze Team, neue Ware täglich um 00:00 %>
 <details class="bm bz is-open" id="bazaar">
   <summary class="bm-head bz-head">
@@ -90,7 +90,6 @@
     <div class="bm-title bz-title">
       <div class="bm-title-row">
         <h2>Lil Dré's Bazaar</h2>
-        <span class="bm-state bm-state-open"><span class="bm-dot"></span>Für <%= bz.team.name %> · noch <%= bzLeft %> von <%= bz.offers.length %></span>
       </div>
       <span class="bz-restock">Neue Ware in <strong data-countdown-parts="<%= bz.restockAt.getTime() %>"><span data-cd="h">–</span>:<span data-cd="m">–</span>:<span data-cd="s">–</span></strong></span>
     </div>
