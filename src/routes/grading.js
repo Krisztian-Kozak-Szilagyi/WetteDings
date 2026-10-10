@@ -1,5 +1,8 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { requireLogin } = require('../middleware');
+const { GradingShop } = require('../models/Grading');
+const { TcgCard } = require('../models/Tcg');
 const grading = require('../grading/gradingService');
 const catalog = require('../tcg/catalog');
 const { centerShift, centeringCap, CENTERING, creaseLine } = require('../grading/condition');
@@ -68,7 +71,64 @@ router.get('/grading', async (req, res) => {
     // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
     heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
     doneCards: state.done.map((j) => ({ ...j, cardInfo: catalog.cardById[j.card] || null })),
+    // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
+    ironLevel: grading.IRON_LEVEL,
+    ironable:
+      state.shop && state.shop.active && state.info.level >= grading.IRON_LEVEL
+        ? (await grading.ironableCards(req.user._id)).map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info)
+        : [],
   });
+});
+
+/** Karte aus dem Katalog mit Seltenheits-Bezeichnung (null, wenn unbekannt) */
+function cardInfo(id) {
+  const c = catalog.cardById[id];
+  return c ? { name: c.name, image: c.image, rarity: c.rarity, rarityLabel: catalog.rarityByKey[c.rarity].label, rank: catalog.rarityByKey[c.rarity].rank, season: c.season } : null;
+}
+
+// ---------- Eigene Karten bügeln (#204) ----------
+router.post('/grading/eigene/:doc/start', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.doc)) throw new UserError('Diese Karte gibt es nicht.');
+    await grading.startIroning({ user: req.user, doc: req.params.doc });
+    res.redirect(`/grading/eigene/${req.params.doc}`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+    res.redirect('/grading');
+  }
+});
+
+// Bügeltisch für die eigene Karte – nur, solange genau diese Karte gerade gebügelt wird
+router.get('/grading/eigene/:doc', async (req, res) => {
+  const shop = await GradingShop.findById(req.user._id).select('ironing active level').lean();
+  const doc = shop && shop.ironing && String(shop.ironing.doc) === req.params.doc ? await TcgCard.findOne({ _id: shop.ironing.doc, user: req.user._id }).select('card').lean() : null;
+  if (!doc) return res.redirect('/grading');
+  res.render('grading-eigene', {
+    title: 'Karte bügeln',
+    // Für den Arbeitstisch nur, was man sieht: der Knick – keine Note, keine anderen Mängel (#73)
+    jobData: {
+      own: true,
+      steps: ['iron'],
+      card: cardInfo(doc.card),
+      spots: [],
+      defects: { crease: true },
+      crease: creaseLine(doc._id),
+      center: null,
+      centerCap: 10,
+      ironUrl: '/grading/eigene/fertig',
+      backUrl: '/grading',
+    },
+  });
+});
+
+router.post('/grading/eigene/fertig', async (req, res) => {
+  try {
+    res.json(await grading.finishIroning({ user: req.user, smooth: Number(str(req.body.smooth)), burns: Number(str(req.body.burns)) }));
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ error: err.message });
+  }
 });
 
 async function handle(req, res, fn) {

@@ -13,6 +13,8 @@ const foil = require('../items/foil');
 const estimate = require('./estimate');
 const { rnd, chance, pick, weighted, rollDefects, gradeFor, applyIron, creaseLine, ironCap, CREASE_SEGMENTS, PROFILES: CONDITION_PROFILES } = require('./condition');
 const { notify } = require('../services/notifyService');
+const { TcgCard } = require('../models/Tcg');
+const { lockedDocs, isLocked, claim } = require('../tcg/locks');
 
 // ---------- Spielregeln (Demo-Werte) ----------
 const CONTRACT_DAYS = 10; // so lange kann man nach der Annahme nicht kündigen
@@ -295,6 +297,65 @@ async function ironJob({ user, smooth, burns }) {
   return { ...input, cap: ironCap(input.smooth), defects: updated.defects };
 }
 
+// ---------- Eigene Karten bügeln (#204) ----------
+// Wer im Grading-Shop ab Stufe IRON_LEVEL arbeitet, kann eigene unfolierte Karten mit Knick bügeln – einmal je Knick.
+// Kein Lohn; das Ergebnis bleibt an der Karte (höhere Obergrenze, Brandflecken als Kratzer). Die Note bleibt geheim.
+
+/** Eigene Exemplare zum Bügeln: unfoliert, mit Knick, noch nicht gebügelt, nicht gesperrt – [{ id, card }] */
+async function ironableCards(userId) {
+  const [docs, locked] = await Promise.all([
+    TcgCard.find({ user: userId, creased: true, ironedAt: null, foiledAt: null }).select('card').sort({ createdAt: -1 }).lean(),
+    lockedDocs(userId),
+  ]);
+  return docs.filter((d) => !isLocked(locked, d)).map((d) => ({ id: String(d._id), card: d.card }));
+}
+
+/** Prüft Shop und Stufe fürs Bügeln eigener Karten */
+async function ironShop(userId, session = null) {
+  const shop = await GradingShop.findById(userId).session(session);
+  if (!shop || !shop.active) throw new UserError('Bügeln kannst du nur, solange du im Grading-Shop arbeitest.');
+  if (shop.level < IRON_LEVEL) throw new UserError(`Bügeln kannst du erst ab Stufe ${IRON_LEVEL}.`);
+  return shop;
+}
+
+/** Bügeln einer eigenen Karte beginnen: merkt sich Exemplar und Startzeit (für die Mindestzeit) */
+async function startIroning({ user, doc }) {
+  return inTransaction(async (session) => {
+    const shop = await ironShop(user._id, session);
+    const card = await TcgCard.findOne({ _id: doc, user: user._id }).select('card foiledAt creased ironedAt').session(session).lean();
+    if (!card) throw new UserError('Diese Karte gehört dir nicht (mehr).');
+    if (card.foiledAt) throw new UserError('Folierte Karten sind eingeschweißt – zum Bügeln zuerst die Folie abziehen.');
+    if (!card.creased) throw new UserError('Diese Karte hat keinen Knick.');
+    if (card.ironedAt) throw new UserError('Diese Karte ist schon gebügelt.');
+    if (isLocked(await lockedDocs(user._id, session), card)) throw new UserError('Die Karte ist gerade unterwegs (Quest, Dungeon, Handel oder Duell).');
+    await claim([card], user._id, session);
+    shop.ironing = { doc: card._id, startedAt: new Date() };
+    await shop.save({ session });
+    return card;
+  });
+}
+
+/** Bügeln einer eigenen Karte abschließen – gibt { smooth, burns, cap, card } zurück (ohne Mängel: die bleiben geheim) */
+async function finishIroning({ user, smooth, burns }) {
+  return inTransaction(async (session) => {
+    const shop = await ironShop(user._id, session);
+    if (!shop.ironing || !shop.ironing.doc) throw new UserError('Du bügelst gerade keine Karte.');
+    const input = ironInput({ smooth, burns });
+    if (Date.now() - shop.ironing.startedAt.getTime() < ironMinMs(input.smooth)) throw new UserError('So schnell kann niemand bügeln – versuch es noch einmal.');
+    const doc = await TcgCard.findOne({ _id: shop.ironing.doc, user: user._id, foiledAt: null, ironedAt: null }).select('card condition').session(session).lean();
+    shop.ironing = null;
+    await shop.save({ session });
+    if (!doc || !doc.condition || !doc.condition.defects.crease) throw new UserError('Diese Karte kannst du nicht mehr bügeln.');
+    const defects = applyIron(doc.condition.defects, input, creaseLine(doc._id));
+    await TcgCard.updateOne(
+      { _id: doc._id, user: user._id, foiledAt: null, ironedAt: null },
+      { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), ironedAt: new Date() } },
+      { session }
+    );
+    return { ...input, cap: ironCap(input.smooth), card: doc.card };
+  });
+}
+
 /**
  * Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben. clean = Sauberkeit 0–100 %.
  * Wer versiegelt (ab Stufe 3), findet mit kleiner Chance eine Folie fürs Inventar.
@@ -357,4 +418,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

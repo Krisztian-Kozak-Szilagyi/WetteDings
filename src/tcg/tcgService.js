@@ -412,7 +412,7 @@ async function favoriteList(owner, counts) {
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
 /**
- * Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, creased: unfolierte mit Knick (#204),
+ * Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, creased: unfolierte mit ungebügeltem Knick (#204),
  * v: Wert in Cent (mit Folie) }]
  */
 async function inventory(userId) {
@@ -425,7 +425,8 @@ async function inventory(userId) {
         n: { $sum: 1 },
         rarity: { $first: '$rarity' },
         foiled: { $sum: { $cond: [isFoiled, 1, 0] } },
-        creased: { $sum: { $cond: [{ $and: [{ $eq: ['$creased', true] }, { $not: [isFoiled] }] }, 1, 0] } },
+        // gebügelte Knicke sieht man kaum noch – sie zählen nicht mit
+        creased: { $sum: { $cond: [{ $and: [{ $eq: ['$creased', true] }, { $not: [isFoiled] }, { $ne: [{ $type: '$ironedAt' }, 'date'] }] }, 1, 0] } },
         v: { $sum: sellValueExpr() },
       },
     },

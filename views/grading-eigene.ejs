@@ -1,0 +1,24 @@
+<%- include('partials/head') %>
+<%# Eigene Karte bügeln (#204): derselbe Arbeitstisch wie bei Kundenaufträgen (public/js/grading.js), nur der Schritt Bügeln %>
+<div class="gr-page">
+  <div class="gr-head">
+    <h1>Karte bügeln</h1>
+    <a class="btn btn-ghost btn-sm" href="/grading">Zurück zum Shop</a>
+  </div>
+  <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>" data-csrf="<%= csrfToken %>">
+    <div class="gr-ticket">
+      <span class="gr-ticket-label">Eigene Karte</span>
+      <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
+      <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %></span><% } %>
+      <span class="gr-ticket-for">ein Versuch – das Ergebnis bleibt</span>
+    </div>
+    <%- include('partials/grading-stage', { steps: jobData.steps }) %>
+    <ol class="gr-steps" data-gr-steps>
+      <li data-step="iron">Bügeln</li>
+    </ol>
+    <%- include('partials/grading-iron-panel', { own: true }) %>
+  </section>
+</div>
+
+<script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

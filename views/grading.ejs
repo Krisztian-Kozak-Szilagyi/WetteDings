@@ -63,29 +63,7 @@
             <span class="gr-ticket-for">für <%= jobData.customer %></span>
           </div>
 
-          <div class="gr-stage" data-gr-stage>
-            <div class="gr-lamp" aria-hidden="true"></div>
-            <div class="gr-zoom" data-gr-zoom>
-              <div class="gr-obj" data-gr-obj></div>
-            </div>
-            <div class="gr-hint" data-gr-hint></div>
-            <%# Messen: Ränder und Zentrierung aus den Messlinien (grading.js), nur beim Benoten %>
-            <div class="gr-measure-read" data-gr-measure-read aria-live="polite" hidden></div>
-            <%# Maus-Werkzeug: Drehen, Putzen, Messen oder UV-Lampe (Tasten D, P, M und U) %>
-            <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
-              <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
-              <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
-              <% if (jobData.steps.includes('iron')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="iron" title="Bügeln (Taste B)" hidden><span aria-hidden="true">♨️</span> Bügeln</button><% } %>
-              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
-              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode gr-mode-uv" role="radio" data-gr-mode="uv" title="UV-Lampe: Macken an Ecken und Kanten leuchten auf (Taste U)" hidden><span aria-hidden="true">🔦</span> UV-Lampe</button><% } %>
-            </div>
-            <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
-            <div class="gr-zoom-btns">
-              <button type="button" class="gr-round" data-gr-zoom-step="-1" title="Verkleinern" aria-label="Verkleinern">−</button>
-              <button type="button" class="gr-round" data-gr-zoom-step="1" title="Vergrößern" aria-label="Vergrößern">+</button>
-              <button type="button" class="gr-round" data-gr-zoom-step="0" title="Zurücksetzen" aria-label="Zurücksetzen">⟲</button>
-            </div>
-          </div>
+          <%- include('partials/grading-stage', { steps: jobData.steps }) %>
 
           <ol class="gr-steps" data-gr-steps>
             <li data-step="clean">Reinigen</li>
@@ -200,6 +178,30 @@
           <% } else { %>
             <h2>Feierabend!</h2>
             <p>Alle <%= limit %> Aufträge für heute sind erledigt. Morgen ab <%= bonusTime %> Uhr kommen neue.</p>
+          <% } %>
+        </section>
+      <% } %>
+
+      <% if (info.level >= ironLevel) { %>
+        <%# #204: eigene Karten mit Knick (im Spiel abbekommen) bügeln – einmal je Knick, kein Lohn %>
+        <section class="gr-done-wrap gr-own">
+          <h2>Eigene Karten bügeln</h2>
+          <% if (ironable.length) { %>
+            <p class="muted small">Knicke aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – aber Vorsicht vor Brandflecken. Ein Versuch je Karte.</p>
+            <ul class="gr-done">
+              <% ironable.forEach((x) => { %>
+                <li class="r-<%= x.info.rarity %>">
+                  <span class="gr-done-thumb"><img src="<%= x.info.image %>" alt="" width="36" height="50" loading="lazy"></span>
+                  <span class="gr-done-info"><span><b><%= x.info.name %></b> <span class="gr-dim"><%= x.info.rarityLabel %> · Knick</span></span></span>
+                  <form method="post" action="/grading/eigene/<%= x.id %>/start">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="btn btn-sm" type="submit">Bügeln</button>
+                  </form>
+                </li>
+              <% }) %>
+            </ul>
+          <% } else { %>
+            <p class="muted small">Keine deiner Karten hat einen Knick. Knicke entstehen selten, wenn du in Quest, Dungeon oder Turm verlierst – folierte Karten sind geschützt.</p>
           <% } %>
         </section>
       <% } %>
