@@ -53,7 +53,7 @@
           </span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
           <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
-          <span class="hb-card-market"><%= marketText(market([{ card: c.id }])) %></span>
+          <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id }])) %></span>
           <% step(side + ':' + c.id, c.name, x.max, n) %>
         </div>
       <% }) %>
@@ -63,7 +63,7 @@
           <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: f.slab, id: f.id, center: f.center }) %></span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
           <span class="hb-card-sub"><%= f.slab ? 'Slab ' + f.slab.code + ' · Note ' + f.slab.grade : 'In Folie' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
-          <span class="hb-card-market"><%= marketText(market([{ card: c.id, foiledAt: f.foiledAt, slab: f.slab }])) %></span>
+          <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id, foiledAt: f.foiledAt, slab: f.slab }])) %></span>
         </label>
       <% }) %>
       <%# Beschädigte Exemplare (#204): einzeln wählbar; die Lupe zeigt Kratzer und Knick (public/js/foil-view.js) %>
@@ -77,7 +77,7 @@
           </span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
           <span class="hb-card-sub"><%= what %> · <%= euro(m.value) %><%= m.lock ? ' · gesperrt' : '' %></span>
-          <span class="hb-card-market"><%= marketText(market([{ card: c.id, damaged: true }])) %></span>
+          <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id, damaged: true }])) %></span>
         </label>
       <% }) %>
     </div>

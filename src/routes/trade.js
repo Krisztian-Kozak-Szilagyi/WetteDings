@@ -45,7 +45,7 @@ const marketText = (s) => (!s ? '' : s.avg == null ? 'noch kein Marktpreis' : `�
 /** Helfer für alle Handels-Ansichten; prices = Ø-Marktpreise (marketPrice.all) */
 const viewHelpers = (prices = new Map()) => ({
   // Ø-Marktpreis (#204) für Positionen einer Seite – nur wenn alle dieselbe Karte im selben Zustand sind
-  market: (list) => marketPrice.summary(list, prices),
+  marketAvg: (list) => marketPrice.summary(list, prices),
   marketText,
   priceDays: marketPrice.DAYS,
   cardInfo,

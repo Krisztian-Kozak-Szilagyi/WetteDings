@@ -180,7 +180,7 @@
                 <span class="<%= t.price < value ? 'pos' : '' %>">Wert <%= euro(value) %></span>
               </span>
             <% } %>
-            <% const ms = kindKey === 'swap' ? null : market(kindKey === 'wanted' ? t.want : t.give); if (ms) { const per = Math.floor(t.price / ms.count); %>
+            <% const ms = kindKey === 'swap' ? null : marketAvg(kindKey === 'wanted' ? t.want : t.give); if (ms) { const per = Math.floor(t.price / ms.count); %>
               <span class="mk-avg" title="Ø-Marktpreis je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage">
                 <%= marketText(ms) %><% if (ms.avg != null && ms.count > 1) { %> · hier <%= euro(per) %> je Stück<% } %>
                 <% if (ms.avg != null && kindKey === 'sale') { %><b class="<%= per <= ms.avg ? 'pos' : 'neg' %>"><%= per <= ms.avg ? 'unter Ø' : 'über Ø' %></b><% } %>

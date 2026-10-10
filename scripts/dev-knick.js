@@ -4,13 +4,15 @@
  * In der laufenden Dev-Datenbank (npm run dev) bekommt ein Spieler:
  *   - einen Grading-Shop ab Stufe 2 (mit Namen und Kürzel, falls noch keiner),
  *   - einen offenen Kundenauftrag mit Knick (ein schon offener Auftrag bekommt den Knick, Bügeln und Note zurückgesetzt),
- *   - zwei eigene unfolierte Karten mit Knick (Grading-Shop → „Eigene Karten bügeln“, Album zeigt „Knick“).
+ *   - zwei eigene unfolierte Karten mit Knick (Grading-Shop → „Eigene Karten bügeln“, Album zeigt „Knick“),
+ *   - eine eigene Karte mit zwei Kratzern (Album: eigener Platz, Kratzer in der Großansicht; Handel: einzelnes Exemplar),
+ *   - einen BfW-Slab (wie die früheren Folien: Etikett mit Note, spielt nicht mit).
  *
  *   npm run dev                      (in einem zweiten Terminal laufen lassen)
  *   npm run dev:knick                für admin
  *   npm run dev:knick -- anna        für einen anderen Testspieler
  *
- * Danach /grading neu laden.
+ * Danach /grading, /tcg/album oder /handel/neu neu laden.
  */
 const path = require('path');
 
@@ -67,14 +69,24 @@ async function main() {
   }
 
   // Eigene Karten mit Knick (wie nach einer verlorenen Quest)
-  const cards = await TcgCard.find({ user: user._id, foiledAt: null, creased: { $ne: true } }).select('card condition').limit(OWN_CARDS).lean();
+  const fresh = await TcgCard.find({ user: user._id, foiledAt: null, damaged: { $ne: true } }).select('card condition').limit(OWN_CARDS + 2).lean();
+  const cards = fresh.slice(0, OWN_CARDS);
   for (const c of cards) {
     const defects = addDamage(c.condition.defects, 'knick');
-    await TcgCard.updateOne({ _id: c._id }, { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), creased: true, ironedAt: null } });
+    await TcgCard.updateOne({ _id: c._id }, { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), creased: true, damaged: true, ironedAt: null } });
   }
+  // Eine Karte mit zwei Kratzern
+  const scratched = fresh[OWN_CARDS];
+  if (scratched) {
+    const defects = addDamage(addDamage(scratched.condition.defects, 'kratzer'), 'kratzer');
+    await TcgCard.updateOne({ _id: scratched._id }, { $set: { 'condition.defects': defects, 'condition.grade': gradeFor(defects), damaged: true } });
+  }
+  // Ein BfW-Slab (wie nach der Migration foilToSlab)
+  const slabbed = fresh[OWN_CARDS + 1];
+  if (slabbed) await TcgCard.updateOne({ _id: slabbed._id }, { $set: { foiledAt: now, slab: { code: 'BfW', grade: slabbed.condition.grade, at: now } } });
 
-  console.log(`[dev:knick] ${user.username}: Shop Stufe ${level}${naming.code ? ` („${naming.name}“, ${naming.code})` : ''}, Auftrag mit Knick (${job}), ${cards.length} eigene Karte(n) mit Knick.`);
-  console.log('[dev:knick] /grading neu laden.');
+  console.log(`[dev:knick] ${user.username}: Shop Stufe ${level}${naming.code ? ` („${naming.name}“, ${naming.code})` : ''}, Auftrag mit Knick (${job}), ${cards.length} eigene Karte(n) mit Knick${scratched ? ', 1 mit Kratzern' : ''}${slabbed ? ', 1 BfW-Slab' : ''}.`);
+  console.log('[dev:knick] /grading, /tcg/album oder /handel/neu neu laden.');
 }
 
 main()

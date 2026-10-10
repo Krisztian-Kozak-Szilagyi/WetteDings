@@ -105,7 +105,7 @@
                     <span class="tcg-dot r-<%= c.rarity %>"></span>
                     <span class="ng-line-name"><%= n > 1 ? n + '× ' : '' %><%= c.name %></span>
                     <% const st = stateLabel(l); if (st) { %><span class="foil-tag"<%- l.foiledAt ? ` title="Foliert am ${dayDate(l.foiledAt)}"` : '' %>><%= st %></span><% } %>
-                    <% const ms = c.isItem ? null : market([l]); if (ms) { %><span class="ng-line-market muted small" title="Ø-Marktpreis je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage"><%= marketText(ms) %></span><% } %>
+                    <% const ms = c.isItem ? null : marketAvg([l]); if (ms) { %><span class="ng-line-market muted small" title="Ø-Marktpreis je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage"><%= marketText(ms) %></span><% } %>
                     <span class="ng-line-value"><%= euro(lineValue(l) * n) %></span>
                   </li>
                 <% }) %>
