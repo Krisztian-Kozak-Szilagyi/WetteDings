@@ -8,6 +8,7 @@ const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const lines = require('../trade/lines');
 const blackMarket = require('../tcg/blackMarket');
+const bazaarService = require('../esports/bazaarService');
 const foil = require('../items/foil');
 const items = require('../items/itemService');
 const { str, UserError } = require('../lib/util');
@@ -132,10 +133,11 @@ function wishPool(counts) {
 
 // ---------- Handelsseite ----------
 router.get('/handel', async (req, res) => {
-  const [data, market, coll] = await Promise.all([
+  const [data, market, coll, bazaar] = await Promise.all([
     trade.overview(req.user),
     blackMarket.today(), // Black Market (16:30–19:00): vier Angebote (Karten, selten Bosskarte oder Folie), jedes nur einmal
     collection(req.user),
+    bazaarService.forUser(req.user), // Lil Dré's Bazaar: nur für spielfähige eSports-Teams (sonst null)
     // Besuch merken: der Markt gilt ab jetzt als gesehen
     User.updateOne({ _id: req.user._id }, { $set: { marketSeenAt: new Date(), dealsSeenAt: new Date() } }),
   ]);
@@ -151,7 +153,19 @@ router.get('/handel', async (req, res) => {
     tab: TABS.includes(asked) ? asked : 'markt',
     rarities: catalog.visibleRarities(),
     blackMarket: { ...market, openTime: blackMarket.OPEN, closeTime: blackMarket.CLOSE, percent: blackMarket.PRICE_PERCENT },
+    bazaar,
   });
+});
+
+// Lil Dré's Bazaar: einen der vier Plätze kaufen (Karte ins Album, der Platz ist fürs ganze Team weg)
+router.post('/handel/bazaar', async (req, res) => {
+  try {
+    await bazaarService.buy({ user: req.user, index: str(req.body.index) });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/handel#bazaar');
 });
 
 // Black Market: eines der vier Angebote kaufen (Karte oder Gegenstand)

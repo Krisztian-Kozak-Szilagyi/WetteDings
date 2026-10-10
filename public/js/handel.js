@@ -8,6 +8,8 @@
   // ---------- Black Market: nach einem Kauf (#blackmarket) aufgeklappt zeigen ----------
   var bm = $('details#blackmarket');
   if (bm && window.location.hash === '#blackmarket') bm.open = true;
+  var bz = $('details#bazaar');
+  if (bz && window.location.hash === '#bazaar') bz.open = true;
 
   // ---------- Miniaturen in den Angeboten vergrößern ----------
   var zoom = $('[data-zoom-modal]');
