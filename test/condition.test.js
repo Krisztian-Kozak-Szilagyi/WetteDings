@@ -27,7 +27,15 @@ test('Zustand: Mängel im Format der Grading-Aufträge, Note folgt aus den Mäng
   }
 });
 
-test('Zustand: frisch aus dem Pack – Note 8 am häufigsten, im Schnitt besser als gebrauchte Kundenkarten', () => {
+test('Zustand: frisch aus dem Pack – nie Kratzer oder Knick (#204), die entstehen erst im Spiel', () => {
+  for (let i = 0; i < 5000; i++) {
+    const { defects } = rollCondition();
+    assert.equal(defects.scratches.length, 0);
+    assert.equal(defects.crease, false);
+  }
+});
+
+test('Zustand: frisch aus dem Pack – Note 10 am häufigsten, im Schnitt besser als gebrauchte Kundenkarten', () => {
   const N = 20000;
   const roll = (fn) => {
     const count = {};
@@ -41,9 +49,10 @@ test('Zustand: frisch aus dem Pack – Note 8 am häufigsten, im Schnitt besser 
   };
   const frisch = roll(() => rollCondition().grade);
   const kunde = roll(() => gradeFor(rollDefects('kunde')));
-  // exakt: 10 ≈ 10,6 %, 9 ≈ 25,6 %, 8 ≈ 27,6 %, Ø ≈ 7,76
-  assert.ok(frisch.share(8) > frisch.share(9) && frisch.share(9) > frisch.share(10), 'Note 8 am häufigsten, dann 9, dann 10');
-  assert.ok(frisch.share(10) > 0.07 && frisch.share(10) < 0.14, `frisch 10: ${frisch.share(10)}`);
+  // exakt: 10 ≈ 35,9 %, 9 ≈ 34,5 %, 8 ≈ 18,0 %, Ø ≈ 8,88
+  assert.ok(frisch.share(10) > frisch.share(8) && frisch.share(9) > frisch.share(8), 'Note 10 und 9 vor der 8');
+  assert.ok(frisch.share(10) > 0.32 && frisch.share(10) < 0.40, `frisch 10: ${frisch.share(10)}`);
+  assert.ok(frisch.avg > 8.8 && frisch.avg < 8.96, `Ø frisch: ${frisch.avg}`);
   assert.ok(frisch.avg > kunde.avg, `Ø frisch ${frisch.avg} > kunde ${kunde.avg}`);
   assert.ok(kunde.share(10) > 0.05 && kunde.share(10) < 0.12, `kunde 10: ${kunde.share(10)}`); // exakt ≈ 8,5 %
   assert.ok(kunde.share(8) > kunde.share(9), 'auch bei Kundenkarten ist die 8 häufiger als die 9');
@@ -122,4 +131,66 @@ test('Erst Obergrenze (Knick, Zentrierung – nur links/rechts zählt), dann je 
   assert.deepEqual(condition.gradeCap({ ...none, centering: { lr: 75, tb: 50 } }), { cap: 6, by: 'zentrierung' });
   assert.deepEqual(condition.gradeCap(none), { cap: 10, by: null });
   assert.equal(gradeFor({ ...none, crease: true, scratches: [{}], centering: { lr: 50, tb: 50 } }), 3);
+});
+
+test('Schaden (#204): Kratzer kommt dazu, Knick nur einmal – ein zweiter wird zum Kratzer; das Original bleibt', () => {
+  const { addDamage } = condition;
+  const base = { scratches: [], corners: [1], edges: [], crease: false, centering: { lr: 50 } };
+  const k = addDamage(base, 'kratzer');
+  assert.equal(k.scratches.length, 1);
+  assert.equal(base.scratches.length, 0);
+  assert.equal(gradeFor(k), 8); // 10 − Ecke − Kratzer
+  const knick = addDamage(base, 'knick');
+  assert.equal(knick.crease, true);
+  assert.equal(gradeFor(knick), 3); // Obergrenze 4 − Ecke
+  const twice = addDamage(knick, 'knick');
+  assert.equal(twice.crease, true);
+  assert.equal(twice.scratches.length, 1);
+  // gebügelter Knick, dann neuer Knick: Bügeln ist aufgehoben
+  const ironed = { ...base, crease: true, creaseCap: 8, ironed: true };
+  const fresh = addDamage({ ...ironed, crease: false }, 'knick');
+  assert.equal(fresh.creaseCap, undefined);
+  assert.equal(fresh.ironed, undefined);
+});
+
+test('Migration auf Version 3: unfoliert ohne Kratzer und Knick, foliert unverändert, zweimal = einmal', () => {
+  const { conditionV3 } = condition;
+  const defects = { scratches: [{ x: 1, y: 1, len: 1, angle: 0 }], corners: [0], edges: [], crease: true, centering: { lr: 58 } };
+  const old = { v: 2, grade: gradeFor(defects), defects };
+  assert.equal(old.grade, 2); // Knick 4 − Kratzer − Ecke
+  const free = conditionV3(old, false);
+  assert.deepEqual(free, { v: 3, grade: 8, defects: { scratches: [], corners: [0], edges: [], crease: false, centering: { lr: 58 } } });
+  assert.equal(old.defects.scratches.length, 1); // Original unverändert
+  assert.deepEqual(conditionV3(free, false), free);
+  const foiled = conditionV3(old, true);
+  assert.deepEqual(foiled, { ...old, v: 3 });
+  // ein späterer Schaden (schon v3) bleibt erhalten
+  const damaged = { v: 3, grade: 7, defects: { ...free.defects, scratches: [{}] } };
+  assert.equal(conditionV3(damaged, false), damaged);
+});
+
+test('Bügeln (#204): je 20 % glatt eine Note mehr, höchstens 9; Brandflecken zählen als Kratzer', () => {
+  const { ironCap, applyIron, creaseLine, gradeCap } = condition;
+  assert.deepEqual([0, 19, 20, 59, 80, 100, 150, -5].map(ironCap), [4, 4, 5, 6, 8, 9, 9, 4]);
+  const knick = { scratches: [], corners: [], edges: [], crease: true, centering: { lr: 50 } };
+  const smooth = applyIron(knick, { smooth: 100, burns: 0 });
+  assert.deepEqual(gradeCap(smooth), { cap: 9, by: 'knick' });
+  assert.equal(gradeFor(smooth), 9);
+  assert.equal(knick.ironed, undefined); // Original unverändert
+  const burnt = applyIron(knick, { smooth: 60, burns: 2 }, creaseLine('6abf00'));
+  assert.equal(gradeFor(burnt), 7 - 2);
+  // nur einmal: ein gebügelter Knick bleibt, wie er ist; ohne Knick passiert nichts
+  assert.deepEqual(applyIron(smooth, { smooth: 0, burns: 5 }), smooth);
+  assert.deepEqual(applyIron({ ...knick, crease: false }, { smooth: 100, burns: 3 }), { ...knick, crease: false });
+  // Werte vom Browser werden geklemmt
+  assert.equal(applyIron(knick, { smooth: 100, burns: 99 }).scratches.length, condition.CREASE_SEGMENTS);
+  assert.equal(applyIron(knick, { smooth: 'x', burns: -3 }).scratches.length, 0);
+  // Zentrierung bleibt die Obergrenze, wenn sie schlechter ist als der gebügelte Knick
+  assert.deepEqual(gradeCap({ ...smooth, centering: { lr: 75 } }), { cap: 6, by: 'zentrierung' });
+  // Knicklinie: fest je ID, auf der Karte
+  assert.deepEqual(creaseLine('6abf00'), creaseLine('6abf00'));
+  for (let i = 0; i < 300; i++) {
+    const l = creaseLine(i.toString(16).padStart(4, '0'));
+    assert.ok(l.y >= 30 && l.y <= 70 && Math.abs(l.angle) <= 12);
+  }
 });

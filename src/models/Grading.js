@@ -12,10 +12,15 @@ const shopSchema = new Schema(
     lockedUntil: { type: Date, default: null }, // Vertragsbindung (10 Tage ab Annahme)
     jobsDone: { type: Number, default: 0 }, // Aufträge insgesamt
     earned: { type: Number, default: 0 }, // Lohn insgesamt in Cent
+    name: { type: String, default: null }, // Name des Shops (#204), Pflicht vor dem ersten Auftrag
+    code: { type: String, default: null }, // Kürzel, z. B. "PSA" – steht auf den Slabs, eindeutig
+    // Laufendes Bügeln einer eigenen Karte (#204): welches Exemplar, seit wann (Mindestzeit wie beim Putzen)
+    ironing: { type: new Schema({ doc: Schema.Types.ObjectId, startedAt: Date }, { _id: false }), default: null },
   },
   { timestamps: true }
 );
 shopSchema.index({ active: 1 });
+shopSchema.index({ code: 1 }, { unique: true, partialFilterExpression: { code: { $type: 'string' } } });
 
 // Ein Auftrag: Karte eines (erfundenen) Kunden reinigen, bewerten und versiegeln.
 // Flecken und Mängel werden beim Annehmen ausgewürfelt; die echte Note kennt nur der Server.
@@ -35,6 +40,8 @@ const jobSchema = new Schema(
     seal: { type: Number, default: null }, // Qualität der Versiegelung 0–100
     pay: { type: Number, default: 0 }, // Lohn in Cent
     foilFound: { type: Boolean, default: false }, // beim Versiegeln eine Folie gefunden
+    iron: { type: new Schema({ smooth: Number, burns: Number }, { _id: false }), default: null }, // gebügelt (#204): geglättet in %, Brandflecken
+    shopCode: { type: String, default: null }, // Kürzel des Shops beim Abschluss (steht auf dem Slab)
     doneAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -47,7 +54,7 @@ jobSchema.index({ user: 1, createdAt: -1 });
 
 // Admin-Einstellungen (ein Dokument, _id "grading")
 const settingsSchema = new Schema(
-  { _id: { type: String, default: 'grading' }, open: Boolean, jobs: Number, pay: { clean: Number, grade: Number, slab: Number }, costs: [Number], premium: Number, updatedByName: String },
+  { _id: { type: String, default: 'grading' }, open: Boolean, jobs: Number, pay: { clean: Number, grade: Number, slab: Number, iron: Number }, costs: [Number], premium: Number, updatedByName: String },
   { timestamps: true }
 );
 

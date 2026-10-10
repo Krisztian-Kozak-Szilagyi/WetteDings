@@ -14,6 +14,10 @@ const cardSchema = new Schema(
     // gebunden. Sichtbar nur auf der Folie. select: false – wird nur geladen, wenn ausdrücklich angefordert
     // (z. B. .select('condition.grade')), damit er nie versehentlich in Seiten oder JSON landet.
     condition: { type: conditionSchema, select: false, default: () => rollCondition() },
+    // Sichtbar (#204): Die Karte hat einen Knick (im Spiel abbekommen, gemeldet) – und wann er gebügelt wurde.
+    // Bewusst außerhalb des geheimen Zustands: man sieht einen Knick, nicht aber die Note
+    creased: { type: Boolean, default: false },
+    ironedAt: { type: Date, default: null },
     // Zuletzt per Handel bekommen (rankService.FRESH_DAYS): so lange zählt das Exemplar in der Rangliste höchstens mit
     // tradedCost, dem Anteil dessen, was der Empfänger dafür gegeben hat – eine geschenkte Karte bringt niemanden auf Platz 1
     tradedAt: { type: Date, default: undefined },
@@ -23,6 +27,7 @@ const cardSchema = new Schema(
   { timestamps: true }
 );
 cardSchema.index({ user: 1, card: 1, createdAt: 1 });
+cardSchema.index({ user: 1, creased: 1 }); // Grading-Shop: eigene Karten mit Knick zum Bügeln
 
 // Ein ungeöffnetes Booster Pack im Inventar (wird beim Öffnen gelöscht)
 const packSchema = new Schema(

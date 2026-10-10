@@ -7,7 +7,8 @@ const crypto = require('crypto');
 
 // Version der Würfel-Regeln: ändern sie sich, bleiben gespeicherte Zustände gültig und unterscheidbar
 // 2: Zentrierung nur noch links/rechts (oben/unten wird nicht mehr gewürfelt und zählt nicht)
-const CONDITION_VERSION = 2;
+// 3: frische Karten ohne Kratzer und Knick (#204) – die entstehen erst im Spiel (src/grading/damage.js)
+const CONDITION_VERSION = 3;
 
 const rnd = (min, max) => min + (crypto.randomInt(1000000) / 1000000) * (max - min);
 const chance = (p) => crypto.randomInt(1000000) < p * 1000000;
@@ -32,7 +33,7 @@ const CENTERING = [
   { max: 70, cap: 7 },
   { max: 80, cap: 6 },
 ];
-// Ein Knick setzt die Obergrenze auf … (wie bei echtem Grading)
+// Ein Knick setzt die Obergrenze auf … (wie bei echtem Grading) – gebügelt höher, siehe ironCap
 const CREASE_CAP = 4;
 
 // Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
@@ -40,11 +41,12 @@ const CREASE_CAP = 4;
 // Die Gewichte entsprechen genau der schlechteren von zwei Achsen mit [78, 13, 5, 3, 1] bzw. [86, 9, 3, 1, 1] –
 // so blieb die Notenverteilung gleich, als oben/unten wegfiel (Version 2).
 // kunde: gebrauchte Karten der Kunden im Grading-Shop – Note 8 am häufigsten (≈ 23 %), 10 ≈ 9 %, Ø 7,2
-// frisch: Karten aus dem Pack, dem Black Market oder vom Team – Note 8 am häufigsten (≈ 28 %), 9 ≈ 26 %,
-// 10 ≈ 11 %, Ø 7,8 (exakt nachrechenbar; test/condition.test.js prüft die Form)
+// frisch: Karten aus dem Pack, dem Black Market oder vom Team – nur Zentrierung, Ecken und Kanten, nie Kratzer
+// oder Knick (#204): Note 10 am häufigsten (≈ 36 %), 9 ≈ 35 %, 8 ≈ 18 %, Ø 8,9 (exakt nachrechenbar;
+// test/condition.test.js prüft die Form)
 const PROFILES = {
   kunde: { scratches: [42, 35, 18, 5], corner: 0.13, edges: [62, 30, 8], crease: 0.06, centering: [6084, 2197, 935, 585, 199] },
-  frisch: { scratches: [30, 44, 21, 5], corner: 0.10, edges: [74, 22, 4], crease: 0.02, centering: [7396, 1629, 579, 197, 199] },
+  frisch: { scratches: [100], corner: 0.10, edges: [74, 22, 4], crease: 0, centering: [7396, 1629, 579, 197, 199] },
 };
 
 /** Zentrierung links/rechts: Bereich nach Gewichten, darin ein ganzzahliger Wert (50 = perfekt) */
@@ -62,15 +64,13 @@ function centeringCap(centering) {
   return range.cap;
 }
 
+/** Ein Kratzer irgendwo auf der Vorderseite (Positionen in % der Kartenfläche) */
+const rollScratch = () => ({ x: Math.round(rnd(20, 80)), y: Math.round(rnd(18, 82)), len: Math.round(rnd(14, 30)), angle: Math.round(rnd(-70, 70)) });
+
 /** Mängel der Vorderseite (Positionen in % der Kartenfläche) – Form wie GradingJob.defects */
 function rollDefects(profile = 'kunde') {
   const p = PROFILES[profile] || PROFILES.kunde;
-  const scratches = Array.from({ length: weighted(p.scratches) }, () => ({
-    x: Math.round(rnd(20, 80)),
-    y: Math.round(rnd(18, 82)),
-    len: Math.round(rnd(14, 30)),
-    angle: Math.round(rnd(-70, 70)),
-  }));
+  const scratches = Array.from({ length: weighted(p.scratches) }, rollScratch);
   const corners = [0, 1, 2, 3].filter(() => chance(p.corner));
   const edges = Array.from({ length: weighted(p.edges) }, () => ({ side: crypto.randomInt(4), pos: Math.round(rnd(20, 80)) }));
   const crease = chance(p.crease);
@@ -85,7 +85,8 @@ function rollDefects(profile = 'kunde') {
  */
 function gradeCap(defects) {
   const center = centeringCap(defects.centering);
-  if (defects.crease && CREASE_CAP <= center) return { cap: CREASE_CAP, by: 'knick' };
+  const crease = defects.creaseCap || CREASE_CAP; // gebügelt: höhere Obergrenze
+  if (defects.crease && crease <= center) return { cap: crease, by: 'knick' };
   return { cap: center, by: center < 10 ? 'zentrierung' : null };
 }
 
@@ -102,6 +103,71 @@ function gradeFor(defects) {
 function rollCondition(profile = 'frisch') {
   const defects = rollDefects(profile);
   return { v: CONDITION_VERSION, grade: gradeFor(defects), defects };
+}
+
+// Tiefe Kopie der Mängel (gespeicherte Zustände sind schlichte Objekte) – die Helfer unten ändern nie das Original
+const copyDefects = (defects) => JSON.parse(JSON.stringify(defects || {}));
+
+/**
+ * Schaden im Spiel (#204): 'kratzer' oder 'knick'. Ein zweiter Knick auf einer geknickten Karte wird zum Kratzer;
+ * ein neuer Knick hebt ein früheres Bügeln auf (er darf wieder gebügelt werden). Gibt neue Mängel zurück.
+ */
+function addDamage(defects, kind) {
+  const d = copyDefects(defects);
+  d.scratches = d.scratches || [];
+  if (kind === 'knick' && !d.crease) {
+    d.crease = true;
+    delete d.creaseCap;
+    delete d.ironed;
+  } else d.scratches.push(rollScratch());
+  return d;
+}
+
+/**
+ * Zustand auf Version 3 heben (Migration, #204): unfolierte Karten verlieren Kratzer und Knick (frische Karten haben
+ * keine mehr, ihre Note ist ohnehin geheim); folierte behalten ihre sichtbaren Mängel und ihre Note.
+ * Ab Version 3 bleibt alles, wie es ist – so löscht die Migration nie einen späteren Schaden.
+ */
+function conditionV3(cond, foiled) {
+  if (!cond || cond.v >= 3) return cond;
+  if (foiled) return { ...cond, v: 3 };
+  const defects = { ...copyDefects(cond.defects), scratches: [], crease: false };
+  delete defects.creaseCap;
+  delete defects.ironed;
+  return { v: 3, grade: gradeFor(defects), defects };
+}
+
+// ---------- Bügeln (#204) ----------
+// Der Knick ist eine Linie quer über die Karte aus CREASE_SEGMENTS Stücken. Wie viel davon glatt wird, bestimmt die
+// neue Obergrenze: 0 % bleibt bei CREASE_CAP, je 20 % eine Note mehr, höchstens 9 (ein Knick bleibt sichtbar).
+const CREASE_SEGMENTS = 10;
+const IRON_MAX_CAP = 9;
+/** Knick-Obergrenze nach dem Bügeln, smooth = geglättet in % */
+const ironCap = (smooth) => Math.min(IRON_MAX_CAP, CREASE_CAP + Math.floor(Math.max(0, Math.min(100, smooth || 0)) / 20));
+
+/**
+ * Lage des Knicks: { y, angle } – waagerecht quer über die Karte, Höhe y in % und leichte Schräge in Grad.
+ * Fest aus der ID (Exemplar oder Auftrag), damit derselbe Knick immer gleich aussieht – wie centerShift.
+ */
+function creaseLine(id) {
+  const bits = Number.parseInt(String(id || '').slice(-4), 16) || 0;
+  return { y: 30 + (bits % 41), angle: ((bits >> 6) % 25) - 12 };
+}
+
+/**
+ * Gebügelten Knick eintragen: neue Obergrenze aus smooth (0–100 %), jeder Brandfleck (zu lange auf einer Stelle)
+ * zählt als Kratzer auf der Knicklinie. Ohne Knick oder schon gebügelt: unverändert. Gibt neue Mängel zurück.
+ */
+function applyIron(defects, { smooth, burns }, line = { y: 50, angle: 0 }) {
+  const d = copyDefects(defects);
+  if (!d.crease || d.ironed) return d;
+  const n = Math.max(0, Math.min(CREASE_SEGMENTS, Math.floor(Number(burns) || 0)));
+  d.scratches = d.scratches || [];
+  for (let i = 0; i < n; i++) {
+    const x = Math.round(10 + ((i + 0.5) * 80) / n);
+    d.scratches.push({ x, y: Math.round(line.y + Math.tan((line.angle * Math.PI) / 180) * (x - 50)), len: 8, angle: line.angle });
+  }
+  return Object.assign(d, { creaseCap: ironCap(smooth), ironed: true });
 }
 
 /**
@@ -136,4 +202,4 @@ function gradeStats(grades) {
   return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
-module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap };
+module.exports = { CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap, addDamage, conditionV3, CREASE_SEGMENTS, IRON_MAX_CAP, ironCap, creaseLine, applyIron };

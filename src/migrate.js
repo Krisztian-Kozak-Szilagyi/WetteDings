@@ -7,8 +7,8 @@ const { migrateTradeDoc } = require('./trade/lines');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
 const { LotteryRound } = require('./models/Lottery');
-const { rollCondition, gradeFor } = require('./grading/condition');
-const { GradingJob } = require('./models/Grading');
+const { rollCondition, gradeFor, conditionV3 } = require('./grading/condition');
+const { GradingJob, GradingShop } = require('./models/Grading');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -39,6 +39,8 @@ async function migrate() {
   await TowerAttempt.createIndexes();
   // eSports: ein Spieler in höchstens einem Team – eindeutiger Index vor dem ersten Beitritt
   await require('./models/Esports').EsportsTeam.createIndexes();
+  // Grading-Shop (#204): Kürzel eindeutig – Index vor dem ersten Benennen
+  await GradingShop.createIndexes();
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [
@@ -152,6 +154,10 @@ async function migrate() {
   const regraded = await regradeWithoutTopBottom();
   if (regraded.cards || regraded.jobs) console.log(`Migration: Note ohne Oben/Unten-Zentrierung neu berechnet (${regraded.cards} Karte(n), ${regraded.jobs} Auftrag/Aufträge).`);
 
+  // #204: frische Karten haben keine Kratzer und Knicke mehr – unfolierte verlieren sie, folierte bleiben, wie sie sind
+  const v3 = await cleanFreshConditionsV3();
+  if (v3) console.log(`Migration: Zustand von ${v3} Karte(n) auf Version 3 gehoben (ohne Kratzer/Knick, wenn unfoliert).`);
+
   // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel)
   const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null } };
   const trades = await Trade.find({ status: 'offen', $or: [{ give: missing }, { want: missing }] }).select('give want').lean();
@@ -252,4 +258,25 @@ async function regradeWithoutTopBottom() {
   return { cards, jobs };
 }
 
-module.exports = { migrate, regradeWithoutTopBottom };
+/**
+ * #204: Zustände auf Version 3 heben (conditionV3) – unfolierte Karten ohne Kratzer und Knick, folierte unverändert;
+ * ein Knick, den man auf der Folie sieht, wird als sichtbares creased vermerkt. In Blöcken, idempotent über die
+ * Version (auch im Filter: ein inzwischen erlittener Schaden wird nie überschrieben). Gibt die Zahl der Karten zurück.
+ */
+async function cleanFreshConditionsV3(batch = 1000) {
+  const coll = TcgCard.collection; // roh: condition ist im Schema select: false
+  const old = { 'condition.v': { $lt: 3 } };
+  let done = 0;
+  for (;;) {
+    const docs = await coll.find(old).project({ condition: 1, foiledAt: 1 }).limit(batch).toArray();
+    if (!docs.length) return done;
+    const ops = docs.map((d) => {
+      const condition = conditionV3(d.condition, !!d.foiledAt);
+      return { updateOne: { filter: { _id: d._id, ...old }, update: { $set: { condition, creased: !!condition.defects.crease } } } };
+    });
+    done += (await coll.bulkWrite(ops, { ordered: false })).modifiedCount;
+    if (docs.length < batch) return done;
+  }
+}
+
+module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3 };
