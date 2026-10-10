@@ -52,7 +52,7 @@
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
           </span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
+          <span class="hb-card-sub"><%= holds(x) %> · Händler <%= euro(r.sell || 0) %></span>
           <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id }])) %></span>
           <% step(side + ':' + c.id, c.name, x.max, n) %>
         </div>
@@ -62,12 +62,12 @@
           <input type="checkbox" name="<%= side %>" value="f:<%= f.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %>">
           <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: f.slab, id: f.id, center: f.center }) %></span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub"><%= f.slab ? 'Slab ' + f.slab.code + ' · Note ' + f.slab.grade : 'In Folie' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
+          <span class="hb-card-sub"><%= f.slab ? 'Slab ' + f.slab.code + ' · Note ' + f.slab.grade : 'In Folie' %> · Händler <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
           <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id, foiledAt: f.foiledAt, slab: f.slab }])) %></span>
         </label>
       <% }) %>
       <%# Beschädigte Exemplare (#204): einzeln wählbar; die Lupe zeigt Kratzer und Knick (public/js/foil-view.js) %>
-      <% marked.forEach((m) => { const c = m.card; const r = pickRar(c); const on = preset.copies.has(m.id); const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : 'Exemplar'; %>
+      <% marked.forEach((m) => { const c = m.card; const r = pickRar(c); const on = preset.copies.has(m.id); const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : 'Gebrauchsspuren'; %>
         <label class="tcg-slot hb-card hb-foil hb-copy r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= c.name.toLowerCase() %> <%= r.label.toLowerCase() %> exemplar" data-label="<%= c.name %> (<%= what %>)" data-image="<%= c.image %>" data-value="<%= m.value %>">
           <input type="checkbox" name="<%= side %>" value="f:<%= m.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar (<%= what %>)">
           <span class="tcg-art hb-art">
@@ -76,7 +76,7 @@
             <button type="button" class="hb-loupe"<%- copyViewAttrs(c, r.label, m.marks, { note: 'Exemplar · ' + what }) %> aria-label="<%= c.name %> genau ansehen" title="Genau ansehen">🔍</button>
           </span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub"><%= what %> · <%= euro(m.value) %><%= m.lock ? ' · gesperrt' : '' %></span>
+          <span class="hb-card-sub"><%= what %> · Händler <%= euro(m.value) %><%= m.lock ? ' · gesperrt' : '' %></span>
           <span class="hb-card-market"><%= marketText(marketAvg([{ card: c.id, damaged: true }])) %></span>
         </label>
       <% }) %>

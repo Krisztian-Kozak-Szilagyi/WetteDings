@@ -34,7 +34,7 @@
       <strong class="ng-listing-name">Du gibst <%= sideText(lp.gives, lp.pay) %></strong>
       <strong class="ng-listing-name">und bekommst <%= sideText(lp.gets, lp.receive) %></strong>
       <% if (lp.receive && !lp.gets.length) { %><span class="ng-price"><%= euro(lp.receive) %></span><% } %>
-      <span class="muted small">Kartenwert <%= euro(linesValue(lp.gives)) %> gegen <%= euro(linesValue(lp.gets)) %><% if (lp.receive && taxFor(lp.receive, t.kind)) { %> · vom Geld bleiben dir <%= euro(lp.receive - taxFor(lp.receive, t.kind)) %> nach Steuer<% } %></span>
+      <span class="muted small">Händlerpreis <%= euro(linesValue(lp.gives)) %> gegen <%= euro(linesValue(lp.gets)) %><% if (lp.receive && taxFor(lp.receive, t.kind)) { %> · vom Geld bleiben dir <%= euro(lp.receive - taxFor(lp.receive, t.kind)) %> nach Steuer<% } %></span>
       <% if (isOpen) { %>
         <form method="post" action="/handel/angebot/<%= t._id %>/beenden" data-confirm="Markt-Angebot zurückziehen?<%= open.length ? ' Alle Gegenangebote darauf werden damit abgelehnt.' : '' %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -105,14 +105,14 @@
                     <span class="tcg-dot r-<%= c.rarity %>"></span>
                     <span class="ng-line-name"><%= n > 1 ? n + '× ' : '' %><%= c.name %></span>
                     <% const st = stateLabel(l); if (st) { %><span class="foil-tag"<%- l.foiledAt ? ` title="Foliert am ${dayDate(l.foiledAt)}"` : '' %>><%= st %></span><% } %>
-                    <% const ms = c.isItem ? null : marketAvg([l]); if (ms) { %><span class="ng-line-market muted small" title="Ø-Marktpreis je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage"><%= marketText(ms) %></span><% } %>
+                    <% const ms = c.isItem ? null : marketAvg([l]); if (ms) { %><span class="ng-line-market muted small" title="Marktpreis: Ø je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage"><%= marketText(ms) %></span><% } %>
                     <span class="ng-line-value"><%= euro(lineValue(l) * n) %></span>
                   </li>
                 <% }) %>
                 <% if (cents > 0) { %><li class="ng-money"><span class="ng-line-name">Geld</span><span class="ng-line-value"><%= euro(cents) %></span></li><% } %>
                 <% if (!list.length && !cents) { %><li class="muted">nichts</li><% } %>
               </ul>
-              <span class="ng-side-total">Kartenwert <%= euro(linesValue(list)) %></span>
+              <span class="ng-side-total">Händlerpreis <%= euro(linesValue(list)) %></span>
             </div>
             <% if (!idx) { %><svg class="ng-arrow" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg><% } %>
           <% }) %>

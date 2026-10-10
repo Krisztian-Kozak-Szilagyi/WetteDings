@@ -158,7 +158,7 @@
       var owned = count + locked;
       $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
         : (owned ? owned + '× im Besitz' : '') + (locked ? ' · ' + locked + '× ' + d.lockLabel : '') + (foiled ? (owned ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
-        + (noBank ? ' · Wert ' + d.sellText + ' (nur Handel, die Bank kauft sie nicht)' : '');
+        + (noBank ? ' · Grundwert ' + d.sellText + ' (nur Handel, kein Händlerpreis)' : ' · Händlerpreis ' + d.sellText);
       $('[data-tcg-owned-actions]', modal).hidden = former;
       $('[data-tcg-former-action]', modal).hidden = !former;
       if (former) {

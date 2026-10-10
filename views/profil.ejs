@@ -86,7 +86,7 @@
     <div class="stats stats-4">
       <div class="stat card"><span class="stat-label">Karten</span><span class="stat-value"><%= cardCount %></span></div>
       <div class="stat card"><span class="stat-label">Sammlung</span><span class="stat-value"><%= uniqueOwned %> / <%= totalCards %></span></div>
-      <div class="stat card"><span class="stat-label">Wert der Karten</span><span class="stat-value"><%= euro(cardValue) %></span></div>
+      <div class="stat card"><span class="stat-label">Händlerwert der Karten</span><span class="stat-value"><%= euro(cardValue) %></span></div>
       <div class="stat card">
         <span class="stat-label">Wetten richtig</span>
         <span class="stat-value"><%= decided ? Math.round((stats.won / decided) * 100) + ' %' : '–' %></span>

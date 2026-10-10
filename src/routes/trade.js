@@ -38,9 +38,10 @@ const linesValue = (list) => (list || []).reduce((s, l) => s + lineValue(l), 0);
 const offerLabel = (t) => (!t.to ? 'Markt' : t.listing ? 'Gegenangebot' : t.give.length && t.want.length ? 'Tausch' : t.give.length ? 'Verkauf' : 'Kaufanfrage');
 
 /**
- * Ø-Marktpreis als kurzer Text (#204): "Ø 12,50 € · 4 verkauft" bzw. "noch kein Marktpreis" – s aus marketPrice.summary
+ * Marktpreis als kurzer Text (#204): "Marktpreis Ø 12,50 € · 4 verkauft" bzw. "noch kein Marktpreis" – s aus marketPrice.summary.
+ * In Karten-UIs heißen die beiden Preise immer Händlerpreis (Bank) und Marktpreis (Spieler).
  */
-const marketText = (s) => (!s ? '' : s.avg == null ? 'noch kein Marktpreis' : `Ø ${euro(s.avg)} · ${s.n} verkauft`);
+const marketText = (s) => (!s ? '' : s.avg == null ? 'noch kein Marktpreis' : `Marktpreis Ø ${euro(s.avg)} · ${s.n} verkauft`);
 
 /** Helfer für alle Handels-Ansichten; prices = Ø-Marktpreise (marketPrice.all) */
 const viewHelpers = (prices = new Map()) => ({

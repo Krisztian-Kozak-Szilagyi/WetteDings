@@ -151,7 +151,7 @@
         sellLink.href = d.offerHref;
       } else if (album) {
         // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
-        statusEl.textContent = d.rarityLabel + (d.slabCode ? ' · Slab ' + d.slabCode : ' · in Folie') + ' · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
+        statusEl.textContent = d.rarityLabel + (d.slabCode ? ' · Slab ' + d.slabCode : ' · in Folie') + ' · Händlerpreis ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (ohne Slab ' + d.baseText + ')' : '');
         sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
       }
       noteEl.hidden = !album || !d.sellOff;
