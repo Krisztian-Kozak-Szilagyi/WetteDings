@@ -62,7 +62,7 @@ const tradeSchema = new Schema(
     closedVia: { type: Schema.Types.ObjectId, ref: 'Trade', default: null }, // Markt-Angebot: über dieses Gegenangebot abgeschlossen
     // Ø-Marktpreis (#204, trade/marketPrice): sauberer Verkauf einer Kartenart in einem Zustand – Schlüssel, Stückzahl,
     // Stückpreis (Cent). Beim Abschluss gesetzt; null = kein sauberer Verkauf (Tausch, Paket, Gegenstand)
-    priceRef: { type: new Schema({ key: String, n: Number, unit: Number }, { _id: false }), default: undefined },
+    priceRef: { type: new Schema({ key: String, n: Number, unit: Number, code: String }, { _id: false }), default: undefined }, // code: Kürzel bei Slabs
     taxPercent: { type: Number, default: 0 },
     tax: { type: Number, default: 0 }, // Cent
     closedAt: { type: Date, default: null },

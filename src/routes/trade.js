@@ -8,6 +8,8 @@ const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const lines = require('../trade/lines');
 const marketPrice = require('../trade/marketPrice');
+const population = require('../tcg/population');
+const { dayDate } = require('../lib/viewHelpers');
 const blackMarket = require('../tcg/blackMarket');
 const foil = require('../items/foil');
 const items = require('../items/itemService');
@@ -38,17 +40,36 @@ const linesValue = (list) => (list || []).reduce((s, l) => s + lineValue(l), 0);
 const offerLabel = (t) => (!t.to ? 'Markt' : t.listing ? 'Gegenangebot' : t.give.length && t.want.length ? 'Tausch' : t.give.length ? 'Verkauf' : 'Kaufanfrage');
 
 /**
- * Marktpreis als kurzer Text (#204): "Marktpreis Ø 12,50 € · 4 verkauft" bzw. "noch kein Marktpreis" – s aus marketPrice.summary.
+ * Marktpreis als kurzer Text (#204) – s aus marketPrice.summary:
+ *   gemessen: "Marktpreis Ø 12,50 € · 4 verkauft", bei Slabs eines Shops mit eigenen Verkäufen "· bei TST Ø 15,00 €"
+ *   geschätzt (Etappe C): "Marktpreis ~ 18,00 € (geschätzt)"; ohne beides: "noch kein Marktpreis".
  * In Karten-UIs heißen die beiden Preise immer Händlerpreis (Bank) und Marktpreis (Spieler).
  */
-const marketText = (s) => (!s ? '' : s.avg == null ? 'noch kein Marktpreis' : `Marktpreis Ø ${euro(s.avg)} · ${s.n} verkauft`);
+function marketText(s) {
+  if (!s) return '';
+  if (s.avg == null) return s.est != null ? `Marktpreis ~ ${euro(s.est)} (geschätzt)` : 'noch kein Marktpreis';
+  return `Marktpreis Ø ${euro(s.avg)} · ${s.n} verkauft` + (s.codeAvg != null ? ` · bei ${s.code} Ø ${euro(s.codeAvg)}` : '');
+}
 
-/** Helfer für alle Handels-Ansichten; prices = Ø-Marktpreise (marketPrice.all) */
-const viewHelpers = (prices = new Map()) => ({
-  // Ø-Marktpreis (#204) für Positionen einer Seite – nur wenn alle dieselbe Karte im selben Zustand sind
-  marketAvg: (list) => marketPrice.summary(list, prices),
+/** Letzte Verkäufe eines Exemplars als Text: "zuletzt verkauft für 40,00 € (03.10.2026), 25,00 €" – oder '' */
+const salesText = (list) => (list && list.length ? `zuletzt verkauft für ${list.map((x, i) => euro(x.unit) + (i ? '' : ` (${dayDate(x.at)})`)).join(', ')}` : '');
+
+/** Exemplare (Folie, Slab, beschädigt) aus Positionen und Pools – für marketPrice.copySales */
+const copyIdsOf = (...groups) => groups.flat().map((x) => x && (x.copy || x.doc || x.id)).filter(Boolean).map(String);
+
+/**
+ * Helfer für alle Handels-Ansichten. ctx = marketPrice.context() (gemessene Preise, Verhältnisse, Population, Vertrauen),
+ * sales = Map Exemplar → letzte Verkäufe (marketPrice.copySales)
+ */
+const viewHelpers = (ctx = { prices: new Map() }, sales = new Map()) => ({
+  // Marktpreis (#204) für Positionen einer Seite – nur wenn alle dieselbe Karte im selben Zustand sind; ohne Verkauf geschätzt
+  marketAvg: (list) => marketPrice.summary(list, ctx.prices, ctx),
   marketText,
   priceDays: marketPrice.DAYS,
+  // Verbreitung und Population (#204 C): "besitzen 12 % · 3 Slabs, 1 × Note 10"
+  popText: (l) => (l && !items.itemByCardId(l.card) ? population.popText(l.card, ctx.population, l.slab ? l.slab.grade : null) : ''),
+  // Verkaufsgeschichte eines Exemplars (id = Exemplar)
+  salesText: (id) => salesText(id && sales.get(String(id))),
   cardInfo,
   rarityByKey: tradeRarities(),
   lineValue,
@@ -170,7 +191,7 @@ router.get('/handel', async (req, res) => {
   res.render('handel', {
     title: 'Handel',
     ...data,
-    ...viewHelpers(await marketPrice.all()),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf(...data.market.map((t) => [...t.give, ...t.want]).flat().filter((l) => l.copy || l.foiledAt || l.damaged)))),
     coll,
     tab: TABS.includes(asked) ? asked : 'markt',
     rarities: catalog.visibleRarities(),
@@ -206,7 +227,7 @@ async function renderBuilder(req, res, { mode, partner = null, listing = null, o
   const theirs = partnerPool || (mode === 'neu' && !partner ? wishPool(mine.counts) : null);
   res.render('handel-neu', {
     title: mode === 'neu' ? 'Neuer Handel' : 'Gegenangebot',
-    ...viewHelpers(await marketPrice.all()),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf(mine.foiled, mine.marked, theirs ? [theirs.foiled, theirs.marked] : []))),
     mode,
     partner,
     listing,
@@ -329,7 +350,7 @@ router.get('/handel/angebot/:id', async (req, res) => {
   const coll = await collection(req.user);
   res.render('handel-angebot', {
     title: t.to ? 'Verhandlung' : 'Markt-Angebot',
-    ...viewHelpers(await marketPrice.all()),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf([...t.give, ...t.want].filter((l) => l.copy || l.foiledAt || l.damaged)))),
     t,
     role: n.role,
     counters: n.counters,

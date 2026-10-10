@@ -186,6 +186,7 @@
                 <% if (ms.avg != null && kindKey === 'sale') { %><b class="<%= per <= ms.avg ? 'pos' : 'neg' %>"><%= per <= ms.avg ? 'unter Ø' : 'über Ø' %></b><% } %>
               </span>
             <% } %>
+            <% if (single && !c.isItem) { const info = [popText(top), salesText(top.copy || top.doc)].filter(Boolean).join(' · '); if (info) { %><span class="mk-pop"><%= info %></span><% } } %>
             <span class="mk-seller">von <%- userLink(t.sellerName) %> · endet <%= relTime(t.expiresAt) %></span>
             <div class="mk-actions">
               <form method="post" action="/handel/angebot/<%= t._id %>/kaufen" data-confirm="<%= action %>? Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.">

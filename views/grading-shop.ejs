@@ -31,6 +31,7 @@
           <button type="button" class="tcg-slot foil-slot r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> aria-label="<%= x.card.name %>, Slab <%= x.slab.code %> Note <%= x.slab.grade %> – ansehen">
             <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
             <span class="tcg-slot-label"><span class="tcg-dot"></span>Slab <%= x.slab.code %> · Note <%= x.slab.grade %></span>
+            <span class="muted small"><%= popText(x) %></span>
           </button>
         <% }) %>
       </div>

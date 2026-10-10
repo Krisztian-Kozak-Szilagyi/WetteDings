@@ -177,6 +177,8 @@ async function migrate() {
   // #204: Ø-Marktpreis – abgeschlossene Geschäfte bekommen ihren Preisbezug (nach foilToSlab: Positionen kennen slab)
   const priced = await backfillPriceRefs();
   if (priced) console.log(`Migration: Preisbezug für ${priced} abgeschlossene(s) Geschäft(e) nachgetragen.`);
+  const coded = await backfillPriceCodes();
+  if (coded) console.log(`Migration: Shop-Kürzel bei ${coded} Slab-Verkauf/-Verkäufen nachgetragen.`);
 
   // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN,
   // geteilte Netze wie das Schulnetz)
@@ -341,4 +343,17 @@ async function backfillPriceRefs(batch = 1000) {
   }
 }
 
-module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs };
+/**
+ * #204 Etappe C: Slab-Verkäufe mit Preisbezug, aber ohne Kürzel (vor Etappe C abgeschlossen) bekommen es nachgetragen
+ * (null, wenn verschiedene Shops im Paket waren). Idempotent über das Feld. Gibt die Zahl zurück.
+ */
+async function backfillPriceCodes() {
+  const { priceRefOf } = require('./trade/marketPrice');
+  const coll = Trade.collection;
+  const docs = await coll.find({ 'priceRef.key': /\|slab-/, 'priceRef.code': { $exists: false } }).project({ give: 1, want: 1, price: 1, extraFrom: 1 }).toArray();
+  if (!docs.length) return 0;
+  await coll.bulkWrite(docs.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { 'priceRef.code': (priceRefOf(t) || {}).code || null } } } })), { ordered: false });
+  return docs.length;
+}
+
+module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };

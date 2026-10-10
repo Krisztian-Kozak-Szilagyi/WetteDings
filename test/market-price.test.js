@@ -36,9 +36,48 @@ test('#204: Ø-Marktpreis – nur saubere Verkäufe zählen', () => {
 
 test('#204: Ø-Marktpreis – Zusammenfassung einer Seite', () => {
   const prices = new Map([['a|lose', { avg: 450, n: 4, deals: 3 }]]);
-  assert.deepEqual(summary([{ card: 'a' }, { card: 'a' }], prices), { key: 'a|lose', state: 'lose', avg: 450, n: 4, deals: 3, count: 2 });
-  assert.deepEqual(summary([{ card: 'a', damaged: true }], prices), { key: 'a|beschaedigt', state: 'beschaedigt', avg: null, n: 0, deals: 0, count: 1 });
+  const pick = (s) => ({ key: s.key, state: s.state, avg: s.avg, n: s.n, deals: s.deals, count: s.count, estimated: s.estimated });
+  assert.deepEqual(pick(summary([{ card: 'a' }, { card: 'a' }], prices)), { key: 'a|lose', state: 'lose', avg: 450, n: 4, deals: 3, count: 2, estimated: false });
+  assert.deepEqual(pick(summary([{ card: 'a', damaged: true }], prices)), { key: 'a|beschaedigt', state: 'beschaedigt', avg: null, n: 0, deals: 0, count: 1, estimated: false });
   assert.equal(summary([{ card: 'a' }, { card: 'b' }], prices), null);
   assert.equal(summary([{ card: 'item:folie' }], prices), null);
   assert.equal(summary([], prices), null);
+});
+
+test('#204 C: Kürzel bei Slab-Verkäufen und Ø je Shop', () => {
+  const slab = (code, grade = 9) => ({ card: 'a', foiledAt: new Date(), slab: { code, grade } });
+  assert.deepEqual(priceRefOf(sale([slab('TST'), slab('TST')], 2000)), { key: 'a|slab-9', n: 2, unit: 1000, code: 'TST' });
+  assert.equal(priceRefOf(sale([slab('TST'), slab('ABC')], 2000)).code, undefined); // verschiedene Shops: kein Kürzel
+  assert.equal(priceRefOf(sale([{ card: 'a', foiledAt: new Date(), grade: 8 }], 500)).code, 'BfW');
+  const prices = new Map([['a|slab-9', { avg: 1200, n: 3, deals: 2 }], ['a|slab-9#TST', { avg: 1500, n: 1, deals: 1 }]]);
+  const s = summary([slab('TST')], prices);
+  assert.deepEqual([s.avg, s.code, s.codeAvg, s.codeN], [1200, 'TST', 1500, 1]);
+  assert.equal(summary([slab('ABC')], prices).codeAvg, null);
+});
+
+test('#204 C: Schätzung – Seltenheit, Verbreitung, Note, Population, Vertrauen', () => {
+  const { estimate, ratiosFrom, trustOf, GRADE_FACTOR } = require('../src/trade/marketPrice');
+  const catalog = require('../src/tcg/catalog');
+  const card = catalog.cardsByRarity.holo[0];
+  const sell = catalog.rarityByKey.holo.sell;
+  // Verhältnis Markt/Händler erst ab 3 verkauften Stück
+  assert.equal(ratiosFrom(new Map([[`${card.id}|lose`, { avg: sell * 2, n: 2 }]])).size, 0);
+  const ratios = ratiosFrom(new Map([[`${card.id}|lose`, { avg: sell * 2, n: 3 }], [`${card.id}|lose#X`, { avg: 1, n: 99 }]]));
+  assert.equal(ratios.get('holo|lose'), 2);
+  // ohne Daten: Händlerpreis
+  assert.equal(estimate({ card: card.id }), sell);
+  assert.equal(estimate({ card: card.id }, { ratios }), sell * 2);
+  // Verbreitung: niemand besitzt sie → ×1,5; alle → ×1
+  const population = (share, slabs = {}) => ({ active: 10, spread: new Map([[card.id, { owners: 1, share }]]), pop: new Map([[card.id, { copies: 5, slabs, byCode: {} }]]) });
+  assert.equal(estimate({ card: card.id }, { population: population(0) }), Math.round(sell * 1.5));
+  assert.equal(estimate({ card: card.id }, { population: population(1) }), sell);
+  // Slab Note 10, keiner da: × 3 (Note) × 1,75 (Pop) × Vertrauen
+  const slab = { card: card.id, foiledAt: new Date(), slab: { code: 'TST', grade: 10 } };
+  assert.equal(estimate(slab, { population: population(1) }), Math.round(sell * GRADE_FACTOR[10] * 1.75));
+  assert.equal(estimate(slab, { population: population(1, { 10: 3 }) }), Math.round(sell * 3));
+  assert.equal(estimate(slab, { population: population(1, { 10: 3 }), trust: new Map([['TST', 1.2]]) }), Math.round(sell * 3 * 1.2));
+  assert.equal(estimate({ card: 'item:folie' }), null);
+  assert.equal(trustOf({ exact: 5, n: 5 }), 1.2);
+  assert.equal(trustOf({ exact: 0, n: 10 }), 0.8);
+  assert.equal(trustOf({ exact: 0, n: 2 }), 1); // zu wenige Noten
 });
