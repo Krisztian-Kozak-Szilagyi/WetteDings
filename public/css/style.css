@@ -3955,13 +3955,17 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
 .gr-stage.mode-measure .gr-hint { bottom: 70px; }
 .gr-measure-cap { margin-top: 2px; color: #facc15; font-weight: 600; }
 
-/* Slab-Etikett im BfW-Lila */
-.gr-slab-label { background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 0 rgba(255, 255, 255, .6); font-weight: 600; }
-.gr-slab-info strong, .gr-slab-cert strong { color: #5b4fc4; letter-spacing: .18em; }
-.gr-slab-word { color: #5b4fc4; letter-spacing: .14em; }
-.gr-slab-grade { color: #161826; font-weight: 600; letter-spacing: -.04em; }
-.gr-slab-cert span { color: #5a5a70; }
-.gr-slab-barcode { background: repeating-linear-gradient(90deg, #161826 0 .6cqw, transparent .6cqw 1cqw, #161826 1cqw 1.3cqw, transparent 1.3cqw 2cqw, #161826 2cqw 3cqw, transparent 3cqw 3.4cqw); }
+/* Slab-Etikett nach dem Vorbild PSA (#204): weißes Etikett mit rotem Rahmen, links Kürzel, Karte und Zertifikat,
+   rechts Notenwort über der großen Note. Gilt für Kundenslabs im Grading-Shop (.gr-slab-label) und Slabs der Mitglieder (.foil-ticket). */
+.gr-slab-label, .foil-ticket { background: #fbfbf8; color: #111; box-shadow: inset 0 0 0 .9cqw #c8102e, inset 0 0 0 calc(.9cqw + 1px) #fff, 0 1px 3px rgba(0, 0, 0, .35); font-weight: 700; }
+.gr-slab-info strong, .gr-slab-cert strong { color: #c8102e; letter-spacing: .12em; font-weight: 900; }
+.gr-slab-info span { color: #222; }
+.gr-slab-certno { font-variant-numeric: tabular-nums; font-size: .82em; color: #555 !important; letter-spacing: .06em; }
+.gr-slab-score { display: grid; justify-items: end; flex: none; line-height: 1; }
+.gr-slab-word { color: #111; letter-spacing: .08em; font-size: .9em; }
+.gr-slab-grade { color: #111; font-weight: 900; letter-spacing: -.04em; }
+.gr-slab-cert span { color: #444; }
+.gr-slab-barcode { background: repeating-linear-gradient(90deg, #111 0 .6cqw, transparent .6cqw 1cqw, #111 1cqw 1.3cqw, transparent 1.3cqw 2cqw, #111 2cqw 3cqw, transparent 3cqw 3.4cqw); }
 
 /* Schritte: Balken mit Beschriftung */
 .gr-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin: 0; counter-reset: none; }
@@ -4603,11 +4607,24 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 .foil-sheen { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; mix-blend-mode: screen; opacity: .55;
   background: linear-gradient(115deg, transparent 20%, #ffffff55 32%, #a8d8ff40 38%, transparent 46%, transparent 60%, #f0abfc33 68%, transparent 76%); background-size: 250% 250%; animation: foil-sheen 6s ease-in-out infinite; }
 @keyframes foil-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 100%; } }
-/* Etikett wie beim Grading-Slab (Note 10, GEM MINT); hinten das Foliendatum. Größen in cqw der Karte */
+/* Etikett des Slabs (Kürzel, Note, Zertifikat); hinten Zertifikat und Strichcode. Größen in cqw der Karte */
 .foil-ticket { position: absolute; top: 3cqw; left: 5cqw; right: 5cqw; height: 17cqw; display: flex; align-items: center; justify-content: space-between; gap: 2cqw;
-  padding: 0 5cqw; border-radius: 2.5cqw; background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; font: 600 4.2cqw/1.2 var(--font);
-  box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 3px rgba(0, 0, 0, .35); }
+  padding: 0 5cqw; border-radius: 2.5cqw; font: 700 4.2cqw/1.2 var(--font); /* Farben: PSA-Etikett bei .gr-slab-label */
+  }
 .foil-ticket .gr-slab-grade { font-size: 11cqw; }
+/* #204: Slab = starres Klargehäuse mit dickem Rand, die Karte liegt in einer Vertiefung; Sleeve (Folie) = dünne, weiche
+   Schutzhülle: kaum größer als die Karte, glänzend, oben offen – ohne Etikett und ohne Note */
+.foil-inner.is-slab .foil-face { border-radius: 4cqw; background: linear-gradient(150deg, #ffffff30, #ffffff0a 35%, #dbeafe1f 70%, #ffffff26);
+  box-shadow: inset 0 0 0 2.2cqw #ffffff14, inset 0 0 0 calc(2.2cqw + 1px) #ffffff40, inset 0 0 0 1px #ffffff80, 0 0 0 1px var(--rar, #ffffff30), 0 8px 20px rgba(0, 0, 0, .4); }
+.foil-inner.is-slab .foil-front img { box-shadow: 0 0 0 1.2cqw #ffffff12, 0 0 0 calc(1.2cqw + 1px) #ffffff30; }
+.foil-inner.is-sleeve .foil-face { padding: 2.6cqw 2.6cqw 3.2cqw; border-radius: 3.2cqw; background: linear-gradient(165deg, #ffffff2b, #ffffff08 40%, #ffffff17 75%, #ffffff0a);
+  box-shadow: inset 0 0 0 1px #ffffff47, 0 0 0 1px var(--rar, #ffffff26), 0 5px 14px rgba(0, 0, 0, .32); }
+/* offene Oberkante der Hülle: eine feine Lippe knapp über der Karte */
+.foil-inner.is-sleeve .foil-front::before { content: ""; position: absolute; left: 1.4cqw; right: 1.4cqw; top: 1.2cqw; height: 0; z-index: 1; pointer-events: none;
+  border-top: 1px solid #ffffff73; box-shadow: 0 1px 2px #0000002e; }
+.foil-inner.is-sleeve .foil-sheen { opacity: .75; background: linear-gradient(105deg, transparent 15%, #ffffff40 26%, transparent 34%, transparent 58%, #ffffff2e 66%, transparent 72%); background-size: 260% 260%; }
+.foil-card-big .foil-inner.is-sleeve .foil-face { padding: 2.6cqw 2.6cqw 3.2cqw; border-radius: 12px; }
+.foil-card-big .foil-inner.is-slab .foil-face { border-radius: 22px; }
 .foil-tag { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: 600; color: #0f172a; background: linear-gradient(90deg, #a8d8ff, #e9d5ff, #fbcfe8); }
 .tcg-mark-foil { font-size: 11px; font-weight: 800; color: #0f172a; background: linear-gradient(135deg, #a8d8ff, #e9d5ff, #fbcfe8); }
 @media (max-width: 420px) { .foil-card { width: 96px; } }
@@ -4716,8 +4733,8 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 }
 .gr-hero-slab-label {
   position: absolute; left: 6%; right: 6%; top: 12px; height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 6px;
-  padding: 0 6%; border-radius: 6px; background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; font: 600 4.6cqw/1.25 var(--font);
-  box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 3px rgba(0, 0, 0, .35);
+  padding: 0 6%; border-radius: 6px; background: #fbfbf8; color: #111; font: 700 4.6cqw/1.25 var(--font);
+  box-shadow: inset 0 0 0 3px #c8102e, inset 0 0 0 4px #fff, 0 1px 3px rgba(0, 0, 0, .35);
 }
 .gr-hero-slab .gr-slab-grade { font-size: 13cqw; }
 .gr-hero-slab-slot { display: block; pointer-events: none; }

@@ -69,6 +69,7 @@ router.get('/grading', async (req, res) => {
         }
       : null,
     // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
+    shopCode: (state.shop && state.shop.code) || null, // Schaukarte mit dem eigenen Kürzel (#204)
     heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
     doneCards: state.done.map((j) => ({ ...j, cardInfo: catalog.cardById[j.card] || null })),
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL

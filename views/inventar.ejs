@@ -76,7 +76,7 @@
           <% } else if (!foilable.length) { %>
             <p class="muted small inv-hint">Du hast keine freie, unfolierte Karte zum Folieren.</p>
           <% } else { %>
-            <form method="post" action="/inventar/folieren" class="inv-foil-form" data-confirm="Karte folieren? Eine Folie wird verbraucht. Die Karte kann danach nicht mehr an die Bank verkauft und nicht auf Quests geschickt werden.">
+            <form method="post" action="/inventar/folieren" class="inv-foil-form" data-confirm="Karte folieren? Eine Folie wird verbraucht. Die Schutzhülle bewahrt die Karte vor Kratzern und Knicken – sie spielt weiter mit, kann aber nicht mehr an die Bank verkauft werden. Die Note bleibt geheim.">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <label class="field"><span>Karte folieren</span>
                 <select name="card" required>
@@ -106,23 +106,30 @@
     <div class="foil-grid">
       <% foiled.forEach((f) => { %>
         <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
-          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt, { grade: f.grade, center: f.center }) %> aria-label="<%= f.card.name %> groß ansehen">
-            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label, grade: f.grade, center: f.center }) %>
+          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt, { slab: f.slab, id: f.id, center: f.center }) %> aria-label="<%= f.card.name %> groß ansehen">
+            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label, slab: f.slab, id: f.id, center: f.center }) %>
           </button>
           <div class="foil-info">
             <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
             <strong><%= f.card.name %> <span class="tcg-badge r-<%= f.card.rarity %>"><%= f.rarity.label %></span></strong>
-            <span>Wert <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
-            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · <%= f.rarity.noBank ? 'Grundwert ' + euro(f.sell) + ' · die Bank kauft sie nicht' : 'Bankwert ohne Folie ' + euro(f.sell) %></span>
+            <% if (f.slab) { %>
+            <span>Slab <b><%= f.slab.code %></b> · Note <b><%= f.slab.grade %></b> · Wert <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
+            <span class="muted small">versiegelt seit <%= dayDate(f.foiledAt) %> · spielt nicht mit · <%= f.rarity.noBank ? 'Grundwert ' + euro(f.sell) + ' · die Bank kauft sie nicht' : 'Bankwert ohne Slab ' + euro(f.sell) %></span>
+            <% } else { %>
+            <span>In Folie · Wert <b><%= euro(f.value) %></b></span>
+            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · geschützt vor Schaden, spielt mit · Note geheim</span>
+            <% } %>
             <% if (f.lock === 'handel') { %>
               <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
             <% } else { %>
               <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=f:<%= f.id %>">Handeln · Markt, Verkauf oder Tausch</a>
-              <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt, die Wertsteigerung ist weg. Die Karte ist danach wieder eine normale Karte.">
+              <% if (!f.slab) { %>
+              <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt. Die Karte ist danach wieder ungeschützt.">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="copy" value="<%= f.id %>">
                 <button class="btn btn-ghost btn-sm" type="submit">Folie abziehen</button>
               </form>
+              <% } %>
             <% } %>
           </div>
         </article>

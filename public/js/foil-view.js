@@ -29,13 +29,17 @@
     return e;
   }
 
-  /** Große Karte: vorne Bild + Grading-Etikett (Name, Seltenheit, Note 10), hinten BfW-Rückseite + Zertifikat mit Foliendatum */
+  /**
+   * Große Karte. Slab (data-slab-code, #204): vorne Bild + Etikett (Kürzel, Name, Seltenheit, Zertifikat, Note), hinten
+   * Zertifikat und Strichcode. Sleeve (Folie ohne Slab): nur die Schutzhülle – keine Note, hinten die Kartenrückseite.
+   */
   function build(d, foiling) {
+    var slab = !!d.slabCode;
     var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : '') + (d.season ? ' season-' + d.season : '')); // Rückseite je Season
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', d.name + ' – ziehen zum Drehen, antippen zum Umdrehen');
-    var inner = el('span', 'foil-inner', card);
+    var inner = el('span', 'foil-inner ' + (slab ? 'is-slab' : 'is-sleeve'), card);
     // Versatz aus der Zentrierung (data-cx/-cy): der Rand um das Kartenbild ist ungleich breit
     if (d.cx) inner.style.setProperty('--cx', d.cx);
     if (d.cy) inner.style.setProperty('--cy', d.cy);
@@ -45,21 +49,24 @@
     img.alt = '';
     img.draggable = false;
     el('span', 'foil-sheen', front);
-    // Etikett wie beim Grading-Slab: Note des Exemplars (data-grade, geheimer Zustand – erst mit der Folie sichtbar)
-    var t = el('span', 'foil-ticket', front);
-    var info = el('span', 'gr-slab-info', t);
-    el('strong', '', info, 'BfW GRADING');
-    el('span', '', info, d.name + ' · ' + d.rarityLabel);
-    el('span', 'gr-slab-word', info, d.gradeWord || '');
-    el('span', 'gr-slab-grade', t, d.grade || '–');
     var back = el('span', 'foil-face foil-back', inner);
     el('span', 'foil-back-art', back);
     el('span', 'foil-sheen', back);
-    // Rückseite: Zertifikat mit Foliendatum und Strichcode
+    if (!slab) return card; // Schutzhülle: die Note bleibt geheim
+    // Etikett des Slabs: Kürzel des Shops, Karte, Zertifikatsnummer, Notenwort und Note
+    var t = el('span', 'foil-ticket', front);
+    var info = el('span', 'gr-slab-info', t);
+    el('strong', '', info, d.slabCode);
+    el('span', '', info, d.name + ' · ' + d.rarityLabel);
+    if (d.cert) el('span', 'gr-slab-certno', info, d.cert);
+    var score = el('span', 'gr-slab-score', t);
+    el('span', 'gr-slab-word', score, d.gradeWord || '');
+    el('span', 'gr-slab-grade', score, d.grade || '–');
+    // Rückseite: Zertifikat und Strichcode
     var tb = el('span', 'foil-ticket', back);
     var cert = el('span', 'gr-slab-cert', tb);
-    el('strong', '', cert, 'BfW GRADING');
-    el('span', '', cert, 'Foliert am ' + d.date);
+    el('strong', '', cert, d.slabCode + ' GRADING');
+    if (d.cert) el('span', '', cert, 'Zertifikat Nr. ' + d.cert);
     el('span', '', cert, d.grade ? 'Note ' + d.grade + ' · ' + d.gradeWord : 'Note –');
     el('span', 'gr-slab-barcode', tb);
     return card;
@@ -118,7 +125,7 @@
       statusEl.hidden = !album;
       if (album) {
         // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
-        statusEl.textContent = d.rarityLabel + ' · foliert · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
+        statusEl.textContent = d.rarityLabel + (d.slabCode ? ' · Slab ' + d.slabCode : ' · in Folie') + ' · Wert ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (normal ' + d.baseText + ')' : '');
         sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
       }
       noteEl.hidden = !album || !d.sellOff;

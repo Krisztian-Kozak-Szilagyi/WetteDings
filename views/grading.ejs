@@ -36,8 +36,8 @@
         <%# Versiegelte Karte im Slab – wie nach einem Auftrag (Etikett oben, Note 10) %>
         <div class="gr-hero-slab">
           <div class="gr-hero-slab-label">
-            <div class="gr-slab-info"><strong>BfW GRADING</strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span><span class="gr-slab-word">GEM MINT</span></div>
-            <div class="gr-slab-grade">10</div>
+            <div class="gr-slab-info"><strong><%= locals.shopCode || 'BfW' %></strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span></div>
+            <div class="gr-slab-score"><span class="gr-slab-word">GEM MINT</span><span class="gr-slab-grade">10</span></div>
           </div>
           <span class="tcg-slot gr-hero-slab-slot r-<%= heroCard.rarity %>">
             <span class="tcg-art">

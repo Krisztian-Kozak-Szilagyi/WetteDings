@@ -711,8 +711,11 @@
       var info = el('div', 'gr-slab-info', label);
       el('strong', '', info).textContent = house;
       el('span', '', info).textContent = job.card ? job.card.name + ' · ' + job.card.rarityLabel : '';
-      el('span', 'gr-slab-word', info).textContent = GRADE_NAMES[g] || '';
-      el('div', 'gr-slab-grade', label).textContent = g || '–';
+      if (job.cert) el('span', 'gr-slab-certno', info).textContent = job.cert;
+      // wie bei PSA: Notenwort über der großen Note
+      var score = el('div', 'gr-slab-score', label);
+      el('span', 'gr-slab-word', score).textContent = GRADE_NAMES[g] || '';
+      el('div', 'gr-slab-grade', score).textContent = g || '–';
       // Rückseite: Zertifikat mit Nummer und Strichcode
       labelBack.innerHTML = '';
       var cert = el('div', 'gr-slab-cert', labelBack);

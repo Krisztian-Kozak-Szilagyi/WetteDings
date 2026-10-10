@@ -57,9 +57,9 @@
       <% pool.foiled.forEach((f) => { const c = f.card; const r = pickRar(c); const on = preset.copies.has(f.id); %>
         <label class="tcg-slot hb-card hb-foil r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %> foliert" data-label="<%= c.name %> (foliert)" data-image="<%= c.image %>" data-value="<%= f.value %>" data-foil>
           <input type="checkbox" name="<%= side %>" value="f:<%= f.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %>">
-          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %></span>
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: f.slab, id: f.id, center: f.center }) %></span>
           <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub">Foliert<%= f.grade ? ' · Note ' + f.grade : '' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
+          <span class="hb-card-sub"><%= f.slab ? 'Slab ' + f.slab.code + ' · Note ' + f.slab.grade : 'In Folie' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
         </label>
       <% }) %>
     </div>

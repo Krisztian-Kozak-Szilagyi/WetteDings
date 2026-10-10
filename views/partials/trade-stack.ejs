@@ -14,7 +14,7 @@
 <span class="tstack tstack-<%= stackSize %><%= shown.length > 1 ? ' tstack-many' : '' %>" style="--n: <%= Math.max(1, shown.length) %>">
   <% shown.forEach((l, i) => { const c = cardInfo(l.card); const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
     <% if (l.foiledAt) { %>
-      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { grade: l.grade }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
         <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span>
       </button>
     <% } else { %>

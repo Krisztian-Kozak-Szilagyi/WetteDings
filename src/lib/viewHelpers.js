@@ -16,15 +16,30 @@ const euro = (cents) => euroFmt.format((cents || 0) / 100);
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
 const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 /**
+ * Zertifikatsnummer eines Slabs (#204): achtstellig, fest aus der Exemplar-ID (wie centerShift) – "f:<ID>" geht auch.
+ * Ohne ID: ''.
+ */
+function slabCert(id) {
+  const hex = String(id || '').replace(/^f:/, '').slice(-8);
+  const n = Number.parseInt(hex, 16);
+  return Number.isFinite(n) ? String(n % 1e8).padStart(8, '0') : '';
+}
+
+/**
  * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
  * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
- * grade: Note des Exemplars (geheimer Zustand, #73) – steht auf dem Etikett der Folie
+ * slab: { code, grade } – Slab mit Etikett (#204); ohne: Schutzhülle (Sleeve) ohne Note. grade: ältere Aufrufer (= Slab "BfW")
+ * id: Exemplar-ID (Zertifikatsnummer auf dem Slab)
  * center: sichtbarer Versatz { x, y } aus der Zentrierung (grading/condition.centerShift)
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, center = null } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, slab = null, id = null, center = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
-  if (grade) h += ` data-grade="${escAttr(grade)}" data-grade-word="${escAttr(gradeWord(grade))}"`;
+  const s = slab || (grade ? { code: 'BfW', grade } : null);
+  if (s) {
+    h += ` data-slab-code="${escAttr(s.code || 'BfW')}" data-cert="${escAttr(slabCert(id || fav))}"`;
+    if (s.grade) h += ` data-grade="${escAttr(s.grade)}" data-grade-word="${escAttr(gradeWord(s.grade))}"`;
+  }
   if (center) h += ` data-cx="${escAttr(center.x)}" data-cy="${escAttr(center.y)}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
@@ -187,6 +202,7 @@ module.exports = {
   dayDate,
   foilViewAttrs,
   gradeWord,
+  slabCert,
   dateSec,
   relTime,
   timeSpan,

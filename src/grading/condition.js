@@ -189,7 +189,7 @@ const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 
 const gradeWord = (grade) => GRADE_NAMES[grade] || '';
 
 /**
- * Kennzahlen der gegradeten (= folierten, Note sichtbar) Karten einer Sammlung: { count, best, bestCount, avg, dist }
+ * Kennzahlen der gegradeten (= Slabs, Note sichtbar – #204) Karten einer Sammlung: { count, best, bestCount, avg, dist }
  * (dist[g] = Anzahl mit Note g, Index 1–10)
  * oder null, wenn keine dabei ist. Unfolierte Karten zählen nie mit – ihr Zustand bleibt geheim.
  */
