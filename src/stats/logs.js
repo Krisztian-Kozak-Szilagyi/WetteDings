@@ -60,8 +60,8 @@ const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
 const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung', esports: 'eSports-Trophäe' };
-const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'black_market'];
-const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft' };
+const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'black_market', 'bazaar_kauf'];
+const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
 
 // ab dieser Seltenheit werden gezogene Karten im Log hervorgehoben
 const RARE_FROM = tcgCatalog.rarityByKey.holo ? tcgCatalog.rarityByKey.holo.rank : 3;
@@ -200,7 +200,7 @@ function sellRow(l, name) {
   const m = l.meta || {};
   let items;
   if (l.type === 'tcg_verkauf' || l.type === 'tcg_zerkleinert') items = cardSummary(m.cards);
-  else if (l.type === 'black_market' && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
+  else if ((l.type === 'black_market' || l.type === 'bazaar_kauf') && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
   else {
     // verkaufter Gegenstand oder Gegenstand aus dem Black Market (meta.item)
     const t = itemService.itemTypeByKey[m.item];

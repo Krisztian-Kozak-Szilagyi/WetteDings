@@ -154,6 +154,7 @@ const ledgerLabels = {
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
   black_market: 'Gekauft (Black Market)', // Karte oder Gegenstand – was genau, steht im Buchungstext
+  bazaar_kauf: "Gekauft (Lil Dré's Bazaar)", // Kaffee oder BfW Energy im Team-Laden
   konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
   grading_lohn: 'Grading-Auftrag erledigt',
   grading_ausbau: 'Grading-Shop ausgebaut',

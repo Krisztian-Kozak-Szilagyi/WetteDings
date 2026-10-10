@@ -52,7 +52,7 @@ const LEDGER_GROUPS = [
   { key: 'dungeon', label: 'Dungeon', types: ['dungeon_lohn'], hint: 'Lohn für gewonnene Kämpfe' },
   { key: 'erfolg', label: 'Erfolge', types: ['erfolg'], hint: 'Belohnung für freigeschaltete Erfolge' },
   { key: 'grading', label: 'Grading-Shop', types: ['grading_lohn', 'grading_ausbau'], hint: 'Löhne für Aufträge − Ausbau des Shops' },
-  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'item_verkauf', 'black_market'], hint: 'Verkäufe an die Bank (Karten, Gegenstände) − Packs und Black Market' },
+  { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'item_verkauf', 'black_market', 'bazaar_kauf'], hint: 'Verkäufe an die Bank (Karten, Gegenstände) − Packs und Black Market' },
   { key: 'esports', label: 'eSports', types: ['esports_gruendung', 'esports_austritt', 'esports_anteil', 'esports_konkurs', 'esports_auszahlung', 'esports_preis', 'schuld_tilgung'], hint: 'Gründungen und Konkurse − Auszahlungen aufgelöster Team-ETFs und Trophäen-Preise' },
   { key: 'coin', label: 'Coin', types: ['coin_kauf', 'coin_verkauf'], hint: 'Verkäufe − Käufe (Kursgewinne/-verluste)' },
   { key: 'wetten', label: 'Wetten', types: ['einsatz', 'auszahlung', 'erstattung', 'provision', 'provision_schiri'], hint: 'noch offene Einsätze und verfallene Gewinne' },

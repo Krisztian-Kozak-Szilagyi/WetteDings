@@ -22,8 +22,8 @@ function summarize({ ledger, stakes, coin, wealth, packsOpened }) {
     {
       key: 'tcg',
       label: 'Packs & Karten',
-      turnover: abs('tcg_pack', 'tcg_verkauf', 'black_market', 'item_verkauf'),
-      result: L('tcg_pack', 'tcg_verkauf', 'black_market', 'item_verkauf') + wealth.cardValue,
+      turnover: abs('tcg_pack', 'tcg_verkauf', 'black_market', 'bazaar_kauf', 'item_verkauf'),
+      result: L('tcg_pack', 'tcg_verkauf', 'black_market', 'bazaar_kauf', 'item_verkauf') + wealth.cardValue,
       hint: 'Pack-Käufe, Bank-Verkäufe, Black Market; Ergebnis inkl. heutigem Wert der Karten und Packs',
     },
     { key: 'handel', label: 'Handel', turnover: abs('handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'), result: L('handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'), hint: 'Geld aus Käufen, Verkäufen und Aufpreisen beim Tausch' },
