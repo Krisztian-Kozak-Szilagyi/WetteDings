@@ -217,7 +217,7 @@
               <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><defs><linearGradient id="pf-g-top1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4"/><stop offset="1" stop-color="#c08a1e"/></linearGradient></defs><path d="M8 34 L6 14 L16 22 L24 9 L32 22 L42 14 L40 34Z" fill="url(#pf-g-top1)"/><rect x="8" y="36" width="32" height="5" rx="2" fill="url(#pf-g-top1)"/><text x="24" y="31" text-anchor="middle" font-size="11" font-weight="900" fill="#3a2a08">1</text></svg>
               <span class="pf-badge-label">Platz 1</span>
               <span class="pf-tip" role="tooltip" id="pf-tip-top1">
-                <span class="pf-tip-title">Platz 1 der Rangliste</span>
+                <span class="pf-tip-title"><%= profileIsTeam ? 'Platz 1 im Team' : 'Platz 1 der Rangliste' %></span>
                 <span class="pf-tip-row">Insgesamt <strong><%= top1 %></strong> ganz oben.</span>
               </span>
             </span>
