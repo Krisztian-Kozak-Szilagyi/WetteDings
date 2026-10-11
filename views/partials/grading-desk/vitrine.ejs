@@ -10,9 +10,10 @@
     <% items.forEach((x) => { const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
       <button type="button" class="gd-vit-slab r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> data-foil-group="vitrine" data-pop="<%= locals.popText ? popText(x) : '' %>" aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – bewundern">
         <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
+        <span class="gd-vit-plaque" aria-hidden="true"><%= x.slab.code %> · <%= x.slab.grade %></span>
       </button>
     <% }) %>
-    <% for (let i = items.length; i < max; i++) { %><span class="gd-vit-empty" aria-hidden="true"></span><% } %>
+    <% for (let i = items.length; i < max; i++) { %><span class="gd-vit-empty" aria-hidden="true"><span></span></span><% } %>
   </div>
   <span class="gd-vit-glass" aria-hidden="true"></span>
   <% if (locals.editHref) { %><a class="gd-vit-edit" href="<%= editHref %>" data-gd-open="vitrine" aria-label="Vitrine einräumen" title="Einräumen">✎</a><% } %>
