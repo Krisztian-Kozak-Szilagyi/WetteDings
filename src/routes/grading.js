@@ -327,6 +327,12 @@ router.get('/grading/shop/:code', async (req, res) => {
   res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade), reviews, histogram });
 });
 
+// Tour über den Schreibtisch beendet oder übersprungen: startet nicht mehr von selbst (?-Knopf startet sie neu)
+router.post('/grading/tour', async (req, res) => {
+  await GradingShop.updateOne({ _id: req.user._id }, { $set: { tourSeenAt: new Date() } });
+  res.status(204).end();
+});
+
 // Handy auf dem Schreibtisch geöffnet: Bewertungen gelten als gesehen (Badge weg)
 router.post('/grading/gesehen', async (req, res) => {
   await orders.markReviewsSeen(req.user._id);

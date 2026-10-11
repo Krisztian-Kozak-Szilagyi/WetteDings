@@ -6862,3 +6862,22 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gs-tag.is-bad input:checked + span { background: color-mix(in srgb, #f87171 18%, transparent); border-color: #f87171; color: #fecaca; }
 .gs-tag input:focus-visible + span { outline: 2px solid var(--color-accent-300); outline-offset: 2px; }
 .gs-tag input:disabled + span { opacity: .45; }
+
+/* Tour über den Schreibtisch (#204): Spotlight über dem Objekt, Sprechblase daneben */
+.gd-tour { position: fixed; inset: 0; z-index: 1000; }
+.gd-tour-spot { position: fixed; border-radius: 18px; box-shadow: 0 0 0 9999px rgba(6, 4, 2, .74), 0 0 0 3px #fde68a, 0 0 30px 6px rgba(253, 230, 138, .45); transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease; pointer-events: none; }
+.gd-tour-bubble {
+  position: fixed; width: min(330px, calc(100vw - 24px)); padding: 16px 16px 12px; border-radius: 14px; background: var(--paper, #fbf8ef); color: #2a2622;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55); transition: left .35s ease, top .35s ease; animation: gd-fade .25s ease;
+}
+.gd-tour-bubble h3 { margin: 0 0 6px; font-size: 17px; }
+.gd-tour-bubble p { margin: 0; font-size: 14px; line-height: 1.45; }
+.gd-tour-bubble .gd-tour-count { margin-bottom: 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #8a7d68; }
+.gd-tour-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+.gd-tour-actions .btn-ghost { color: #4a4237; }
+.gd-tour-actions .btn-ghost:first-child { margin-right: auto; }
+.gd-tour.is-still .gd-tour-spot, .gd-tour.is-still .gd-tour-bubble { transition: none; animation: none; }
+.gd-info { margin: 0; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-accent) 14%, transparent); font-size: 14px; line-height: 1.45; }
+.gd-sheet-help[aria-expanded="true"] { background: var(--color-accent-700); }
+.gd-tour-actions .btn-primary { background: #3a2a10; border-color: #3a2a10; color: #fdf6e3; }
+.gd-tour-actions .btn-primary:hover { background: #57401a; }

@@ -73,8 +73,24 @@
     const canTake = used < limit || !!nextOrder;
     const ownedTools = tools.filter((t) => t.owned).length;
     const milesDone = milestones.filter((m) => m.done).length;
+    // Tour (public/js/grading-tour.js): die Erklärungen, die nicht auf dem Tisch stehen – je Objekt (data-tour) eine
+    // Station; sheet = Fenster, dessen ?-Knopf denselben Text zeigt. Fehlt ein Objekt, wird die Station übersprungen.
+    const tour = [
+      { key: 'schild', title: 'Dein Shop', text: 'Name, Kürzel und Stufe. Der Balken zeigt deine Reputation – sie wächst mit sauberer Arbeit und guten Bewertungen. Rechts: heute verdient und wie viele Aufträge heute noch gehen.' },
+      { key: 'matte', title: 'Hier wird gearbeitet', text: 'Nimm den nächsten Auftrag an – ab an die Werkbank: putzen, bügeln, benoten, versiegeln. Je sauberer und genauer, desto mehr Lohn.' },
+      { key: 'vitrine', sheet: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je seltener und besser benotet, desto schneller wächst deine Reputation. Tippe einen Slab an, um ihn zu bewundern – ✎ räumt ein. Ausgestellte Slabs lassen sich nicht handeln.' },
+      { key: 'eingang', sheet: 'auftraege', title: 'Eingang', text: players ? `Karten von Mitgliedern zu deinen Festpreisen – Express zuerst, dann die ältesten. Du hast ${orderDays} Tage, mit Express ${expressDays}, sonst geht die Karte samt Geld zurück. Die echte Note bleibt geheim: auf den Slab kommt deine.` : `Ab Stufe ${orderLevel} schicken dir auch Mitglieder ihre Karten – zu deinen Preisen.` },
+      { key: 'spiess', sheet: 'bons', title: 'Kassenzettel', text: 'Jeder erledigte Auftrag landet als Bon auf dem Spieß – mit allen Posten. Unten steht, was du heute verdient hast.' },
+      { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte. Gute Bewertungen bringen Reputation – und neue Kunden.' },
+      { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen aus dem Admin-Panel. Neue Preise gelten für neue Aufträge, offene behalten ihren Preis. Günstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
+      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: 'Ausbauen bringt neue Arbeitsschritte und mehr Lohn, Werkzeuge machen die Arbeit am Tisch bequemer. Hier änderst du auch Name und Kürzel.' },
+      { key: 'buegeln', sheet: 'buegeln', title: 'Eigene Karten bügeln', text: 'Karten mit Knick aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – Vorsicht vor Brandflecken. Ein Versuch je Karte.' },
+      { key: 'meilensteine', sheet: 'meilensteine', title: 'Erfolge', text: 'Meilensteine rund ums Grading – mit dem Fortschritt bis zum nächsten.' },
+      { key: 'karton', title: 'Selbst einreichen', text: 'Lass eigene Karten bei einem anderen Shop graden – so kommst du an Slabs für deine Vitrine.' },
+    ];
   %>
-  <div class="gd-desk" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %>>
+  <script type="application/json" data-gd-tour><%- JSON.stringify(tour) %></script><%# feste Texte ohne Nutzereingaben %>
+  <div class="gd-desk" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %><% if (shop.code && !shop.tourSeenAt) { %> data-gd-tour-auto<% } %>>
     <%# ---------- Namensschild: Shop, Stufe, Reputation, heute ---------- %>
     <header class="gd-plate" data-tour="schild">
       <div class="gd-plate-id">
@@ -436,6 +452,7 @@
 
 <% if (active) { %>
   <script src="/js/grading-desk.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/grading-tour.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/grading-hub.js?v=<%= assetVersion %>" defer></script>
 <% } %>
 <%- include('partials/foil-modal') %>
