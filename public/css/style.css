@@ -8723,3 +8723,26 @@ a.pg-btn, a.pg-btn:hover { color: #3b2503; }
 .pg-btn.is-off { filter: grayscale(.85) brightness(.6) drop-shadow(0 3px 0 rgba(0, 0, 0, .4)); cursor: var(--cur-default, not-allowed); }
 .pg-btn.is-off:hover { filter: grayscale(.85) brightness(.6) drop-shadow(0 3px 0 rgba(0, 0, 0, .4)); }
 .pg-btn.is-off:active { border-image-source: url("/img/grading/ui-button.png"); transform: none; }
+
+/* Vitrinen-Schild als Zertifikat (wie das Etikett im Slab): weißes Papier, roter Doppelrahmen, Name voll lesbar */
+.gd-vit-plaque {
+  top: calc(100% + 12px); width: calc(100% + var(--vit-gap) - 8px); max-width: none; box-sizing: border-box; overflow: hidden;
+  flex-direction: row; align-items: stretch; justify-content: space-between; gap: .8em; padding: .7em .9em .7em; border-radius: 3px;
+  font-size: clamp(10px, 7.2cqw, 12.5px); line-height: 1.25; white-space: normal; color: #111;
+  background: #fbfbf8;
+  box-shadow: inset 0 0 0 .5em #c8102e, inset 0 0 0 calc(.5em + 1px) #fff, 0 1px 0 rgba(255, 255, 255, .25), 0 5px 12px rgba(0, 0, 0, .6);
+}
+.gd-vp-info { display: flex; flex-direction: column; gap: .1em; min-width: 0; flex: 1 1 auto; padding-left: .5em; }
+.gd-vp-code { font-size: .9em; font-weight: 900; letter-spacing: .16em; color: #c8102e; }
+.gd-vp-name { min-width: 0; font-weight: 800; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; color: #111; }
+.gd-vp-rar { font-size: .8em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #555; }
+.gd-vp-score { display: grid; align-content: center; justify-items: end; flex: none; gap: .1em; line-height: 1; padding-right: .5em; }
+.gd-vp-word { font-size: .75em; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #111; text-align: right; }
+.gd-vp-grade { font-size: 2.1em; font-weight: 900; line-height: 1; letter-spacing: -.04em; color: #111; font-variant-numeric: tabular-nums; }
+.gd-vit-plaque.is-gem { background: linear-gradient(135deg, #fff4cf, #f2c14e 45%, #fff1c2 60%, #d9a634); box-shadow: inset 0 0 0 .5em #a8101f, inset 0 0 0 calc(.5em + 1px) #fff4cf, 0 0 14px rgba(242, 193, 78, .45), 0 5px 12px rgba(0, 0, 0, .6); }
+.gd-vit-plaque.is-gem .gd-vp-code { color: #8a0f1c; }
+.gd-vit-plaque.is-gem .gd-vp-rar { color: #6b5320; }
+.gd-vit-shelf { padding-bottom: 96px; }
+.gd-vit-shelf::after { bottom: 72px; }
+.gd-vit-plaque { min-height: 3.6em; }
+@media (max-width: 760px) { .gd-vit-shelf { padding-bottom: 92px; } }
