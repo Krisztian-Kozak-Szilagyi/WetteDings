@@ -116,3 +116,13 @@ test('#204: Werkzeuge – ab ihrer Stufe kaufbar, gekaufte markiert', () => {
   assert.deepEqual(list.map((t) => [t.key, t.owned, t.available]), [['tuch', true, true], ['schablone', false, false], ['eisen', false, false], ['uv', false, false]]);
   assert.ok(grading.toolsFor({ level: 2 }).every((t) => t.available && !t.owned && t.cost > 0));
 });
+
+test('#204: Schnell-Tags zur Bewertung – aus dem Katalog, höchstens drei, leer erlaubt', () => {
+  assert.deepEqual(orders.validTags([]), []);
+  assert.deepEqual(orders.validTags(undefined), []);
+  assert.deepEqual(orders.validTags('sauber'), ['sauber']);
+  assert.deepEqual(orders.validTags(['sauber', 'fair', 'sauber']), ['sauber', 'fair']); // doppelt zählt einmal
+  assert.throws(() => orders.validTags(['sauber', 'fair', 'schnell', 'preis']), /höchstens 3/);
+  assert.throws(() => orders.validTags(['<script>']), /gibt es nicht/);
+  assert.ok(orders.REVIEW_TAGS.some((t) => t.good) && orders.REVIEW_TAGS.some((t) => !t.good));
+});

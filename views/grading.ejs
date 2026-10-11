@@ -167,12 +167,14 @@
       <span class="gd-tag">Bons</span>
     </a>
 
-    <a class="gd-obj gd-phone" href="<%= hubUrl('bewertungen') %>" data-gd-open="bewertungen" data-tour="handy" aria-label="Bewertungen: <%= r && r.stars != null ? fmtStars(r.stars) + ' Sterne aus ' + r.starCount : 'noch keine' %>">
+    <a class="gd-obj gd-phone" href="<%= hubUrl('bewertungen') %>" data-gd-open="bewertungen" data-tour="handy" aria-label="Bewertungen: <%= r && r.stars != null ? fmtStars(r.stars) + ' Sterne aus ' + r.starCount : 'noch keine' %><%= newReviews ? ', ' + newReviews + ' neu' : '' %>">
       <span class="gd-phone-body"><span class="gd-phone-screen">
         <b><%= r ? fmtStars(r.stars) : '–' %></b>
         <span class="gd-stars" aria-hidden="true"><%= starRow(r && r.stars) %></span>
         <small>(<%= r ? r.starCount : 0 %>)</small>
+        <% if (reviews[0] && reviews[0].tags.length) { %><span class="gd-phone-quote">„<%= reviews[0].tags.map((t) => t.label).join(', ') %>“</span><% } %>
       </span></span>
+      <% if (newReviews) { %><span class="gd-badge" data-gd-new-reviews><%= newReviews %></span><% } %>
       <span class="gd-tag">Bewertungen</span>
     </a>
 
@@ -288,14 +290,12 @@
     <%- sheetHead('bewertungen', 'Bewertungen') %>
     <div class="gd-sheet-body">
       <% if (r) { %>
-        <div class="gd-review-head">
-          <div class="gd-review-score"><b><%= fmtStars(r.stars) %></b><span class="gd-stars"><%= starRow(r.stars) %></span><small><%= r.starCount %> Bewertung<%= r.starCount === 1 ? '' : 'en' %></small></div>
-          <dl class="gd-review-facts">
-            <dt>Qualität</dt><dd><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></dd>
-            <dt>Treffsicher</dt><dd><%= r.hitRate != null ? Math.round(r.hitRate) + ' %' : '–' %></dd>
-            <dt>Aufträge</dt><dd><%= shop.jobsDone %></dd>
-          </dl>
-        </div>
+        <dl class="gd-review-facts">
+          <dt>Qualität</dt><dd><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></dd>
+          <dt>Treffsicher</dt><dd><%= r.hitRate != null ? Math.round(r.hitRate) + ' %' : '–' %></dd>
+          <dt>Aufträge</dt><dd><%= shop.jobsDone %></dd>
+        </dl>
+        <%- include('partials/grading-desk/reviews', { r, histogram, reviews }) %>
       <% } %>
     </div>
   </dialog>

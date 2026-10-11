@@ -26,6 +26,26 @@ const ORDER_LEVEL = 3; // Spieler-Aufträge erst ab der Slab-Werkstatt – ohne 
 const OPEN = ['wartet', 'in_arbeit'];
 const RATE_DAYS = 7; // so lange nach der Rückgabe kann der Kunde bewerten
 const ORDERS_HREF = '/grading/einreichen';
+// Schnell-Tags zur Bewertung (#204, Google-Stil): fester Katalog statt Freitext – keine Moderation nötig
+const REVIEW_TAGS = [
+  { key: 'sauber', label: 'Blitzsauber', good: true },
+  { key: 'schnell', label: 'Schnell', good: true },
+  { key: 'fair', label: 'Note fair', good: true },
+  { key: 'preis', label: 'Preis top', good: true },
+  { key: 'verpackt', label: 'Top verpackt', good: true },
+  { key: 'teuer', label: 'Zu teuer', good: false },
+  { key: 'langsam', label: 'Langsam', good: false },
+  { key: 'streng', label: 'Note zu streng', good: false },
+];
+const TAG_MAX = 3;
+const tagByKey = Object.fromEntries(REVIEW_TAGS.map((t) => [t.key, t]));
+/** Tags einer Bewertung prüfen: höchstens TAG_MAX aus dem Katalog, doppelte zählen einmal, leer ist erlaubt */
+function validTags(raw) {
+  const list = [...new Set((Array.isArray(raw) ? raw : raw ? [raw] : []).map(String))];
+  if (list.length > TAG_MAX) throw new UserError(`Bitte höchstens ${TAG_MAX} Stichworte.`);
+  if (list.some((k) => !tagByKey[k])) throw new UserError('Dieses Stichwort gibt es nicht.');
+  return list;
+}
 const SHOP_HREF = '/grading';
 
 const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
@@ -317,19 +337,60 @@ async function dropOwner(ownerId, session) {
   return open;
 }
 
-/** Bewertung des Kunden: 1–5 Sterne, einmal, bis RATE_DAYS nach der Rückgabe – zählt fürs Rating und die Reputation */
-async function rate({ user, orderId, stars }) {
+/**
+ * Bewertung des Kunden: 1–5 Sterne und bis zu TAG_MAX Schnell-Tags, einmal, bis RATE_DAYS nach der Rückgabe – die
+ * Sterne zählen fürs Rating und die Reputation
+ */
+async function rate({ user, orderId, stars, tags = [] }) {
   if (!(Number.isInteger(stars) && stars >= 1 && stars <= 5)) throw new UserError('Bitte vergib 1 bis 5 Sterne.');
+  const picked = validTags(tags);
   if (!mongoose.isValidObjectId(orderId)) throw new UserError('Diesen Auftrag gibt es nicht.');
   const found = await GradingOrder.findOne({ _id: orderId, owner: user._id }).lean();
   if (!found || !canRate(found)) throw new UserError('Diesen Auftrag kannst du nicht (mehr) bewerten.');
   await inTransaction(async (session) => {
-    const res = await GradingOrder.updateOne({ _id: found._id, stars: null }, { $set: { stars, ratedAt: new Date() } }, { session });
+    const res = await GradingOrder.updateOne({ _id: found._id, stars: null }, { $set: { stars, tags: picked, ratedAt: new Date() } }, { session });
     if (!res.modifiedCount) throw new UserError('Du hast diesen Auftrag schon bewertet.');
     await GradingShop.updateOne({ _id: found.shop }, { $inc: { 'stars.sum': stars, 'stars.n': 1, reputation: reputation.starGain(stars) } }, { session });
   });
-  await notify(found.shop, { area: 'Grading', href: SHOP_HREF, text: `${user.username} hat deinen Auftrag „${cardName(found.card)}“ mit ${stars} ${stars === 1 ? 'Stern' : 'Sternen'} bewertet.` });
+  const said = picked.length ? ` – „${picked.map((k) => tagByKey[k].label).join('“, „')}“` : '';
+  await notify(found.shop, { area: 'Grading', href: `${SHOP_HREF}?reiter=bewertungen`, text: `${user.username} hat deinen Auftrag „${cardName(found.card)}“ mit ${stars} ${stars === 1 ? 'Stern' : 'Sternen'} bewertet${said}.` });
 }
+
+/**
+ * Bewertungen eines Shops, neueste zuerst (#204, Google-Stil): [{ id, stars, tags: [{ key, label, good }], ratedAt,
+ * owner: { username, avatar } | null, card, result, services }]
+ */
+async function shopReviews(shopId, limit = 20) {
+  const list = await GradingOrder.find({ shop: shopId, stars: { $ne: null } }).sort({ ratedAt: -1 }).limit(limit).lean();
+  const users = await User.find({ _id: { $in: [...new Set(list.map((o) => String(o.owner)))] } }).select('username avatar deletedAt').lean();
+  const byId = new Map(users.filter((u) => !u.deletedAt).map((u) => [String(u._id), u]));
+  return list.map((o) => ({
+    id: String(o._id),
+    stars: o.stars,
+    tags: (o.tags || []).map((k) => tagByKey[k]).filter(Boolean),
+    ratedAt: o.ratedAt,
+    owner: byId.get(String(o.owner)) || null,
+    card: catalog.cardById[o.card] || null,
+    result: o.result,
+    services: servicesOf(o),
+    shopCode: o.shopCode,
+  }));
+}
+
+/** Verteilung der Sterne eines Shops: [Anzahl 5★, 4★, 3★, 2★, 1★] */
+async function starHistogram(shopId) {
+  const rows = await GradingOrder.aggregate([{ $match: { shop: new mongoose.Types.ObjectId(String(shopId)), stars: { $ne: null } } }, { $group: { _id: '$stars', n: { $sum: 1 } } }]);
+  const by = new Map(rows.map((r) => [r._id, r.n]));
+  return [5, 4, 3, 2, 1].map((s) => by.get(s) || 0);
+}
+
+/** Neue Bewertungen seit dem letzten Blick aufs Handy (Badge auf dem Schreibtisch) */
+async function newReviewCount(shop) {
+  if (!shop) return 0;
+  return GradingOrder.countDocuments({ shop: shop._id, ratedAt: { $gt: shop.reviewsSeenAt || new Date(0) } });
+}
+
+const markReviewsSeen = (userId) => GradingShop.updateOne({ _id: userId }, { $set: { reviewsSeenAt: new Date() } });
 
 /**
  * Vitrine des eigenen Shops festlegen: nur eigene Slabs, höchstens showcaseMax, nicht im Handel. Reihenfolge wie
@@ -366,6 +427,13 @@ async function showcaseChoices(userId) {
 }
 
 module.exports = {
+  REVIEW_TAGS,
+  TAG_MAX,
+  validTags,
+  shopReviews,
+  starHistogram,
+  newReviewCount,
+  markReviewsSeen,
   ORDER_LEVEL,
   OPEN,
   RATE_DAYS,

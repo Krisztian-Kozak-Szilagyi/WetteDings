@@ -120,13 +120,16 @@ router.get('/grading', async (req, res) => {
   const players = active && orders.acceptsOrders(state.shop);
   const coded = !!state.shop && !!state.shop.code;
   // Spieler-Aufträge: Warteschlange, Verlauf, Kennzahlen und Vitrine des eigenen Shops
-  const [queue, showcase, history, ironable, milestones, pop] = await Promise.all([
+  const [queue, showcase, history, ironable, milestones, pop, reviews, histogram, newReviews] = await Promise.all([
     players ? orders.queueFor(req.user._id) : [],
     coded ? orders.showcaseChoices(req.user._id) : [],
     coded ? orders.shopHistory(req.user._id) : [],
     active && state.info.level >= grading.IRON_LEVEL ? grading.ironableCards(req.user._id) : [],
     active ? milestonesOf(req.user._id).catch(() => []) : [],
     coded ? population.all() : null,
+    coded ? orders.shopReviews(req.user._id) : [],
+    coded ? orders.starHistogram(req.user._id) : [0, 0, 0, 0, 0],
+    coded ? orders.newReviewCount(state.shop) : 0,
   ]);
   const job = state.open;
   const tools = grading.toolsFor(state.shop);
@@ -143,6 +146,9 @@ router.get('/grading', async (req, res) => {
       tool: tools.some((t) => t.available && !t.owned && balance >= t.cost),
     },
     popText: (x) => (pop ? population.popText(x.card.id, pop, x.slab.grade) : ''),
+    reviews,
+    histogram,
+    newReviews,
     levels: grading.LEVELS.map((l) => grading.levelInfo(l.level)),
     pay: grading.PAY,
     contractDays: grading.CONTRACT_DAYS,
@@ -268,6 +274,8 @@ router.get('/grading/einreichen', async (req, res) => {
     expressDays: grading.settings.expressDays,
     services: grading.SERVICES,
     rateDays: orders.RATE_DAYS,
+    reviewTags: orders.REVIEW_TAGS,
+    tagMax: orders.TAG_MAX,
     rarityByKey: catalog.rarityByKey,
   });
 });
@@ -303,7 +311,8 @@ router.post('/grading/auftrag/:id/bewerten', (req, res) =>
     req,
     res,
     async () => {
-      await orders.rate({ user: req.user, orderId: req.params.id, stars: Number.parseInt(str(req.body.stars), 10) });
+      const tags = [].concat(req.body.tags || []).map(str);
+      await orders.rate({ user: req.user, orderId: req.params.id, stars: Number.parseInt(str(req.body.stars), 10), tags });
       return 'Danke für deine Bewertung!';
     },
     '/grading/einreichen'
@@ -314,8 +323,14 @@ router.post('/grading/auftrag/:id/bewerten', (req, res) =>
 router.get('/grading/shop/:code', async (req, res) => {
   const shop = await orders.shopByCode(req.params.code);
   if (!shop) return res.status(404).render('error', { title: 'Grading-Shop', status: 404, message: 'Diesen Grading-Shop gibt es nicht.' });
-  const pop = await population.all();
-  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade) });
+  const [pop, reviews, histogram] = await Promise.all([population.all(), orders.shopReviews(shop.id, 5), orders.starHistogram(shop.id)]);
+  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade), reviews, histogram });
+});
+
+// Handy auf dem Schreibtisch geöffnet: Bewertungen gelten als gesehen (Badge weg)
+router.post('/grading/gesehen', async (req, res) => {
+  await orders.markReviewsSeen(req.user._id);
+  res.status(204).end();
 });
 
 // Eigener Shop: Festpreise je Baustein für Spieler-Aufträge und Vitrine

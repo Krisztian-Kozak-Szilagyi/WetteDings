@@ -86,3 +86,27 @@
   form.addEventListener('change', update);
   update();
 })();
+
+// Bewerten (#204): nach den Sternen erscheinen passende Schnell-Tags – 4–5 Sterne Lob, 1–3 Kritik, höchstens data-max
+(function () {
+  document.querySelectorAll('.gs-rate').forEach(function (form) {
+    var box = form.querySelector('[data-gs-tags]');
+    if (!box) return;
+    var max = +box.getAttribute('data-max') || 3;
+    function sync() {
+      var star = form.querySelector('input[name="stars"]:checked');
+      box.hidden = !star;
+      if (!star) return;
+      var good = +star.value >= 4;
+      box.querySelectorAll('.gs-tag').forEach(function (l) {
+        var fits = l.classList.contains('is-good') === good;
+        l.hidden = !fits;
+        if (!fits) l.querySelector('input').checked = false;
+      });
+      var n = box.querySelectorAll('input:checked').length;
+      box.querySelectorAll('input').forEach(function (i) { i.disabled = !i.checked && n >= max; });
+    }
+    form.addEventListener('change', sync);
+    sync();
+  });
+})();

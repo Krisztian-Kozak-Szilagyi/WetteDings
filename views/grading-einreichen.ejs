@@ -138,6 +138,10 @@
                   <span class="gs-stars" role="radiogroup" aria-label="Sterne">
                     <% for (let s = 5; s >= 1; s--) { %><input type="radio" id="st-<%= o._id %>-<%= s %>" name="stars" value="<%= s %>" required><label for="st-<%= o._id %>-<%= s %>" title="<%= s %> <%= s === 1 ? 'Stern' : 'Sterne' %>">★</label><% } %>
                   </span>
+                  <%# Schnell-Tags (#204): erscheinen nach den Sternen – 4–5 Sterne Lob, 1–3 Kritik %>
+                  <span class="gs-tags" data-gs-tags data-max="<%= tagMax %>" hidden>
+                    <% reviewTags.forEach((t) => { %><label class="gs-tag <%= t.good ? 'is-good' : 'is-bad' %>"><input type="checkbox" name="tags" value="<%= t.key %>"><span><%= t.label %></span></label><% }) %>
+                  </span>
                   <button class="btn btn-sm" type="submit">Bewerten</button>
                 </form>
               <% } %>

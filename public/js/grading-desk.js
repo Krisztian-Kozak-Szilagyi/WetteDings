@@ -95,6 +95,18 @@
     if (flash && body) body.insertBefore(flash, body.firstChild);
   }
 
+  // Handy geöffnet: neue Bewertungen gelten als gesehen
+  var reviewBadge = document.querySelector('[data-gd-new-reviews]');
+  if (reviewBadge && sheets.bewertungen) {
+    sheets.bewertungen.addEventListener('gd:open', function () {
+      var token = document.querySelector('input[name="_csrf"]');
+      if (!token || !reviewBadge.isConnected) return;
+      fetch('/grading/gesehen', { method: 'POST', body: new URLSearchParams({ _csrf: token.value }), credentials: 'same-origin' }).then(function (res) {
+        if (res.ok) reviewBadge.remove();
+      }).catch(function () {});
+    });
+  }
+
   // Vitrine einräumen: höchstens max Slabs ankreuzbar
   var drawer = document.querySelector('[data-gd-drawer]');
   if (drawer) {

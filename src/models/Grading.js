@@ -34,6 +34,8 @@ const shopSchema = new Schema(
     codeRequest: { type: new Schema({ code: String, at: Date }, { _id: false }), default: null },
     codeHistory: { type: [String], default: [] }, // frühere Kürzel (stehen noch auf älteren Slabs)
     tools: { type: [String], default: [] }, // gekaufte Werkzeug-Upgrades (#204, gradingService.TOOLS)
+    reviewsSeenAt: { type: Date, default: null }, // Bewertungen bis hierhin gesehen (Badge am Handy auf dem Schreibtisch)
+    tourSeenAt: { type: Date, default: null }, // Tour über den Schreibtisch gesehen oder übersprungen
   },
   { timestamps: true }
 );
@@ -101,6 +103,7 @@ const orderSchema = new Schema(
     // grade = Note des Shops; Zweitprüfung: before = Note auf dem Slab vorher, changed = neuer Slab, issuer = Kürzel vorher
     result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number, before: Number, changed: Boolean, issuer: String }, { _id: false }), default: null },
     stars: { type: Number, default: null }, // Bewertung des Kunden 1–5
+    tags: { type: [String], default: undefined }, // Schnell-Tags zur Bewertung (orderService.REVIEW_TAGS)
     ratedAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -108,6 +111,7 @@ const orderSchema = new Schema(
 orderSchema.index({ shop: 1, status: 1, createdAt: 1 });
 orderSchema.index({ owner: 1, status: 1, createdAt: -1 });
 orderSchema.index({ status: 1, expiresAt: 1 });
+orderSchema.index({ shop: 1, ratedAt: -1 }, { partialFilterExpression: { ratedAt: { $type: 'date' } } });
 // Ein Exemplar kann nur in einem offenen Auftrag stecken
 orderSchema.index({ doc: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['wartet', 'in_arbeit'] } } });
 
