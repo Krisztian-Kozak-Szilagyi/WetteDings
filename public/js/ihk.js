@@ -1,16 +1,9 @@
 (function () {
   'use strict';
 
-  // ---------- Vergrößern (Antippen/Klick) mit Auswahl-Knöpfen ----------
+  // ---------- Vergrößern (Klick auf ein belegtes Feld bzw. die Lupe im Auswahlfenster) ----------
   var zoom = document.querySelector('[data-ihk-zoom]');
-  var pickFn = null; // pickFn(el, target) – nur vorhanden, wenn eine Auswahl möglich ist
-  var zoomEl = null;
-  var zoomPick = zoom && zoom.querySelector('[data-ihk-zoom-pick]');
-  var zoomBoost = zoom && zoom.querySelector('[data-ihk-zoom-boost]');
-  var zoomRemove = zoom && zoom.querySelector('[data-ihk-zoom-remove]');
   var zoomMeta = zoom && zoom.querySelector('[data-ihk-zoom-meta]');
-  var removeFn = null; // removeFn(slotKey) – leert ein Feld (nur bei der Auswahl)
-  var zoomSlot = null; // Feld, dessen Karte gerade vergrößert ist
 
   // Schwierigkeit und – nur bei Hybrid-Quests – der Hinweis "Hybrid" unter dem Quest-Text
   function showMeta(el) {
@@ -31,32 +24,12 @@
     }
   }
 
-  function openZoom(el, slotKey) {
+  function openZoom(el) {
     if (!zoom || !el || !el.dataset.zoom) return;
     showMeta(el);
-    // Belegtes Feld bei der Auswahl: Karte bzw. Quest wieder herausnehmen
-    zoomSlot = slotKey && removeFn ? slotKey : null;
-    zoomRemove.hidden = !zoomSlot;
     zoom.querySelector('[data-ihk-zoom-img]').src = el.dataset.zoom;
     zoom.querySelector('[data-ihk-zoom-title]').textContent = el.dataset.zoomTitle || '';
     zoom.querySelector('[data-ihk-zoom-text]').textContent = el.dataset.zoomText || '';
-    // data-blocked: kein freies Exemplar (Im Dungeon, Im Handel …) – nur ansehen, nicht wählen
-    zoomEl = el.dataset.drag && pickFn && !el.dataset.blocked ? el : null;
-    zoomPick.hidden = !zoomEl;
-    zoomBoost.hidden = !zoomEl || el.dataset.drag !== 'card' || !el.dataset.boostable;
-    if (zoomEl) {
-      var type = el.dataset.drag;
-      var main = type === 'card' ? 'card' : type === 'boost' ? 'boost' : 'offer';
-      var isMain = el.classList.contains('is-selected');
-      var isBoost = el.classList.contains('is-boost');
-      zoomPick.dataset.target = main;
-      zoomPick.textContent = main === 'offer' ? (isMain ? 'Ausgewählt ✓' : 'Diese Quest wählen')
-        : main === 'card' ? (isMain ? 'Ausgewählt ✓' : 'Diese Karte wählen')
-        : (isBoost ? 'Als Boost gewählt ✓' : 'Als Boost wählen');
-      zoomPick.disabled = main === 'boost' ? isBoost : isMain;
-      zoomBoost.textContent = isBoost ? 'Als Boost gewählt ✓' : 'Als Boost wählen';
-      zoomBoost.disabled = isBoost;
-    }
     if (typeof zoom.showModal === 'function') zoom.showModal();
     else zoom.setAttribute('open', '');
   }
@@ -65,31 +38,35 @@
     else zoom.removeAttribute('open');
   }
   if (zoom) {
-    zoomPick.addEventListener('click', function () { if (zoomEl) pickFn(zoomEl, zoomPick.dataset.target); closeZoom(); });
-    zoomBoost.addEventListener('click', function () { if (zoomEl) pickFn(zoomEl, 'boost'); closeZoom(); });
-    zoomRemove.addEventListener('click', function () { if (zoomSlot) removeFn(zoomSlot); closeZoom(); });
     zoom.querySelector('[data-ihk-zoom-close]').addEventListener('click', closeZoom);
     zoom.addEventListener('click', function (e) { if (e.target === zoom) closeZoom(); });
   }
-  // Slots ohne Auswahl (laufende Quest / Ergebnis): Klick vergrößert
-  document.querySelectorAll('.ihk-slot[data-zoom]').forEach(function (s) {
-    s.addEventListener('click', function () { openZoom(s); });
+  // Lupe auf einer Karte im Auswahlfenster: vergrößern, nicht auswählen
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-ihk-zoom-btn]');
+    if (!btn) return;
+    e.preventDefault();
+    openZoom(btn);
   });
 
-  // ---------- Auswahl: Karte links, Boost darunter, Quest rechts ----------
+  // ---------- Auswahl: Klick auf einen Platz öffnet das Auswahlfenster (wie im Dungeon) ----------
   var pick = document.querySelector('[data-ihk-pick]');
+  // Slots ohne Auswahl (laufende Quest / Ergebnis): Klick vergrößert
+  if (!pick) {
+    document.querySelectorAll('.ihk-slot[data-zoom]').forEach(function (s) {
+      s.addEventListener('click', function () { openZoom(s); });
+    });
+  }
   if (pick) {
     var startBtn = pick.querySelector('[data-ihk-start]');
     var slots = { card: pick.querySelector('[data-ihk-drop="card"]'), boost: pick.querySelector('[data-ihk-drop="boost"]'), boost2: pick.querySelector('[data-ihk-drop="boost2"]'), offer: pick.querySelector('[data-ihk-drop="offer"]') };
-    var accepts = { card: ['card'], boost: ['card', 'boost'], boost2: ['card', 'boost'], offer: ['offer'] };
+    var pickers = Array.prototype.slice.call(document.querySelectorAll('[data-ihk-picker]'));
+    var pickerFor = function (k) { return document.querySelector('[data-ihk-picker="' + k + '"]'); };
     var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2'; };
-    // Charakterkarten nur in einen Boost-Slot, wenn ihre Fähigkeit dort wirkt
-    var fits = function (slot, el) {
-      if (el.dataset.blocked) return false; // kein freies Exemplar
-      if (slots[slot].classList.contains('is-disabled') || accepts[slot].indexOf(el.dataset.drag) === -1) return false;
-      return !(isBoostSlot(slot) && el.dataset.drag === 'card' && !el.dataset.boostable);
-    };
     var input = function (name) { return pick.querySelector('input[name="' + name + '"]'); };
+    var calm = function () { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; };
+    var PICK_MS = 380; // so lange hebt sich die gewählte Karte, bevor das Fenster schließt
+    var PEEK_PX = 40; // so weit schaut die vierte Kartenreihe hervor, wenn es mehr als drei gibt
 
     var fillSlot = function (target, el) {
       var slot = slots[target];
@@ -99,9 +76,8 @@
         empty.className = 'ihk-slot-empty';
         // Boost 2 ist nur bei Hybrid-Quests aktiv – sonst ausgegraut
         if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>' + (slot.classList.contains('is-disabled') ? 'nur bei Hybrid-Quests' : 'optional') + '</small>';
-        else empty.textContent = 'Karte hierher ziehen';
+        else empty.textContent = target === 'offer' ? 'Quest wählen' : 'Karte wählen';
         slot.appendChild(empty);
-        ['zoom', 'zoomTitle', 'zoomText', 'zoomLevel', 'zoomLevelKey', 'zoomHybrid'].forEach(function (k) { delete slot.dataset[k]; });
         return;
       }
       var img = document.createElement('img');
@@ -109,19 +85,15 @@
       img.alt = '';
       img.draggable = false;
       slot.appendChild(img);
-      slot.dataset.zoom = el.dataset.zoom;
-      slot.dataset.zoomTitle = el.dataset.zoomTitle || '';
-      slot.dataset.zoomText = el.dataset.zoomText || '';
-      ['zoomLevel', 'zoomLevelKey', 'zoomHybrid'].forEach(function (k) { if (el.dataset[k]) slot.dataset[k] = el.dataset[k]; else delete slot.dataset[k]; });
       slot.classList.remove('is-picked');
       void slot.offsetWidth;
       slot.classList.add('is-picked');
     };
     var clear = function (target) { input(target).value = ''; fillSlot(target, null); };
 
-    // Markierungen in der Kartenliste und der zweite Boost-Slot (nur bei Hybrid-Quests) folgen den Eingabefeldern
+    // Markierungen (Angebote in der Mitte, Häkchen im Auswahlfenster) und der zweite Boost-Slot folgen den Eingabefeldern
     var refresh = function () {
-      var card = input('card').value, b1 = input('boost').value, b2 = input('boost2').value, offer = input('offer').value;
+      var offer = input('offer').value;
       var hybrid = false;
       pick.querySelectorAll('[data-drag="offer"]').forEach(function (x) {
         var on = offer !== '' && x.dataset.value === offer;
@@ -131,27 +103,24 @@
       // Wechsel auf eine normale Quest: Boost 2 wird wieder grau und gibt seine Karte zurück
       if (slots.boost2.classList.contains('is-disabled') === hybrid) {
         slots.boost2.classList.toggle('is-disabled', !hybrid);
+        slots.boost2.setAttribute('aria-disabled', hybrid ? 'false' : 'true');
         clear('boost2');
-        b2 = '';
       }
-      pick.querySelectorAll('[data-drag="card"], [data-drag="boost"]').forEach(function (x) {
-        x.classList.toggle('is-selected', x.dataset.drag === 'card' && x.dataset.value === card);
-        x.classList.toggle('is-boost', x.dataset.value === b1 || x.dataset.value === b2);
+      pickers.forEach(function (dlg) {
+        var v = input(dlg.dataset.ihkPicker).value;
+        dlg.querySelectorAll('input[type="radio"]').forEach(function (r) { r.checked = r.value === v; });
       });
-      startBtn.disabled = !(card && offer !== '');
+      startBtn.disabled = !(input('card').value && offer !== '');
     };
 
     var assign = function (el, target) {
       if (el.dataset.blocked) return; // kein freies Exemplar (Im Dungeon, Im Handel …)
-      target = target || (el.dataset.drag === 'boost' ? 'boost' : el.dataset.drag);
       var value = el.dataset.value;
       if (isBoostSlot(target)) {
         // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte; Charaktere nur mit Boost-Fähigkeit
         if (el.dataset.drag === 'card' && !el.dataset.boostable) return;
         // bisher Hauptkarte: wandert in den Boost-Slot, das Hauptfeld wird frei
         if (input('card').value === value) clear('card');
-        // "Als Boost wählen": ist der erste Slot belegt, kommt die Karte bei Hybrid-Quests in den zweiten
-        if (target === 'boost' && !slots.boost2.classList.contains('is-disabled') && input('boost').value && input('boost').value !== value && !input('boost2').value) target = 'boost2';
         var other = target === 'boost' ? 'boost2' : 'boost';
         if (input(other).value === value) clear(other);
       }
@@ -160,78 +129,109 @@
       fillSlot(target, el);
       refresh();
     };
-    pickFn = assign;
-    removeFn = function (k) { clear(k); refresh(); };
+
+    // ---------- Auswahlfenster ----------
+    // Weich ausgeblendet wird nur die Kante, hinter der noch Karten liegen (CSS: .has-above / .has-below)
+    var fadeEdges = function (grid) {
+      grid.classList.toggle('has-above', grid.scrollTop > 2);
+      grid.classList.toggle('has-below', grid.scrollTop + grid.clientHeight < grid.scrollHeight - 2);
+    };
+    // Höhe: bis drei Reihen wächst das Fenster mit, ab der vierten scrollt das Raster (CSS: --dg-grid-max)
+    var sizePicker = function (dlg) {
+      var grid = dlg.querySelector('[data-ihk-grid]');
+      dlg.style.minHeight = '';
+      var first = Array.prototype.find.call(grid.children, function (el) { return !el.hidden && el.matches('[data-ihk-item]'); });
+      if (first) {
+        var cs = getComputedStyle(grid);
+        var gap = parseFloat(cs.rowGap) || 0;
+        grid.style.setProperty('--dg-grid-max', Math.ceil(3 * first.offsetHeight + 3 * gap + parseFloat(cs.paddingTop) + PEEK_PX) + 'px');
+      }
+      dlg.style.minHeight = dlg.offsetHeight + 'px';
+    };
+    var closePicker = function (dlg) {
+      dlg.classList.remove('is-picking');
+      if (typeof dlg.close === 'function') dlg.close();
+      else dlg.removeAttribute('open');
+    };
+    var openPicker = function (k) {
+      var dlg = pickerFor(k);
+      if (!dlg || slots[k].classList.contains('is-disabled')) return;
+      refresh();
+      dlg.classList.remove('is-opening', 'is-picking');
+      dlg.querySelectorAll('img[loading="lazy"]').forEach(function (img) { img.loading = 'eager'; });
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+      sizePicker(dlg);
+      var grid = dlg.querySelector('[data-ihk-grid]');
+      // Die schon gewählte Karte mittig zeigen
+      var chosen = grid.querySelector('input:checked');
+      if (chosen && chosen.value !== '') {
+        var g = grid.getBoundingClientRect();
+        var c = chosen.closest('.dg-pick').getBoundingClientRect();
+        grid.scrollTop += c.top - g.top - (g.height - c.height) / 2;
+      }
+      fadeEdges(grid);
+      // Hereinfächern in der Reihenfolge, in der man die Karten sieht
+      var top = grid.getBoundingClientRect().top;
+      var bottom = top + grid.clientHeight;
+      var n = 0;
+      Array.prototype.forEach.call(grid.children, function (el) {
+        if (el.hidden) return;
+        var r = el.getBoundingClientRect();
+        el.style.setProperty('--i', r.bottom > top && r.top < bottom ? n++ : 0);
+      });
+      void dlg.offsetWidth;
+      dlg.classList.add('is-opening');
+      clearTimeout(dlg.openTimer);
+      dlg.openTimer = setTimeout(function () { dlg.classList.remove('is-opening'); }, 850);
+      var search = dlg.querySelector('[data-ihk-search]');
+      if (search && window.innerWidth >= 720) search.focus({ preventScroll: true });
+    };
 
     Object.keys(slots).forEach(function (k) {
-      slots[k].addEventListener('click', function () { if (!drag.active) openZoom(slots[k], input(k).value !== '' ? k : null); });
+      slots[k].addEventListener('click', function () { openPicker(k); });
+      slots[k].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(k); }
+      });
     });
+    pickers.forEach(function (dlg) {
+      var k = dlg.dataset.ihkPicker;
+      dlg.querySelector('[data-ihk-picker-close]').addEventListener('click', function () { closePicker(dlg); });
+      dlg.addEventListener('click', function (e) {
+        if (e.target === dlg) return closePicker(dlg); // Klick daneben schließt
+        // Klick auf die schon gewählte Karte: kein change-Ereignis – Fenster einfach schließen
+        var box = e.target.closest('.dg-pick');
+        if (!box || e.target.matches('input') || e.target.closest('[data-ihk-zoom-btn]')) return;
+        var r = box.querySelector('input');
+        if (r && r.checked && !r.disabled) closePicker(dlg);
+      });
+      // Klick auf eine Karte übernimmt sie sofort; die gewählte hebt sich kurz, dann schließt das Fenster
+      dlg.addEventListener('change', function (e) {
+        var r = e.target;
+        if (r.type !== 'radio') return;
+        var item = r.closest('[data-ihk-item]');
+        if (item) assign(item, k);
+        else { clear(k); refresh(); } // „Ohne Boost“
+        var box = r.closest('.dg-pick');
+        dlg.classList.remove('is-opening');
+        dlg.classList.add('is-picking');
+        if (box) box.classList.add('is-picked');
+        setTimeout(function () {
+          if (box) box.classList.remove('is-picked');
+          closePicker(dlg);
+        }, calm() ? 0 : PICK_MS);
+      });
+    });
+    window.addEventListener('resize', function () { pickers.forEach(function (dlg) { if (dlg.open) sizePicker(dlg); }); });
 
-    // Ziehen (nur Maus); auf Touch-Geräten: antippen = vergrößern + Knopf
-    var drag = { el: null, active: false, ghost: null };
-    var targetAt = function (x, y) {
-      var hit = document.elementFromPoint(x, y);
-      var slot = hit && hit.closest('[data-ihk-drop]');
-      return slot && drag.el && fits(slot.dataset.ihkDrop, drag.el) ? slot : null;
-    };
-    var moveGhost = function (x, y) {
-      drag.ghost.style.left = x + 'px';
-      drag.ghost.style.top = y + 'px';
-      var t = targetAt(x, y);
-      Object.keys(slots).forEach(function (k) { slots[k].classList.toggle('is-target', slots[k] === t); });
-    };
-    var beginDrag = function () {
-      drag.active = true;
-      drag.ghost = document.createElement('img');
-      drag.ghost.src = drag.el.dataset.image;
-      drag.ghost.className = 'ihk-ghost';
-      document.body.appendChild(drag.ghost);
-      drag.el.classList.add('is-dragging');
-      document.body.classList.add('ihk-dragging'); // Cursor: zugreifende Hand
-      Object.keys(slots).forEach(function (k) { if (fits(k, drag.el)) slots[k].classList.add('is-drop-hint'); });
-    };
-    var endDrag = function (drop) {
-      if (drag.active) {
-        var slot = drop ? targetAt(drag.x, drag.y) : null;
-        if (slot) assign(drag.el, slot.dataset.ihkDrop);
-        drag.ghost.remove();
-        drag.el.classList.remove('is-dragging');
-        document.body.classList.remove('ihk-dragging');
-        Object.keys(slots).forEach(function (k) { slots[k].classList.remove('is-target', 'is-drop-hint'); });
-        setTimeout(function () { drag.active = false; }, 0);
-      } else if (drop && drag.el) {
-        openZoom(drag.el);
-      }
-      drag.el = null;
-    };
-    pick.addEventListener('pointerdown', function (e) {
-      var el = e.target.closest('[data-drag]');
-      if (!el || e.button > 0) return;
-      drag.el = el;
-      drag.active = false;
-      drag.x = drag.sx = e.clientX;
-      drag.y = drag.sy = e.clientY;
-      drag.touch = e.pointerType !== 'mouse';
+    // Angebote in der Mitte: Klick (oder Enter/Leertaste) wählt die Quest direkt
+    pick.querySelectorAll('[data-drag="offer"]').forEach(function (el) {
+      el.addEventListener('click', function () { assign(el, 'offer'); });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); assign(el, 'offer'); }
+      });
     });
-    document.addEventListener('pointermove', function (e) {
-      if (!drag.el) return;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      if (!drag.active) {
-        if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) <= 8) return;
-        if (drag.touch) { drag.el = null; return; } // Wischen = Scrollen
-        beginDrag();
-      }
-      moveGhost(e.clientX, e.clientY);
-    });
-    document.addEventListener('pointerup', function () { if (drag.el) endDrag(true); });
-    document.addEventListener('pointercancel', function () { if (drag.el) endDrag(false); });
-    pick.addEventListener('keydown', function (e) {
-      var el = e.target.closest('[data-drag]');
-      if (!el) return;
-      if (e.key === 'Enter') { e.preventDefault(); openZoom(el); }
-      if (e.key === ' ') { e.preventDefault(); assign(el); }
-    });
+    refresh();
   }
 
   // ---------- Countdown während der Quest, danach neu laden ----------
@@ -533,55 +533,58 @@
   else requestAnimationFrame(frame);
 })();
 
-// ---------- Kartenauswahl: Suchen + Seltenheit (partials/mkt-bar) ----------
+// ---------- Auswahlfenster: Suchen + Seltenheit (partials/mkt-bar) blenden Karten aus, der Rest wird gescrollt ----------
 (function () {
   'use strict';
-  var pick = document.querySelector('.ihk-pick');
-  if (!pick) return;
-  var search = pick.querySelector('[data-ihk-search]');
-  var opts = Array.prototype.slice.call(pick.querySelectorAll('[data-ihk-rar]'));
-  var cards = Array.prototype.slice.call(pick.querySelectorAll('.ihk-pick-card'));
-  var empty = pick.querySelector('[data-ihk-empty]');
-  var boostHead = pick.querySelector('[data-ihk-boost-head]');
-  var rarity = 'all';
-  // Favoriten stehen fest oben; „Häufig verwendet“ (nur ohne Favoriten) holt die meistgespielten Karten per CSS nach vorn
-  var groups = Array.prototype.slice.call(pick.querySelectorAll('[data-pick-group]'));
-  var freqBtn = pick.querySelector('[data-ihk-freq]');
-  var freqOn = false;
-  function apply() {
-    var q = search ? search.value.trim().toLowerCase() : '';
-    groups.forEach(function (g) {
-      var kind = g.getAttribute('data-pick-group');
-      var hasFavs = !!g.parentNode.querySelector('[data-fav]');
-      g.hidden = !!(q || rarity !== 'all') || (kind === 'freq' && !freqOn) || (kind === 'rest' && !hasFavs && !freqOn);
-    });
-    var shownCards = 0;
-    var shownBoosts = 0;
-    cards.forEach(function (c) {
-      var ok = (rarity === 'all' || c.getAttribute('data-rarity') === rarity) && (!q || (c.getAttribute('data-name') || '').indexOf(q) !== -1);
-      c.hidden = !ok;
-      if (ok && c.getAttribute('data-drag') === 'boost') shownBoosts++;
-      else if (ok) shownCards++;
-    });
-    if (boostHead) {
-      boostHead.hidden = !shownBoosts;
-      boostHead.nextElementSibling.hidden = !shownBoosts;
+  function fadeEdges(grid) {
+    grid.classList.toggle('has-above', grid.scrollTop > 2);
+    grid.classList.toggle('has-below', grid.scrollTop + grid.clientHeight < grid.scrollHeight - 2);
+  }
+  document.querySelectorAll('[data-ihk-picklist]').forEach(function (box) {
+    var grid = box.querySelector('[data-ihk-grid]');
+    var items = Array.prototype.slice.call(box.querySelectorAll('[data-ihk-item]'));
+    var none = box.querySelector('[data-ihk-none]'); // "Ohne Boost" – nur ohne Suche und Filter
+    var search = box.querySelector('[data-ihk-search]');
+    var opts = Array.prototype.slice.call(box.querySelectorAll('[data-ihk-rar]'));
+    var empty = box.querySelector('[data-ihk-empty]');
+    // Favoriten stehen fest oben; „Häufig verwendet“ (nur ohne Favoriten) holt die meistgespielten Karten per CSS nach vorn
+    var groups = Array.prototype.slice.call(box.querySelectorAll('[data-pick-group]'));
+    var freqBtn = box.querySelector('[data-ihk-freq]');
+    var hasFavs = !!box.querySelector('[data-fav]');
+    var rarity = '';
+    var freqOn = false;
+    grid.addEventListener('scroll', function () { fadeEdges(grid); }, { passive: true });
+    if (!search) return; // Quest-Fenster: ohne Suche
+    function apply() {
+      var q = search.value.trim().toLowerCase();
+      groups.forEach(function (g) {
+        var kind = g.getAttribute('data-pick-group');
+        g.hidden = !!(q || rarity) || (kind === 'freq' && !freqOn) || (kind === 'rest' && !hasFavs && !freqOn);
+      });
+      var shown = 0;
+      items.forEach(function (it) {
+        it.hidden = !((!rarity || it.getAttribute('data-rarity') === rarity) && (!q || (it.getAttribute('data-name') || '').indexOf(q) !== -1));
+        if (!it.hidden) shown++;
+      });
+      if (none) none.hidden = !!(q || rarity);
+      if (empty) empty.hidden = shown > 0;
+      grid.scrollTop = 0;
+      fadeEdges(grid);
     }
-    if (empty) empty.hidden = shownCards + shownBoosts > 0;
-  }
-  opts.forEach(function (o) {
-    o.addEventListener('click', function () {
-      rarity = o.getAttribute('data-ihk-rar');
-      apply();
+    opts.forEach(function (o) {
+      o.addEventListener('click', function () {
+        rarity = o.getAttribute('data-ihk-rar');
+        apply();
+      });
     });
+    search.addEventListener('input', apply);
+    if (freqBtn) {
+      freqBtn.addEventListener('click', function () {
+        freqOn = !freqOn;
+        box.classList.toggle('show-freq', freqOn);
+        freqBtn.setAttribute('aria-pressed', freqOn ? 'true' : 'false');
+        apply();
+      });
+    }
   });
-  if (search) search.addEventListener('input', apply);
-  if (freqBtn) {
-    freqBtn.addEventListener('click', function () {
-      freqOn = !freqOn;
-      pick.classList.toggle('show-freq', freqOn);
-      freqBtn.setAttribute('aria-pressed', freqOn ? 'true' : 'false');
-      apply();
-    });
-  }
 })();
