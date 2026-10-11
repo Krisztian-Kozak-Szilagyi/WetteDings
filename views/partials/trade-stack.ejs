@@ -15,8 +15,9 @@
 <span class="tstack tstack-<%= stackSize %><%= shown.length > 1 ? ' tstack-many' : '' %>" style="--n: <%= Math.max(1, shown.length) %>">
   <% shown.forEach((l, i) => { const c = cardInfo(l.card); const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
     <% if (l.foiledAt) { %>
-      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
-        <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span>
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled <%= l.slab || l.grade ? 'is-slab' : 'is-sleeve' %>" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
+        <%# Mit Slab das starre Gehäuse mit Etikett (Kürzel, Note), sonst die Schutzhülle – wie in der Kartenauswahl %>
+        <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %></span>
       </button>
     <% } else if (l.damaged && l.marks) { const what = stateLabel(l); %>
       <button type="button" class="tstack-card r-<%= c.rarity %> is-marked" style="--i: <%= i %>"<%- copyViewAttrs(c, r.label, l.marks, { note: 'Exemplar · ' + (what === 'Exemplar' ? 'Gebrauchsspuren' : what) }) %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar – genau ansehen">

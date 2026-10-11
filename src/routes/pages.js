@@ -20,6 +20,9 @@ const { profileStats } = require('../stats/profileStats');
 const avatars = require('../profile/avatars');
 const cosmetics = require('../cosmetics/cosmeticService');
 const cosmeticLogic = require('../cosmetics/logic');
+const grading = require('../grading/gradingService');
+const gradingOrders = require('../grading/orderService');
+const { GradingShop } = require('../models/Grading');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -69,8 +72,22 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
   // eigener Fortschritt bei den gesperrten Erfolgen (andere sehen nur, ob ein Erfolg da ist)
   const progress = isMe ? await achievementService.progressOf(profile._id, earned.map((e) => e.key)) : {};
   for (const a of achievements) a.progress = (!a.earned && progress[a.key]) || null;
+  // Grading-Shop des Mitglieds (#204): Leiste auf dem Profil – nur, wenn der Shop für alle offen ist (oder ich Admin bin)
+  let gradingBar = null;
+  if (grading.settings.open || req.user.isAdmin) {
+    const gs = await GradingShop.findById(profile._id).select('active code').lean();
+    const shop = gs && gs.active && gs.code ? await gradingOrders.shopByCode(gs.code) : null;
+    if (shop) {
+      // „ab“-Preis wie bei der Shop-Auswahl: Grading mit Slab (ohne Lager: Bügeln), verglichen mit dem Durchschnitt der Shops
+      const from = (x) => (x.slabs >= 1 ? x.prices.base + x.prices.slab : x.prices.base + x.prices.iron);
+      const all = (await gradingOrders.shopsForOrders()).map(from);
+      const avg = all.length > 1 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+      gradingBar = { shop, isMe, accepts: !!shop.accepts, from: from(shop), avg, diff: avg ? (from(shop) - avg) / avg : null };
+    }
+  }
   const has = new Set(owned.map((o) => o._id));
   res.render('profil', {
+    gradingBar,
     title: profile.username,
     profile,
     isMe,

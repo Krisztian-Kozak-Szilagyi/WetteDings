@@ -168,9 +168,9 @@
         ticket.lines.appendChild(li);
       });
     }
-    var head = shop ? shop.closest('.gs-shop').querySelector('.gs-shop-head') : null;
+    var head = shop ? shop.closest('.gs-shop').querySelector('.ge-shop-name') : null;
     ticket.shop.hidden = !head;
-    ticket.shop.textContent = head ? head.querySelector('b').textContent + ' (' + shop.value + ')' : '';
+    ticket.shop.textContent = head ? head.textContent + ' (' + shop.value + ')' : '';
     ticket.sum.textContent = total != null ? euro(total) : '–';
     ticket.note.textContent = !card || review ? '' : card.getAttribute('data-sleeve') === '1'
       ? '🛡️ Dein TCG Sleeve bleibt beim Shop und schützt die Karte beim Versand.'
@@ -345,7 +345,13 @@
   }
 
   form.addEventListener('change', update);
+  // Shop schon gewählt (Link vom Profil): gleich bei der Karte beginnen
+  if (picked('shop')) stepNo = 1;
   update();
+  if (stepNo > 0 && !stepOk[stepNo - 1]) {
+    stepNo = 0;
+    update();
+  }
 })();
 
 // Bewerten (#204): nach den Sternen erscheinen passende Schnell-Tags – 4–5 Sterne Lob, 1–3 Kritik, höchstens data-max

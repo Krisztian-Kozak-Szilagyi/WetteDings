@@ -80,6 +80,7 @@
     <span class="muted small">Mitglied seit <%= dayDate(profile.createdAt) %></span>
   </div>
 </section>
+<% if (gradingBar) { %><%- include('partials/profil-grading', { g: gradingBar }) %><% } %>
 
 <div class="pf-layout">
   <div class="pf-main">

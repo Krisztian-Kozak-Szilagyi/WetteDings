@@ -119,7 +119,7 @@
                       <% if (c.marks) { %><button type="button" class="hb-loupe"<%- copyViewAttrs(c.card, r.label, c.marks, { note: 'Exemplar' }) %> aria-label="<%= c.card.name %> genau ansehen" title="Genau ansehen">🔍</button><% } %>
                     </span>
                   <% } %>
-                  <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.damaged ? ' · Spuren' : '' %></span>
+                  <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.creased ? (c.ironed ? ' · gebügelt' : ' · Knick') : c.damaged ? ' · Spuren' : '' %></span>
                 </label>
               <% }) %>
             </div>
