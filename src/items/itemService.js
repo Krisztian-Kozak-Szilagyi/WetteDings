@@ -7,7 +7,7 @@
 const crypto = require('crypto');
 const { Item, ItemStack, ItemLog } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
-const { GradingShop } = require('../models/Grading');
+const { GradingShop, GradingOrder } = require('../models/Grading');
 const { Trade, openFilter } = require('../models/Trade');
 const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
@@ -59,13 +59,26 @@ async function lockedItemIds(userId, session) {
   return new Set(trades.flatMap((t) => lockedFor(t, userId)).map(String));
 }
 
-/** Freie Stücke einer Art (storage 'stueck', nicht im Handel), älteste zuerst */
-async function freeItems(userId, type, session) {
+/**
+ * Leere Slabs, die ein Grading-Shop für laufende Spieler-Aufträge zurückhält (#204): jeder Auftrag „in Arbeit“ mit
+ * „Benoten + Slab“ hat seinen Slab reserviert – er lässt sich weder verkaufen noch handeln, bis der Auftrag fertig ist,
+ * abgebrochen wird oder abläuft. Aufträge ohne Angabe der Bausteine zählen als Bügeln + Slab (orderService.servicesOf).
+ */
+const reservedSlabs = (userId, session) =>
+  GradingOrder.countDocuments({ shop: userId, status: 'in_arbeit', $or: [{ 'services.slab': true }, { services: null }] }).session(session || null);
+
+/**
+ * Freie Stücke einer Art (storage 'stueck', nicht im Handel), älteste zuerst. Slabs: ohne die für laufende Aufträge
+ * reservierten (ignoreReserved = true nur für den Auftrag, der sie verbraucht).
+ */
+async function freeItems(userId, type, session, ignoreReserved = false) {
   const [docs, locked] = await Promise.all([
     Item.find({ user: userId, type }).sort({ createdAt: 1 }).select('_id').session(session || null).lean(),
     lockedItemIds(userId, session),
   ]);
-  return docs.filter((d) => !locked.has(String(d._id)));
+  const free = docs.filter((d) => !locked.has(String(d._id)));
+  if (type !== 'slab' || ignoreReserved) return free;
+  return free.slice(0, Math.max(0, free.length - (await reservedSlabs(userId, session))));
 }
 
 /** Gegenstände per Schreibzugriff beanspruchen (gleichzeitiger Verkauf/Handel/Folieren kollidiert, siehe tcg/locks.claim) */
@@ -76,12 +89,12 @@ async function claimItems(docs, userId, session) {
 }
 
 /** Wie viele Stück einer Art frei verfügbar sind (nicht im Handel) */
-async function freeCount(userId, t, session) {
+async function freeCount(userId, t, session, ignoreReserved = false) {
   if (t.storage === 'stapel') {
     const s = await ItemStack.findOne({ user: userId, type: t.key }).select('count').session(session || null).lean();
     return s ? s.count : 0;
   }
-  return (await freeItems(userId, t.key, session)).length;
+  return (await freeItems(userId, t.key, session, ignoreReserved)).length;
 }
 
 /**
@@ -113,7 +126,7 @@ async function addItems({ userIds, type, count = 1, source, session, meta }) {
  * (nicht im Handel); newest = die neuesten zuerst (sonst die ältesten). Vorher mit freeCount prüfen, um eine
  * passende Meldung zu zeigen – hier gibt es nur die allgemeine.
  */
-async function takeItems({ userId, type, count = 1, source, session, newest = false, meta }) {
+async function takeItems({ userId, type, count = 1, source, session, newest = false, meta, ignoreReserved = false }) {
   const t = needType(type);
   needSource(source);
   if (!session) throw new Error('takeItems braucht eine Transaktion');
@@ -123,7 +136,7 @@ async function takeItems({ userId, type, count = 1, source, session, newest = fa
     const res = await ItemStack.updateOne({ user: userId, type: t.key, count: { $gte: count } }, { $inc: { count: -count } }, { session });
     if (res.modifiedCount !== 1) throw changed();
   } else {
-    const free = await freeItems(userId, t.key, session);
+    const free = await freeItems(userId, t.key, session, ignoreReserved);
     if (free.length < count) throw changed();
     const docs = newest ? free.slice(-count) : free.slice(0, count);
     await claimItems(docs, userId, session);
@@ -321,7 +334,8 @@ function splitFoilDrops(userIds, slabPercent = foil.settings.slabDropPercent, ro
 }
 
 /** Freie leere Slabs eines Shops (nicht im Handel) – die braucht er zum Versiegeln (grading/gradingService) */
-const slabStock = (userId, session) => freeCount(userId, itemTypeByKey.slab, session);
+/** ignoreReserved = true: Bestand inklusive der für laufende Aufträge reservierten Slabs (für die Aufträge selbst) */
+const slabStock = (userId, session, ignoreReserved = false) => freeCount(userId, itemTypeByKey.slab, session, ignoreReserved);
 
 /** Neue Gegenstände seit dem letzten Besuch des Inventars (gleiche Marke wie bei den Packs) – für das Leuchten an „TCG“ */
 async function newItemCount(user) {
@@ -337,4 +351,4 @@ async function newItemCount(user) {
 const notifyGift = (userIds, t, count) =>
   notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
 
-module.exports = { buyItems, buyPrice, MAX_BUY, splitFoilDrops, slabStock, newItemCount, revokeItems, ITEM_TYPES, itemTypeByKey, itemType, addItems, takeItems, freeCount, logItems, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };
+module.exports = { reservedSlabs, buyItems, buyPrice, MAX_BUY, splitFoilDrops, slabStock, newItemCount, revokeItems, ITEM_TYPES, itemTypeByKey, itemType, addItems, takeItems, freeCount, logItems, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

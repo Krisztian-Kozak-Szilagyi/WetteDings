@@ -196,37 +196,51 @@
             <% if (kindKey !== 'sale') { %><span class="mk-kind"><%= kindKey === 'swap' ? 'Tausch' : 'Gesucht' %></span><% } else if (!single) { %><span class="mk-bundle"><%= countText(list) %></span><% } %>
           </div>
           <div class="mk-body">
-            <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
-            <span class="mk-rarity">
-              <span class="tcg-dot r-<%= c.rarity %>"></span><%= single ? r.label : 'bis ' + r.label %>
-              <% const st = single ? stateLabel(top) : ''; if (st) { %><span class="foil-tag"<%- top.foiledAt ? ` title="Foliert am ${dayDate(top.foiledAt)}"` : '' %>><%= st %></span><% } %>
-              <% if (kindKey !== 'wanted' && !c.isItem) { %>
-                <span class="own-tag<%= missing ? ' own-new' : '' %>"><%= single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz' %></span>
-              <% } %>
-              <% if (kindKey === 'wanted' && !lacking.length) { %><span class="own-tag own-new">Hast du frei</span><% } %>
-            </span>
+            <%# Feste Reihenfolge in jeder Kachel: 1 Was (Name, Chips) · 2 Was kostet es (Preis, Urteil, Vergleichswerte) · 3 Von wem · 4 Aktionen %>
+            <div class="mk-head">
+              <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
+              <span class="mk-rarity">
+                <span class="mk-chip"><span class="tcg-dot r-<%= c.rarity %>"></span><%= single ? r.label : 'bis ' + r.label %></span>
+                <% const st = single ? stateLabel(top) : ''; if (st) { %><span class="foil-tag"<%- top.foiledAt ? ` title="Foliert am ${dayDate(top.foiledAt)}"` : '' %>><%= st %></span><% } %>
+                <% if (kindKey !== 'wanted' && !c.isItem) { %>
+                  <span class="own-tag<%= missing ? ' own-new' : '' %>"><%= single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz' %></span>
+                <% } %>
+                <% if (kindKey === 'wanted' && !lacking.length) { %><span class="own-tag own-new">Hast du frei</span><% } %>
+              </span>
+            </div>
+            <% const ms = kindKey === 'swap' ? null : marketAvg(kindKey === 'wanted' ? t.want : t.give);
+               const mval = ms ? (ms.avg != null ? ms.avg : ms.est) : null;
+               const per = ms ? Math.floor(t.price / ms.count) : 0;
+               const verdict = kindKey === 'sale' && mval ? (per < mval * 0.95 ? 'low' : per > mval * 1.05 ? 'high' : 'mid') : '';
+               const pop = single && !c.isItem ? [popText(top), salesText(top.copy || top.doc)].filter(Boolean).join(' · ') : ''; %>
             <% if (kindKey === 'swap') { %>
               <span class="mk-wants">
                 <span class="mk-wants-label">gegen</span>
                 <%- include('partials/trade-stack', { list: t.want, size: 'sm', max: 3 }) %>
                 <span class="mk-wants-text"><%= sideText(t.want, p.pay) %><% if (p.receive) { %> <span class="pos">+ <%= euro(p.receive) %> für dich</span><% } %></span>
               </span>
-              <span class="mk-price mk-price-sub"><span>Händlerpreis <%= euro(value) %> gegen <%= euro(linesValue(t.want)) %></span></span>
+              <dl class="mk-kv">
+                <div><dt>Händler gibst du</dt><dd><%= euro(linesValue(t.want)) %></dd></div>
+                <div><dt>Händler bekommst du</dt><dd><%= euro(value) %></dd></div>
+              </dl>
             <% } else if (kindKey === 'wanted') { %>
-              <span class="mk-price"><strong><%= euro(t.price) %></strong><span>zahlt <%= t.sellerName %></span></span>
+              <div class="mk-money">
+                <span class="mk-price-main"><strong><%= euro(t.price) %></strong></span>
+                <span class="mk-sub">zahlt <%= t.sellerName %></span>
+              </div>
             <% } else { %>
-              <span class="mk-price">
-                <strong><%= euro(t.price) %></strong>
-                <span class="<%= t.price < value ? 'pos' : '' %>">Händlerpreis <%= euro(value) %></span>
-              </span>
+              <div class="mk-money">
+                <span class="mk-price-main">
+                  <strong><%= euro(t.price) %></strong>
+                  <% if (verdict) { %><span class="mk-verdict is-<%= verdict %>" title="Preis je Stück gegen den Marktpreis (±5 % gelten als Durchschnitt)"><%= { low: '▼ unter Ø', mid: '≈ Ø', high: '▲ über Ø' }[verdict] %></span><% } %>
+                </span>
+                <dl class="mk-kv"<%- pop || ms ? ` title="${[ms ? marketText(ms) : '', pop].filter(Boolean).join(' · ').replace(/"/g, '&quot;')}"` : '' %>>
+                  <div><dt>Händler</dt><dd class="<%= t.price < value ? 'pos' : '' %>"><%= euro(value) %></dd></div>
+                  <div><dt>Markt Ø</dt><dd><%= mval != null ? euro(mval) : '–' %><% if (ms && ms.avg == null && mval != null) { %> <small>geschätzt</small><% } %></dd></div>
+                </dl>
+                <% if (ms && ms.count > 1) { %><span class="mk-sub"><%= euro(per) %> je Stück</span><% } %>
+              </div>
             <% } %>
-            <% const ms = kindKey === 'swap' ? null : marketAvg(kindKey === 'wanted' ? t.want : t.give); if (ms) { const per = Math.floor(t.price / ms.count); %>
-              <span class="mk-avg" title="Marktpreis: Ø je Stück aus sauberen Verkäufen der letzten <%= priceDays %> Tage">
-                <%= marketText(ms) %><% if (ms.avg != null && ms.count > 1) { %> · hier <%= euro(per) %> je Stück<% } %>
-                <% if (ms.avg != null && kindKey === 'sale') { %><b class="<%= per <= ms.avg ? 'pos' : 'neg' %>"><%= per <= ms.avg ? 'unter Ø' : 'über Ø' %></b><% } %>
-              </span>
-            <% } %>
-            <% if (single && !c.isItem) { const info = [popText(top), salesText(top.copy || top.doc)].filter(Boolean).join(' · '); if (info) { %><span class="mk-pop"><%= info %></span><% } } %>
             <span class="mk-seller">von <%- userLink(t.sellerName) %> · endet <%= relTime(t.expiresAt) %></span>
             <div class="mk-actions">
               <form method="post" action="/handel/angebot/<%= t._id %>/kaufen" data-confirm="<%= action %>? Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.">

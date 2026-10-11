@@ -487,7 +487,7 @@ async function takePlayerJob({ user, info, orderId, status, session }) {
   // Aufträge mit „Benoten + Slab“ brauchen je einen leeren Slab: genug für alle schon angenommenen und diesen? Sonst
   // wird beim automatischen Annehmen der nächste Auftrag ohne Slab genommen, beim gezielten Annehmen gibt es einen Hinweis
   const committed = await GradingJob.countDocuments({ user: user._id, status: { $in: RUNNING }, 'services.slab': true }).session(session);
-  const slabOk = (await slabStock(user._id, session)) > committed;
+  const slabOk = (await slabStock(user._id, session, true)) > committed;
   // Express zuerst, sonst der älteste; die Frist beginnt beim ersten Arbeitsbeginn neu (Express: kürzer), nach einem
   // Abbruch läuft sie weiter (orderService.startSet)
   const noSlab = slabOk || orderId ? {} : { services: { $ne: null }, 'services.slab': { $ne: true } };
@@ -733,8 +733,8 @@ async function finishPlayerJob({ job, shop, session }) {
   // Das Gehäuse verbraucht der Shop: ein leerer Slab aus seinem Inventar je Versiegelung (Zweitprüfung nicht: dort bleibt
   // der Slab, nur das Etikett wird getauscht). Fehlt er, bleibt der Auftrag offen – nachkaufen und noch einmal senden.
   if (slabbed) {
-    if (!(await slabStock(job.user, session))) throw new UserError(NO_SLAB);
-    await takeItems({ userId: job.user, type: 'slab', source: 'versiegeln', session, meta: { card: job.card } });
+    if (!(await slabStock(job.user, session, true))) throw new UserError(NO_SLAB);
+    await takeItems({ userId: job.user, type: 'slab', source: 'versiegeln', session, meta: { card: job.card }, ignoreReserved: true });
   }
   const set = slabbed ? { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now, cert: slabCert(order.doc) } } : {};
   if (job.iron) Object.assign(set, { 'condition.defects': d, 'condition.grade': job.grade, ironedAt: now, creased: !!d.crease, damaged: (d.scratches || []).length > 0 || !!d.crease });
