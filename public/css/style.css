@@ -6460,16 +6460,11 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gh-miles li.is-done { opacity: .75; }
 
 /* ---------- Grading-Shop als Schreibtisch (#204): Nussbaum-Platte unter einer Tischlampe, Objekte öffnen Fenster ---------- */
-/* Grafiken: Fluent Emoji 3D (MIT) und Poly-Haven-Holz (CC0), siehe public/img/grading/LICENSES.md; Gravurschrift Fraunces (OFL) */
-@font-face {
-  font-family: "Fraunces"; font-style: normal; font-weight: 500 800; font-display: swap;
-  src: url("/fonts/fraunces-latin-wght-normal.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
+/* Grafiken: Fluent Emoji 3D (MIT) und Poly-Haven-Holz (CC0), siehe public/img/grading/LICENSES.md; Schrift wie auf der restlichen Seite (Inter) */
 /* Der Tisch bricht aus dem 1240-px-Container aus: bis 1600 px breit, seitlich 24 px Luft */
 .gd-page { gap: 16px; width: min(100vw - 48px, 1600px); margin-inline: calc(50% - min(50vw - 24px, 800px)); }
 .gd-desk {
-  --paper: #fbf8ef; --paper-ink: #2a2622; --brass-ink: #24190a; --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --paper: #fbf8ef; --paper-ink: #2a2622; --brass-ink: #24190a; --display: var(--font);
   --focus: 0 0 0 2px #2a1a08, 0 0 0 4px #fde68a;
   --obj-shadow: drop-shadow(6px 10px 7px rgba(10, 5, 0, .55)) drop-shadow(1px 2px 1px rgba(10, 5, 0, .35));
   position: relative; display: grid; gap: 28px 18px; padding: 28px 32px 30px; border-radius: 26px; isolation: isolate;
@@ -6539,7 +6534,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-zone { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; padding: 4px 22px; }
 .gd-zone + .gd-zone { box-shadow: -1px 0 0 rgba(60, 40, 10, .35), -2px 0 0 rgba(255, 245, 210, .45); }
 .gd-zone-id { padding-left: 4px; }
-.gd-plate h1 { font: 700 30px/1.1 var(--display); color: #1d1406; text-shadow: 0 1px 0 rgba(255, 244, 210, .6); overflow-wrap: anywhere; }
+.gd-plate h1 { font: 800 28px/1.15 var(--display); letter-spacing: -.01em; color: #1d1406; text-shadow: 0 1px 0 rgba(255, 244, 210, .6); overflow-wrap: anywhere; }
 .gd-stamp {
   display: inline-block; padding: 2px 9px 1px; border: 2.5px solid #7a1212; border-radius: 6px; color: #7a1212; font: 800 15px/1.1 var(--font);
   letter-spacing: .16em; transform: rotate(-5deg); mix-blend-mode: multiply;
@@ -6559,7 +6554,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-res { display: flex; align-items: center; gap: 8px; }
 .gd-res .gd-img { flex: none; filter: drop-shadow(1px 2px 1px rgba(60, 40, 10, .45)); }
 .gd-res > span { display: flex; flex-direction: column; line-height: 1.1; }
-.gd-res b { font: 700 18px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gd-res b { font: 700 17px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gd-res.is-bump { animation: gd-bump .5s ease; }
 @keyframes gd-bump { 40% { transform: scale(1.12); } }
 .gd-help {
@@ -6593,7 +6588,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 }
 .gd-vit-slab, .gd-vit-empty { flex: none; width: clamp(96px, 11vw, 170px); scroll-snap-align: center; }
 .gd-vit-slab {
-  position: relative; display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none;
+  position: relative; display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none; font: inherit;
   cursor: var(--cur-pointer, pointer); transform: rotateX(5deg); transition: transform .3s cubic-bezier(.3, 1.3, .5, 1); z-index: 1;
 }
 .gd-vit-slab .foil-card { position: relative; z-index: 1; filter: drop-shadow(0 12px 10px rgba(0, 0, 0, .7)); }
@@ -6661,7 +6656,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-mat-step { position: absolute; top: 26px; left: 22px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(0, 0, 0, .28); font: 800 12px var(--font); letter-spacing: .1em; text-transform: uppercase; color: #d9f5e6; }
 .gd-mat-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 22px 44px; flex-wrap: wrap; width: 100%; }
 .gd-mat-text { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; max-width: 460px; }
-.gd-mat-text h2 { font: 700 32px/1.1 var(--display); text-shadow: 0 2px 8px rgba(0, 0, 0, .4); }
+.gd-mat-text h2 { font: 800 30px/1.15 var(--display); letter-spacing: -.01em; text-shadow: 0 2px 8px rgba(0, 0, 0, .4); }
 .gd-mat-who { font-size: 15px; color: #d4f5e3; }
 .gd-mat-who b { color: #fde68a; }
 .gd-mat-card { width: 150px; height: auto; aspect-ratio: 720 / 1008; border-radius: 10px; transform: rotate(-5deg); box-shadow: 0 0 0 2px var(--rar, #fff), 8px 14px 18px rgba(0, 0, 0, .55); }
@@ -6717,10 +6712,10 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-clip { --tilt: -4deg; }
 .gd-clip-paper {
   position: absolute; left: 25%; right: 25%; top: 26%; bottom: 14%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: #f4f2f8; color: #1e3a8a; border-radius: 2px; font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive; line-height: 1.1;
+  background: #f4f2f8; color: #1e3a8a; border-radius: 2px; font-family: var(--font); line-height: 1.1;
 }
-.gd-clip-paper small { font-size: 12px; }
-.gd-clip-paper b { font-size: 20px; white-space: nowrap; }
+.gd-clip-paper small { font-size: 11px; font-weight: 600; }
+.gd-clip-paper b { font-size: 19px; font-weight: 800; white-space: nowrap; }
 .gd-phone { --tilt: 5deg; }
 .gd-phone-screen {
   position: absolute; left: 27%; right: 27%; top: 11.5%; bottom: 13%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
@@ -6750,7 +6745,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-sheet-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 18px 14px 12px 16px; background: rgba(42, 36, 32, .92); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(255, 220, 170, .1); touch-action: none; }
 .gd-sheet-icon { width: 36px; filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, .45)); }
 .gd-sheet-grip { position: absolute; top: 6px; left: 50%; width: 42px; height: 4px; margin-left: -21px; border-radius: 2px; background: var(--color-neutral-700); }
-.gd-sheet-head h2 { flex: 1; margin: 0; font: 700 21px/1.2 "Fraunces", Georgia, serif; }
+.gd-sheet-head h2 { flex: 1; margin: 0; font: 700 19px/1.2 var(--font); }
 .gd-sheet-help, .gd-sheet-close { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255, 220, 170, .08); color: var(--text); font-size: 18px; font-weight: 700; cursor: var(--cur-pointer, pointer); }
 .gd-sheet-help:hover, .gd-sheet-close:hover { background: rgba(255, 220, 170, .16); }
 .gd-sheet-close { font-size: 24px; }
