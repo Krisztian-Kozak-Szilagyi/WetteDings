@@ -112,6 +112,7 @@
         <h1><%= shop.name || 'Dein Grading-Shop' %></h1>
         <% if (shop.code) { %><span class="gd-stamp" aria-label="Kürzel <%= shop.code %>"><%= shop.code %></span><% } %>
         <% if (shop.codeRequest) { %><span class="gd-seal" title="Neues Kürzel beantragt – wartet auf Freigabe">⏳ <%= shop.codeRequest.code %></span><% } %>
+        <button type="button" class="gd-help" data-tour-start aria-label="Tour: So funktioniert dein Shop"><span aria-hidden="true">?</span> Tour</button>
       </div>
       <div class="gd-zone gd-zone-progress">
         <span class="gd-row"><span class="gd-label">Stufe <%= info.level %>/<%= levels.length %></span><span class="gd-level" aria-hidden="true"><% levels.forEach((l) => { %><i class="<%= l.level <= info.level ? 'is-on' : '' %>"></i><% }) %></span><b><%= info.name %></b></span>
@@ -124,7 +125,6 @@
         <span class="gd-res"><%- img('scroll-open', 34) %><span><span class="gd-label">Aufträge</span><b><%= used %>/<%= limit %></b></span></span>
         <% if (players) { %><span class="gd-res"><%- img('scroll', 34) %><span><span class="gd-label">Mitglieder</span><b><%= playerUsed %>/<%= playerLimit %></b></span></span><% } %>
       </div>
-      <button type="button" class="gd-help" data-tour-start aria-label="Tour: So funktioniert dein Shop"><span aria-hidden="true">?</span> Tour</button>
     </header>
 
     <%# ---------- Glasvitrine ---------- %>

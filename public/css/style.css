@@ -6528,7 +6528,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 
 /* Namensschild im Pixel-Stil (Kenney „Pixel UI Pack“, 9-Slice, 2-fach): Identität | Fortschritt | Ressourcen | Tour */
 .gd-plate {
-  grid-area: plate; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto auto; align-items: center; gap: 0 12px;
+  grid-area: plate; position: relative; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) minmax(0, 1.2fr); align-items: center; gap: 0 12px;
   padding: 4px 8px; color: #2a1d0a; image-rendering: pixelated;
   border: 24px solid transparent; border-image: url("/img/grading/ui-plate.png") 12 fill / 24px round;
   filter: drop-shadow(0 6px 0 rgba(0, 0, 0, .35)) drop-shadow(4px 10px 10px rgba(0, 0, 0, .35));
@@ -6538,7 +6538,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-zone-progress, .gd-zone-res {
   color: #fdf3d6; padding: 0 4px; image-rendering: pixelated;
   border: 20px solid transparent; border-image: url("/img/grading/ui-inlay.png") 10 fill / 20px round;
-  margin: -6px 0;
+  margin: -6px 0; align-self: stretch; justify-content: center; min-height: 104px;
 }
 .gd-zone-id { padding-left: 2px; }
 .gd-plate h1 { font: 800 28px/1.15 var(--display); letter-spacing: -.01em; color: #2a1d0a; overflow-wrap: anywhere; }
@@ -6559,7 +6559,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-meter { position: relative; flex: 1 1 80px; min-width: 70px; height: 14px; background: #3b2810; box-shadow: 0 0 0 2px #1f1408; }
 .gd-meter span { display: block; height: 100%; background: linear-gradient(#86efac 0 3px, #22c55e 3px 10px, #15803d 10px); }
 .gd-meter::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 8px, #1f1408 8px 10px); pointer-events: none; }
-.gd-zone-res { flex-wrap: nowrap; gap: 18px; }
+.gd-zone-res { flex-wrap: nowrap; gap: 12px; justify-content: space-around; }
 .gd-res { display: flex; align-items: center; gap: 8px; }
 .gd-res .gd-img { flex: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .45)); }
 .gd-res > span { display: flex; flex-direction: column; line-height: 1.1; }
@@ -6820,12 +6820,14 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .foil-plaque span { font-size: 13px; font-weight: 700; letter-spacing: .04em; }
 .foil-plaque small { font-size: 11px; opacity: .8; }
 
+/* Namensschild: unter 1280 px Name oben, darunter die beiden Felder gleich breit */
+@media (max-width: 1279px) {
+  .gd-plate { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 14px; }
+  .gd-zone-id { grid-column: 1 / -1; margin-bottom: 4px; }
+}
 @media (max-width: 1099px) {
   .gd-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "plate plate plate" "vit vit vit" "in mat out" "shop shop shop" "own own own"; padding: 22px; }
   .gd-flow { display: none; }
-  .gd-plate { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 14px; }
-  .gd-zone-res { grid-column: 1; }
-  .gd-help { justify-self: end; }
 }
 @media (max-width: 760px) {
   .gd-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "plate plate" "vit vit" "mat mat" "in out" "shop shop" "own own"; padding: 16px; gap: 22px 10px; border-radius: 20px; }
