@@ -30,18 +30,20 @@
   <%# Test-Karten stehen nicht in ihrer Season, sondern (nur für Admins) im Abschnitt "Test" ganz unten.
       Noch nicht erhältliche Karten kommen als "?" ans Ende ihrer Season und zählen nicht mit. %>
   <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key && c.rarity !== 'test-item'), soon: unreleased.filter((c) => c.season === s.key) })).filter((s) => s.list.length || s.soon.length); %>
-  <% const seasonOpts = seasonList.map((s) => ({ key: s.key, label: s.label })).concat(testCards.length ? [{ key: 'test', label: 'Test' }] : []); %>
+  <% const seasonOpts = (slabCopies.length ? [{ key: 'slabs', label: 'Slabs' }] : []).concat(seasonList.map((s) => ({ key: s.key, label: s.label })), testCards.length ? [{ key: 'test', label: 'Test' }] : []); %>
   <div class="album-filter-row"><%- include('partials/tcg-filter', { seasonOpts }) %></div>
   <% if (!cardCount) { %>
     <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
   <% } %>
+  <%# Slabs: ganz oben als einzelne Karten. Karten im Sleeve stehen unten in den Seasons neben ihren Varianten ohne Sleeve. %>
+  <%- include('partials/slab-shelf') %>
   <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
     <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
       <div class="album-season-head">
         <h2 id="season-<%= s.key %>"><%= s.label %></h2>
         <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
       </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list.concat(s.soon) }) %>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list.concat(s.soon), slabsAbove: true }) %>
     </section>
   <% }) %>
   <% if (testCards.length) { %>
@@ -50,7 +52,7 @@
         <h2 id="season-test">Test</h2>
         <span class="tcg-progress-num"><%= testCards.filter((c) => counts[c.id]).length %> / <%= testCards.length %></span>
       </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: testCards }) %>
+      <%- include('partials/tcg-grid', { mode: 'album', cards: testCards, slabsAbove: true }) %>
     </section>
   <% } %>
 </div>

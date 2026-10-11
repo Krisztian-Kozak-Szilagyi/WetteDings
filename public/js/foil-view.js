@@ -1,26 +1,30 @@
 (function () {
   'use strict';
 
-  // Folierte Karte groß ansehen (Inventar, Album, Profil, Handel): Auslöser ist ein Element mit data-foil-view
-  // (data-image, data-name, data-rarity, data-rarity-label, data-date; im Album zusätzlich data-fav/data-fav-on,
-  // in fremden Sammlungen data-trade-href).
-  // Ziehen dreht die Karte in 3D, antippen dreht sie um. Dialog: views/partials/foil-modal.ejs
+  // Karte im Sleeve, im Slab oder als einzelnes Exemplar groß ansehen (Album, Profil, Handel, Vitrine): Auslöser ist ein
+  // Element mit data-foil-view (data-image, data-name, data-rarity, data-rarity-label, data-date, data-no; im Album
+  // zusätzlich data-fav/data-fav-on, in fremden Sammlungen data-trade-href).
+  // Aufbau wie die reguläre Großansicht der Karten (partials/card-zoom, public/js/tcg.js): Karte links, rechts Seltenheit,
+  // Name, Status und Aktionen; die Karte neigt sich mit der Maus (bindTilt), antippen dreht sie um.
+  // Dialog: views/partials/foil-modal.ejs
   var modal = document.querySelector('[data-foil-modal]');
   if (!modal || !modal.showModal) return;
   var stage = modal.querySelector('[data-foil-stage]');
-  var favForm = modal.querySelector('[data-foil-fav]');
-  // Album-Menü (views/partials/foil-modal.ejs mit favForm): Wert, Favorit, „Im Handel anbieten“ (die Bank kauft folierte Karten nicht).
-  // Auf Dashboard und TCG-Seite (Favoriten) nur der Favorit – Wert und Handel gibt es nur im Album (data-album-foil).
-  var menu = modal.querySelector('[data-foil-menu]');
-  var sellLink = modal.querySelector('[data-foil-sell]');
+  var body = modal.querySelector('.foil-modal-body');
+  var dotEl = modal.querySelector('[data-foil-dot]');
+  var rarityEl = modal.querySelector('[data-foil-rarity]');
+  var nameEl = modal.querySelector('[data-foil-name]');
   var statusEl = modal.querySelector('[data-foil-status]');
   var noteEl = modal.querySelector('[data-foil-note]');
-  var tradeBox = modal.querySelector('[data-foil-trade]');
+  var favForm = modal.querySelector('[data-foil-fav]'); // nur mit favForm (Album, Dashboard)
+  var sellLink = modal.querySelector('[data-foil-sell]'); // nur im Album: „Im Handel anbieten“
+  var unwrapForm = modal.querySelector('[data-foil-unwrap]'); // nur im Album: Sleeve abziehen / Slab aufbrechen
+  var tradeLink = modal.querySelector('[data-foil-trade]'); // nur in fremden Sammlungen: „Angebot machen“
+  var certBtn = modal.querySelector('[data-foil-cert]'); // Zertifikat eines Slabs
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var view = null;
-  var drag = null;
-  var certLink = null; // Link zum Zertifikat eines Slabs (#204), beim ersten Öffnen angelegt
+  var certLink = null; // Showroom (Vitrine): Link zum Zertifikat unter dem Messingschild, beim ersten Öffnen angelegt
   // Galerie (#204, Vitrine): Auslöser mit data-foil-group blättern per Wischen, ‹ › und Pfeiltasten durch ihre Gruppe;
   // dazu Showroom-Licht und ein Messingschild (Name, Note, Population aus data-pop)
   var gallery = null; // { list, idx }
@@ -65,7 +69,7 @@
     var card = el('div', 'foil-card foil-card-big' + (foiling ? ' is-foiling' : '') + (d.season ? ' season-' + d.season : '')); // Rückseite je Season
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', d.name + ' – ziehen zum Drehen, antippen zum Umdrehen');
+    card.setAttribute('aria-label', d.name + ' – antippen zum Umdrehen');
     var inner = el('span', 'foil-inner ' + (bare ? 'is-bare' : slab ? 'is-slab' : 'is-sleeve'), card);
     // Versatz aus der Zentrierung (data-cx/-cy): der Rand um das Kartenbild ist ungleich breit
     if (d.cx) inner.style.setProperty('--cx', d.cx);
@@ -100,34 +104,19 @@
     return card;
   }
 
-  function render() {
-    view.inner.style.transform = 'rotateX(' + view.rx.toFixed(2) + 'deg) rotateY(' + view.ry.toFixed(2) + 'deg)';
-    view.card.style.setProperty('--gx', (50 + ((((view.ry % 360) + 540) % 360) - 180) * 0.8).toFixed(1) + '%');
-    view.card.style.setProperty('--gy', (50 + view.rx * 1.2).toFixed(1) + '%');
-  }
-
-  function loop(now) {
-    if (!view || !modal.open) return;
-    var t = view.tween;
-    if (t) {
-      var k = clamp((now - t.start) / t.ms, 0, 1);
-      var e = 1 - Math.pow(1 - k, 3);
-      view.rx = t.fx + (t.tx - t.fx) * e;
-      view.ry = t.fy + (t.ty - t.fy) * e;
-      if (k >= 1) view.tween = null;
-    } else if (!drag && (Math.abs(view.vx) > 0.01 || Math.abs(view.vy) > 0.01)) {
-      view.ry += view.vy;
-      view.rx = clamp(view.rx + view.vx, -60, 60);
-      view.vx *= 0.9;
-      view.vy *= 0.9;
-    }
-    render();
-    requestAnimationFrame(loop);
+  // Neigung bei Mouse-over – dieselben Winkel wie bei den regulären Karten (tcg.js bindTilt); die Umdrehung (base) kommt dazu
+  function setTilt(rx, ry, mx, my, live) {
+    view.inner.style.transition = live ? 'transform .06s linear' : 'transform .35s ease';
+    view.inner.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + (view.base + ry).toFixed(2) + 'deg)';
+    view.card.style.setProperty('--gx', mx.toFixed(1) + '%');
+    view.card.style.setProperty('--gy', my.toFixed(1) + '%');
   }
 
   function flip() {
-    view.tween = { fx: view.rx, fy: view.ry, tx: 0, ty: (Math.round(view.ry / 180) + 1) * 180, start: performance.now(), ms: reduceMotion ? 1 : 650 };
-    view.vx = view.vy = 0;
+    view.base += 180;
+    view.flipUntil = performance.now() + (reduceMotion ? 0 : 650);
+    view.inner.style.transition = reduceMotion ? 'none' : 'transform .65s cubic-bezier(.3, .7, .2, 1)';
+    view.inner.style.transform = 'rotateX(0deg) rotateY(' + view.base + 'deg)';
   }
 
   function step(dir) {
@@ -205,14 +194,26 @@
     if (gallery && gallery.list.length > 1) el('small', 'fp-count', plaque, (gallery.idx + 1) + ' / ' + gallery.list.length);
   }
 
-  function open(trigger, foiling) {
-    var d = trigger.dataset;
-    var card = build(d, foiling);
-    stage.className = 'foil-modal-stage r-' + (d.rarity || '');
-    stage.innerHTML = '';
-    stage.appendChild(card);
-    view = { card: card, inner: card.querySelector('.foil-inner'), rx: foiling ? 0 : -8, ry: foiling ? 0 : 14, vx: 0, vy: 0, tween: null };
-
+  /**
+   * Panel rechts wie bei der regulären Großansicht: Seltenheit · Nummer, Name, Status und die Aktionen der Variante
+   * (Sleeve, Slab oder einzelnes Exemplar) – im Album Favorit, Handeln und Abziehen, in fremden Sammlungen Angebot machen.
+   */
+  function fillInfo(d) {
+    var copy = !!d.offerHref; // Exemplar mit Spuren (#204): eigener Link ins Handelsfenster, kein Favorit
+    var album = 'albumFoil' in d || copy;
+    dotEl.className = 'tcg-dot r-' + (d.rarity || '');
+    rarityEl.textContent = (d.rarityLabel || '') + (d.no ? ' · #' + d.no : '');
+    nameEl.textContent = d.name || '';
+    noteEl.hidden = true;
+    var state = d.slabCode ? 'Slab ' + d.slabCode + ' · Note ' + d.grade + (d.gradeWord ? ' (' + d.gradeWord + ')' : '') : copy ? '' : 'bare' in d ? 'Exemplar' : 'Im Sleeve';
+    if (copy) {
+      statusEl.textContent = d.copyNote || 'Exemplar';
+    } else if (album) {
+      // wie bei normalen Karten: Status und Händlerpreis (Folienwert, normaler Preis zum Vergleich)
+      statusEl.textContent = state + ' · Händlerpreis ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (ohne Slab ' + d.baseText + ')' : '');
+    } else {
+      statusEl.textContent = state + (d.date && !d.slabCode ? ' seit ' + d.date : d.sealed ? ' · versiegelt ' + d.sealed : '');
+    }
     // Album (und Favoriten): als Favorit zeigen / entfernen
     if (favForm) {
       favForm.hidden = !d.fav;
@@ -221,70 +222,72 @@
         favForm.querySelector('button').textContent = d.favOn === '1' ? '★ Favorit entfernen' : '☆ Als Favorit zeigen';
       }
     }
-    if (menu) {
-      // Exemplar mit Spuren (#204): eigener Link ins Handelsfenster, kein Favorit
-      var copy = !!d.offerHref;
-      menu.hidden = !d.fav && !copy;
-      var album = 'albumFoil' in d || copy;
+    if (sellLink) {
       sellLink.hidden = !album || !!d.sellOff;
-      statusEl.hidden = !album;
-      if (copy) {
-        statusEl.textContent = d.rarityLabel + (d.copyNote ? ' · ' + d.copyNote : '');
-        sellLink.href = d.offerHref;
-      } else if (album) {
-        // wie bei normalen Karten: Seltenheit und Wert (Folienwert, normaler Preis zum Vergleich)
-        statusEl.textContent = d.rarityLabel + (d.slabCode ? ' · Slab ' + d.slabCode : ' · in Folie') + ' · Händlerpreis ' + d.sellText + (d.baseText && d.baseText !== d.sellText ? ' (ohne Slab ' + d.baseText + ')' : '');
-        sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
+      if (copy) sellLink.href = d.offerHref;
+      else if (album && d.fav) sellLink.href = '/handel/neu?gib=' + encodeURIComponent(d.fav);
+    }
+    if (album && d.sellOff) {
+      noteEl.hidden = false;
+      noteEl.textContent = d.sellOff;
+    }
+    // Sleeve abziehen / Slab aufbrechen: nur für das eigene Exemplar im Album (fav = "f:<Exemplar>")
+    if (unwrapForm) {
+      var mine = album && !copy && d.fav && d.fav.indexOf('f:') === 0;
+      unwrapForm.hidden = !mine;
+      if (mine) {
+        unwrapForm.querySelector('input[name="copy"]').value = d.fav.slice(2);
+        unwrapForm.querySelector('button').textContent = d.slabCode ? 'Slab aufbrechen' : 'Sleeve abziehen';
+        unwrapForm.setAttribute('data-confirm', d.slabCode
+          ? 'Slab von ' + d.name + ' aufbrechen? Kürzel ' + d.slabCode + ', Note ' + d.grade + (d.slabCode === 'BfW' ? ' und die Wertsteigerung' : '') + ' sind danach weg, das Gehäuse ist zerstört – die Note ist wieder geheim. Du kannst die Karte neu graden lassen.'
+          : 'TCG Sleeve von ' + d.name + ' abziehen? Der Sleeve kommt zurück ins Inventar. Die Karte ist danach wieder ungeschützt.');
       }
-      noteEl.hidden = !album || !d.sellOff;
-      noteEl.textContent = d.sellOff || '';
     }
     // Fremde Sammlung: Tausch für dieses Exemplar vorschlagen
-    if (tradeBox) {
-      tradeBox.hidden = !d.tradeHref;
-      if (d.tradeHref) tradeBox.querySelector('a').href = d.tradeHref;
+    if (tradeLink) {
+      tradeLink.hidden = !d.tradeHref;
+      if (d.tradeHref) tradeLink.href = d.tradeHref;
     }
-    // Slab (#204): Link zum Zertifikat (Note, Shop, Zweitprüfungen, Population, Verkäufe)
-    if (!certLink) {
-      certLink = el('a', 'foil-cert-link', modal, 'Zertifikat ansehen →');
+  }
+
+  function open(trigger, foiling) {
+    var d = trigger.dataset;
+    var card = build(d, foiling);
+    stage.className = 'foil-modal-stage r-' + (d.rarity || '');
+    stage.innerHTML = '';
+    stage.appendChild(card);
+    view = { card: card, inner: card.querySelector('.foil-inner'), base: 0, flipUntil: 0 };
+    fillInfo(d);
+    // Slab (#204): Link zum Zertifikat (Note, Shop, Zweitprüfungen, Population, Verkäufe) – nicht auf der Zertifikatsseite selbst
+    var certHref = d.slabCode && d.cert ? '/slab/' + encodeURIComponent(d.cert) : '';
+    var showCert = !!certHref && location.pathname !== certHref;
+    if (certBtn) {
+      certBtn.hidden = !showCert;
+      if (certHref) certBtn.href = certHref;
     }
-    if (d.cert) certLink.href = '/slab/' + encodeURIComponent(d.cert);
-    certLink.hidden = !(d.slabCode && d.cert) || location.pathname === certLink.pathname; // nicht auf der Zertifikatsseite selbst
+    if (!certLink) certLink = el('a', 'foil-cert-link', body, 'Zertifikat ansehen →');
+    if (certHref) certLink.href = certHref;
+    certLink.hidden = !showCert;
     setupGallery(trigger, d);
 
-    card.addEventListener('pointerdown', function (e) {
-      drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId };
-      view.tween = null;
-      card.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    });
     card.addEventListener('pointermove', function (e) {
-      if (!drag || e.pointerId !== drag.id) return;
-      var dx = e.clientX - drag.x;
-      var dy = e.clientY - drag.y;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      drag.moved += Math.abs(dx) + Math.abs(dy);
-      view.vy = dx * 0.5;
-      view.vx = -dy * 0.4;
-      view.ry += view.vy;
-      view.rx = clamp(view.rx + view.vx, -60, 60);
+      if (performance.now() < view.flipUntil) return; // wie bei den regulären Karten (tcg.js bindTilt) unabhängig von „Bewegung reduzieren“
+      var r = card.getBoundingClientRect();
+      var x = clamp((e.clientX - r.left) / r.width, 0, 1);
+      var y = clamp((e.clientY - r.top) / r.height, 0, 1);
+      setTilt((0.5 - y) * 18, (x - 0.5) * 22, x * 100, y * 100, true);
     });
-    function end(e) {
-      if (!drag || e.pointerId !== drag.id) return;
-      var tap = drag.moved < 6;
-      drag = null;
-      if (tap) flip();
-    }
-    card.addEventListener('pointerup', end);
-    card.addEventListener('pointercancel', end);
+    card.addEventListener('pointerleave', function () {
+      if (performance.now() < view.flipUntil) return;
+      setTilt(0, 0, 50, 50, false);
+    });
+    card.addEventListener('click', flip);
     card.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
     });
 
     if (!modal.open) modal.showModal();
     card.focus();
-    requestAnimationFrame(loop);
   }
 
   document.addEventListener('click', function (e) {
@@ -297,14 +300,14 @@
   modal.querySelector('[data-foil-close]').addEventListener('click', function () { modal.close(); });
   modal.addEventListener('click', function (e) {
     if (swiped) { swiped = false; return; }
-    if (e.target === modal || e.target === stage) modal.close();
+    if (e.target === modal || e.target === stage || e.target === body) modal.close();
   });
   modal.addEventListener('keydown', function (e) {
     if (!gallery) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
     if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
   });
-  // Wischen neben der Karte blättert (auf der Karte selbst dreht Ziehen sie)
+  // Wischen neben der Karte blättert
   var swipe = null;
   stage.addEventListener('pointerdown', function (e) {
     if (e.target !== stage || !gallery) return;
@@ -322,10 +325,10 @@
   });
   modal.addEventListener('close', function () { gallery = null; });
 
-  // Inventar: gerade folierte Karte groß zeigen, wie die Folie aufgezogen wird
-  var fresh = document.querySelector('.foil-item.is-new [data-foil-view]');
+  // Album: gerade in den Sleeve gesteckte Karte groß zeigen, wie die Hülle aufgezogen wird
+  var fresh = document.querySelector('[data-foil-view].is-new');
   if (fresh) {
-    fresh.closest('.foil-item').scrollIntoView({ block: 'center' });
+    fresh.scrollIntoView({ block: 'center' });
     open(fresh, !reduceMotion);
   }
 })();
