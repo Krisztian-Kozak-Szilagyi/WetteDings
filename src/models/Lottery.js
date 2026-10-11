@@ -35,6 +35,7 @@ const entrySchema = new Schema(
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     username: { type: String, required: true },
     tickets: { type: Number, default: 0 },
+    bought: { type: Number }, // davon gekauft (Limit pro Person); fehlt bei alten Einträgen
     ranges: {
       type: [new Schema({ from: Number, to: Number }, { _id: false })],
       default: [],

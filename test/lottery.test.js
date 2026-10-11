@@ -84,3 +84,12 @@ test('Tages-Lotterie: Bank-Topf im Admin-Panel einstellbar, Standard 0', () => {
   assert.deepStrictEqual(lottery.settings.taeglich, { ticketPrice: config.lotteryTicketPrice, prizeCash: 0, prizePacks: 0, prizeFoils: 0 });
   assert.strictEqual(lottery.ticketPrice('taeglich'), config.lotteryTicketPrice);
 });
+
+test('Limit pro Person: Woche 10, Monat 20, täglich ohne Limit', () => {
+  const { ticketsLeft } = require('../src/services/lotteryService');
+  assert.equal(ticketsLeft('woche', null), 10);
+  assert.equal(ticketsLeft('woche', { tickets: 4, bought: 3 }), 7);
+  assert.equal(ticketsLeft('woche', { tickets: 90 }), 0); // alter Eintrag ohne bought-Feld
+  assert.equal(ticketsLeft('monat', { tickets: 5, bought: 5 }), 15);
+  assert.equal(ticketsLeft('taeglich', { tickets: 500, bought: 500 }), Infinity);
+});
