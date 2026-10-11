@@ -74,13 +74,14 @@ const SUBTABS = {
     { key: 'geraete', label: 'Mehrfach-Konten' },
     { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
     { key: 'karten', label: 'Kartensperren' },
+    { key: 'kuerzel', label: 'Kürzel-Anfragen' },
   ],
   spielwerte: [
     { key: 'tcg', label: 'TCG' },
     { key: 'steuer', label: 'Steuern' },
     { key: 'bonus', label: 'Tagesbonus' },
     { key: 'grading', label: 'Grading' },
-    { key: 'folie', label: 'Folie' },
+    { key: 'folie', label: 'Sleeve & Slab' },
     { key: 'kosmetik', label: 'Kosmetik' },
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
@@ -130,7 +131,7 @@ router.get('/admin', requireStaff, async (req, res) => {
   const needs = (...tabs) => tabs.includes(tab);
 
   // Offene Aufgaben – für die Übersicht und die Zähler an den Reitern
-  const [reportCount, chatReportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans()]);
+  const [reportCount, chatReportCount, bans, codeRequestCount] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans(), grading.codeRequestCount()]);
   const counts = {
     disputes: res.locals.betDisputes || 0,
     reports: reportCount,
@@ -140,12 +141,13 @@ router.get('/admin', requireStaff, async (req, res) => {
     suspicious: res.locals.tradeAlerts || 0,
     packLogNew: res.locals.packLogNew || 0,
     bans: bans.length,
+    codeRequests: codeRequestCount,
   };
-  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts;
+  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts + counts.codeRequests;
   counts.vergaben = counts.packLogNew;
   counts.protokolle = counts.suspicious;
   // Zähler je Unterreiter
-  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans, kuerzel: counts.codeRequests };
 
   // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
   const subs = SUBTABS[tab] || null;
@@ -265,10 +267,13 @@ router.get('/admin', requireStaff, async (req, res) => {
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
+    gradingServices: grading.SERVICES,
+    gradingTools: grading.TOOLS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
     gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     // Kartensperren: wählbar sind Karten, die in einem Spielmodus etwas tun (Charakter oder Boost)
     cardBanModes: cardBans.MODES,
+    codeRequests: needsSub('moderation', 'kuerzel') ? await grading.codeRequests() : [], // Shop-Kürzel ändern (#204)
     cardBanList: needsSub('moderation', 'karten') ? cardBans.list().map((b) => ({ ...b, rarityLabel: (tcgCatalog.rarityByKey[b.card.rarity] || {}).label || '' })) : [],
     cardBanCards: needsSub('moderation', 'karten')
       ? tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key && (c.isCharacter || canBoost(c))) })).filter((g) => g.cards.length)
@@ -310,6 +315,20 @@ const DISPUTE_URL = subUrl('moderation', 'streit');
 
 // Frühere eigene Seite – jetzt ein Unterreiter der Moderation
 router.get('/admin/streitfaelle', requireStaff, (req, res) => res.redirect(DISPUTE_URL));
+
+// Grading-Shop: Kürzel-Anfrage freigeben oder ablehnen (#204) – Admin und Devs
+router.post('/admin/grading-kuerzel/:shop', requireStaff, requireReauth('/admin?bereich=moderation&teil=kuerzel'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.shop)) throw new UserError('Diese Anfrage gibt es nicht.');
+    const approve = req.body.decision === 'ok';
+    const r = await grading.decideCodeRequest({ actor: req.user, shopId: req.params.shop, approve });
+    req.flash('success', approve ? `Kürzel ${r.old} → ${r.code} freigegeben.` : `Anfrage abgelehnt – es bleibt bei ${r.code}.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/admin?bereich=moderation&teil=kuerzel');
+});
 
 router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(DISPUTE_URL), async (req, res) => {
   const outcome = str(req.body.outcome);
@@ -501,17 +520,32 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   }
   const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
-  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab) };
+  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
-  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
+  // Spieler-Aufträge (#204, Etappe B)
+  const int = (k) => Number.parseInt(typeof req.body[k] === 'string' ? req.body[k] : '', 10);
+  const playerJobs = int('gr_player_jobs');
+  // Preisrahmen je Baustein: gr_sp_<baustein>_min/def/max
+  const servicePrice = Object.fromEntries(grading.SERVICES.map(({ key }) => [key, { min: money(req.body[`gr_sp_${key}_min`]), max: money(req.body[`gr_sp_${key}_max`]), def: money(req.body[`gr_sp_${key}_def`]) }]));
+  const badRange = grading.SERVICES.find(({ key }) => Object.values(servicePrice[key]).some(tooBig) || !grading.validRange(servicePrice[key]));
+  const orderDays = int('gr_order_days');
+  const expressDays = int('gr_express_days');
+  const showcaseMax = int('gr_showcase');
+  // Werkzeug-Upgrades (#204): Preis je Werkzeug
+  const toolCosts = Object.fromEntries(grading.TOOLS.map((t) => [t.key, money(req.body['gr_tool_' + t.key])]));
+  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100 || !Number.isInteger(playerJobs) || playerJobs < 0 || playerJobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
-  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
+  } else if (badRange) {
+    req.flash('error', `Preisrahmen „${badRange.label}“: mindestens ≤ Standard ≤ höchstens (bis 100.000 €).`);
+  } else if (!Number.isInteger(orderDays) || orderDays < 1 || orderDays > 30 || !Number.isInteger(expressDays) || expressDays < 1 || expressDays > orderDays || !Number.isInteger(showcaseMax) || showcaseMax < 0 || showcaseMax > 24) {
+    req.flash('error', 'Frist: 1 bis 30 Tage, Express-Frist: 1 Tag bis zur normalen Frist, Vitrine: 0 bis 24 Plätze.');
+  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig) || Object.values(toolCosts).some(tooBig)) {
     req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
   } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
     req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
   } else {
-    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, pay, costs, premium, admin: req.user });
-    req.flash('success', `Gespeichert: Grading-Shop ${jobs} Aufträge pro Tag.`);
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, playerJobs, pay, costs, premium, servicePrice, orderDays, expressDays, showcaseMax, toolCosts, admin: req.user });
+    req.flash('success', `Gespeichert: Grading-Shop ${jobs} NPC- und ${playerJobs} Mitglieder-Aufträge pro Tag.`);
   }
   res.redirect(subUrl('spielwerte', 'grading'));
 });
@@ -716,13 +750,20 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
   const chance = percent(req.body.chance);
   const bonusPercent = percent(req.body.bonus);
   const dailyPercent = percent(req.body.daily);
-  if (!(chance >= 0 && chance <= 100)) {
+  const slabDropPercent = percent(req.body.slabanteil);
+  const sleevePrice = parseEuro(req.body.sleeve);
+  const slabPrice = parseEuro(req.body.slabpreis);
+  if (!foil.validPrice('folie', sleevePrice) || !foil.validPrice('slab', slabPrice)) {
+    req.flash('error', 'Shop-Preise: ganze Cent, mindestens der Ankaufspreis der Bank und höchstens 1.000 €.');
+  } else if (!(slabDropPercent >= 0 && slabDropPercent <= 100)) {
+    req.flash('error', 'Slab-Anteil: 0 bis 100 %.');
+  } else if (!(chance >= 0 && chance <= 100)) {
     req.flash('error', 'Fundchance: 0 bis 100 % (höchstens zwei Nachkommastellen).');
   } else if (!(bonusPercent >= 0 && bonusPercent <= 1000) || !(dailyPercent >= 0 && dailyPercent <= 1000)) {
     req.flash('error', 'Wertsteigerung: 0 bis 1000 % (höchstens zwei Nachkommastellen).');
   } else {
-    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent });
-    req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
+    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent, sleevePrice, slabPrice, slabDropPercent });
+    req.flash('success', `Gespeichert: ${String(chance).replace('.', ',')} % Fundchance, Preise ${euro(sleevePrice)} (Sleeve, Bank-Shop) / ${euro(slabPrice)} (Slab, Werkstatt), ${String(slabDropPercent).replace('.', ',')} % der Dungeon-Funde sind Slabs.`);
   }
   res.redirect(subUrl('spielwerte', 'folie'));
 });

@@ -1,11 +1,13 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { requireLogin } = require('../middleware');
 const { TcgOpening } = require('../models/Tcg');
 const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
-const { itemInventory } = require('../items/itemService');
+const items = require('../items/itemService');
+const { itemInventory } = items;
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const cosmetics = require('../cosmetics/cosmeticService');
@@ -55,9 +57,22 @@ router.get('/tcg', async (req, res) => {
 
 router.get('/tcg/album', async (req, res) => {
   const coll = await collection(req.user);
+  // Eigene Slabs stehen ganz oben als einzelne Karten (beste Note zuerst, dann seltenste Karte); Karten im Sleeve bleiben
+  // unten im Raster neben ihren ungesleevten Varianten (partials/tcg-grid)
+  const slabCopies = Object.entries(coll.foiledCopies)
+    .flatMap(([cardId, list]) => list.filter((f) => f.slab).map((f) => ({ ...f, card: catalog.cardById[cardId] })))
+    .filter((s) => s.card)
+    .sort((a, b) => b.slab.grade - a.slab.grade || (catalog.rarityByKey[b.card.rarity].rank || 0) - (catalog.rarityByKey[a.card.rarity].rank || 0) || a.card.name.localeCompare(b.card.name, 'de'));
+  // Kartennummer je Season (#01 …) – wie im Raster des Albums gezählt; steht im Panel der Großansicht
+  const cardNo = {};
+  for (const s of catalog.SEASONS) catalog.CARDS.filter((c) => c.season === s.key && c.rarity !== 'test-item').forEach((c, i) => { cardNo[c.id] = String(i + 1).padStart(2, '0'); });
+  const neu = str(req.query.neu); // gerade in den Sleeve gesteckt: öffnet sich in 3D (public/js/foil-view.js)
   res.render('tcg-album', {
     title: 'Album',
     ...coll,
+    slabCopies,
+    cardNo,
+    highlight: Object.values(coll.foiledCopies).some((l) => l.some((f) => f.id === neu)) ? neu : '',
     cards: catalog.CARDS,
     seasons: catalog.SEASONS,
     // noch nicht erhältliche Karten: nur Admins sehen sie als "?" in ihrer Season (zählen nicht mit)
@@ -115,6 +130,16 @@ async function albumAction(req, res, fn, to = () => '/tcg/album') {
   }
   res.redirect(to());
 }
+
+// Sleeve abziehen bzw. Slab aufbrechen (aus der Großansicht im Album): der Sleeve kommt zurück ins Inventar
+router.post('/tcg/huelle-abziehen', (req, res) =>
+  albumAction(req, res, async () => {
+    const copyId = str(req.body.copy);
+    if (!mongoose.isValidObjectId(copyId)) throw new UserError('Diese Karte gibt es nicht.');
+    const { card, sleeve } = await items.unfoilCard({ user: req.user, copyId });
+    return sleeve ? `${card ? card.name : 'Die Karte'} ist wieder ohne Hülle – der TCG Sleeve liegt in deinem Inventar.` : `Der Slab von ${card ? card.name : 'der Karte'} ist aufgebrochen – die Karte kann neu eingereicht werden.`;
+  })
+);
 
 const cardName = (id) => {
   const card = catalog.cardById[id];

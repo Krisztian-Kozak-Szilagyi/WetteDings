@@ -7,6 +7,9 @@ const catalog = require('../tcg/catalog');
 const { collection } = require('../tcg/collection');
 const trade = require('../trade/tradeService');
 const lines = require('../trade/lines');
+const marketPrice = require('../trade/marketPrice');
+const population = require('../tcg/population');
+const { dayDate } = require('../lib/viewHelpers');
 const blackMarket = require('../tcg/blackMarket');
 const bazaarService = require('../esports/bazaarService');
 const foil = require('../items/foil');
@@ -26,19 +29,48 @@ const cardInfo = (id) => {
 };
 /** Seltenheiten samt der Pseudo-Seltenheit "Gegenstand" */
 const tradeRarities = () => ({ ...catalog.rarityByKey, item: items.ITEM_RARITY });
-/** Kartenwert einer Position: Bankwert, bei folierten Karten mit Wertsteigerung */
+/** Kartenwert einer Position: Bankwert, bei Slabs mit Wertsteigerung */
 const lineValue = (l) => {
   const c = cardInfo(l.card);
   if (c.isItem) return c.sell;
   const r = catalog.rarityByKey[c.rarity];
-  return foil.cardValue(r ? r.sell : 0, l.foiledAt);
+  return foil.cardValue(r ? r.sell : 0, foil.growthFrom(l));
 };
 const linesValue = (list) => (list || []).reduce((s, l) => s + lineValue(l), 0);
 /** Art des Angebots als Wort */
 const offerLabel = (t) => (!t.to ? 'Markt' : t.listing ? 'Gegenangebot' : t.give.length && t.want.length ? 'Tausch' : t.give.length ? 'Verkauf' : 'Kaufanfrage');
 
-/** Helfer für alle Handels-Ansichten */
-const viewHelpers = () => ({
+/**
+ * Marktpreis als kurzer Text (#204) – s aus marketPrice.summary:
+ *   gemessen: "Marktpreis Ø 12,50 € · 4 verkauft", bei Slabs eines Shops mit eigenen Verkäufen "· bei TST Ø 15,00 €"
+ *   geschätzt (Etappe C): "Marktpreis ~ 18,00 € (geschätzt)"; ohne beides: "noch kein Marktpreis".
+ * In Karten-UIs heißen die beiden Preise immer Händlerpreis (Bank) und Marktpreis (Spieler).
+ */
+function marketText(s) {
+  if (!s) return '';
+  if (s.avg == null) return s.est != null ? `Marktpreis ~ ${euro(s.est)} (geschätzt)` : 'noch kein Marktpreis';
+  return `Marktpreis Ø ${euro(s.avg)} · ${s.n} verkauft` + (s.codeAvg != null ? ` · bei ${s.code} Ø ${euro(s.codeAvg)}` : '');
+}
+
+/** Letzte Verkäufe eines Exemplars als Text: "zuletzt verkauft für 40,00 € (03.10.2026), 25,00 €" – oder '' */
+const salesText = (list) => (list && list.length ? `zuletzt verkauft für ${list.map((x, i) => euro(x.unit) + (i ? '' : ` (${dayDate(x.at)})`)).join(', ')}` : '');
+
+/** Exemplare (Folie, Slab, beschädigt) aus Positionen und Pools – für marketPrice.copySales */
+const copyIdsOf = (...groups) => groups.flat().map((x) => x && (x.copy || x.doc || x.id)).filter(Boolean).map(String);
+
+/**
+ * Helfer für alle Handels-Ansichten. ctx = marketPrice.context() (gemessene Preise, Verhältnisse, Population, Vertrauen),
+ * sales = Map Exemplar → letzte Verkäufe (marketPrice.copySales)
+ */
+const viewHelpers = (ctx = { prices: new Map() }, sales = new Map()) => ({
+  // Marktpreis (#204) für Positionen einer Seite – nur wenn alle dieselbe Karte im selben Zustand sind; ohne Verkauf geschätzt
+  marketAvg: (list) => marketPrice.summary(list, ctx.prices, ctx),
+  marketText,
+  priceDays: marketPrice.DAYS,
+  // Verbreitung und Population (#204 C): "besitzen 12 % · 3 Slabs, 1 × Note 10"
+  popText: (l) => (l && !items.itemByCardId(l.card) ? population.popText(l.card, ctx.population, l.slab ? l.slab.grade : null) : ''),
+  // Verkaufsgeschichte eines Exemplars (id = Exemplar)
+  salesText: (id) => salesText(id && sales.get(String(id))),
   cardInfo,
   rarityByKey: tradeRarities(),
   lineValue,
@@ -46,6 +78,7 @@ const viewHelpers = () => ({
   offerLabel,
   perspective: lines.perspective,
   lineLabel: lines.lineLabel,
+  stateLabel: lines.stateLabel,
   countText: lines.countText,
   roleOf: trade.roleOf,
   canAccept: trade.canAccept,
@@ -84,7 +117,8 @@ function presetOf(list) {
 }
 
 /**
- * Was ein Mitglied in einem Angebot geben kann: freie Karten (unfoliert) je Karte, folierte Exemplare und Gegenstände.
+ * Was ein Mitglied in einem Angebot geben kann: freie Karten (unfoliert, unbeschädigt) je Karte, Exemplare (folierte,
+ * Slabs und beschädigte – #204: die wählt man einzeln) und Gegenstände.
  * own = eigene Sammlung (nur freie; Exemplare, die dieses Angebot selbst sperrt, zählen wieder als frei),
  * sonst fremde Sammlung (alles, was sie besitzt – gesperrt darf es sein, geprüft wird beim Annehmen).
  */
@@ -95,13 +129,23 @@ async function pickable(member, { own, keep = [] } = {}) {
   const keepItems = {};
   const keepCopies = new Set();
   for (const l of keep.filter((x) => x.doc)) {
-    if (l.foiledAt) keepCopies.add(String(l.doc));
+    if (l.copy || l.foiledAt) keepCopies.add(String(l.doc));
     else if (items.itemByCardId(l.card)) keepItems[l.card] = (keepItems[l.card] || 0) + 1;
     else keepCards[l.card] = (keepCards[l.card] || 0) + 1;
   }
+  // Beschädigte Exemplare zählen nicht als "Karte" – sie stehen einzeln in marked
+  const marked = Object.entries(coll.markedCopies || {})
+    .flatMap(([id, list]) => list.map((m) => ({ ...m, card: catalog.cardById[id], lock: keepCopies.has(m.id) ? null : m.lock })))
+    .filter((m) => m.card && (!own || !m.lock));
+  const damagedBy = {};
+  const damagedFree = {};
+  for (const [id, list] of Object.entries(coll.markedCopies || {})) {
+    damagedBy[id] = list.length;
+    damagedFree[id] = list.filter((m) => !m.lock).length;
+  }
   const cards = catalog.CARDS.map((c) => {
-    const plain = (coll.counts[c.id] || 0) - (coll.foiledByCard[c.id] || 0);
-    const max = own ? Math.max(0, (coll.free[c.id] || 0) + (keepCards[c.id] || 0)) : Math.max(0, plain);
+    const plain = (coll.counts[c.id] || 0) - (coll.foiledByCard[c.id] || 0) - (damagedBy[c.id] || 0);
+    const max = own ? Math.max(0, (coll.free[c.id] || 0) - (damagedFree[c.id] || 0) + (keepCards[c.id] || 0)) : Math.max(0, plain);
     return { card: c, max, owned: plain };
   }).filter((x) => x.max > 0);
   const foiled = Object.entries(coll.foiledCopies)
@@ -114,7 +158,7 @@ async function pickable(member, { own, keep = [] } = {}) {
       return { card: items.itemCard(it), max: own ? it.count - it.inTrade + (keepItems[id] || 0) : it.count };
     })
     .filter((x) => x.max > 0);
-  return { cards, foiled, goods, counts: coll.counts };
+  return { cards, foiled, marked, goods, counts: coll.counts };
 }
 
 /**
@@ -126,6 +170,7 @@ function wishPool(counts) {
   return {
     cards: catalog.CARDS.filter((c) => visible.has(c.rarity)).map((c) => ({ card: c, max: trade.MAX_LINES, owned: counts[c.id] || 0 })),
     foiled: [],
+    marked: [],
     goods: items.ITEM_TYPES.filter((t) => t.tradable).map((t) => ({ card: items.itemCard(t), max: trade.MAX_LINES })),
     counts,
   };
@@ -148,7 +193,7 @@ router.get('/handel', async (req, res) => {
   res.render('handel', {
     title: 'Handel',
     ...data,
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf(...data.market.map((t) => [...t.give, ...t.want]).flat().filter((l) => l.copy || l.foiledAt || l.damaged)))),
     coll,
     tab: TABS.includes(asked) ? asked : 'markt',
     rarities: catalog.visibleRarities(),
@@ -196,7 +241,7 @@ async function renderBuilder(req, res, { mode, partner = null, listing = null, o
   const theirs = partnerPool || (mode === 'neu' && !partner ? wishPool(mine.counts) : null);
   res.render('handel-neu', {
     title: mode === 'neu' ? 'Neuer Handel' : 'Gegenangebot',
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf(mine.foiled, mine.marked, theirs ? [theirs.foiled, theirs.marked] : []))),
     mode,
     partner,
     listing,
@@ -319,7 +364,7 @@ router.get('/handel/angebot/:id', async (req, res) => {
   const coll = await collection(req.user);
   res.render('handel-angebot', {
     title: t.to ? 'Verhandlung' : 'Markt-Angebot',
-    ...viewHelpers(),
+    ...viewHelpers(await marketPrice.context(), await marketPrice.copySales(copyIdsOf([...t.give, ...t.want].filter((l) => l.copy || l.foiledAt || l.damaged)))),
     t,
     role: n.role,
     counters: n.counters,

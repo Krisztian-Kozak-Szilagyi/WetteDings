@@ -1,9 +1,13 @@
-<%# Kleine folierte Karte (Vorderseite mit Grading-Etikett): card, rarityLabel, grade (Note des Exemplars, #73), center (Versatz) %>
-<% const g = locals.grade || null; const ctr = locals.center || null; %>
-<span class="foil-inner"<%- ctr ? ` style="--cx: ${ctr.x}; --cy: ${ctr.y}"` : '' %>>
+<%# Kleine folierte Karte: card, rarityLabel, center (Versatz), id (Exemplar, Zertifikatsnummer),
+    slab ({ code, grade }) – mit Slab: starres Gehäuse mit Etikett (Kürzel, Note, #204); ohne: Schutzhülle (Sleeve),
+    die Note bleibt geheim. grade allein (ältere Aufrufer) zählt als Slab "BfW". %>
+<% const sl = locals.slab || (locals.grade ? { code: 'BfW', grade: locals.grade } : null); const ctr = locals.center || null; %>
+<span class="foil-inner <%= sl ? 'is-slab' : 'is-sleeve' %>"<%- ctr ? ` style="--cx: ${ctr.x}; --cy: ${ctr.y}"` : '' %>>
   <span class="foil-face foil-front">
     <img src="<%= card.image %>" alt="" loading="lazy" width="720" height="1008">
     <span class="foil-sheen" aria-hidden="true"></span>
-    <span class="foil-ticket"><span class="gr-slab-info"><strong>BfW GRADING</strong><span><%= card.name %> · <%= rarityLabel %></span><span class="gr-slab-word"><%= g ? gradeWord(g) : '' %></span></span><span class="gr-slab-grade"><%= g || '–' %></span></span>
+    <% if (sl) { %>
+    <span class="foil-ticket"><span class="gr-slab-info"><strong><%= sl.code || 'BfW' %></strong><span><%= card.name %> · <%= rarityLabel %></span><% const sealed = sl.at || locals.sealedAt; if (locals.id || sealed) { %><span class="gr-slab-certno"><%= [locals.id ? slabCert(locals.id) : '', sealed ? dayDate(sealed) : ''].filter(Boolean).join(' · ') %></span><% } %></span><span class="gr-slab-score"><span class="gr-slab-word"><%= sl.grade ? gradeWord(sl.grade) : '' %></span><span class="gr-slab-grade"><%= sl.grade || '–' %></span></span></span>
+    <% } %>
   </span>
 </span>

@@ -2,10 +2,12 @@
 // Geld in eine Richtung. Reine Helfer ohne Datenbank – genutzt von Handel, Protokollen, Statistik und Ansichten.
 //
 // Trade.give = was der Anbieter (seller) gibt, Trade.want = was er vom Empfänger (to) bekommt.
-// Position: { card, copy, doc, foiledAt, grade }
+// Position: { card, copy, doc, foiledAt, grade, slab, damaged, creased, ironed, marks }
 //   card – Karten-ID oder "item:<Art>"
-//   copy – ein bestimmtes foliertes Exemplar, das verlangt wird
+//   copy – ein bestimmtes Exemplar, das verlangt wird: in Folie, im Slab oder mit sichtbarem Schaden (#204).
+//          Ohne copy bekommt die Position ein unfoliertes, unbeschädigtes Exemplar.
 //   doc  – das gesperrte Exemplar; gesetzt, sobald der Besitzer die Position selbst zugesagt hat
+//   slab/damaged/creased/ironed/marks – was man dem Exemplar ansieht (Anzeige, Ø-Marktpreis)
 // Geld: price (Cent) zahlt extraFrom ('seller' | 'to'); ohne Angabe zahlt der Empfänger bzw. Käufer.
 const catalog = require('../tcg/catalog');
 const { euro } = require('../lib/viewHelpers');
@@ -72,14 +74,30 @@ function lockedFor(t, userId) {
 /** Alle Karten-IDs beider Seiten (z. B. für die Suche im Protokoll) */
 const cardIds = (t) => [...(t.give || []), ...(t.want || [])].map((l) => l.card);
 
+/**
+ * Zustand einer Position als Wort (#204): "Slab BfW 9", "foliert", "Knick", "Knick, gebügelt", "Exemplar" (nur Kratzer –
+ * die sieht man beim genauen Hinschauen, der Text verrät sie nicht) oder '' für eine Karte ohne Folie und Schaden.
+ * Alte Positionen mit Note, aber ohne slab, waren Folien mit Etikett – also BfW-Slabs.
+ */
+function stateLabel(l) {
+  const slab = l.slab || (l.foiledAt && l.grade ? { code: 'BfW', grade: l.grade } : null);
+  if (slab) return `Slab ${slab.code} ${slab.grade}`;
+  if (l.foiledAt) return 'foliert';
+  if (l.creased) return l.ironed ? 'Knick, gebügelt' : 'Knick';
+  if (l.damaged) return 'Exemplar';
+  return '';
+}
+
 /** Positionen als Text, gleiche Karten zusammengefasst: "2× Aleks (Gold), Luca (Holo, foliert)" – die Seltenheit unterscheidet gleichnamige Karten */
 function lineLabel(lines) {
   const groups = new Map();
   for (const l of lines || []) {
-    const key = l.card + (l.foiledAt ? ':f' : '');
+    const state = stateLabel(l);
+    // Exemplare stehen einzeln, gleiche Karten ohne Besonderheit werden gezählt
+    const key = l.card + (state ? ':' + (l.copy || l.doc || state) : '');
     const c = catalog.cardById[l.card];
     const r = c && catalog.rarityByKey[c.rarity];
-    const extra = [r && r.label, l.foiledAt && 'foliert'].filter(Boolean).join(', ');
+    const extra = [r && r.label, state].filter(Boolean).join(', ');
     const g = groups.get(key) || { name: cardName(l.card) + (extra ? ` (${extra})` : ''), n: 0 };
     g.n += 1;
     groups.set(key, g);
@@ -151,6 +169,7 @@ function costShares(received, paid) {
 module.exports = {
   ITEM_PREFIX,
   costShares,
+  stateLabel,
   isItemId,
   otherRole,
   cardName,

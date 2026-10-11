@@ -111,14 +111,40 @@
           <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
         </label>
         <div class="admin-gr-grid">
-          <label class="field"><span>Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+          <label class="field"><span>NPC-Aufträge pro Tag</span><input type="number" name="gr_jobs" min="0" max="100" step="1" value="<%= gradingSettings.jobs %>" required></label>
+          <label class="field"><span>Aufträge von Mitgliedern pro Tag <em>(ab Stufe 3)</em></span><input type="number" name="gr_player_jobs" min="0" max="100" step="1" value="<%= gradingSettings.playerJobs %>" required></label>
+          <label class="field"><span>Frist für Mitglieder-Aufträge in Tagen</span><input type="number" name="gr_order_days" min="1" max="30" step="1" value="<%= gradingSettings.orderDays %>" required></label>
+          <label class="field"><span>Frist mit Express-Zuschlag in Tagen</span><input type="number" name="gr_express_days" min="1" max="30" step="1" value="<%= gradingSettings.expressDays %>" required></label>
+          <label class="field"><span>Plätze in der Vitrine</span><input type="number" name="gr_showcase" min="0" max="24" step="1" value="<%= gradingSettings.showcaseMax %>" required></label>
           <label class="field"><span>Lohn Putzen in €</span><input type="text" name="gr_pay_clean" inputmode="decimal" value="<%= (gradingSettings.pay.clean / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Benoten in €</span><input type="text" name="gr_pay_grade" inputmode="decimal" value="<%= (gradingSettings.pay.grade / 100).toFixed(2).replace('.', ',') %>" required></label>
           <label class="field"><span>Lohn Versiegeln in €</span><input type="text" name="gr_pay_slab" inputmode="decimal" value="<%= (gradingSettings.pay.slab / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Lohn Bügeln in € <em>(Knick ganz glatt)</em></span><input type="text" name="gr_pay_iron" inputmode="decimal" value="<%= (gradingSettings.pay.iron / 100).toFixed(2).replace('.', ',') %>" required></label>
           <% gradingLevels.slice(1).forEach((l, i) => { %>
             <label class="field"><span>Ausbau auf Stufe <%= l.level %> („<%= l.name %>“) in €</span><input type="text" name="gr_cost_<%= l.level %>" inputmode="decimal" value="<%= (gradingSettings.costs[i] / 100).toFixed(2).replace('.', ',') %>" required></label>
           <% }) %>
+          <% gradingTools.forEach((t) => { %>
+            <label class="field"><span>Werkzeug „<%= t.name %>“ in € <em>(ab Stufe <%= t.level %>)</em></span><input type="text" name="gr_tool_<%= t.key %>" inputmode="decimal" value="<%= (gradingSettings.toolCosts[t.key] / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <% }) %>
           <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
+        </div>
+        <%# #204: Festpreise je Baustein – jeder Shop legt seine Preise in diesem Rahmen fest; der Kunde zahlt die Summe der gebuchten Bausteine %>
+        <h3 class="admin-ihk-sub">Preisrahmen für Aufträge von Mitgliedern</h3>
+        <p class="muted small">Jeder Shop setzt je Baustein einen Festpreis in diesem Rahmen („Standard“ gilt, bis er selbst einen wählt). Reinigung ist immer dabei, dazu Bügeln und/oder Benoten + Slab; Express ist ein Zuschlag für die kürzere Frist.</p>
+        <div class="table-wrap">
+          <table class="table admin-gr-prices">
+            <thead><tr><th>Baustein</th><th class="num">mindestens €</th><th class="num">Standard €</th><th class="num">höchstens €</th></tr></thead>
+            <tbody>
+              <% gradingServices.forEach((sv) => { const r = gradingSettings.servicePrice[sv.key]; %>
+                <tr>
+                  <td><%= sv.label %></td>
+                  <% ['min', 'def', 'max'].forEach((f) => { %>
+                    <td class="num"><input type="text" name="gr_sp_<%= sv.key %>_<%= f %>" inputmode="decimal" value="<%= (r[f] / 100).toFixed(2).replace('.', ',') %>" aria-label="<%= sv.label %> <%= { min: 'mindestens', def: 'Standard', max: 'höchstens' }[f] %>" required></td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
         </div>
         <button class="btn btn-primary" type="submit">Speichern</button>
         <% if (gradingCalc) { const gc = gradingCalc; const pct = (v) => Math.round(v * 100) + ' %'; %>
@@ -142,7 +168,7 @@
               </table>
             </div>
             <p class="muted small">Zum Vergleich: Tagesbonus <strong data-gc-bonus><%= euro(dailyBonus()) %></strong> pro Tag – entfällt, solange man im Grading-Shop arbeitet. „Mehr als Stufe davor“ und „Ausbau bezahlt nach“ (= Ausbaukosten ÷ Mehrverdienst) (Profil „<%= gc.input.profiles[gc.input.profiles.length - 1].label %>“).</p>
-            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt').join(' · ') %>.</p>
+            <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt, ' + p.iron + ' % glatt gebügelt').join(' · ') %>. Gebügelt wird nur bei Kundenkarten mit Knick (<%= pct(gc.input.creaseChance) %>).</p>
             <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Folien)</h3>
             <% if (gc.actual.length) { %>
               <div class="table-wrap">
@@ -174,14 +200,17 @@
 
   <% if (sub === 'folie') { %>
   <section class="stats-block" id="folie">
-    <%- blockHead('Folie', 'Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit dieser Chance eine Folie. Folierte Karten steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel, die Bank zahlt aber nur ohne Folie.') %>
+    <%- blockHead('TCG Sleeve & Slab', 'Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit dieser Chance einen TCG Sleeve (die frühere Folie). Der Bank-Shop im Inventar verkauft Sleeves, die Werkstatt eines Grading-Shops leere Slabs – jeweils zu festen Preisen (mindestens so viel, wie die Bank beim Ankauf zahlt – sonst ließe sich Geld drucken); im Dungeon und im Turm ist ein Teil der Funde ein leerer Slab. Alte BfW-Slabs steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel.') %>
     <div class="card">
       <form method="post" data-reauth action="/admin/folie" class="form panel-form">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="admin-gr-grid">
           <label class="field"><span>Fundchance pro versiegelter Karte in %</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung beim Folieren in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung alter BfW-Slabs: sofort in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Wertsteigerung alter BfW-Slabs pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+          <label class="field"><span>Bank-Shop: Preis TCG Sleeve in € (Ankauf <%= euro(itemTypes.find((t) => t.key === 'folie').sell) %>)</span><input type="text" name="sleeve" inputmode="decimal" value="<%= (foilSettings.sleevePrice / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Werkstatt: Preis leerer Slab in € (Ankauf <%= euro(itemTypes.find((t) => t.key === 'slab').sell) %>)</span><input type="text" name="slabpreis" inputmode="decimal" value="<%= (foilSettings.slabPrice / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <label class="field"><span>Dungeon/Turm: Anteil der Funde, die ein leerer Slab sind, in %</span><input type="text" name="slabanteil" inputmode="decimal" value="<%= String(foilSettings.slabDropPercent).replace('.', ',') %>" required></label>
         </div>
         <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
         <button class="btn btn-primary" type="submit">Speichern</button>
@@ -340,7 +369,7 @@
           </table>
         </div>
         <label class="field admin-tcg-pack">
-          <span>Boss: Chance auf eine Folie pro Spieler (%)</span>
+          <span>Boss: Chance auf einen Sleeve- oder Slab-Fund pro Spieler (%)</span>
           <input type="text" name="foilChance" inputmode="decimal" value="<%= String(dungeon.settings.foilChance).replace('.', ',') %>" required>
         </label>
         <label class="field admin-tcg-pack">

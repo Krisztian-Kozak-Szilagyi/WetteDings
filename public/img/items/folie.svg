@@ -15,5 +15,5 @@
   <rect x="170" y="210" width="380" height="64" rx="10" fill="#f8fafc"/>
   <path d="M220 330h120L250 760h-60Z" fill="#ffffff" opacity=".45"/>
   <path d="M390 330h60L360 760h-60Z" fill="#ffffff" opacity=".3"/>
-  <text x="360" y="900" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#e9d5ff" letter-spacing="6">FOLIE</text>
+  <text x="360" y="900" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#e9d5ff" letter-spacing="6">SLEEVE</text>
 </svg>

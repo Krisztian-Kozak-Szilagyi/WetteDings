@@ -105,7 +105,7 @@
   <div class="dx-row">
     <section class="dx-col-wide dx-favs" aria-labelledby="dx-favs-h">
       <div class="dx-head">
-        <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(d.cardValue) %></div><% } %></div>
+        <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Händlerwert <%= euro(d.cardValue) %></div><% } %></div>
         <a class="dx-link" href="/tcg/album">Zum Album →</a>
       </div>
       <% if (!d.cardCount) { %><p class="muted small">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p><% } %>

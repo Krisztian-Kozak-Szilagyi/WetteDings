@@ -60,8 +60,8 @@ const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
 const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung', esports: 'eSports-Trophäe' };
-const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'black_market', 'bazaar_kauf'];
-const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
+const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'item_kauf', 'black_market', 'bazaar_kauf'];
+const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', item_kauf: 'Gegenstand gekauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
 
 // ab dieser Seltenheit werden gezogene Karten im Log hervorgehoben
 const RARE_FROM = tcgCatalog.rarityByKey.holo ? tcgCatalog.rarityByKey.holo.rank : 3;
@@ -422,9 +422,9 @@ function gradingRow(j, name) {
     at: j.doneAt || j.createdAt,
     startedAt: j.createdAt,
     player: name || '–',
-    shop: level ? level.name : `Stufe ${j.level}`,
+    shop: (level ? level.name : `Stufe ${j.level}`) + (j.shopCode ? ` · ${j.shopCode}` : ''),
     card: cardLabel(j.card),
-    customer: j.customer,
+    customer: j.source === 'spieler' ? `${j.customer} (Mitglied)` : j.customer, // Spieler-Auftrag (#204): Slab mit der Note des Shops
     done: j.status === 'fertig',
     grade: j.grade,
     guess: j.guess,
@@ -437,7 +437,7 @@ function gradingRow(j, name) {
 
 async function gradingLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound doneAt createdAt', all);
+  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound shopCode source doneAt createdAt', all);
   const names = await namesOf(docs.map((j) => j.user));
   return { ...pg, rows: docs.map((j) => gradingRow(j, names.get(String(j.user)))) };
 }

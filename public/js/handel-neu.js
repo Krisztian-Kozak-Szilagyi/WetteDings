@@ -3,7 +3,7 @@
 
   // Handelsfenster (/handel/neu und Gegenangebote): Karten antippen oder ins Fenster ziehen legt sie in die Ablage
   // oben, "−" oder Herausziehen nimmt eine weg.
-  // Geld fließt nur in eine Richtung; Zusammenfassung mit Kartenwert, Wertvergleich und Steuer.
+  // Geld fließt nur in eine Richtung; Zusammenfassung mit Händlerpreis, Wertvergleich und Steuer.
   // Ohne JS gehen die Zahlenfelder unter den Karten direkt.
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -281,16 +281,16 @@
     $all('[data-hb-sum]', root).forEach(function (el) {
       var side = el.getAttribute('data-hb-sum');
       var sel = side === 'gib' ? give : get;
-      el.textContent = sel.count ? 'Wert ' + euro(sel.value) : '';
+      el.textContent = sel.count ? 'Händlerpreis ' + euro(sel.value) : '';
     });
-    // Wertvergleich: was ich bekomme minus was ich gebe (Kartenwert + Geld)
+    // Wertvergleich: was ich bekomme minus was ich gebe (Händlerpreis + Geld)
     if (balanceBox) {
       var diff = get.value + receive - give.value - pay;
       var any = give.count || get.count;
       balanceBox.hidden = !any;
       balanceBox.textContent = !diff ? 'gleicher Wert' : (diff > 0 ? '+' : '−') + euro(Math.abs(diff));
       balanceBox.className = 'hb-balance' + (diff > 0 ? ' is-pos' : diff < 0 ? ' is-neg' : '');
-      balanceBox.title = diff > 0 ? 'Du bekommst mehr Kartenwert, als du gibst' : diff < 0 ? 'Du gibst mehr Kartenwert, als du bekommst' : '';
+      balanceBox.title = diff > 0 ? 'Du bekommst mehr nach Händlerpreis, als du gibst' : diff < 0 ? 'Du gibst mehr nach Händlerpreis, als du bekommst' : '';
     }
 
     var kind = give.count && get.count ? 'tausch' : isMarket || isListing ? 'markt' : 'privat';

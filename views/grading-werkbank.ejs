@@ -1,0 +1,116 @@
+<%- include('partials/head') %>
+<%# Werkbank (#204): der Arbeitstisch für den offenen Auftrag (public/js/grading.js) – nur Ticket, Bühne, Schritte, Panel %>
+<div class="gr-page gr-workbench">
+<div class="gr-wb-head">
+  <a class="btn btn-ghost btn-sm" href="/grading" aria-label="Zurück zum Shop">← Shop</a>
+  <div class="gr-ticket">
+    <span class="gr-ticket-label"><%= jobData.services && jobData.services.review ? 'Zweitprüfung' : jobData.player ? 'Mitglied' : 'Auftrag' %></span>
+    <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
+    <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %><% if (jobData.card.bonus) { %> · +<%= jobData.card.bonus %> % Lohn<% } %></span><% } %>
+    <span class="gr-ticket-for">für <%= jobData.customer %></span>
+    <% if (jobData.services) { %><%- include('partials/grading-services', { sv: jobData.services }) %><% } %>
+  </div>
+  <button type="button" class="btn btn-ghost btn-sm gr-sound" data-gr-sound aria-pressed="false">🔇 Ton aus</button>
+</div>
+
+<section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">
+  <%- include('partials/grading-stage', { steps: jobData.steps }) %>
+
+  <ol class="gr-steps" data-gr-steps>
+    <% if (jobData.steps.includes('clean')) { %><li data-step="clean">Reinigen</li><% } %>
+    <% if (jobData.steps.includes('iron')) { %><li data-step="iron">Bügeln</li><% } %>
+    <% if (jobData.steps.includes('grade')) { %><li data-step="grade">Benoten</li><% } %>
+    <% if (jobData.steps.includes('slab')) { %><li data-step="slab">Versiegeln</li><% } %>
+    <li data-step="send">Zurückschicken</li>
+  </ol>
+
+  <% if (jobData.steps.includes('clean')) { %>
+  <div class="gr-panel" data-gr-panel="clean">
+    <div class="gr-row">
+      <p class="gr-text">Nimm das Werkzeug <b>Putzen</b> und reibe mit gedrückter Maustaste über die Flecken. Mit <b>Drehen</b> wendest du die Karte – auch hinten kann Schmutz sein. Ob sie wirklich sauber ist, musst du selbst entscheiden.
+        <% if (!jobData.player) { %><span class="gr-note">Ganz sauber: <%= euro(pay.clean) %> – jeder Rest Schmutz kostet Lohn.</span><% } else { %><span class="gr-note">Sauberkeit zählt für deine Arbeitsqualität.</span><% } %></p>
+      <button type="button" class="btn btn-primary" data-gr-clean-ok>Fertig geputzt</button>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (jobData.steps.includes('iron')) { %>
+  <%- include('partials/grading-iron-panel', { pay }) %>
+  <% } %>
+
+  <% if (jobData.steps.includes('grade')) { %>
+  <div class="gr-panel" data-gr-panel="grade" hidden>
+    <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an den linken und rechten Rand des Kartenbilds und liest die seitliche Zentrierung ab. Die <b>UV-Lampe</b> lässt bestoßene Ecken und Kantenmacken grün aufleuchten – fahr damit langsam am Rand entlang.</p>
+    <%# Bewertung in drei Stufen (src/grading/condition.js: gradeCap, gradeFor) – erst die Obergrenze, dann abziehen %>
+    <ol class="gr-flow">
+      <li class="gr-flow-step is-cap">
+        <span class="gr-flow-num">1</span>
+        <div class="gr-flow-body">
+          <span class="gr-flow-title">Obergrenze <small>der niedrigste Wert zählt</small></span>
+          <div class="gr-cap-row">
+            <span class="gr-cap-crease" title="Gebügelt: höher – je glatter, desto mehr (höchstens 9)"><span>Knick</span><b>4</b><small>gebügelt bis 9</small></span>
+            <div class="gr-cap-center">
+              <small>Zentrierung <span>– Rand ungleich breit</span></small>
+              <ol class="gr-center-scale">
+                <% centeringScale.forEach((c) => { %><li title="<%= c.fromLabel %> bis einschließlich <%= c.toLabel %>"><span><%= c.fromLabel %>–</span><span><%= c.toLabel %></span><b><%= c.cap %></b></li><% }) %>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li class="gr-flow-step">
+        <span class="gr-flow-num">2</span>
+        <div class="gr-flow-body">
+          <span class="gr-flow-title">Davon abziehen <small>je Mangel</small></span>
+          <ul class="gr-minus-list">
+            <li>Kratzer <b>−1</b></li>
+            <li>Bestoßene Ecke <b>−1</b></li>
+            <li>Kantenmacke <b>−1</b></li>
+          </ul>
+        </div>
+      </li>
+      <li class="gr-flow-step is-result">
+        <span class="gr-flow-num">3</span>
+        <div class="gr-flow-body"><span class="gr-flow-title">= Note <small>mindestens 1</small></span></div>
+      </li>
+    </ol>
+    <div class="gr-grades" data-gr-grades>
+      <% for (let g = 1; g <= 10; g++) { %><button type="button" class="gr-grade" data-grade="<%= g %>"><%= g %></button><% } %>
+    </div>
+    <div class="gr-row gr-grade-row">
+      <span class="gr-note"><%= jobData.services && jobData.services.review ? 'Zweitprüfung: die Karte liegt im Slab eines anderen Shops – seine Note siehst du nicht. Weicht deine ab, bekommt sie einen neuen Slab mit deinem Kürzel.' : jobData.player ? 'Deine Note kommt auf den Slab – Treffsicherheit zählt fürs Rating.' : 'Exakt +' + euro(pay.grade) + ' · um 1 daneben +' + euro(pay.grade / 2) %></span>
+      <button type="button" class="btn btn-primary" data-gr-grade-ok disabled>Note abgeben</button>
+    </div>
+    <div class="gr-result">
+      <div class="gr-verdict" data-gr-verdict hidden></div>
+      <button type="button" class="btn btn-primary" data-gr-grade-next hidden>Weiter</button>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (jobData.steps.includes('slab')) { %>
+  <div class="gr-panel" data-gr-panel="slab" hidden>
+    <p class="gr-text">Stoppe den Regler möglichst genau in der Mitte – so sitzt die Karte gerade im Slab<% if (!jobData.player) { %> <span class="gr-note">(bis +<%= euro(pay.slab) %>)</span><% } %>.</p>
+    <div class="gr-row">
+      <div class="gr-meter" data-gr-meter><span class="gr-meter-zone"></span><span class="gr-meter-needle" data-gr-needle></span></div>
+      <button type="button" class="btn btn-primary" data-gr-seal>Versiegeln</button>
+    </div>
+    <p class="gr-seal-result" data-gr-seal-result></p>
+  </div>
+  <% } %>
+
+  <form method="post" action="/grading/zuruecksenden" class="gr-panel" data-gr-panel="send" data-gr-send hidden>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="job" value="<%= jobData.id %>">
+    <input type="hidden" name="clean" value="">
+    <input type="hidden" name="seal" value="">
+    <div class="gr-row">
+      <p class="gr-text"><b>Fertig!</b> Die Karte ist bereit für <%= jobData.customer %>.</p>
+      <button class="btn btn-primary btn-lg gr-glow" type="submit">An <%= jobData.customer %> zurückschicken</button>
+    </div>
+  </form>
+</section>
+</div>
+
+<script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

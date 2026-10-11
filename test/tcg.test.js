@@ -161,7 +161,7 @@ test('Namen als Profil-Links: maskiert, verschachtelt als span, gelöschte Konte
   assert.equal(userLink(''), '');
 });
 
-test('Boss-Karte: 5.000 € Wert, Folie steigert ihn, die Bank kauft sie nicht', () => {
+test('Boss-Karte: 5.000 € Wert, ein Slab steigert ihn, die Bank kauft sie nicht', () => {
   const catalog = require('../src/tcg/catalog');
   const foil = require('../src/items/foil');
   const { sellValueExpr } = require('../src/tcg/tcgService');
@@ -169,9 +169,8 @@ test('Boss-Karte: 5.000 € Wert, Folie steigert ihn, die Bank kauft sie nicht',
   assert.strictEqual(boss.sell, 500000);
   assert.strictEqual(boss.noBank, true);
   // Ranglisten-/Profilwert kennt die Boss-Seltenheit
-  const branches = sellValueExpr().$floor.$add[0].$multiply[0].$switch.branches;
-  assert.ok(branches.some((b) => b.case.$eq[1] === 'boss' && b.then === 500000));
-  // foliert ist sie mehr wert als ohne Folie
+  assert.ok(JSON.stringify(sellValueExpr()).includes('{"case":{"$eq":["$rarity","boss"]},"then":500000}'));
+  // im Slab ist sie mehr wert (Wertsteigerung ab foiledAt, foil.growthFrom)
   assert.ok(foil.cardValue(boss.sell, new Date(Date.now() - 3 * 86400000)) > boss.sell);
 });
 
@@ -190,4 +189,26 @@ test('Duplikate: Exemplar im Handelsangebot zählt nicht als das verbleibende (#
   assert.deepEqual(ids(pickDuplicates(list.slice(0, 2), locked([['a', 'handel']]))), []);
   // Handel und Quest zusammen: das Quest-Exemplar bleibt
   assert.deepEqual(ids(pickDuplicates(list, locked([['a', 'handel'], ['b', 'quest']]))), ['c']);
+});
+
+test('#204: Bank – ungebügelter Knick halber Preis, beschädigte Exemplare gehen zuerst', () => {
+  const { bankPrice, bankOrder, bankProceeds, pickDuplicates } = require('../src/tcg/tcgService');
+  assert.equal(bankPrice(1001, { creased: true }), 500);
+  assert.equal(bankPrice(1000, { creased: true, ironedAt: new Date() }), 1000); // gebügelt: voller Preis
+  assert.equal(bankPrice(1000, { damaged: true }), 1000); // Kratzer allein: voller Preis
+  assert.equal(bankPrice(1000, {}), 1000);
+  const t = (d) => new Date(Date.UTC(2026, 0, d));
+  const docs = [
+    { _id: 'a', createdAt: t(1) },
+    { _id: 'b', createdAt: t(2), damaged: true },
+    { _id: 'c', createdAt: t(3), damaged: true, creased: true },
+    { _id: 'd', createdAt: t(4) },
+    { _id: 'e', createdAt: t(5), damaged: true, creased: true, ironedAt: t(6) },
+  ];
+  assert.deepEqual([...docs].sort(bankOrder).map((d) => d._id), ['c', 'b', 'e', 'a', 'd']);
+  // Duplikate: es bleibt das neueste unbeschädigte
+  const none = { reasons: new Map() };
+  assert.deepEqual(pickDuplicates([...docs].sort(bankOrder), none).map((d) => d._id), ['c', 'b', 'e', 'a']);
+  const holo = require('../src/tcg/catalog').rarityByKey.holo;
+  assert.equal(bankProceeds([{ rarity: 'holo', creased: true }, { rarity: 'holo' }]), Math.floor(holo.sell / 2) + holo.sell);
 });

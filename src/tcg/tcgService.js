@@ -186,9 +186,25 @@ async function packInventory(userId) {
   return catalog.PACK_TYPES.filter((t) => counts[t.key]).map((t) => ({ ...t, count: counts[t.key] }));
 }
 
+// ---------- Bank und Knick (#204) ----------
+// Für einen ungebügelten Knick zahlt die Bank die Hälfte. Beim Verkaufen und Zerkleinern gehen beschädigte Exemplare
+// zuerst weg (Knick vor Kratzer, dann die ältesten) – so bleibt bevorzugt ein unbeschädigtes Exemplar übrig.
+const CREASE_BANK_PERCENT = 50;
+/** Hat das Exemplar einen ungebügelten Knick? */
+const openCrease = (copy) => !!(copy && copy.creased && !copy.ironedAt);
+/** Was die Bank für dieses Exemplar zahlt (Cent): Verkaufswert, mit ungebügeltem Knick die Hälfte (abgerundet) */
+const bankPrice = (sell, copy) => (openCrease(copy) ? Math.floor((sell * CREASE_BANK_PERCENT) / 100) : sell);
+/** Reihenfolge für Bank und Zerkleinern: ungebügelter Knick, sonst beschädigt, dann unbeschädigt – je die ältesten zuerst */
+const bankRank = (c) => (openCrease(c) ? 0 : c.damaged ? 1 : 2);
+const bankOrder = (a, b) => bankRank(a) - bankRank(b) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0) || String(a._id).localeCompare(String(b._id));
+const sellOf = (c) => (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0);
+/** Erlös der Bank für diese Exemplare (Cent) */
+const bankProceeds = (docs) => docs.reduce((s, c) => s + bankPrice(sellOf(c), c), 0);
+
 /**
- * Welche unfolierten Exemplare einer Karte sind Duplikate (Liste nach Alter sortiert, älteste zuerst)?
- * Es bleibt immer eins: ein Exemplar auf Quest oder im Dungeon (kommt zurück) oder sonst das neueste freie.
+ * Welche unfolierten Exemplare einer Karte sind Duplikate (Liste in Bank-Reihenfolge, siehe bankOrder)?
+ * Es bleibt immer eins: ein Exemplar auf Quest oder im Dungeon (kommt zurück) oder sonst das letzte freie – das neueste
+ * unbeschädigte, wenn es eins gibt (#204).
  * Exemplare im Handelsangebot werden weder verkauft noch als das verbleibende gezählt – sie gehen ja weg (#72).
  */
 function pickDuplicates(list, locked) {
@@ -198,13 +214,13 @@ function pickDuplicates(list, locked) {
 }
 
 /**
- * Karten verkaufen: count Stück der Karte cardId (die ältesten zuerst).
+ * Karten verkaufen: count Stück der Karte cardId (beschädigte zuerst, dann die ältesten – bankOrder).
  * keepOne = true verkauft alle Duplikate und behält genau eine.
  */
 async function sellCards({ user, cardId, count = 1, keepOne = false }) {
   if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu verkaufen.');
   return inTransaction(async (session) => {
-    const all = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id rarity foiledAt').session(session).lean();
+    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id rarity foiledAt damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
     if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
     // Boss-Karten (noBank) kauft die Bank nicht – nur Handel
     if (all.some((c) => (catalog.rarityByKey[c.rarity] || {}).noBank)) throw new UserError('Diese Karte kauft die Bank nicht. Du kannst sie im Handel anbieten.');
@@ -226,7 +242,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
     const res = await TcgCard.deleteMany({ _id: { $in: toSell.map((c) => c._id) }, user: user._id }, { session });
     if (res.deletedCount !== n) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 
-    const proceeds = rarity.sell * n;
+    const proceeds = bankProceeds(toSell); // ungebügelter Knick: halber Preis (#204)
     const updated = await User.findOneAndUpdate({ _id: user._id }, { $inc: { balance: proceeds } }, { new: true, session });
     await Ledger.create([{ user: user._id, type: 'tcg_verkauf', amount: proceeds, meta: soldMeta(toSell.map((c) => ({ _id: c._id, card: cardId, rarity: c.rarity }))) }], { session });
     return { count: n, proceeds, remaining: all.length - n, balance: updated.balance };
@@ -239,7 +255,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
  */
 async function allDuplicates(user, session) {
   // folierte Exemplare bleiben immer (die Bank kauft sie nicht)
-  const owned = await TcgCard.find({ user: user._id, foiledAt: null }).sort({ createdAt: 1, _id: 1 }).select('_id card rarity').session(session).lean();
+  const owned = (await TcgCard.find({ user: user._id, foiledAt: null }).select('_id card rarity damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
   const byCard = new Map();
   for (const c of owned) {
     if (!byCard.has(c.card)) byCard.set(c.card, []);
@@ -267,7 +283,7 @@ async function sellAllDuplicates({ user }) {
     const toSell = await allDuplicates(user, session);
     if (!toSell.length) throw new UserError('Du hast keine doppelten Karten, die verkauft werden können.');
 
-    const proceeds = toSell.reduce((s, c) => s + (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);
+    const proceeds = bankProceeds(toSell);
     const res = await TcgCard.deleteMany({ _id: { $in: toSell.map((c) => c._id) }, user: user._id }, { session });
     if (res.deletedCount !== toSell.length) throw new UserError('Dein Bestand hat sich geändert. Bitte versuche es erneut.');
 
@@ -282,7 +298,7 @@ async function sellAllDuplicates({ user }) {
 // nur Boss-Karten lassen sich einzeln zerkleinern (die Bank kauft sie nicht). Konfetti = Bankwert in ganzen Euro.
 // Buchung als tcg_zerkleinert mit 0 € (für Kontoauszug und Kartenhistorie), Konfetti steht in meta.konfetti.
 
-const konfettiOf = (docs) => docs.reduce((s, c) => s + konfettiFor(catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0), 0);
+const konfettiOf = (docs) => docs.reduce((s, c) => s + konfettiFor(bankPrice(sellOf(c), c)), 0);
 
 async function creditKonfetti({ user, docs, session }) {
   const konfetti = konfettiOf(docs);
@@ -297,11 +313,11 @@ async function creditKonfetti({ user, docs, session }) {
 async function shredCards({ user, cardId, keepOne = false }) {
   if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu zerkleinern.');
   return inTransaction(async (session) => {
-    const all = await TcgCard.find({ user: user._id, card: cardId }).sort({ createdAt: 1 }).select('_id card rarity foiledAt').session(session).lean();
+    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id card rarity foiledAt damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
     if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
     const owned = all.filter((c) => !c.foiledAt);
     if (!owned.length) throw new UserError('Folierte Karten lassen sich nicht zerkleinern.');
-    if (!konfettiOf(owned.slice(0, 1))) throw new UserError('Diese Karte lässt sich nicht zerkleinern.');
+    if (!konfettiFor(sellOf(owned[0]))) throw new UserError('Diese Karte lässt sich nicht zerkleinern.');
     const locked = await lockedDocs(user._id, session);
     const free = owned.filter((c) => !isLocked(locked, c));
     const toShred = keepOne ? pickDuplicates(owned, locked) : free.slice(0, 1);
@@ -331,7 +347,7 @@ const foilFavDoc = (id) => (isFoilFav(id) && mongoose.isValidObjectId(id.slice(F
 async function ownedFoilFavs(userId, ids) {
   const docIds = ids.map(foilFavDoc).filter(Boolean);
   if (!docIds.length) return new Map();
-  const docs = await TcgCard.find({ _id: { $in: docIds }, user: userId, foiledAt: { $ne: null } }).select('card foiledAt condition.grade condition.defects.centering').lean();
+  const docs = await TcgCard.find({ _id: { $in: docIds }, user: userId, foiledAt: { $ne: null } }).select('card foiledAt slab condition.defects.centering').lean();
   return new Map(docs.map((d) => [String(d._id), d]));
 }
 
@@ -390,7 +406,8 @@ async function toggleFavorite({ user, cardId }) {
 }
 
 /**
- * Favoriten eines Mitglieds zum Anzeigen: [{ key, card, foiledAt, grade }] – foiledAt und grade (Note auf der Folie) nur bei folierten Exemplaren.
+ * Favoriten eines Mitglieds zum Anzeigen: [{ key, card, foiledAt, slab, grade }] – foiledAt nur bei folierten Exemplaren,
+ * slab und grade (Note auf dem Etikett) nur bei Slabs.
  * counts = { cardId: Anzahl } des Mitglieds; Karten, die es nicht mehr besitzt, fallen weg.
  */
 async function favoriteList(owner, counts) {
@@ -400,7 +417,7 @@ async function favoriteList(owner, counts) {
     .map((id) => {
       if (isFoilFav(id)) {
         const d = foils.get(id.slice(FOIL_FAV.length));
-        return d && catalog.cardById[d.card] ? { key: id, card: catalog.cardById[d.card], foiledAt: d.foiledAt, grade: d.condition ? d.condition.grade : null, center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null } : null;
+        return d && catalog.cardById[d.card] ? { key: id, card: catalog.cardById[d.card], foiledAt: d.foiledAt, slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null, grade: d.slab ? d.slab.grade : null, center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null } : null;
       }
       const card = catalog.cardById[id];
       return card && counts[id] ? { key: id, card, foiledAt: null, grade: null, center: null } : null;
@@ -411,18 +428,32 @@ async function favoriteList(owner, counts) {
 /** Anzahl neuer geschenkter Packs (Quest, Admin) seit dem letzten Besuch des Inventars – für das Abzeichen im Menü */
 const newPackCount = (user) => TcgPack.countDocuments({ user: user._id, source: { $ne: 'kauf' }, createdAt: { $gt: user.packsSeenAt || user.createdAt } });
 
-/** Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, v: Wert in Cent (mit Folie) }] */
+/**
+ * Sammlung eines Nutzers: [{ _id: cardId, n, rarity, foiled: folierte Exemplare, creased: unfolierte mit ungebügeltem Knick (#204),
+ * v: Wert in Cent (mit Folie) }]
+ */
 async function inventory(userId) {
+  const isFoiled = { $eq: [{ $type: '$foiledAt' }, 'date'] };
   const agg = await TcgCard.aggregate([
     { $match: { user: userId } },
-    { $group: { _id: '$card', n: { $sum: 1 }, rarity: { $first: '$rarity' }, foiled: { $sum: { $cond: [{ $eq: [{ $type: '$foiledAt' }, 'date'] }, 1, 0] } }, v: { $sum: sellValueExpr() } } },
+    {
+      $group: {
+        _id: '$card',
+        n: { $sum: 1 },
+        rarity: { $first: '$rarity' },
+        foiled: { $sum: { $cond: [isFoiled, 1, 0] } },
+        // gebügelte Knicke sieht man kaum noch – sie zählen nicht mit
+        creased: { $sum: { $cond: [{ $and: [{ $eq: ['$creased', true] }, { $not: [isFoiled] }, { $ne: [{ $type: '$ironedAt' }, 'date'] }] }, 1, 0] } },
+        v: { $sum: sellValueExpr() },
+      },
+    },
   ]);
   return agg;
 }
 
 /**
- * MongoDB-Ausdruck: Wert (Cent) einer Karte – Verkaufswert anhand von $rarity, foliert plus Wertsteigerung
- * (src/items/foil.js). Für Ranglisten-Aggregationen.
+ * MongoDB-Ausdruck: Wert (Cent) einer Karte – Verkaufswert anhand von $rarity, im Slab plus Wertsteigerung
+ * (src/items/foil.js), mit ungebügeltem Knick die Hälfte wie bei der Bank (#204, bankPrice). Für Ranglisten-Aggregationen.
  */
 function sellValueExpr(field = '$rarity') {
   const sell = {
@@ -431,7 +462,9 @@ function sellValueExpr(field = '$rarity') {
       default: 0,
     },
   };
-  return { $floor: { $add: [{ $multiply: [sell, foil.factorExpr()] }, 1e-9] } };
+  const openCrease = { $and: [{ $eq: ['$creased', true] }, { $ne: [{ $type: '$ironedAt' }, 'date'] }, { $ne: [{ $type: '$foiledAt' }, 'date'] }] };
+  const base = { $cond: [openCrease, { $floor: { $add: [{ $divide: [{ $multiply: [sell, CREASE_BANK_PERCENT] }, 100] }, 1e-9] } }, sell] };
+  return { $floor: { $add: [{ $multiply: [base, foil.factorExpr()] }, 1e-9] } };
 }
 
 /** Wert aller Karten eines Nutzers in Cent: Wert der Karten (foliert mit Steigerung) + ungeöffnete Packs zum aktuellen Packpreis */
@@ -444,4 +477,4 @@ async function cardValueCents(userId) {
 }
 
 module.exports = {
-  revokePacks, soldMeta, pickDuplicates, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, shredCards, shredAllDuplicates, inventory, sellValueExpr, cardValueCents };
+  revokePacks, soldMeta, pickDuplicates, CREASE_BANK_PERCENT, bankPrice, bankOrder, bankProceeds, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, shredCards, shredAllDuplicates, inventory, sellValueExpr, cardValueCents };

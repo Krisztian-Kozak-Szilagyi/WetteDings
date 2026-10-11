@@ -1,0 +1,10 @@
+<%# Wartender Auftrag eines Mitglieds in der Warteschlange des Shops (#204) – o mit cardInfo, services, ownerName, price, expiresAt %>
+<% const left = (new Date(o.expiresAt) - Date.now()) / 864e5; %>
+<li class="<%= o.cardInfo ? 'r-' + o.cardInfo.rarity : '' %>">
+  <span class="gr-done-thumb"><% if (o.cardInfo) { %><img src="<%= o.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+  <span class="gr-done-info">
+    <span><b><%= o.cardInfo ? o.cardInfo.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %></span></span>
+    <span class="gr-done-meta"><%- include('grading-services', { sv: o.services }) %> <span class="gh-due<%= left < 1 ? ' is-soon' : '' %>">bis <%= date(o.expiresAt) %></span></span>
+  </span>
+  <b class="gr-pay">+<%= euro(o.price) %></b>
+</li>

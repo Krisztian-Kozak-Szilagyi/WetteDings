@@ -10,7 +10,7 @@ const { DungeonRun } = require('../models/Dungeon');
 const { TcgCard } = require('../models/Tcg');
 const catalog = require('../tcg/catalog');
 const cardBans = require('../tcg/cardBans');
-const { lockedDocs, isLocked, claim } = require('../tcg/locks');
+const { lockedDocs, pickCopy, claim } = require('../tcg/locks');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
@@ -263,9 +263,12 @@ function switchCard({ user, cardId }) {
     const r = L.addSwitch(run.live.chosen, run.live.energy, i);
     if (r.error) throw new UserError(r.error);
     const locked = await lockedDocs(m.user, session);
-    const docs = await TcgCard.find({ user: m.user, card: card.id }).sort({ createdAt: -1 }).select('_id').session(session).lean();
-    const doc = docs.find((x) => !isLocked(locked, x));
-    if (!doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel, Folie oder schon im Turm).');
+    const docs = await TcgCard.find({ user: m.user, card: card.id }).sort({ createdAt: -1 }).select('_id foiledAt').session(session).lean();
+    // Wer mit Folie gestartet ist, wechselt auf ein foliertes Exemplar, wenn es eins gibt (#204) – sonst wie üblich
+    // lieber ein unfoliertes
+    const foiled = !!m.cardDoc && !!(await TcgCard.exists({ _id: m.cardDoc, foiledAt: { $ne: null } }).session(session));
+    const doc = (foiled && pickCopy(docs, locked, { foiled: true })) || pickCopy(docs, locked);
+    if (!doc) throw new UserError('Diese Karte ist nicht frei (Quest, Handel oder schon im Turm).');
     await claim([doc], m.user, session);
     run.members[i] = { ...m, card: card.id, cardDoc: doc._id };
     run.live.chosen = r.chosen;

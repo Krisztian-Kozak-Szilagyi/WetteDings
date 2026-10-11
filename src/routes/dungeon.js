@@ -8,6 +8,7 @@ const { floorByKey } = require('../dungeon/tower');
 const LIVE = require('../dungeon/liveTower');
 const liveTower = require('../dungeon/liveTowerService');
 const { EsportsTeam } = require('../models/Esports');
+const { TcgCard } = require('../models/Tcg');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
@@ -122,7 +123,11 @@ router.get('/dungeon', async (req, res) => {
   const esTeam = esTeamId ? await EsportsTeam.findById(esTeamId).select('name ticker').lean() : null;
   // frei = eigene Exemplare ohne die als Haupt- oder Boost-Karte gewählten (die eigenen Vorrats-Exemplare zählen als frei)
   const inUse = (id) => (mine ? [mine.card, mine.boost].filter((x) => x === id).length : 0);
-  const freeOf = (id) => (cards ? Math.max(0, (cards.counts[id] || 0) - inUse(id)) : 0);
+  // Kaffee und Energy werden verbraucht – dafür nie ein foliertes Exemplar (setSupplies), also ohne die folierten
+  const freeOf = (id) => (cards ? Math.max(0, (cards.counts[id] || 0) - (cards.foiled[id] || 0) - inUse(id)) : 0);
+  // Schalter „Folierte Exemplare einsetzen“ (#204): an, wenn die gewählte Karte schon ein foliertes Exemplar ist
+  const myDocs = mine ? [mine.cardDoc, mine.boostDoc].filter(Boolean) : [];
+  const foilChecked = myDocs.length > 0 && !!(await TcgCard.exists({ _id: { $in: myDocs }, foiledAt: { $ne: null } }));
   const coffeeChoices = esLobby ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: freeOf(id), asBoost: !!mine && mine.boost === id })).filter((c) => c.card) : [];
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
@@ -177,6 +182,7 @@ router.get('/dungeon', async (req, res) => {
     playback: running && runDungeon ? playback(running, runDungeon, now) : null,
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
+    foilChecked,
     shortcuts,
     startFans,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
@@ -247,7 +253,7 @@ router.get('/dungeon/geschichte/:key', (req, res, next) => {
 // Karten in der Lobby wählen: aus dem Auswahl-Fenster per fetch (JSON, Fehler erscheinen im Fenster), sonst wie gewohnt
 const wantsJson = (req) => (req.get('Accept') || '').includes('application/json');
 router.post('/dungeon/karten', async (req, res) => {
-  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null });
+  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null, foiled: str(req.body.foil) === '1' });
   if (!wantsJson(req)) return handle(req, res, () => pick().then(() => null));
   try {
     await pick();

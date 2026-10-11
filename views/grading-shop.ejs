@@ -1,0 +1,43 @@
+<%- include('partials/head') %>
+<%# Öffentliche Seite eines Grading-Shops (#204, Etappe B): Kennzahlen, Preis und Vitrine – Slabs in 3D ansehen %>
+<% const r = shop.rating; %>
+<div class="gr-page">
+  <div class="gr-head">
+    <h1><%= shop.name %> <span class="gr-shop-code"><%= shop.code %></span></h1>
+    <a class="btn btn-ghost btn-sm" href="/grading/einreichen">Alle Shops</a>
+  </div>
+  <section class="gs-profile">
+    <p class="gr-rep"><b><%= r.tier.label %></b> · Reputation <%= Math.round(r.reputation) %> · Stufe <%= shop.level %> · von <%= shop.owner %></p>
+    <dl class="gr-facts">
+      <dt>Bewertung</dt><dd><%= r.stars != null ? '★ ' + r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' aus ' + r.starCount : 'noch keine' %></dd>
+      <dt>Arbeitsqualität</dt><dd><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></dd>
+      <dt>Treffsicherheit</dt><dd><%= r.hitRate != null ? Math.round(r.hitRate) + ' % exakt aus ' + r.graded : '–' %></dd>
+      <dt>Aufträge</dt><dd><%= shop.jobsDone %> erledigt, davon <%= shop.playerJobsDone %> für Mitglieder</dd>
+      <% if (shop.accepts) { %>
+        <% services.forEach((sv) => { %><dt><%= sv.label %></dt><dd><%= euro(shop.prices[sv.key]) %></dd><% }) %>
+        <dt>Warteschlange</dt><dd><%= shop.queue ? shop.queue + ' Karte(n)' : 'leer' %></dd>
+        <dt>Leere Slabs</dt><dd><%= shop.slabs ? shop.slabs + ' auf Lager' : 'keine – „Benoten + Slab“ gerade nicht möglich' %></dd>
+      <% } %>
+      <dt>Vitrinen-Boost</dt><dd>+<%= Math.round(shop.boost * 100) %> % Reputation je Auftrag</dd>
+    </dl>
+    <% if (!own && shop.accepts) { %>
+      <a class="btn btn-primary" href="/grading/einreichen?shop=<%= shop.code %>">Karte bei <%= shop.code %> einreichen</a>
+    <% } else if (!shop.accepts) { %>
+      <p class="muted small">Dieser Shop nimmt gerade keine Karten von Mitgliedern an (erst ab Stufe 4).</p>
+    <% } %>
+  </section>
+
+  <section class="gs-vitrine-wrap">
+    <h2>Bewertungen</h2>
+    <%- include('partials/grading-desk/reviews', { r, histogram, reviews }) %>
+  </section>
+
+  <%# Glasvitrine wie auf dem Schreibtisch des Shops – Slabs groß bewundern, wischen blättert %>
+  <section class="gs-vitrine-wrap">
+    <h2>Vitrine</h2>
+    <%- include('partials/grading-desk/vitrine', { items: shop.showcase, max: shop.showcase.length || 3 }) %>
+  </section>
+</div>
+
+<%- include('partials/foil-modal') %>
+<%- include('partials/foot') %>

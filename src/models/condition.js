@@ -8,6 +8,10 @@ const defectsSchema = new Schema(
     corners: { type: [Number], default: [] }, // 0 = oben links, 1 = oben rechts, 2 = unten rechts, 3 = unten links
     edges: { type: [new Schema({ side: Number, pos: Number }, { _id: false })], default: [] }, // side wie corners: 0 oben, 1 rechts, 2 unten, 3 links
     crease: { type: Boolean, default: false },
+    // Gebügelter Knick (#204): neue Obergrenze statt CREASE_CAP, und dass dieser Knick schon gebügelt wurde.
+    // Ohne Default – fehlt bei allen Karten, die nie gebügelt wurden
+    creaseCap: { type: Number, default: undefined },
+    ironed: { type: Boolean, default: undefined },
     // Zentrierung je Achse als Anteil der breiteren Seite (58 = 58/42); fehlt bei Kundenkarten (= perfekt)
     centering: { type: new Schema({ lr: Number, tb: Number }, { _id: false }), default: undefined },
   },

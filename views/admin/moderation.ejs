@@ -182,6 +182,29 @@
     <% } %>
   </div>
 </section>
+<% } else if (sub === 'kuerzel') { %>
+<%# Grading-Shops: neues Kürzel freigeben (#204) – das Kürzel steht auf Slabs und trägt Reputation %>
+<section class="stats-block" id="kuerzel">
+  <%- blockHead('Kürzel-Anfragen' + count(codeRequests.length), 'Nach dem ersten Festlegen ändern Shops ihr Kürzel nur mit Freigabe. Ältere Slabs behalten das alte Kürzel, es wird am Shop vermerkt.') %>
+  <div class="card">
+    <% if (!codeRequests.length) { %>
+      <p class="muted">Keine offenen Anfragen.</p>
+    <% } else { %>
+      <ul class="list-plain">
+        <% codeRequests.forEach((r) => { %>
+          <li class="row-actions">
+            <span><b><%= r.username %></b> · „<%= r.name %>“: <b><%= r.code %></b> → <b><%= r.requested %></b> <span class="muted small">(<%= date(r.at) %>)</span></span>
+            <form method="post" data-reauth action="/admin/grading-kuerzel/<%= r.shop %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-primary btn-sm" type="submit" name="decision" value="ok">Freigeben</button>
+              <button class="btn btn-ghost btn-sm" type="submit" name="decision" value="nein">Ablehnen</button>
+            </form>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</section>
 <% } else if (sub === 'auffaelligkeiten') { %>
 <%
   const openGroups = suspicionGroups.filter((g) => g.open);

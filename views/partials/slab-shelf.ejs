@@ -1,0 +1,17 @@
+<%#
+  Slab-Regal ganz oben im Album: die eigenen Slabs als einzelne Karten, beste Note zuerst (routes/tcg.js, slabCopies).
+  slabCopies = [{ id, card, foiledAt, slab, center, value, lock }], rarityByKey, favoriteIds, highlight
+%>
+<% if (slabCopies.length) { const best = Math.max(...slabCopies.map((s) => s.slab.grade)); %>
+  <section class="album-season album-slabs" id="slabs" data-album-season-section="slabs" aria-labelledby="season-slabs">
+    <div class="album-season-head">
+      <h2 id="season-slabs">Meine Slabs</h2>
+      <span class="tcg-progress-num"><%= slabCopies.length %> <%= slabCopies.length === 1 ? 'Slab' : 'Slabs' %> · beste Note <%= best %></span>
+    </div>
+    <div class="tcg-grid tcg-album tcg-slab-shelf">
+      <% slabCopies.forEach((s) => { %>
+        <%- include('foil-copy-slot', { c: s.card, r: rarityByKey[s.card.rarity] || { label: s.card.rarity, sell: 0 }, f: s, isAlbum: true, favoriteIds, linkFor: null, highlight: locals.highlight || '', no: (locals.cardNo || {})[s.card.id] || '' }) %>
+      <% }) %>
+    </div>
+  </section>
+<% } %>

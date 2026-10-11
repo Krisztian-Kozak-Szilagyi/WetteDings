@@ -49,6 +49,15 @@
     return form.getAttribute('data-confirm') || '';
   }
 
+  // Formular nach einer Rückfrage erneut absenden – mit dem Button, der gedrückt wurde (sonst fehlt dessen name/value,
+  // z. B. decision=ok bei „Freigeben“ und der Server wertet es als „Ablehnen“)
+  var submitters = new WeakMap();
+  function resubmit(form) {
+    var btn = submitters.get(form);
+    if (form.requestSubmit) form.requestSubmit(btn && form.contains(btn) ? btn : undefined); else form.submit();
+  }
+  document.addEventListener('submit', function (e) { if (e.submitter) submitters.set(e.target, e.submitter); }, true);
+
   // Passwortabfrage für Moderations- und Spielwerte-Aktionen (Formulare mit data-reauth, nur für Admin/Devs).
   // Ersetzt dort die Sicherheitsabfrage: der Dialog zeigt deren Text und fragt zusätzlich das Passwort ab.
   var reauth = document.querySelector('[data-reauth-dialog]');
@@ -72,7 +81,7 @@
       field.value = reauthInput.value;
       form.dataset.reauthOk = '1';
       reauth.close();
-      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      resubmit(form);
     });
   }
   function askPassword(form) {
@@ -98,7 +107,7 @@
       confirmBox.close();
       if (!form) return;
       form.dataset.confirmOk = '1';
-      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      resubmit(form);
     });
   }
 
@@ -120,7 +129,7 @@
           confirmBox.querySelector('[data-confirm-dialog-ok]').focus();
         } else if (window.confirm(text)) {
           form.dataset.confirmOk = '1';
-          if (form.requestSubmit) form.requestSubmit(); else form.submit();
+          resubmit(form);
         }
       }
       return;
@@ -149,8 +158,13 @@
     if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
     setTimeout(function () {
       if (e.defaultPrevented) return;
-      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; b.setAttribute('data-sent', ''); });
     }, 0);
+  });
+  // Zurück-Taste: der Browser holt die Seite aus dem Zwischenspeicher – dann sind die gesperrten Buttons wieder frei
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('button[data-sent]').forEach(function (b) { b.disabled = false; b.removeAttribute('data-sent'); });
   });
 
   // ---------- Live-Aktualisierung (alle 5 Sekunden) ----------
@@ -1070,7 +1084,7 @@
   var set = function (sel, text) { var el = box.querySelector(sel); if (el) el.textContent = text; };
   var recalc = function () {
     var jobs = val('gr_jobs');
-    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100 };
+    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100, iron: val('gr_pay_iron') * 100 };
     var premium = val('gr_premium');
     var ref = input.profiles[input.profiles.length - 1].key;
     var prev = null;
@@ -1079,6 +1093,7 @@
       var day = {};
       input.profiles.forEach(function (p) {
         var j = (pay.clean * p.clean) / 100;
+        if (l.steps.indexOf('iron') >= 0) j += (pay.iron * (input.creaseChance || 0) * (p.iron || 0)) / 100; // nur Karten mit Knick
         if (l.steps.indexOf('grade') >= 0) j += pay.grade * (p.exact + p.near / 2);
         if (l.steps.indexOf('slab') >= 0) j += (pay.slab * p.seal) / 100;
         j = j * (l.premium ? 1 + premium / 100 : 1) * input.factor;

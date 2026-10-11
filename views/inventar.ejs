@@ -1,137 +1,165 @@
 <%- include('partials/head') %>
+<%#
+  Inventar: zuerst das, was du besitzt – Slots mit Bild und Anzahl, antippen öffnet die Aktionen (benutzen, verkaufen,
+  handeln). Der Shop ist der zweite Reiter. Erklärungen stehen hinter „?“. Karten in Sleeve oder Slab stehen im Album.
+  Locals: packs, itemList (count, inTrade, buy, via, sell, tradable, text, image, category), foilable, hasShop, packPrice,
+  packImage, cardsPerPack, itemCategories
+%>
 <%
-  const pct = (p) => (Math.round(p * 10) / 10).toFixed(1).replace('.0', '').replace('.', ',');
-  const packTotal = packs.reduce((s, p) => s + p.count, 0);
-  // Folierbare Karten nach Seltenheit gruppiert (selten zuerst)
+  const help = (text) => `<details class="help-tip"><summary aria-label="Erklärung" title="Erklärung">?</summary><div class="help-tip-body">${text}</div></details>`;
+  // Karten ohne Sleeve nach Seltenheit gruppiert (selten zuerst) – für „Karte in den Sleeve stecken“
   const groups = [];
   foilable.forEach((f) => {
     let g = groups.find((x) => x.rarity.key === f.rarity.key);
     if (!g) groups.push((g = { rarity: f.rarity, list: [] }));
     g.list.push(f);
   });
-  const foilIcon = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M6 2.8h12a1.2 1.2 0 0 1 1.2 1.2v16a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 20V4A1.2 1.2 0 0 1 6 2.8Z"/><path fill="currentColor" opacity=".55" d="M7.5 6.5 13 6.5 8.5 17.5H7.5Z"/><path fill="currentColor" opacity=".3" d="M14.5 6.5h2l-4.5 11h-2Z"/></svg>';
+  // Slots: nur, was du besitzt
+  const slots = packs.filter((p) => p.count).map((p) => ({ id: 'pack-' + p.key, cat: 'packs', label: p.label, image: p.image, count: p.count, pack: p }))
+    .concat(itemList.filter((i) => i.count).map((i) => ({ id: i.key, cat: i.category, label: i.label, image: i.image, count: i.count, item: i })));
+  const catLabel = Object.fromEntries(itemCategories.map((c) => [c.key, c.label]).concat([['packs', 'Packs']]));
+  const cats = [...new Set(slots.map((s) => s.cat))];
+  const balance = currentUser.balance;
+  const buyable = itemList.filter((i) => i.buy);
 %>
 
-<div class="inv-page">
-  <header class="inv-head">
-    <h1>Inventar</h1>
-    <p class="muted">Deine ungeöffneten Booster Packs, Gegenstände und folierten Karten.</p>
+<div class="bag-page">
+  <header class="bag-head">
+    <h1>Inventar <%- help('Hier liegt, was du besitzt. Tippe einen Gegenstand an, um ihn zu benutzen, zu verkaufen oder zu handeln. Nachschub gibt es im Reiter „Shop“. Karten in Sleeve oder Slab findest du im Album.') %></h1>
+    <div class="bag-head-r">
+      <span class="bag-wallet"><small>Guthaben</small><b><%= euro(balance) %></b></span>
+      <a class="btn btn-ghost btn-sm" href="/tcg/album" title="Karten in Sleeve und Slab">🗂️ Album</a>
+    </div>
   </header>
 
-  <section class="inv-block" id="packs">
-    <h2>Booster Packs <span class="inv-count"><%= packTotal %></span></h2>
-    <% if (!packs.length) { %>
-      <p class="muted small">Keine ungeöffneten Packs. Neue gibt es im <a href="/tcg">TCG-Shop</a>.</p>
+  <div class="bag-tabs" role="tablist" aria-label="Bereich">
+    <button type="button" role="tab" class="bag-tab active" aria-selected="true" data-bag-tab="inventar">Inventar <i><%= slots.length %></i></button>
+    <button type="button" role="tab" class="bag-tab is-shop" aria-selected="false" data-bag-tab="shop">Shop</button>
+  </div>
+
+  <%# ---------- Inventar: Slots ---------- %>
+  <section class="bag-panel" data-bag-panel="inventar">
+    <% if (!slots.length) { %>
+      <div class="bag-empty">
+        <span aria-hidden="true">🎒</span>
+        <p>Dein Inventar ist leer.</p>
+        <button type="button" class="btn btn-primary" data-bag-goto="shop">Zum Shop</button>
+      </div>
+    <% } else { %>
+      <% if (cats.length > 1) { %>
+        <nav class="bag-chips" aria-label="Kategorie" data-shop-filters>
+          <button type="button" class="shop-chip active" data-shop-filter="all" aria-pressed="true">Alle</button>
+          <% cats.forEach((c) => { %><button type="button" class="shop-chip" data-shop-filter="<%= c %>" aria-pressed="false"><%= catLabel[c] || c %></button><% }) %>
+        </nav>
+      <% } %>
+      <div class="bag-grid">
+        <% slots.forEach((s) => { %>
+          <button type="button" class="bag-slot" data-shop-cat="<%= s.cat %>" data-dialog-open="bag-<%= s.id %>" aria-label="<%= s.label %>, <%= s.count %> im Besitz – Aktionen öffnen">
+            <span class="bag-art bag-art-<%= s.item ? s.item.key : 'pack' %>"><img src="<%= s.image %>" alt="" width="720" height="1008" loading="lazy"></span>
+            <span class="bag-count">×<%= s.count %></span>
+            <span class="bag-name"><%= s.label %></span>
+            <% if (s.item && s.item.inTrade) { %><span class="bag-sub"><%= s.item.inTrade %> im Handel</span><% } %>
+          </button>
+        <% }) %>
+      </div>
     <% } %>
-    <div class="tcg-mypacks">
-      <% packs.forEach((p) => { %>
-        <div class="tcg-mypack">
-          <span class="tcg-mypack-img" aria-hidden="true">
-            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
-            <img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy">
-          </span>
-          <div class="tcg-mypack-text">
-            <strong><span data-tcg-pack-count="<%= p.key %>"><%= p.count %></span> ungeöffnete<%= p.count === 1 ? 's Pack' : ' Packs' %></strong>
-            <span><%= p.label %></span>
-          </div>
-          <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= p.image %>">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="type" value="<%= p.key %>">
-            <button class="btn btn-primary" type="submit">Öffnen</button>
-          </form>
-        </div>
-      <% }) %>
-    </div>
   </section>
 
-  <section class="inv-block" id="gegenstaende">
-    <h2>Gegenstände</h2>
-    <div class="inv-items">
-      <% itemList.forEach((it) => { %>
-        <div class="inv-item<%= it.count ? '' : ' is-empty' %>">
-          <span class="inv-item-icon"><% if (it.key === 'folie') { %><%- foilIcon %><% } else { %><img src="<%= it.image %>" alt="" width="22" height="22"><% } %></span>
-          <div class="inv-item-text">
-            <strong><%= it.label %> <span class="inv-count"><%= it.count %></span><% if (it.inTrade) { %> <span class="muted small">davon <%= it.inTrade %> im Handel</span><% } %></strong>
-            <span class="muted small"><%= it.key === 'folie' ? 'Schweißt eine deiner Karten ein. Folierte Karten steigen sofort um ' + pct(foilSettings.bonusPercent) + ' % und danach jeden Tag im Wert, können aber nicht an die Bank verkauft und nicht auf Quests geschickt werden.' : it.text %></span>
-          </div>
-        </div>
-        <% const free = it.count - it.inTrade; %>
-        <% if (free > 0) { %>
-          <div class="inv-item-actions">
-            <% if (it.sell) { %>
+  <%# ---------- Shop: kompakte Liste ---------- %>
+  <section class="bag-panel" data-bag-panel="shop" hidden>
+    <ul class="bag-shop">
+      <% packs.forEach((p) => { %>
+        <li class="bag-row">
+          <span class="bag-row-art bag-art-pack"><img src="<%= p.image %>" alt="" width="800" height="1280" loading="lazy"></span>
+          <span class="bag-row-main"><b><%= p.label %></b><%- help(cardsPerPack + ' zufällige Karten – von Crumpled bis Icon. Gekaufte Packs landen im Inventar, geöffnet im Album.') %></span>
+          <span class="bag-row-buy"><span class="bag-price"><%= euro(packPrice) %></span><a class="btn btn-primary btn-sm" href="/tcg">Zum TCG-Shop</a></span>
+        </li>
+      <% }) %>
+      <% itemList.forEach((it) => { if (!it.buy) return; %>
+        <li class="bag-row" id="<%= it.key %>">
+          <span class="bag-row-art bag-art-<%= it.key %>"><img src="<%= it.image %>" alt="" width="720" height="1008" loading="lazy"></span>
+          <span class="bag-row-main"><b><%= it.label %></b><%- help(it.text.replace(/</g, '&lt;')) %><small>Ankauf <%= euro(it.sell) %></small></span>
+          <span class="bag-row-buy">
+            <span class="bag-price"><%= euro(it.buy) %></span>
+            <% if ((it.via || 'bank') === 'bank') { %>
+              <form method="post" action="/inventar/kaufen" class="bag-buy" data-shop-buy data-price="<%= it.buy %>" data-label="<%= it.label %>" data-balance="<%= balance %>" data-confirm="1× <%= it.label %> für <%= euro(it.buy) %> kaufen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="type" value="<%= it.key %>">
+                <span class="shop-qty" role="group" aria-label="Anzahl">
+                  <button type="button" data-shop-step="-1" aria-label="Einen weniger">−</button>
+                  <input type="number" name="count" min="1" max="100" value="1" inputmode="numeric" aria-label="Anzahl <%= it.label %>">
+                  <button type="button" data-shop-step="1" aria-label="Einen mehr">+</button>
+                </span>
+                <button class="btn btn-primary btn-sm" type="submit" data-shop-submit <%= balance < it.buy ? 'disabled' : '' %>>Kaufen · <span data-shop-total><%= euro(it.buy) %></span></button>
+              </form>
+            <% } else if (hasShop) { %>
+              <a class="btn btn-primary btn-sm" href="/grading?reiter=werkstatt" title="Leere Slabs kaufst du in der Werkstatt deines Grading-Shops">Zur Werkstatt</a>
+            <% } else { %>
+              <span class="bag-note" title="Leere Slabs verkauft die Bank nur an Grading-Shops – sonst im Handel">nur Grading-Shops · <a href="/handel">Handel</a></span>
+            <% } %>
+          </span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<%# ---------- Aktionen je Gegenstand (Dialog) ---------- %>
+<% slots.forEach((s) => { %>
+  <dialog class="dialog bag-dialog" id="bag-<%= s.id %>" aria-labelledby="bag-<%= s.id %>-t">
+    <div class="dialog-head">
+      <h2 id="bag-<%= s.id %>-t"><%= s.label %> <span class="bag-n">×<%= s.count %></span></h2>
+      <span class="bag-head-tools">
+        <%- help(s.item ? s.item.text.replace(/</g, '&lt;') : cardsPerPack + ' zufällige Karten – von Crumpled bis Icon. Geöffnete Karten landen im Album.') %>
+        <button type="button" class="dialog-x" data-dialog-close aria-label="Schließen">×</button>
+      </span>
+    </div>
+    <div class="bag-detail">
+      <span class="bag-detail-art bag-art-<%= s.item ? s.item.key : 'pack' %>"><img src="<%= s.image %>" alt="" width="720" height="1008"></span>
+      <div class="bag-actions">
+        <% if (s.pack) { %>
+          <form method="post" action="/tcg/oeffnen" data-tcg-open data-image="<%= s.pack.image %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="type" value="<%= s.pack.key %>">
+            <button class="btn btn-primary btn-block" type="submit">Öffnen</button>
+          </form>
+        <% } else { const it = s.item; const free = it.count - it.inTrade; %>
+          <% if (it.key === 'folie') { %>
+            <% if (free && foilable.length) { %>
+              <details class="bag-use" open>
+                <summary>Karte in den Sleeve stecken</summary>
+                <form method="post" action="/inventar/folieren" data-confirm="Karte in einen TCG Sleeve stecken? Ein Sleeve wird verbraucht – beim Abziehen im Album bekommst du ihn zurück.">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <select name="card" required aria-label="Karte wählen">
+                    <option value="">– Karte wählen –</option>
+                    <% groups.forEach((g) => { %>
+                      <optgroup label="<%= g.rarity.label %>">
+                        <% g.list.forEach((f) => { %><option value="<%= f.card.id %>"><%= f.card.name %><%= f.free > 1 ? ' (' + f.free + '×)' : '' %></option><% }) %>
+                      </optgroup>
+                    <% }) %>
+                  </select>
+                  <button class="btn btn-primary btn-block" type="submit">In den Sleeve</button>
+                </form>
+              </details>
+            <% } else { %>
+              <p class="bag-note"><%= free ? 'Keine freie Karte ohne Sleeve.' : 'Alle Sleeves stehen im Handel.' %></p>
+            <% } %>
+          <% } %>
+          <% if (free > 0 && it.tradable) { %><a class="btn btn-ghost btn-block" href="/handel/neu?gib=<%= encodeURIComponent('item:' + it.key) %>">Handeln</a><% } %>
+          <% if (free > 0 && it.sell) { %>
             <form method="post" action="/inventar/verkaufen" data-confirm="1× <%= it.label %> für <%= euro(it.sell) %> an die Bank verkaufen?">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="type" value="<%= it.key %>">
               <input type="hidden" name="count" value="1">
-              <button class="btn btn-ghost btn-sm" type="submit">1 verkaufen · <%= euro(it.sell) %></button>
-            </form>
-            <% } %>
-            <% if (it.tradable) { %>
-            <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=<%= encodeURIComponent('item:' + it.key) %>">Im Handel anbieten</a>
-            <% } %>
-          </div>
-        <% } %>
-        <% if (it.key === 'folie') { %>
-          <% if (!free) { %>
-          <% } else if (!foilable.length) { %>
-            <p class="muted small inv-hint">Du hast keine freie, unfolierte Karte zum Folieren.</p>
-          <% } else { %>
-            <form method="post" action="/inventar/folieren" class="inv-foil-form" data-confirm="Karte folieren? Eine Folie wird verbraucht. Die Karte kann danach nicht mehr an die Bank verkauft und nicht auf Quests geschickt werden.">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <label class="field"><span>Karte folieren</span>
-                <select name="card" required>
-                  <option value="">– Karte auswählen –</option>
-                  <% groups.forEach((g) => { %>
-                    <optgroup label="<%= g.rarity.label %>">
-                      <% g.list.forEach((f) => { %><option value="<%= f.card.id %>"><%= f.card.name %><%= f.free > 1 ? ' (' + f.free + '×)' : '' %> · <%= euro(f.rarity.sell) %></option><% }) %>
-                    </optgroup>
-                  <% }) %>
-                </select>
-              </label>
-              <button class="btn btn-primary" type="submit">Folieren</button>
+              <button class="btn btn-ghost btn-block" type="submit">Verkaufen · <%= euro(it.sell) %></button>
             </form>
           <% } %>
         <% } %>
-      <% }) %>
+        <button type="button" class="bag-more" data-bag-goto="shop" data-dialog-close>Nachschub im Shop →</button>
+      </div>
     </div>
-  </section>
-
-  <section class="inv-block" id="folierte">
-    <h2>Folierte Karten <span class="inv-count"><%= foiled.length %></span></h2>
-    <% if (!foiled.length) { %>
-      <p class="muted small">Noch keine.</p>
-    <% } else { %>
-      <p class="muted small">Tippe eine Karte an, um sie groß anzusehen und umzudrehen.</p>
-    <% } %>
-    <div class="foil-grid">
-      <% foiled.forEach((f) => { %>
-        <article class="foil-item r-<%= f.card.rarity %><%= highlight === f.id ? ' is-new' : '' %>" id="f-<%= f.id %>">
-          <button type="button" class="foil-card"<%- foilViewAttrs(f.card, f.rarity.label, f.foiledAt, { grade: f.grade, center: f.center }) %> aria-label="<%= f.card.name %> groß ansehen">
-            <%- include('partials/foil-mini', { card: f.card, rarityLabel: f.rarity.label, grade: f.grade, center: f.center }) %>
-          </button>
-          <div class="foil-info">
-            <% if (highlight === f.id) { %><span class="badge badge-entschieden">Neu foliert</span><% } %>
-            <strong><%= f.card.name %> <span class="tcg-badge r-<%= f.card.rarity %>"><%= f.rarity.label %></span></strong>
-            <span>Wert <b><%= euro(f.value) %></b> <span class="pos small">+<%= pct(f.percent) %> %</span></span>
-            <span class="muted small">foliert am <%= dayDate(f.foiledAt) %> · <%= f.rarity.noBank ? 'Grundwert ' + euro(f.sell) + ' · die Bank kauft sie nicht' : 'Bankwert ohne Folie ' + euro(f.sell) %></span>
-            <% if (f.lock === 'handel') { %>
-              <span class="small">Steht gerade im <a href="/handel">Handel</a>.</span>
-            <% } else { %>
-              <a class="btn btn-ghost btn-sm" href="/handel/neu?gib=f:<%= f.id %>">Handeln · Markt, Verkauf oder Tausch</a>
-              <form method="post" action="/inventar/folie-abziehen" data-confirm="Folie von <%= f.card.name %> abziehen? Die Folie geht dabei kaputt, die Wertsteigerung ist weg. Die Karte ist danach wieder eine normale Karte.">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="copy" value="<%= f.id %>">
-                <button class="btn btn-ghost btn-sm" type="submit">Folie abziehen</button>
-              </form>
-            <% } %>
-          </div>
-        </article>
-      <% }) %>
-    </div>
-  </section>
-</div>
-
-<%- include('partials/foil-modal') %>
+  </dialog>
+<% }) %>
 
 <!-- Pack-Öffnung (public/js/tcg.js) -->
 <div class="tcg-reveal" data-tcg-reveal hidden>
@@ -150,4 +178,5 @@
 </div>
 
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/inventar.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

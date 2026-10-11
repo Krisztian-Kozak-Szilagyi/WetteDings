@@ -9,7 +9,7 @@
   const title = mode === 'gegen' ? 'Gegenangebot' : mode === 'markt' ? 'Angebot machen' : 'Neuer Handel';
   // eigene folierte Exemplare der Vorauswahl – gehen beim Wechsel des Ziels mit
   const presetCopies = [...give.copies].map((id) => 'f:' + id);
-  const poolSize = (pool) => (pool ? pool.cards.length + pool.foiled.length + pool.goods.length : 0);
+  const poolSize = (pool) => (pool ? pool.cards.length + pool.foiled.length + (pool.marked || []).length + pool.goods.length : 0);
   const showTheirs = !isMarket && !fixedGets; // Sammlung des Mitglieds als Reiter; auf dem Markt: Wunschkarten über die Suche im Fenster
   const showMine = !fixedGives;
   // Geldfeld: beim Gegenangebot mit Bezug ("verlangt 25,00 €" bzw. "bisher …") – der Betrag ist immer der ganze, kein Aufschlag
