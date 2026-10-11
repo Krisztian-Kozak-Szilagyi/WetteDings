@@ -6098,3 +6098,14 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .bz-face { width: 140px; height: 360px; }
   .bz-face img { width: 300px; top: -8px; margin-left: -75px; }
 }
+
+/* IHK: Auswahl per Klick wie im Dungeon – Platz anklicken, im Fenster (.dg-picker) wählen (public/js/ihk.js) */
+.ihk-slot[data-ihk-drop] { cursor: var(--cur-pointer); transition: outline-color .2s, box-shadow .2s; }
+.ihk-slot[data-ihk-drop]:not(.is-disabled):hover, .ihk-slot[data-ihk-drop]:focus-visible { outline: 1px solid var(--color-accent-300); outline-offset: -1px; }
+.ihk-slot[data-ihk-drop]:not(.is-disabled):hover img, .ihk-slot[data-ihk-drop]:focus-visible img { box-shadow: 0 0 0 2px var(--color-accent-300), 0 0 30px color-mix(in srgb, var(--color-accent) 40%, transparent); }
+.ihk-slot-item.is-disabled[data-ihk-drop] { cursor: var(--cur-no); }
+.ihk-offer, .ihk-picker [data-drag], .ihk-picker [data-drag]:active { cursor: var(--cur-pointer); }
+.ihk-picker .ihk-offer-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.ihk-offer-cap { display: grid; gap: 2px; margin-top: 8px; font-size: 12.5px; text-align: center; color: var(--color-neutral-400); }
+.ihk-offer-cap strong { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.ihk-picker .ihk-pick-stats { margin-top: 6px; }
