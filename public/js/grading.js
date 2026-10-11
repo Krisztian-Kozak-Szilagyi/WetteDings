@@ -162,6 +162,7 @@
       vy *= 0.9;
     }
     ironTick(now);
+    wetDry(now);
     render();
     requestAnimationFrame(loop);
   }
@@ -237,6 +238,8 @@
     stage.classList.toggle('mode-measure', m === 'measure');
     stage.classList.toggle('mode-uv', m === 'uv');
     stage.classList.toggle('mode-iron', m === 'iron');
+    tool.setAttribute('data-tool', m === 'clean' || m === 'iron' ? m : '');
+    if (m !== 'clean' && m !== 'iron') toolOff();
     readout.hidden = m !== 'measure' || !!mbar; // mit Messleiste steht die Anzeige dort statt auf der Bühne
     if (mbar) mbar.hidden = m !== 'measure';
     if (m !== 'uv') uvOff();
@@ -285,6 +288,7 @@
     });
   }
   stage.addEventListener('pointerleave', function (e) {
+    if (e.pointerType === 'mouse') toolOff();
     if (mode === 'uv' && e.pointerType === 'mouse') uvOff();
   });
 
@@ -302,21 +306,122 @@
     setTimeout(function () { f.remove(); }, 700);
   }
 
+  // Kurzlebige Effekte auf der Bühne (Glitzern, Dampf): ein Element, das sich per CSS-Animation selbst auflöst –
+  // bei reduzierter Bewegung blendet das CSS nur ein und aus (Dampf entfällt dort ganz)
+  function puff(cls, x, y, life, vars) {
+    var r = stage.getBoundingClientRect();
+    var p = el('span', cls, stage);
+    p.style.left = x - r.left + 'px';
+    p.style.top = y - r.top + 'px';
+    if (vars) Object.keys(vars).forEach(function (k) { p.style.setProperty(k, vars[k]); });
+    setTimeout(function () { p.remove(); }, life);
+    return p;
+  }
+  function sparkle(x, y, big) {
+    var n = big ? 7 : 4;
+    for (var i = 0; i < n; i++) {
+      var a = (Math.PI * 2 * i) / n + Math.random() * 0.6;
+      var d = (big ? 26 : 16) + Math.random() * 10;
+      puff('gr-sparkle', x, y, 650, { '--dx': (Math.cos(a) * d).toFixed(1) + 'px', '--dy': (Math.sin(a) * d).toFixed(1) + 'px' });
+    }
+    try { if (navigator.vibrate) navigator.vibrate(big ? 14 : 6); } catch (err) { /* egal */ }
+  }
+
+  // Werkzeug am Zeiger (#204): Schwamm beim Putzen, Bügeleisen beim Bügeln – folgt der Maus (mit dem Finger beim Ziehen),
+  // neigt sich in Bewegungsrichtung und drückt sich beim Reiben an
+  var tool = el('div', 'gr-tool', stage);
+  var toolTilt = 0;
+  var toolLast = null;
+  function toolAt(x, y) {
+    var r = stage.getBoundingClientRect();
+    if (toolLast) toolTilt = clamp(toolTilt * 0.7 + (x - toolLast.x) * 0.9, -22, 22);
+    toolLast = { x: x, y: y };
+    tool.style.setProperty('--tx', (x - r.left).toFixed(0) + 'px');
+    tool.style.setProperty('--ty', (y - r.top).toFixed(0) + 'px');
+    tool.style.setProperty('--tilt', toolTilt.toFixed(1) + 'deg');
+    stage.classList.add('tool-on');
+  }
+  function toolOff() {
+    stage.classList.remove('tool-on');
+    toolLast = null;
+  }
+
+  // Nass-Glanz (#204): wo der Schwamm über die Vorderseite reibt, bleibt eine glänzende Spur, die langsam trocknet
+  var wet = el('canvas', 'gr-wet', stage);
+  var wetCtx = wet.getContext ? wet.getContext('2d') : null;
+  var wetLast = null;
+  var wetActive = 0;
+  function wetSize() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    wet.width = Math.round(stage.clientWidth * dpr);
+    wet.height = Math.round(stage.clientHeight * dpr);
+    if (wetCtx) wetCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  wetSize();
+  window.addEventListener('resize', wetSize);
+  function wetStroke(x, y) {
+    if (!wetCtx || !facingFront) return; // Glanz bewegt sich nicht – auch bei reduzierter Bewegung
+    var s = stage.getBoundingClientRect();
+    var f = front.getBoundingClientRect();
+    var px = x - s.left;
+    var py = y - s.top;
+    wetCtx.save();
+    wetCtx.beginPath();
+    wetCtx.rect(f.left - s.left, f.top - s.top, f.width, f.height); // nur auf der Karte
+    wetCtx.clip();
+    wetCtx.lineCap = 'round';
+    wetCtx.lineJoin = 'round';
+    wetCtx.strokeStyle = 'rgba(220, 240, 255, .14)';
+    wetCtx.lineWidth = BRUSH * 2.2;
+    wetCtx.beginPath();
+    wetCtx.moveTo(wetLast ? wetLast.x : px, wetLast ? wetLast.y : py);
+    wetCtx.lineTo(px, py);
+    wetCtx.stroke();
+    wetCtx.restore();
+    wetLast = { x: px, y: py };
+    wetActive = performance.now();
+  }
+  function wetDry(now) {
+    if (!wetCtx || !wetActive) return;
+    // trocknet in etwa 1,5 s nach: jedes Bild ein wenig wegnehmen
+    wetCtx.save();
+    wetCtx.globalCompositeOperation = 'destination-out';
+    wetCtx.fillStyle = 'rgba(0, 0, 0, .035)';
+    wetCtx.fillRect(0, 0, wet.width, wet.height);
+    wetCtx.restore();
+    if (now - wetActive > 2500) {
+      wetCtx.clearRect(0, 0, wet.width, wet.height);
+      wetActive = 0;
+    }
+  }
+
+  // Fleckarten lösen sich verschieden schnell: Kaffee klebt (langsamer); schneller als bisher wird keiner, sonst passt
+  // die Mindestzeit auf dem Server (MS_PER_SPOT) nicht mehr
+  var SPOT_EASE = { kaffee: 0.7 };
+  spots.forEach(function (s, i) { s.kind = (job.spots[i] || {}).kind; s.ease = SPOT_EASE[s.kind] || 1; });
+
   /** Reibt alle Flecken der sichtbaren Seite, die der Lappen an (x, y) berührt */
   function rubAt(x, y, dist) {
     var hit = false;
     spots.forEach(function (s) {
       if (s.hp <= 0 || (s.side === 'f') !== facingFront) return;
       var r = s.el.getBoundingClientRect();
-      var dx = x - (r.left + r.width / 2);
-      var dy = y - (r.top + r.height / 2);
+      var cx = r.left + r.width / 2;
+      var cy = r.top + r.height / 2;
+      var dx = x - cx;
+      var dy = y - cy;
       if (Math.sqrt(dx * dx + dy * dy) > Math.max(r.width, r.height) / 2 + BRUSH) return;
       hit = true;
-      s.hp = Math.max(0, s.hp - dist / s.need);
+      s.hp = Math.max(0, s.hp - (dist * s.ease) / s.need);
       if (s.hp < 0.04) s.hp = 0;
       // Reste bleiben lange sichtbar: erst ganz am Ende verschwindet ein Fleck
       s.el.style.setProperty('--hp', Math.pow(s.hp, 0.6).toFixed(3));
-      if (!s.hp) s.el.classList.add('is-clean');
+      // Flecken verschmieren erst ein wenig (größer, blasser), bevor sie verschwinden
+      if (s.kind === 'fleck') s.el.style.setProperty('--sc', (1 + 0.9 * s.hp * (1 - s.hp)).toFixed(3));
+      if (!s.hp) {
+        s.el.classList.add('is-clean');
+        sparkle(cx, cy, s.el.offsetWidth > 30);
+      }
     });
     if (hit) {
       foam(x, y);
@@ -358,7 +463,13 @@
         hit = Math.sqrt(dx * dx + dy * dy) <= IRON_R + Math.max(r.width, r.height) / 2;
       }
       if (hit) {
+        var wasFlat = s.flat >= 1;
         s.flat = Math.min(1, s.flat + dt * FLAT_RATE);
+        if (!wasFlat && s.flat >= 1 && !s.burnt) {
+          // dieses Stück ist glatt: kurz funkeln
+          var sr = s.el.getBoundingClientRect();
+          sparkle(sr.left + sr.width / 2, sr.top + sr.height / 2, false);
+        }
         s.heat += dt * HEAT_RATE;
         if (s.heat >= 1 && !s.burnt) {
           s.burnt = true;
@@ -373,13 +484,24 @@
       ironBar.style.width = Math.round(Math.min(1, hottest) * 100) + '%';
       ironBar.parentNode.classList.toggle('is-hot', hottest > 0.7);
     }
+    // Hitze am Eisen selbst: die Sohle glüht mit, kurz vor dem Brandfleck flackert es rot
+    stage.style.setProperty('--hot', Math.min(1, hottest).toFixed(3));
+    stage.classList.toggle('is-scorching', hottest > 0.75);
   }
+  var lastSteam = 0;
   function ironMove(x, y) {
+    var moved = ironAt ? Math.abs(x - ironAt.x) + Math.abs(y - ironAt.y) : 0;
     ironAt = { x: x, y: y };
     var r = stage.getBoundingClientRect();
     ironGlow.style.setProperty('--ix', x - r.left + 'px');
     ironGlow.style.setProperty('--iy', y - r.top + 'px');
     stage.classList.add('iron-on');
+    // Dampf beim Bewegen
+    var now = performance.now();
+    if (moved > 2 && now - lastSteam > 70) {
+      lastSteam = now;
+      puff('gr-steam', x + (Math.random() * 30 - 15), y - 14, 900, { '--s': (0.6 + Math.random() * 0.8).toFixed(2), '--drift': (Math.random() * 20 - 10).toFixed(0) + 'px' });
+    }
   }
   function ironUp() {
     ironAt = null;
@@ -602,12 +724,22 @@
       return;
     }
     if (mode === 'uv') return uvAt(e.clientX, e.clientY); // Ableuchten dreht die Karte nicht
-    if (mode === 'iron') return ironMove(e.clientX, e.clientY); // Bügeln auch nicht
+    if (mode === 'iron') {
+      toolAt(e.clientX, e.clientY);
+      return ironMove(e.clientX, e.clientY); // Bügeln auch nicht
+    }
     tween = null;
-    if (mode === 'clean') rubAt(e.clientX, e.clientY, 6);
+    if (mode === 'clean') {
+      toolAt(e.clientX, e.clientY);
+      wetLast = null;
+      wetStroke(e.clientX, e.clientY);
+      rubAt(e.clientX, e.clientY, 6);
+    }
   });
 
   stage.addEventListener('pointermove', function (e) {
+    // Werkzeug am Zeiger: mit der Maus immer, mit dem Finger beim Ziehen
+    if ((mode === 'clean' || mode === 'iron') && !sent && (drag || e.pointerType === 'mouse')) toolAt(e.clientX, e.clientY);
     // UV-Lampe: mit der Maus schon beim Darüberfahren, mit dem Finger beim Ziehen
     if (mode === 'uv') {
       if (!sent && (drag || e.pointerType === 'mouse')) uvAt(e.clientX, e.clientY);
@@ -634,11 +766,14 @@
       vy = clamp(dx * k, -6, 6);
       vx = clamp(-dy * k, -6, 6);
     } else {
+      wetStroke(e.clientX, e.clientY);
       rubAt(e.clientX, e.clientY, Math.sqrt(dx * dx + dy * dy));
     }
   });
 
-  function endDrag() {
+  function endDrag(e) {
+    wetLast = null;
+    if (e && e.pointerType && e.pointerType !== 'mouse') toolOff();
     if (drag && drag.guide) {
       hideLoupe();
       announceGuides();
