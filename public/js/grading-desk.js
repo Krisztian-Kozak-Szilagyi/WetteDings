@@ -95,6 +95,16 @@
     if (flash && body) body.insertBefore(flash, body.firstChild);
   }
 
+  // Zurück von der Werkbank (?neu=1): der neue Bon fällt auf den Spieß, der Münzstapel hüpft
+  if (/[?&]neu=1/.test(location.search)) {
+    var bonsOnSpike = desk.querySelectorAll('.gd-spike-bon');
+    var fresh = bonsOnSpike[bonsOnSpike.length - 1];
+    if (fresh) fresh.classList.add('is-new');
+    var coins = desk.querySelector('[data-gd-coins]');
+    if (coins) setTimeout(function () { coins.classList.add('is-bump'); }, 350);
+    if (!start) history.replaceState(null, '', base);
+  }
+
   // Handy geöffnet: neue Bewertungen gelten als gesehen
   var reviewBadge = document.querySelector('[data-gd-new-reviews]');
   if (reviewBadge && sheets.bewertungen) {

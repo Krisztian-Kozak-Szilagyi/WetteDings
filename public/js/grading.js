@@ -1211,7 +1211,7 @@
       el('p', 'muted small', actions).textContent = 'Feierabend – alle Aufträge für heute erledigt.';
     }
     var back = el('a', 'btn btn-ghost', actions);
-    back.href = '/grading';
+    back.href = '/grading?neu=1'; // der Schreibtisch spießt den neuen Bon auf
     back.textContent = 'Zum Shop';
     if (!res.canNext) setTimeout(function () { back.focus(); }, 50);
     requestAnimationFrame(function () { box.classList.add('is-on'); });
