@@ -190,8 +190,8 @@ jobs:
             # merken, welche Version läuft (für einen Neustart von Hand)
             printf 'IMAGE=%s\nIMAGE_TAG=%s\n' '$IMAGE' '$IMAGE_TAG' > .image
             docker logout ghcr.io
-            # alte Images aufräumen, die letzten bleiben für ein schnelles Zurückrollen
-            docker image prune -af --filter 'until=336h' >/dev/null || true
+            # alte Images aufräumen; die der letzten 3 Tage bleiben für ein schnelles Zurückrollen (vorher 14 Tage – zu viel Platz)
+            docker image prune -af --filter 'until=72h' >/dev/null || true
           "
 
       # ---------------- Kontrolle (beide Betriebsarten) ----------------
