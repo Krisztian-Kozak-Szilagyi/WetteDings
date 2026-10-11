@@ -105,14 +105,11 @@
     const priceFrom = shopPrices.base + shopPrices.slab;
     const shopStatus = attention.upgrade ? 'Ausbau möglich' : attention.tool ? 'Werkzeug kaufbar' : `Stufe ${info.level}/${levels.length}`;
   %>
-  <div class="gd-desk" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %><% if (shop.code && !shop.tourSeenAt) { %> data-gd-tour-auto<% } %>>
+  <div class="gd-desk gd-desk-<%= Math.min(4, Math.max(1, info.level || 1)) %>" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %><% if (shop.code && !shop.tourSeenAt) { %> data-gd-tour-auto<% } %>>
     <%# ---------- Namensschild: Identität | Fortschritt | Ressourcen | Tour ---------- %>
-    <header class="gd-plate" data-tour="schild">
-      <div class="gd-zone gd-zone-id">
-        <h1><%= shop.name || 'Dein Grading-Shop' %></h1>
-        <% if (shop.code) { %><span class="gd-stamp" aria-label="Kürzel <%= shop.code %>"><%= shop.code %></span><% } %>
-        <% if (shop.codeRequest) { %><span class="gd-seal" title="Neues Kürzel beantragt – wartet auf Freigabe">⏳ <%= shop.codeRequest.code %></span><% } %>
-        <button type="button" class="gd-help" data-tour-start aria-label="Tour: So funktioniert dein Shop"><span aria-hidden="true">?</span> Tour</button>
+    <header class="gd-plate gd-plate-<%= Math.min(4, Math.max(1, info.level || 1)) %>" data-tour="schild">
+      <div class="gd-zone gd-zone-id gd-sign gd-sign-<%= Math.min(4, Math.max(1, info.level || 1)) %>">
+        <h1><span class="gd-name"><%= shop.name || 'Dein Grading-Shop' %></span><% if (shop.code) { %><span class="gd-stamp" aria-label="Kürzel <%= shop.code %>"><%= shop.code %></span><% } %><% if (shop.codeRequest) { %><span class="gd-seal" title="Neues Kürzel beantragt – wartet auf Freigabe">⏳ <%= shop.codeRequest.code %></span><% } %></h1>
       </div>
       <div class="gd-zone gd-zone-progress">
         <span class="gd-row"><span class="gd-label">Stufe <%= info.level %>/<%= levels.length %></span><span class="gd-level" aria-hidden="true"><% levels.forEach((l) => { %><i class="<%= l.level <= info.level ? 'is-on' : '' %>"></i><% }) %></span><b><%= info.name %></b></span>
@@ -125,6 +122,7 @@
         <span class="gd-res"><%- img('scroll-open', 34) %><span><span class="gd-label">Aufträge</span><b><%= used %>/<%= limit %></b></span></span>
         <% if (players) { %><span class="gd-res"><%- img('scroll', 34) %><span><span class="gd-label">Mitglieder</span><b><%= playerUsed %>/<%= playerLimit %></b></span></span><% } %>
       </div>
+      <button type="button" class="gd-help" data-tour-start title="Tour: So funktioniert dein Shop" aria-label="Tour: So funktioniert dein Shop">?</button>
     </header>
 
     <%# ---------- Glasvitrine ---------- %>
@@ -161,7 +159,7 @@
         <form method="post" action="/grading/name" class="gd-namecard">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <h2>Wie heißt dein Shop?</h2>
-          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" placeholder="Günthers Kartenklinik" required></label>
+          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" placeholder="Günthers Klinik" required></label>
           <label class="field"><span>Kürzel – steht auf jedem Slab</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
           <button class="gd-go" type="submit">Shop eröffnen ▶</button>
         </form>
@@ -402,7 +400,7 @@
       <form method="post" action="/grading/name" class="form gd-shopform">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <%- tabInput('werkstatt') %>
-        <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" value="<%= shop.name %>" required></label>
+        <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" value="<%= shop.name %>" required></label>
         <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
         <button class="btn btn-sm" type="submit">Speichern</button>
         <% if (shop.codeRequest) { %><p class="small">⏳ <b><%= shop.codeRequest.code %></b> wartet auf Freigabe</p><% } %>

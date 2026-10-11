@@ -25,6 +25,7 @@ Holztextur auf 1024 px verkleinert und nach WebP umgewandelt.
 | ui-button.png | Kenney „Pixel UI Pack“: 9-Slice/Colored/yellow.png | CC0 |
 | ui-button-pressed.png | Kenney „Pixel UI Pack“: 9-Slice/Colored/yellow_pressed.png | CC0 |
 | ui-stamp.png | Kenney „Pixel UI Pack“: 9-Slice/Outline/red.png | CC0 |
+| diamond-plate.svg | selbst erzeugt (Riffelblech für die Tischplatte der Stufe 3) | eigenes Werk |
 | wood.webp | Poly Haven „black_walnut_veneer_02“ (Diffuse, 1k) | CC0 |
 
 - Pixel-Icons: Henrique Lazarini (7Soul1), „496 pixel art icons for medieval/fantasy RPG“,

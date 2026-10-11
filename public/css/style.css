@@ -1,4 +1,10 @@
 /* ========== Grundlagen (Design „Nocturne“: dunkel, Inter, Lila als Linie und Licht) ========== */
+/* Pacifico (SIL OFL, public/fonts/Pacifico-OFL.txt): verspielte Neon-Schreibschrift für den Shopnamen auf dem Schild der Stufe 4 */
+@font-face {
+  font-family: "Pacifico"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/fonts/pacifico-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 @font-face {
   font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap;
   src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2");
@@ -6481,6 +6487,50 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
     inset 0 2px 0 rgba(255, 220, 170, .18), inset 0 -3px 0 rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(0, 0, 0, .4),
     0 2px 0 #1b0e05, 0 6px 0 #120902, 0 30px 60px rgba(0, 0, 0, .6);
 }
+/* Tischplatte je Ausbaustufe, passend zum Namensschild: 1 rohes Holz · 2 polierter Nussbaum mit Messingleiste · 3 Stahl-Werkbank · 4 Samtunterlage */
+.gd-desk-1 {
+  background:
+    radial-gradient(70% 70% at 15% 6%, rgba(255, 214, 150, .16), rgba(255, 214, 150, 0) 60%),
+    radial-gradient(140% 120% at 50% 40%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .65) 100%),
+    linear-gradient(rgba(70, 40, 18, .5), rgba(40, 22, 8, .68)),
+    url("/img/grading/wood.webp") center / 640px auto repeat;
+}
+.gd-desk-2 {
+  background:
+    linear-gradient(115deg, transparent 0 30%, rgba(255, 230, 180, .1) 42%, transparent 54%),
+    radial-gradient(70% 70% at 15% 6%, rgba(255, 220, 160, .34), rgba(255, 214, 150, 0) 60%),
+    radial-gradient(140% 120% at 50% 40%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, .5) 100%),
+    linear-gradient(rgba(58, 30, 12, .58), rgba(30, 14, 4, .72)),
+    url("/img/grading/wood.webp") center / 640px auto repeat;
+  box-shadow:
+    inset 0 0 0 3px #1a0d03, inset 0 0 0 6px #d9a441, inset 0 0 0 7px #7a5416, inset 0 0 0 8px #1a0d03,
+    0 2px 0 #1b0e05, 0 6px 0 #120902, 0 30px 60px rgba(0, 0, 0, .6);
+}
+.gd-desk-3 {
+  background:
+    radial-gradient(70% 70% at 15% 6%, rgba(200, 225, 255, .22), transparent 60%),
+    radial-gradient(140% 120% at 50% 40%, transparent 45%, rgba(0, 0, 0, .55) 100%),
+    linear-gradient(rgba(20, 28, 38, .35), rgba(10, 14, 20, .5)),
+    url("/img/grading/diamond-plate.svg") 0 0 / 64px 64px;
+  box-shadow:
+    inset 0 0 0 3px #14181d, inset 0 0 0 5px #8d98a5, inset 0 0 0 6px #272e36,
+    0 2px 0 #14181d, 0 6px 0 #0b0e12, 0 30px 60px rgba(0, 0, 0, .6);
+}
+.gd-desk-4 {
+  /* Samtunterlage: tiefes Indigo wie das Namensschild mit weichem Schimmer, feinem Flor und Goldkordel am Rand */
+  background:
+    radial-gradient(60% 50% at 18% 8%, rgba(160, 150, 240, .26), transparent 70%),
+    linear-gradient(118deg, transparent 0 34%, rgba(160, 150, 240, .13) 46%, transparent 58%),
+    radial-gradient(140% 120% at 50% 45%, transparent 40%, rgba(8, 5, 28, .72) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .035) 0 1px, rgba(0, 0, 0, .06) 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .025) 0 1px, rgba(0, 0, 0, .05) 1px 3px),
+    linear-gradient(#2c2563, #1f1948 55%, #130f33);
+  box-shadow:
+    inset 0 0 0 3px #0e0b24, inset 0 0 0 5px #d9a441, inset 0 0 0 6px #7a5416, inset 0 0 0 7px #0e0b24,
+    inset 0 0 40px rgba(0, 0, 0, .45),
+    0 2px 0 #0e0b24, 0 6px 0 #07051a, 0 30px 60px rgba(0, 0, 0, .6);
+}
+
 .gd-desk h1, .gd-desk h2 { margin: 0; }
 .gd-img { display: block; height: auto; user-select: none; -webkit-user-drag: none; }
 .gd-px { image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -6528,7 +6578,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 
 /* Namensschild im Pixel-Stil (Kenney „Pixel UI Pack“, 9-Slice, 2-fach): Identität | Fortschritt | Ressourcen | Tour */
 .gd-plate {
-  grid-area: plate; position: relative; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) minmax(0, 1.2fr); align-items: center; gap: 0 12px;
+  grid-area: plate; position: relative; display: grid; grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 0 12px;
   padding: 4px 8px; color: #2a1d0a; image-rendering: pixelated;
   border: 24px solid transparent; border-image: url("/img/grading/ui-plate.png") 12 fill / 24px round;
   filter: drop-shadow(0 6px 0 rgba(0, 0, 0, .35)) drop-shadow(4px 10px 10px rgba(0, 0, 0, .35));
@@ -6540,8 +6590,146 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   border: 20px solid transparent; border-image: url("/img/grading/ui-inlay.png") 10 fill / 20px round;
   margin: -6px 0; align-self: stretch; justify-content: center; min-height: 104px;
 }
+/* Rahmen und Einlege-Felder des Schilds je Ausbaustufe (1 bleibt das Pixel-Pergament): 2 Nussbaum mit Messing · 3 Stahl mit Nieten · 4 Indigo-Samt mit Goldkante */
+.gd-plate-2, .gd-plate-3, .gd-plate-4 { border-image: none; }
+.gd-plate-2 .gd-zone-progress, .gd-plate-2 .gd-zone-res,
+.gd-plate-3 .gd-zone-progress, .gd-plate-3 .gd-zone-res,
+.gd-plate-4 .gd-zone-progress, .gd-plate-4 .gd-zone-res { border-image: none; }
+
+.gd-plate-2 {
+  background: linear-gradient(rgba(58, 30, 12, .5), rgba(30, 14, 4, .7)), url("/img/grading/wood.webp") center / 480px auto;
+  box-shadow: inset 0 0 0 2px #1a0d03, inset 0 0 0 4px #d9a441, inset 0 0 0 5px #7a5416, inset 0 0 0 6px #1a0d03;
+}
+.gd-plate-2 .gd-label, .gd-plate-2 .gd-num { color: #f0d9a0; }
+
+.gd-plate-3 {
+  background:
+    radial-gradient(circle, #f4f7fa 0 1px, #8a95a2 2px, #232a31 3.5px, transparent 4px) no-repeat left 8px top 8px / 10px 10px,
+    radial-gradient(circle, #f4f7fa 0 1px, #8a95a2 2px, #232a31 3.5px, transparent 4px) no-repeat right 8px top 8px / 10px 10px,
+    radial-gradient(circle, #f4f7fa 0 1px, #8a95a2 2px, #232a31 3.5px, transparent 4px) no-repeat left 8px bottom 8px / 10px 10px,
+    radial-gradient(circle, #f4f7fa 0 1px, #8a95a2 2px, #232a31 3.5px, transparent 4px) no-repeat right 8px bottom 8px / 10px 10px,
+    linear-gradient(112deg, transparent 0 38%, rgba(255, 255, 255, .16) 46%, transparent 54%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .06) 0 1px, rgba(0, 0, 0, .05) 1px 3px),
+    linear-gradient(#6f7a87, #4d5762 50%, #373f49);
+  box-shadow: inset 0 0 0 2px #14181d, inset 0 0 0 4px #8d98a5, inset 0 0 0 5px #272e36, inset 0 8px 14px rgba(255, 255, 255, .08);
+}
+.gd-plate-3 .gd-label, .gd-plate-3 .gd-num { color: #d5dde6; }
+.gd-plate-3 .gd-level i, .gd-plate-3 .gd-meter { background: #11151a; }
+
+.gd-plate-4 {
+  /* gepolsterter Samt wie der Tisch, nur etwas heller; Gold nur als dünne Paspel am Außenrand mit feiner Zweitlinie */
+  background:
+    radial-gradient(65% 120% at 20% 0%, rgba(175, 165, 255, .3), transparent 70%),
+    linear-gradient(112deg, transparent 0 40%, rgba(175, 165, 255, .12) 50%, transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .035) 0 1px, rgba(0, 0, 0, .06) 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .025) 0 1px, rgba(0, 0, 0, .05) 1px 3px),
+    linear-gradient(#3b3282, #2c2563 55%, #1f1948);
+  box-shadow: none;
+}
+/* Der Rahmen sitzt am äußeren Rand: das Schild hat 24 px durchsichtigen Rand, ein inset-Schatten würde erst innerhalb davon zeichnen */
+.gd-plate-4::before { content: ""; position: absolute; inset: -24px; pointer-events: none; box-shadow: inset 0 0 0 2px #0e0b24, inset 0 0 0 3px #e2b455, inset 0 0 0 4px #0e0b24, inset 0 8px 16px rgba(190, 180, 255, .1), inset 0 -10px 16px rgba(0, 0, 0, .25); }
+.gd-plate-4::after { content: ""; position: absolute; inset: -19px; pointer-events: none; border: 1px solid rgba(226, 180, 85, .4); }
+/* keine Kästen: Schrift liegt direkt auf dem Samt, getrennt durch eine feine Goldlinie mit kleiner Raute */
+.gd-plate-4 .gd-zone-progress, .gd-plate-4 .gd-zone-res { background: none; box-shadow: none; position: relative; }
+.gd-plate-4 .gd-zone-progress::before, .gd-plate-4 .gd-zone-res::before {
+  content: ""; position: absolute; left: -8px; top: 18px; bottom: 18px; width: 1px;
+  background: linear-gradient(transparent, #e2b455 25%, #e2b455 75%, transparent);
+}
+.gd-plate-4 .gd-zone-progress::after, .gd-plate-4 .gd-zone-res::after {
+  content: ""; position: absolute; left: -10px; top: 50%; width: 5px; height: 5px; margin-top: -2px; background: #e2b455; transform: rotate(45deg);
+}
+@media (max-width: 1099px) { .gd-plate-4 .gd-zone-progress::before, .gd-plate-4 .gd-zone-res::before, .gd-plate-4 .gd-zone-progress::after, .gd-plate-4 .gd-zone-res::after { display: none; } }
+.gd-plate-4 .gd-label, .gd-plate-4 .gd-num { color: #e8d49a; }
+/* Stufe 2 und 3 ebenfalls ohne Kästen: Trennlinie je Material – Messing mit Niete auf Holz, Stahlnut mit Schraube auf Metall */
+.gd-plate-2 .gd-zone-progress, .gd-plate-2 .gd-zone-res, .gd-plate-3 .gd-zone-progress, .gd-plate-3 .gd-zone-res {
+  background: none; box-shadow: none; position: relative;
+}
+.gd-plate-2 .gd-zone-progress::before, .gd-plate-2 .gd-zone-res::before,
+.gd-plate-3 .gd-zone-progress::before, .gd-plate-3 .gd-zone-res::before { content: ""; position: absolute; left: -8px; top: 18px; bottom: 18px; width: 2px; }
+.gd-plate-2 .gd-zone-progress::after, .gd-plate-2 .gd-zone-res::after,
+.gd-plate-3 .gd-zone-progress::after, .gd-plate-3 .gd-zone-res::after { content: ""; position: absolute; left: -11px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; }
+.gd-plate-2 .gd-zone-progress::before, .gd-plate-2 .gd-zone-res::before { background: linear-gradient(#7a5416, #d9a441 50%, #7a5416); box-shadow: 1px 0 0 #1a0d03; }
+.gd-plate-2 .gd-zone-progress::after, .gd-plate-2 .gd-zone-res::after { background: radial-gradient(circle at 35% 30%, #fde68a, #b7791f); box-shadow: 0 0 0 1px #1a0d03; }
+.gd-plate-3 .gd-zone-progress::before, .gd-plate-3 .gd-zone-res::before { background: #1b2026; box-shadow: 1px 0 0 rgba(255, 255, 255, .35); }
+.gd-plate-3 .gd-zone-progress::after, .gd-plate-3 .gd-zone-res::after { background: radial-gradient(circle, #f4f7fa 0 1px, #8a95a2 2px, #232a31 4px); }
+@media (max-width: 1099px) {
+  .gd-plate-2 .gd-zone-progress::before, .gd-plate-2 .gd-zone-res::before, .gd-plate-2 .gd-zone-progress::after, .gd-plate-2 .gd-zone-res::after,
+  .gd-plate-3 .gd-zone-progress::before, .gd-plate-3 .gd-zone-res::before, .gd-plate-3 .gd-zone-progress::after, .gd-plate-3 .gd-zone-res::after { display: none; }
+}
+.gd-plate-4 .gd-level i, .gd-plate-4 .gd-meter { background: #07051a; }
+/* Hintergrund über die ganze Fläche inkl. des 24-px-Rands ausrichten – sonst wiederholen sich Verläufe im Rand als Kacheln, in den Ecken sichtbar */
+.gd-plate-2, .gd-plate-3, .gd-plate-4 { background-origin: border-box; background-clip: border-box; }
 .gd-zone-id { padding-left: 2px; }
-.gd-plate h1 { font: 800 28px/1.15 var(--display); letter-spacing: -.01em; color: #2a1d0a; overflow-wrap: anywhere; }
+.gd-plate h1 { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px 14px; width: 100%; font: 800 32px/1.15 var(--display); letter-spacing: -.01em; color: #2a1d0a; }
+.gd-name { overflow-wrap: break-word; hyphens: auto; min-width: 0; flex: 0 1 auto; max-width: 12.5em; } /* 20 Zeichen (SHOP_NAME_MAX) passen in eine Zeile, längere Wörter brechen um */
+
+/* Namensschild je Ausbaustufe: 1 Holzbrett · 2 Holz mit Messing · 3 Metall mit Nieten · 4 Neon-Reklame */
+.gd-sign { position: relative; padding: 14px 30px; margin: -6px 0; align-self: stretch; min-height: 104px; border-radius: 2px; isolation: isolate; }
+.gd-sign::before, .gd-sign::after { content: ""; position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; z-index: 1; }
+.gd-sign::before { left: 6px; }
+.gd-sign::after { right: 6px; }
+.gd-sign h1 { letter-spacing: .05em; }
+.gd-sign .gd-name { position: relative; z-index: 2; }
+/* Kürzel rechts neben dem Namen, bleibt in einer Zeile mit ihm */
+.gd-sign h1 .gd-stamp, .gd-sign h1 .gd-seal { flex: none; margin: 0; }
+.gd-sign .gd-seal { color: inherit; }
+
+.gd-sign-1 {
+  background: linear-gradient(rgba(60, 30, 8, .35), rgba(40, 20, 4, .5)), url("/img/grading/wood.webp") center / 360px auto;
+  box-shadow: inset 0 0 0 2px #3b2208, inset 0 2px 0 3px rgba(255, 220, 160, .18), 0 3px 0 rgba(0, 0, 0, .35);
+}
+.gd-sign-1::before, .gd-sign-1::after { background: #2a1706; box-shadow: inset 1px 1px 0 #8a6a3a; }
+.gd-sign-1 h1 { color: #f6e3b8; text-shadow: 0 2px 0 #2a1706, 0 0 1px #2a1706; }
+
+.gd-sign-2 {
+  background: linear-gradient(rgba(30, 14, 4, .55), rgba(20, 8, 2, .7)), url("/img/grading/wood.webp") center / 360px auto;
+  box-shadow: inset 0 0 0 2px #1a0d03, inset 0 0 0 4px #d9a441, inset 0 0 0 5px #7a5416, 0 3px 0 rgba(0, 0, 0, .35);
+}
+.gd-sign-2::before, .gd-sign-2::after { background: radial-gradient(circle at 35% 30%, #fde68a, #b7791f); }
+.gd-sign-2 h1 { color: #fdf3d6; text-shadow: 0 2px 0 #1a0d03; }
+
+.gd-sign-3 {
+  /* Industrie-Stahlplatte: vier Nieten in den Ecken, gebürstete Fläche, diagonaler Glanz, Schrift eingeprägt */
+  background:
+    radial-gradient(circle, #f4f7fa 0 1.5px, #8a95a2 2.5px, #232a31 4.5px, transparent 5px) no-repeat left 9px top 9px / 12px 12px,
+    radial-gradient(circle, #f4f7fa 0 1.5px, #8a95a2 2.5px, #232a31 4.5px, transparent 5px) no-repeat right 9px top 9px / 12px 12px,
+    radial-gradient(circle, #f4f7fa 0 1.5px, #8a95a2 2.5px, #232a31 4.5px, transparent 5px) no-repeat left 9px bottom 9px / 12px 12px,
+    radial-gradient(circle, #f4f7fa 0 1.5px, #8a95a2 2.5px, #232a31 4.5px, transparent 5px) no-repeat right 9px bottom 9px / 12px 12px,
+    linear-gradient(112deg, transparent 0 38%, rgba(255, 255, 255, .2) 46%, transparent 54%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .06) 0 1px, rgba(0, 0, 0, .05) 1px 3px),
+    linear-gradient(#6f7a87, #4d5762 50%, #373f49);
+  box-shadow: inset 0 0 0 2px #14181d, inset 0 0 0 4px #8d98a5, inset 0 0 0 5px #272e36, inset 0 8px 14px rgba(255, 255, 255, .1), 0 3px 0 rgba(0, 0, 0, .4);
+}
+.gd-sign-3::before, .gd-sign-3::after { display: none; }
+/* aufgesetzte Chrom-Buchstaben: Verlauf hell → dunkel mit scharfer Kante in der Mitte, dazu Kontur und Schlagschatten */
+.gd-sign-3 h1 { text-shadow: none; }
+.gd-sign-3 .gd-name {
+  color: transparent; background: linear-gradient(#ffffff 0 42%, #cfd8e2 50%, #8795a5 52%, #dfe6ee); -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 0 .6px #0c1015) drop-shadow(0 1px 0 #0c1015) drop-shadow(0 3px 2px rgba(0, 0, 0, .55));
+}
+
+.gd-sign-4 {
+  /* Neon-Schrift direkt auf dem Samt-Schild, nur ein warmer Lichtschein dahinter – keine Tafel, kein Rahmen */
+  background: radial-gradient(ellipse closest-side at 50% 50%, rgba(255, 150, 40, .16), transparent); /* läuft vor dem Boxrand auf 0 aus */
+  box-shadow: none;
+}
+.gd-sign-4::before, .gd-sign-4::after { display: none; }
+.gd-sign-4 h1 {
+  animation: gd-neon 7s steps(1) infinite;
+}
+/* Neonschrift: weißglühender Kern, enges farbiges Glühen – bleibt scharf und gut lesbar */
+.gd-sign-4 .gd-name {
+  font-family: "Pacifico", var(--display); font-weight: 400; font-size: 1.3em; letter-spacing: 0; line-height: 1.5;
+  color: #fff7e0; text-shadow: 0 0 1px #fff, 0 0 4px #ffb02e, 0 0 9px rgba(255, 138, 0, .85), 0 0 20px rgba(255, 110, 0, .4);
+}
+.gd-sign-4 h1 .gd-stamp {
+  color: #ffd6f5; border: 0; border-image: none; padding: 1px 8px; border-radius: 3px;
+  text-shadow: 0 0 6px #f0abfc, 0 0 14px #d946ef;
+  box-shadow: 0 0 0 2px #f0abfc, 0 0 8px #d946ef, inset 0 0 8px rgba(217, 70, 239, .5);
+}
+.gd-sign-4 .gd-seal { background: rgba(255, 255, 255, .1); color: #e6fbff; }
+@keyframes gd-neon { 0%, 61%, 63%, 100% { opacity: 1; } 62% { opacity: .72; } 84% { opacity: .9; } 85% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gd-sign-4 h1 { animation: none; } }
 .gd-stamp {
   display: inline-block; padding: 0 4px; color: #a11d1d; font: 800 15px/1.2 var(--font); letter-spacing: .16em; image-rendering: pixelated;
   border: 12px solid transparent; border-image: url("/img/grading/ui-stamp.png") 6 fill / 12px round; margin: -6px 0;
@@ -6566,12 +6754,11 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-res b { font: 700 17px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gd-res.is-bump { animation: gd-bump .5s ease; }
 @keyframes gd-bump { 40% { transform: scale(1.12); } }
-/* Knopf „Tour“: gelber Pixel-Knopf, beim Drücken die gedrückte Variante */
+/* Knopf „Tour“: kleiner gelber „?“-Pixel-Knopf in der Schild-Ecke, beim Drücken die gedrückte Variante */
 .gd-help {
-  display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; color: #3b2503; font: 800 13px var(--font); cursor: var(--cur-pointer, pointer);
+  position: absolute; top: -6px; right: -6px; z-index: 2; display: inline-grid; place-items: center; min-width: 48px; height: 48px; padding: 0; color: #3b2503; font: 900 18px var(--display); cursor: var(--cur-pointer, pointer);
   background: none; image-rendering: pixelated; border: 12px solid transparent; border-image: url("/img/grading/ui-button.png") 6 fill / 12px round;
 }
-.gd-help span { display: inline-grid; place-items: center; width: 18px; height: 18px; background: #3b2503; color: #fcd34d; font-weight: 900; }
 .gd-help:hover { filter: brightness(1.06); }
 .gd-help:active { border-image-source: url("/img/grading/ui-button-pressed.png"); transform: translateY(2px); }
 
@@ -6631,11 +6818,13 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 1px 0 0 rgba(255, 255, 255, .08), inset -1px 0 0 rgba(255, 255, 255, .08);
 }
 .gd-vit-edit {
-  position: absolute; top: 10px; right: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #b38a3e, #f0d993 50%, #c99d4c); color: var(--brass-ink); font: 700 13px var(--font); text-decoration: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 4px 10px rgba(0, 0, 0, .55);
+  position: absolute; top: 4px; right: 6px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 0 4px;
+  color: #3b2503; font: 800 13px/1.3 var(--font); text-decoration: none; image-rendering: pixelated;
+  background: none; border: 12px solid transparent; border-image: url("/img/grading/ui-button.png") 6 fill / 12px round;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .4));
 }
-.gd-vit-edit:hover { text-decoration: none; filter: brightness(1.06); }
+.gd-vit-edit:hover { text-decoration: none; filter: brightness(1.06) drop-shadow(0 3px 0 rgba(0, 0, 0, .4)); }
+.gd-vit-edit:active { border-image-source: url("/img/grading/ui-button-pressed.png"); transform: translateY(2px); }
 
 /* Ablauf ① Eingang → ② Werkbank → ③ Bons: Kreidepfeile zwischen den Stationen */
 .gd-tray { grid-area: in; align-self: center; }
@@ -6678,15 +6867,15 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-phases li.is-done { background: rgba(74, 222, 128, .18); color: #bbf7d0; }
 .gd-phases li.is-now { background: #fde68a; color: #2b1d05; font-weight: 800; }
 .gd-go {
-  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; padding: 12px 32px; border: 0; border-radius: 10px;
-  background: linear-gradient(#fde68a, #f5b400 55%, #e19a00); color: #241803; font: 800 18px var(--font); letter-spacing: .01em; text-decoration: none;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45);
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 0; padding: 0 8px; color: #3b2503; font: 800 18px/1.3 var(--font); letter-spacing: .01em; text-decoration: none;
+  background: none; image-rendering: pixelated; border: 18px solid transparent; border-image: url("/img/grading/ui-button.png") 6 fill / 18px round;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .4)) drop-shadow(0 8px 10px rgba(0, 0, 0, .35));
   cursor: var(--cur-pointer, pointer); animation: gd-pulse 2.2s ease-in-out infinite;
 }
-.gd-go:hover { text-decoration: none; filter: brightness(1.05); }
-.gd-go:active { transform: translateY(4px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), 0 2px 0 #9a6a00, 0 6px 12px rgba(0, 0, 0, .4); }
-.gd-desk .gd-go:focus-visible { box-shadow: var(--focus), 0 6px 0 #9a6a00; border-radius: 10px; }
-@keyframes gd-pulse { 0%, 100% { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45), 0 0 0 0 rgba(253, 224, 71, .5); } 50% { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45), 0 0 0 16px rgba(253, 224, 71, 0); } }
+.gd-go:hover { text-decoration: none; filter: brightness(1.06) drop-shadow(0 4px 0 rgba(0, 0, 0, .4)) drop-shadow(0 8px 10px rgba(0, 0, 0, .35)); }
+.gd-go:active { border-image-source: url("/img/grading/ui-button-pressed.png"); transform: translateY(3px); animation: none; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .4)); }
+.gd-desk .gd-go:focus-visible { box-shadow: var(--focus); border-radius: 0; }
+@keyframes gd-pulse { 0%, 100% { filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .4)) drop-shadow(0 8px 10px rgba(0, 0, 0, .35)) drop-shadow(0 0 0 rgba(253, 224, 71, 0)); } 50% { filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .4)) drop-shadow(0 8px 10px rgba(0, 0, 0, .35)) drop-shadow(0 0 10px rgba(253, 224, 71, .8)); } }
 .gd-mat-text form { margin: 0; }
 .gd-envelope, .gd-mug { position: relative; display: block; }
 .gd-mat-icon { width: 136px; filter: drop-shadow(0 6px 0 rgba(0, 0, 0, .35)) drop-shadow(4px 10px 10px rgba(0, 0, 0, .4)); }
@@ -6705,8 +6894,9 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-group-own { grid-area: own; flex-wrap: nowrap; }
 .gd-group .gd-obj { min-width: 118px; }
 .gd-group-sign {
-  position: absolute; top: -12px; left: 18px; padding: 3px 12px; border-radius: 4px; color: var(--brass-ink); font: 700 13px var(--display); letter-spacing: .04em;
-  background: linear-gradient(135deg, #b38a3e, #f0d993 45%, #c99d4c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 3px 6px rgba(0, 0, 0, .45);
+  position: absolute; top: -20px; left: 14px; padding: 0 4px; color: #3b2503; font: 800 13px/1.3 var(--display); letter-spacing: .06em; image-rendering: pixelated;
+  background: none; border: 12px solid transparent; border-image: url("/img/grading/ui-button.png") 6 fill / 12px round;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .35));
 }
 .gd-stars { color: #fbbc04; letter-spacing: 1px; font-size: 13px; }
 
@@ -6824,6 +7014,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 @media (max-width: 1279px) {
   .gd-plate { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 14px; }
   .gd-zone-id { grid-column: 1 / -1; margin-bottom: 4px; }
+  .gd-sign { min-height: 80px; margin: 0; }
 }
 @media (max-width: 1099px) {
   .gd-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "plate plate plate" "vit vit vit" "in mat out" "shop shop shop" "own own own"; padding: 22px; }
@@ -6834,8 +7025,8 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .gd-plate { grid-template-columns: minmax(0, 1fr); row-gap: 12px; padding: 2px 2px; }
   .gd-zone-progress, .gd-zone-res { margin: 0; }
   .gd-zone-res { grid-column: auto; flex-wrap: wrap; gap: 10px 16px; }
-  .gd-help { position: absolute; top: 0; right: 0; margin: 0; }
-  .gd-plate h1 { font-size: 23px; padding-right: 96px; }
+  .gd-help { top: -4px; right: -4px; }
+  .gd-plate h1 { font-size: 26px; padding-right: 44px; }
   .gd-mat { min-height: 0; padding: 50px 16px 22px; }
   .gd-mat-text { align-items: center; text-align: center; }
   .gd-mat-text h2 { font-size: 26px; }
@@ -6844,7 +7035,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .gd-mat-text form { width: 100%; }
   .gd-vitrine { padding: 30px 10px 22px; border-width: 10px; }
   .gd-vit-shelf { justify-content: flex-start; }
-  .gd-vit-edit { top: 6px; right: 6px; padding: 5px 11px; font-size: 12px; }
+  .gd-vit-edit { top: 0; right: 2px; font-size: 12px; }
   .gd-obj { min-width: 0; }
   .gd-group { padding-top: 28px; }
   .gd-group .gd-obj { flex: 1 1 40%; }
@@ -6854,7 +7045,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 @media (prefers-reduced-motion: reduce) {
   .gd-badge, .gd-go, [data-gd-spike].is-new, .gd-res.is-bump { animation: none; }
   .gd-vit-slab:hover { transform: rotateX(0deg) scale(1.2); }
-  .gd-go { box-shadow: 0 6px 0 #9a6a00, 0 0 0 4px rgba(253, 224, 71, .45); }
   .gd-art, .gd-vit-slab, .gd-drawer-item { transition: none; }
   .gd-sheet[open] { animation: gd-fade .2s ease; }
 }

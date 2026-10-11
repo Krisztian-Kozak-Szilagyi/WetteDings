@@ -141,6 +141,7 @@ router.get('/grading', async (req, res) => {
   const balance = req.user.balance;
   res.render('grading', {
     title: 'Grading-Shop',
+    shopNameMax: grading.SHOP_NAME_MAX,
     ...state,
     active,
     tab,

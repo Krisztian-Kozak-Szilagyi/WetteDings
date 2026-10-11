@@ -285,6 +285,9 @@ async function quit({ user }) {
 
 // ---------- Name und Kürzel (#204) ----------
 // Das Kürzel steht auf den Slabs (statt "BfW GRADING"). BFW gehört dem Haus.
+// Der Name steht groß auf dem Namensschild des Hubs – länger als 20 Zeichen bricht dort um
+const SHOP_NAME_MIN = 3;
+const SHOP_NAME_MAX = 20;
 const CODE_RE = /^[A-Z0-9]{2,5}$/;
 const RESERVED_CODES = ['BFW'];
 
@@ -292,7 +295,7 @@ const RESERVED_CODES = ['BFW'];
 function validShopName({ name, code }) {
   const n = String(name || '').replace(/\s+/g, ' ').trim();
   const c = String(code || '').replace(/\s+/g, '').toUpperCase();
-  if (n.length < 3 || n.length > 30) throw new UserError('Der Name deines Shops braucht 3 bis 30 Zeichen.');
+  if (n.length < SHOP_NAME_MIN || n.length > SHOP_NAME_MAX) throw new UserError(`Der Name deines Shops braucht ${SHOP_NAME_MIN} bis ${SHOP_NAME_MAX} Zeichen.`);
   if (!CODE_RE.test(c)) throw new UserError('Das Kürzel besteht aus 2 bis 5 Buchstaben oder Ziffern.');
   if (RESERVED_CODES.includes(c)) throw new UserError(`Das Kürzel ${c} ist reserviert.`);
   return { name: n, code: c };
@@ -738,4 +741,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, SHOP_NAME_MIN, SHOP_NAME_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
