@@ -91,3 +91,18 @@ test('#204 B: Tageslimits getrennt nach NPC und Spieler, Bügeln nur ungebügelt
   assert.equal(orders.canRate({ status: 'fertig', stars: null, doneAt: new Date(Date.now() - 8 * 864e5) }), false);
   assert.equal(LOCK_LABELS.grading && LOCK_LABELS.vitrine ? 'ok' : 'fehlt', 'ok');
 });
+
+test('#204: Lohn nach Posten ergibt dieselbe Summe wie payFor', () => {
+  const cases = [
+    { level: 1, clean: 80, rarity: 'holo' },
+    { level: 2, clean: 100, grade: 7, guess: 6, iron: 55, rarity: 'glitch' },
+    { level: 3, clean: 93, grade: 9, guess: 9, seal: 71, rarity: 'sith' },
+    { level: 4, clean: 100, grade: 5, guess: 8, seal: 100, iron: 100, rarity: 'boss' },
+  ];
+  for (const c of cases) {
+    const p = grading.payParts(c);
+    assert.equal(p.total, grading.payFor(c));
+    assert.equal(Object.values(p.parts).reduce((a, b) => a + b, 0) + p.extra, p.total);
+  }
+  assert.deepEqual(Object.keys(grading.payParts({ level: 3, clean: 100, grade: 5, guess: 5, seal: 50 }).parts), ['clean', 'grade', 'slab']);
+});

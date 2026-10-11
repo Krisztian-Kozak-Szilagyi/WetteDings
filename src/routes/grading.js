@@ -359,6 +359,36 @@ router.post('/grading/buegeln', async (req, res) => {
   }
 });
 
+// Die Werkbank schickt per fetch (Accept: JSON) und zeigt danach den Abschluss-Bildschirm (#204); ohne JS wie bisher
+router.post('/grading/zuruecksenden', async (req, res, next) => {
+  if (!(req.get('accept') || '').includes('application/json')) return next();
+  try {
+    const job = await grading.finishJob({ user: req.user, clean: Number(str(req.body.clean)), seal: Number(str(req.body.seal)) });
+    const state = await grading.getState(req.user._id);
+    const canNext = state.used < state.limit || (state.waiting > 0 && state.playerUsed < state.playerLimit);
+    res.json({
+      pay: job.pay,
+      breakdown: job.breakdown,
+      reputation: job.score ? job.score.reputation : 0,
+      quality: job.score ? job.score.quality : null,
+      player: !!job.order,
+      services: job.order ? job.order.services || null : null,
+      customer: job.customer,
+      clean: job.clean,
+      seal: job.seal,
+      iron: job.iron ? job.iron.smooth : null,
+      guess: job.guess,
+      grade: job.order ? null : job.grade, // Karten von Mitgliedern: echte Note bleibt geheim
+      shopCode: job.shopCode,
+      foilFound: !!job.foilFound,
+      canNext,
+      left: { npc: Math.max(0, state.limit - state.used), players: state.waiting },
+    });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ error: err.message });
+  }
+});
 router.post('/grading/zuruecksenden', (req, res) =>
   handle(req, res, async () => {
     const clean = Number(str(req.body.clean));

@@ -10,6 +10,7 @@
     <span class="gr-ticket-for">für <%= jobData.customer %></span>
     <% if (jobData.services) { %><%- include('partials/grading-services', { sv: jobData.services }) %><% } %>
   </div>
+  <button type="button" class="btn btn-ghost btn-sm gr-sound" data-gr-sound aria-pressed="false">🔇 Ton aus</button>
 </div>
 
 <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">

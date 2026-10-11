@@ -13,6 +13,8 @@
   var csrf = form ? form.elements._csrf.value : bench.getAttribute('data-csrf');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var BRUSH = 16; // Radius des Putzlappens in Pixeln (zusätzlich zur Fleckgröße)
+  var noop = function () {};
+  var sound = { clean: noop, snap: noop, flat: noop, seal: noop, send: noop, done: noop }; // echte Töne weiter unten
 
   function el(tag, cls, parent) {
     var e = document.createElement(tag);
@@ -137,6 +139,7 @@
 
   // Kleines Signal beim Einrasten: kurz vibrieren, wo das Gerät es kann
   function feedbackTick() {
+    sound.snap();
     try { if (navigator.vibrate) navigator.vibrate(8); } catch (err) { /* ohne geht es auch */ }
   }
 
@@ -421,6 +424,7 @@
       if (!s.hp) {
         s.el.classList.add('is-clean');
         sparkle(cx, cy, s.el.offsetWidth > 30);
+        sound.clean();
       }
     });
     if (hit) {
@@ -469,6 +473,7 @@
           // dieses Stück ist glatt: kurz funkeln
           var sr = s.el.getBoundingClientRect();
           sparkle(sr.left + sr.width / 2, sr.top + sr.height / 2, false);
+          sound.flat();
         }
         s.heat += dt * HEAT_RATE;
         if (s.heat >= 1 && !s.burnt) {
@@ -831,6 +836,14 @@
     hint.classList.remove('is-gone');
   }
   function setStep(name) {
+    // Stationswechsel (#204): Bühne bekommt die Stimmung der Station, die Karte rückt weiter
+    if (step && step !== name && !reduceMotion) {
+      zoomEl.classList.remove('is-travel');
+      void zoomEl.offsetWidth;
+      zoomEl.classList.add('is-travel');
+      setTimeout(function () { zoomEl.classList.remove('is-travel'); }, 520);
+    }
+    stage.setAttribute('data-station', name);
     step = name;
     bench.querySelectorAll('[data-gr-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-gr-panel') !== name; });
     // Schritte in der Leiste nach ihrem Namen (ein schon erledigtes Bügeln steht als erledigt da)
@@ -1038,20 +1051,198 @@
       setZoom(1);
       tweenTo(-6, Math.round(ry / 360) * 360 + 14, 700);
       obj.classList.add('is-slabbed');
+      stage.classList.add('is-pressing'); // Presse: kurzer Stoß (nur hier wackelt die Bühne)
+      setTimeout(function () { stage.classList.remove('is-pressing'); }, 420);
+      sound.seal();
       setTimeout(nextStep, 1300);
     });
   }
 
-  // Zurückschicken: Karte fliegt davon, dann wird das Formular abgeschickt
+  // ---------- Ton (#204) ----------
+  // Kurze, selbst erzeugte Töne (WebAudio) – aus, bis man sie einschaltet; die Wahl merkt sich der Browser
+  var soundBtn = document.querySelector('[data-gr-sound]');
+  var soundOn = false;
+  try { soundOn = localStorage.getItem('grading-ton') === '1'; } catch (err) { /* ohne Speicher: aus */ }
+  var audio = null;
+  function tone(freq, ms, type, vol, slide) {
+    if (!soundOn) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      var t = audio.currentTime;
+      var o = audio.createOscillator();
+      var g = audio.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq * (0.97 + Math.random() * 0.06), t); // leicht verschieden, damit es nicht nervt
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + ms / 1000);
+      g.gain.setValueAtTime(vol || 0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+      o.connect(g).connect(audio.destination);
+      o.start(t);
+      o.stop(t + ms / 1000 + 0.02);
+    } catch (err) { /* kein Ton möglich */ }
+  }
+  var cleanedCount = 0;
+  sound = {
+    clean: function () { tone(660 + Math.min(8, cleanedCount++) * 70, 140, 'triangle', 0.07); },
+    snap: function () { tone(1400, 40, 'square', 0.03); },
+    flat: function () { tone(880, 90, 'sine', 0.05); },
+    seal: function () { tone(140, 220, 'sawtooth', 0.09, 60); },
+    send: function () { tone(300, 320, 'sine', 0.06, 900); },
+    done: function () { tone(784, 160, 'triangle', 0.07); setTimeout(function () { tone(1047, 260, 'triangle', 0.07); }, 140); },
+  };
+  function renderSoundBtn() {
+    if (!soundBtn) return;
+    soundBtn.textContent = soundOn ? '🔊 Ton an' : '🔇 Ton aus';
+    soundBtn.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+  }
+  if (soundBtn) {
+    renderSoundBtn();
+    soundBtn.addEventListener('click', function () {
+      soundOn = !soundOn;
+      try { localStorage.setItem('grading-ton', soundOn ? '1' : '0'); } catch (err) { /* egal */ }
+      renderSoundBtn();
+      sound.flat();
+    });
+  }
+
+  // ---------- Abschluss (#204) ----------
+  // Nach dem Zurückschicken: Vorher/Nachher, Lohn je Posten, Reputation – und gleich der nächste Auftrag
+  var euroFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  var euro = function (c) { return euroFmt.format((c || 0) / 100); };
+  /** Kleine Karte für Vorher/Nachher: Bild im Rand, vorher mit Flecken und Knick, nachher sauber (im Slab) */
+  function miniCard(parent, before, res) {
+    var m = el('div', 'gr-mini' + (job.card ? ' r-' + job.card.rarity : ''), parent);
+    if (job.center) m.style.setProperty('--cx', job.center.x);
+    var im = el('img', 'gr-mini-img', m);
+    im.src = img.src;
+    im.alt = '';
+    if (before) {
+      (job.spots || []).forEach(function (s) {
+        if (s.side !== 'f') return;
+        var e = el('span', 'gr-spot gr-spot-' + s.kind, m);
+        e.style.left = s.x + '%';
+        e.style.top = s.y + '%';
+        e.style.width = s.r * 1.6 + '%';
+      });
+      if (d.crease && job.crease) {
+        var c = el('span', 'gr-crease', m);
+        c.style.top = job.crease.y + '%';
+        c.style.transform = 'rotate(' + job.crease.angle + 'deg)';
+      }
+    } else if (res.guess && job.steps.indexOf('slab') >= 0) {
+      var lab = el('div', 'gr-mini-slab', m);
+      el('b', '', lab).textContent = res.shopCode || '';
+      el('span', '', lab).textContent = res.guess;
+    }
+    return m;
+  }
+  function showSummary(res) {
+    var box = el('div', 'gr-finish', bench);
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'gr-finish-title');
+    var panel = el('div', 'gr-finish-panel', box);
+    el('p', 'gr-kicker', panel).textContent = 'Zurück an ' + (res.customer || 'den Kunden');
+    var h = el('h2', '', panel);
+    h.id = 'gr-finish-title';
+    h.textContent = '+' + euro(res.pay);
+
+    var grid = el('div', 'gr-finish-grid', panel);
+    // Vorher/Nachher: Schieber legt die saubere Karte über die alte
+    var ba = el('div', 'gr-ba', grid);
+    var stack = el('div', 'gr-ba-stack', ba);
+    miniCard(stack, true, res).classList.add('gr-ba-before');
+    miniCard(stack, false, res).classList.add('gr-ba-after');
+    var range = el('input', 'gr-ba-range', ba);
+    range.type = 'range';
+    range.min = '0';
+    range.max = '100';
+    range.value = '50';
+    range.setAttribute('aria-label', 'Vorher und nachher vergleichen');
+    var setCut = function () { stack.style.setProperty('--cut', range.value + '%'); };
+    range.addEventListener('input', setCut);
+    setCut();
+    var cap = el('div', 'gr-ba-cap', ba);
+    el('span', '', cap).textContent = 'Vorher';
+    el('span', '', cap).textContent = 'Nachher';
+
+    // Posten
+    var list = el('dl', 'gr-finish-list', grid);
+    var row = function (label, value, cls) {
+      el('dt', cls || '', list).textContent = label;
+      el('dd', cls || '', list).textContent = value;
+    };
+    var p = (res.breakdown && res.breakdown.parts) || {};
+    if (res.player) {
+      var LABELS = { base: 'Annahme & Reinigung', iron: 'Knick bügeln', slab: 'Benoten + Slab', express: 'Express' };
+      Object.keys(LABELS).forEach(function (k) { if (p[k] != null) row(LABELS[k], euro(p[k])); });
+    } else {
+      if (p.clean != null) row('Reinigung · ' + res.clean + ' % sauber', euro(p.clean));
+      if (p.iron != null) row('Bügeln · ' + res.iron + ' % glatt', euro(p.iron));
+      if (p.grade != null) row('Note ' + res.guess + (res.grade != null ? (res.guess === res.grade ? ' · exakt' : ' · richtig ' + res.grade) : ''), euro(p.grade));
+      if (p.slab != null) row('Versiegeln · ' + res.seal + ' %', euro(p.slab));
+      if (res.breakdown && res.breakdown.extra) row('Zuschläge (Seltenheit, Premium)', euro(res.breakdown.extra));
+    }
+    row('Summe', euro(res.pay), 'is-sum');
+
+    var facts = el('div', 'gr-finish-facts', panel);
+    if (res.reputation) el('span', 'gr-finish-rep', facts).textContent = 'Reputation +' + res.reputation;
+    if (res.quality != null) el('span', '', facts).textContent = 'Qualität ' + res.quality + ' %';
+    if (res.player && res.guess) el('span', '', facts).textContent = 'Slab ' + (res.shopCode || '') + ' · Note ' + res.guess;
+    if (res.foilFound) el('span', 'gr-ok', facts).textContent = '+ 1 Folie im Inventar';
+
+    var actions = el('div', 'gr-finish-actions', panel);
+    if (res.canNext) {
+      var f = el('form', '', actions);
+      f.method = 'post';
+      f.action = '/grading/auftrag';
+      var c = el('input', '', f);
+      c.type = 'hidden';
+      c.name = '_csrf';
+      c.value = csrf;
+      var b = el('button', 'btn btn-primary btn-lg gr-glow', f);
+      b.type = 'submit';
+      b.textContent = res.left && res.left.players ? 'Nächste Karte (Mitglied) →' : 'Nächster Auftrag →';
+      setTimeout(function () { b.focus(); }, 50);
+    } else {
+      el('p', 'muted small', actions).textContent = 'Feierabend – alle Aufträge für heute erledigt.';
+    }
+    var back = el('a', 'btn btn-ghost', actions);
+    back.href = '/grading';
+    back.textContent = 'Zum Shop';
+    if (!res.canNext) setTimeout(function () { back.focus(); }, 50);
+    requestAnimationFrame(function () { box.classList.add('is-on'); });
+    sound.done();
+  }
+
+  // Zurückschicken: Karte fliegt davon, der Server rechnet ab, danach der Abschluss-Bildschirm.
+  // Klappt es nicht (z. B. zu schnell geputzt), kommt die Karte zurück auf den Tisch und die Meldung erscheint.
   if (form) form.addEventListener('submit', function (e) {
     if (sent) return;
     e.preventDefault();
     sent = true;
     form.elements.clean.value = String(cleanliness());
-    try { sessionStorage.removeItem(SAVE_KEY); } catch (err) { /* egal */ }
-    form.querySelector('button[type="submit"]').disabled = true;
+    var btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
     obj.classList.add('is-sent');
-    setTimeout(function () { form.submit(); }, reduceMotion ? 0 : 850);
+    sound.send();
+    var body = new URLSearchParams(new FormData(form));
+    var wait = new Promise(function (r) { setTimeout(r, reduceMotion ? 0 : 850); });
+    fetch(form.action, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.error) throw new Error(res.error);
+        try { sessionStorage.removeItem(SAVE_KEY); } catch (err) { /* egal */ }
+        return wait.then(function () { showSummary(res); });
+      })
+      .catch(function (err) {
+        sent = false;
+        btn.disabled = false;
+        obj.classList.remove('is-sent');
+        requestAnimationFrame(loop);
+        var msg = form.querySelector('.gr-send-error') || el('p', 'gr-send-error gr-bad', form);
+        msg.textContent = err.message || 'Das hat nicht geklappt – bitte noch einmal.';
+      });
   });
 
   setStep(steps[0]);

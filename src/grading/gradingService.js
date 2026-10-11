@@ -167,18 +167,24 @@ function rollSpots() {
 }
 
 /** Lohn eines Auftrags in Cent. clean = wie sauber die Karte zurückging (0–100 %), iron = wie glatt gebügelt (0–100 %) */
-function payFor({ level, clean = 100, grade, guess, seal, rarity, iron = null }) {
+/**
+ * Lohn eines NPC-Auftrags nach Posten (#204, für den Abschluss-Bildschirm): parts = Lohn je Schritt vor Zuschlägen,
+ * extra = Premium- und Seltenheits-Zuschlag, total = Summe (wie payFor)
+ */
+function payParts({ level, clean = 100, grade, guess, seal, rarity, iron = null }) {
   const info = levelInfo(level);
-  let pay = Math.round((PAY.clean * Math.max(0, Math.min(100, clean))) / 100);
-  if (info.steps.includes('iron') && Number.isFinite(iron)) pay += Math.round((PAY.iron * Math.max(0, Math.min(100, iron))) / 100);
+  const parts = { clean: Math.round((PAY.clean * Math.max(0, Math.min(100, clean))) / 100) };
+  if (info.steps.includes('iron') && Number.isFinite(iron)) parts.iron = Math.round((PAY.iron * Math.max(0, Math.min(100, iron))) / 100);
   if (info.steps.includes('grade')) {
     const diff = Math.abs(grade - guess);
-    if (diff === 0) pay += PAY.grade;
-    else if (diff === 1) pay += PAY.grade / 2;
+    parts.grade = diff === 0 ? PAY.grade : diff === 1 ? PAY.grade / 2 : 0;
   }
-  if (info.steps.includes('slab')) pay += Math.round((PAY.slab * Math.max(0, Math.min(100, seal))) / 100);
-  return Math.round(pay * info.factor * (1 + rarityBonus(rarity) / 100));
+  if (info.steps.includes('slab')) parts.slab = Math.round((PAY.slab * Math.max(0, Math.min(100, seal))) / 100);
+  const sum = Object.values(parts).reduce((a, b) => a + b, 0);
+  const total = Math.round(sum * info.factor * (1 + rarityBonus(rarity) / 100));
+  return { parts, extra: total - sum, total };
 }
+const payFor = (input) => payParts(input).total;
 
 // ---------- Ablauf ----------
 
@@ -555,6 +561,7 @@ async function scoreShop({ shopId, job, session }) {
   const inc = { 'quality.sum': quality, 'quality.n': 1, reputation: reputation.reputationGain({ quality, player: isPlayerJob(job), boost: orders().boostOf(showcase) }) };
   if (job.guess != null) Object.assign(inc, { 'hits.n': 1, 'hits.exact': job.guess === job.grade ? 1 : 0 });
   await GradingShop.updateOne({ _id: shopId }, { $inc: inc }, { session });
+  return { quality, reputation: inc.reputation };
 }
 
 /**
@@ -609,8 +616,10 @@ async function finishJob({ user, clean, seal }) {
       await Ledger.create([{ user: user._id, type: 'grading_lohn', amount: pay, betTitle: card ? `${card.name} für ${job.customer}` : job.customer }], { session });
     }
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay, ...(player && { playerJobsDone: 1 }) } }, { session });
-    await scoreShop({ shopId: user._id, job, session });
-    return { ...job.toObject(), order };
+    const score = await scoreShop({ shopId: user._id, job, session });
+    // Posten für den Abschluss-Bildschirm (NPC: Lohn je Schritt; Mitglieder-Auftrag: gebuchte Bausteine)
+    const breakdown = player ? { parts: { ...(order.priceParts || {}) }, extra: 0, total: pay } : payParts({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
+    return { ...job.toObject(), order, breakdown, score };
   });
   if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });
   if (done.order) {
@@ -652,4 +661,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
