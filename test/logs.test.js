@@ -38,7 +38,7 @@ test('Protokolle: Karten zusammengefasst, seltenste zuerst, ab Holo hervorgehobe
 });
 
 test('Protokolle: Karten- und Gegenstandsnamen, unbekannte IDs bleiben stehen', () => {
-  assert.equal(logs.cardLabel('item:folie'), 'Folie (Gegenstand)');
+  assert.equal(logs.cardLabel('item:folie'), 'TCG Sleeve (Gegenstand)');
   assert.equal(logs.cardLabel('gibt-es-nicht'), 'gibt-es-nicht');
   assert.equal(logs.cardLabel(null), '–');
 });
@@ -60,14 +60,14 @@ test('Protokolle: Verkäufe aus der Buchung – Bank, Gegenstand, Black Market, 
   assert.equal(bank.kind, 'An die Bank verkauft');
   assert.equal(bank.items[0].count, 3);
   const item = logs.sellRow({ type: 'item_verkauf', amount: 500, createdAt: at, meta: { item: 'folie', count: 2 } }, 'anna');
-  assert.deepStrictEqual(item.items.map((i) => [i.label, i.count]), [['Folie (Gegenstand)', 2]]);
+  assert.deepStrictEqual(item.items.map((i) => [i.label, i.count]), [['TCG Sleeve (Gegenstand)', 2]]);
   const bm = logs.sellRow({ type: 'black_market', amount: -9000, createdAt: at, meta: { card: glitch.id, rarity: 'glitch' } }, 'anna');
   assert.equal(bm.kind, 'Black Market gekauft');
   assert.equal(bm.items[0].rare, true);
   // Gegenstand aus dem Black Market (Folie): als Gegenstand benannt, nicht als Karte
   const bmItem = logs.sellRow({ type: 'black_market', amount: -100000, createdAt: at, betTitle: 'Folie (Gegenstand)', meta: { item: 'folie', count: 1 } }, 'anna');
   assert.equal(bmItem.kind, 'Black Market gekauft');
-  assert.deepStrictEqual(bmItem.items.map((i) => [i.label, i.rarity, i.count]), [['Folie (Gegenstand)', 'item', 1]]);
+  assert.deepStrictEqual(bmItem.items.map((i) => [i.label, i.rarity, i.count]), [['TCG Sleeve (Gegenstand)', 'item', 1]]);
   const old =logs.sellRow({ type: 'tcg_verkauf', amount: 500, createdAt: at, betTitle: 'Alte Buchung' }, undefined);
   assert.equal(old.player, '–');
   assert.equal(old.items[0].label, 'Alte Buchung');

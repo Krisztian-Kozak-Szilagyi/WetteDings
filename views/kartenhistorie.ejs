@@ -53,7 +53,7 @@
     <section class="card">
       <h2><%= history.label %></h2>
       <div class="susp-facts">
-        <span class="susp-fact"><b><%= euro(history.value) %></b> Bankwert</span>
+        <span class="susp-fact"><b><%= euro(history.value) %></b> Händlerpreis</span>
         <span class="susp-fact"><b><%= history.events.filter((e) => e.to).length %></b> Besitzerwechsel</span>
         <% if (history.exists) { %>
           <span class="susp-fact"><b><%= history.owner %></b> besitzt sie<%= history.ownerSince ? ' seit ' + date(history.ownerSince) : '' %></span>

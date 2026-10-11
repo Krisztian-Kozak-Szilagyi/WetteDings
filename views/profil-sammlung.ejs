@@ -6,7 +6,7 @@
     <h1>Sammlung von <%= profile.username %><%- roleBadge(profile.username) %></h1>
   </div>
   <div class="sammlung-head-side">
-    <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Wert <%= euro(collectionValue) %></span>
+    <span class="muted"><%= uniqueOwned %> / <%= cards.length %> Karten · <%= cardCount %> insgesamt · Händlerwert <%= euro(collectionValue) %></span>
     <%- include('partials/grade-stats', { graded, own: isMe }) %>
   </div>
 </div>

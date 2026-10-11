@@ -1,0 +1,36 @@
+<%#
+  Glasvitrine (#204): ausgestellte Slabs im Regal, jeder unter seinem Spotlight – antippen zeigt sie groß im Showroom
+  (public/js/foil-view.js, Galerie „vitrine“: wischen bzw. ‹ › blättert). Schreibtisch und öffentliche Shop-Seite.
+  items = ausgestellte Slabs ({ id, card, rarity, foiledAt, slab }), max = Plätze, popText(x) und popStats(x) optional
+  (Population als Text bzw. Seltenheit in der Note fürs Messingschild, tcg/population.gradeRarity),
+  editHref optional (eigener Shop: „Einräumen“ und leere Fächer öffnen das Fenster Vitrine), rarityByKey
+%>
+<div class="gd-vitrine<%= items.length ? '' : ' is-empty' %>" data-tour="vitrine" style="--vit-slots: <%= Math.max(1, max) %>"><%# Zahl der Fächer: daraus die Fachbreite (CSS) %>
+  <div class="gd-vit-shelf">
+    <% items.forEach((x) => { const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
+      <%# Fach: der Slab wird beim Darüberfahren groß, das Messingschild bleibt am Regalboden (außerhalb des Buttons) %>
+      <div class="gd-vit-item r-<%= x.rarity %>">
+      <button type="button" class="gd-vit-slab r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> data-foil-group="vitrine" data-pop="<%= locals.popText ? popText(x) : '' %>"<% const st = locals.popStats ? popStats(x) : null; if (st) { %> data-pop-stats="<%= JSON.stringify(st) %>"<% } %> aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – bewundern" title="<%= x.card.name %> – ansehen">
+        <span class="gd-vit-spot" aria-hidden="true"></span>
+        <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
+      </button>
+      <%# Schild: „Name – Seltenheit“ (Gold, Holo …) / „Kürzel – Note“ %>
+      <%# im Stil des Grading-Etiketts im Album (partials/grade-stats): helles Etikett, violette Schrift, Note 10 golden, wandernder Glanz %>
+      <span class="gd-vit-plaque<%= x.slab.grade === 10 ? ' is-gem' : '' %>" aria-hidden="true">
+        <span class="gd-vp-line"><b class="gd-vp-name"><%= x.card.name %></b><i>–</i><span class="gd-vp-rar"><%= rl %></span></span>
+        <span class="gd-vp-line"><span class="gd-vp-code"><%= x.slab.code %></span><i>–</i><b class="gd-vp-grade"><%= x.slab.grade %></b></span>
+        <span class="gv-sheen"></span>
+      </span>
+      </div>
+    <% }) %>
+    <% for (let i = items.length; i < max; i++) { %>
+      <% if (locals.editHref) { %>
+        <a class="gd-vit-empty is-add" href="<%= editHref %>" data-gd-open="vitrine" aria-label="Freies Fach – Slab ausstellen" title="Slab ausstellen"><span><b aria-hidden="true">+</b><small>Slab ausstellen</small></span></a>
+      <% } else { %>
+        <span class="gd-vit-empty" aria-hidden="true"><span></span></span>
+      <% } %>
+    <% } %>
+  </div>
+  <span class="gd-vit-glass" aria-hidden="true"></span>
+  <% if (locals.editHref) { %><a class="gd-vit-edit" href="<%= editHref %>" data-gd-open="vitrine"><span aria-hidden="true">✎</span> Einräumen</a><% } %>
+</div>

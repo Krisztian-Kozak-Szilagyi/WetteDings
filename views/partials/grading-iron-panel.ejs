@@ -1,0 +1,11 @@
+<%# Bügeln (#204) – Panel am Arbeitstisch (public/js/grading.js): bei Kundenaufträgen mit Knick und für eigene Karten.
+    own: eigene Karte (kein Lohn, Ergebnis bleibt an der Karte); pay: Lohn-Einstellungen (nur bei Aufträgen) %>
+<div class="gr-panel" data-gr-panel="iron" hidden>
+  <div class="gr-row">
+    <p class="gr-text">Nimm das <b>Bügeleisen</b> und fahr mit gedrückter Maustaste langsam über den Knick, bis er glatt ist. Aber nicht stehen bleiben: Wird eine Stelle zu heiß, gibt es einen <b>Brandfleck</b> (zählt wie ein Kratzer).
+      <span class="gr-note">Je glatter, desto höher die Obergrenze: ein Knick begrenzt die Note auf 4 – ganz glatt auf 9.<% if (typeof own === 'undefined' || !own) { %> Ganz glatt: +<%= euro(pay.iron) %>.<% } %></span></p>
+    <button type="button" class="btn btn-primary" data-gr-iron-ok>Fertig gebügelt</button>
+  </div>
+  <div class="gr-iron-meter" aria-hidden="true"><span data-gr-iron-bar></span></div>
+  <p class="gr-iron-result" data-gr-iron-result aria-live="polite" hidden></p>
+</div>

@@ -11,8 +11,10 @@ const catalog = require('../tcg/catalog');
 const tcgService = require('../tcg/tcgService');
 const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
 const { resolveAll, who, canBoost, needsCoffee, isCoffee } = require('./abilities');
-const { lockedDocs, isLocked, claim } = require('../tcg/locks');
+const { lockedDocs, pickCopy, claim } = require('../tcg/locks');
 const { logSettingsChange } = require('../stats/settingsLog');
+const { damageCards, ihkSeverity, damageText } = require('../grading/damage');
+const { notify } = require('../services/notifyService');
 
 const WORK_TIME = 180; // "Arbeitszeit" einer Quest (Spiel-Sekunden)
 // Anzahl Arbeitstakte = 10 + Speed/10 (Speed 10 → 11, 35 → 13,5, 99 → 19,9). Speed hilft also,
@@ -268,7 +270,8 @@ async function checkBoost(user, card, boostId) {
   return boost;
 }
 
-async function start({ user, cardId, boostId, boost2Id, offerIndex }) {
+/** foiled: folierte Exemplare einsetzen (geschützt vor Schaden, #204) – sonst lieber unfolierte */
+async function start({ user, cardId, boostId, boost2Id, offerIndex, foiled = false }) {
   const card = catalog.cardById[cardId];
   if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   const { running, used, limit } = await getState(user._id);
@@ -291,15 +294,16 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex }) {
   try {
     // Sperrprüfung und Quest-Anlage in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder gehandelt wird
     return await inTransaction(async (session) => {
-      // Nur freie Exemplare (nicht im Handel) können auf eine Quest
+      // Nur freie Exemplare (nicht im Handel) können auf eine Quest – folierte auch (#204)
       const locked = await lockedDocs(user._id, session);
-      const freeDoc = async (id) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d));
+      const freeDoc = async (id) => pickCopy(await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id foiledAt').session(session).lean(), locked, { foiled });
+      const why = foiled ? 'kein freies foliertes Exemplar' : 'gerade im Handel oder unterwegs';
       const doc = await freeDoc(cardId);
-      if (!doc) throw new UserError('Diese Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
+      if (!doc) throw new UserError(`Diese Karte besitzt du nicht (oder ${why}).`);
       const boostDocs = [];
       for (const b of boosts) {
         const d = await freeDoc(b.id);
-        if (!d) throw new UserError('Die Boost-Karte besitzt du nicht (oder sie ist gerade im Handel oder foliert).');
+        if (!d) throw new UserError(`Die Boost-Karte besitzt du nicht (oder ${why}).`);
         boostDocs.push(d);
       }
       await claim([doc, ...boostDocs], user._id, session);
@@ -341,6 +345,7 @@ const rollsPack = (chance, rand = crypto.randomInt(1000000) / 1000000) => rand *
 
 /** Nach Ablauf: Belohnung gutschreiben, Karte freigeben, neue Quests anbieten */
 async function collect({ user }) {
+  let hits = [];
   const result = await inTransaction(async (session) => {
     const run = await IhkRun.findOneAndUpdate(
       { user: user._id, status: 'laeuft', endsAt: { $lte: new Date() } },
@@ -359,9 +364,13 @@ async function collect({ user }) {
       run.pack = type.key;
       await run.save({ session });
     }
+    // Verloren: die eingesetzten (unfolierten) Karten können Kratzer oder einen Knick abbekommen (#204)
+    if (!run.success) hits = await damageCards({ userId: user._id, docs: [run.cardDoc, run.boostDoc, run.boost2Doc], severity: ihkSeverity(run), session });
     return run;
   });
   await IhkState.updateOne({ _id: user._id }, { $set: { offers: generateOffers() } }, { upsert: true });
+  const text = damageText(hits, (id) => (catalog.cardById[id] || { name: id }).name, 'IHK');
+  if (text) await notify(user._id, { area: 'IHK', href: '/tcg', text });
   return result;
 }
 

@@ -1,0 +1,6 @@
+<%# Rating eines Grading-Shops (#204): Reputations-Stufe, Sterne, Qualität, Treffsicherheit – r = reputation.ratingOf(shop), owner optional %>
+<% const fmt = (v) => (v != null ? Math.round(v) + ' %' : '–'); %>
+<span class="gr-rating">
+  <span class="gr-rating-tier"><b><%= r.tier.label %></b> · Reputation <%= Math.round(r.reputation) %><% if (locals.owner) { %> · von <%= owner %><% } %></span>
+  <span class="gr-rating-facts gr-dim small"><%= r.stars != null ? '★ ' + r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' (' + r.starCount + ')' : 'noch keine Bewertung' %> · Qualität <%= fmt(r.quality) %> · Treffsicherheit <%= fmt(r.hitRate) %></span>
+</span>

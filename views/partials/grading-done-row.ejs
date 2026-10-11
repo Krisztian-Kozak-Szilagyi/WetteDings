@@ -1,0 +1,13 @@
+<%# Heute erledigter Auftrag (#204) – j = GradingJob mit cardInfo %>
+<li class="<%= j.cardInfo ? 'r-' + j.cardInfo.rarity : '' %>">
+  <span class="gr-done-thumb"><% if (j.cardInfo) { %><img src="<%= j.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+  <span class="gr-done-info">
+    <span><b><%= j.cardInfo ? j.cardInfo.name : j.card %></b> <span class="gr-dim">für <%= j.customer %></span></span>
+    <span class="gr-done-meta">
+      <% if (j.guess !== null && j.source === 'spieler') { %><span>Slab-Note <%= j.guess %> · Karte eines Mitglieds</span><% } else if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } else if (j.source === 'spieler') { %><span>gebügelt · Karte eines Mitglieds</span><% } %>
+      <% if (j.seal !== null) { %><span> · <% if (j.shopCode) { %><b class="gr-shop-code"><%= j.shopCode %></b> <% } %>Versiegelung <%= j.seal %> %</span><% } %>
+      <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
+    </span>
+  </span>
+  <b class="gr-pay">+<%= euro(j.pay) %></b>
+</li>

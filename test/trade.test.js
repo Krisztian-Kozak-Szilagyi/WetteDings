@@ -202,7 +202,7 @@ test('Positionen: Kategorie, Sicht einer Rolle, Sperren und Texte', () => {
   const a = catalog.cardById[A].name;
   const ra = catalog.rarityByKey[catalog.cardById[A].rarity].label;
   assert.equal(lines.lineLabel([{ card: A }, { card: A }, { card: A, foiledAt: new Date() }]), `2× ${a} (${ra}), ${a} (${ra}, foliert)`);
-  assert.equal(lines.lineLabel([{ card: 'item:folie' }]), 'Folie');
+  assert.equal(lines.lineLabel([{ card: 'item:folie' }]), 'TCG Sleeve');
   assert.equal(lines.sideText([], 0), 'nichts');
   assert.equal(lines.countText(L(A)), '1 Karte');
   assert.equal(lines.countText(L(A, B)), '2 Karten');
@@ -231,4 +231,29 @@ test('Migration: altes Angebot mit einer Karte wird zu Positionen', () => {
   const zu = migrateTradeDoc({ kind: 'tausch', status: 'verkauft', card: A, cardDoc: 'p', give: [{ card: A }], take: [{ card: B }], giveDocs: ['g1'], takeDocs: ['t1'], to: 'b', buyer: 'b', price: 0 });
   assert.equal(zu.$set.give[0].doc, 'g1');
   assert.equal(zu.$set.want[0].doc, 't1');
+});
+
+test('#204: Zustand einer Position – Slab, Folie, Knick; Kratzer verrät der Text nicht', () => {
+  const { stateLabel } = require('../src/trade/lines');
+  assert.equal(stateLabel({ foiledAt: new Date(), slab: { code: 'PSA', grade: 9 } }), 'Slab PSA 9');
+  assert.equal(stateLabel({ foiledAt: new Date(), grade: 8 }), 'Slab BfW 8'); // alte Position mit Note = Folie mit Etikett
+  assert.equal(stateLabel({ foiledAt: new Date(), slab: null }), 'foliert');
+  assert.equal(stateLabel({ damaged: true, creased: true }), 'Knick');
+  assert.equal(stateLabel({ damaged: true, creased: true, ironed: true }), 'Knick, gebügelt');
+  assert.equal(stateLabel({ damaged: true }), 'Exemplar');
+  assert.equal(stateLabel({}), '');
+});
+
+test('#204: Exemplare – was gezielt gehandelt wird und wann es sich verändert hat', () => {
+  const { isCopy, changedCopy } = require('../src/trade/tradeService');
+  assert.equal(isCopy({ foiledAt: new Date() }), true);
+  assert.equal(isCopy({ damaged: true }), true);
+  assert.equal(isCopy({ damaged: false, foiledAt: null }), false);
+  const line = { foiledAt: null, damaged: true, creased: false, ironed: false, marks: { s: [[1, 2, 3, 4]] } };
+  assert.equal(changedCopy(line, { ...line }), false);
+  assert.equal(changedCopy(line, { ...line, marks: { s: [[1, 2, 3, 4], [5, 6, 7, 8]] } }), true); // neuer Kratzer
+  assert.equal(changedCopy(line, { ...line, creased: true }), true); // Knick
+  assert.equal(changedCopy(line, { ...line, foiledAt: new Date() }), true); // inzwischen foliert
+  // folierte Exemplare nehmen keinen Schaden – alte Positionen ohne damaged-Feld bleiben gültig
+  assert.equal(changedCopy({ foiledAt: new Date(), grade: 8 }, { foiledAt: new Date(), damaged: true, marks: null }), false);
 });

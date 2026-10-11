@@ -1,7 +1,8 @@
 <%#
-  Karten einer Seite eines Angebots als Fächer: list = Positionen ({ card, foiledAt, grade }), money = Cent dazu (optional).
+  Karten einer Seite eines Angebots als Fächer: list = Positionen ({ card, foiledAt, slab, damaged, marks … }), money = Cent dazu (optional).
   size: 'sm' (Zeilen), 'md' (Markt-Kachel), 'lg' (Verhandlung). Gezeigt werden höchstens max Karten, der Rest als "+n".
-  Jede Karte ist ein Knopf: normale Karten öffnen den Zoom (public/js/handel.js), folierte die 3D-Ansicht (public/js/foil-view.js).
+  Jede Karte ist ein Knopf: normale Karten öffnen den Zoom (public/js/handel.js), folierte und beschädigte Exemplare die
+  3D-Ansicht (public/js/foil-view.js) – beschädigte mit ihren Kratzern und dem Knick (#204).
 %>
 <%
   const stackList = locals.list || [];
@@ -14,8 +15,13 @@
 <span class="tstack tstack-<%= stackSize %><%= shown.length > 1 ? ' tstack-many' : '' %>" style="--n: <%= Math.max(1, shown.length) %>">
   <% shown.forEach((l, i) => { const c = cardInfo(l.card); const r = rarityByKey[c.rarity] || { label: '', sell: 0 }; %>
     <% if (l.foiledAt) { %>
-      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { grade: l.grade }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-foiled" style="--i: <%= i %>"<%- foilViewAttrs(c, r.label, l.foiledAt, { slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert – in 3D ansehen">
         <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><span class="foil-sheen" aria-hidden="true"></span>
+      </button>
+    <% } else if (l.damaged && l.marks) { const what = stateLabel(l); %>
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-marked" style="--i: <%= i %>"<%- copyViewAttrs(c, r.label, l.marks, { note: 'Exemplar · ' + (what === 'Exemplar' ? 'Gebrauchsspuren' : what) }) %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar – genau ansehen">
+        <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+        <% if (l.creased) { %><span class="tcg-crease-tag"><%= l.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
       </button>
     <% } else { %>
       <button type="button" class="tstack-card r-<%= c.rarity %>" style="--i: <%= i %>" data-zoom-card

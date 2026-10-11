@@ -91,7 +91,7 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,
-    cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
+    cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung der Slabs
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln
     rarityByKey: catalog.rarityByKey,

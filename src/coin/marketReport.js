@@ -33,7 +33,7 @@ const METRICS = [
   { key: 'lotterie', label: 'Lotterie', unit: 'Lose', types: ['lotto_los'] },
   { key: 'ihk', label: 'IHK-Aufträge', unit: 'Quests', types: ['ihk_lohn'] },
   { key: 'dungeon', label: 'Dungeon-Expeditionen', unit: 'Siege', types: ['dungeon_lohn'] },
-  { key: 'grading', label: 'Grading-Gewerbe', unit: 'Aufträge', types: ['grading_lohn'] },
+  { key: 'grading', label: 'Grading-Gewerbe', unit: 'Aufträge', types: ['grading_lohn', 'grading_einnahme'] },
   { key: 'forum', label: 'Forum', unit: 'Beiträge' },
 ];
 

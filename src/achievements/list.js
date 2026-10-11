@@ -11,7 +11,7 @@ const { TcgOpening, TcgCard } = require('../models/Tcg');
 const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const { LotteryRound } = require('../models/Lottery');
-const { GradingJob } = require('../models/Grading');
+const { GradingJob, GradingOrder } = require('../models/Grading');
 const { DungeonRun } = require('../models/Dungeon');
 const { EsportsTeam } = require('../models/Esports');
 const { ItemLog } = require('../models/Item');
@@ -60,6 +60,8 @@ async function trophyMembers(places) {
 }
 /** Höchste Ausbaustufe des Grading-Shops (spät geladen: der Grading-Service zieht viel nach sich) */
 const topShopLevel = () => require('../grading/gradingService').LEVELS.length;
+// Versiegelte Aufträge (Grading-Meilensteine, #204)
+const SEALED = { status: 'fertig', seal: { $ne: null } };
 
 const ACHIEVEMENTS = [
   // ---- Einzelstücke (von Hand vergeben) ----
@@ -256,6 +258,42 @@ const ACHIEVEMENTS = [
     text: 'Triff im Grading-Shop 50-mal genau die richtige Note.',
     icon: { glyph: 'loupe50', tone: 'gold', frame: 'gold' },
     holders: () => countAtLeast(GradingJob, { status: 'fertig', $expr: { $eq: ['$guess', '$grade'] } }, 50),
+  },
+  // Grading-Meilensteine (#204): Versiegeln, Bügeln, Express und Zweitprüfung
+  {
+    key: 'gem-mint',
+    name: 'Gem Mint',
+    text: 'Versiegle im Grading-Shop einen Slab mit Note 10.',
+    icon: { glyph: 'foil', tone: 'gold', frame: 'silver' },
+    holders: () => countAtLeast(GradingJob, { ...SEALED, guess: 10 }, 1),
+  },
+  {
+    key: 'slab-fabrik',
+    name: 'Slab-Fabrik',
+    text: 'Versiegle im Grading-Shop 100 Slabs.',
+    icon: { glyph: 'shop', tone: 'gold', frame: 'gold' },
+    holders: () => countAtLeast(GradingJob, SEALED, 100),
+  },
+  {
+    key: 'buegelmeister',
+    name: 'Bügelmeister',
+    text: 'Bügle bei einem Auftrag einen Knick ganz glatt – ohne Brandfleck.',
+    icon: { glyph: 'holo', tone: 'red', frame: 'bronze' },
+    holders: () => countAtLeast(GradingJob, { status: 'fertig', 'iron.smooth': 100, 'iron.burns': 0 }, 1),
+  },
+  {
+    key: 'express-profi',
+    name: 'Express-Profi',
+    text: 'Erledige 20 Express-Aufträge von Mitgliedern rechtzeitig.',
+    icon: { glyph: 'hourglass', tone: 'blue', frame: 'silver' },
+    holders: () => countAtLeast(GradingOrder, { status: 'fertig', 'services.express': true }, 20, '$shop'),
+  },
+  {
+    key: 'zweite-meinung',
+    name: 'Zweite Meinung',
+    text: 'Führe 10 Zweitprüfungen für Slabs anderer Shops durch.',
+    icon: { glyph: 'loupe', tone: 'violet', frame: 'silver' },
+    holders: () => countAtLeast(GradingOrder, { status: 'fertig', 'services.review': true }, 10, '$shop'),
   },
   {
     key: 'energy',
@@ -500,6 +538,9 @@ const PROGRESS = {
   feierabend: async (user) => [part(await IhkRun.countDocuments({ user, status: 'fertig', success: true }), 50, 'Quests')],
   'ruhige-hand': async (user) => [part(await gradeHits(user), 10, 'richtige Noten')],
   'grading-profi': async (user) => [part(await gradeHits(user), 50, 'richtige Noten')],
+  'slab-fabrik': async (user) => [part(await GradingJob.countDocuments({ user, ...SEALED }), 100, 'versiegelte Slabs')],
+  'express-profi': async (user) => [part(await GradingOrder.countDocuments({ shop: user, status: 'fertig', 'services.express': true }), 20, 'Express-Aufträge')],
+  'zweite-meinung': async (user) => [part(await GradingOrder.countDocuments({ shop: user, status: 'fertig', 'services.review': true }), 10, 'Zweitprüfungen')],
   energy: async (user) => {
     const ids = catalog.CARDS.filter((c) => c.name === 'BFW Energy').map((c) => c.id);
     if (!ids.length) return null;

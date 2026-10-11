@@ -33,8 +33,8 @@
       var badge = $('[data-zoom-rarity]', zoom);
       badge.textContent = d.rarityLabel;
       badge.className = 'tcg-badge r-' + d.rarity;
-      // eigener Text (z. B. Gegenstand im Black Market), sonst Kartenwert und Besitz
-      $('[data-zoom-meta]', zoom).textContent = d.metaText || 'Kartenwert ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
+      // eigener Text (z. B. Gegenstand im Black Market), sonst Händlerpreis und Besitz
+      $('[data-zoom-meta]', zoom).textContent = d.metaText || 'Händlerpreis ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
       // Fremde Sammlung: von hier aus einen Tausch für diese Karte vorschlagen
       var tradeLink = $('[data-zoom-trade]', zoom);
       if (tradeLink) {
