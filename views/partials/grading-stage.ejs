@@ -23,3 +23,21 @@
     <button type="button" class="gr-round" data-gr-zoom-step="0" title="Zurücksetzen" aria-label="Zurücksetzen">⟲</button>
   </div>
 </div>
+<% if (steps.includes('grade')) { %>
+<%# Messleiste (#204): Ränder, Verhältnis und Feinjustierung je Linie – nur beim Messen sichtbar %>
+<div class="gr-mbar" data-gr-mbar hidden>
+  <div class="gr-mbar-side">
+    <span class="gr-mbar-label">Links</span>
+    <button type="button" class="gr-round" data-gr-nudge="-1" data-guide="l" aria-label="Linke Linie nach links">‹</button>
+    <b data-gr-mval="l">–</b>
+    <button type="button" class="gr-round" data-gr-nudge="1" data-guide="l" aria-label="Linke Linie nach rechts">›</button>
+  </div>
+  <div class="gr-mbar-mid"><b data-gr-mratio>–</b><small data-gr-mcap></small></div>
+  <div class="gr-mbar-side">
+    <span class="gr-mbar-label">Rechts</span>
+    <button type="button" class="gr-round" data-gr-nudge="-1" data-guide="r" aria-label="Rechte Linie nach links">‹</button>
+    <b data-gr-mval="r">–</b>
+    <button type="button" class="gr-round" data-gr-nudge="1" data-guide="r" aria-label="Rechte Linie nach rechts">›</button>
+  </div>
+</div>
+<% } %>

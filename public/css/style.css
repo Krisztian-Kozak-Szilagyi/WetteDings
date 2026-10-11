@@ -6287,3 +6287,50 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 }
 @media (prefers-reduced-motion: reduce) { .gh-now-card { transform: none; } }
 .gh-more summary { cursor: var(--cur-pointer, pointer); font-size: 13px; color: var(--color-neutral-400); padding: 6px 0; }
+
+/* Messen (#204): Messebene über der Vorderseite mit Griffen unter der Karte, Lupe, Messleiste unter der Bühne */
+.gr-stage.mode-measure .gr-obj { animation: none; transition: none; }
+.gr-stage.mode-measure .gr-zoom { transition: none; }
+.gr-stage.mode-measure { cursor: default; }
+.gr-mtool { position: absolute; z-index: 6; display: none; pointer-events: none; }
+.gr-stage.mode-measure .gr-mtool { display: block; }
+.gr-mtool .gr-guide { position: absolute; top: -6px; height: calc(var(--grip-y, 100%) + 6px); width: 1px; transform: translateX(-50%); background: #22d3ee; box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); opacity: .9; }
+.gr-mtool .gr-guide.is-active { background: #facc15; }
+.gr-mtool .gr-guide.is-snapped { background: #4ade80; box-shadow: 0 0 6px #4ade80, 0 0 0 1px rgba(0, 0, 0, .5); }
+.gr-grip {
+  position: absolute; top: var(--grip-y, 100%); width: 44px; height: 44px; margin: 0; padding: 0; transform: translateX(-50%);
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; border: 2px solid #22d3ee; background: rgba(10, 12, 24, .85);
+  pointer-events: auto; cursor: ew-resize; touch-action: none;
+}
+.gr-grip::before { content: ''; position: absolute; left: 50%; top: -9px; width: 2px; height: 12px; transform: translateX(-50%); background: inherit; border-left: 2px solid #22d3ee; }
+.gr-grip::after { content: '⟷'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; color: #e5e7eb; }
+.gr-grip.is-active { border-color: #facc15; box-shadow: 0 0 0 4px rgba(250, 204, 21, .2); }
+.gr-grip.is-active::before { border-left-color: #facc15; }
+.gr-loupe {
+  position: absolute; top: var(--loupe-y, 18%); width: 120px; height: 120px; transform: translate(-50%, -50%) scale(.6); opacity: 0;
+  border-radius: 50%; overflow: hidden; pointer-events: none; transition: opacity .12s, transform .12s;
+  box-shadow: 0 0 0 3px #facc15, 0 10px 30px rgba(0, 0, 0, .6); background: #111;
+}
+.gr-loupe.is-on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.gr-loupe.is-snapped { box-shadow: 0 0 0 3px #4ade80, 0 10px 30px rgba(0, 0, 0, .6); }
+.gr-loupe-face { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.gr-loupe-img { position: absolute; display: block; max-width: none; border-radius: 1.2%; }
+.gr-loupe-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #facc15; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
+.gr-loupe.is-snapped .gr-loupe-line { background: #4ade80; }
+.gr-mbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: -6px; padding: 10px 14px;
+  border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-neutral-800);
+}
+.gr-mbar[hidden] { display: none; }
+.gr-mbar-side { display: flex; align-items: center; gap: 8px; }
+.gr-mbar-side b { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.gr-mbar-side .gr-round { width: 44px; height: 44px; font-size: 20px; }
+.gr-mbar-label { font-size: 12px; color: var(--color-neutral-400); }
+.gr-mbar-mid { display: flex; flex-direction: column; align-items: center; }
+.gr-mbar-mid b { font-size: 22px; color: #facc15; font-variant-numeric: tabular-nums; }
+.gr-mbar-mid small { font-size: 12px; color: #facc15; }
+@media (max-width: 560px) {
+  .gr-mbar { justify-content: center; }
+  .gr-mbar-mid { order: -1; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .gr-loupe { transition: none; } }

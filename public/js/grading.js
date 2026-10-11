@@ -132,6 +132,12 @@
     obj.style.setProperty('--gx', (50 + fy * 1.6).toFixed(1) + '%');
     obj.style.setProperty('--gy', (50 + rx * 1.6).toFixed(1) + '%');
     shadow.style.transform = 'translateX(-50%) scaleX(' + (0.35 + 0.65 * Math.abs(Math.cos((ny * Math.PI) / 180))).toFixed(3) + ')';
+    if (mode === 'measure') placeTool(); // Messebene folgt der Karte (Zoom, Verschieben)
+  }
+
+  // Kleines Signal beim Einrasten: kurz vibrieren, wo das Gerät es kann
+  function feedbackTick() {
+    try { if (navigator.vibrate) navigator.vibrate(8); } catch (err) { /* ohne geht es auch */ }
   }
 
   function tweenTo(toX, toY, ms) {
@@ -195,6 +201,7 @@
   }
   stage.addEventListener('wheel', function (e) {
     e.preventDefault();
+    if (drag && drag.guide) return; // beim Ziehen einer Messlinie nicht zoomen
     setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY);
   }, { passive: false });
   // Knöpfe für Geräte ohne Mausrad: vergrößern, verkleinern, alles zurücksetzen
@@ -230,13 +237,23 @@
     stage.classList.toggle('mode-measure', m === 'measure');
     stage.classList.toggle('mode-uv', m === 'uv');
     stage.classList.toggle('mode-iron', m === 'iron');
-    readout.hidden = m !== 'measure';
+    readout.hidden = m !== 'measure' || !!mbar; // mit Messleiste steht die Anzeige dort statt auf der Bühne
+    if (mbar) mbar.hidden = m !== 'measure';
     if (m !== 'uv') uvOff();
     if (m === 'measure' || m === 'uv' || m === 'iron') {
       // Messen, Ableuchten und Bügeln gehen von vorn: Karte flach mit der Vorderseite zur Kamera legen
       var front0 = Math.round(ry / 360) * 360;
       tweenTo(0, front0, 350);
-      if (m === 'measure') renderGuides();
+      if (m === 'measure') {
+        // nah genug für die Bildkante – aber beide Kanten müssen auf die Bühne passen (schmale Bildschirme)
+        var fit = (stage.clientWidth - 24) / (obj.offsetWidth / zoom);
+        var target = clamp(Math.min(2, fit), 1, 2.6);
+        if (Math.abs(zoom - target) > 0.01 || ox || oy) {
+          ox = oy = 0;
+          setZoom(target);
+        }
+        renderGuides();
+      }
     }
     showHint();
   }
@@ -378,13 +395,39 @@
   // Zwei Messlinien auf der Vorderseite (nur links/rechts – für die Note zählt nur die seitliche Zentrierung).
   // Wer sie an die Kanten des Kartenbilds zieht, liest die Ränder in mm (Kartenbreite 63 mm) und das Verhältnis ab –
   // geschätzt wird nichts, messen muss man aber selbst. Die Linien starten bewusst nicht am Bildrand.
+  // Bedienung (#204): eigene Ebene über der Karte mit breiten Griffen unter der Karte (Finger verdeckt nichts), Greifen
+  // mit Versatz statt Springen, Lupe beim Ziehen, leichter Magnet an der Bildkante, ‹ › zum Feinjustieren. Beim Messen
+  // liegt die Karte still: kein Schweben, keine Übergänge, Zoom während des Ziehens gesperrt.
   var CARD_MM = 63;
   var guides = { l: 0.1, r: 0.9 };
   var active = 'l';
   var readout = bench.querySelector('[data-gr-measure-read]');
-  var measureBox = el('div', 'gr-measure', front);
+  var mbar = bench.querySelector('[data-gr-mbar]');
+  var mtool = el('div', 'gr-mtool', stage);
   var guideEls = {};
-  ['l', 'r'].forEach(function (k) { guideEls[k] = el('div', 'gr-guide gr-guide-' + k, measureBox); });
+  var gripEls = {};
+  ['l', 'r'].forEach(function (k) {
+    guideEls[k] = el('div', 'gr-guide gr-guide-' + k, mtool);
+    gripEls[k] = el('button', 'gr-grip gr-grip-' + k, mtool);
+    gripEls[k].type = 'button';
+    gripEls[k].tabIndex = -1; // Tastatur: Pfeiltasten auf der Bühne und die Knöpfe der Messleiste
+    gripEls[k].setAttribute('aria-hidden', 'true');
+    gripEls[k].setAttribute('data-guide', k);
+  });
+  // Lupe: vergrößerter Ausschnitt der Vorderseite rund um die gezogene Linie (Rand in Seltenheitsfarbe + Bild)
+  var LOUPE_X = 5;
+  var loupe = el('div', 'gr-loupe', mtool);
+  var loupeFace = el('div', 'gr-loupe-face', loupe);
+  var loupeImg = el('img', 'gr-loupe-img', loupeFace);
+  loupeImg.src = img.src;
+  loupeImg.alt = '';
+  loupeImg.draggable = false;
+  el('span', 'gr-loupe-line', loupe);
+  // Wo das Kartenbild wirklich anfängt und aufhört (Anteil der Kartenbreite, wie .gr-front .gr-img im CSS)
+  var cxShift = job.center ? Number(job.center.x) || 0 : 0;
+  var imgEdge = { l: 0.03 * (1 + cxShift), r: 0.03 * (1 + cxShift) + 0.94 };
+  var SNAP = (job.tools || []).indexOf('schablone') >= 0 ? 0.012 : 0.004; // Magnet: Anteil der Kartenbreite
+  var frontBox = null; // Lage der Vorderseite auf der Bühne (px), beim Messen jedes Bild neu
   var mm = function (v) { return v.toFixed(1).replace('.', ',') + ' mm'; };
   // breitere Seite in ganzen Prozent (wie die Zentrierung gespeichert ist, z. B. 59 = 59/41)
   function bigShare(a, b) { return a + b > 0 ? Math.round((Math.max(a, b) / (a + b)) * 100) : null; }
@@ -400,37 +443,140 @@
     for (var i = 0; i < scale.length; i++) if (big <= scale[i].to) return scale[i].cap;
     return scale[scale.length - 1].cap;
   }
+  // Anzeige: feste Elemente, beim Ziehen nur Text tauschen (kein Neuaufbau); vorgelesen wird erst nach dem Loslassen
+  var mRead = {};
+  (function buildReadout() {
+    var row = el('div', 'gr-measure-row', readout);
+    mRead.sides = el('span', '', row);
+    mRead.ratio = el('b', '', row);
+    mRead.cap = el('div', 'gr-measure-cap', readout);
+    readout.removeAttribute('aria-live');
+    mRead.live = el('span', 'sr-only', bench);
+    mRead.live.setAttribute('aria-live', 'polite');
+    if (mbar) {
+      mRead.barL = mbar.querySelector('[data-gr-mval="l"]');
+      mRead.barR = mbar.querySelector('[data-gr-mval="r"]');
+      mRead.barRatio = mbar.querySelector('[data-gr-mratio]');
+      mRead.barCap = mbar.querySelector('[data-gr-mcap]');
+    }
+  })();
   function renderGuides() {
-    guideEls.l.style.left = (guides.l * 100).toFixed(2) + '%';
-    guideEls.r.style.left = (guides.r * 100).toFixed(2) + '%';
-    Object.keys(guideEls).forEach(function (k) { guideEls[k].classList.toggle('is-active', k === active); });
+    guideEls.l.style.left = gripEls.l.style.left = (guides.l * 100).toFixed(3) + '%';
+    guideEls.r.style.left = gripEls.r.style.left = (guides.r * 100).toFixed(3) + '%';
+    ['l', 'r'].forEach(function (k) {
+      var on = k === active;
+      guideEls[k].classList.toggle('is-active', on);
+      gripEls[k].classList.toggle('is-active', on);
+      guideEls[k].classList.toggle('is-snapped', Math.abs(guides[k] - imgEdge[k]) < 1e-6);
+    });
     var l = guides.l * CARD_MM;
     var r = (1 - guides.r) * CARD_MM;
-    readout.innerHTML = '';
-    var row = el('div', 'gr-measure-row', readout);
-    el('span', '', row).textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
-    el('b', '', row).textContent = ratio(l, r);
     var cap = capFor(l, r);
-    if (cap) el('div', 'gr-measure-cap', readout).textContent = 'Zentrierung → Obergrenze ' + cap;
+    mRead.sides.textContent = 'Links ' + mm(l) + ' · Rechts ' + mm(r);
+    mRead.ratio.textContent = ratio(l, r);
+    mRead.cap.textContent = cap ? 'Zentrierung → Obergrenze ' + cap : '';
+    if (mbar) {
+      mRead.barL.textContent = mm(l);
+      mRead.barR.textContent = mm(r);
+      mRead.barRatio.textContent = ratio(l, r);
+      mRead.barCap.textContent = cap ? 'Obergrenze ' + cap : '';
+    }
   }
-  // Linie auf eine Position setzen; die linke bleibt in der linken Hälfte, die rechte in der anderen
-  function setGuide(k, v) {
-    guides[k] = k === 'l' ? clamp(v, 0, 0.499) : clamp(v, 0.501, 1);
+  function announceGuides() {
+    mRead.live.textContent = mRead.sides.textContent + ', ' + mRead.ratio.textContent + (mRead.cap.textContent ? ', ' + mRead.cap.textContent : '');
+  }
+  // Linie auf eine Position setzen; die linke bleibt in der linken Hälfte, die rechte in der anderen.
+  // snap: nahe der echten Bildkante rastet sie ein (beim Ziehen; die Feinjustierung rastet nicht)
+  function setGuide(k, v, snap) {
+    v = k === 'l' ? clamp(v, 0, 0.499) : clamp(v, 0.501, 1);
+    var was = guides[k] === imgEdge[k];
+    if (snap && Math.abs(v - imgEdge[k]) <= SNAP) {
+      v = imgEdge[k];
+      if (!was) feedbackTick();
+    }
+    guides[k] = v;
     active = k;
     renderGuides();
   }
+  /** Lage der Vorderseite auf der Bühne – die Messebene liegt genau darüber */
+  function placeTool() {
+    var s = stage.getBoundingClientRect();
+    var f = front.getBoundingClientRect();
+    frontBox = { left: f.left, width: f.width, top: f.top, height: f.height };
+    mtool.style.left = (f.left - s.left).toFixed(1) + 'px';
+    mtool.style.top = (f.top - s.top).toFixed(1) + 'px';
+    mtool.style.width = f.width.toFixed(1) + 'px';
+    mtool.style.height = f.height.toFixed(1) + 'px';
+    // Griffe und Lupe bleiben im sichtbaren Teil der Bühne, auch wenn die vergrößerte Karte übersteht
+    var visTop = Math.max(f.top, s.top);
+    var visBottom = Math.min(f.bottom, s.bottom);
+    mtool.style.setProperty('--grip-y', Math.min(f.height + 18, s.bottom - f.top - 52).toFixed(1) + 'px');
+    mtool.style.setProperty('--loupe-y', (Math.min(visTop + 76, (visTop + visBottom) / 2) - f.top).toFixed(1) + 'px');
+  }
   /** Waagerechte Position des Zeigers auf der Vorderseite (0 … 1) – die Karte liegt beim Messen flach */
   function onFront(x) {
-    var r = front.getBoundingClientRect();
+    var r = frontBox || front.getBoundingClientRect();
     return (x - r.left) / r.width;
   }
-  /** Die Linie, die dem Zeiger am nächsten ist, greifen */
-  function pickGuide(x) {
-    var p = onFront(x);
-    return Math.abs(p - guides.l) <= Math.abs(p - guides.r) ? 'l' : 'r';
+  /** Lupe über der gezogenen Linie: gleicher Ausschnitt, LOUPE_X-fach, Mitte = Linie auf halber Kartenhöhe */
+  function showLoupe(k) {
+    if (!frontBox) return;
+    var W = frontBox.width;
+    var H = frontBox.height;
+    var S = LOUPE_X;
+    var size = loupe.offsetWidth || 120;
+    loupeFace.style.width = W * S + 'px';
+    loupeFace.style.height = H * S + 'px';
+    loupeFace.style.background = getComputedStyle(front).backgroundColor;
+    loupeImg.style.left = imgEdge.l * W * S + 'px';
+    loupeImg.style.top = 0.0214 * H * S + 'px';
+    loupeImg.style.width = 0.94 * W * S + 'px';
+    loupeImg.style.height = 0.9572 * H * S + 'px';
+    loupeFace.style.transform = 'translate(' + (size / 2 - guides[k] * W * S).toFixed(1) + 'px, ' + (size / 2 - 0.5 * H * S).toFixed(1) + 'px)';
+    loupe.style.left = (guides[k] * 100).toFixed(3) + '%';
+    loupe.classList.add('is-on');
+    loupe.classList.toggle('is-snapped', guides[k] === imgEdge[k]);
   }
-  function moveGuide(k, x) {
-    setGuide(k, onFront(x));
+  function hideLoupe() { loupe.classList.remove('is-on'); }
+  /** Greift ein Zeiger eine Linie? Griff unter der Karte oder nah an der Linie selbst (sonst null – kein Springen) */
+  function grabGuide(e) {
+    var grip = e.target.closest && e.target.closest('.gr-grip');
+    if (grip) return grip.getAttribute('data-guide');
+    if (!frontBox) return null;
+    var reach = (e.pointerType === 'mouse' ? 10 : 22) / frontBox.width;
+    var p = onFront(e.clientX);
+    var dl = Math.abs(p - guides.l);
+    var dr = Math.abs(p - guides.r);
+    if (Math.min(dl, dr) > reach) return null;
+    return dl <= dr ? 'l' : 'r';
+  }
+  // Messleiste unter der Bühne: ‹ › schieben die Linie um 0,05 mm (gedrückt halten = weiter)
+  if (mbar) {
+    mbar.querySelectorAll('[data-gr-nudge]').forEach(function (btn) {
+      var k = btn.getAttribute('data-guide');
+      var dir = Number(btn.getAttribute('data-gr-nudge'));
+      var timer = null;
+      var nudge = function () { setGuide(k, guides[k] + dir * (0.05 / CARD_MM)); };
+      var stop = function () {
+        clearTimeout(timer);
+        clearInterval(timer);
+        timer = null;
+        announceGuides();
+      };
+      btn.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        nudge();
+        timer = setTimeout(function () { timer = setInterval(nudge, 60); }, 350);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { btn.addEventListener(ev, stop); });
+      btn.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          nudge();
+          announceGuides();
+        }
+      });
+    });
   }
 
   // ---------- Zeiger ----------
@@ -444,8 +590,15 @@
     stage.classList.add('is-pressed');
     hint.classList.add('is-gone');
     if (mode === 'measure') {
-      drag.guide = pickGuide(e.clientX);
-      moveGuide(drag.guide, e.clientX);
+      if (tween) return (drag = null); // Karte legt sich noch flach – erst danach messen
+      placeTool();
+      var k = grabGuide(e);
+      if (!k) return; // daneben gedrückt: nichts springt
+      drag.guide = k;
+      drag.offset = onFront(e.clientX) - guides[k]; // Versatz zum Griff merken
+      active = k;
+      renderGuides();
+      showLoupe(k);
       return;
     }
     if (mode === 'uv') return uvAt(e.clientX, e.clientY); // Ableuchten dreht die Karte nicht
@@ -462,7 +615,10 @@
     }
     if (!drag) return;
     if (mode === 'measure') {
-      if (drag.guide) moveGuide(drag.guide, e.clientX);
+      if (drag.guide) {
+        setGuide(drag.guide, onFront(e.clientX) - drag.offset, true);
+        showLoupe(drag.guide);
+      }
       return;
     }
     if (mode === 'iron') return ironMove(e.clientX, e.clientY);
@@ -483,6 +639,10 @@
   });
 
   function endDrag() {
+    if (drag && drag.guide) {
+      hideLoupe();
+      announceGuides();
+    }
     drag = null;
     stage.classList.remove('is-pressed');
     ironUp();
@@ -524,7 +684,7 @@
     grade: {
       clean: 'Putzen: mit gedrückter Maustaste reiben',
       rotate: 'Schräg ins Licht drehen – Kratzer blitzen auf · Mausrad = Zoom',
-      measure: 'Messen: Linien an den linken und rechten Rand des Kartenbilds ziehen · Pfeiltasten ←→ = fein · Mausrad = Zoom',
+      measure: 'Messen: Griffe unten an die Kante des Kartenbilds ziehen – dort rastet die Linie ein · ‹ › oder ←→ = fein',
       uv: 'UV-Lampe: langsam an Ecken und Kanten entlangfahren – Macken leuchten grün auf · Mausrad = Zoom',
     },
     slab: { clean: 'Stoppe den Zeiger im grünen Bereich', rotate: 'Stoppe den Zeiger im grünen Bereich' },
