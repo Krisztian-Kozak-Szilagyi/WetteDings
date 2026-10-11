@@ -95,10 +95,9 @@
     if (flash && body) body.insertBefore(flash, body.firstChild);
   }
 
-  // Zurück von der Werkbank (?neu=1): der neue Bon fällt auf den Spieß, der Münzstapel hüpft
+  // Zurück von der Werkbank (?neu=1): das Kassenbuch und die Münzen hüpfen
   if (/[?&]neu=1/.test(location.search)) {
-    var bonsOnSpike = desk.querySelectorAll('.gd-spike-bon');
-    var fresh = bonsOnSpike[bonsOnSpike.length - 1];
+    var fresh = desk.querySelector('[data-gd-spike]');
     if (fresh) fresh.classList.add('is-new');
     var coins = desk.querySelector('[data-gd-coins]');
     if (coins) setTimeout(function () { coins.classList.add('is-bump'); }, 350);
