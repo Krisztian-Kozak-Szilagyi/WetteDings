@@ -8746,3 +8746,14 @@ a.pg-btn, a.pg-btn:hover { color: #3b2503; }
 .gd-vit-shelf::after { bottom: 72px; }
 .gd-vit-plaque { min-height: 3.6em; }
 @media (max-width: 760px) { .gd-vit-shelf { padding-bottom: 92px; } }
+
+/* Vitrinen-Schild ohne Rahmen, Metall nach Note: ab 9 Gold, 6 bis 8 Silber, darunter Bronze */
+.gd-vit-plaque { padding: .75em 1.1em; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .25), 0 1px 0 rgba(255, 255, 255, .2), 0 5px 12px rgba(0, 0, 0, .6); }
+.gd-vp-info, .gd-vp-score { padding: 0; }
+.gd-vit-plaque.is-gold { background: linear-gradient(135deg, #fff2b8 0%, #f2c14e 38%, #fff3c4 55%, #d9a634 100%); --pl-ink: #2b1d05; --pl-dim: #6b5320; --pl-code: #7a4e00; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 0 rgba(120, 80, 0, .35), 0 0 14px rgba(242, 193, 78, .4), 0 5px 12px rgba(0, 0, 0, .6); }
+.gd-vit-plaque.is-silver { background: linear-gradient(135deg, #f4f6f9 0%, #c3cad4 40%, #eef1f5 56%, #a5adba 100%); --pl-ink: #1a1f27; --pl-dim: #4c5563; --pl-code: #3d4757; }
+.gd-vit-plaque.is-bronze { background: linear-gradient(135deg, #f0c9a2 0%, #c58750 40%, #eebb90 56%, #a2673a 100%); --pl-ink: #2a1708; --pl-dim: #5e3c1e; --pl-code: #5b3210; }
+.gd-vit-plaque :is(.gd-vp-name, .gd-vp-word, .gd-vp-grade) { color: var(--pl-ink, #111); }
+.gd-vit-plaque .gd-vp-rar { color: var(--pl-dim, #555); }
+.gd-vit-plaque .gd-vp-code { color: var(--pl-code, #333); }
+.gd-vit-plaque.is-gold .gv-sheen { animation-duration: 2.6s; mix-blend-mode: overlay; }

@@ -14,9 +14,9 @@
         <span class="gd-vit-spot" aria-hidden="true"></span>
         <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
       </button>
-      <%# Schild im Stil des Zertifikats in der Zoomansicht (weißes Etikett, roter Doppelrahmen): links Kürzel, Name und Seltenheit – der
+      <%# Schild im Stil des Zertifikats in der Zoomansicht (Etikett ohne Rahmen; Note ab 9 Gold, 6 bis 8 Silber, darunter Bronze): links Kürzel, Name und Seltenheit – der
           Name bricht um, nichts wird abgeschnitten –, rechts Notenwort über der großen Note %>
-      <span class="gd-vit-plaque<%= x.slab.grade === 10 ? ' is-gem' : '' %>" aria-hidden="true">
+      <span class="gd-vit-plaque <%= x.slab.grade >= 9 ? 'is-gold' : x.slab.grade >= 6 ? 'is-silver' : 'is-bronze' %>" aria-hidden="true">
         <span class="gd-vp-info">
           <b class="gd-vp-code"><%= x.slab.code %></b>
           <span class="gd-vp-name"><%= x.card.name %></span>
