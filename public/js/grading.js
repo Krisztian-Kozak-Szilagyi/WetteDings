@@ -895,7 +895,8 @@
           ironRes.hidden = false;
           if (job.own) {
             // eigene Karte: fertig – zurück zur Liste
-            if (job.backUrl) setTimeout(function () { window.location.href = job.backUrl; }, 2200);
+            // feste Adresse statt eines Werts aus dem DOM (CodeQL js/xss-through-dom)
+            if (job.backUrl) setTimeout(function () { window.location.href = '/grading'; }, 2200);
             return;
           }
           setTimeout(nextStep, 1300);

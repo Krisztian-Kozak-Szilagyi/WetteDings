@@ -36,11 +36,11 @@ router.use('/grading', requireLogin, requireGrading);
 
 // Zertifikat eines Slabs (#204): Karte, Note, Shop, Zweitprüfungen, frühere Etiketten, Population und letzte Verkäufe –
 // für alle eingeloggten Mitglieder (Slabs gibt es auch ohne freigegebenen Grading-Shop: alte BfW-Slabs)
-router.get('/slab/:cert', requireLogin, async (req, res) => {
-  const cert = str(req.params.cert).replace(/\D/g, '');
-  const doc = cert ? await TcgCard.findOne({ 'slab.cert': cert, slab: { $ne: null } }).select('user card rarity foiledAt slab').lean() : null;
+router.get('/slab/:nummer', requireLogin, async (req, res) => {
+  const nummer = str(req.params.nummer).replace(/\D/g, '');
+  const doc = nummer ? await TcgCard.findOne({ 'slab.cert': nummer, slab: { $ne: null } }).select('user card rarity foiledAt slab').lean() : null;
   const c = doc && catalog.cardById[doc.card];
-  if (!c) return res.status(404).render('error', { title: 'Zertifikat', status: 404, message: `Ein Slab mit der Zertifikatsnummer ${cert || '–'} ist nicht bekannt.` });
+  if (!c) return res.status(404).render('error', { title: 'Zertifikat', status: 404, message: `Ein Slab mit der Zertifikatsnummer ${nummer || '–'} ist nicht bekannt.` });
   const marketPrice = require('../trade/marketPrice');
   const User = require('../models/User');
   const [owner, shop, pop, sales, ctx] = await Promise.all([
@@ -52,8 +52,8 @@ router.get('/slab/:cert', requireLogin, async (req, res) => {
   ]);
   const line = { card: doc.card, slab: doc.slab, foiledAt: doc.foiledAt };
   res.render('slab', {
-    title: `Zertifikat ${cert}`,
-    cert,
+    title: `Zertifikat ${nummer}`,
+    cert: nummer,
     doc: { id: String(doc._id), card: c, rarity: doc.rarity, rarityLabel: (catalog.rarityByKey[doc.rarity] || {}).label || '', foiledAt: doc.foiledAt, slab: doc.slab },
     owner: owner && !owner.deletedAt ? owner.username : null,
     shop,
