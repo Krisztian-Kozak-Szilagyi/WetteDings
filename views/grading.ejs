@@ -135,7 +135,6 @@
       <%- slot('scroll', (players ? '' : img('key', 34, 'gd-art-lock')) + (queue.length ? badge((queueExpress ? '⚡' : '') + queue.length, queue.length + ' warten' + (queueExpress ? ', Express dabei' : ''), queueExpress ? ' is-express' : '') : '')) %>
       <span class="gd-tag"><b><i class="gd-step">1</i> Eingang</b><small><%= !players ? 'ab Stufe ' + orderLevel : queue.length ? queue.length + ' warten' : 'leer' %></small></span>
     </a>
-    <span class="gd-flow gd-flow-in" aria-hidden="true"></span>
 
     <%# Schneidematte: genau eine Hauptaktion %>
     <section class="gd-mat <%= openJob ? 'is-work' : !shop.code ? 'is-name' : canTake ? 'is-mail' : 'is-closed' %>" data-tour="matte" aria-label="Werkbank">
@@ -195,7 +194,6 @@
       <% } %>
     </section>
 
-    <span class="gd-flow gd-flow-out" aria-hidden="true"></span>
     <a class="gd-obj gd-spike" href="<%= hubUrl('bons') %>" data-gd-open="bons" data-tour="spiess" aria-label="Kassenzettel: heute <%= bons.length %> erledigt, <%= euro(earnedToday) %>">
       <%- slot('book', bons.length ? badge(bons.length, bons.length + ' heute erledigt', ' is-count') : '', ' data-gd-spike') %>
       <span class="gd-tag"><b><i class="gd-step">3</i> Bons</b><small><%= bons.length ? bons.length + ' heute erledigt' : 'noch keiner heute' %></small></span>

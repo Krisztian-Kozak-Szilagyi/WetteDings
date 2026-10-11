@@ -6475,8 +6475,8 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   --focus: 0 0 0 2px #2a1a08, 0 0 0 4px #fde68a;
   --obj-shadow: drop-shadow(6px 10px 7px rgba(10, 5, 0, .55)) drop-shadow(1px 2px 1px rgba(10, 5, 0, .35));
   position: relative; display: grid; gap: 28px 18px; padding: 28px 32px 30px; border-radius: 26px; isolation: isolate;
-  grid-template-columns: minmax(160px, 1fr) 70px minmax(0, 2.6fr) 70px minmax(160px, 1fr);
-  grid-template-areas: "plate plate plate plate plate" "vit vit vit vit vit" "in fin mat fout out" "shop shop shop own own";
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2.6fr) minmax(160px, 1fr);
+  grid-template-areas: "plate plate plate" "vit vit vit" "in mat out" "shop shop own";
   background:
     radial-gradient(70% 70% at 15% 6%, rgba(255, 214, 150, .26), rgba(255, 214, 150, 0) 60%),
     radial-gradient(140% 120% at 50% 40%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, .55) 100%),
@@ -6544,7 +6544,8 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 }
 .gd-tag b { display: flex; align-items: center; gap: 6px; font: 800 13px/1.2 var(--font); letter-spacing: .1em; text-transform: uppercase; }
 .gd-tag small { font: 600 12px/1.25 var(--font); color: #5a4f42; }
-.gd-step { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #2a1d0e; color: #fde68a; font: 800 11px/1 var(--font); font-style: normal; letter-spacing: 0; }
+/* Schritt-Nummer als Pixel-Kästchen (wie die Stufen-Anzeige am Schild): eckig, gelb, mit hartem Rand und Schattenkante */
+.gd-step { display: inline-grid; place-items: center; width: 20px; height: 20px; background: #fcd34d; color: #2a1d0e; font: 800 12px/1 var(--font); font-style: normal; letter-spacing: 0; box-shadow: inset 0 0 0 2px #1f1408, inset -2px -2px 0 2px #d97706; }
 .gd-badge {
   position: absolute; top: -4px; right: -6px; z-index: 3; display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 8px;
   border-radius: 999px; background: linear-gradient(#ef4444, #b91c1c); color: #fff; font: 800 14px/1 var(--font);
@@ -6829,11 +6830,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 /* Ablauf ① Eingang → ② Werkbank → ③ Bons: Kreidepfeile zwischen den Stationen */
 .gd-tray { grid-area: in; align-self: center; }
 .gd-spike { grid-area: out; align-self: center; }
-.gd-flow { align-self: center; position: relative; height: 24px; opacity: .55; }
-.gd-flow-in { grid-area: fin; }
-.gd-flow-out { grid-area: fout; }
-.gd-flow::before { content: ""; position: absolute; left: 4px; right: 14px; top: 50%; border-top: 3px dashed #f5e9cf; }
-.gd-flow::after { content: ""; position: absolute; right: 2px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-top: 3px solid #f5e9cf; border-right: 3px solid #f5e9cf; transform: rotate(45deg); }
 
 /* Schneidematte: Gummi mit Raster und Skala, die eine Hauptaktion */
 .gd-mat {
@@ -6853,7 +6849,11 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   content: ""; position: absolute; top: 9px; left: 18px; right: 18px; height: 12px; opacity: .6;
   background: repeating-linear-gradient(90deg, #ecfdf3 0 1px, transparent 1px 10px) bottom / auto 5px repeat-x, repeating-linear-gradient(90deg, #ecfdf3 0 1px, transparent 1px 50px) bottom / auto 12px repeat-x;
 }
-.gd-mat-step { position: absolute; top: 26px; left: 22px; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: var(--radius-sm); background: rgba(0, 0, 0, .28); font: 800 12px var(--font); letter-spacing: .1em; text-transform: uppercase; color: #d9f5e6; }
+.gd-mat-step {
+  position: absolute; top: 24px; left: 22px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px;
+  background: linear-gradient(#4a3318, #36230d); color: #fde68a; font: 800 12px var(--font); letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 2px 0 #1f1408; image-rendering: pixelated;
+  box-shadow: inset 0 0 0 2px #1f1408, inset 0 0 0 4px #8a6420, inset 0 2px 0 4px rgba(255, 220, 160, .14), 0 3px 0 rgba(0, 0, 0, .4);
+}
 .gd-mat-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 22px 44px; flex-wrap: wrap; width: 100%; }
 .gd-mat-text { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; max-width: 460px; }
 .gd-mat-text h2 { font: 800 30px/1.15 var(--display); letter-spacing: -.01em; text-shadow: 0 2px 8px rgba(0, 0, 0, .4); }
@@ -7018,7 +7018,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 }
 @media (max-width: 1099px) {
   .gd-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "plate plate plate" "vit vit vit" "in mat out" "shop shop shop" "own own own"; padding: 22px; }
-  .gd-flow { display: none; }
 }
 @media (max-width: 760px) {
   .gd-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "plate plate" "vit vit" "mat mat" "in out" "shop shop" "own own"; padding: 16px; gap: 22px 10px; border-radius: 20px; }

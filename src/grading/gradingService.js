@@ -28,9 +28,9 @@ const MS_PER_SEGMENT = 300; // Mindestzeit pro geglättetem Stück Knick beim B�
 // bestimmen, slab = einschweißen. Kosten, Lohn und Aufträge pro Tag stehen in den Einstellungen (Admin-Panel).
 const LEVELS = [
   { level: 1, name: 'Putzstube', steps: ['clean'], perk: 'Karten reinigen und zurückschicken' },
-  { level: 2, name: 'Grading-Labor', steps: ['clean', 'iron', 'grade'], perk: 'Knicke bügeln und Karten benoten (1–10) – richtige Noten bringen Extra-Lohn; auch eigene Karten bügeln' },
-  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'iron', 'grade', 'slab'], perk: 'Karten im Slab versiegeln – saubere Versiegelung bringt Extra-Lohn' },
-  { level: 4, name: 'Premium-Labor', steps: ['clean', 'iron', 'grade', 'slab'], premium: true, perk: 'Stammkunden zahlen besser – mehr Lohn' },
+  { level: 2, name: 'Grading-Labor', steps: ['clean', 'iron'], perk: 'Knicke bügeln – auch eigene Karten; sauber geglättet bringt Extra-Lohn' },
+  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'iron', 'grade', 'slab'], perk: 'Karten benoten (1–10) und im Slab versiegeln – richtige Noten und saubere Versiegelung bringen Extra-Lohn; mit Glück ein Folienfund' },
+  { level: 4, name: 'Premium-Labor', steps: ['clean', 'iron', 'grade', 'slab'], premium: true, perk: 'Karten von Mitgliedern annehmen, Preise festlegen, Vitrine – und Stammkunden zahlen besser (mehr Lohn)' },
 ];
 // Ab dieser Stufe kann man bügeln – Kundenkarten und eigene Karten
 const IRON_LEVEL = 2;
@@ -39,9 +39,9 @@ const IRON_LEVEL = 2;
 // level kaufbar, Preise in den Einstellungen (toolCosts). Wirkung im Browser (public/js/grading.js, job.tools)
 const TOOLS = [
   { key: 'tuch', name: 'Mikrofasertuch', level: 1, perk: 'Größerer Putzradius – Flecken sind schneller erwischt' },
-  { key: 'schablone', name: 'Zentrierschablone', level: 2, perk: 'Messlinien rasten deutlich stärker an der Bildkante ein' },
   { key: 'eisen', name: 'Profi-Bügeleisen', level: 2, perk: 'Erhitzt langsamer – weniger Gefahr von Brandflecken' },
-  { key: 'uv', name: 'UV-Lampe Pro', level: 2, perk: 'Größerer Lichtkegel – Ecken und Kanten schneller abgeleuchtet' },
+  { key: 'schablone', name: 'Zentrierschablone', level: 3, perk: 'Messlinien rasten deutlich stärker an der Bildkante ein' },
+  { key: 'uv', name: 'UV-Lampe Pro', level: 3, perk: 'Größerer Lichtkegel – Ecken und Kanten schneller abgeleuchtet' },
 ];
 const toolByKey = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
 
@@ -228,7 +228,7 @@ const shopValues = () => LEVELS.map((l) => shopValue(l.level));
 
 /**
  * Shop, offener Auftrag und heutige Aufträge. limit/used = NPC-Aufträge, playerLimit/playerUsed = Aufträge von
- * Mitgliedern (#204, ab Stufe 3), waiting = wartende Spieler-Aufträge dieses Shops
+ * Mitgliedern (#204, ab Stufe 4), waiting = wartende Spieler-Aufträge dieses Shops
  */
 async function getState(userId) {
   const day = today();
@@ -491,7 +491,7 @@ async function takeJob({ user }) {
 }
 
 /**
- * Note festlegen (nur einmal pro Auftrag, ab Stufe 2). Gibt die echte Note zurück – die Mängel sieht der
+ * Note festlegen (nur einmal pro Auftrag, ab Stufe 3). Gibt die echte Note zurück – die Mängel sieht der
  * Spieler danach markiert. Ändern lässt sich die Note nicht mehr. Bei Spieler-Aufträgen (#204) bleibt die echte Note
  * geheim (grade: null): auf den Slab kommt die Note des Shops.
  */
@@ -499,7 +499,7 @@ async function setGuess({ user, guess }) {
   if (!(Number.isInteger(guess) && guess >= 1 && guess <= 10)) throw new UserError('Bitte gib eine Note von 1 bis 10.');
   const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
   if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
-  if (!stepsFor(job).includes('grade')) throw new UserError(job.services ? 'Dieser Auftrag umfasst kein Benoten – nur bügeln und zurückschicken.' : 'Benoten kannst du erst ab Stufe 2.');
+  if (!stepsFor(job).includes('grade')) throw new UserError(job.services ? 'Dieser Auftrag umfasst kein Benoten – nur bügeln und zurückschicken.' : 'Benoten kannst du erst ab Stufe 3.');
   if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick – danach kannst du benoten.');
   const updated = await GradingJob.findOneAndUpdate({ _id: job._id, status: 'offen', guess: null }, { $set: { guess } }, { new: true }).lean();
   const final = updated || job; // schon benotet: die erste Note bleibt

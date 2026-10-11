@@ -22,7 +22,7 @@ const { visibleMarks } = require('./condition');
 const reputation = require('./reputation');
 const { settings, SERVICES } = require('./gradingService');
 
-const ORDER_LEVEL = 3; // Spieler-Aufträge erst ab der Slab-Werkstatt – ohne Slab keine sichtbare Note
+const ORDER_LEVEL = 4; // Spieler-Aufträge erst im Premium-Labor – Benoten und Slab gibt es schon ab Stufe 3
 const OPEN = ['wartet', 'in_arbeit'];
 const RATE_DAYS = 7; // so lange nach der Rückgabe kann der Kunde bewerten
 const ORDERS_HREF = '/grading/einreichen';
@@ -84,7 +84,7 @@ function priceOf(shop, services, s = settings) {
 /** Liegen alle Festpreise (Cent) im Rahmen? prices: { base, iron, slab, express } */
 const validPrices = (prices, s = settings) => !!prices && SERVICE_KEYS.every((k) => Number.isInteger(prices[k]) && prices[k] >= s.servicePrice[k].min && prices[k] <= s.servicePrice[k].max);
 
-/** Nimmt dieser Shop Spieler-Aufträge an? (angestellt, Stufe 3+, mit Kürzel) */
+/** Nimmt dieser Shop Spieler-Aufträge an? (angestellt, Stufe 4, mit Kürzel) */
 const acceptsOrders = (shop) => !!shop && !!shop.active && (shop.level || 1) >= ORDER_LEVEL && !!shop.code;
 
 /** Frist ab jetzt – mit Express kürzer */
@@ -169,7 +169,7 @@ async function shopsForOrders() {
     .sort((a, b) => b.rating.reputation - a.rating.reputation || a.name.localeCompare(b.name, 'de'));
 }
 
-/** Ein Shop nach Kürzel (auch ohne Spieler-Aufträge, z. B. Stufe 2) – oder null */
+/** Ein Shop nach Kürzel (auch ohne Spieler-Aufträge, z. B. Stufe 2 oder 3) – oder null */
 async function shopByCode(code) {
   const s = await GradingShop.findOne({ code: String(code || '').toUpperCase() }).lean();
   if (!s) return null;

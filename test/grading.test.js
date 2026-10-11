@@ -37,9 +37,9 @@ test('Lohn je Stufe: Putzen nach Sauberkeit, Note exakt/±1, Versiegeln nach Qua
   assert.equal(payFor({ level: 1, grade: 8, guess: NaN, seal: null }), PAY.clean);
   assert.equal(payFor({ level: 1, clean: 60 }), Math.round(PAY.clean * 0.6));
   assert.equal(payFor({ level: 1, clean: 0 }), 0);
-  assert.equal(payFor({ level: 2, grade: 8, guess: 8 }), PAY.clean + PAY.grade);
-  assert.equal(payFor({ level: 2, grade: 8, guess: 7 }), PAY.clean + PAY.grade / 2);
-  assert.equal(payFor({ level: 2, grade: 8, guess: 5 }), PAY.clean);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 7, seal: null }), PAY.clean + PAY.grade / 2);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 5, seal: null }), PAY.clean);
   assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 100 }), PAY.clean + PAY.grade + PAY.slab);
   assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 500 }), PAY.clean + PAY.grade + PAY.slab); // gedeckelt
   assert.equal(payFor({ level: 4, grade: 8, guess: 8, seal: 100 }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3));
@@ -112,8 +112,9 @@ test('#204: Bügeln – nur ab Stufe 2 und nur bei Karten mit Knick; Lohn nach G
   const glatt = { ...knick, crease: false };
   assert.equal(IRON_LEVEL, 2);
   assert.deepEqual(stepsFor({ level: 1, defects: knick }), ['clean']);
-  assert.deepEqual(stepsFor({ level: 2, defects: knick }), ['clean', 'iron', 'grade']);
-  assert.deepEqual(stepsFor({ level: 2, defects: glatt }), ['clean', 'grade']);
+  assert.deepEqual(stepsFor({ level: 2, defects: knick }), ['clean', 'iron']);
+  assert.deepEqual(stepsFor({ level: 2, defects: glatt }), ['clean']);
+  assert.deepEqual(stepsFor({ level: 3, defects: knick }), ['clean', 'iron', 'grade', 'slab']);
   assert.deepEqual(stepsFor({ level: 4, defects: knick }), ['clean', 'iron', 'grade', 'slab']);
   assert.deepEqual(stepsFor({ level: 3, defects: undefined }), ['clean', 'grade', 'slab']);
   // Werte vom Browser werden geklemmt
@@ -123,8 +124,8 @@ test('#204: Bügeln – nur ab Stufe 2 und nur bei Karten mit Knick; Lohn nach G
   assert.equal(ironMinMs(100), 10 * MS_PER_SEGMENT);
   assert.equal(ironMinMs(0), 0);
   // Lohn: Bügeln nur ab Stufe 2 und nur, wenn gebügelt wurde
-  assert.equal(payFor({ level: 2, grade: 8, guess: 8, iron: 100 }), PAY.clean + PAY.grade + PAY.iron);
-  assert.equal(payFor({ level: 2, grade: 8, guess: 8, iron: 50 }), PAY.clean + PAY.grade + PAY.iron / 2);
-  assert.equal(payFor({ level: 2, grade: 8, guess: 8 }), PAY.clean + PAY.grade);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 100 }), PAY.clean + PAY.grade + PAY.iron);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 50 }), PAY.clean + PAY.grade + PAY.iron / 2);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade);
   assert.equal(payFor({ level: 1, iron: 100 }), PAY.clean);
 });

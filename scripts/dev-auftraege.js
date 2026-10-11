@@ -13,7 +13,7 @@
  *   npm run dev:auftraege                für den Shop von admin
  *   npm run dev:auftraege -- anna        für den Shop eines anderen Testspielers
  *
- * Der Shop braucht Stufe 3 und ein Kürzel (sonst vorher npm run dev:knick). Danach /grading neu laden.
+ * Der Shop braucht Stufe 4 und ein Kürzel (sonst vorher npm run dev:knick). Danach /grading neu laden.
  */
 const path = require('path');
 

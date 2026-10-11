@@ -76,9 +76,9 @@ test('#204: Schritte nach gebuchten Bausteinen', () => {
   assert.ok(grading.validRange({ min: 0, max: 10, def: 5 }) && !grading.validRange({ min: 6, max: 10, def: 5 }));
 });
 
-test('#204 B: Annahme ab Stufe 3', () => {
-  assert.equal(orders.acceptsOrders({ active: true, level: 3, code: 'AB' }), true);
-  assert.equal(orders.acceptsOrders({ active: true, level: 2, code: 'AB' }), false);
+test('#204 B: Annahme ab Stufe 4', () => {
+  assert.equal(orders.acceptsOrders({ active: true, level: 4, code: 'AB' }), true);
+  assert.equal(orders.acceptsOrders({ active: true, level: 3, code: 'AB' }), false);
   assert.equal(orders.acceptsOrders({ active: false, level: 4, code: 'AB' }), false);
   assert.equal(orders.acceptsOrders({ active: true, level: 4, code: null }), false);
 });
@@ -113,8 +113,8 @@ test('#204: Lohn nach Posten ergibt dieselbe Summe wie payFor', () => {
 
 test('#204: Werkzeuge – ab ihrer Stufe kaufbar, gekaufte markiert', () => {
   const list = grading.toolsFor({ level: 1, tools: ['tuch'] });
-  assert.deepEqual(list.map((t) => [t.key, t.owned, t.available]), [['tuch', true, true], ['schablone', false, false], ['eisen', false, false], ['uv', false, false]]);
-  assert.ok(grading.toolsFor({ level: 2 }).every((t) => t.available && !t.owned && t.cost > 0));
+  assert.deepEqual(list.map((t) => [t.key, t.owned, t.available]), [['tuch', true, true], ['eisen', false, false], ['schablone', false, false], ['uv', false, false]]);
+  assert.ok(grading.toolsFor({ level: 3 }).every((t) => t.available && !t.owned && t.cost > 0));
 });
 
 test('#204: Schnell-Tags zur Bewertung – aus dem Katalog, höchstens drei, leer erlaubt', () => {
