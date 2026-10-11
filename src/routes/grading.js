@@ -6,6 +6,8 @@ const { TcgCard } = require('../models/Tcg');
 const grading = require('../grading/gradingService');
 const orders = require('../grading/orderService');
 const reputation = require('../grading/reputation');
+const damage = require('../grading/damage');
+const items = require('../items/itemService');
 const population = require('../tcg/population');
 const catalog = require('../tcg/catalog');
 const { centerShift, centeringCap, CENTERING, creaseLine } = require('../grading/condition');
@@ -160,6 +162,9 @@ router.get('/grading', async (req, res) => {
       expiresAt: o ? o.expiresAt : null,
     };
   });
+  // Leere Slabs (Inventar): so viele braucht der Shop für die angenommenen und neue Aufträge mit „Benoten + Slab“
+  const slabFree = active ? await items.slabStock(req.user._id) : 0;
+  const slabCommitted = running.filter((j) => j.services && j.services.slab).length;
   const tools = grading.toolsFor(state.shop);
   const balance = req.user.balance;
   res.render('grading', {
@@ -171,6 +176,8 @@ router.get('/grading', async (req, res) => {
     ordTab: req.query.ord === 'angenommen' ? 'angenommen' : null, // Eingang öffnet auf dem Reiter „Angenommen“
     acceptedJobs,
     maxAccepted: grading.MAX_ACCEPTED,
+    slabs: { free: slabFree, left: Math.max(0, slabFree - slabCommitted) }, // left = noch für neue Aufträge
+    slabShop: { price: items.buyPrice(items.itemTypeByKey.slab), sell: items.itemTypeByKey.slab.sell, image: items.itemTypeByKey.slab.image, max: items.MAX_BUY }, // Werkstatt › Material
     hubUrl,
     // Hinweise auf dem Tisch: rotes Badge bzw. Wackeln, wenn dort etwas zu tun ist
     attention: {
@@ -301,6 +308,8 @@ router.get('/grading/einreichen', async (req, res) => {
   const pick = str(req.query.shop).toUpperCase();
   res.render('grading-einreichen', {
     title: 'Karte graden lassen',
+    // Risiko für Kratzer oder Knick auf dem Versand ohne TCG Sleeve, in % (grading/damage.SHIPPING_SEVERITY)
+    shipRisk: Math.round((damage.chanceFor('kratzer', damage.SHIPPING_SEVERITY) + damage.chanceFor('knick', damage.SHIPPING_SEVERITY)) * 100),
     shops: shops.map((s) => ({ ...s, own: s.id === String(req.user._id) })),
     cards,
     orders: mine,
@@ -323,7 +332,8 @@ router.post('/grading/einreichen', (req, res) =>
       const services = { iron: req.body.iron === '1', slab: req.body.slab === '1', express: req.body.express === '1', review: req.body.review === '1' };
       const order = await orders.submit({ user: req.user, shopCode: str(req.body.shop), doc: str(req.body.doc), services });
       const days = order.services.express ? grading.settings.expressDays : grading.settings.orderDays;
-      return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${days} ${days === 1 ? 'Tag' : 'Tage'} Zeit.`;
+      const note = order.sleeveSent ? ' Dein TCG Sleeve bleibt beim Shop.' : order.shipDamage.length ? ` Pech: Die Karte hat unterwegs ${order.shipDamage[0] === 'knick' ? 'einen Knick' : 'einen Kratzer'} abbekommen.` : '';
+      return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${days} ${days === 1 ? 'Tag' : 'Tage'} Zeit.${note}`;
     },
     '/grading/einreichen'
   )
@@ -421,6 +431,15 @@ router.post('/grading/name', (req, res) =>
     const { name, code, requested } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
     if (requested) return `Dein Shop heißt jetzt „${name}“. Das neue Kürzel ${requested} ist beantragt – ein Admin oder Dev gibt es frei. Bis dahin bleibt ${code}.`;
     return `Dein Shop heißt jetzt „${name}“ – Kürzel ${code}.`;
+  })
+);
+
+// Leere Slabs kaufen (Werkstatt › Material): das Gehäuse, das jeder Auftrag mit „Benoten + Slab“ verbraucht
+router.post('/grading/slabs-kaufen', (req, res) =>
+  handle(req, res, async () => {
+    const count = Number.parseInt(str(req.body.count), 10);
+    const { type, count: n, cost } = await items.buyItems({ user: req.user, type: 'slab', count: Number.isInteger(count) ? count : 1, via: 'grading' });
+    return `${n}× ${type.label} für ${euro(cost)} gekauft – sie liegen im Lager deiner Werkstatt.`;
   })
 );
 

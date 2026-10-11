@@ -345,6 +345,29 @@
     drawer.addEventListener('change', sync);
     sync();
   }
+  // Werkstatt › Material: Anzahl wählen (− / +), der Preis rechnet mit und die Rückfrage nennt die Summe
+  document.querySelectorAll('[data-gd-qty]').forEach(function (form) {
+    var input = form.querySelector('input[name="count"]');
+    var total = form.querySelector('[data-gd-qty-total]');
+    var price = +form.getAttribute('data-price') || 0;
+    var label = form.getAttribute('data-label') || 'Stück';
+    var fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    var max = +input.max || 10;
+    function sync() {
+      var n = Math.max(1, Math.min(max, parseInt(input.value, 10) || 1));
+      total.textContent = fmt.format((price * n) / 100);
+      form.setAttribute('data-confirm', n + '× ' + label + ' für ' + fmt.format((price * n) / 100) + ' kaufen?');
+    }
+    form.querySelectorAll('[data-gd-qty-step]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        input.value = Math.max(1, Math.min(max, (parseInt(input.value, 10) || 1) + (+b.getAttribute('data-gd-qty-step'))));
+        sync();
+      });
+    });
+    input.addEventListener('input', sync);
+    sync();
+  });
+
   // Kassenzettel: ein offener Bon schließt sich auch beim Antippen seiner Posten, nicht nur der Kopfzeile
   document.addEventListener('click', function (e) {
     var det = e.target.closest('.gd-bon details[open]');

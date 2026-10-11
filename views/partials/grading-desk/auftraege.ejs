@@ -3,7 +3,7 @@
   welchen Auftrag er annimmt – Liste links, Details und „Annehmen“ rechts (auf dem Handy nacheinander).
   Reiter „Angenommen“: bis max Aufträge gleichzeitig, einer davon aktiv (Werkbank) – je Auftrag Bearbeiten/Auswählen und Abbrechen.
   Locals: queue (mit lines), jobs (angenommene Aufträge, der aktive mit active: true), max, history (Bons), npc { left, limit, ok },
-  member { used, limit }, players (nimmt Mitglieder-Aufträge an), orderLevel, days { normal, express }, img, csrfToken,
+  member { used, limit }, slabs { free, left } (leere Slabs im Inventar / noch für neue Aufträge), players (nimmt Mitglieder-Aufträge an), orderLevel, days { normal, express }, img, csrfToken,
   labels (Schritt → Name). Unter orderLevel gibt es nur Laufkundschaft – Annehmen, Auswählen und Abbrechen gehen trotzdem.
 %>
 <%
@@ -20,6 +20,7 @@
   const stamp = (big) => `<b class="gd-ord-stamp${big ? ' is-big' : ''}">Express</b>`;
   // kind: member | npc – der Browser sperrt nach dem Annehmen die Knöpfe, deren Kontingent jetzt voll ist
   const accept = (fields, why, label, kind) => {
+    if (why === 'slab') return `<a class="gd-go is-off" href="/grading?reiter=werkstatt" data-gd-open="werkstatt">Leerer Slab fehlt – kaufen ▶</a>`;
     if (!why) return `<form method="post" action="/grading/auftrag" class="gd-ord-accept" data-ord-kind="${kind}"><input type="hidden" name="_csrf" value="${csrfToken}"><input type="hidden" name="reiter" value="auftraege">${fields}<button class="gd-go" type="submit">${label} ▶</button></form>`;
     if (why === 'full') return `<span class="gd-go is-off" aria-disabled="true">Voll ${jobs.length}/${max}</span>`;
     return '<span class="gd-go is-off" aria-disabled="true">Heute erledigt</span>';
@@ -36,6 +37,7 @@
       <% if (players) { %><span>Mitglieder <b data-ord-stat="member"><%= member.used %>/<%= member.limit %></b></span><% } %>
       <span>NPC <b data-ord-stat="npc"><%= npc.limit - npc.left %>/<%= npc.limit %></b></span>
       <span>Angenommen <b data-ord-stat="accepted"><%= jobs.length %>/<%= max %></b></span>
+      <span><a href="/grading?reiter=werkstatt" data-gd-open="werkstatt" title="Leere Slabs im Lager – je Auftrag mit „Benoten + Slab“ wird einer verbraucht. Nachkaufen in der Werkstatt.">Leere Slabs <b><%= slabs.free %></b></a></span>
     </p>
   </div>
 
@@ -89,7 +91,7 @@
               <li class="is-total"><span>Lohn</span><b>+<%= euro(o.price) %></b></li>
             </ul>
             <p class="gd-ord-facts"><span>Frist <b><%= d %> <%= d === 1 ? 'Tag' : 'Tage' %></b></span><span>Eingang bis <b><%= date(o.expiresAt) %></b></span></p>
-            <%- accept(`<input type="hidden" name="order" value="${id}">`, blocked, 'Annehmen', 'member') %>
+            <%- accept(`<input type="hidden" name="order" value="${id}">`, !blocked && o.services.slab && slabs.left < 1 ? 'slab' : blocked, 'Annehmen', 'member') %>
           </section>
         <% }) %>
         <section class="gd-ord-detail" data-ord-detail="npc" hidden>

@@ -9,7 +9,7 @@ const { UserError } = require('../lib/util');
 const { euro, slabCert } = require('../lib/viewHelpers');
 const { logSettingsChange } = require('../stats/settingsLog');
 const catalog = require('../tcg/catalog');
-const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
+const { rollGradingFoil, ITEM_TYPES, slabStock, takeItems } = require('../items/itemService');
 const foil = require('../items/foil');
 const estimate = require('./estimate');
 const { rnd, chance, pick, weighted, rollDefects, gradeFor, applyIron, creaseLine, ironCap, CREASE_SEGMENTS, PROFILES: CONDITION_PROFILES } = require('./condition');
@@ -30,7 +30,7 @@ const MS_PER_SEGMENT = 300; // Mindestzeit pro geglättetem Stück Knick beim B�
 const LEVELS = [
   { level: 1, name: 'Putzstube', steps: ['clean'], perk: 'Karten reinigen und zurückschicken' },
   { level: 2, name: 'Grading-Labor', steps: ['clean', 'iron'], perk: 'Knicke bügeln – auch eigene Karten; sauber geglättet bringt Extra-Lohn' },
-  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'iron', 'grade', 'slab'], perk: 'Karten benoten (1–10) und im Slab versiegeln – richtige Noten und saubere Versiegelung bringen Extra-Lohn; mit Glück ein Folienfund' },
+  { level: 3, name: 'Slab-Werkstatt', steps: ['clean', 'iron', 'grade', 'slab'], perk: 'Karten benoten (1–10) und im Slab versiegeln – richtige Noten und saubere Versiegelung bringen Extra-Lohn; mit Glück ein TCG Sleeve als Fund' },
   { level: 4, name: 'Premium-Labor', steps: ['clean', 'iron', 'grade', 'slab'], premium: true, perk: 'Karten von Mitgliedern annehmen, Preise festlegen, Vitrine – und Stammkunden zahlen besser (mehr Lohn)' },
 ];
 // Ab dieser Stufe kann man bügeln – Kundenkarten und eigene Karten
@@ -216,6 +216,8 @@ function usedToday({ done, open, level, day, source = 'npc' }) {
   const running = [].concat(open || []); // aktiver und angenommene Aufträge
   return done.filter((j) => j.level === level && of(j)).length + running.filter((j) => j.day === day && j.level === level && of(j)).length;
 }
+
+const NO_SLAB = 'Dir fehlt ein leerer Slab für diesen Auftrag – kauf einen in der Werkstatt (Material) oder im Handel.';
 
 /** So viele Aufträge kann ein Shop gleichzeitig angenommen haben (der aktive mitgezählt) */
 const MAX_ACCEPTED = 5;
@@ -482,10 +484,16 @@ async function upgrade({ user }) {
  * statt eines Fehlers – sonst würde die Transaktion samt Erstattung (Karte weg) zurückgerollt.
  */
 async function takePlayerJob({ user, info, orderId, status, session }) {
+  // Aufträge mit „Benoten + Slab“ brauchen je einen leeren Slab: genug für alle schon angenommenen und diesen? Sonst
+  // wird beim automatischen Annehmen der nächste Auftrag ohne Slab genommen, beim gezielten Annehmen gibt es einen Hinweis
+  const committed = await GradingJob.countDocuments({ user: user._id, status: { $in: RUNNING }, 'services.slab': true }).session(session);
+  const slabOk = (await slabStock(user._id, session)) > committed;
   // Express zuerst, sonst der älteste; die Frist beginnt beim ersten Arbeitsbeginn neu (Express: kürzer), nach einem
   // Abbruch läuft sie weiter (orderService.startSet)
-  const next = await GradingOrder.findOne({ shop: user._id, status: 'wartet', ...(orderId ? { _id: orderId } : {}) }).sort(orders().QUEUE_SORT).select('services firstStartedAt').session(session).lean();
+  const noSlab = slabOk || orderId ? {} : { services: { $ne: null }, 'services.slab': { $ne: true } };
+  const next = await GradingOrder.findOne({ shop: user._id, status: 'wartet', ...(orderId ? { _id: orderId } : {}), ...noSlab }).sort(orders().QUEUE_SORT).select('services firstStartedAt').session(session).lean();
   if (!next) return orderId ? { error: 'Dieser Auftrag ist nicht mehr im Eingang – vielleicht wurde er storniert oder ist abgelaufen.' } : null;
+  if (orderId && !slabOk && orders().servicesOf(next).slab) return { error: NO_SLAB };
   const order = await GradingOrder.findOneAndUpdate({ _id: next._id, status: 'wartet' }, { $set: orders().startSet(next) }, { new: true, session }).lean();
   if (!order) return orderId ? { error: 'Dieser Auftrag ist nicht mehr im Eingang.' } : null;
   const card = await TcgCard.findOne({ _id: order.doc, user: order.owner }).select('card condition').session(session).lean();
@@ -722,6 +730,12 @@ async function finishPlayerJob({ job, shop, session }) {
   if (job.services && job.services.review) return finishReview({ job, shop, order, now, session });
   const d = job.defects.toObject ? job.defects.toObject() : job.defects;
   const slabbed = stepsFor(job).includes('slab');
+  // Das Gehäuse verbraucht der Shop: ein leerer Slab aus seinem Inventar je Versiegelung (Zweitprüfung nicht: dort bleibt
+  // der Slab, nur das Etikett wird getauscht). Fehlt er, bleibt der Auftrag offen – nachkaufen und noch einmal senden.
+  if (slabbed) {
+    if (!(await slabStock(job.user, session))) throw new UserError(NO_SLAB);
+    await takeItems({ userId: job.user, type: 'slab', source: 'versiegeln', session, meta: { card: job.card } });
+  }
   const set = slabbed ? { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now, cert: slabCert(order.doc) } } : {};
   if (job.iron) Object.assign(set, { 'condition.defects': d, 'condition.grade': job.grade, ironedAt: now, creased: !!d.crease, damaged: (d.scratches || []).length > 0 || !!d.crease });
   const res = Object.keys(set).length ? await TcgCard.updateOne({ _id: order.doc, user: order.owner }, { $set: set }, { session }) : { matchedCount: await TcgCard.countDocuments({ _id: order.doc, user: order.owner }).session(session) };
@@ -759,7 +773,7 @@ async function finishReview({ job, shop, order, now, session }) {
 
 /**
  * Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben (Spieler-Aufträge: den Preis des Auftrags).
- * clean = Sauberkeit 0–100 %. Wer versiegelt (ab Stufe 3), findet mit kleiner Chance eine Folie fürs Inventar.
+ * clean = Sauberkeit 0–100 %. Wer versiegelt (ab Stufe 3), findet mit kleiner Chance einen TCG Sleeve fürs Inventar.
  */
 async function finishJob({ user, jobId, clean, seal }) {
   const done = await inTransaction(async (session) => {
@@ -793,7 +807,7 @@ async function finishJob({ user, jobId, clean, seal }) {
     const score = await scoreShop({ shopId: user._id, job, session });
     return { ...job.toObject(), order, breakdown, score };
   });
-  if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });
+  if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir ein TCG Sleeve übrig geblieben – er liegt in deinem Inventar.' });
   if (done.order) {
     const name = (catalog.cardById[done.card] || {}).name || done.card;
     const r = done.order.result;
@@ -842,4 +856,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, SHOP_NAME_MIN, SHOP_NAME_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, abortJob, selectJob, MAX_ACCEPTED, dayQuota, workedMs, activate, park, setGuess, finishJob, isWorking };
+module.exports = { NO_SLAB, TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, SHOP_NAME_MIN, SHOP_NAME_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, abortJob, selectJob, MAX_ACCEPTED, dayQuota, workedMs, activate, park, setGuess, finishJob, isWorking };

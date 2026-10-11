@@ -20,7 +20,7 @@ const { lockedDocs, isLocked, pickCopy, claim, copiesByCard, lockLabel } = requi
 const { damageCards, dungeonSeverity, damageText } = require('../grading/damage');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
 const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
-const { grantItems } = require('../items/itemService');
+const { grantItems, splitFoilDrops } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
 const { cleanFloorTexts, applyFloorTexts, towerQuota } = require('./tower');
@@ -42,7 +42,7 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 // ---------- Einstellungen (Admin) ----------
 // open = für alle Mitglieder (sonst nur Admins); intervalHours = Abstand der Starts
 // required / rewards = Ziel-Punkte und Lohn (Cent pro Spieler) für [Trash 1, Trash 2, Boss]
-// foilChance / cardChance = Chance in % pro Spieler auf eine Folie bzw. die Boss-Karte (nur wenn der Boss fällt)
+// foilChance / cardChance = Chance in % pro Spieler auf einen Fund (TCG Sleeve oder leerer Slab) bzw. die Boss-Karte (nur wenn der Boss fällt)
 // botWeights = Gewicht je Seltenheit für die Karte eines Bots
 // tower = Mage Tower: open (zusätzlich zu open), Ziel-Punkte der ersten Runde und Anstieg pro Runde (%), Lohn pro Spieler
 // für Runde 1 und Zuwachs je weitere Runde (Cent), Beute-Chance pro geschaffter Runde und ihre Obergrenze (%),
@@ -915,8 +915,10 @@ async function finishDue({ now = Date.now() } = {}) {
   for (const { _id } of due) {
     try {
       const hits = new Map(); // Schaden je Mitglied (#204): userId → [{ card, kind }]
+      const slabFinders = new Set(); // wer statt eines TCG Sleeves einen leeren Slab gefunden hat (nur für die Nachricht)
       const run = await inTransaction(async (session) => {
         hits.clear(); // die Transaktion kann wiederholt werden
+        slabFinders.clear();
         const r = await DungeonRun.findOneAndUpdate({ _id, status: 'laeuft' }, { $set: { status: 'fertig', chat: [] } }, { new: true, session });
         if (!r) return null;
         const d = defOf(r.dungeon);
@@ -934,7 +936,11 @@ async function finishDue({ now = Date.now() } = {}) {
           await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
           await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
         }
-        if (foils.length) await grantItems({ userIds: foils, type: 'folie', source: 'dungeon', session });
+        // Funde: ein Teil (Einstellung slabDropPercent) ist ein leerer Slab, der Rest ein TCG Sleeve
+        const drops = splitFoilDrops(foils);
+        if (drops.sleeves.length) await grantItems({ userIds: drops.sleeves, type: 'folie', source: 'dungeon', session });
+        if (drops.slabs.length) await grantItems({ userIds: drops.slabs, type: 'slab', source: 'dungeon', session });
+        drops.slabs.forEach((u) => slabFinders.add(String(u)));
         // Verloren: Charakter- und Boost-Karte (unfoliert) können Kratzer oder einen Knick abbekommen – Kaffee und
         // Energy werden ohnehin verbraucht (#204)
         if (!r.success) {
@@ -951,7 +957,7 @@ async function finishDue({ now = Date.now() } = {}) {
       const card = bossCardOf(run.dungeon);
       const where = run.mode === 'tower' ? 'Mage Tower' : d ? d.title : 'Dungeon';
       for (const m of run.members.filter((x) => x.user)) {
-        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? 'eine Folie' : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
+        const loot = [m.reward > 0 ? euroText(m.reward) : null, m.foil ? (slabFinders.has(String(m.user)) ? 'einen leeren Slab' : 'einen TCG Sleeve') : null, m.bossCard && card ? `die Boss-Karte „${card.name}“` : null].filter(Boolean);
         let head = run.success ? `${d ? d.title : 'Dungeon'} geschafft!` : `${d ? d.title : 'Dungeon'}: Rückzug.`;
         if (run.mode === 'tower') head = `Mage Tower: ${towerResultText(run.rounds)}.`;
         await notify([m.user], { area: 'Dungeon', href: '/dungeon', text: loot.length ? `${head} Beute: ${loot.join(', ')}.` : `${head} Diesmal ohne Beute.` });

@@ -8,6 +8,9 @@ const { addDamage, gradeFor, CONDITION_VERSION } = require('./condition');
 
 // Chance je eingesetzter Karte: [knappe Niederlage, Totalausfall] – dazwischen linear nach der Schwere
 const CHANCE = { kratzer: [0.08, 0.2], knick: [0.005, 0.03] };
+// Versand an einen Grading-Shop (orderService.submit): eine Karte ohne Sleeve riskiert unterwegs wie bei einer verlorenen
+// Quest einen Kratzer, selten einen Knick – ein kleines Risiko (ca. 9 %), darum nur ein Hauch über „knapp verloren“
+const SHIPPING_SEVERITY = 0.05;
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
 /** Chance für 'kratzer' oder 'knick' bei Schwere s (0 = knapp, 1 = Totalausfall) */
@@ -76,4 +79,4 @@ function damageText(hits, cardName, where) {
   return `${where}: Deine Karte${hits.length > 1 ? 'n haben' : ' hat'} etwas abbekommen – ${joined}. Folierte Karten sind geschützt.`;
 }
 
-module.exports = { CHANCE, chanceFor, rollDamage, shortfall, ihkSeverity, dungeonSeverity, damageCards, damageText };
+module.exports = { CHANCE, SHIPPING_SEVERITY, chanceFor, rollDamage, shortfall, ihkSeverity, dungeonSeverity, damageCards, damageText };

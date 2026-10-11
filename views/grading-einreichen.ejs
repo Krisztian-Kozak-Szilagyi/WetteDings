@@ -27,6 +27,7 @@
 
       <section class="gs-step">
         <h2><span class="gs-num">1</span> Karte wählen</h2>
+        <p class="small muted gs-risk">🛡️ <b>Mit TCG Sleeve</b> ist die Karte beim Versand geschützt – der Sleeve bleibt dafür beim Shop. <b>Ohne Sleeve</b> besteht ein kleines Risiko (ca. <%= shipRisk %> %), dass sie unterwegs einen Kratzer oder, selten, einen Knick abbekommt.</p>
         <div class="tabs gs-filter" role="group" aria-label="Karten filtern">
           <% [['alle', 'Alle'], ['spuren', 'Mit Spuren'], ['knick', 'Mit Knick'], ['slab', 'Slabs (Zweitprüfung)']].forEach(([k, label], i) => { %>
             <button type="button" class="tab <%= i ? '' : 'active' %>" data-gs-filter="<%= k %>" aria-pressed="<%= i ? 'false' : 'true' %>"><%= label %></button>
@@ -35,7 +36,7 @@
         <div class="tcg-grid gs-cards">
           <% cards.forEach((c) => { const r = rarityByKey[c.rarity] || { label: '' }; const ironable = c.creased && !c.ironed; %>
             <label class="tcg-slot gs-card r-<%= c.rarity %>" data-kind="<%= c.slab ? 'slab' : [c.damaged ? 'spuren' : '', ironable ? 'knick' : ''].join(' ') %>">
-              <input type="radio" name="doc" value="<%= c.id %>" data-ironable="<%= ironable ? 1 : 0 %>" data-slab="<%= c.slab ? c.slab.code : '' %>" data-name="<%= c.card.name %>" required>
+              <input type="radio" name="doc" value="<%= c.id %>" data-ironable="<%= ironable ? 1 : 0 %>" data-sleeve="<%= c.foiledAt && !c.slab ? 1 : 0 %>" data-slab="<%= c.slab ? c.slab.code : '' %>" data-name="<%= c.card.name %>" required>
               <% if (c.slab) { %>
                 <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c.card, rarityLabel: r.label, slab: c.slab, id: c.id }) %></span>
               <% } else if (c.foiledAt) { %>
@@ -47,7 +48,7 @@
                   <% if (c.marks) { %><button type="button" class="hb-loupe"<%- copyViewAttrs(c.card, r.label, c.marks, { note: 'Exemplar' }) %> aria-label="<%= c.card.name %> genau ansehen" title="Genau ansehen">🔍</button><% } %>
                 </span>
               <% } %>
-              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Folie geht ab' : c.damaged ? ' · Spuren' : '' %></span>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.damaged ? ' · Spuren' : '' %></span>
             </label>
           <% }) %>
         </div>
@@ -85,11 +86,12 @@
         <h2><span class="gs-num">3</span> Shop wählen</h2>
         <div class="gs-shops">
           <% others.forEach((s, i) => { %>
-            <label class="gs-shop" data-prices="<%= JSON.stringify(s.prices) %>" data-code="<%= s.code %>">
+            <label class="gs-shop" data-prices="<%= JSON.stringify(s.prices) %>" data-code="<%= s.code %>" data-slabs="<%= s.slabs %>">
               <input type="radio" name="shop" value="<%= s.code %>" <%= (pick ? pick === s.code : i === 0) ? 'checked' : '' %> required>
               <span class="gs-shop-head"><b><%= s.name %></b> <span class="gr-shop-code"><%= s.code %></span></span>
               <%- include('partials/grading-rating', { r: s.rating, owner: s.owner }) %>
               <span class="gs-shop-price"><b data-gs-total><%= euro(s.prices.base + s.prices.slab) %></b> für deine Auswahl · <%= s.queue ? s.queue + ' in der Warteschlange' : 'keine Warteschlange' %></span>
+              <span class="gs-shop-stock small<%= s.slabs ? ' muted' : ' is-out' %>" data-gs-stock><%= s.slabs ? s.slabs + (s.slabs === 1 ? ' leerer Slab' : ' leere Slabs') + ' auf Lager' : 'Keine leeren Slabs – „Benoten + Slab“ nicht möglich' %></span>
               <span class="gs-shop-list muted small"><% services.forEach((sv, j) => { %><%= j ? ' · ' : '' %><%= sv.short %> <%= euro(s.prices[sv.key]) %><% }) %></span>
               <% if (s.showcase.length) { %>
                 <span class="gs-shop-showcase">

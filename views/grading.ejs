@@ -85,7 +85,8 @@
       const svc = sv.review ? ['Zweitprüfung'] : ['Reinigung', sv.iron && 'Bügeln', sv.slab && 'Benoten + Slab', sv.express && 'Express'].filter(Boolean);
       return { card: o.cardInfo, title: o.cardInfo ? o.cardInfo.name : o.card, who: o.ownerName, at: o.doneAt, svc, lines: linesOf(o.priceParts, true), total: done ? o.price : null, note: res + (o.stars ? ' · ' + '★'.repeat(o.stars) : ''), void: !done };
     });
-    const nextOrder = waiting && playerUsed < playerLimit ? queue[0] : null;
+    // nächster Auftrag auf der Matte: der erste, den der Shop auch erledigen kann (Slab-Aufträge brauchen einen leeren Slab)
+    const nextOrder = waiting && playerUsed < playerLimit ? queue.find((o) => !o.services.slab || slabs.left > 0) || null : null;
     const canTake = used < limit || !!nextOrder;
     const ownedTools = tools.filter((t) => t.owned).length;
     const milesDone = milestones.filter((m) => m.done).length;
@@ -99,7 +100,7 @@
       { key: 'vitrine', sheet: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je seltener und besser benotet, desto schneller wächst deine Reputation. In der Schublade setzt du Häkchen bei den Slabs, die in die Vitrine sollen, und speicherst. Ausgestellte Slabs lassen sich nicht handeln. Tippe in der Vitrine einen Slab an, um ihn zu bewundern.' },
       { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen aus dem Admin-Panel. Neue Preise gelten für neue Aufträge, offene behalten ihren Preis. Günstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
       { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte. Gute Bewertungen bringen Reputation – und neue Kunden.' },
-      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `Shop: Name ändern geht frei, ein neues Kürzel muss ein Admin freigeben – ältere Slabs behalten das alte. Ausbau: jede Stufe schaltet neue Arbeitsschritte frei und bringt mehr Lohn; Mauszeiger über eine Stufe zeigt, was sie bringt. Werkzeuge: Komfort am Tisch, ohne Extra-Lohn – Mauszeiger darüber zeigt die Wirkung. Ruf: wächst mit +${repRules.base} je Auftrag (bei guter Qualität mehr), ×${repRules.player} bei Mitglieder-Aufträgen, ±${repRules.star} je Stern über oder unter 3 und bis +${Math.round(repRules.cap * 100)} % durch Slabs in der Vitrine. Die Fahnen sind die vier Ruf-Stufen, der gelbe Mast füllt sich bis zu deinem Stand.` },
+      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `Shop: Name ändern geht frei, ein neues Kürzel muss ein Admin freigeben – ältere Slabs behalten das alte. Ausbau: jede Stufe schaltet neue Arbeitsschritte frei und bringt mehr Lohn; Mauszeiger über eine Stufe zeigt, was sie bringt. Werkzeuge: Komfort am Tisch, ohne Extra-Lohn – Mauszeiger darüber zeigt die Wirkung.${players ? ' Material: Für jeden Auftrag mit „Benoten + Slab“ verbraucht dein Shop einen leeren Slab – hier kaufst du Nachschub (oder im Handel).' : ''} Ruf: wächst mit +${repRules.base} je Auftrag (bei guter Qualität mehr), ×${repRules.player} bei Mitglieder-Aufträgen, ±${repRules.star} je Stern über oder unter 3 und bis +${Math.round(repRules.cap * 100)} % durch Slabs in der Vitrine. Die Fahnen sind die vier Ruf-Stufen, der gelbe Mast füllt sich bis zu deinem Stand.` },
       { key: 'meilensteine', sheet: 'meilensteine', title: 'Erfolge', text: 'Meilensteine rund ums Grading, als Medaillen im Regal. Golden = geschafft, dunkel = noch offen mit Fortschrittsbalken. Mauszeiger über eine Medaille zeigt die Aufgabe.' },
       { key: 'buegeln', sheet: 'buegeln', title: 'Eigene Karten bügeln', text: 'Karten mit Knick aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – Vorsicht vor Brandflecken. Ein Versuch je Karte.' },
       { key: 'karton', title: 'Selbst einreichen', text: 'Lass eigene Karten bei einem anderen Shop graden – so kommst du an Slabs für deine Vitrine.' },
@@ -263,6 +264,7 @@
           max: maxAccepted,
           labels: Object.fromEntries(Object.entries(STEP).map(([k, v]) => [k, v[0]])),
           history: histBons,
+          slabs,
           players,
           orderLevel,
           member: { used: playerUsed, limit: playerLimit },
@@ -448,6 +450,35 @@
         <% }) %>
       </ul>
       </div>
+      <%# Material: leere Slabs kaufen – jeder Auftrag mit „Benoten + Slab“ verbraucht einen (src/items, gradingService.NO_SLAB) %>
+      <% if (players) { %>
+      <section class="gd-wk-col gd-stock" aria-label="Material">
+        <h3 class="gd-sheet-sub">Material</h3>
+        <div class="gd-stock-card">
+          <img class="gd-stock-img" src="<%= slabShop.image %>" alt="" width="56" height="78" loading="lazy">
+          <div class="gd-stock-text">
+            <b>Leerer Slab</b>
+            <small>Das Gehäuse zum Versiegeln – je Auftrag mit „Benoten + Slab“ wird einer verbraucht.</small>
+          </div>
+        </div>
+        <dl class="gr-facts">
+          <dt>Auf Lager</dt><dd data-gd-stock-free><%= slabs.free %></dd>
+          <dt>Für Aufträge reserviert</dt><dd title="Angenommene und wartende Aufträge mit „Benoten + Slab“"><%= slabs.free - slabs.left %></dd>
+          <dt>Noch frei für neue</dt><dd><%= slabs.left %></dd>
+        </dl>
+        <form method="post" action="/grading/slabs-kaufen" class="gd-stock-buy" data-gd-qty data-price="<%= slabShop.price %>" data-label="Leere Slabs" data-confirm="1× Leerer Slab für <%= euro(slabShop.price) %> kaufen?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('werkstatt') %>
+          <span class="gd-qty" role="group" aria-label="Anzahl">
+            <button type="button" data-gd-qty-step="-1" aria-label="Einen weniger">−</button>
+            <input type="number" name="count" min="1" max="<%= slabShop.max %>" value="1" inputmode="numeric" aria-label="Anzahl">
+            <button type="button" data-gd-qty-step="1" aria-label="Einen mehr">+</button>
+          </span>
+          <button class="btn btn-primary" type="submit" data-gd-qty-submit <%= currentUser.balance < slabShop.price ? 'disabled' : '' %>>Kaufen · <span data-gd-qty-total><%= euro(slabShop.price) %></span></button>
+        </form>
+        <p class="small gd-stock-note">Zu <%= euro(slabShop.price) %> das Stück. Auch im <a href="/handel">Handel</a> von anderen Mitgliedern zu haben; die Bank kauft einen leeren Slab für <%= euro(slabShop.sell) %> zurück.</p>
+      </section>
+      <% } %>
       <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min)) : 0; const pct = Math.min(100 - 50 / nT, 50 / nT + (ti + prog) * (100 / nT)); const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast']; %>
       <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, ±<%= repRules.star %> je Stern über oder unter 3, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine">
         <h3 class="gd-sheet-sub">Ruf</h3>

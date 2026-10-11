@@ -10,27 +10,45 @@
 //                        (Tücher, Hüllen, Boxen …), skaliert auch bei Tausenden Stück
 //   tradable: im Handel anbietbar (derzeit nur bei storage 'stueck')
 //   sell:     Ankaufspreis der Bank in Cent (0 = Bank kauft nicht an)
+//   buy:      Verkaufspreis der Bank in Cent (0 = nicht im Shop); im Admin-Panel einstellbar (items/foil.js, PRICE_FIELD)
+//   via:      wo man ihn kauft: 'bank' = Bank-Shop im Inventar, 'grading' = nur über die Werkstatt eines Grading-Shops
+//             (setzt einen aktiven Shop voraus). Ohne buy egal.
 //   image:    Bild (/img/items/…)
 //   text:     Beschreibung im Inventar
 const CATEGORIES = [
-  { key: 'material', label: 'Material' }, // wird bei einer Arbeit verbraucht (z. B. Folie)
+  { key: 'material', label: 'Material' }, // wird bei einer Arbeit verbraucht (z. B. leerer Slab beim Versiegeln)
   { key: 'werkzeug', label: 'Werkzeug' }, // bleibt erhalten, schaltet etwas frei
   { key: 'verpackung', label: 'Verpackung' }, // Hüllen, Toploader, Boxen …
 ];
 
 // Woher ein Gegenstand kommt / wohin er geht (Item.source, ItemLog.source)
-const SOURCES = ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren', 'blackmarket'];
+const VIA = ['bank', 'grading'];
+const SOURCES = ['admin', 'grading', 'dungeon', 'handel', 'lotto', 'kampf', 'bank', 'folieren', 'blackmarket', 'versiegeln'];
 
 const ITEM_TYPES = [
   {
-    key: 'folie',
-    label: 'Folie',
-    category: 'material',
+    key: 'folie', // Schlüssel bleibt (steht in der Datenbank) – im Spiel heißt die Folie jetzt „TCG Sleeve“
+    label: 'TCG Sleeve',
+    category: 'verpackung',
     storage: 'stueck',
     tradable: true,
     sell: 1000,
+    buy: 1500,
+    via: 'bank',
     image: '/img/items/folie.svg',
-    text: 'Schutzhülle für eine deiner Karten: Folierte Karten spielen weiter mit und sind auf Quests, im Dungeon und im Turm vor Kratzern und Knicken geschützt. Die Note bleibt geheim – die zeigt nur ein Slab. Verkaufen an die Bank und Duelle gehen nicht.',
+    text: 'Schutzhülle für eine Karte: Sie spielt weiter mit und ist auf Quests, im Dungeon und im Turm vor Kratzern und Knicken sicher. Die Note zeigt nur ein Slab. Abziehen im Album gibt dir den Sleeve zurück. Karten im Sleeve gehen nicht an die Bank und nicht ins Duell.',
+  },
+  {
+    key: 'slab',
+    label: 'Leerer Slab',
+    category: 'material',
+    storage: 'stueck',
+    tradable: true,
+    sell: 2500,
+    buy: 4000,
+    via: 'grading',
+    image: '/img/items/slab.svg',
+    text: 'Das Gehäuse, in das ein Grading-Shop eine Karte einschweißt – jeder Auftrag mit „Benoten + Slab“ verbraucht einen. Kaufen: Werkstatt deines Grading-Shops oder Handel.',
   },
 ];
 
@@ -47,6 +65,10 @@ function validateTypes(types = ITEM_TYPES) {
     if (t.storage !== 'stueck' && t.storage !== 'stapel') throw new Error(`Gegenstand "${t.key}": storage muss 'stueck' oder 'stapel' sein`);
     if (t.tradable && t.storage !== 'stueck') throw new Error(`Gegenstand "${t.key}": Handel geht nur mit storage 'stueck'`);
     if (!Number.isInteger(t.sell) || t.sell < 0) throw new Error(`Gegenstand "${t.key}": sell muss ganze Cent ≥ 0 sein`);
+    const buy = t.buy === undefined ? 0 : t.buy; // ohne Angabe: nicht im Bank-Shop
+    if (!Number.isInteger(buy) || buy < 0) throw new Error(`Gegenstand "${t.key}": buy muss ganze Cent ≥ 0 sein`);
+    if (t.via !== undefined && !VIA.includes(t.via)) throw new Error(`Gegenstand "${t.key}": via muss 'bank' oder 'grading' sein`);
+    if (buy && buy < t.sell) throw new Error(`Gegenstand "${t.key}": die Bank darf nicht billiger verkaufen (${buy}) als sie ankauft (${t.sell}) – sonst ließe sich Geld drucken`);
   }
   return true;
 }

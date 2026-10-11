@@ -207,3 +207,18 @@ test('#204: Schnell-Tags zur Bewertung – aus dem Katalog, höchstens drei, lee
   assert.throws(() => orders.validTags(['<script>']), /gibt es nicht/);
   assert.ok(orders.REVIEW_TAGS.some((t) => t.good) && orders.REVIEW_TAGS.some((t) => !t.good));
 });
+
+test('#204: Versand ohne Sleeve – kleines Risiko für Kratzer, selten Knick (wie nach einer knapp verlorenen Quest)', () => {
+  const damage = require('../src/grading/damage');
+  const s = damage.SHIPPING_SEVERITY;
+  const kratzer = damage.chanceFor('kratzer', s);
+  const knick = damage.chanceFor('knick', s);
+  assert.ok(s > 0 && s < 0.2, 'nur ein Hauch über „knapp verloren“');
+  assert.ok(kratzer > 0.08 && kratzer < 0.1, `Kratzer ca. 9 % (${kratzer})`);
+  assert.ok(knick > 0.005 && knick < 0.01, `Knick unter 1 % (${knick})`);
+  assert.ok(kratzer + knick < 0.1, 'insgesamt unter 10 %');
+  assert.equal(damage.rollDamage(s, 0), 'knick'); // erst der seltene Knick
+  assert.equal(damage.rollDamage(s, knick + 0.001), 'kratzer');
+  assert.equal(damage.rollDamage(s, knick + kratzer + 0.001), null); // der Normalfall
+  assert.equal(damage.rollDamage(s, 0.5), null);
+});

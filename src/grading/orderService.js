@@ -1,7 +1,7 @@
 // Spieler-Aufträge im Grading (#204, Etappe B): Mitglieder reichen eigene Karten bei Grading-Shops anderer Mitglieder
 // ein. Ablauf:
 //   einreichen mit gebuchten Bausteinen (Reinigung immer, dazu Bügeln und/oder Benoten + Slab, optional Express; Preis
-//   = Summe der Festpreise des Shops, wird eingezogen, Karte gesperrt, eine Folie geht ab) → der Shop nimmt den Auftrag
+//   = Summe der Festpreise des Shops, wird eingezogen, Karte gesperrt, ein TCG Sleeve kommt zurück ins Inventar) → der Shop nimmt den Auftrag
 //   an (Express zuerst, vor den NPC-Aufträgen, gradingService.takeJob) → putzt und erledigt die gebuchten Schritte → die
 //   Karte kommt gebügelt bzw. als Slab mit Kürzel und Note des Shops zurück, der Shop bekommt den Preis
 //   (gradingService.finishJob) → der Kunde kann 1–5 Sterne geben.
@@ -19,6 +19,8 @@ const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, claim, lockLabel } = require('../tcg/locks');
 const { visibleMarks } = require('./condition');
+const items = require('../items/itemService');
+const { damageCards, SHIPPING_SEVERITY } = require('./damage');
 const reputation = require('./reputation');
 const { settings, SERVICES } = require('./gradingService');
 
@@ -133,7 +135,7 @@ function boostOf(showcase = []) {
 }
 
 /** Shop für die Anzeige: Kennzahlen, Preis, Warteschlange, Vitrine, Boost */
-function shopView(s, owners, queues, showcases) {
+function shopView(s, owners, queues, showcases, slabs = new Map()) {
   const showcase = showcases.get(String(s._id)) || [];
   return {
     id: String(s._id),
@@ -143,6 +145,7 @@ function shopView(s, owners, queues, showcases) {
     level: s.level,
     prices: shopPrices(s),
     queue: queues.get(String(s._id)) || 0,
+    slabs: slabs.get(String(s._id)) || 0, // frei verfügbare leere Slabs für neue Aufträge mit „Benoten + Slab“
     rating: reputation.ratingOf(s),
     showcase,
     boost: boostOf(showcase),
@@ -157,15 +160,28 @@ async function queuesOf(shopIds) {
   return new Map(rows.map((r) => [String(r._id), r.n]));
 }
 
+/**
+ * Leere Slabs, die ein Shop noch für neue Aufträge hat: freie Slabs im Inventar minus die schon zugesagten Aufträge mit
+ * „Benoten + Slab“ (wartend oder in Arbeit) – so bleibt kein Kunde auf einem Auftrag sitzen, den der Shop nicht versiegeln
+ * kann. Map shopId → Anzahl (nie negativ).
+ */
+async function slabCapacity(shopIds, session = null) {
+  const rows = await GradingOrder.aggregate([{ $match: { shop: { $in: shopIds }, status: { $in: OPEN }, 'services.slab': true } }, { $group: { _id: '$shop', n: { $sum: 1 } } }]).session(session);
+  const committed = new Map(rows.map((r) => [String(r._id), r.n]));
+  const out = new Map();
+  for (const id of shopIds) out.set(String(id), Math.max(0, (await items.slabStock(id, session)) - (committed.get(String(id)) || 0)));
+  return out;
+}
+
 /** Alle Shops, die Spieler-Aufträge annehmen – nach Reputation sortiert (eigener Shop mit dabei, markiert vom Aufrufer) */
 async function shopsForOrders() {
   const shops = await GradingShop.find({ active: true, level: { $gte: ORDER_LEVEL }, code: { $type: 'string' } }).lean();
   const ids = shops.map((s) => s._id);
-  const [users, queues, showcases] = await Promise.all([User.find({ _id: { $in: ids }, deletedAt: null }).select('username').lean(), queuesOf(ids), showcasesOf(shops)]);
+  const [users, queues, showcases, slabs] = await Promise.all([User.find({ _id: { $in: ids }, deletedAt: null }).select('username').lean(), queuesOf(ids), showcasesOf(shops), slabCapacity(ids)]);
   const owners = new Map(users.map((u) => [String(u._id), u.username]));
   return shops
     .filter((s) => owners.has(String(s._id)))
-    .map((s) => shopView(s, owners, queues, showcases))
+    .map((s) => shopView(s, owners, queues, showcases, slabs))
     .sort((a, b) => b.rating.reputation - a.rating.reputation || a.name.localeCompare(b.name, 'de'));
 }
 
@@ -173,9 +189,9 @@ async function shopsForOrders() {
 async function shopByCode(code) {
   const s = await GradingShop.findOne({ code: String(code || '').toUpperCase() }).lean();
   if (!s) return null;
-  const [user, queues, showcases] = await Promise.all([User.findById(s._id).select('username deletedAt').lean(), queuesOf([s._id]), showcasesOf([s])]);
+  const [user, queues, showcases, slabs] = await Promise.all([User.findById(s._id).select('username deletedAt').lean(), queuesOf([s._id]), showcasesOf([s]), slabCapacity([s._id])]);
   if (!user || user.deletedAt) return null;
-  return { ...shopView(s, new Map([[String(s._id), user.username]]), queues, showcases), accepts: acceptsOrders(s) };
+  return { ...shopView(s, new Map([[String(s._id), user.username]]), queues, showcases, slabs), accepts: acceptsOrders(s) };
 }
 
 /**
@@ -236,8 +252,10 @@ async function setPrices({ user, prices }) {
 
 /**
  * Karte einreichen mit gebuchten Bausteinen (services: { iron, slab, express }): mindestens Bügeln oder Benoten + Slab,
- * Bügeln nur bei einem ungebügelten Knick. Eigener Shop geht nicht, Shop muss Spieler-Aufträge annehmen. Eine Folie geht
- * ab (eine Karte im Slab muss erst aufgebrochen werden), der Preis wird eingezogen, die Karte ist bis zur Rückgabe gesperrt.
+ * Bügeln nur bei einem ungebügelten Knick. Eigener Shop geht nicht, Shop muss Spieler-Aufträge annehmen. Ein TCG Sleeve
+ * bleibt beim Shop (liegt danach in dessen Inventar) – dafür ist die Karte beim Versand geschützt; ohne Sleeve besteht ein
+ * kleines Risiko für Kratzer oder Knick (damage.SHIPPING_SEVERITY). Eine Karte im Slab muss erst aufgebrochen werden.
+ * Der Preis wird eingezogen, die Karte ist bis zur Rückgabe gesperrt.
  */
 async function submit({ user, shopCode, doc, services }) {
   if (!mongoose.isValidObjectId(doc)) throw new UserError('Diese Karte gibt es nicht.');
@@ -249,8 +267,12 @@ async function submit({ user, shopCode, doc, services }) {
   if (String(shop._id) === String(user._id)) throw new UserError('Deine eigene Karte kannst du nicht bei deinem eigenen Shop einreichen.');
   const { parts, total: price } = priceOf(shop, want);
   let order;
+  let shipDamage = []; // Schaden auf dem Versand: [{ card, kind }]
+  let sleeveSent = false; // ein TCG Sleeve ging an den Shop
   try {
     order = await inTransaction(async (session) => {
+      shipDamage = []; // die Transaktion kann wiederholt werden
+      sleeveSent = false;
       const card = await TcgCard.findOne({ _id: doc, user: user._id }).select('card foiledAt slab condition.defects.crease condition.defects.ironed').session(session).lean();
       if (!card) throw new UserError('Diese Karte gehört dir nicht (mehr).');
       // Zweitprüfung nur für Slabs eines anderen Shops; sonst nur Karten ohne Slab
@@ -262,10 +284,19 @@ async function submit({ user, shopCode, doc, services }) {
       if (want.iron && !(defects.crease && !defects.ironed)) throw new UserError('Diese Karte hat keinen Knick, den man noch bügeln kann.');
       const reason = (await lockedDocs(user._id, session)).reasons.get(String(card._id));
       if (reason && reason !== (want.review ? 'slab' : 'folie')) throw new UserError(`Die Karte ist gerade gesperrt (${lockLabel(reason)}).`);
+      if (want.slab && !(await slabCapacity([shop._id], session)).get(String(shop._id))) throw new UserError(`${shop.name || shop.code} hat gerade keine leeren Slabs – wähle einen anderen Shop oder nur „Knick bügeln“.`);
       const paid = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: price } }, { $inc: { balance: -price } }, { new: true, session });
       if (!paid) throw new UserError(`Dein Guthaben reicht nicht – der Auftrag kostet ${euro(price)}.`);
       await claim([card._id], user._id, session);
-      if (card.foiledAt && !want.review) await TcgCard.updateOne({ _id: card._id }, { $set: { foiledAt: null } }, { session });
+      if (card.foiledAt && !want.review) {
+        // Karte im Sleeve: die Hülle schützt sie beim Versand und bleibt beim Shop – sie landet in dessen Inventar
+        await TcgCard.updateOne({ _id: card._id }, { $set: { foiledAt: null } }, { session });
+        await items.addItems({ userIds: [shop._id], type: 'folie', source: 'grading', session, meta: { card: card.card, from: String(user._id) } });
+        sleeveSent = true;
+      } else if (!want.review) {
+        // ohne Sleeve: kleines Risiko für Kratzer, selten einen Knick – der Shop bekommt die Karte so, wie sie ankommt
+        shipDamage = await damageCards({ userId: user._id, docs: [card._id], severity: SHIPPING_SEVERITY, session });
+      }
       const [created] = await GradingOrder.create(
         [{ owner: user._id, ownerName: user.username, shop: shop._id, shopCode: shop.code, shopName: shop.name, doc: card._id, card: card.card, price, priceParts: parts, services: want, expiresAt: deadline(Date.now(), settings, want) }],
         { session }
@@ -278,8 +309,12 @@ async function submit({ user, shopCode, doc, services }) {
     throw err;
   }
   const what = SERVICES.filter(({ key }) => key !== 'base' && want[key]).map((x) => x.short).join(', ');
-  await notify(shop._id, { area: 'Grading', href: SHOP_HREF, text: `${user.username} hat dir „${cardName(order.card)}“ geschickt: ${what} (${euro(price)}).` });
-  return order;
+  await notify(shop._id, { area: 'Grading', href: SHOP_HREF, text: `${user.username} hat dir „${cardName(order.card)}“ geschickt: ${what} (${euro(price)}).${sleeveSent ? ' Der TCG Sleeve der Karte liegt jetzt in deinem Inventar.' : ''}` });
+  if (shipDamage.length) {
+    const kind = shipDamage[0].kind === 'knick' ? 'einen Knick' : 'einen Kratzer';
+    await notify(user._id, { area: 'Grading', href: ORDERS_HREF, text: `Versand an ${shop.code}: Deine Karte „${cardName(order.card)}“ hat unterwegs ${kind} abbekommen – ohne TCG Sleeve ist das ein kleines Risiko.` });
+  }
+  return { ...order, shipDamage: shipDamage.map((h) => h.kind), sleeveSent };
 }
 
 /** Wartenden Auftrag stornieren (nur der Kunde, nur solange der Shop nicht angefangen hat) */
@@ -485,6 +520,7 @@ module.exports = {
   showcasesOf,
   shopsForOrders,
   shopByCode,
+  slabCapacity,
   submittable,
   myOrders,
   queueFor,

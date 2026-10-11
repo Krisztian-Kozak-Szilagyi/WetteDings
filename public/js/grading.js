@@ -1192,7 +1192,7 @@
     if (res.reputation) el('span', 'gr-finish-rep', facts).textContent = 'Reputation +' + res.reputation;
     if (res.quality != null) el('span', '', facts).textContent = 'Qualität ' + res.quality + ' %';
     if (res.player && res.guess) el('span', '', facts).textContent = 'Slab ' + (res.shopCode || '') + ' · Note ' + res.guess;
-    if (res.foilFound) el('span', 'gr-ok', facts).textContent = '+ 1 Folie im Inventar';
+    if (res.foilFound) el('span', 'gr-ok', facts).textContent = '+ 1 TCG Sleeve im Inventar';
 
     var actions = el('div', 'gr-finish-actions', panel);
     if (res.nextJob) {

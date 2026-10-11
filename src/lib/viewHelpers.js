@@ -33,7 +33,7 @@ function slabCert(id) {
  * id: Exemplar-ID (Zertifikatsnummer auf dem Slab)
  * center: sichtbarer Versatz { x, y } aus der Zentrierung (grading/condition.centerShift)
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, slab = null, id = null, center = null } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, slab = null, id = null, center = null, no = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
   const s = slab || (grade ? { code: 'BfW', grade } : null);
   if (s) {
@@ -41,6 +41,7 @@ function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false,
     if (s.at || foiledAt) h += ` data-sealed="${escAttr(dayDate(s.at || foiledAt))}"`;
     if (s.grade) h += ` data-grade="${escAttr(s.grade)}" data-grade-word="${escAttr(gradeWord(s.grade))}"`;
   }
+  if (no) h += ` data-no="${escAttr(no)}"`; // Kartennummer in der Season (#41), steht im Panel der Großansicht
   if (center) h += ` data-cx="${escAttr(center.x)}" data-cy="${escAttr(center.y)}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
@@ -51,9 +52,10 @@ function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false,
  * bei folierten Karten (public/js/foil-view.js), nur ohne Hülle und mit Kratzern bzw. Knick (grading/condition.visibleMarks).
  * offer: Link „Im Handel anbieten“ (eigenes Album), trade: „Angebot machen“ (fremde Sammlung), note: Zeile unter der Karte
  */
-function copyViewAttrs(card, rarityLabel, marks, { offer = null, trade = null, note = '' } = {}) {
+function copyViewAttrs(card, rarityLabel, marks, { offer = null, trade = null, note = '', no = null } = {}) {
   let h = ` data-foil-view data-bare data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}"`;
   h += ` data-marks="${escAttr(JSON.stringify(marks || {}))}"`;
+  if (no) h += ` data-no="${escAttr(no)}"`;
   if (offer) h += ` data-offer-href="${escAttr(offer)}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
   if (note) h += ` data-copy-note="${escAttr(note)}"`;
@@ -166,6 +168,7 @@ const ledgerLabels = {
   tcg_zerkleinert: 'TCG-Karten zerkleinert',
   kosmetik_kauf: 'Kosmetik gekauft',
   item_verkauf: 'Gegenstand verkauft',
+  item_kauf: 'Gegenstand gekauft',
   ihk_lohn: 'IHK-Quest geschafft',
   dungeon_lohn: 'Dungeon-Beute',
   erfolg: 'Erfolg freigeschaltet',

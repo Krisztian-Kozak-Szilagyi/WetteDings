@@ -16,6 +16,7 @@
       <% if (shop.accepts) { %>
         <% services.forEach((sv) => { %><dt><%= sv.label %></dt><dd><%= euro(shop.prices[sv.key]) %></dd><% }) %>
         <dt>Warteschlange</dt><dd><%= shop.queue ? shop.queue + ' Karte(n)' : 'leer' %></dd>
+        <dt>Leere Slabs</dt><dd><%= shop.slabs ? shop.slabs + ' auf Lager' : 'keine – „Benoten + Slab“ gerade nicht möglich' %></dd>
       <% } %>
       <dt>Vitrinen-Boost</dt><dd>+<%= Math.round(shop.boost * 100) %> % Reputation je Auftrag</dd>
     </dl>

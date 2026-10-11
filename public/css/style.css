@@ -1527,19 +1527,6 @@ a.chat-msg-from:hover { text-decoration: underline; }
 .tcg-qty input::-webkit-outer-spin-button, .tcg-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .btn-glow { min-height: 44px; padding: 0 22px; font-size: 15px; box-shadow: 0 0 24px color-mix(in srgb, var(--color-accent) 30%, transparent); }
 
-.tcg-mypacks { display: flex; flex-direction: column; gap: 12px; }
-.tcg-mypack {
-  display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, var(--color-accent-900), var(--color-surface)); box-shadow: 0 0 0 1px var(--color-accent-800);
-}
-.tcg-mypack-img { position: relative; width: 44px; height: 60px; flex: none; }
-.tcg-mypack-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-.tcg-mypack-img img:first-child { transform: rotate(-8deg) translateX(-4px); opacity: .5; }
-.tcg-mypack-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.tcg-mypack-text strong { font-weight: 500; }
-.tcg-mypack-text span { font-size: 12px; color: var(--color-neutral-500); }
-.tcg-mypack form { margin: 0; }
-
 .tcg-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: stretch; }
 .tcg-favs-box { flex: 2 1 520px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .tcg-favs-box h2 { margin: 0; font-size: 25px; }
@@ -4562,31 +4549,102 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 }
 @media (prefers-reduced-motion: reduce) { .bm.is-open .bm-title h2 { animation: none; } }
 
-/* ---------- Inventar & Folie ---------- */
-.inv-page { display: flex; flex-direction: column; gap: 40px; }
-.inv-head h1 { margin: 0 0 4px; }
-.inv-block h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
-.inv-count { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--color-accent-900); color: var(--color-accent-200); font-size: 12px; font-weight: 600; box-shadow: 0 0 0 1px var(--color-accent-800); }
-.inv-items { display: flex; flex-direction: column; gap: 12px; }
-.inv-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); }
-.inv-item.is-empty { opacity: .75; }
-.inv-item-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 10px; color: #dff3ff; background: linear-gradient(135deg, #7dd3fc33, #c4b5fd44, #f0abfc33); box-shadow: inset 0 0 0 1px #c4b5fd55; }
-.inv-item-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.inv-item-text strong { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.inv-hint { margin: 0; }
-.inv-foil-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.inv-foil-form .field { flex: 1 1 260px; margin: 0; }
-.inv-foil-form select { width: 100%; }
-
-.foil-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 18px; }
-.foil-item { display: flex; gap: 14px; padding: 12px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); scroll-margin-top: 90px; }
-.foil-item.is-new { animation: foil-new 2.4s ease-out 1; box-shadow: 0 0 0 2px var(--rar, var(--color-accent)); }
+/* ---------- Karten im Sleeve/Slab: Hervorhebung nach dem Einstecken (Album) ---------- */
+.foil-slot.is-new { animation: foil-new 2.4s ease-out 1; }
 @keyframes foil-new { 0% { transform: scale(.96); box-shadow: 0 0 0 2px var(--rar), 0 0 40px var(--rar); } 100% { transform: none; } }
-.foil-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
-.foil-info > strong { font-weight: 600; }
-.foil-info form { margin: 0; }
-/* Knöpfe dürfen umbrechen, sonst ragt „Handeln · Markt, Verkauf oder Tausch“ aus schmalen Kacheln heraus (#120) */
-.foil-info .btn { white-space: normal; text-align: center; max-width: 100%; }
+
+/* ---------- Inventar: Slots mit Bild und Anzahl, Aktionen im Dialog; der Shop ist der zweite Reiter ---------- */
+.bag-page { display: flex; flex-direction: column; gap: 16px; }
+.bag-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+.bag-head h1 { display: flex; align-items: center; gap: 10px; margin: 0; }
+.bag-head-r { display: flex; align-items: center; gap: 14px; }
+.bag-wallet { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.bag-wallet small { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.bag-wallet b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.bag-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--color-neutral-800); }
+.bag-tab { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-neutral-400); font: 600 15px var(--font); cursor: var(--cur-pointer, pointer); }
+.bag-tab:hover { color: var(--text); }
+.bag-tab.active { color: var(--text); border-bottom-color: var(--color-accent-300); }
+.bag-tab.is-shop { margin-left: auto; font-weight: 500; font-size: 14px; }
+.bag-row-main .help-tip-body, .bag-head h1 .help-tip-body { left: 0; right: auto; } /* die Blase öffnet nach rechts, nicht aus dem Bild heraus */
+.bag-head h1 .help-tip-body { font-family: var(--font); }
+.bag-tab i { font-style: normal; padding: 1px 8px; border-radius: 999px; background: var(--color-accent-900); color: var(--color-accent-200); font-size: 12px; font-weight: 600; }
+.bag-panel[hidden] { display: none; }
+.bag-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.shop-chip { padding: 6px 14px; border: 0; border-radius: 999px; background: var(--color-surface); color: var(--color-neutral-300); font: 500 13px var(--font); box-shadow: 0 0 0 1px var(--color-neutral-800); cursor: var(--cur-pointer, pointer); transition: background .15s, color .15s, box-shadow .15s; }
+.shop-chip:hover { color: var(--text); box-shadow: 0 0 0 1px var(--color-neutral-600); }
+.shop-chip.active { background: var(--color-accent-900); color: var(--color-accent-200); box-shadow: 0 0 0 1px var(--color-accent-800); }
+
+/* Bildflächen je Sorte: getönter Grund wie im Spiel-Inventar */
+.bag-art-pack { background: radial-gradient(120% 90% at 50% 0%, #f0abfc30, transparent 62%), linear-gradient(160deg, #2b1a3d, #0f1424); }
+.bag-art-folie { background: radial-gradient(120% 90% at 50% 0%, #7dd3fc38, transparent 62%), linear-gradient(160deg, #162a45, #0f1424); }
+.bag-art-slab { background: radial-gradient(120% 90% at 50% 0%, #fde68a30, transparent 62%), linear-gradient(160deg, #2a2540, #0f1424); }
+
+/* Slots */
+.bag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 12px; }
+.bag-slot { position: relative; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 0; border-radius: 14px; background: var(--color-surface); color: var(--text); text-align: left; font: inherit; box-shadow: 0 0 0 1px var(--color-neutral-800); cursor: var(--cur-pointer, pointer); transition: transform .15s ease, box-shadow .15s ease; }
+.bag-slot[hidden] { display: none; }
+.bag-slot:hover, .bag-slot:focus-visible { outline: 0; transform: translateY(-3px); box-shadow: 0 0 0 2px var(--color-accent-300), 0 10px 24px rgba(0, 0, 0, .4); }
+.bag-art { display: flex; align-items: center; justify-content: center; height: 150px; padding: 14px; }
+.bag-art img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 8px 18px rgba(0, 0, 0, .5); transition: transform .2s ease; }
+.bag-slot:hover .bag-art img { transform: scale(1.06) rotate(-1.5deg); }
+.bag-count { position: absolute; top: 8px; right: 8px; min-width: 30px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .62); color: #fff; text-align: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+.bag-name { padding: 9px 11px 10px; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.bag-sub { margin-top: -6px; padding: 0 11px 9px; font-size: 11.5px; color: var(--color-neutral-500); }
+.bag-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 16px; color: var(--color-neutral-400); text-align: center; }
+.bag-empty > span { font-size: 40px; }
+.bag-empty p { margin: 0; }
+
+/* Aktionen im Dialog */
+.bag-dialog { width: min(100% - 32px, 440px); }
+.bag-head-tools { display: inline-flex; align-items: center; gap: 6px; }
+.bag-n { margin-left: 6px; color: var(--color-neutral-400); font-weight: 500; font-size: .85em; }
+.bag-detail { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 18px; align-items: start; }
+.bag-detail-art { display: flex; align-items: center; justify-content: center; padding: 10px; border-radius: 12px; aspect-ratio: 5 / 7; box-shadow: 0 0 0 1px var(--color-neutral-800); }
+.bag-detail-art img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 8px 18px rgba(0, 0, 0, .5); }
+.bag-actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.bag-actions form { margin: 0; }
+.bag-note { margin: 0; font-size: 13px; color: var(--color-neutral-400); }
+.bag-use { border-radius: 10px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px var(--color-neutral-800); }
+.bag-use summary { padding: 9px 12px; color: var(--color-accent-300); font-size: 14px; font-weight: 500; cursor: var(--cur-pointer, pointer); }
+.bag-use[open] summary { border-bottom: 1px solid var(--color-neutral-800); }
+.bag-use form { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.bag-use select { width: 100%; }
+.bag-more { margin-top: 4px; padding: 6px 0; border: 0; background: none; color: var(--color-neutral-400); font: 500 13px var(--font); text-align: left; cursor: var(--cur-pointer, pointer); }
+.bag-more:hover { color: var(--color-accent-300); }
+
+/* Shop: kompakte Liste */
+.bag-shop { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bag-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 8px 14px; padding: 10px 14px; border-radius: 12px; background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); scroll-margin-top: 90px; }
+.bag-row:target { box-shadow: 0 0 0 2px var(--color-accent-300); }
+.bag-row-art { display: flex; align-items: center; justify-content: center; width: 44px; height: 62px; padding: 4px; border-radius: 8px; }
+.bag-row-art img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 3px; }
+.bag-row-main { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.bag-row-main b { font-weight: 600; }
+.bag-row-main small { color: var(--color-neutral-500); font-size: 12px; }
+.bag-row-buy { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 12px; }
+.bag-price { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bag-buy { display: flex; align-items: center; gap: 8px; margin: 0; }
+.shop-qty { display: inline-flex; align-items: stretch; flex: none; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--color-neutral-700); }
+.shop-qty button { width: 30px; border: 0; background: var(--color-neutral-800); color: var(--text); font: 600 17px/1 var(--font); cursor: var(--cur-pointer, pointer); }
+.shop-qty button:hover { background: var(--color-neutral-700); }
+.shop-qty input { width: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: var(--color-bg); color: var(--text); text-align: center; font: 600 14px var(--font); -moz-appearance: textfield; }
+.shop-qty input::-webkit-outer-spin-button, .shop-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+@media (max-width: 560px) {
+  .bag-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .bag-art { height: 124px; }
+  .bag-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .bag-row-buy { grid-column: 1 / -1; justify-content: space-between; }
+  .bag-detail { grid-template-columns: 88px minmax(0, 1fr); gap: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .bag-slot, .bag-art img { transition: none; } .bag-slot:hover, .bag-slot:hover .bag-art img { transform: none; } }
+
+/* Album: Slab-Regal ganz oben – die eigenen Slabs als einzelne Karten, leicht abgesetzt von den Seasons */
+.album-slabs .tcg-slab-shelf { padding: 4px 2px 8px; }
+.album-slabs .album-season-head h2 { display: flex; align-items: center; gap: 8px; }
+.album-slabs .album-season-head h2::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: linear-gradient(135deg, #fde68a, #c4b5fd); box-shadow: 0 0 10px #fde68a66; }
+.tcg-in-slab { position: relative; text-decoration: none; }
+.tcg-in-slab .tcg-art { opacity: .45; filter: grayscale(.4); }
 .foil-trade summary { cursor: var(--cur-pointer, pointer); color: var(--color-accent-300); font-size: 14px; }
 .foil-trade .form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .foil-trade .field { margin: 0; }
@@ -4665,14 +4723,12 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 .foil-tag { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; font-weight: 600; color: #0f172a; background: linear-gradient(90deg, #a8d8ff, #e9d5ff, #fbcfe8); }
 .tcg-mark-foil { font-size: 11px; font-weight: 800; color: #0f172a; background: linear-gradient(135deg, #a8d8ff, #e9d5ff, #fbcfe8); }
 @media (max-width: 420px) { .foil-card { width: 96px; } }
-@media (prefers-reduced-motion: reduce) { .foil-sheen, .foil-item.is-new { animation: none; } .foil-inner { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .foil-sheen, .foil-slot.is-new { animation: none; } .foil-inner { transition: none; } }
 
 a.tcg-mypack { color: inherit; text-decoration: none; }
 .r-item { --rar: #c4b5fd; }
 .tcg-badge.r-item { background: linear-gradient(135deg, #a8d8ff, #e9d5ff, #fbcfe8); color: #0f172a; }
 .tcg-dot.r-item { background: #c4b5fd; }
-.inv-item-actions { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; padding-left: 4px; }
-.inv-item-actions form { margin: 0; }
 
 /* Inventar-Kachel im Stil des IHK-Start-Knopfs, aber holografisch (Folie) */
 .inv-tile {
@@ -4707,11 +4763,12 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .foil-modal { border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; background: transparent; color: #fff; overflow: hidden; }
 .foil-modal::backdrop { background: color-mix(in srgb, var(--color-bg) 78%, transparent); backdrop-filter: blur(8px); }
 .foil-modal .tcg-close { position: absolute; top: 16px; right: 16px; z-index: 2; }
-.foil-modal-stage { display: grid; place-items: center; width: 100%; height: 100%; padding: 16px; perspective: 1100px; animation: tcg-pop .25s ease; }
-.foil-card-big { width: min(340px, 78vw, 52dvh); cursor: var(--cur-grab); touch-action: none; user-select: none; -webkit-user-select: none; }
-.foil-card-big:active { cursor: var(--cur-grabbing); }
+.foil-modal-stage { display: grid; place-items: center; width: 100%; padding: 0; perspective: 1000px; animation: tcg-pop .25s ease; }
+.foil-card-big { width: min(100%, 420px, calc((100dvh - 96px) / 1.6)); cursor: var(--cur-pointer, pointer); touch-action: none; user-select: none; -webkit-user-select: none; }
+/* einzelnes Exemplar ohne Hülle: so groß wie die reguläre Karte */
+.foil-card-big:has(.is-bare) { width: min(100%, 460px, calc((100dvh - 80px) / 1.4)); }
 .foil-card-big:focus { outline: none; } /* Firefox zeigt sonst einen Rahmen um die ganze Fläche (#46) */
-.foil-card-big .foil-inner { transition: none; will-change: transform; }
+.foil-card-big .foil-inner { transition: transform .35s ease; will-change: transform; }
 .foil-card-big .foil-sheen { animation: none; opacity: .7; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), #ffffff70, transparent 45%), linear-gradient(115deg, transparent 25%, #a8d8ff40 40%, #f0abfc33 60%, transparent 75%); }
 .foil-card-big .foil-face { padding: 23cqw 3.5cqw 3.5cqw; border-radius: 18px; }
 .foil-card-big .foil-face img, .foil-card-big .foil-back-art { border-radius: 10px; }
@@ -4740,9 +4797,19 @@ a.tcg-mypack { color: inherit; text-decoration: none; }
 .tcg-slot.foil-slot { position: relative; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: var(--cur-pointer, pointer); }
 .tcg-slot.foil-slot .tcg-marks { position: absolute; top: 18%; right: 8px; z-index: 2; }
 /* Großansicht: Karte in der Mitte, Favoriten-Knopf darunter */
-.foil-modal[open] { display: flex; flex-direction: column; }
-.foil-modal .foil-modal-stage { flex: 1 1 auto; height: auto; min-height: 0; }
-.foil-modal-actions { display: flex; justify-content: center; margin: 0; padding: 0 16px 28px; }
+.foil-modal[open] { display: flex; align-items: center; justify-content: center; }
+/* Karte links, rechts Seltenheit, Name, Status und Aktionen – dieselbe Aufteilung wie die reguläre Großansicht (.tcg-modal-body) */
+.foil-modal-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 40px; width: min(920px, calc(100vw - 24px)); max-height: 100dvh; }
+.foil-modal-info[hidden] { display: none; }
+.foil-modal-info .tcg-modal-note[hidden], .foil-modal-info form[hidden], .foil-modal-info a[hidden] { display: none; }
+.foil-modal-info .btn-block { text-decoration: none; }
+.foil-modal:not(.is-showroom) .foil-cert-link { display: none; } /* der Link steht im Panel; unter der Karte nur im Showroom */
+@media (max-width: 720px) {
+  .foil-modal-body { grid-template-columns: 1fr; justify-items: center; gap: 14px; overflow-y: auto; padding: 56px 0 16px; }
+  .foil-modal-info { width: min(100%, 360px); }
+  .foil-card-big { width: min(100%, 300px, calc((100dvh - 330px) / 1.6)); }
+  .foil-card-big:has(.is-bare) { width: min(100%, 320px, calc((100dvh - 330px) / 1.4)); }
+}
 .tcg-hero-pack .tcg-pack-art:hover { filter: none !important; }
 /* Folierter Platz: insgesamt genau so groß wie eine normale Karte; Karte, Folie und Etikett bewegen sich als ein Stück */
 .foil-card.foil-card-slot { display: block; width: 100%; perspective: none; cursor: inherit; container-type: inline-size; transition: transform .2s ease; }
@@ -6057,13 +6124,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .ihk-pick-card[data-blocked] img { filter: grayscale(1) brightness(.6); }
 
 /* Folierte Karte im Album: Menü unter der Karte wie bei normalen Karten – Wert, Favorit, Schützen, Verkaufen (foil-modal.ejs) */
-.foil-modal-menu { width: min(360px, calc(100vw - 32px)); margin: 0 auto; padding: 0 0 24px; text-align: center; }
-.foil-modal-menu[hidden] { display: none; }
-.foil-modal-menu .tcg-modal-status { margin: 0 0 10px; color: var(--color-neutral-300); font-size: 13px; }
-.foil-modal-menu .tcg-modal-status[hidden] { display: none; }
-.foil-modal-menu .foil-modal-actions { flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
-.foil-modal-menu .foil-modal-actions form[hidden], .foil-modal-menu .foil-modal-actions a[hidden], .foil-modal-menu .foil-modal-actions p[hidden] { display: none; }
-.foil-modal-menu .foil-modal-actions p { margin: 0; }
 
 /* ---------- Kosmetik-Shop (/kosmetik) und Avatar-Effekte ---------- */
 .album-dupes form { margin: 0; }
@@ -6217,6 +6277,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gs-svc.is-off { opacity: .45; cursor: var(--cur-default); }
 .gs-warn { margin: 0; color: var(--nein); font-size: 13px; }
 .gs-shop-list { line-height: 1.5; }
+.gs-shop-stock.is-out { color: var(--nein, #f87171); font-weight: 600; }
 .gs-submit { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800), 0 -8px 24px rgba(0, 0, 0, .35); }
 .gs-summary { margin: 0; font-weight: 600; }
 .gs-stars { display: inline-flex; flex-direction: row-reverse; }
@@ -7308,10 +7369,11 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   background: linear-gradient(rgba(255, 238, 196, .2), rgba(255, 238, 196, 0)); clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
 }
 .foil-modal.is-showroom .foil-modal-stage { touch-action: none; }
+.foil-modal.is-showroom .foil-modal-body { display: flex; flex-direction: column; align-items: center; gap: 0; width: auto; }
+.foil-modal.is-showroom .foil-modal-info { display: none; }
 /* Showroom: Karte und Schild als Gruppe mittig – die Bühne füllt nicht mehr die ganze Höhe, das Schild sitzt 2 cm
    unter der Karte (abzüglich des Innenabstands der Bühne); die Karte etwas kleiner, damit alles auf den Schirm passt */
-.foil-modal.is-showroom[open] { justify-content: center; }
-.foil-modal.is-showroom .foil-modal-stage { flex: 0 0 auto; padding-bottom: 0; }
+.foil-modal.is-showroom .foil-modal-stage { flex: 0 0 auto; }
 /* Breite aus der Höhe: Slab ≈ 1,65 × so hoch wie breit, darunter ~300 px für Abstand, Schild und Zertifikat-Link */
 .foil-modal.is-showroom .foil-card-big { width: min(300px, 70vw, calc((100dvh - 300px) / 1.65)); }
 .foil-modal.is-showroom .foil-cert-link { margin-top: 10px; }
@@ -7700,6 +7762,19 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 @media (max-width: 760px) { .gd-pop-xl .gd-wk { grid-template-columns: minmax(0, 1fr); } .gd-pop-xl .gd-wk .gh-tools { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); } }
 /* Werkstatt: Spalten gleich hoch, Lochwand und Leiter füllen ihre Spalte (kein toter Platz unten) */
 .gd-pop-xl .gd-wk { align-items: stretch; }
+/* Material: Lager an leeren Slabs mit Kauf (Werkstatt) */
+.gd-stock-card { display: flex; align-items: center; gap: 12px; }
+.gd-stock-img { flex: none; width: 56px; height: auto; aspect-ratio: 720 / 1008; border-radius: 6px; box-shadow: 0 0 0 2px var(--ord-line, #d9a441), 3px 5px 8px rgba(0, 0, 0, .5); }
+.gd-stock-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gd-stock-text small { color: var(--ord-dim, inherit); line-height: 1.35; }
+.gd-stock-buy { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gd-stock-buy .btn { flex: 1 1 130px; }
+.gd-stock-note { color: var(--ord-dim, inherit); line-height: 1.4; }
+.gd-qty { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 2px var(--ord-line, #d9a441); }
+.gd-qty button { width: 34px; border: 0; background: rgba(0, 0, 0, .25); color: inherit; font: 800 18px/1 var(--font); cursor: var(--cur-pointer, pointer); }
+.gd-qty button:hover { background: rgba(255, 255, 255, .12); }
+.gd-qty input { width: 48px; border: 0; border-radius: 0; background: rgba(0, 0, 0, .18); color: inherit; text-align: center; font: 700 15px var(--font); -moz-appearance: textfield; }
+.gd-qty input::-webkit-outer-spin-button, .gd-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .gd-pop-xl .gd-wk-col .gh-tools { flex: 1 1 auto; align-content: start; }
 .gd-pop-xl .gd-wk-col .gr-tree { flex: 1 1 auto; justify-content: space-between; }
 .gd-pop-xl .gd-wk-col .gr-tree li:last-child .gr-tree-body { padding-bottom: 0; }

@@ -81,7 +81,7 @@ const SUBTABS = {
     { key: 'steuer', label: 'Steuern' },
     { key: 'bonus', label: 'Tagesbonus' },
     { key: 'grading', label: 'Grading' },
-    { key: 'folie', label: 'Folie' },
+    { key: 'folie', label: 'Sleeve & Slab' },
     { key: 'kosmetik', label: 'Kosmetik' },
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
@@ -750,13 +750,20 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
   const chance = percent(req.body.chance);
   const bonusPercent = percent(req.body.bonus);
   const dailyPercent = percent(req.body.daily);
-  if (!(chance >= 0 && chance <= 100)) {
+  const slabDropPercent = percent(req.body.slabanteil);
+  const sleevePrice = parseEuro(req.body.sleeve);
+  const slabPrice = parseEuro(req.body.slabpreis);
+  if (!foil.validPrice('folie', sleevePrice) || !foil.validPrice('slab', slabPrice)) {
+    req.flash('error', 'Shop-Preise: ganze Cent, mindestens der Ankaufspreis der Bank und höchstens 1.000 €.');
+  } else if (!(slabDropPercent >= 0 && slabDropPercent <= 100)) {
+    req.flash('error', 'Slab-Anteil: 0 bis 100 %.');
+  } else if (!(chance >= 0 && chance <= 100)) {
     req.flash('error', 'Fundchance: 0 bis 100 % (höchstens zwei Nachkommastellen).');
   } else if (!(bonusPercent >= 0 && bonusPercent <= 1000) || !(dailyPercent >= 0 && dailyPercent <= 1000)) {
     req.flash('error', 'Wertsteigerung: 0 bis 1000 % (höchstens zwei Nachkommastellen).');
   } else {
-    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent });
-    req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
+    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent, sleevePrice, slabPrice, slabDropPercent });
+    req.flash('success', `Gespeichert: ${String(chance).replace('.', ',')} % Fundchance, Preise ${euro(sleevePrice)} (Sleeve, Bank-Shop) / ${euro(slabPrice)} (Slab, Werkstatt), ${String(slabDropPercent).replace('.', ',')} % der Dungeon-Funde sind Slabs.`);
   }
   res.redirect(subUrl('spielwerte', 'folie'));
 });

@@ -39,7 +39,9 @@
     var firstFree = null;
     form.querySelectorAll('[data-prices]').forEach(function (el) {
       var radio = el.querySelector('input[name="shop"]');
-      var blocked = review && el.getAttribute('data-code') === slabCode;
+      // ohne leere Slabs kann der Shop „Benoten + Slab“ nicht liefern (Zweitprüfung und Bügeln gehen trotzdem)
+      var noSlab = want.slab && +el.getAttribute('data-slabs') < 1;
+      var blocked = (review && el.getAttribute('data-code') === slabCode) || noSlab;
       radio.disabled = blocked;
       el.classList.toggle('is-off', blocked);
       if (blocked && radio.checked) radio.checked = false;
@@ -65,7 +67,7 @@
         : !(review || want.iron || want.slab)
           ? 'Wähle, was der Shop tun soll.'
           : (review ? 'Zweitprüfung für „' : '„') + card.getAttribute('data-name') + '“ bei ' + shop.value + ' für ' + euro(shopTotal) + '.';
-    form.setAttribute('data-confirm', ok ? summary.textContent + ' Der Preis wird sofort abgebucht, die Karte ist bis zur Rückgabe gesperrt.' + (review ? '' : ' Eine Folie geht dabei ab.') : '');
+    form.setAttribute('data-confirm', ok ? summary.textContent + ' Der Preis wird sofort abgebucht, die Karte ist bis zur Rückgabe gesperrt.' + (review ? '' : card.getAttribute('data-sleeve') === '1' ? ' Dein TCG Sleeve bleibt beim Shop (er schützt die Karte beim Versand).' : ' Ohne TCG Sleeve besteht beim Versand ein kleines Risiko für Kratzer oder einen Knick.') : '');
   }
 
   // Filter: alle, mit Spuren, mit Knick, Slabs

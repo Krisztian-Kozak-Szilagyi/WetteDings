@@ -202,7 +202,7 @@ test('Positionen: Kategorie, Sicht einer Rolle, Sperren und Texte', () => {
   const a = catalog.cardById[A].name;
   const ra = catalog.rarityByKey[catalog.cardById[A].rarity].label;
   assert.equal(lines.lineLabel([{ card: A }, { card: A }, { card: A, foiledAt: new Date() }]), `2× ${a} (${ra}), ${a} (${ra}, foliert)`);
-  assert.equal(lines.lineLabel([{ card: 'item:folie' }]), 'Folie');
+  assert.equal(lines.lineLabel([{ card: 'item:folie' }]), 'TCG Sleeve');
   assert.equal(lines.sideText([], 0), 'nichts');
   assert.equal(lines.countText(L(A)), '1 Karte');
   assert.equal(lines.countText(L(A, B)), '2 Karten');
