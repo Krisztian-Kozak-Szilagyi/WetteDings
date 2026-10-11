@@ -200,7 +200,7 @@
                   <span class="gr-done-thumb"><% if (o.cardInfo) { %><img src="<%= o.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
                   <span class="gr-done-info">
                     <span><b><%= o.cardInfo ? o.cardInfo.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %></span></span>
-                    <span class="gr-done-meta">bis <%= date(o.expiresAt) %></span>
+                    <span class="gr-done-meta"><%- include('partials/grading-services', { sv: o.services }) %> · bis <%= date(o.expiresAt) %></span>
                   </span>
                   <b class="gr-pay">+<%= euro(o.price) %></b>
                 </li>
@@ -322,9 +322,13 @@
         <% if (players) { %>
           <form method="post" action="/grading/preis" class="form gr-price-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <label class="field"><span>Preis je Karte eines Mitglieds <em>(<%= euro(orderPrice.min) %>–<%= euro(orderPrice.max) %>)</em></span>
-              <input type="text" name="price" inputmode="decimal" value="<%= (shopPrice / 100).toFixed(2).replace('.', ',') %>" required></label>
-            <button class="btn btn-sm" type="submit">Preis speichern</button>
+            <p class="gr-label">Festpreise für Mitglieder</p>
+            <% services.forEach((sv) => { const r = servicePrice[sv.key]; %>
+              <label class="field"><span><%= sv.label %> <em>(<%= euro(r.min) %>–<%= euro(r.max) %>)</em></span>
+                <input type="text" name="<%= sv.key %>" inputmode="decimal" value="<%= (shopPrices[sv.key] / 100).toFixed(2).replace('.', ',') %>" required></label>
+            <% }) %>
+            <button class="btn btn-sm" type="submit">Preise speichern</button>
+            <p class="muted small">Gelten für neue Aufträge – offene behalten ihren Preis.</p>
           </form>
         <% } else if (shop.code) { %>
           <p class="muted small">Ab Stufe <%= orderLevel %> (Slab-Werkstatt) schicken dir auch Mitglieder ihre Karten – zu deinem Preis.</p>

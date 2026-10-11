@@ -35,8 +35,17 @@ const LEVELS = [
 // Ab dieser Stufe kann man bügeln – Kundenkarten und eigene Karten
 const IRON_LEVEL = 2;
 
-/** Arbeitsschritte eines Auftrags: Bügeln nur, wenn die Kundenkarte einen Knick hat, der noch nicht gebügelt ist */
-const stepsFor = (job) => levelInfo(job.level).steps.filter((s) => s !== 'iron' || !!(job.defects && job.defects.crease && !job.defects.ironed));
+/**
+ * Arbeitsschritte eines Auftrags: Bügeln nur, wenn die Kundenkarte einen Knick hat, der noch nicht gebügelt ist.
+ * Spieler-Aufträge mit gebuchten Bausteinen (job.services, #204): Bügeln nur, wenn gebucht; Benoten und Versiegeln nur
+ * mit dem Baustein slab. Ohne services (NPC, ältere Aufträge) entscheidet allein die Stufe.
+ */
+const stepsFor = (job) =>
+  levelInfo(job.level).steps.filter((s) => {
+    if (s === 'iron') return !!(job.defects && job.defects.crease && !job.defects.ironed) && (!job.services || !!job.services.iron);
+    if (s === 'grade' || s === 'slab') return !job.services || !!job.services.slab;
+    return true;
+  });
 /** Spieler-Auftrag (Karte eines Mitglieds) statt NPC-Kunde? */
 const isPlayerJob = (job) => !!job && job.source === 'spieler';
 
@@ -59,8 +68,9 @@ const CUSTOMERS = ['Sammler Günther', 'Frau Hildebrandt', 'Kevin (12)', 'Onkel 
 // jobs = NPC-Aufträge pro Tag (alle Stufen), pay = Lohn in Cent pro Schritt (clean: ganz sauber; grade: exakte Note,
 // ±1 = halb; slab: perfekt versiegelt; iron: Knick ganz glatt), costs = Ausbaukosten in Cent für Stufe 2, 3, 4,
 // premium = Lohn-Aufschlag in % auf Stufe 4.
-// Spieler-Aufträge (#204, Etappe B): playerJobs pro Tag, orderPrice = Preisrahmen und Standardpreis (Cent),
-// orderDays = Frist (so lange wartet ein Auftrag bzw. darf er in Arbeit sein), showcaseMax = Plätze in der Vitrine
+// Spieler-Aufträge (#204, Etappe B): playerJobs pro Tag, servicePrice = Preisrahmen und Standardpreis je Baustein (Cent,
+// siehe SERVICES), orderDays = Frist (so lange wartet ein Auftrag bzw. darf er in Arbeit sein), expressDays = Frist mit
+// Express-Zuschlag, showcaseMax = Plätze in der Vitrine
 const DEFAULTS = {
   open: false,
   jobs: 10,
@@ -68,13 +78,29 @@ const DEFAULTS = {
   pay: { clean: 2500, grade: 3000, slab: 3500, iron: 2000 },
   costs: [100000, 150000, 180000],
   premium: 30,
-  orderPrice: { min: 2000, max: 50000, def: 8000 },
+  servicePrice: {
+    base: { min: 1000, max: 20000, def: 2000 },
+    iron: { min: 1000, max: 30000, def: 3000 },
+    slab: { min: 1000, max: 50000, def: 6000 },
+    express: { min: 0, max: 30000, def: 3000 },
+  },
   orderDays: 3,
+  expressDays: 1,
   showcaseMax: 6,
 };
-const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs], orderPrice: { ...DEFAULTS.orderPrice } };
+// Bausteine eines Spieler-Auftrags (#204): base ist immer dabei, dazu mindestens iron oder slab; express ist ein Zuschlag
+const SERVICES = [
+  { key: 'base', label: 'Annahme & Reinigung', short: 'Reinigung' },
+  { key: 'iron', label: 'Knick bügeln', short: 'Bügeln' },
+  { key: 'slab', label: 'Benoten + Slab', short: 'Slab' },
+  { key: 'express', label: 'Express-Zuschlag', short: 'Express' },
+];
+const copyServicePrice = (sp) => Object.fromEntries(SERVICES.map(({ key }) => [key, { ...sp[key] }]));
+const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs], servicePrice: copyServicePrice(DEFAULTS.servicePrice) };
 const PAY = settings.pay; // gleiches Objekt – Änderungen im Admin-Panel gelten sofort
 const validCents = (v) => Number.isInteger(v) && v >= 0 && v <= 100000000;
+/** Preisrahmen { min, max, def } in Cent mit min ≤ def ≤ max */
+const validRange = (p) => !!p && [p.min, p.max, p.def].every(validCents) && p.min <= p.def && p.def <= p.max;
 
 /** Ergänzt die Stufe um die aktuellen Einstellungen (Kosten, Aufträge, Lohnfaktor) */
 function levelInfo(level) {
@@ -90,9 +116,15 @@ function apply(doc) {
   if (Array.isArray(doc.costs) && doc.costs.length === 3 && doc.costs.every(validCents)) settings.costs = [...doc.costs];
   if (Number.isFinite(doc.premium) && doc.premium >= 0 && doc.premium <= 500) settings.premium = doc.premium;
   if (Number.isInteger(doc.playerJobs) && doc.playerJobs >= 0 && doc.playerJobs <= 100) settings.playerJobs = doc.playerJobs;
-  const p = doc.orderPrice;
-  if (p && [p.min, p.max, p.def].every(validCents) && p.min <= p.def && p.def <= p.max) settings.orderPrice = { min: p.min, max: p.max, def: p.def };
+  // Preisrahmen je Baustein: jeder Baustein einzeln – ein ungültiger lässt die anderen gelten
+  if (doc.servicePrice) {
+    for (const { key } of SERVICES) {
+      const p = doc.servicePrice[key];
+      if (validRange(p)) settings.servicePrice[key] = { min: p.min, max: p.max, def: p.def };
+    }
+  }
   if (Number.isInteger(doc.orderDays) && doc.orderDays >= 1 && doc.orderDays <= 30) settings.orderDays = doc.orderDays;
+  if (Number.isInteger(doc.expressDays) && doc.expressDays >= 1 && doc.expressDays <= 30) settings.expressDays = doc.expressDays;
   if (Number.isInteger(doc.showcaseMax) && doc.showcaseMax >= 0 && doc.showcaseMax <= 24) settings.showcaseMax = doc.showcaseMax;
 }
 async function loadSettings() {
@@ -346,10 +378,13 @@ async function upgrade({ user }) {
  */
 async function takePlayerJob(user, info) {
   return inTransaction(async (session) => {
+    // Express zuerst, sonst der älteste; die Frist läuft ab Arbeitsbeginn neu (Express: kürzer)
+    const next = await GradingOrder.findOne({ shop: user._id, status: 'wartet' }).sort(orders().QUEUE_SORT).select('services').session(session).lean();
+    if (!next) return null;
     const order = await GradingOrder.findOneAndUpdate(
-      { shop: user._id, status: 'wartet' },
-      { $set: { status: 'in_arbeit', startedAt: new Date(), expiresAt: orders().deadline() } },
-      { sort: { createdAt: 1 }, new: true, session }
+      { _id: next._id, status: 'wartet' },
+      { $set: { status: 'in_arbeit', startedAt: new Date(), expiresAt: orders().deadline(Date.now(), settings, next.services) } },
+      { new: true, session }
     ).lean();
     if (!order) return null;
     const card = await TcgCard.findOne({ _id: order.doc, user: order.owner }).select('card condition').session(session).lean();
@@ -358,7 +393,7 @@ async function takePlayerJob(user, info) {
       return null;
     }
     const [job] = await GradingJob.create(
-      [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', order: order._id, cardDoc: order.doc }],
+      [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', order: order._id, cardDoc: order.doc, services: orders().servicesOf(order) }],
       { session }
     );
     await GradingOrder.updateOne({ _id: order._id }, { $set: { job: job._id } }, { session });
@@ -413,7 +448,7 @@ async function setGuess({ user, guess }) {
   if (!(Number.isInteger(guess) && guess >= 1 && guess <= 10)) throw new UserError('Bitte gib eine Note von 1 bis 10.');
   const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
   if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
-  if (!levelInfo(job.level).steps.includes('grade')) throw new UserError('Benoten kannst du erst ab Stufe 2.');
+  if (!stepsFor(job).includes('grade')) throw new UserError(job.services ? 'Dieser Auftrag umfasst kein Benoten – nur bügeln und zurückschicken.' : 'Benoten kannst du erst ab Stufe 2.');
   if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick – danach kannst du benoten.');
   const updated = await GradingJob.findOneAndUpdate({ _id: job._id, status: 'offen', guess: null }, { $set: { guess } }, { new: true }).lean();
   const final = updated || job; // schon benotet: die erste Note bleibt
@@ -523,19 +558,20 @@ async function scoreShop({ shopId, job, session }) {
 }
 
 /**
- * Spieler-Auftrag abschließen (#204), in der Transaktion von finishJob: Die Karte bekommt das Ergebnis des Bügelns,
- * kommt in einen Slab mit Kürzel und Note des Shops; der Shop bekommt den Preis. Gibt den Auftrag zurück.
+ * Spieler-Auftrag abschließen (#204), in der Transaktion von finishJob: Die Karte bekommt das Ergebnis des Bügelns und –
+ * mit dem Baustein slab – einen Slab mit Kürzel und Note des Shops; der Shop bekommt den Preis. Gibt den Auftrag zurück.
  */
 async function finishPlayerJob({ job, shop, session }) {
   const order = await GradingOrder.findOne({ _id: job.order, status: 'in_arbeit' }).session(session);
   if (!order) throw new UserError('Dieser Auftrag ist abgelaufen – die Karte ging an den Kunden zurück.');
   const now = new Date();
   const d = job.defects.toObject ? job.defects.toObject() : job.defects;
-  const set = { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now } };
+  const slabbed = stepsFor(job).includes('slab');
+  const set = slabbed ? { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now } } : {};
   if (job.iron) Object.assign(set, { 'condition.defects': d, 'condition.grade': job.grade, ironedAt: now, creased: !!d.crease, damaged: (d.scratches || []).length > 0 || !!d.crease });
-  const res = await TcgCard.updateOne({ _id: order.doc, user: order.owner }, { $set: set }, { session });
+  const res = Object.keys(set).length ? await TcgCard.updateOne({ _id: order.doc, user: order.owner }, { $set: set }, { session }) : { matchedCount: await TcgCard.countDocuments({ _id: order.doc, user: order.owner }).session(session) };
   if (!res.matchedCount) throw new UserError('Die Karte gibt es nicht mehr.');
-  Object.assign(order, { status: 'fertig', doneAt: now, result: { grade: job.guess, clean: job.clean, seal: job.seal, iron: job.iron ? job.iron.smooth : null } });
+  Object.assign(order, { status: 'fertig', doneAt: now, result: { grade: slabbed ? job.guess : null, clean: job.clean, seal: job.seal, iron: job.iron ? job.iron.smooth : null } });
   await order.save({ session });
   await User.updateOne({ _id: job.user }, { $inc: { balance: order.price } }, { session });
   await Ledger.create([{ user: job.user, type: 'grading_einnahme', amount: order.price, betTitle: `${(catalog.cardById[job.card] || {}).name || job.card} für ${order.ownerName}` }], { session });
@@ -550,14 +586,14 @@ async function finishJob({ user, clean, seal }) {
   const done = await inTransaction(async (session) => {
     const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session);
     if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
-    const info = levelInfo(job.level);
+    const steps = stepsFor(job);
     const cleanQ = Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
-    if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick.');
+    if (steps.includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick.');
     // Putzen (und Bügeln) braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
     const ironMs = job.iron ? ironMinMs(job.iron.smooth) : 0;
     if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100 + ironMs) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
-    if (info.steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
-    const sealQ = info.steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
+    if (steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
+    const sealQ = steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
     const card = catalog.cardById[job.card];
     const player = isPlayerJob(job);
     const shop = await GradingShop.findById(user._id).select('code').session(session).lean();
@@ -579,7 +615,8 @@ async function finishJob({ user, clean, seal }) {
   if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });
   if (done.order) {
     const name = (catalog.cardById[done.card] || {}).name || done.card;
-    await notify(done.order.owner, { area: 'Grading', href: '/grading/einreichen', text: `„${name}“ ist zurück: Slab ${done.shopCode}, Note ${done.guess}. Bewerte den Shop!` });
+    const what = done.order.result.grade != null ? `Slab ${done.shopCode}, Note ${done.guess}` : `gebügelt bei ${done.shopCode}`;
+    await notify(done.order.owner, { area: 'Grading', href: '/grading/einreichen', text: `„${name}“ ist zurück: ${what}. Bewerte den Shop!` });
   }
   return done;
 }
@@ -615,4 +652,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

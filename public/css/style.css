@@ -2602,6 +2602,8 @@ a.stats-kpi:hover { text-decoration: none; border-color: color-mix(in srgb, var(
   --gr-back: url('/img/tcg-backs/pre-season.webp') center / cover no-repeat;
 }
 .admin-gr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 14px; margin-bottom: 14px; }
+.admin-gr-prices { margin-bottom: 14px; }
+.admin-gr-prices input { width: 100%; max-width: 110px; text-align: right; }
 .admin-gr-calc { margin: 4px 0 16px; }
 .admin-gr-calc .table-wrap { margin-bottom: 8px; }
 .admin-gr-calc-table td.num, .admin-gr-calc-table th.num { white-space: nowrap; }
@@ -6205,4 +6207,29 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gs-card:has(input:checked) .tcg-art, .gs-card:has(input:checked) .foil-card { box-shadow: 0 0 0 2px var(--color-accent-300); border-radius: 8px; }
 .gs-order-actions form { margin: 0; }
 .gs-rate { display: flex; gap: 6px; align-items: center; }
+/* #204: Bausteine beim Einreichen, Gesamtpreis, Sterne zum Anklicken */
+.gs-num { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 6px; border-radius: 50%; background: var(--color-accent-300); color: var(--color-neutral-900); font-size: 14px; font-weight: 700; vertical-align: 2px; }
+.gs-svcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.gs-svc { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; min-height: 48px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); cursor: var(--cur-pointer, pointer); }
+.gs-svc input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.gs-svc > span { display: flex; flex-direction: column; gap: 2px; }
+.gs-svc small { color: var(--color-neutral-400); font-size: 12px; }
+.gs-svc:has(input:checked) { box-shadow: 0 0 0 2px var(--color-accent-300); }
+.gs-svc.is-fixed { cursor: var(--cur-default); opacity: .8; }
+.gs-svc.is-off { opacity: .45; cursor: var(--cur-default); }
+.gs-warn { margin: 0; color: var(--nein); font-size: 13px; }
+.gs-shop-list { line-height: 1.5; }
+.gs-submit { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800), 0 -8px 24px rgba(0, 0, 0, .35); }
+.gs-summary { margin: 0; font-weight: 600; }
+.gs-stars { display: inline-flex; flex-direction: row-reverse; }
+.gs-stars input { position: absolute; opacity: 0; pointer-events: none; }
+.gs-stars label { padding: 4px 3px; font-size: 22px; line-height: 1; color: var(--color-neutral-700); cursor: var(--cur-pointer, pointer); transition: color .12s, transform .12s; }
+.gs-stars label:hover, .gs-stars label:hover ~ label, .gs-stars input:checked ~ label { color: #f5c542; }
+.gs-stars label:hover { transform: scale(1.15); }
+.gs-stars input:focus-visible + label { outline: 2px solid var(--color-accent-300); border-radius: 4px; }
+.gr-rating { display: flex; flex-direction: column; gap: 2px; }
+.gr-svc { display: inline-flex; gap: 4px; margin-right: 4px; vertical-align: 1px; }
+.gr-svc-tag { padding: 1px 6px; border-radius: 999px; font-size: 11px; background: var(--color-neutral-800); color: var(--color-neutral-200); }
+.gr-svc-tag.is-express { background: #f59e0b; color: #1a1200; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .gs-stars label { transition: none; } .gs-stars label:hover { transform: none; } }
 .gs-profile { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

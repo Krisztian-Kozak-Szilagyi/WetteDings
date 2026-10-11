@@ -41,6 +41,10 @@ async function migrate() {
   await require('./models/Esports').EsportsTeam.createIndexes();
   // Grading-Shop (#204): Kürzel eindeutig – Index vor dem ersten Benennen
   await GradingShop.createIndexes();
+  // #204: Festpreise je Baustein statt eines Paketpreises – der alte Preis abzüglich der Standard-Reinigung wird der
+  // Preis für Benoten + Slab (geklemmt wird beim Lesen, orderService.shopPrices)
+  const repriced = await migrateShopPrices();
+  if (repriced) console.log(`Migration: Paketpreis von ${repriced} Grading-Shop(s) auf Bausteinpreise umgestellt.`);
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [
@@ -356,4 +360,25 @@ async function backfillPriceCodes() {
   return docs.length;
 }
 
-module.exports = { migrate, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };
+/**
+ * #204: Grading-Shops mit altem Paketpreis (Feld price) bekommen Bausteinpreise – Reinigung zum Standard, der Rest geht
+ * auf Benoten + Slab, Bügeln und Express bleiben beim Standard. Idempotent über das Feld price. Gibt die Zahl zurück.
+ */
+async function migrateShopPrices() {
+  const coll = GradingShop.collection;
+  const docs = await coll.find({ price: { $exists: true } }).project({ price: 1 }).toArray();
+  if (!docs.length) return 0;
+  const base = require('./grading/gradingService').settings.servicePrice.base.def;
+  await coll.bulkWrite(
+    docs.map((d) => ({
+      updateOne: {
+        filter: { _id: d._id },
+        update: Number.isInteger(d.price) ? { $set: { prices: { base: null, iron: null, slab: Math.max(0, d.price - base), express: null } }, $unset: { price: '' } } : { $unset: { price: '' } },
+      },
+    })),
+    { ordered: false }
+  );
+  return docs.length;
+}
+
+module.exports = { migrate, migrateShopPrices, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };

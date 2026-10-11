@@ -1,8 +1,10 @@
 // Spieler-Aufträge im Grading (#204, Etappe B): Mitglieder reichen eigene Karten bei Grading-Shops anderer Mitglieder
 // ein. Ablauf:
-//   einreichen (Preis wird eingezogen, Karte gesperrt, eine Folie geht ab) → der Shop nimmt den Auftrag an (vor den
-//   NPC-Aufträgen, gradingService.takeJob) → putzt, bügelt, benotet, versiegelt → die Karte kommt als Slab mit Kürzel
-//   und Note des Shops zurück, der Shop bekommt den Preis (gradingService.finishJob) → der Kunde kann 1–5 Sterne geben.
+//   einreichen mit gebuchten Bausteinen (Reinigung immer, dazu Bügeln und/oder Benoten + Slab, optional Express; Preis
+//   = Summe der Festpreise des Shops, wird eingezogen, Karte gesperrt, eine Folie geht ab) → der Shop nimmt den Auftrag
+//   an (Express zuerst, vor den NPC-Aufträgen, gradingService.takeJob) → putzt und erledigt die gebuchten Schritte → die
+//   Karte kommt gebügelt bzw. als Slab mit Kürzel und Note des Shops zurück, der Shop bekommt den Preis
+//   (gradingService.finishJob) → der Kunde kann 1–5 Sterne geben.
 // Läuft die Frist ab (Auftrag wartet zu lange oder bleibt liegen) oder storniert der Kunde einen wartenden Auftrag,
 // bekommt er sein Geld zurück und die Karte ist wieder frei.
 const mongoose = require('mongoose');
@@ -18,7 +20,7 @@ const catalog = require('../tcg/catalog');
 const { lockedDocs, claim, lockLabel } = require('../tcg/locks');
 const { visibleMarks } = require('./condition');
 const reputation = require('./reputation');
-const { settings } = require('./gradingService');
+const { settings, SERVICES } = require('./gradingService');
 
 const ORDER_LEVEL = 3; // Spieler-Aufträge erst ab der Slab-Werkstatt – ohne Slab keine sichtbare Note
 const OPEN = ['wartet', 'in_arbeit'];
@@ -29,20 +31,44 @@ const SHOP_HREF = '/grading';
 const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
 
 // ---------- Reine Regeln ----------
-/** Preis eines Shops für Spieler-Aufträge (Cent): eigener Preis im Rahmen, sonst der Standardpreis */
-function priceOf(shop, s = settings) {
-  const p = shop && Number.isInteger(shop.price) ? shop.price : s.orderPrice.def;
-  return Math.max(s.orderPrice.min, Math.min(s.orderPrice.max, p));
+const SERVICE_KEYS = SERVICES.map((x) => x.key);
+// Warteschlange: Express zuerst, sonst der älteste
+const QUEUE_SORT = { 'services.express': -1, createdAt: 1 };
+
+/** Festpreise eines Shops je Baustein (Cent): eigener Preis im Rahmen, sonst der Standardpreis – { base, iron, slab, express } */
+function shopPrices(shop, s = settings) {
+  const own = (shop && shop.prices) || {};
+  return Object.fromEntries(
+    SERVICE_KEYS.map((k) => {
+      const r = s.servicePrice[k];
+      const p = Number.isInteger(own[k]) ? own[k] : r.def;
+      return [k, Math.max(r.min, Math.min(r.max, p))];
+    })
+  );
 }
 
-/** Liegt ein Preis (Cent) im Rahmen? */
-const validPrice = (cents, s = settings) => Number.isInteger(cents) && cents >= s.orderPrice.min && cents <= s.orderPrice.max;
+/** Gebuchte Bausteine aufbereiten: { iron, slab, express } als Booleans (Reinigung ist immer dabei) */
+const normServices = (v = {}) => ({ iron: !!v.iron, slab: !!v.slab, express: !!v.express });
+/** Bausteine eines Auftrags – ältere Aufträge ohne services waren Bügeln (wenn nötig) + Slab */
+const servicesOf = (order) => (order && order.services ? normServices(order.services) : { iron: true, slab: true, express: false });
+
+/** Preis eines Auftrags bei diesem Shop: { parts: { base, iron?, slab?, express? }, total } */
+function priceOf(shop, services, s = settings) {
+  const all = shopPrices(shop, s);
+  const want = normServices(services);
+  const parts = { base: all.base };
+  for (const k of ['iron', 'slab', 'express']) if (want[k]) parts[k] = all[k];
+  return { parts, total: Object.values(parts).reduce((a, b) => a + b, 0) };
+}
+
+/** Liegen alle Festpreise (Cent) im Rahmen? prices: { base, iron, slab, express } */
+const validPrices = (prices, s = settings) => !!prices && SERVICE_KEYS.every((k) => Number.isInteger(prices[k]) && prices[k] >= s.servicePrice[k].min && prices[k] <= s.servicePrice[k].max);
 
 /** Nimmt dieser Shop Spieler-Aufträge an? (angestellt, Stufe 3+, mit Kürzel) */
 const acceptsOrders = (shop) => !!shop && !!shop.active && (shop.level || 1) >= ORDER_LEVEL && !!shop.code;
 
-/** Frist ab jetzt */
-const deadline = (now = Date.now(), s = settings) => new Date(now + s.orderDays * 864e5);
+/** Frist ab jetzt – mit Express kürzer */
+const deadline = (now = Date.now(), s = settings, services = null) => new Date(now + (services && services.express ? s.expressDays : s.orderDays) * 864e5);
 
 // ---------- Geld ----------
 /** Preis an den Kunden zurück (in der Transaktion), Buchung grading_erstattung */
@@ -95,7 +121,7 @@ function shopView(s, owners, queues, showcases) {
     code: s.code,
     owner: owners.get(String(s._id)) || '?',
     level: s.level,
-    price: priceOf(s),
+    prices: shopPrices(s),
     queue: queues.get(String(s._id)) || 0,
     rating: reputation.ratingOf(s),
     showcase,
@@ -162,40 +188,49 @@ async function submittable(userId) {
 /** Aufträge eines Kunden (neueste zuerst) – mit „bewertbar“ */
 async function myOrders(userId, now = Date.now()) {
   const list = await GradingOrder.find({ owner: userId }).sort({ createdAt: -1 }).limit(30).lean();
-  return list.map((o) => ({ ...o, cardInfo: catalog.cardById[o.card] || null, rateable: canRate(o, now) }));
+  return list.map((o) => ({ ...o, services: servicesOf(o), cardInfo: catalog.cardById[o.card] || null, rateable: canRate(o, now) }));
 }
 
-/** Wartende Aufträge eines Shops (älteste zuerst) */
-const queueFor = (shopId) => GradingOrder.find({ shop: shopId, status: 'wartet' }).sort({ createdAt: 1 }).lean();
+/** Wartende Aufträge eines Shops (Express zuerst, sonst älteste zuerst) – mit aufbereiteten Bausteinen */
+const queueFor = async (shopId) => (await GradingOrder.find({ shop: shopId, status: 'wartet' }).sort(QUEUE_SORT).lean()).map((o) => ({ ...o, services: servicesOf(o) }));
 
 /** Darf der Kunde diesen Auftrag (noch) bewerten? */
 const canRate = (o, now = Date.now()) => o.status === 'fertig' && o.stars == null && !!o.doneAt && now - new Date(o.doneAt).getTime() <= RATE_DAYS * 864e5;
 
 // ---------- Aktionen ----------
-/** Preis des eigenen Shops setzen (Cent, im Rahmen) */
-async function setPrice({ user, price }) {
-  if (!validPrice(price)) throw new UserError(`Der Preis muss zwischen ${euro(settings.orderPrice.min)} und ${euro(settings.orderPrice.max)} liegen.`);
-  const res = await GradingShop.updateOne({ _id: user._id }, { $set: { price } });
+/** Festpreise des eigenen Shops setzen (Cent je Baustein, im Rahmen) – gelten für neue Aufträge, offene behalten ihren Preis */
+async function setPrices({ user, prices }) {
+  const bad = SERVICES.find(({ key }) => !validPrices({ ...shopPrices(null), [key]: prices[key] }));
+  if (bad) {
+    const r = settings.servicePrice[bad.key];
+    throw new UserError(`${bad.label}: Der Preis muss zwischen ${euro(r.min)} und ${euro(r.max)} liegen.`);
+  }
+  const res = await GradingShop.updateOne({ _id: user._id }, { $set: { prices: Object.fromEntries(SERVICE_KEYS.map((k) => [k, prices[k]])) } });
   if (!res.matchedCount) throw new UserError('Du hast keinen Grading-Shop.');
 }
 
 /**
- * Karte einreichen: eigener Shop geht nicht, Shop muss Spieler-Aufträge annehmen. Eine Folie geht ab (eine Karte im
- * Slab muss erst aufgebrochen werden), der Preis wird eingezogen, die Karte ist bis zur Rückgabe gesperrt.
+ * Karte einreichen mit gebuchten Bausteinen (services: { iron, slab, express }): mindestens Bügeln oder Benoten + Slab,
+ * Bügeln nur bei einem ungebügelten Knick. Eigener Shop geht nicht, Shop muss Spieler-Aufträge annehmen. Eine Folie geht
+ * ab (eine Karte im Slab muss erst aufgebrochen werden), der Preis wird eingezogen, die Karte ist bis zur Rückgabe gesperrt.
  */
-async function submit({ user, shopCode, doc }) {
+async function submit({ user, shopCode, doc, services }) {
   if (!mongoose.isValidObjectId(doc)) throw new UserError('Diese Karte gibt es nicht.');
+  const want = normServices(services);
+  if (!want.iron && !want.slab) throw new UserError('Wähle mindestens „Knick bügeln“ oder „Benoten + Slab“.');
   await expireDue();
   const shop = await GradingShop.findOne({ code: String(shopCode || '').toUpperCase() }).lean();
   if (!acceptsOrders(shop)) throw new UserError('Dieser Shop nimmt gerade keine Aufträge von Mitgliedern an.');
   if (String(shop._id) === String(user._id)) throw new UserError('Deine eigene Karte kannst du nicht bei deinem eigenen Shop einreichen.');
-  const price = priceOf(shop);
+  const { parts, total: price } = priceOf(shop, want);
   let order;
   try {
     order = await inTransaction(async (session) => {
-      const card = await TcgCard.findOne({ _id: doc, user: user._id }).select('card foiledAt slab').session(session).lean();
+      const card = await TcgCard.findOne({ _id: doc, user: user._id }).select('card foiledAt slab condition.defects.crease condition.defects.ironed').session(session).lean();
       if (!card) throw new UserError('Diese Karte gehört dir nicht (mehr).');
       if (card.slab) throw new UserError('Die Karte steckt schon in einem Slab – brich ihn zuerst auf.');
+      const defects = (card.condition && card.condition.defects) || {};
+      if (want.iron && !(defects.crease && !defects.ironed)) throw new UserError('Diese Karte hat keinen Knick, den man noch bügeln kann.');
       const reason = (await lockedDocs(user._id, session)).reasons.get(String(card._id));
       if (reason && reason !== 'folie') throw new UserError(`Die Karte ist gerade gesperrt (${lockLabel(reason)}).`);
       const paid = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: price } }, { $inc: { balance: -price } }, { new: true, session });
@@ -203,7 +238,7 @@ async function submit({ user, shopCode, doc }) {
       await claim([card._id], user._id, session);
       if (card.foiledAt) await TcgCard.updateOne({ _id: card._id }, { $set: { foiledAt: null } }, { session });
       const [created] = await GradingOrder.create(
-        [{ owner: user._id, ownerName: user.username, shop: shop._id, shopCode: shop.code, shopName: shop.name, doc: card._id, card: card.card, price, expiresAt: deadline() }],
+        [{ owner: user._id, ownerName: user.username, shop: shop._id, shopCode: shop.code, shopName: shop.name, doc: card._id, card: card.card, price, priceParts: parts, services: want, expiresAt: deadline(Date.now(), settings, want) }],
         { session }
       );
       await Ledger.create([{ user: user._id, type: 'grading_auftrag', amount: -price, betTitle: `${cardName(card.card)} bei ${shop.code}` }], { session });
@@ -213,7 +248,8 @@ async function submit({ user, shopCode, doc }) {
     if (err.code === 11000) throw new UserError('Diese Karte steckt schon in einem Auftrag.');
     throw err;
   }
-  await notify(shop._id, { area: 'Grading', href: SHOP_HREF, text: `${user.username} hat dir „${cardName(order.card)}“ zum Graden geschickt (${euro(price)}).` });
+  const what = SERVICES.filter(({ key }) => key !== 'base' && want[key]).map((x) => x.short).join(', ');
+  await notify(shop._id, { area: 'Grading', href: SHOP_HREF, text: `${user.username} hat dir „${cardName(order.card)}“ geschickt: ${what} (${euro(price)}).` });
   return order;
 }
 
@@ -324,8 +360,12 @@ module.exports = {
   ORDER_LEVEL,
   OPEN,
   RATE_DAYS,
+  QUEUE_SORT,
+  shopPrices,
+  normServices,
+  servicesOf,
   priceOf,
-  validPrice,
+  validPrices,
   acceptsOrders,
   deadline,
   canRate,
@@ -336,7 +376,7 @@ module.exports = {
   submittable,
   myOrders,
   queueFor,
-  setPrice,
+  setPrices,
   submit,
   cancel,
   expireDue,

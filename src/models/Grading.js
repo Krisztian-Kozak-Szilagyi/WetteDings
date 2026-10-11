@@ -1,6 +1,11 @@
 const { Schema, model } = require('mongoose');
 const { defectsSchema } = require('./condition');
 
+// Preise je Baustein eines Spieler-Auftrags in Cent (#204) – beim Shop (null = Standardpreis) und eingefroren am Auftrag
+const pricesSchema = new Schema({ base: { type: Number, default: null }, iron: { type: Number, default: null }, slab: { type: Number, default: null }, express: { type: Number, default: null } }, { _id: false });
+// Gebuchte Bausteine eines Spieler-Auftrags (#204): Reinigung ist immer dabei
+const servicesSchema = new Schema({ iron: Boolean, slab: Boolean, express: Boolean }, { _id: false });
+
 // Grading-Shop eines Mitglieds (Mini-Game). _id = User-ID.
 // Solange active = true, gibt es keinen Tagesbonus; kündigen geht erst ab lockedUntil.
 const shopSchema = new Schema(
@@ -16,9 +21,9 @@ const shopSchema = new Schema(
     code: { type: String, default: null }, // Kürzel, z. B. "PSA" – steht auf den Slabs, eindeutig
     // Laufendes Bügeln einer eigenen Karte (#204): welches Exemplar, seit wann (Mindestzeit wie beim Putzen)
     ironing: { type: new Schema({ doc: Schema.Types.ObjectId, startedAt: Date }, { _id: false }), default: null },
-    // Multiplayer (#204, Etappe B): Preis für Spieler-Aufträge (Cent, null = Standardpreis aus den Einstellungen),
-    // ausgestellte Slabs (Vitrine), Reputation und Kennzahlen fürs Rating
-    price: { type: Number, default: null },
+    // Multiplayer (#204, Etappe B): Festpreise je Baustein für Spieler-Aufträge (Cent, null = Standardpreis aus den
+    // Einstellungen; Bausteine in gradingService.SERVICES), ausgestellte Slabs (Vitrine), Reputation und Kennzahlen fürs Rating
+    prices: { type: pricesSchema, default: () => ({}) },
     showcase: { type: [Schema.Types.ObjectId], default: [] },
     reputation: { type: Number, default: 0 },
     stars: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Kundenbewertungen 1–5
@@ -59,6 +64,7 @@ const jobSchema = new Schema(
     source: { type: String, enum: ['npc', 'spieler'], default: 'npc' },
     order: { type: Schema.Types.ObjectId, ref: 'GradingOrder', default: null },
     cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // das Exemplar (Lage des Knicks wie auf der Karte)
+    services: { type: servicesSchema, default: null }, // gebuchte Bausteine des Spieler-Auftrags (null = NPC: Schritte nach Stufe)
     doneAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -81,7 +87,9 @@ const orderSchema = new Schema(
     shopName: { type: String, default: null },
     doc: { type: Schema.Types.ObjectId, ref: 'TcgCard', required: true }, // das Exemplar
     card: { type: String, required: true }, // Karten-ID (Anzeige)
-    price: { type: Number, required: true }, // Cent
+    price: { type: Number, required: true }, // Cent, Summe der Bausteine
+    services: { type: servicesSchema, default: null }, // gebuchte Bausteine (fehlt bei älteren Aufträgen = Bügeln + Slab)
+    priceParts: { type: pricesSchema, default: null }, // Preis je Baustein beim Einreichen
     status: { type: String, enum: ['wartet', 'in_arbeit', 'fertig', 'abgelaufen', 'storniert'], default: 'wartet' },
     expiresAt: { type: Date, required: true }, // bis dahin muss der Shop anfangen bzw. fertig werden
     startedAt: { type: Date, default: null },
@@ -100,7 +108,9 @@ orderSchema.index({ status: 1, expiresAt: 1 });
 orderSchema.index({ doc: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['wartet', 'in_arbeit'] } } });
 
 // Admin-Einstellungen (ein Dokument, _id "grading"). jobs = NPC-Aufträge pro Tag, playerJobs = Spieler-Aufträge pro Tag,
-// orderPrice = Preisrahmen der Spieler-Aufträge (Cent), orderDays = Frist, showcaseMax = Plätze in der Vitrine
+// servicePrice = Preisrahmen je Baustein der Spieler-Aufträge (Cent), orderDays/expressDays = Frist normal/Express,
+// showcaseMax = Plätze in der Vitrine
+const rangeSchema = new Schema({ min: Number, max: Number, def: Number }, { _id: false });
 const settingsSchema = new Schema(
   {
     _id: { type: String, default: 'grading' },
@@ -110,8 +120,9 @@ const settingsSchema = new Schema(
     pay: { clean: Number, grade: Number, slab: Number, iron: Number },
     costs: [Number],
     premium: Number,
-    orderPrice: { min: Number, max: Number, def: Number },
+    servicePrice: { base: rangeSchema, iron: rangeSchema, slab: rangeSchema, express: rangeSchema },
     orderDays: Number,
+    expressDays: Number,
     showcaseMax: Number,
     updatedByName: String,
   },

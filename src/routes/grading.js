@@ -84,8 +84,9 @@ router.get('/grading', async (req, res) => {
     players,
     orderLevel: orders.ORDER_LEVEL,
     queue: queue.map((o) => ({ ...o, cardInfo: cardInfo(o.card) })),
-    shopPrice: state.shop ? orders.priceOf(state.shop) : grading.settings.orderPrice.def,
-    orderPrice: grading.settings.orderPrice,
+    shopPrices: orders.shopPrices(state.shop),
+    servicePrice: grading.settings.servicePrice,
+    services: grading.SERVICES,
     orderDays: grading.settings.orderDays,
     rating: state.shop ? reputation.ratingOf(state.shop) : null,
     showcase,
@@ -175,6 +176,8 @@ router.get('/grading/einreichen', async (req, res) => {
     orders: mine,
     pick,
     orderDays: grading.settings.orderDays,
+    expressDays: grading.settings.expressDays,
+    services: grading.SERVICES,
     rateDays: orders.RATE_DAYS,
     rarityByKey: catalog.rarityByKey,
   });
@@ -185,8 +188,10 @@ router.post('/grading/einreichen', (req, res) =>
     req,
     res,
     async () => {
-      const order = await orders.submit({ user: req.user, shopCode: str(req.body.shop), doc: str(req.body.doc) });
-      return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${grading.settings.orderDays} Tage Zeit.`;
+      const services = { iron: req.body.iron === '1', slab: req.body.slab === '1', express: req.body.express === '1' };
+      const order = await orders.submit({ user: req.user, shopCode: str(req.body.shop), doc: str(req.body.doc), services });
+      const days = order.services.express ? grading.settings.expressDays : grading.settings.orderDays;
+      return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${days} ${days === 1 ? 'Tag' : 'Tage'} Zeit.`;
     },
     '/grading/einreichen'
   )
@@ -221,16 +226,20 @@ router.get('/grading/shop/:code', async (req, res) => {
   const shop = await orders.shopByCode(req.params.code);
   if (!shop) return res.status(404).render('error', { title: 'Grading-Shop', status: 404, message: 'Diesen Grading-Shop gibt es nicht.' });
   const pop = await population.all();
-  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade) });
+  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade) });
 });
 
-// Eigener Shop: Preis für Spieler-Aufträge und Vitrine
+// Eigener Shop: Festpreise je Baustein für Spieler-Aufträge und Vitrine
 router.post('/grading/preis', (req, res) =>
   handle(req, res, async () => {
-    const price = parseEuro(str(req.body.price));
-    if (price === null) throw new UserError('Bitte gib einen gültigen Preis an.');
-    await orders.setPrice({ user: req.user, price });
-    return `Neuer Preis für Aufträge von Mitgliedern: ${euro(price)}.`;
+    const prices = {};
+    for (const sv of grading.SERVICES) {
+      const cents = parseEuro(str(req.body[sv.key]));
+      if (cents === null) throw new UserError(`Bitte gib für „${sv.label}“ einen gültigen Preis an.`);
+      prices[sv.key] = cents;
+    }
+    await orders.setPrices({ user: req.user, prices });
+    return 'Neue Preise gespeichert – sie gelten für neue Aufträge.';
   })
 );
 
