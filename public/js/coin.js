@@ -340,6 +340,7 @@
   window.addEventListener('resize', function () { clearTimeout(fitEvents.t); fitEvents.t = setTimeout(fitEvents, 120); });
 
   loadHistory();
-  setInterval(poll, POLL_MS);
-  historyTimer = setInterval(loadHistory, HISTORY_REFRESH_MS);
+  // verborgener Tab: keine Abfragen (Serverlast)
+  setInterval(function () { if (!document.hidden) poll(); }, POLL_MS);
+  historyTimer = setInterval(function () { if (!document.hidden) loadHistory(); }, HISTORY_REFRESH_MS);
 })();
