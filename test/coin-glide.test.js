@@ -47,3 +47,14 @@ test('Einmalige Aktionen: kein +75-%-Sprung mehr, jede hat eine Frist', () => {
   }
   assert.ok(!markets.ONE_TIME_ACTIONS.some((a) => a.key === 'mia-median-2026-10-07'));
 });
+
+test('Einmalige Aktion MIA +34,72 % in einer Stunde', () => {
+  const a = markets.ONE_TIME_ACTIONS.find((x) => x.key === 'mia-anstieg-2026-10-11');
+  assert.ok(a && a.symbol === 'MIA');
+  assert.deepStrictEqual(a.glide, { factor: 1.3472, hours: 1 });
+  // Gleitflug in Takten: nach einer Stunde genau Startkurs × 1,3472
+  let p = 10, t = 0;
+  const g = { target: p * a.glide.factor, endAt: 3600e3 };
+  for (; t < 3600e3; t += 5000) p = glideStep(p, g, t, t + 5000).price;
+  assert.ok(Math.abs(p - 13.472) < 1e-9);
+});
