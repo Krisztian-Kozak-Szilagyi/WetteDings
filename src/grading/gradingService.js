@@ -677,7 +677,9 @@ async function finishJob({ user, clean, seal }) {
     const order = player ? await finishPlayerJob({ job, shop, session }) : null;
     const pay = player ? order.price : payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
     const foilFound = sealQ > 0 && (await rollGradingFoil({ userId: user._id, session }));
-    Object.assign(job, { status: 'fertig', pay, foilFound, shopCode: (shop && shop.code) || null, doneAt: new Date() });
+    // Posten für Abschluss-Bildschirm und Kassenzettel (NPC: Lohn je Schritt; Mitglieder-Auftrag: gebuchte Bausteine)
+    const breakdown = player ? { parts: { ...(order.priceParts || {}) }, extra: 0, total: pay } : payParts({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
+    Object.assign(job, { status: 'fertig', pay, foilFound, shopCode: (shop && shop.code) || null, doneAt: new Date(), parts: { ...breakdown.parts, extra: breakdown.extra } });
     await job.save({ session });
     if (!player) {
       await User.updateOne({ _id: user._id }, { $inc: { balance: pay } }, { session });
@@ -685,8 +687,6 @@ async function finishJob({ user, clean, seal }) {
     }
     await GradingShop.updateOne({ _id: user._id }, { $inc: { jobsDone: 1, earned: pay, ...(player && { playerJobsDone: 1 }) } }, { session });
     const score = await scoreShop({ shopId: user._id, job, session });
-    // Posten für den Abschluss-Bildschirm (NPC: Lohn je Schritt; Mitglieder-Auftrag: gebuchte Bausteine)
-    const breakdown = player ? { parts: { ...(order.priceParts || {}) }, extra: 0, total: pay } : payParts({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
     return { ...job.toObject(), order, breakdown, score };
   });
   if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });

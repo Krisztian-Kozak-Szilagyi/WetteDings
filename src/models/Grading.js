@@ -66,6 +66,8 @@ const jobSchema = new Schema(
     order: { type: Schema.Types.ObjectId, ref: 'GradingOrder', default: null },
     cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // das Exemplar (Lage des Knicks wie auf der Karte)
     services: { type: servicesSchema, default: null }, // gebuchte Bausteine des Spieler-Auftrags (null = NPC: Schritte nach Stufe)
+    // Posten beim Abschluss (#204, Kassenzettel auf dem Schreibtisch): NPC Lohn je Schritt + Zuschlag, Mitglieder die Bausteine
+    parts: { type: new Schema({ clean: Number, iron: Number, grade: Number, slab: Number, base: Number, express: Number, review: Number, extra: Number }, { _id: false }), default: null },
     doneAt: { type: Date, default: null },
   },
   { timestamps: true }

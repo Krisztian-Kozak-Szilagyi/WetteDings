@@ -21,6 +21,12 @@
   var view = null;
   var drag = null;
   var certLink = null; // Link zum Zertifikat eines Slabs (#204), beim ersten Öffnen angelegt
+  // Galerie (#204, Vitrine): Auslöser mit data-foil-group blättern per Wischen, ‹ › und Pfeiltasten durch ihre Gruppe;
+  // dazu Showroom-Licht und ein Messingschild (Name, Note, Population aus data-pop)
+  var gallery = null; // { list, idx }
+  var nav = null;
+  var plaque = null;
+  var swiped = false;
 
   function el(tag, cls, parent, text) {
     var e = document.createElement(tag);
@@ -124,6 +130,43 @@
     view.vx = view.vy = 0;
   }
 
+  function step(dir) {
+    if (!gallery || gallery.list.length < 2) return;
+    var n = gallery.list.length;
+    open(gallery.list[(gallery.idx + dir + n) % n], false);
+  }
+
+  /** Galerie, Showroom-Licht und Messingschild für den Auslöser einrichten */
+  function setupGallery(trigger, d) {
+    var group = d.foilGroup;
+    gallery = null;
+    if (group) {
+      var list = Array.prototype.filter.call(document.querySelectorAll('[data-foil-group="' + group + '"]'), function (t) { return !modal.contains(t); });
+      gallery = { list: list, idx: list.indexOf(trigger) };
+    }
+    modal.classList.toggle('is-showroom', !!group);
+    if (!nav) {
+      nav = el('div', 'foil-nav', modal);
+      var prev = el('button', 'foil-nav-btn is-prev', nav, '‹');
+      var next = el('button', 'foil-nav-btn is-next', nav, '›');
+      prev.type = next.type = 'button';
+      prev.setAttribute('aria-label', 'Vorheriger Slab');
+      next.setAttribute('aria-label', 'Nächster Slab');
+      prev.addEventListener('click', function () { step(-1); });
+      next.addEventListener('click', function () { step(1); });
+      plaque = el('div', 'foil-plaque', modal);
+    }
+    nav.hidden = !gallery || gallery.list.length < 2;
+    plaque.hidden = !group;
+    if (group) {
+      plaque.innerHTML = '';
+      el('strong', '', plaque, d.name);
+      el('span', '', plaque, (d.slabCode ? d.slabCode + ' · ' : '') + (d.gradeWord ? d.gradeWord + ' ' : '') + (d.grade || ''));
+      if (d.pop) el('small', '', plaque, d.pop);
+      if (gallery && gallery.list.length > 1) el('small', 'foil-plaque-count', plaque, (gallery.idx + 1) + ' / ' + gallery.list.length);
+    }
+  }
+
   function open(trigger, foiling) {
     var d = trigger.dataset;
     var card = build(d, foiling);
@@ -169,6 +212,7 @@
     }
     if (d.cert) certLink.href = '/slab/' + encodeURIComponent(d.cert);
     certLink.hidden = !(d.slabCode && d.cert) || location.pathname === certLink.pathname; // nicht auf der Zertifikatsseite selbst
+    setupGallery(trigger, d);
 
     card.addEventListener('pointerdown', function (e) {
       drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId };
@@ -200,7 +244,7 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
     });
 
-    modal.showModal();
+    if (!modal.open) modal.showModal();
     card.focus();
     requestAnimationFrame(loop);
   }
@@ -213,7 +257,32 @@
     open(trigger, false);
   }, true);
   modal.querySelector('[data-foil-close]').addEventListener('click', function () { modal.close(); });
-  modal.addEventListener('click', function (e) { if (e.target === modal || e.target === stage) modal.close(); });
+  modal.addEventListener('click', function (e) {
+    if (swiped) { swiped = false; return; }
+    if (e.target === modal || e.target === stage) modal.close();
+  });
+  modal.addEventListener('keydown', function (e) {
+    if (!gallery) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  });
+  // Wischen neben der Karte blättert (auf der Karte selbst dreht Ziehen sie)
+  var swipe = null;
+  stage.addEventListener('pointerdown', function (e) {
+    if (e.target !== stage || !gallery) return;
+    swipe = { x: e.clientX, y: e.clientY };
+  });
+  stage.addEventListener('pointerup', function (e) {
+    if (!swipe) return;
+    var dx = e.clientX - swipe.x;
+    var dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      swiped = true;
+      step(dx < 0 ? 1 : -1);
+    }
+  });
+  modal.addEventListener('close', function () { gallery = null; });
 
   // Inventar: gerade folierte Karte groß zeigen, wie die Folie aufgezogen wird
   var fresh = document.querySelector('.foil-item.is-new [data-foil-view]');

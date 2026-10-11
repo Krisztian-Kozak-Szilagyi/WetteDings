@@ -1,12 +1,13 @@
 <%- include('partials/head') %>
 <%#
-  Grading-Shop (#204): ohne Job das Stellenangebot, mit Job der Shop-Hub – Kopf (Stufe, Reputation, Tageszähler),
-  „Jetzt dran“ mit genau einer Hauptaktion (Werkbank) und Reiter für Übersicht, Aufträge, Vitrine, Preise, Werkstatt.
+  Grading-Shop (#204): ohne Job das Stellenangebot, mit Job der Schreibtisch – Holzplatte von oben mit Namensschild,
+  Glasvitrine, Schneidematte (genau eine Hauptaktion) und Objekten, die je ein Fenster öffnen (public/js/grading-desk.js).
+  Erklärungen stehen in der Tour (public/js/grading-tour.js), nicht auf dem Tisch.
 %>
 <% const locked = active && shop.lockedUntil && new Date(shop.lockedUntil) > new Date(); %>
 <% const tabInput = (t) => `<input type="hidden" name="reiter" value="${t}">`; %>
 
-<div class="gr-page">
+<div class="gr-page<%= active ? ' gd-page' : '' %>">
 <% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <% if (!active) { %>
@@ -51,355 +52,391 @@
     </div>
   </section>
 <% } else { %>
-  <%# ---------- Kopf: Shop, Stufe, Reputation, Tageszähler ---------- %>
-  <header class="gh-head">
-    <div class="gh-id">
-      <p class="gr-kicker">Stufe <%= info.level %> · <%= info.name %></p>
-      <h1 class="gh-name"><%= shop.name || 'Grading-Shop' %><% if (shop.code) { %> <span class="gr-shop-code"><%= shop.code %></span><% } %></h1>
-      <% if (rating && shop.code) { const t = rating.tier; const span = t.next ? t.next - t.min : 1; const pct = t.next ? Math.min(100, Math.round(((rating.reputation - t.min) / span) * 100)) : 100; %>
-        <div class="gh-rep">
-          <span><b><%= t.label %></b> · Reputation <%= Math.round(rating.reputation) %><% if (t.next) { %> <span class="gr-dim">/ <%= t.next %></span><% } %></span>
-          <span class="gh-bar" role="progressbar" aria-label="Reputation bis zur nächsten Stufe" aria-valuenow="<%= pct %>" aria-valuemin="0" aria-valuemax="100"><span style="width: <%= pct %>%"></span></span>
+  <%
+    const shown = showcase.filter((s) => s.shown);
+    const r = rating;
+    const fmtStars = (v) => (v != null ? v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
+    const starRow = (v) => { const n = Math.round(v || 0); return '★'.repeat(n) + '☆'.repeat(5 - n); };
+    const tier = r && r.tier;
+    const repPct = tier ? (tier.next ? Math.min(100, Math.round(((r.reputation - tier.min) / (tier.next - tier.min)) * 100)) : 100) : 0;
+    const sheetHead = (key, title) => `<header class="gd-sheet-head"><span class="gd-sheet-grip" aria-hidden="true"></span><h2 id="gd-${key}-t">${title}</h2><button type="button" class="gd-sheet-help" data-tour-info="${key}" aria-label="Kurz erklärt">?</button><button type="button" class="gd-sheet-close" data-gd-close aria-label="Schließen">×</button></header>`;
+    // Kassenzettel: NPC-Lohn je Schritt bzw. gebuchte Bausteine eines Mitglieds
+    const npcLabels = { clean: 'Reinigung', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln', extra: 'Zuschlag' };
+    const svcLabels = Object.fromEntries(services.map((s) => [s.key, s.label]));
+    const linesOf = (parts, player) => Object.entries(parts || {}).filter(([k, v]) => v && (player ? svcLabels : npcLabels)[k]).map(([k, v]) => [(player ? svcLabels : npcLabels)[k], v]);
+    const bonNote = (j) => [
+      j.guess !== null && j.source === 'spieler' ? `Slab ${j.shopCode || ''} · Note ${j.guess}` : j.guess !== null ? `Note ${j.guess}${j.guess === j.grade ? ' ✓' : ' · richtig ' + j.grade}` : j.source === 'spieler' ? 'gebügelt' : '',
+      j.foilFound ? '+ 1 Folie' : '',
+    ].filter(Boolean).join(' · ');
+    const bons = doneCards.map((j) => ({ card: j.cardInfo, title: j.cardInfo ? j.cardInfo.name : j.card, who: j.customer, at: j.doneAt, lines: linesOf(j.parts, j.source === 'spieler'), total: j.pay, note: bonNote(j) }));
+    const nextOrder = waiting && playerUsed < playerLimit ? queue[0] : null;
+    const canTake = used < limit || !!nextOrder;
+    const ownedTools = tools.filter((t) => t.owned).length;
+    const milesDone = milestones.filter((m) => m.done).length;
+  %>
+  <div class="gd-desk" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %>>
+    <%# ---------- Namensschild: Shop, Stufe, Reputation, heute ---------- %>
+    <header class="gd-plate" data-tour="schild">
+      <div class="gd-plate-id">
+        <h1><%= shop.name || 'Dein Grading-Shop' %></h1>
+        <% if (shop.code) { %><span class="gd-stamp" aria-label="Kürzel <%= shop.code %>"><%= shop.code %></span><% } %>
+        <% if (shop.codeRequest) { %><span class="gd-seal" aria-label="Neues Kürzel <%= shop.codeRequest.code %> beantragt">⏳ <%= shop.codeRequest.code %></span><% } %>
+      </div>
+      <div class="gd-plate-meta">
+        <span class="gd-level" aria-label="Stufe <%= info.level %> von <%= levels.length %>: <%= info.name %>"><% levels.forEach((l) => { %><i class="<%= l.level <= info.level ? 'is-on' : '' %>"></i><% }) %><b><%= info.name %></b></span>
+        <% if (tier && shop.code) { %>
+          <span class="gd-rep" aria-label="<%= tier.label %>, Reputation <%= Math.round(r.reputation) %><%= tier.next ? ' von ' + tier.next : '' %>"><b><%= tier.label %></b><span class="gh-bar" aria-hidden="true"><span style="width: <%= repPct %>%"></span></span></span>
+        <% } %>
+      </div>
+      <div class="gd-plate-today">
+        <span class="gd-coins" data-gd-coins aria-label="Heute verdient: <%= euro(earnedToday) %>"><i></i><i></i><i></i><b><%= euro(earnedToday) %></b></span>
+        <span class="gd-quota" aria-label="Aufträge heute: <%= used %> von <%= limit %>"><span aria-hidden="true">✉</span><span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="<%= i < used ? 'is-on' : '' %>"></span><% } %></span></span>
+        <% if (players) { %><span class="gd-quota" aria-label="Aufträge von Mitgliedern heute: <%= playerUsed %> von <%= playerLimit %>"><span aria-hidden="true">👤</span><span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < playerLimit; i++) { %><span class="<%= i < playerUsed ? 'is-on' : '' %>"></span><% } %></span></span><% } %>
+      </div>
+      <button type="button" class="gd-help" data-tour-start aria-label="Tour: So funktioniert dein Shop">?</button>
+    </header>
+
+    <%# ---------- Glasvitrine ---------- %>
+    <% if (shop.code) { %>
+      <%- include('partials/grading-desk/vitrine', { items: shown, max: showcaseMax, editHref: hubUrl('vitrine') }) %>
+    <% } %>
+
+    <%# ---------- Schneidematte: genau eine Hauptaktion ---------- %>
+    <section class="gd-mat <%= openJob ? 'is-work' : !shop.code ? 'is-name' : canTake ? 'is-mail' : 'is-closed' %>" data-tour="matte" aria-label="Werkbank">
+      <% if (openJob) { %>
+        <% if (openJob.card) { %><img class="gd-mat-card r-<%= openJob.card.rarity %>" src="<%= openJob.card.image %>" alt="" width="120" height="168"><% } %>
+        <div class="gd-mat-text">
+          <h2><%= openJob.card ? openJob.card.name : 'Karte' %></h2>
+          <span class="gd-mat-who">für <%= openJob.customer %></span>
+          <% if (openJob.services) { %><%- include('partials/grading-services', { sv: openJob.services }) %><% } %>
+        </div>
+        <a class="gd-go" href="/grading/werkbank">▶ Weiter</a>
+      <% } else if (!shop.code) { %>
+        <form method="post" action="/grading/name" class="gd-namecard">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <h2>Wie heißt dein Shop?</h2>
+          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" placeholder="Günthers Kartenklinik" required></label>
+          <label class="field"><span>Kürzel – steht auf jedem Slab</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
+          <button class="gd-go" type="submit">▶ Shop eröffnen</button>
+        </form>
+      <% } else if (canTake) { %>
+        <span class="gd-envelope<%= nextOrder && nextOrder.services.express ? ' is-express' : '' %>" aria-hidden="true">
+          <% if (nextOrder && nextOrder.cardInfo) { %><img src="<%= nextOrder.cardInfo.image %>" alt="" width="60" height="84"><% } %>
+          <span class="gd-envelope-flap"></span>
+          <% if (nextOrder && nextOrder.services.express) { %><span class="gd-envelope-stamp">EXPRESS</span><% } %>
+        </span>
+        <div class="gd-mat-text">
+          <% if (nextOrder) { %>
+            <h2><%= nextOrder.cardInfo ? nextOrder.cardInfo.name : nextOrder.card %></h2>
+            <span class="gd-mat-who">von <%= nextOrder.ownerName %> · <b>+<%= euro(nextOrder.price) %></b></span>
+            <%- include('partials/grading-services', { sv: nextOrder.services }) %>
+          <% } else { %>
+            <h2>Neuer Auftrag</h2>
+            <span class="gd-mat-who">noch <%= limit - used %> heute</span>
+          <% } %>
+        </div>
+        <form method="post" action="/grading/auftrag">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="gd-go" type="submit">▶ Annehmen</button>
+        </form>
+      <% } else { %>
+        <span class="gd-mug" aria-hidden="true"><span></span></span>
+        <div class="gd-mat-text">
+          <h2>Feierabend</h2>
+          <span class="gd-mat-who">Neue Aufträge ab <%= bonusTime %> Uhr<% if (waiting) { %> · <%= waiting %> ✉ warten<% } %></span>
         </div>
       <% } %>
-    </div>
-    <div class="gh-today">
-      <div class="gh-count"><span>NPC heute</span><b><%= used %> / <%= limit %></b>
-        <span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="<%= i < used ? 'is-on' : '' %>"></span><% } %></span></div>
-      <% if (players) { %><div class="gh-count"><span>Mitglieder heute</span><b><%= playerUsed %> / <%= playerLimit %></b>
-        <span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < playerLimit; i++) { %><span class="<%= i < playerUsed ? 'is-on' : '' %>"></span><% } %></span></div><% } %>
-      <div class="gh-count"><span>Heute verdient</span><b><%= euro(earnedToday) %></b></div>
-    </div>
-  </header>
-
-  <%# ---------- Jetzt dran: genau eine Hauptaktion ---------- %>
-  <section class="gh-now">
-    <% if (openJob) { %>
-      <% if (openJob.card) { %><img class="gh-now-card r-<%= openJob.card.rarity %>" src="<%= openJob.card.image %>" alt="" width="72" height="100"><% } %>
-      <div class="gh-now-text">
-        <p class="gr-kicker">Auf der Werkbank</p>
-        <h2><%= openJob.card ? openJob.card.name : 'Karte' %> <span class="gr-dim">für <%= openJob.customer %></span></h2>
-        <% if (openJob.services) { %><%- include('partials/grading-services', { sv: openJob.services }) %><% } %>
-      </div>
-      <a class="btn btn-primary btn-lg gr-glow" href="/grading/werkbank">Weiterarbeiten →</a>
-    <% } else if (!shop.code) { %>
-      <%# Ohne Namen und Kürzel keine Aufträge – das Kürzel steht auf jedem Slab %>
-      <div class="gh-now-text">
-        <p class="gr-kicker">Erster Schritt</p>
-        <h2>Wie heißt dein Shop?</h2>
-        <p class="muted">Bevor die ersten Karten kommen: Gib deinem Shop einen Namen und ein Kürzel. Das Kürzel steht auf jedem Slab, das du versiegelst.</p>
-        <form method="post" action="/grading/name" class="form gr-name-form">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" placeholder="z. B. Günthers Kartenklinik" required></label>
-          <label class="field"><span>Kürzel <em>(2–5 Zeichen)</em></span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
-          <button class="btn btn-primary btn-lg gr-glow" type="submit">Shop eröffnen</button>
-        </form>
-      </div>
-    <% } else if (used < limit || (waiting && playerUsed < playerLimit)) { const next = waiting && playerUsed < playerLimit ? queue[0] : null; %>
-      <% if (next && next.cardInfo) { %><img class="gh-now-card r-<%= next.cardInfo.rarity %>" src="<%= next.cardInfo.image %>" alt="" width="72" height="100"><% } else { %><span class="gh-now-mail" aria-hidden="true">✉</span><% } %>
-      <div class="gh-now-text">
-        <p class="gr-kicker"><%= next ? (next.services.express ? 'Express wartet' : 'Karte eines Mitglieds') : 'Briefkasten' %></p>
-        <% if (next) { %>
-          <h2><%= next.cardInfo ? next.cardInfo.name : next.card %> <span class="gr-dim">von <%= next.ownerName %></span></h2>
-          <p class="small"><%- include('partials/grading-services', { sv: next.services }) %> +<%= euro(next.price) %> · bis <%= date(next.expiresAt) %><% if (waiting > 1) { %> · <%= waiting - 1 %> weitere warten<% } %></p>
-        <% } else { %>
-          <h2>Noch <%= limit - used %> <%= limit - used === 1 ? 'Karte' : 'Karten' %> für heute</h2>
-          <p class="muted small">NPC-Kunden zahlen Lohn je Arbeitsschritt – je sauberer und genauer, desto mehr.</p>
-        <% } %>
-      </div>
-      <form method="post" action="/grading/auftrag">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button class="btn btn-primary btn-lg gr-glow" type="submit">Auftrag annehmen →</button>
-      </form>
-    <% } else { %>
-      <span class="gh-now-mail" aria-hidden="true">☕</span>
-      <div class="gh-now-text">
-        <p class="gr-kicker">Feierabend</p>
-        <h2>Alle Aufträge für heute erledigt</h2>
-        <p class="muted small">Morgen ab <%= bonusTime %> Uhr kommen neue.<% if (waiting) { %> <%= waiting %> <%= waiting === 1 ? 'Karte eines Mitglieds wartet' : 'Karten von Mitgliedern warten' %> bis morgen.<% } %></p>
-      </div>
-    <% } %>
-  </section>
-
-  <% if (shop.code) { %>
-  <nav class="tabs gh-tabs" aria-label="Bereiche des Shops">
-    <% tabs.forEach((t) => { const badge = t.key === 'auftraege' ? queue.length : 0; %>
-      <a class="tab <%= tab === t.key ? 'active' : '' %>" href="<%= hubUrl(t.key) %>" <% if (tab === t.key) { %>aria-current="page"<% } %>><%= t.label %><% if (badge) { %><span class="tab-count"><%= badge %></span><% } %></a>
-    <% }) %>
-  </nav>
-  <% } %>
-
-  <% if (tab === 'uebersicht' || !shop.code) { %>
-    <%# ---------- Übersicht ---------- %>
-    <% if (rating && shop.code) { %>
-      <div class="gh-kpis">
-        <div class="gh-kpi"><span>Bewertung</span><b><%= rating.stars != null ? '★ ' + rating.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) : '–' %></b><small><%= rating.starCount %> Bewertung<%= rating.starCount === 1 ? '' : 'en' %></small></div>
-        <div class="gh-kpi"><span>Qualität</span><b><%= rating.quality != null ? Math.round(rating.quality) + ' %' : '–' %></b><small>Ø Sauberkeit, Versiegelung, Glätte</small></div>
-        <div class="gh-kpi"><span>Treffsicherheit</span><b><%= rating.hitRate != null ? Math.round(rating.hitRate) + ' %' : '–' %></b><small><%= rating.graded %> benotet</small></div>
-        <div class="gh-kpi"><span>Aufträge</span><b><%= shop.jobsDone %></b><small><%= euro(shop.earned) %> verdient</small></div>
-      </div>
-    <% } %>
-
-    <div class="gh-grid">
-      <% if (players) { %>
-        <section class="gh-card">
-          <h2>Warteschlange <a class="small" href="<%= hubUrl('auftraege') %>">alle →</a></h2>
-          <% if (queue.length) { %>
-            <ul class="gr-done">
-              <% queue.slice(0, 4).forEach((o) => { %><%- include('partials/grading-order-row', { o }) %><% }) %>
-            </ul>
-          <% } else { %>
-            <p class="muted small">Gerade wartet keine Karte. Mitglieder finden dich unter <a href="/grading/einreichen">Karte graden lassen</a> – Rating, Preise und Vitrine entscheiden mit.</p>
-          <% } %>
-        </section>
-      <% } %>
-
-      <section class="gh-card">
-        <h2>Heute erledigt</h2>
-        <% if (doneCards.length) { %>
-          <ul class="gr-done">
-            <% doneCards.forEach((j) => { %><%- include('partials/grading-done-row', { j }) %><% }) %>
-          </ul>
-        <% } else { %>
-          <p class="muted small">Noch nichts – der erste Auftrag wartet oben.</p>
-        <% } %>
-      </section>
-
-      <% if (ironable.length) { %>
-        <section class="gh-card">
-          <h2>Eigene Karten bügeln</h2>
-          <p class="muted small">Knicke aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – aber Vorsicht vor Brandflecken. Ein Versuch je Karte.</p>
-          <ul class="gr-done">
-            <% ironable.forEach((x, i) => { %>
-              <% if (i === 4) { %></ul><details class="gh-more"><summary><%= ironable.length - 4 %> weitere</summary><ul class="gr-done"><% } %>
-              <li class="r-<%= x.info.rarity %>">
-                <span class="gr-done-thumb"><img src="<%= x.info.image %>" alt="" width="36" height="50" loading="lazy"></span>
-                <span class="gr-done-info"><span><b><%= x.info.name %></b> <span class="gr-dim"><%= x.info.rarityLabel %> · Knick</span></span></span>
-                <form method="post" action="/grading/eigene/<%= x.id %>/start">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button class="btn btn-sm" type="submit">Bügeln</button>
-                </form>
-              </li>
-            <% }) %>
-          </ul><% if (ironable.length > 4) { %></details><% } %>
-        </section>
-      <% } %>
-
-      <% if (milestones.length) { %>
-        <section class="gh-card">
-          <h2>Meilensteine <span class="gr-dim"><%= milestones.filter((m) => m.done).length %> / <%= milestones.length %></span> <a class="small" href="/profil/<%= encodeURIComponent(currentUser.username) %>">alle Erfolge →</a></h2>
-          <ul class="gh-miles">
-            <% milestones.slice(0, 4).forEach((m) => { %>
-              <li class="<%= m.done ? 'is-done' : '' %>">
-                <span class="gh-mile-head"><b><%= m.done ? '✓ ' : '' %><%= m.name %></b><% if (m.progress) { %><small><%= m.progress.text %></small><% } %></span>
-                <small class="muted"><%= m.text %></small>
-                <% if (m.progress && !m.done) { %><span class="gh-bar" aria-hidden="true"><span style="width: <%= m.progress.pct %>%"></span></span><% } %>
-              </li>
-            <% }) %>
-          </ul>
-        </section>
-      <% } %>
-
-      <% if (shop.code) { const shown = showcase.filter((s) => s.shown); %>
-        <section class="gh-card">
-          <h2>Vitrine <span class="gr-dim"><%= shown.length %> / <%= showcaseMax %></span> <a class="small" href="<%= hubUrl('vitrine') %>">verwalten →</a></h2>
-          <% if (shown.length) { %>
-            <div class="gh-vitrine-mini">
-              <% shown.slice(0, 6).forEach((s) => { const r = rarityByKey[s.rarity] || { label: '' }; %>
-                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: s.card, rarityLabel: r.label, slab: s.slab, id: s.id }) %></span>
-              <% }) %>
-            </div>
-          <% } else { %>
-            <p class="muted small">Leer. Ausgestellte Slabs boosten deine Reputation je Auftrag – je seltener und besser benotet, desto mehr.</p>
-          <% } %>
-        </section>
-      <% } %>
-    </div>
-
-  <% } else if (tab === 'auftraege') { %>
-    <%# ---------- Aufträge: Warteschlange und Verlauf ---------- %>
-    <% if (players) { %>
-      <section class="gh-card">
-        <h2>Warteschlange</h2>
-        <p class="muted small">Express zuerst, dann die ältesten. Normal hast du <%= orderDays %> Tage, mit Express <%= expressDays %> – sonst geht die Karte samt Geld zurück. Die echte Note bleibt geheim: auf den Slab kommt deine.</p>
-        <% if (queue.length) { %>
-          <ul class="gr-done"><% queue.forEach((o) => { %><%- include('partials/grading-order-row', { o }) %><% }) %></ul>
-        <% } else { %>
-          <p class="muted small">Gerade wartet keine Karte.</p>
-        <% } %>
-      </section>
-    <% } else { %>
-      <section class="gh-card"><p class="muted">Ab Stufe <%= orderLevel %> (Slab-Werkstatt) schicken dir auch Mitglieder ihre Karten – zu deinen Preisen.</p></section>
-    <% } %>
-    <section class="gh-card">
-      <h2>Heute erledigt</h2>
-      <% if (doneCards.length) { %>
-        <ul class="gr-done"><% doneCards.forEach((j) => { %><%- include('partials/grading-done-row', { j }) %><% }) %></ul>
-      <% } else { %>
-        <p class="muted small">Heute noch nichts erledigt.</p>
-      <% } %>
     </section>
-    <% if (history.length) { %>
-      <section class="gh-card">
-        <h2>Aufträge von Mitgliedern</h2>
-        <ul class="gr-done">
-          <% history.forEach((o) => { const c = o.cardInfo; %>
-            <li class="<%= c ? 'r-' + c.rarity : '' %>">
-              <span class="gr-done-thumb"><% if (c) { %><img src="<%= c.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
-              <span class="gr-done-info">
-                <span><b><%= c ? c.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %> · <%= date(o.doneAt) %></span></span>
-                <span class="gr-done-meta"><%- include('partials/grading-services', { sv: o.services }) %>
-                  <% if (o.status === 'fertig') { %><%= o.services.review ? 'Zweitprüfung: ' + (o.result.changed ? 'Note ' + o.result.grade + ' statt ' + o.result.before : 'Note ' + o.result.grade + ' bestätigt') : o.result && o.result.grade != null ? 'Note ' + o.result.grade : 'gebügelt' %><%= o.stars ? ' · ' + '★'.repeat(o.stars) : '' %><% } else { %><%= o.status === 'abgelaufen' ? 'abgelaufen – erstattet' : 'storniert' %><% } %></span>
-              </span>
-              <b class="gr-pay"><%= o.status === 'fertig' ? '+' + euro(o.price) : '–' %></b>
-            </li>
+
+    <%# ---------- Objekte auf dem Tisch ---------- %>
+    <a class="gd-obj gd-tray<%= players ? '' : ' is-locked' %>" href="<%= hubUrl('auftraege') %>" data-gd-open="auftraege" data-tour="eingang" aria-label="Eingang: <%= players ? queue.length + ' Karten von Mitgliedern warten' : 'ab Stufe ' + orderLevel %>">
+      <span class="gd-tray-box">
+        <% queue.slice(0, 4).forEach((o, i) => { %><span class="gd-tray-mail<%= o.services.express ? ' is-express' : '' %>" style="--i: <%= i %>"></span><% }) %>
+        <% if (!players) { %><span class="gd-lock" aria-hidden="true">🔒</span><% } %>
+      </span>
+      <% if (queue.length) { %><span class="gd-badge"><%= queue.length %></span><% } %>
+      <span class="gd-tag">Eingang</span>
+    </a>
+
+    <a class="gd-obj gd-spike" href="<%= hubUrl('bons') %>" data-gd-open="bons" data-tour="spiess" aria-label="Kassenzettel: heute <%= bons.length %> Aufträge, <%= euro(earnedToday) %>">
+      <span class="gd-spike-stack" data-gd-spike>
+        <% bons.slice(0, 5).reverse().forEach((b, i, arr) => { %><span class="gd-spike-bon" style="--i: <%= i %>; --r: <%= ((i * 37) % 13) - 6 %>deg"><% if (i === arr.length - 1) { %><b>+<%= euro(b.total) %></b><% } %></span><% }) %>
+        <span class="gd-spike-nail" aria-hidden="true"></span>
+      </span>
+      <span class="gd-spike-base"><%= euro(earnedToday) %></span>
+      <span class="gd-tag">Bons</span>
+    </a>
+
+    <a class="gd-obj gd-phone" href="<%= hubUrl('bewertungen') %>" data-gd-open="bewertungen" data-tour="handy" aria-label="Bewertungen: <%= r && r.stars != null ? fmtStars(r.stars) + ' Sterne aus ' + r.starCount : 'noch keine' %>">
+      <span class="gd-phone-body"><span class="gd-phone-screen">
+        <b><%= r ? fmtStars(r.stars) : '–' %></b>
+        <span class="gd-stars" aria-hidden="true"><%= starRow(r && r.stars) %></span>
+        <small>(<%= r ? r.starCount : 0 %>)</small>
+      </span></span>
+      <span class="gd-tag">Bewertungen</span>
+    </a>
+
+    <a class="gd-obj gd-clip<%= players ? '' : ' is-locked' %>" href="<%= hubUrl('preise') %>" data-gd-open="preise" data-tour="preise" aria-label="Preisliste<%= players ? '' : ': ab Stufe ' + orderLevel %>">
+      <span class="gd-clip-board"><span class="gd-clip-clamp" aria-hidden="true"></span><span class="gd-clip-paper">
+        <% if (players) { %>
+          <% services.forEach((sv) => { %><span><span><%= sv.short %></span><b><%= euro(shopPrices[sv.key]) %></b></span><% }) %>
+        <% } else { %><span class="gd-lock" aria-hidden="true">🔒</span><% } %>
+      </span></span>
+      <span class="gd-tag">Preise</span>
+    </a>
+
+    <div class="gd-shelf">
+      <a class="gd-obj gd-roll" href="<%= hubUrl('werkstatt') %>" data-gd-open="werkstatt" data-tour="werkstatt" aria-label="Werkstatt: Stufe <%= info.level %>, <%= ownedTools %> von <%= tools.length %> Werkzeugen<%= attention.upgrade || attention.tool ? ' – etwas ist bezahlbar' : '' %>">
+        <span class="gd-roll-body" aria-hidden="true"><i>🔧</i><i>🧽</i><i>📐</i><i>🔦</i></span>
+        <% if (attention.upgrade || attention.tool) { %><span class="gd-badge is-dot">!</span><% } %>
+        <span class="gd-tag">Werkstatt</span>
+      </a>
+      <% if (ironable.length) { %>
+        <a class="gd-obj gd-iron" href="<%= hubUrl('buegeln') %>" data-gd-open="buegeln" data-tour="buegeln" aria-label="Eigene Karten bügeln: <%= ironable.length %> mit Knick">
+          <svg class="gd-iron-svg" viewBox="0 0 64 44" aria-hidden="true"><path d="M6 36 C6 22 16 12 34 12 L58 12 L58 36 Z" fill="#c9ccd6"/><path d="M6 36 L58 36 L58 40 L6 40 Z" fill="#8b8f9c"/><path d="M26 12 C26 4 50 4 50 12" fill="none" stroke="#3f424d" stroke-width="5" stroke-linecap="round"/><circle cx="44" cy="24" r="4" fill="#f87171"/></svg>
+          <span class="gd-badge"><%= ironable.length %></span>
+          <span class="gd-tag">Bügeln</span>
+        </a>
+      <% } %>
+      <% if (milestones.length) { %>
+        <a class="gd-obj gd-cup" href="<%= hubUrl('meilensteine') %>" data-gd-open="meilensteine" data-tour="meilensteine" aria-label="Meilensteine: <%= milesDone %> von <%= milestones.length %>">
+          <svg class="gd-cup-svg" viewBox="0 0 48 52" aria-hidden="true"><path d="M12 4 H36 V18 C36 26 30 31 24 31 C18 31 12 26 12 18 Z" fill="#e3b341"/><path d="M12 8 H5 C5 18 9 21 13 21 M36 8 H43 C43 18 39 21 35 21" fill="none" stroke="#e3b341" stroke-width="3"/><rect x="21" y="30" width="6" height="9" fill="#c99a2e"/><rect x="13" y="39" width="22" height="7" rx="2" fill="#6b4a2b"/></svg>
+          <span class="gd-cup-count"><%= milesDone %>/<%= milestones.length %></span>
+          <span class="gd-tag">Erfolge</span>
+        </a>
+      <% } %>
+      <a class="gd-obj gd-box" href="/grading/einreichen" data-tour="karton" aria-label="Eigene Karte bei einem anderen Shop graden lassen">
+        <span class="gd-box-body" aria-hidden="true"><span class="gd-box-tape"></span></span>
+        <span class="gd-tag">Einreichen</span>
+      </a>
+    </div>
+  </div>
+
+  <%# ================= Fenster ================= %>
+
+  <%# Eingang: Warteschlange der Mitglieder-Aufträge %>
+  <dialog class="gd-sheet" data-gd-sheet="auftraege" aria-labelledby="gd-auftraege-t">
+    <%- sheetHead('auftraege', 'Eingang') %>
+    <div class="gd-sheet-body">
+      <% if (!players) { %>
+        <p class="gd-locked"><span aria-hidden="true">🔒</span> Ab Stufe <%= orderLevel %></p>
+      <% } else if (queue.length) { %>
+        <p class="gd-chips"><span>Normal <%= orderDays %> T</span><span class="is-express">Express <%= expressDays %> T</span></p>
+        <ul class="gr-done"><% queue.forEach((o) => { %><%- include('partials/grading-order-row', { o }) %><% }) %></ul>
+      <% } else { %>
+        <p class="gd-empty"><span aria-hidden="true">📭</span> Leer</p>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Kassenzettel: heute erledigt, darunter ältere Mitglieder-Aufträge %>
+  <dialog class="gd-sheet" data-gd-sheet="bons" aria-labelledby="gd-bons-t">
+    <%- sheetHead('bons', 'Kassenzettel') %>
+    <div class="gd-sheet-body">
+      <p class="gd-sum-line"><span>Heute</span><b><%= euro(earnedToday) %></b></p>
+      <% if (bons.length) { %>
+        <ul class="gd-bons"><% bons.forEach((b) => { %><%- include('partials/grading-desk/bon', { b }) %><% }) %></ul>
+      <% } else { %>
+        <p class="gd-empty"><span aria-hidden="true">🧾</span> Noch kein Bon</p>
+      <% } %>
+      <% if (history.length) { %>
+        <h3 class="gd-sheet-sub">Mitglieder</h3>
+        <ul class="gd-bons">
+          <% history.forEach((o) => {
+            const done = o.status === 'fertig';
+            const res = !done ? (o.status === 'abgelaufen' ? 'abgelaufen – erstattet' : 'storniert') : o.services.review ? (o.result.changed ? `Zweitprüfung: Note ${o.result.grade} statt ${o.result.before}` : `Zweitprüfung: Note ${o.result.grade} bestätigt`) : o.result && o.result.grade != null ? `Slab · Note ${o.result.grade}` : 'gebügelt';
+          %>
+            <%- include('partials/grading-desk/bon', { b: { card: o.cardInfo, title: o.cardInfo ? o.cardInfo.name : o.card, who: o.ownerName, at: o.doneAt, lines: linesOf(o.priceParts, true), total: done ? o.price : null, note: res + (o.stars ? ' · ' + '★'.repeat(o.stars) : ''), void: !done } }) %>
           <% }) %>
         </ul>
-      </section>
-    <% } %>
+      <% } %>
+    </div>
+  </dialog>
 
-  <% } else if (tab === 'vitrine') { %>
-    <%# ---------- Vitrine: eigene Slabs ausstellen; Seltenheit × Note boostet die Reputation je Auftrag ---------- %>
-    <section class="gh-card gr-vitrine" id="vitrine">
-      <h2>Vitrine <span class="gr-dim"><%= showcase.filter((s) => s.shown).length %> / <%= showcaseMax %></span></h2>
+  <%# Vitrine einräumen: Schublade mit allen eigenen Slabs %>
+  <% if (shop.code) { %>
+  <dialog class="gd-sheet" data-gd-sheet="vitrine" aria-labelledby="gd-vitrine-t">
+    <%- sheetHead('vitrine', `Vitrine <span class="gr-dim">${shown.length} / ${showcaseMax}</span>`) %>
+    <div class="gd-sheet-body">
       <% if (showcase.length) { %>
-        <p class="muted small">Ausgestellte Slabs sehen alle auf deiner <a href="/grading/shop/<%= shop.code %>">Shop-Seite</a>. Je seltener und besser benotet, desto schneller wächst deine Reputation. Ausgestellt lassen sie sich nicht handeln.</p>
-        <form method="post" action="/grading/vitrine" class="gr-vitrine-form">
+        <form method="post" action="/grading/vitrine" class="gd-drawer" data-gd-drawer data-max="<%= showcaseMax %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <div class="gr-vitrine-grid">
-            <% showcase.forEach((s) => { const r = rarityByKey[s.rarity] || { label: '' }; %>
-              <label class="gr-vitrine-item r-<%= s.rarity %><%= s.lock ? ' is-locked' : '' %>">
-                <input type="checkbox" name="doc" value="<%= s.id %>" <%= s.shown ? 'checked' : '' %> <%= s.lock ? 'disabled' : '' %>>
-                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: s.card, rarityLabel: r.label, slab: s.slab, id: s.id }) %></span>
-                <span class="small"><%= s.card.name %><%= s.lock ? ' · gesperrt' : '' %></span>
+          <div class="gd-drawer-grid">
+            <% showcase.forEach((s) => { const rl = (rarityByKey[s.rarity] || { label: '' }).label; %>
+              <label class="gd-drawer-item r-<%= s.rarity %><%= s.lock ? ' is-locked' : '' %>" title="<%= s.card.name %><%= s.lock ? ' – gesperrt' : '' %>">
+                <input type="checkbox" name="doc" value="<%= s.id %>" <%= s.shown ? 'checked' : '' %> <%= s.lock ? 'disabled' : '' %> aria-label="<%= s.card.name %>, Note <%= s.slab.grade %><%= s.lock ? ', gesperrt' : '' %>">
+                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: s.card, rarityLabel: rl, slab: s.slab, id: s.id }) %></span>
+                <% if (s.lock) { %><span class="gd-lock" aria-hidden="true">🔒</span><% } %>
               </label>
             <% }) %>
           </div>
-          <button class="btn btn-primary btn-sm" type="submit">Vitrine speichern</button>
+          <div class="gd-sheet-actions">
+            <a class="btn btn-ghost btn-sm" href="/grading/shop/<%= shop.code %>">Shop-Seite</a>
+            <button class="btn btn-primary" type="submit">Speichern</button>
+          </div>
         </form>
       <% } else { %>
-        <p class="muted small">Du hast noch keinen Slab. Lass eine Karte bei einem anderen Shop graden – dann kannst du sie hier ausstellen.</p>
+        <p class="gd-empty"><span aria-hidden="true">🗄️</span> Noch kein Slab</p>
+        <a class="btn btn-primary btn-block" href="/grading/einreichen">Karte graden lassen</a>
       <% } %>
-    </section>
-
-  <% } else if (tab === 'preise') { %>
-    <%# ---------- Preise: Festpreise je Baustein im Rahmen aus dem Admin-Panel ---------- %>
-    <% if (players) { %>
-      <div class="gh-grid">
-        <section class="gh-card">
-          <h2>Festpreise für Mitglieder</h2>
-          <p class="muted small">Kunden buchen Bausteine und zahlen die Summe. Neue Preise gelten für neue Aufträge – offene behalten ihren Preis.</p>
-          <form method="post" action="/grading/preis" class="form gr-price-form" data-gh-prices>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <%- tabInput('preise') %>
-            <% services.forEach((sv) => { const r = servicePrice[sv.key]; %>
-              <label class="field gh-price-field"><span><%= sv.label %> <em><%= euro(r.min) %> – <%= euro(r.max) %></em></span>
-                <input type="text" name="<%= sv.key %>" inputmode="decimal" value="<%= (shopPrices[sv.key] / 100).toFixed(2).replace('.', ',') %>" data-min="<%= r.min %>" data-max="<%= r.max %>" required></label>
-            <% }) %>
-            <button class="btn btn-primary btn-sm" type="submit">Preise speichern</button>
-          </form>
-        </section>
-        <section class="gh-card">
-          <h2>So sehen Kunden dich</h2>
-          <div class="gs-shop gh-preview">
-            <span class="gs-shop-head"><b><%= shop.name %></b> <span class="gr-shop-code"><%= shop.code %></span></span>
-            <%- include('partials/grading-rating', { r: rating }) %>
-            <span class="gs-shop-price"><b data-gh-sum><%= euro(shopPrices.base + shopPrices.slab) %></b> für Reinigung + Slab</span>
-            <span class="gs-shop-list muted small">mit Bügeln <b data-gh-sum-iron><%= euro(shopPrices.base + shopPrices.iron + shopPrices.slab) %></b> · Express +<span data-gh-express><%= euro(shopPrices.express) %></span></span>
-          </div>
-          <p class="muted small">Ein typischer Auftrag ist Reinigung + Slab. Günstige Preise füllen die Warteschlange, gute Bewertungen rechtfertigen höhere.</p>
-        </section>
-      </div>
-    <% } else { %>
-      <section class="gh-card"><p class="muted">Ab Stufe <%= orderLevel %> (Slab-Werkstatt) schicken dir auch Mitglieder ihre Karten – dann legst du hier deine Preise fest.</p></section>
-    <% } %>
-
-  <% } else if (tab === 'werkstatt') { %>
-    <%# ---------- Werkstatt: Ausbau, Name/Kürzel, Vertrag ---------- %>
-    <div class="gh-grid">
-      <section class="gh-card gr-tree-wrap">
-        <h2>Ausbau</h2>
-        <ol class="gr-tree">
-          <% levels.forEach((l) => { const done = l.level <= info.level; %>
-            <li class="<%= done ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>">
-              <span class="gr-tree-dot"><%= done ? '✓' : l.level %></span>
-              <span class="gr-tree-body">
-                <span class="gr-tree-name"><%= l.name %><% if (l.cost) { %><span><%= euro(l.cost) %></span><% } %></span>
-                <span class="gr-tree-perk"><%= l.perk %></span>
-              </span>
-            </li>
-          <% }) %>
-        </ol>
-        <% if (next) { %>
-          <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <%- tabInput('werkstatt') %>
-            <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen für <%= euro(next.cost) %></button>
-            <p class="muted small">Danach heute noch einmal <%= next.jobs %> Aufträge.</p>
-          </form>
-        <% } %>
-      </section>
-
-      <section class="gh-card">
-        <h2>Werkzeuge</h2>
-        <p class="muted small">Machen die Arbeit am Tisch angenehmer – mehr Lohn gibt es dafür nicht. Einmal gekauft, gehören sie dir.</p>
-        <ul class="gh-tools">
-          <% tools.forEach((t) => { %>
-            <li class="gh-tool<%= t.owned ? ' is-owned' : '' %><%= !t.available ? ' is-locked' : '' %>">
-              <span class="gh-tool-icon" aria-hidden="true"><%= { tuch: '🧽', schablone: '📐', eisen: '♨️', uv: '🔦' }[t.key] %></span>
-              <span class="gh-tool-text"><b><%= t.name %></b><small><%= t.perk %></small></span>
-              <% if (t.owned) { %>
-                <span class="gh-tool-state">✓ vorhanden</span>
-              <% } else if (!t.available) { %>
-                <span class="gh-tool-state">ab Stufe <%= t.level %></span>
-              <% } else { %>
-                <form method="post" action="/grading/werkzeug" data-confirm="<%= t.name %> für <%= euro(t.cost) %> kaufen?">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <%- tabInput('werkstatt') %>
-                  <input type="hidden" name="tool" value="<%= t.key %>">
-                  <button class="btn btn-sm" type="submit" <%= currentUser.balance < t.cost ? 'disabled' : '' %>><%= euro(t.cost) %></button>
-                </form>
-              <% } %>
-            </li>
-          <% }) %>
-        </ul>
-      </section>
-
-      <section class="gh-card">
-        <h2>Shop</h2>
-        <form method="post" action="/grading/name" class="form">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <%- tabInput('werkstatt') %>
-          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" value="<%= shop.name %>" required></label>
-          <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
-          <button class="btn btn-sm" type="submit">Speichern</button>
-          <p class="muted small">Den Namen kannst du jederzeit ändern. Ein neues Kürzel muss ein Admin oder Dev freigeben – es steht auf deinen Slabs. Ältere Slabs behalten das alte.</p>
-          <% if (shop.codeRequest) { %><p class="small">Beantragt: <b><%= shop.codeRequest.code %></b> – wartet auf Freigabe.</p><% } %>
-        </form>
-        <a class="small" href="/grading/shop/<%= shop.code %>">Öffentliche Shop-Seite ansehen →</a>
-        <dl class="gr-facts">
-          <dt>NPC-Aufträge pro Tag</dt><dd><%= info.jobs %></dd>
-          <% if (players) { %><dt>Aufträge von Mitgliedern</dt><dd><%= playerLimit %> pro Tag</dd><% } %>
-          <dt>Erledigt insgesamt</dt><dd><%= shop.jobsDone %></dd>
-          <dt>Verdient insgesamt</dt><dd><%= euro(shop.earned) %></dd>
-          <dt>Vertrag</dt><dd><%= locked ? 'bis ' + date(shop.lockedUntil) : 'kündbar' %></dd>
-        </dl>
-        <% if (locked) { %>
-          <p class="gr-note">Kündigen möglich ab <%= date(shop.lockedUntil) %></p>
-        <% } else { %>
-          <form method="post" action="/grading/kuendigen" data-confirm="Wirklich kündigen? Ab morgen gibt es wieder den Tagesbonus.">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button class="btn btn-ghost btn-sm" type="submit">Kündigen</button>
-          </form>
-        <% } %>
-      </section>
     </div>
+  </dialog>
   <% } %>
 
-  <p class="gh-foot"><a href="/grading/einreichen">Eigene Karte bei einem anderen Shop graden lassen →</a></p>
+  <%# Bewertungen %>
+  <dialog class="gd-sheet" data-gd-sheet="bewertungen" aria-labelledby="gd-bewertungen-t">
+    <%- sheetHead('bewertungen', 'Bewertungen') %>
+    <div class="gd-sheet-body">
+      <% if (r) { %>
+        <div class="gd-review-head">
+          <div class="gd-review-score"><b><%= fmtStars(r.stars) %></b><span class="gd-stars"><%= starRow(r.stars) %></span><small><%= r.starCount %> Bewertung<%= r.starCount === 1 ? '' : 'en' %></small></div>
+          <dl class="gd-review-facts">
+            <dt>Qualität</dt><dd><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></dd>
+            <dt>Treffsicher</dt><dd><%= r.hitRate != null ? Math.round(r.hitRate) + ' %' : '–' %></dd>
+            <dt>Aufträge</dt><dd><%= shop.jobsDone %></dd>
+          </dl>
+        </div>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Preise: Festpreise je Baustein im Rahmen aus dem Admin-Panel %>
+  <dialog class="gd-sheet" data-gd-sheet="preise" aria-labelledby="gd-preise-t">
+    <%- sheetHead('preise', 'Preisliste') %>
+    <div class="gd-sheet-body">
+      <% if (players) { %>
+        <form method="post" action="/grading/preis" class="form gd-prices" data-gh-prices>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('preise') %>
+          <% services.forEach((sv) => { const pr = servicePrice[sv.key]; %>
+            <label class="gd-price-row"><span><%= sv.label %><small><%= euro(pr.min) %> – <%= euro(pr.max) %></small></span>
+              <input type="text" name="<%= sv.key %>" inputmode="decimal" value="<%= (shopPrices[sv.key] / 100).toFixed(2).replace('.', ',') %>" data-min="<%= pr.min %>" data-max="<%= pr.max %>" required aria-label="<%= sv.label %> in Euro"></label>
+          <% }) %>
+          <div class="gs-shop gh-preview" aria-label="So sehen Kunden dich">
+            <span class="gs-shop-head"><b><%= shop.name %></b> <span class="gr-shop-code"><%= shop.code %></span></span>
+            <span class="gs-shop-price"><b data-gh-sum><%= euro(shopPrices.base + shopPrices.slab) %></b> Reinigung + Slab</span>
+            <span class="gs-shop-list muted small">mit Bügeln <b data-gh-sum-iron><%= euro(shopPrices.base + shopPrices.iron + shopPrices.slab) %></b> · Express +<span data-gh-express><%= euro(shopPrices.express) %></span></span>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Speichern</button>
+        </form>
+      <% } else { %>
+        <p class="gd-locked"><span aria-hidden="true">🔒</span> Ab Stufe <%= orderLevel %></p>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Werkstatt: Ausbau, Werkzeuge, Shop, Vertrag %>
+  <dialog class="gd-sheet" data-gd-sheet="werkstatt" aria-labelledby="gd-werkstatt-t">
+    <%- sheetHead('werkstatt', 'Werkstatt') %>
+    <div class="gd-sheet-body">
+      <ol class="gr-tree">
+        <% levels.forEach((l) => { const done = l.level <= info.level; %>
+          <li class="<%= done ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>">
+            <span class="gr-tree-dot"><%= done ? '✓' : l.level %></span>
+            <span class="gr-tree-body">
+              <span class="gr-tree-name"><%= l.name %><% if (l.cost) { %><span><%= euro(l.cost) %></span><% } %></span>
+              <span class="gr-tree-perk"><%= l.perk %></span>
+            </span>
+          </li>
+        <% }) %>
+      </ol>
+      <% if (next) { %>
+        <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('werkstatt') %>
+          <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen · <%= euro(next.cost) %></button>
+        </form>
+      <% } %>
+
+      <h3 class="gd-sheet-sub">Werkzeuge</h3>
+      <ul class="gh-tools">
+        <% tools.forEach((t) => { %>
+          <li class="gh-tool<%= t.owned ? ' is-owned' : '' %><%= !t.available ? ' is-locked' : '' %>">
+            <span class="gh-tool-icon" aria-hidden="true"><%= { tuch: '🧽', schablone: '📐', eisen: '♨️', uv: '🔦' }[t.key] %></span>
+            <span class="gh-tool-text"><b><%= t.name %></b><small><%= t.perk %></small></span>
+            <% if (t.owned) { %>
+              <span class="gh-tool-state">✓</span>
+            <% } else if (!t.available) { %>
+              <span class="gh-tool-state">🔒 Stufe <%= t.level %></span>
+            <% } else { %>
+              <form method="post" action="/grading/werkzeug" data-confirm="<%= t.name %> für <%= euro(t.cost) %> kaufen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <%- tabInput('werkstatt') %>
+                <input type="hidden" name="tool" value="<%= t.key %>">
+                <button class="btn btn-sm" type="submit" <%= currentUser.balance < t.cost ? 'disabled' : '' %>><%= euro(t.cost) %></button>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+
+      <h3 class="gd-sheet-sub">Shop</h3>
+      <form method="post" action="/grading/name" class="form gd-shopform">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <%- tabInput('werkstatt') %>
+        <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="30" value="<%= shop.name %>" required></label>
+        <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
+        <button class="btn btn-sm" type="submit">Speichern</button>
+        <% if (shop.codeRequest) { %><p class="small">⏳ <b><%= shop.codeRequest.code %></b> wartet auf Freigabe</p><% } %>
+      </form>
+      <dl class="gr-facts">
+        <dt>Aufträge pro Tag</dt><dd><%= info.jobs %><% if (players) { %> + <%= playerLimit %> Mitglieder<% } %></dd>
+        <dt>Erledigt</dt><dd><%= shop.jobsDone %> · <%= euro(shop.earned) %></dd>
+        <dt>Vertrag</dt><dd><%= locked ? 'bis ' + date(shop.lockedUntil) : 'kündbar' %></dd>
+      </dl>
+      <% if (!locked) { %>
+        <form method="post" action="/grading/kuendigen" data-confirm="Wirklich kündigen? Ab morgen gibt es wieder den Tagesbonus.">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-ghost btn-sm" type="submit">Kündigen</button>
+        </form>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Eigene Karten mit Knick bügeln %>
+  <% if (ironable.length) { %>
+  <dialog class="gd-sheet" data-gd-sheet="buegeln" aria-labelledby="gd-buegeln-t">
+    <%- sheetHead('buegeln', 'Bügeln') %>
+    <div class="gd-sheet-body">
+      <div class="gd-iron-grid">
+        <% ironable.forEach((x) => { %>
+          <form method="post" action="/grading/eigene/<%= x.id %>/start" class="gd-iron-item r-<%= x.info.rarity %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" aria-label="<%= x.info.name %> bügeln">
+              <img src="<%= x.info.image %>" alt="" width="90" height="126" loading="lazy">
+              <span><%= x.info.name %></span>
+            </button>
+          </form>
+        <% }) %>
+      </div>
+    </div>
+  </dialog>
+  <% } %>
+
+  <%# Meilensteine %>
+  <% if (milestones.length) { %>
+  <dialog class="gd-sheet" data-gd-sheet="meilensteine" aria-labelledby="gd-meilensteine-t">
+    <%- sheetHead('meilensteine', `Erfolge <span class="gr-dim">${milesDone} / ${milestones.length}</span>`) %>
+    <div class="gd-sheet-body">
+      <ul class="gh-miles">
+        <% milestones.forEach((m) => { %>
+          <li class="<%= m.done ? 'is-done' : '' %>">
+            <span class="gh-mile-head"><b><%= m.done ? '🏆 ' : '' %><%= m.name %></b><% if (m.progress) { %><small><%= m.progress.text %></small><% } %></span>
+            <small class="muted"><%= m.text %></small>
+            <% if (m.progress && !m.done) { %><span class="gh-bar" aria-hidden="true"><span style="width: <%= m.progress.pct %>%"></span></span><% } %>
+          </li>
+        <% }) %>
+      </ul>
+      <a class="small" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Alle Erfolge →</a>
+    </div>
+  </dialog>
+  <% } %>
 <% } %>
 </div>
 
-<script src="/js/grading-hub.js?v=<%= assetVersion %>" defer></script>
+<% if (active) { %>
+  <script src="/js/grading-desk.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/grading-hub.js?v=<%= assetVersion %>" defer></script>
+<% } %>
 <%- include('partials/foil-modal') %>
 <%- include('partials/foot') %>

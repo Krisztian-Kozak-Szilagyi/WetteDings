@@ -61,15 +61,9 @@ router.get('/slab/:cert', requireLogin, async (req, res) => {
   });
 });
 
-// Reiter des Shop-Hubs (#204): Übersicht als Start, die anderen verwalten den Shop
-const HUB_TABS = [
-  { key: 'uebersicht', label: 'Übersicht' },
-  { key: 'auftraege', label: 'Aufträge' },
-  { key: 'vitrine', label: 'Vitrine' },
-  { key: 'preise', label: 'Preise' },
-  { key: 'werkstatt', label: 'Werkstatt' },
-];
-const hubUrl = (tab) => (tab && tab !== 'uebersicht' ? `/grading?reiter=${tab}` : '/grading');
+// Fenster des Schreibtischs (#204): jedes Objekt auf dem Tisch öffnet eins; ?reiter=<key> öffnet es beim Laden
+const DESK_SHEETS = ['auftraege', 'bons', 'vitrine', 'bewertungen', 'preise', 'werkstatt', 'buegeln', 'meilensteine'];
+const hubUrl = (tab) => (DESK_SHEETS.includes(tab) ? `/grading?reiter=${tab}` : '/grading');
 // Erfolge rund ums Grading (#204) – Fortschritt in der Übersicht des Hubs
 const GRADING_ACHIEVEMENTS = ['ruhige-hand', 'grading-profi', 'gem-mint', 'buegelmeister', 'slab-fabrik', 'express-profi', 'zweite-meinung'];
 
@@ -116,30 +110,39 @@ function benchData(job, shop) {
   };
 }
 
-// Shop-Hub (#204): Kopf mit Stufe und Tageszählern, „Jetzt dran“ (eine Primäraktion), Reiter für die Verwaltung
+// Shop als Schreibtisch (#204): Namensschild, Vitrine, Schneidematte mit genau einer Hauptaktion und Objekte,
+// die je ein Fenster öffnen (Eingang, Bons, Bewertungen, Preise, Werkstatt, Bügeln, Meilensteine)
 router.get('/grading', async (req, res) => {
   await orders.expireDue();
   const state = await grading.getState(req.user._id);
   const active = !!state.shop && state.shop.active;
-  const tab = HUB_TABS.some((t) => t.key === req.query.reiter) ? req.query.reiter : 'uebersicht';
+  const tab = DESK_SHEETS.includes(req.query.reiter) ? req.query.reiter : null;
   const players = active && orders.acceptsOrders(state.shop);
   const coded = !!state.shop && !!state.shop.code;
   // Spieler-Aufträge: Warteschlange, Verlauf, Kennzahlen und Vitrine des eigenen Shops
-  const [queue, showcase, history, ironable, milestones] = await Promise.all([
+  const [queue, showcase, history, ironable, milestones, pop] = await Promise.all([
     players ? orders.queueFor(req.user._id) : [],
     coded ? orders.showcaseChoices(req.user._id) : [],
-    coded && tab === 'auftraege' ? orders.shopHistory(req.user._id) : [],
+    coded ? orders.shopHistory(req.user._id) : [],
     active && state.info.level >= grading.IRON_LEVEL ? grading.ironableCards(req.user._id) : [],
-    active && tab === 'uebersicht' ? milestonesOf(req.user._id).catch(() => []) : [],
+    active ? milestonesOf(req.user._id).catch(() => []) : [],
+    coded ? population.all() : null,
   ]);
   const job = state.open;
+  const tools = grading.toolsFor(state.shop);
+  const balance = req.user.balance;
   res.render('grading', {
     title: 'Grading-Shop',
     ...state,
     active,
     tab,
-    tabs: HUB_TABS,
     hubUrl,
+    // Hinweise auf dem Tisch: rotes Badge bzw. Wackeln, wenn dort etwas zu tun ist
+    attention: {
+      upgrade: !!state.next && balance >= state.next.cost,
+      tool: tools.some((t) => t.available && !t.owned && balance >= t.cost),
+    },
+    popText: (x) => (pop ? population.popText(x.card.id, pop, x.slab.grade) : ''),
     levels: grading.LEVELS.map((l) => grading.levelInfo(l.level)),
     pay: grading.PAY,
     contractDays: grading.CONTRACT_DAYS,
@@ -164,7 +167,7 @@ router.get('/grading', async (req, res) => {
     showcaseMax: grading.settings.showcaseMax,
     rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
-    tools: grading.toolsFor(state.shop),
+    tools,
     milestones,
     ironLevel: grading.IRON_LEVEL,
     ironable: ironable.map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info),
@@ -238,7 +241,7 @@ router.post('/grading/eigene/fertig', async (req, res) => {
 });
 
 // Ziel nach einem Formular: der Reiter, aus dem es kam (Feld reiter), sonst die Übersicht
-async function handle(req, res, fn, target = hubUrl(HUB_TABS.some((t) => t.key === req.body.reiter) ? req.body.reiter : null)) {
+async function handle(req, res, fn, target = hubUrl(req.body.reiter)) {
   try {
     const msg = await fn();
     if (msg) req.flash('success', msg);
