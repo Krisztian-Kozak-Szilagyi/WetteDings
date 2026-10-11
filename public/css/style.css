@@ -6558,7 +6558,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-res.is-bump { animation: gd-bump .5s ease; }
 @keyframes gd-bump { 40% { transform: scale(1.12); } }
 .gd-help {
-  display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 8px 14px; border: 1.5px solid rgba(255, 240, 200, .5); border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 8px 14px; border: 1.5px solid rgba(255, 240, 200, .5); border-radius: var(--radius-md);
   background: #2a1d0e; color: #fdf3d6; font: 700 13px var(--font); cursor: var(--cur-pointer, pointer); box-shadow: 1px 3px 6px rgba(0, 0, 0, .35);
 }
 .gd-help span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fde68a; color: #2a1d0e; font-weight: 900; }
@@ -6620,7 +6620,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 1px 0 0 rgba(255, 255, 255, .08), inset -1px 0 0 rgba(255, 255, 255, .08);
 }
 .gd-vit-edit {
-  position: absolute; top: 10px; right: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px;
+  position: absolute; top: 10px; right: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-md);
   background: linear-gradient(135deg, #b38a3e, #f0d993 50%, #c99d4c); color: var(--brass-ink); font: 700 13px var(--font); text-decoration: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 4px 10px rgba(0, 0, 0, .55);
 }
@@ -6665,14 +6665,14 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gd-phases li.is-done { background: rgba(74, 222, 128, .18); color: #bbf7d0; }
 .gd-phases li.is-now { background: #fde68a; color: #2b1d05; font-weight: 800; box-shadow: 0 0 0 3px rgba(253, 230, 138, .3); }
 .gd-go {
-  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; padding: 12px 32px; border: 0; border-radius: 999px;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; padding: 12px 32px; border: 0; border-radius: 10px;
   background: linear-gradient(#fde68a, #f5b400 55%, #e19a00); color: #241803; font: 800 18px var(--font); letter-spacing: .01em; text-decoration: none;
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45);
   cursor: var(--cur-pointer, pointer); animation: gd-pulse 2.2s ease-in-out infinite;
 }
 .gd-go:hover { text-decoration: none; filter: brightness(1.05); }
 .gd-go:active { transform: translateY(4px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), 0 2px 0 #9a6a00, 0 6px 12px rgba(0, 0, 0, .4); }
-.gd-desk .gd-go:focus-visible { box-shadow: var(--focus), 0 6px 0 #9a6a00; border-radius: 999px; }
+.gd-desk .gd-go:focus-visible { box-shadow: var(--focus), 0 6px 0 #9a6a00; border-radius: 10px; }
 @keyframes gd-pulse { 0%, 100% { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45), 0 0 0 0 rgba(253, 224, 71, .5); } 50% { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), inset 0 -2px 0 rgba(120, 70, 0, .35), 0 6px 0 #9a6a00, 0 12px 22px rgba(0, 0, 0, .45), 0 0 0 16px rgba(253, 224, 71, 0); } }
 .gd-mat-text form { margin: 0; }
 .gd-envelope { position: relative; display: block; width: 190px; height: 168px; filter: var(--obj-shadow); }
@@ -6916,7 +6916,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gs-tags[hidden], .gs-tag[hidden] { display: none; }
 .gs-tag { position: relative; cursor: var(--cur-pointer, pointer); }
 .gs-tag input { position: absolute; opacity: 0; pointer-events: none; }
-.gs-tag span { display: inline-block; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--color-neutral-700); font-size: 12px; transition: background .12s, border-color .12s; }
+.gs-tag span { display: inline-block; padding: 4px 11px; border-radius: var(--radius-sm); border: 1px solid var(--color-neutral-700); font-size: 12px; transition: background .12s, border-color .12s; }
 .gs-tag.is-good input:checked + span { background: color-mix(in srgb, #4ade80 18%, transparent); border-color: #4ade80; color: #bbf7d0; }
 .gs-tag.is-bad input:checked + span { background: color-mix(in srgb, #f87171 18%, transparent); border-color: #f87171; color: #fecaca; }
 .gs-tag input:focus-visible + span { outline: 2px solid var(--color-accent-300); outline-offset: 2px; }
