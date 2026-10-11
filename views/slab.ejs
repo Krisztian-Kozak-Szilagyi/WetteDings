@@ -1,0 +1,47 @@
+<%- include('partials/head') %>
+<%# Zertifikat eines Slabs (#204): Karte in 3D, Note und Shop, Zweitprüfungen, frühere Etiketten, Population, Verkäufe %>
+<% const s = doc.slab; %>
+<div class="gr-page">
+  <div class="gr-head">
+    <h1>Zertifikat <span class="gr-dim"><%= cert %></span></h1>
+  </div>
+  <div class="gh-grid sl-grid">
+    <section class="gh-card sl-card">
+      <button type="button" class="tcg-slot foil-slot r-<%= doc.rarity %>"<%- foilViewAttrs(doc.card, doc.rarityLabel, doc.foiledAt, { slab: { code: s.code, grade: s.grade }, id: doc.id }) %> aria-label="<%= doc.card.name %> im Slab ansehen">
+        <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: doc.card, rarityLabel: doc.rarityLabel, slab: { code: s.code, grade: s.grade }, id: doc.id }) %></span>
+      </button>
+      <p class="muted small">Antippen: in 3D drehen und wenden.</p>
+    </section>
+    <section class="gh-card">
+      <h2><%= doc.card.name %> <span class="gr-dim"><%= doc.rarityLabel %></span></h2>
+      <p class="sl-grade"><span class="sl-grade-num"><%= s.grade || '–' %></span><span><%= s.grade ? gradeWord(s.grade) : 'ohne Note' %></span></p>
+      <dl class="gr-facts">
+        <dt>Gegradet von</dt><dd><% if (shop) { %><a href="/grading/shop/<%= shop.code %>"><%= shop.name %></a> <span class="gr-shop-code"><%= s.code %></span><% } else { %><span class="gr-shop-code"><%= s.code || 'BfW' %></span><%= s.code === 'BfW' || !s.code ? ' (Haus-Grading)' : '' %><% } %></dd>
+        <% if (s.at) { %><dt>Versiegelt</dt><dd><%= date(s.at) %></dd><% } %>
+        <dt>Besitzer</dt><dd><%= owner ? owner : '–' %></dd>
+        <% if (popText) { %><dt>Population</dt><dd><%= popText %></dd><% } %>
+        <% if (market) { %><dt>Marktpreis</dt><dd><%= market.avg != null ? 'Ø ' + euro(market.avg) + ' (' + market.n + ' verkauft)' : market.est != null ? '~ ' + euro(market.est) + ' (geschätzt)' : '–' %></dd><% } %>
+      </dl>
+      <% if ((s.reviews || []).length) { %>
+        <h3 class="sl-sub">Bestätigt</h3>
+        <ul class="sl-list">
+          <% s.reviews.forEach((r) => { %><li>✓ Zweitprüfung durch <span class="gr-shop-code"><%= r.code %></span> – Note <%= r.grade %> · <%= date(r.at) %></li><% }) %>
+        </ul>
+      <% } %>
+      <% if ((s.history || []).length) { %>
+        <h3 class="sl-sub">Frühere Etiketten</h3>
+        <ul class="sl-list">
+          <% s.history.slice().reverse().forEach((h) => { %><li><span class="gr-shop-code"><%= h.code %></span> Note <%= h.grade %><%= h.at ? ' · ' + date(h.at) : '' %> – nach Zweitprüfung ersetzt</li><% }) %>
+        </ul>
+      <% } %>
+      <% if (sales.length) { %>
+        <h3 class="sl-sub">Letzte Verkäufe</h3>
+        <ul class="sl-list">
+          <% sales.forEach((x) => { %><li><%= euro(x.unit) %> · <%= date(x.at) %></li><% }) %>
+        </ul>
+      <% } %>
+    </section>
+  </div>
+</div>
+<%- include('partials/foil-modal') %>
+<%- include('partials/foot') %>

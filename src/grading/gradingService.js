@@ -5,7 +5,7 @@ const { GradingShop, GradingJob, GradingSettings, GradingOrder } = require('../m
 const { inTransaction } = require('../services/betService');
 const { today } = require('../services/bonusService');
 const { UserError } = require('../lib/util');
-const { euro } = require('../lib/viewHelpers');
+const { euro, slabCert } = require('../lib/viewHelpers');
 const { logSettingsChange } = require('../stats/settingsLog');
 const catalog = require('../tcg/catalog');
 const { rollGradingFoil, ITEM_TYPES } = require('../items/itemService');
@@ -51,7 +51,9 @@ const toolByKey = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
  * mit dem Baustein slab. Ohne services (NPC, ältere Aufträge) entscheidet allein die Stufe.
  */
 const stepsFor = (job) =>
-  levelInfo(job.level).steps.filter((s) => {
+  job.services && job.services.review
+    ? ['grade'] // Zweitprüfung: die Karte bleibt im Slab, nur benoten
+    : levelInfo(job.level).steps.filter((s) => {
     if (s === 'iron') return !!(job.defects && job.defects.crease && !job.defects.ironed) && (!job.services || !!job.services.iron);
     if (s === 'grade' || s === 'slab') return !job.services || !!job.services.slab;
     return true;
@@ -93,18 +95,21 @@ const DEFAULTS = {
     iron: { min: 1000, max: 30000, def: 3000 },
     slab: { min: 1000, max: 50000, def: 6000 },
     express: { min: 0, max: 30000, def: 3000 },
+    review: { min: 1000, max: 30000, def: 3000 },
   },
   orderDays: 3,
   expressDays: 1,
   showcaseMax: 6,
   toolCosts: { tuch: 30000, schablone: 60000, eisen: 50000, uv: 40000 },
 };
-// Bausteine eines Spieler-Auftrags (#204): base ist immer dabei, dazu mindestens iron oder slab; express ist ein Zuschlag
+// Bausteine eines Spieler-Auftrags (#204): base ist immer dabei, dazu mindestens iron oder slab; express ist ein Zuschlag.
+// review (Zweitprüfung) steht allein: ein Slab eines anderen Shops wird blind nachbenotet – ohne Reinigung
 const SERVICES = [
   { key: 'base', label: 'Annahme & Reinigung', short: 'Reinigung' },
   { key: 'iron', label: 'Knick bügeln', short: 'Bügeln' },
   { key: 'slab', label: 'Benoten + Slab', short: 'Slab' },
   { key: 'express', label: 'Express-Zuschlag', short: 'Express' },
+  { key: 'review', label: 'Zweitprüfung', short: 'Zweitprüfung' },
 ];
 const copyServicePrice = (sp) => Object.fromEntries(SERVICES.map(({ key }) => [key, { ...sp[key] }]));
 const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs], servicePrice: copyServicePrice(DEFAULTS.servicePrice), toolCosts: { ...DEFAULTS.toolCosts } };
@@ -436,7 +441,7 @@ async function takePlayerJob(user, info) {
       return null;
     }
     const [job] = await GradingJob.create(
-      [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', order: order._id, cardDoc: order.doc, services: orders().servicesOf(order) }],
+      [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: orders().servicesOf(order).review ? [] : rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', order: order._id, cardDoc: order.doc, services: orders().servicesOf(order) }],
       { session }
     );
     await GradingOrder.updateOne({ _id: order._id }, { $set: { job: job._id } }, { session });
@@ -609,9 +614,10 @@ async function finishPlayerJob({ job, shop, session }) {
   const order = await GradingOrder.findOne({ _id: job.order, status: 'in_arbeit' }).session(session);
   if (!order) throw new UserError('Dieser Auftrag ist abgelaufen – die Karte ging an den Kunden zurück.');
   const now = new Date();
+  if (job.services && job.services.review) return finishReview({ job, shop, order, now, session });
   const d = job.defects.toObject ? job.defects.toObject() : job.defects;
   const slabbed = stepsFor(job).includes('slab');
-  const set = slabbed ? { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now } } : {};
+  const set = slabbed ? { foiledAt: now, slab: { code: shop.code, grade: job.guess, at: now, cert: slabCert(order.doc) } } : {};
   if (job.iron) Object.assign(set, { 'condition.defects': d, 'condition.grade': job.grade, ironedAt: now, creased: !!d.crease, damaged: (d.scratches || []).length > 0 || !!d.crease });
   const res = Object.keys(set).length ? await TcgCard.updateOne({ _id: order.doc, user: order.owner }, { $set: set }, { session }) : { matchedCount: await TcgCard.countDocuments({ _id: order.doc, user: order.owner }).session(session) };
   if (!res.matchedCount) throw new UserError('Die Karte gibt es nicht mehr.');
@@ -623,6 +629,30 @@ async function finishPlayerJob({ job, shop, session }) {
 }
 
 /**
+ * Zweitprüfung abschließen (#204, in der Transaktion von finishJob): gleiche Note → der Slab bekommt einen Vermerk
+ * „bestätigt von …“; andere Note → neuer Slab mit Kürzel und Note des Prüfers, das alte Etikett kommt in die Geschichte.
+ * Lag die alte Note 2 oder mehr neben der echten, verliert der Aussteller Reputation. Der Prüfer bekommt den Preis.
+ */
+async function finishReview({ job, shop, order, now, session }) {
+  const card = await TcgCard.findOne({ _id: order.doc, user: order.owner }).select('slab').session(session).lean();
+  if (!card || !card.slab) throw new UserError('Die Karte steckt nicht mehr im Slab.');
+  const old = card.slab;
+  const changed = job.guess !== old.grade;
+  const update = changed
+    ? { $set: { slab: { code: shop.code, grade: job.guess, at: now, cert: old.cert || slabCert(order.doc), history: [...(old.history || []), { code: old.code, grade: old.grade, at: old.at }] } } }
+    : { $push: { 'slab.reviews': { code: shop.code, grade: job.guess, at: now } } };
+  await TcgCard.updateOne({ _id: order.doc, user: order.owner }, update, { session });
+  // Aussteller lag deutlich daneben: weniger Reputation (alte BfW-Slabs haben keinen Shop)
+  const issuerWrong = old.code && old.code !== 'BfW' && Math.abs((old.grade || 0) - job.grade) >= 2;
+  const issuer = issuerWrong ? await GradingShop.findOneAndUpdate({ $or: [{ code: old.code }, { codeHistory: old.code }] }, { $inc: { reputation: -reputation.REVIEW_PENALTY } }, { session }).select('_id').lean() : null;
+  Object.assign(order, { status: 'fertig', doneAt: now, result: { grade: job.guess, clean: null, seal: null, iron: null, before: old.grade, changed, issuer: old.code } });
+  await order.save({ session });
+  await User.updateOne({ _id: job.user }, { $inc: { balance: order.price } }, { session });
+  await Ledger.create([{ user: job.user, type: 'grading_einnahme', amount: order.price, betTitle: `Zweitprüfung ${(catalog.cardById[job.card] || {}).name || job.card} für ${order.ownerName}` }], { session });
+  return { ...order.toObject(), issuerShop: issuer ? issuer._id : null };
+}
+
+/**
  * Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben (Spieler-Aufträge: den Preis des Auftrags).
  * clean = Sauberkeit 0–100 %. Wer versiegelt (ab Stufe 3), findet mit kleiner Chance eine Folie fürs Inventar.
  */
@@ -631,7 +661,8 @@ async function finishJob({ user, clean, seal }) {
     const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session);
     if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
     const steps = stepsFor(job);
-    const cleanQ = Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
+    // ohne Putzschritt (Zweitprüfung) gilt die Karte als sauber
+    const cleanQ = !steps.includes('clean') ? 100 : Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
     if (steps.includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick.');
     // Putzen (und Bügeln) braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
     const ironMs = job.iron ? ironMinMs(job.iron.smooth) : 0;
@@ -661,8 +692,17 @@ async function finishJob({ user, clean, seal }) {
   if (done.foilFound) await notify(user._id, { area: 'Grading', href: '/inventar', text: 'Beim Versiegeln ist dir eine Folie übrig geblieben – sie liegt in deinem Inventar.' });
   if (done.order) {
     const name = (catalog.cardById[done.card] || {}).name || done.card;
-    const what = done.order.result.grade != null ? `Slab ${done.shopCode}, Note ${done.guess}` : `gebügelt bei ${done.shopCode}`;
+    const r = done.order.result;
+    const review = done.order.services && done.order.services.review;
+    const what = review
+      ? r.changed
+        ? `Zweitprüfung bei ${done.shopCode} ergibt Note ${r.grade} statt ${r.before} – neuer Slab`
+        : `Zweitprüfung bei ${done.shopCode} bestätigt Note ${r.grade}`
+      : r.grade != null
+        ? `Slab ${done.shopCode}, Note ${done.guess}`
+        : `gebügelt bei ${done.shopCode}`;
     await notify(done.order.owner, { area: 'Grading', href: '/grading/einreichen', text: `„${name}“ ist zurück: ${what}. Bewerte den Shop!` });
+    if (done.order.issuerShop) await notify(done.order.issuerShop, { area: 'Grading', href: '/grading', text: `Zweitprüfung: Dein Slab „${name}“ (Note ${r.before}) lag deutlich daneben – ${done.shopCode} vergab ${r.grade}. Das kostet Reputation.` });
   }
   return done;
 }

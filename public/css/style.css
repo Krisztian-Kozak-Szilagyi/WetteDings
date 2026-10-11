@@ -6483,3 +6483,23 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gh-tool form { margin: 0; }
 .gr-stage.uv-pro .gr-uv-light { width: 184px; height: 184px; }
 .gr-stage.uv-pro .gr-uv-shade { background: radial-gradient(circle 210px at var(--ux, 50%) var(--uy, 50%), transparent 0 40%, rgba(8, 4, 22, .62) 100%); }
+.gs-filter { margin: 0; }
+.gs-cards .gs-card[hidden], .gs-svc[hidden] { display: none; }
+.gs-shop.is-off { opacity: .4; cursor: var(--cur-default); }
+.gr-svc-tag.is-review { background: #7c3aed; color: #fff; }
+.foil-cert-link { display: block; margin: 10px auto 0; text-align: center; font-size: 14px; }
+.foil-cert-link[hidden] { display: none; }
+.sl-grid { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
+@media (max-width: 640px) { .sl-grid { grid-template-columns: 1fr; } }
+.sl-card { align-items: center; }
+.sl-card .foil-slot { width: 100%; max-width: 230px; padding: 0; border: 0; background: none; }
+.sl-grade { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+.sl-grade-num { font-size: 48px; font-weight: 800; line-height: 1; color: var(--color-accent-300); }
+.sl-sub { margin: 8px 0 0; font-size: 14px; }
+.sl-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--color-neutral-300); display: flex; flex-direction: column; gap: 4px; }
+.gh-miles { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.gh-miles li { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.gh-mile-head { display: flex; justify-content: space-between; gap: 8px; }
+.gh-mile-head small { color: var(--color-neutral-400); font-size: 12px; white-space: nowrap; }
+.gh-miles li.is-done b { color: var(--color-accent-300); }
+.gh-miles li.is-done { opacity: .75; }

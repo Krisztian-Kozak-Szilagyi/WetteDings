@@ -32,6 +32,35 @@ function requireGrading(req, res, next) {
 }
 router.use('/grading', requireLogin, requireGrading);
 
+// Zertifikat eines Slabs (#204): Karte, Note, Shop, Zweitprüfungen, frühere Etiketten, Population und letzte Verkäufe –
+// für alle eingeloggten Mitglieder (Slabs gibt es auch ohne freigegebenen Grading-Shop: alte BfW-Slabs)
+router.get('/slab/:cert', requireLogin, async (req, res) => {
+  const cert = str(req.params.cert).replace(/\D/g, '');
+  const doc = cert ? await TcgCard.findOne({ 'slab.cert': cert, slab: { $ne: null } }).select('user card rarity foiledAt slab').lean() : null;
+  const c = doc && catalog.cardById[doc.card];
+  if (!c) return res.status(404).render('error', { title: 'Zertifikat', status: 404, message: `Ein Slab mit der Zertifikatsnummer ${cert || '–'} ist nicht bekannt.` });
+  const marketPrice = require('../trade/marketPrice');
+  const User = require('../models/User');
+  const [owner, shop, pop, sales, ctx] = await Promise.all([
+    User.findById(doc.user).select('username deletedAt').lean(),
+    doc.slab.code && doc.slab.code !== 'BfW' ? GradingShop.findOne({ $or: [{ code: doc.slab.code }, { codeHistory: doc.slab.code }] }).select('name code').lean() : null,
+    population.all(),
+    marketPrice.copySales([doc._id], 5),
+    marketPrice.context(),
+  ]);
+  const line = { card: doc.card, slab: doc.slab, foiledAt: doc.foiledAt };
+  res.render('slab', {
+    title: `Zertifikat ${cert}`,
+    cert,
+    doc: { id: String(doc._id), card: c, rarity: doc.rarity, rarityLabel: (catalog.rarityByKey[doc.rarity] || {}).label || '', foiledAt: doc.foiledAt, slab: doc.slab },
+    owner: owner && !owner.deletedAt ? owner.username : null,
+    shop,
+    popText: population.popText(doc.card, pop, doc.slab.grade),
+    sales: sales.get(String(doc._id)) || [],
+    market: marketPrice.summary([line], ctx.prices, ctx),
+  });
+});
+
 // Reiter des Shop-Hubs (#204): Übersicht als Start, die anderen verwalten den Shop
 const HUB_TABS = [
   { key: 'uebersicht', label: 'Übersicht' },
@@ -41,6 +70,19 @@ const HUB_TABS = [
   { key: 'werkstatt', label: 'Werkstatt' },
 ];
 const hubUrl = (tab) => (tab && tab !== 'uebersicht' ? `/grading?reiter=${tab}` : '/grading');
+// Erfolge rund ums Grading (#204) – Fortschritt in der Übersicht des Hubs
+const GRADING_ACHIEVEMENTS = ['ruhige-hand', 'grading-profi', 'gem-mint', 'buegelmeister', 'slab-fabrik', 'express-profi', 'zweite-meinung'];
+
+/** Meilensteine fürs Hub: [{ key, name, text, done, progress: { pct, text } | null }] – erledigte zuletzt */
+async function milestonesOf(userId) {
+  const achievements = require('../achievements/achievementService');
+  const { byKey } = require('../achievements/list');
+  const earned = new Set((await achievements.earnedOf(userId)).map((a) => a.key));
+  const progress = await achievements.progressOf(userId, [...earned]);
+  return GRADING_ACHIEVEMENTS.filter((k) => byKey[k])
+    .map((k) => ({ key: k, name: byKey[k].name, text: byKey[k].text, done: earned.has(k), progress: progress[k] || null }))
+    .sort((a, b) => Number(a.done) - Number(b.done));
+}
 
 /** Daten für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server */
 function benchData(job, shop) {
@@ -83,11 +125,12 @@ router.get('/grading', async (req, res) => {
   const players = active && orders.acceptsOrders(state.shop);
   const coded = !!state.shop && !!state.shop.code;
   // Spieler-Aufträge: Warteschlange, Verlauf, Kennzahlen und Vitrine des eigenen Shops
-  const [queue, showcase, history, ironable] = await Promise.all([
+  const [queue, showcase, history, ironable, milestones] = await Promise.all([
     players ? orders.queueFor(req.user._id) : [],
     coded ? orders.showcaseChoices(req.user._id) : [],
     coded && tab === 'auftraege' ? orders.shopHistory(req.user._id) : [],
     active && state.info.level >= grading.IRON_LEVEL ? grading.ironableCards(req.user._id) : [],
+    active && tab === 'uebersicht' ? milestonesOf(req.user._id).catch(() => []) : [],
   ]);
   const job = state.open;
   res.render('grading', {
@@ -122,6 +165,7 @@ router.get('/grading', async (req, res) => {
     rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
     tools: grading.toolsFor(state.shop),
+    milestones,
     ironLevel: grading.IRON_LEVEL,
     ironable: ironable.map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info),
   });
@@ -230,7 +274,7 @@ router.post('/grading/einreichen', (req, res) =>
     req,
     res,
     async () => {
-      const services = { iron: req.body.iron === '1', slab: req.body.slab === '1', express: req.body.express === '1' };
+      const services = { iron: req.body.iron === '1', slab: req.body.slab === '1', express: req.body.express === '1', review: req.body.review === '1' };
       const order = await orders.submit({ user: req.user, shopCode: str(req.body.shop), doc: str(req.body.doc), services });
       const days = order.services.express ? grading.settings.expressDays : grading.settings.orderDays;
       return `Eingereicht: „${(catalog.cardById[order.card] || {}).name || order.card}“ bei ${order.shopCode} für ${euro(order.price)}. Der Shop hat ${days} ${days === 1 ? 'Tag' : 'Tage'} Zeit.`;

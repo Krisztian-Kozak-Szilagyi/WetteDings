@@ -185,6 +185,21 @@
         </section>
       <% } %>
 
+      <% if (milestones.length) { %>
+        <section class="gh-card">
+          <h2>Meilensteine <span class="gr-dim"><%= milestones.filter((m) => m.done).length %> / <%= milestones.length %></span> <a class="small" href="/profil/<%= encodeURIComponent(currentUser.username) %>">alle Erfolge →</a></h2>
+          <ul class="gh-miles">
+            <% milestones.slice(0, 4).forEach((m) => { %>
+              <li class="<%= m.done ? 'is-done' : '' %>">
+                <span class="gh-mile-head"><b><%= m.done ? '✓ ' : '' %><%= m.name %></b><% if (m.progress) { %><small><%= m.progress.text %></small><% } %></span>
+                <small class="muted"><%= m.text %></small>
+                <% if (m.progress && !m.done) { %><span class="gh-bar" aria-hidden="true"><span style="width: <%= m.progress.pct %>%"></span></span><% } %>
+              </li>
+            <% }) %>
+          </ul>
+        </section>
+      <% } %>
+
       <% if (shop.code) { const shown = showcase.filter((s) => s.shown); %>
         <section class="gh-card">
           <h2>Vitrine <span class="gr-dim"><%= shown.length %> / <%= showcaseMax %></span> <a class="small" href="<%= hubUrl('vitrine') %>">verwalten →</a></h2>
@@ -234,7 +249,7 @@
               <span class="gr-done-info">
                 <span><b><%= c ? c.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %> · <%= date(o.doneAt) %></span></span>
                 <span class="gr-done-meta"><%- include('partials/grading-services', { sv: o.services }) %>
-                  <% if (o.status === 'fertig') { %><%= o.result && o.result.grade != null ? 'Note ' + o.result.grade : 'gebügelt' %><%= o.stars ? ' · ' + '★'.repeat(o.stars) : '' %><% } else { %><%= o.status === 'abgelaufen' ? 'abgelaufen – erstattet' : 'storniert' %><% } %></span>
+                  <% if (o.status === 'fertig') { %><%= o.services.review ? 'Zweitprüfung: ' + (o.result.changed ? 'Note ' + o.result.grade + ' statt ' + o.result.before : 'Note ' + o.result.grade + ' bestätigt') : o.result && o.result.grade != null ? 'Note ' + o.result.grade : 'gebügelt' %><%= o.stars ? ' · ' + '★'.repeat(o.stars) : '' %><% } else { %><%= o.status === 'abgelaufen' ? 'abgelaufen – erstattet' : 'storniert' %><% } %></span>
               </span>
               <b class="gr-pay"><%= o.status === 'fertig' ? '+' + euro(o.price) : '–' %></b>
             </li>

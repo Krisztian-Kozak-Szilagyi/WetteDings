@@ -25,7 +25,22 @@ const cardSchema = new Schema(
     // Slab (#204): Die Karte ist von einem Grading-Shop versiegelt – Kürzel und Note stehen sichtbar auf dem Etikett.
     // foiledAt ist dabei ebenfalls gesetzt (geschützt, nicht bei der Bank). Ohne Slab ist eine folierte Karte nur in
     // einer Schutzhülle (Sleeve, Name im Spiel weiter "Folie") – ohne Note. Slabs spielen nicht mit.
-    slab: { type: new Schema({ code: String, grade: Number, at: Date }, { _id: false }), default: null },
+    // Slab (#204): Kürzel und Note des Shops, Zertifikatsnummer (viewHelpers.slabCert, für /slab/:cert), Zweitprüfungen
+    // mit gleicher Note (reviews) und frühere Etiketten nach einer abweichenden Zweitprüfung (history)
+    slab: {
+      type: new Schema(
+        {
+          code: String,
+          grade: Number,
+          at: Date,
+          cert: String,
+          reviews: { type: [new Schema({ code: String, grade: Number, at: Date }, { _id: false })], default: undefined },
+          history: { type: [new Schema({ code: String, grade: Number, at: Date }, { _id: false })], default: undefined },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     // Zuletzt per Handel bekommen (rankService.FRESH_DAYS): so lange zählt das Exemplar in der Rangliste höchstens mit
     // tradedCost, dem Anteil dessen, was der Empfänger dafür gegeben hat – eine geschenkte Karte bringt niemanden auf Platz 1
     tradedAt: { type: Date, default: undefined },
@@ -37,6 +52,7 @@ const cardSchema = new Schema(
 cardSchema.index({ user: 1, card: 1, createdAt: 1 });
 cardSchema.index({ user: 1, creased: 1 }); // Grading-Shop: eigene Karten mit Knick zum Bügeln
 cardSchema.index({ user: 1, card: 1, damaged: 1 }); // Handel und Bank: unbeschädigte Exemplare einer Karte
+cardSchema.index({ 'slab.cert': 1 }, { partialFilterExpression: { 'slab.cert': { $type: 'string' } } }); // Cert-Seite (#204)
 
 // Ein ungeöffnetes Booster Pack im Inventar (wird beim Öffnen gelöscht)
 const packSchema = new Schema(

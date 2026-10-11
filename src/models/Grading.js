@@ -2,9 +2,9 @@ const { Schema, model } = require('mongoose');
 const { defectsSchema } = require('./condition');
 
 // Preise je Baustein eines Spieler-Auftrags in Cent (#204) – beim Shop (null = Standardpreis) und eingefroren am Auftrag
-const pricesSchema = new Schema({ base: { type: Number, default: null }, iron: { type: Number, default: null }, slab: { type: Number, default: null }, express: { type: Number, default: null } }, { _id: false });
+const pricesSchema = new Schema({ base: { type: Number, default: null }, iron: { type: Number, default: null }, slab: { type: Number, default: null }, express: { type: Number, default: null }, review: { type: Number, default: null } }, { _id: false });
 // Gebuchte Bausteine eines Spieler-Auftrags (#204): Reinigung ist immer dabei
-const servicesSchema = new Schema({ iron: Boolean, slab: Boolean, express: Boolean }, { _id: false });
+const servicesSchema = new Schema({ iron: Boolean, slab: Boolean, express: Boolean, review: Boolean }, { _id: false });
 
 // Grading-Shop eines Mitglieds (Mini-Game). _id = User-ID.
 // Solange active = true, gibt es keinen Tagesbonus; kündigen geht erst ab lockedUntil.
@@ -96,7 +96,8 @@ const orderSchema = new Schema(
     startedAt: { type: Date, default: null },
     doneAt: { type: Date, default: null },
     job: { type: Schema.Types.ObjectId, ref: 'GradingJob', default: null },
-    result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number }, { _id: false }), default: null }, // grade = Note des Shops
+    // grade = Note des Shops; Zweitprüfung: before = Note auf dem Slab vorher, changed = neuer Slab, issuer = Kürzel vorher
+    result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number, before: Number, changed: Boolean, issuer: String }, { _id: false }), default: null },
     stars: { type: Number, default: null }, // Bewertung des Kunden 1–5
     ratedAt: { type: Date, default: null },
   },
@@ -121,7 +122,7 @@ const settingsSchema = new Schema(
     pay: { clean: Number, grade: Number, slab: Number, iron: Number },
     costs: [Number],
     premium: Number,
-    servicePrice: { base: rangeSchema, iron: rangeSchema, slab: rangeSchema, express: rangeSchema },
+    servicePrice: { base: rangeSchema, iron: rangeSchema, slab: rangeSchema, express: rangeSchema, review: rangeSchema },
     orderDays: Number,
     expressDays: Number,
     showcaseMax: Number,

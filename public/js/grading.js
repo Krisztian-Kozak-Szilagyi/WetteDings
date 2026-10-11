@@ -1177,7 +1177,7 @@
     };
     var p = (res.breakdown && res.breakdown.parts) || {};
     if (res.player) {
-      var LABELS = { base: 'Annahme & Reinigung', iron: 'Knick bügeln', slab: 'Benoten + Slab', express: 'Express' };
+      var LABELS = { base: 'Annahme & Reinigung', iron: 'Knick bügeln', slab: 'Benoten + Slab', review: 'Zweitprüfung', express: 'Express' };
       Object.keys(LABELS).forEach(function (k) { if (p[k] != null) row(LABELS[k], euro(p[k])); });
     } else {
       if (p.clean != null) row('Reinigung · ' + res.clean + ' % sauber', euro(p.clean));

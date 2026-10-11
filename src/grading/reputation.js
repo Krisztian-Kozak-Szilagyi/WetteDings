@@ -6,6 +6,7 @@ const BASE_GAIN = 10; // Reputation je Auftrag bei mittlerer Qualität (Faktor 1
 const PLAYER_FACTOR = 2; // Spieler-Aufträge zählen doppelt
 const SHOWCASE_CAP = 1; // Vitrine: höchstens +100 %
 const STAR_STEP = 5; // je Stern über bzw. unter 3: ±5 Reputation
+const REVIEW_PENALTY = 15; // Zweitprüfung (#204): Slab-Note lag 2 oder mehr neben der echten – so viel verliert der Aussteller
 const TIERS = [
   { min: 0, label: 'Neuling' },
   { min: 100, label: 'Bekannt' },
@@ -63,4 +64,4 @@ function ratingOf(shop = {}) {
   };
 }
 
-module.exports = { BASE_GAIN, PLAYER_FACTOR, SHOWCASE_CAP, STAR_STEP, TIERS, qualityOf, showcaseBoost, reputationGain, starGain, tierOf, ratingOf };
+module.exports = { REVIEW_PENALTY, BASE_GAIN, PLAYER_FACTOR, SHOWCASE_CAP, STAR_STEP, TIERS, qualityOf, showcaseBoost, reputationGain, starGain, tierOf, ratingOf };

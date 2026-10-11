@@ -47,16 +47,16 @@ function shopPrices(shop, s = settings) {
   );
 }
 
-/** Gebuchte Bausteine aufbereiten: { iron, slab, express } als Booleans (Reinigung ist immer dabei) */
-const normServices = (v = {}) => ({ iron: !!v.iron, slab: !!v.slab, express: !!v.express });
+/** Gebuchte Bausteine aufbereiten: { iron, slab, express, review } als Booleans (Reinigung ist dabei, außer bei der Zweitprüfung) */
+const normServices = (v = {}) => (v.review ? { iron: false, slab: false, express: !!v.express, review: true } : { iron: !!v.iron, slab: !!v.slab, express: !!v.express, review: false });
 /** Bausteine eines Auftrags – ältere Aufträge ohne services waren Bügeln (wenn nötig) + Slab */
-const servicesOf = (order) => (order && order.services ? normServices(order.services) : { iron: true, slab: true, express: false });
+const servicesOf = (order) => (order && order.services ? normServices(order.services) : { iron: true, slab: true, express: false, review: false });
 
 /** Preis eines Auftrags bei diesem Shop: { parts: { base, iron?, slab?, express? }, total } */
 function priceOf(shop, services, s = settings) {
   const all = shopPrices(shop, s);
   const want = normServices(services);
-  const parts = { base: all.base };
+  const parts = want.review ? { review: all.review } : { base: all.base };
   for (const k of ['iron', 'slab', 'express']) if (want[k]) parts[k] = all[k];
   return { parts, total: Object.values(parts).reduce((a, b) => a + b, 0) };
 }
@@ -159,24 +159,25 @@ async function shopByCode(code) {
 }
 
 /**
- * Eigene Karten, die sich einreichen lassen: kein Slab, nicht gesperrt (außer Folie – die geht beim Einreichen ab).
- * [{ id, card, rarity, foiledAt, damaged, creased, ironed, marks }] – seltenste zuerst
+ * Eigene Karten, die sich einreichen lassen: nicht gesperrt (außer Folie – die geht beim Einreichen ab). Slabs nur zur
+ * Zweitprüfung (#204, slab gesetzt). [{ id, card, rarity, foiledAt, slab, damaged, creased, ironed, marks }] – seltenste zuerst
  */
 async function submittable(userId) {
   const [docs, locked] = await Promise.all([
-    TcgCard.find({ user: userId, slab: null }).select('card rarity foiledAt damaged creased ironedAt condition.defects.scratches condition.defects.crease').lean(),
+    TcgCard.find({ user: userId }).select('card rarity foiledAt slab damaged creased ironedAt condition.defects.scratches condition.defects.crease').lean(),
     lockedDocs(userId),
   ]);
   return docs
     .filter((d) => {
       const r = locked.reasons.get(String(d._id));
-      return catalog.cardById[d.card] && (!r || r === 'folie');
+      return catalog.cardById[d.card] && (!r || r === (d.slab ? 'slab' : 'folie'));
     })
     .map((d) => ({
       id: String(d._id),
       card: catalog.cardById[d.card],
       rarity: d.rarity,
       foiledAt: d.foiledAt,
+      slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null,
       damaged: !!d.damaged,
       creased: !!d.creased,
       ironed: !!d.ironedAt,
@@ -221,7 +222,7 @@ async function setPrices({ user, prices }) {
 async function submit({ user, shopCode, doc, services }) {
   if (!mongoose.isValidObjectId(doc)) throw new UserError('Diese Karte gibt es nicht.');
   const want = normServices(services);
-  if (!want.iron && !want.slab) throw new UserError('Wähle mindestens „Knick bügeln“ oder „Benoten + Slab“.');
+  if (!want.iron && !want.slab && !want.review) throw new UserError('Wähle mindestens „Knick bügeln“ oder „Benoten + Slab“.');
   await expireDue();
   const shop = await GradingShop.findOne({ code: String(shopCode || '').toUpperCase() }).lean();
   if (!acceptsOrders(shop)) throw new UserError('Dieser Shop nimmt gerade keine Aufträge von Mitgliedern an.');
@@ -232,15 +233,19 @@ async function submit({ user, shopCode, doc, services }) {
     order = await inTransaction(async (session) => {
       const card = await TcgCard.findOne({ _id: doc, user: user._id }).select('card foiledAt slab condition.defects.crease condition.defects.ironed').session(session).lean();
       if (!card) throw new UserError('Diese Karte gehört dir nicht (mehr).');
-      if (card.slab) throw new UserError('Die Karte steckt schon in einem Slab – brich ihn zuerst auf.');
+      // Zweitprüfung nur für Slabs eines anderen Shops; sonst nur Karten ohne Slab
+      if (want.review) {
+        if (!card.slab) throw new UserError('Eine Zweitprüfung gibt es nur für Karten im Slab.');
+        if (card.slab.code === shop.code || (shop.codeHistory || []).includes(card.slab.code)) throw new UserError('Dieser Slab stammt von genau diesem Shop – wähle für die Zweitprüfung einen anderen.');
+      } else if (card.slab) throw new UserError('Die Karte steckt schon in einem Slab – brich ihn zuerst auf.');
       const defects = (card.condition && card.condition.defects) || {};
       if (want.iron && !(defects.crease && !defects.ironed)) throw new UserError('Diese Karte hat keinen Knick, den man noch bügeln kann.');
       const reason = (await lockedDocs(user._id, session)).reasons.get(String(card._id));
-      if (reason && reason !== 'folie') throw new UserError(`Die Karte ist gerade gesperrt (${lockLabel(reason)}).`);
+      if (reason && reason !== (want.review ? 'slab' : 'folie')) throw new UserError(`Die Karte ist gerade gesperrt (${lockLabel(reason)}).`);
       const paid = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: price } }, { $inc: { balance: -price } }, { new: true, session });
       if (!paid) throw new UserError(`Dein Guthaben reicht nicht – der Auftrag kostet ${euro(price)}.`);
       await claim([card._id], user._id, session);
-      if (card.foiledAt) await TcgCard.updateOne({ _id: card._id }, { $set: { foiledAt: null } }, { session });
+      if (card.foiledAt && !want.review) await TcgCard.updateOne({ _id: card._id }, { $set: { foiledAt: null } }, { session });
       const [created] = await GradingOrder.create(
         [{ owner: user._id, ownerName: user.username, shop: shop._id, shopCode: shop.code, shopName: shop.name, doc: card._id, card: card.card, price, priceParts: parts, services: want, expiresAt: deadline(Date.now(), settings, want) }],
         { session }

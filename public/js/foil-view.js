@@ -20,6 +20,7 @@
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var view = null;
   var drag = null;
+  var certLink = null; // Link zum Zertifikat eines Slabs (#204), beim ersten Öffnen angelegt
 
   function el(tag, cls, parent, text) {
     var e = document.createElement(tag);
@@ -162,6 +163,12 @@
       tradeBox.hidden = !d.tradeHref;
       if (d.tradeHref) tradeBox.querySelector('a').href = d.tradeHref;
     }
+    // Slab (#204): Link zum Zertifikat (Note, Shop, Zweitprüfungen, Population, Verkäufe)
+    if (!certLink) {
+      certLink = el('a', 'foil-cert-link', modal, 'Zertifikat ansehen →');
+    }
+    if (d.cert) certLink.href = '/slab/' + encodeURIComponent(d.cert);
+    certLink.hidden = !(d.slabCode && d.cert) || location.pathname === certLink.pathname; // nicht auf der Zertifikatsseite selbst
 
     card.addEventListener('pointerdown', function (e) {
       drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId };

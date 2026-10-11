@@ -181,6 +181,9 @@ async function migrate() {
   // #204: Ø-Marktpreis – abgeschlossene Geschäfte bekommen ihren Preisbezug (nach foilToSlab: Positionen kennen slab)
   const priced = await backfillPriceRefs();
   if (priced) console.log(`Migration: Preisbezug für ${priced} abgeschlossene(s) Geschäft(e) nachgetragen.`);
+  // #204: Slabs bekommen ihre Zertifikatsnummer gespeichert (die Cert-Seite sucht danach)
+  const certs = await backfillSlabCerts();
+  if (certs) console.log(`Migration: Zertifikatsnummer bei ${certs} Slab(s) nachgetragen.`);
   const coded = await backfillPriceCodes();
   if (coded) console.log(`Migration: Shop-Kürzel bei ${coded} Slab-Verkauf/-Verkäufen nachgetragen.`);
 
@@ -381,4 +384,19 @@ async function migrateShopPrices() {
   return docs.length;
 }
 
-module.exports = { migrate, migrateShopPrices, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };
+/** #204: Slabs ohne gespeicherte Zertifikatsnummer bekommen sie (aus der Exemplar-ID, wie auf dem Etikett). Idempotent. */
+async function backfillSlabCerts(batch = 1000) {
+  const { slabCert } = require('./lib/viewHelpers');
+  const coll = TcgCard.collection;
+  let n = 0;
+  for (;;) {
+    const docs = await coll.find({ slab: { $type: 'object' }, 'slab.cert': { $exists: false } }).project({ _id: 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    await coll.bulkWrite(docs.map((d) => ({ updateOne: { filter: { _id: d._id }, update: { $set: { 'slab.cert': slabCert(d._id) } } } })), { ordered: false });
+    n += docs.length;
+    if (docs.length < batch) break;
+  }
+  return n;
+}
+
+module.exports = { migrate, migrateShopPrices, backfillSlabCerts, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };
