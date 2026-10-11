@@ -71,12 +71,14 @@ async function remove(symbol) {
  * Einmalige Aktionen (Krisztian): jeder Schlüssel läuft höchstens einmal – nie durch einen Neustart oder Deploy erneut.
  * Dreifach gesichert: Merker im CoinState (oneTimeJumps, direkt über den MongoDB-Treiber gesetzt), Frist "until"
  * (danach läuft die Aktion nie mehr) und erledigte Einträge werden aus der Liste gelöscht.
- * Bisher erledigt: 'mia-median-2026-10-07' (+75 %) – lief durch einen Fehler bei jedem Deploy erneut (strictQuery
+ * Bisher erledigt: 'mia-rueckfuehrung-2026-10-07' (Gleitflug auf 6,50 €), 'mia-median-2026-10-07' (+75 %) – lief durch einen Fehler bei jedem Deploy erneut (strictQuery
  * strich die $ne-Bedingung, timestamps meldeten trotzdem "geändert"); deshalb die Rückführung unten.
  *   glide: { target (€), hours } – Gleitflug auf den Zielkurs (src/coin/glide.js), danach normal weiter
+ *   glide: { factor, hours } – dasselbe, Ziel = Kurs beim Start × factor
  */
 const ONE_TIME_ACTIONS = [
-  { key: 'mia-rueckfuehrung-2026-10-07', symbol: 'MIA', glide: { target: 6.5, hours: 8 }, until: Date.parse('2026-10-09T00:00:00+02:00') },
+  // Krisztian, 2026-10-11: MIA einmalig +34,72 % innerhalb einer Stunde
+  { key: 'mia-anstieg-2026-10-11', symbol: 'MIA', glide: { factor: 1.3472, hours: 1 }, until: Date.parse('2026-10-15T00:00:00+02:00') },
 ];
 
 /** Merker setzen; true nur, wenn er vorher wirklich fehlte (Treiber direkt: kein strictQuery, keine timestamps) */
@@ -94,8 +96,9 @@ async function oneTimeActions(now = Date.now()) {
     // Merker zuerst setzen: lieber eine Aktion verloren als zwei
     if (!(await claimOnce(a.symbol, a.key))) continue;
     if (a.glide) {
-      const r = await e.startGlide(a.key, a.glide.target, now + a.glide.hours * DAY / 24);
-      console.log(`${e.NAME}: einmaliger Gleitflug (${a.key}) ${r.from.toFixed(4)} € → ${r.target} € bis ${new Date(r.endAt).toISOString()}`);
+      const target = a.glide.factor ? (price) => price * a.glide.factor : a.glide.target;
+      const r = await e.startGlide(a.key, target, now + a.glide.hours * DAY / 24);
+      console.log(`${e.NAME}: einmaliger Gleitflug (${a.key}) ${r.from.toFixed(4)} € → ${r.target.toFixed(4)} € bis ${new Date(r.endAt).toISOString()}`);
     }
   }
 }

@@ -280,15 +280,18 @@ function createEngine(cfg) {
 
   /**
    * Gleitflug starten: der Kurs läuft bis endAt (ms) gleichmäßig auf target (€) zu, danach normal weiter.
+   * target darf eine Funktion des aktuellen Kurses sein (z. B. Kurs × 1,35).
    * Wird gespeichert – ein Neustart setzt ihn fort, statt ihn neu zu beginnen.
    */
   function startGlide(key, target, endAt) {
     if (!state) throw new Error('Kurs-Engine läuft nicht.');
     return exclusive(async () => {
       tick();
-      state.glide = { key, target, endAt };
+      const to = typeof target === 'function' ? target(state.price) : target;
+      if (!(to > 0)) throw new Error('Ungültiger Zielkurs.');
+      state.glide = { key, target: to, endAt };
       await flush();
-      return { from: state.price, target, endAt };
+      return { from: state.price, target: to, endAt };
     });
   }
 
