@@ -66,4 +66,31 @@ function popText(cardId, data, grade = null) {
   return parts.join(' · ');
 }
 
-module.exports = { ACTIVE_DAYS, all, invalidate, slabsAtLeast, popText };
+// Seltenheit in der Note: Anteil der Exemplare einer Karte, die als Slab genau diese Note tragen (die erste passende Stufe gilt)
+const GRADE_RARITY = [
+  { key: 'einzig', label: 'Einzigartig', test: (r) => r.at <= 1 },
+  { key: 'rar', label: 'Sehr selten', test: (r) => r.share <= 0.02 || r.at <= 3 },
+  { key: 'selten', label: 'Selten', test: (r) => r.share <= 0.1 },
+  { key: 'normal', label: 'Verbreitet', test: () => true },
+];
+
+/**
+ * Wie selten ist dieser Slab in seiner Note? (#204, Messingschild in der Vitrine) – wie der Population Report echter
+ * Grading-Firmen: at = Slabs der Karte mit genau dieser Note, higher = mit besserer Note, total = alle Slabs der Karte,
+ * copies = alle Exemplare, share = at / copies, dist = Slabs je Note 1–10, tier = { key, label } aus GRADE_RARITY.
+ * null ohne Daten.
+ */
+function gradeRarity(cardId, data, grade) {
+  const p = data && data.pop.get(cardId);
+  if (!p || !grade) return null;
+  const dist = Array.from({ length: 10 }, (_, i) => p.slabs[i + 1] || 0);
+  const sum = (a) => a.reduce((s, n) => s + n, 0);
+  const total = sum(dist);
+  const at = p.slabs[grade] || 0;
+  const copies = Math.max(p.copies || 0, total);
+  const r = { grade, at, higher: sum(dist.slice(grade)), total, copies, share: copies ? at / copies : 0, dist };
+  const tier = GRADE_RARITY.find((t) => t.test(r));
+  return { ...r, tier: { key: tier.key, label: tier.label } };
+}
+
+module.exports = { ACTIVE_DAYS, all, invalidate, slabsAtLeast, popText, gradeRarity, GRADE_RARITY };

@@ -178,6 +178,7 @@ router.get('/grading', async (req, res) => {
       tool: tools.some((t) => t.available && !t.owned && balance >= t.cost),
     },
     popText: (x) => (pop ? population.popText(x.card.id, pop, x.slab.grade) : ''),
+    popStats: (x) => population.gradeRarity(x.card.id, pop, x.slab.grade), // Seltenheit in der Note fürs Messingschild
     reviews,
     histogram,
     newReviews,
@@ -358,7 +359,7 @@ router.get('/grading/shop/:code', async (req, res) => {
   const shop = await orders.shopByCode(req.params.code);
   if (!shop) return res.status(404).render('error', { title: 'Grading-Shop', status: 404, message: 'Diesen Grading-Shop gibt es nicht.' });
   const [pop, reviews, histogram] = await Promise.all([population.all(), orders.shopReviews(shop.id, 5), orders.starHistogram(shop.id)]);
-  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade), reviews, histogram });
+  res.render('grading-shop', { title: shop.name, shop, own: shop.id === String(req.user._id), services: grading.SERVICES, rarityByKey: catalog.rarityByKey, popText: (x) => population.popText(x.card.id, pop, x.slab.grade), popStats: (x) => population.gradeRarity(x.card.id, pop, x.slab.grade), reviews, histogram });
 });
 
 // Tour über den Schreibtisch beendet oder übersprungen: startet nicht mehr von selbst (?-Knopf startet sie neu)

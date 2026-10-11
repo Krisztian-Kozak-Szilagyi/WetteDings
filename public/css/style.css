@@ -4617,6 +4617,7 @@ button.forum-react:hover { box-shadow: inset 0 0 0 1px var(--color-neutral-600);
 /* Etikett des Slabs (Kürzel, Note, Zertifikat); hinten Zertifikat und Strichcode. Größen in cqw der Karte */
 .foil-ticket { position: absolute; top: 3cqw; left: 5cqw; right: 5cqw; height: 17cqw; display: flex; align-items: center; justify-content: space-between; gap: 2cqw;
   padding: 0 5cqw; border-radius: 2.5cqw; font: 700 4.2cqw/1.2 var(--font); /* Farben: PSA-Etikett bei .gr-slab-label */
+  text-align: left; /* steckt die Karte in einem Button (Vitrine), würde das Etikett sonst mittig gesetzt */
   }
 .foil-ticket .gr-slab-grade { font-size: 11cqw; }
 /* #204: Slab = starres Klargehäuse mit dickem Rand, die Karte liegt in einer Vertiefung; Sleeve (Folie) = dünne, weiche
@@ -6769,19 +6770,33 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   background-blend-mode: normal, normal, multiply, normal;
   box-shadow: inset 0 0 60px rgba(0, 0, 0, .85), inset 0 0 0 1px rgba(255, 220, 160, .1), 0 1px 0 rgba(255, 220, 170, .15), 6px 16px 28px rgba(0, 0, 0, .6);
 }
+/* Das Regal scrollt waagerecht – dadurch schneidet es auch oben ab. Beim Darüberfahren wächst ein Slab bis ~50 px nach
+   oben: dafür oben Luft im Regal, die per negativem Rand in den Innenabstand der Vitrine reicht (Höhe bleibt gleich) */
 .gd-vit-shelf {
-  position: relative; z-index: 1; display: flex; justify-content: center; align-items: flex-end; gap: clamp(18px, 3vw, 40px);
-  padding: 10px 10px 46px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; perspective: 900px;
+  position: relative; z-index: 1; display: flex; align-items: flex-end;
+  margin-top: -36px; padding: 58px 10px 66px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; perspective: 900px;
+  /* Abstand und Fachbreite aus der Breite der Vitrine (Container) und der Zahl der Fächer (--vit-slots): auch voll
+     besetzt passen alle nebeneinander – erst unter 96 px je Fach wird gescrollt. „safe center“: läuft das Regal
+     über, beginnt es links statt links abgeschnitten zu sein */
+  --vit-gap: clamp(14px, 3cqw, 36px);
+  justify-content: safe center; gap: var(--vit-gap);
 }
+.gd-vitrine { container-type: inline-size; }
+/* registriert: wird im Regal zu px ausgerechnet und so vererbt – sonst rechneten Fach und Schild das cqw neu (relativ zum Fach) */
+@property --vit-gap { syntax: "<length>"; inherits: true; initial-value: 24px; }
 .gd-vit-shelf::-webkit-scrollbar { display: none; }
 .gd-vit-shelf::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 22px; height: 12px; border-radius: 2px; z-index: -1;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 42px; height: 12px; border-radius: 2px; z-index: -1; /* 24 px unter den Slabs (Innenabstand unten 66 px) */
   background: linear-gradient(rgba(60, 28, 10, .4), rgba(20, 8, 2, .6)), url("/img/grading/wood.webp") center / 400px auto;
   box-shadow: inset 0 1px 0 rgba(255, 220, 170, .25), 0 10px 16px rgba(0, 0, 0, .65);
 }
-.gd-vit-slab, .gd-vit-empty { flex: none; width: clamp(96px, 11vw, 170px); scroll-snap-align: center; }
+/* Fach = Slab + Messingschild: nur der Slab (Button) wächst beim Darüberfahren, das Schild bleibt am Regalboden */
+.gd-vit-item, .gd-vit-empty { flex: none; width: clamp(96px, calc((100cqw - 20px - (var(--vit-slots, 6) - 1) * var(--vit-gap)) / var(--vit-slots, 6)), 170px); scroll-snap-align: center; }
+/* Fach als Container: die Schrift des Schilds richtet sich nach der Fachbreite */
+.gd-vit-item { position: relative; z-index: 1; perspective: 900px; container-type: inline-size; }
+.gd-vit-item:hover, .gd-vit-item:focus-within { z-index: 5; }
 .gd-vit-slab {
-  position: relative; display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none; font: inherit;
+  position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0; border: 0; background: none; font: inherit;
   cursor: var(--cur-pointer, pointer); transform: rotateX(5deg); transition: transform .3s cubic-bezier(.3, 1.3, .5, 1); z-index: 1;
 }
 .gd-vit-slab .foil-card { position: relative; z-index: 1; filter: drop-shadow(0 12px 10px rgba(0, 0, 0, .7)); }
@@ -6791,14 +6806,29 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 }
 .gd-vit-slab::before { content: ""; position: absolute; inset: 8% 6% 22%; z-index: 0; border-radius: 50%; background: color-mix(in srgb, var(--rar, #fff) 45%, transparent); filter: blur(24px); opacity: .55; }
 @media (hover: hover) {
-  .gd-vit-slab:hover { transform: rotateX(0deg) translateY(-14px) scale(1.35); z-index: 5; }
+  .gd-vit-slab:hover { transform: rotateX(0deg) translateY(-10px) scale(1.3); z-index: 5; }
 }
 .gd-vit-slab:focus-visible { transform: rotateX(0deg) translateY(-10px) scale(1.15); z-index: 5; }
+/* Messingschild am Regalboden, zwei Zeilen: „Name – Seltenheit“ und „Kürzel – Note“ (zu lange Namen enden mit …) */
+/* Aussehen wie das Grading-Etikett im Album (.gv-slab): helles Etikett mit violettem Rand und Glanz, Note 10 in Gold */
 .gd-vit-plaque {
-  position: absolute; bottom: -34px; left: 50%; z-index: 1; transform: translateX(-50%); white-space: nowrap; padding: 2px 10px; border-radius: 3px;
-  font: 700 12px/1.4 var(--display); letter-spacing: .04em; color: var(--brass-ink);
-  background: linear-gradient(135deg, #b38a3e, #f0d993 45%, #c99d4c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 2px 3px rgba(0, 0, 0, .5);
+  position: absolute; top: calc(100% + 10px); left: 50%; z-index: 1; transform: translateX(-50%); overflow: hidden;
+  /* höchstens so breit, dass zwischen zwei Schildern noch 8 px frei bleiben – auch bei voller Vitrine */
+  display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: calc(100% + var(--vit-gap) - 8px); padding: .4em .9em .45em; border-radius: 7px;
+  font: 700 clamp(11px, 8cqw, 13px)/1.3 var(--font); color: #161826; white-space: nowrap; pointer-events: none; /* Schrift nach Fachbreite */
+  background: linear-gradient(180deg, #f3f2fa, #dddbee);
+  box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 1px 0 rgba(255, 255, 255, .25), 0 4px 10px rgba(0, 0, 0, .55);
 }
+.gd-vp-line { display: flex; align-items: baseline; gap: 4px; max-width: 100%; min-width: 0; }
+.gd-vp-line i { font-style: normal; color: #9a98b8; }
+.gd-vp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gd-vp-rar { flex: none; font-size: .85em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #5a5a70; } /* Seltenheit in Großbuchstaben: CRUMPLED, HOLO … */
+.gd-vp-code { font-size: .85em; font-weight: 800; letter-spacing: .2em; color: #5b4fc4; }
+.gd-vp-grade { font-size: 1.25em; font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.gd-vit-plaque.is-gem { background: linear-gradient(135deg, #fff4cf, #f2c14e 45%, #fff1c2 60%, #d9a634); box-shadow: inset 0 0 0 1px rgba(146, 102, 10, .45), 0 0 14px rgba(242, 193, 78, .45), 0 4px 10px rgba(0, 0, 0, .55); }
+.gd-vit-plaque.is-gem .gd-vp-code { color: #7a4e00; }
+.gd-vit-plaque.is-gem :is(.gd-vp-rar, .gd-vp-line i) { color: #8a6a2a; }
+.gd-vit-plaque.is-gem .gv-sheen { animation-duration: 2.6s; mix-blend-mode: overlay; }
 .gd-vit-empty { position: relative; aspect-ratio: 720 / 1008; color: rgba(255, 230, 190, .55); text-decoration: none; }
 .gd-vit-empty > span { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 10px; border: 1px solid rgba(255, 220, 170, .1); background: linear-gradient(160deg, rgba(255, 255, 255, .03), rgba(0, 0, 0, .2)); box-shadow: inset 0 0 22px rgba(0, 0, 0, .5); }
 .gd-vit-empty b { font: 300 38px/1 var(--font); }
@@ -7278,19 +7308,59 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   background: linear-gradient(rgba(255, 238, 196, .2), rgba(255, 238, 196, 0)); clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
 }
 .foil-modal.is-showroom .foil-modal-stage { touch-action: none; }
+/* Showroom: Karte und Schild als Gruppe mittig – die Bühne füllt nicht mehr die ganze Höhe, das Schild sitzt 2 cm
+   unter der Karte (abzüglich des Innenabstands der Bühne); die Karte etwas kleiner, damit alles auf den Schirm passt */
+.foil-modal.is-showroom[open] { justify-content: center; }
+.foil-modal.is-showroom .foil-modal-stage { flex: 0 0 auto; padding-bottom: 0; }
+/* Breite aus der Höhe: Slab ≈ 1,65 × so hoch wie breit, darunter ~300 px für Abstand, Schild und Zertifikat-Link */
+.foil-modal.is-showroom .foil-card-big { width: min(300px, 70vw, calc((100dvh - 300px) / 1.65)); }
+.foil-modal.is-showroom .foil-cert-link { margin-top: 10px; }
 .foil-nav { position: absolute; top: 50%; left: 0; right: 0; z-index: 2; display: flex; justify-content: space-between; padding: 0 10px; transform: translateY(-50%); pointer-events: none; }
 .foil-nav[hidden] { display: none; }
 .foil-nav-btn { width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .1); color: #fff; font-size: 30px; line-height: 1; pointer-events: auto; cursor: var(--cur-pointer, pointer); }
 .foil-nav-btn:hover { background: rgba(255, 255, 255, .2); }
+/* Schild unter der Karte – wie das Etikett der Grading-Vitrine im Album (.gv-slab): helles Etikett, violette Schrift,
+   Note groß; Note 10 in Gold. Darunter die Seltenheit in dieser Note mit Notenspiegel der Karte */
 .foil-plaque {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto 18px; padding: 8px 22px;
-  border-radius: 6px; background: linear-gradient(135deg, #b98c3a, #f2d98c 35%, #c99a45 60%, #ecd086); color: #3a2a10; text-align: center;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, .4); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 8px 18px rgba(0, 0, 0, .55);
+  display: flex; flex-direction: column; gap: 6px; width: min(340px, calc(100vw - 32px)); margin: calc(2cm - 16px) auto 0; padding: 10px 14px 10px;
+  border-radius: 10px; background: linear-gradient(180deg, #f3f2fa, #dddbee); color: #161826; text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(91, 79, 196, .35), 0 10px 24px rgba(0, 0, 0, .55);
 }
 .foil-plaque[hidden] { display: none; }
-.foil-plaque strong { font-size: 16px; }
-.foil-plaque span { font-size: 13px; font-weight: 700; letter-spacing: .04em; }
-.foil-plaque small { font-size: 11px; opacity: .8; }
+.fp-head { font-size: 10px; font-weight: 700; letter-spacing: .22em; color: #5b4fc4; }
+.fp-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.fp-name { display: flex; flex-direction: column; min-width: 0; }
+.fp-name strong { font-size: 17px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-name small { font-size: 12px; font-weight: 600; color: #5a5a70; }
+.fp-score { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
+.fp-word { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #5b4fc4; }
+.fp-grade { font-size: 40px; font-weight: 700; line-height: .9; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.fp-pop { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(91, 79, 196, .22); }
+.fp-pop-head { display: flex; align-items: center; gap: 8px; }
+.fp-pop-head small { font-size: 12px; color: #5a5a70; font-weight: 600; }
+.fp-tier { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .04em; background: #e4e2f3; color: #3f3a74; }
+.fp-tier.is-einzig { background: linear-gradient(135deg, #fff1c2, #f2c14e); color: #5c3a00; box-shadow: 0 0 10px rgba(242, 193, 78, .55); }
+.fp-tier.is-rar { background: #5b4fc4; color: #fff; }
+.fp-tier.is-selten { background: #c9c3f2; color: #2e2870; }
+.fp-bars { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; align-items: end; height: 42px; }
+.fp-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
+.fp-bar i { display: block; width: 100%; height: calc(var(--h) * 28px); min-height: 2px; border-radius: 2px 2px 0 0; background: rgba(91, 79, 196, .18); }
+.fp-bar.has i { background: rgba(91, 79, 196, .45); }
+.fp-bar.is-this i { background: #5b4fc4; box-shadow: 0 0 8px rgba(91, 79, 196, .5); }
+.fp-bar b { font-size: 10px; font-weight: 600; color: #8a8aa0; line-height: 1; }
+.fp-bar.is-this b { color: #161826; font-weight: 800; }
+.fp-pop-text { font-size: 12px; color: #3c3c52; }
+.fp-count { align-self: center; font-size: 11px; color: #6a6a80; }
+.foil-plaque.is-gem { background: linear-gradient(135deg, #fff4cf, #f2c14e 45%, #fff1c2 60%, #d9a634); box-shadow: inset 0 0 0 1px rgba(146, 102, 10, .45), 0 0 22px rgba(242, 193, 78, .4), 0 10px 24px rgba(0, 0, 0, .55); }
+.foil-plaque.is-gem :is(.fp-head, .fp-word) { color: #7a4e00; }
+.foil-plaque.is-gem :is(.fp-name small, .fp-pop-head small, .fp-pop-text, .fp-count) { color: #5c4210; }
+.foil-plaque.is-gem .fp-pop { border-top-color: rgba(122, 78, 0, .25); }
+.foil-plaque.is-gem .fp-bar i { background: rgba(122, 78, 0, .18); }
+.foil-plaque.is-gem .fp-bar.has i { background: rgba(122, 78, 0, .4); }
+.foil-plaque.is-gem .fp-bar.is-this i { background: #7a4e00; box-shadow: 0 0 8px rgba(122, 78, 0, .45); }
+.foil-plaque.is-gem .fp-bar b { color: #8a6a2a; }
+.foil-plaque.is-gem .fp-tier { background: rgba(122, 78, 0, .15); color: #5c3a00; box-shadow: none; }
+.foil-plaque.is-gem .fp-tier.is-einzig { background: #7a4e00; color: #fff4cf; }
 
 /* Namensschild: unter 1280 px Name oben, darunter die beiden Felder gleich breit */
 @media (max-width: 1279px) {
@@ -7315,7 +7385,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .gd-go { width: 100%; }
   .gd-mat-text form { width: 100%; }
   .gd-vitrine { padding: 30px 10px 22px; border-width: 10px; }
-  .gd-vit-shelf { justify-content: flex-start; }
+  .gd-vit-shelf { justify-content: flex-start; margin-top: -26px; padding-top: 44px; }
   .gd-vit-edit { top: 0; right: 2px; font-size: 12px; }
   .gd-obj { min-width: 0; }
   .gd-slot { width: 104px; height: 104px; }

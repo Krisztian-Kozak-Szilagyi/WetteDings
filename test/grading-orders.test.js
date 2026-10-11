@@ -145,6 +145,25 @@ test('#204: Frist beginnt nur beim ersten Annehmen neu – Abbrechen und neu Ann
   assert.ok(orders.WARN_HOURS < 24, 'Warnung kürzer als die kürzeste Frist (Express)');
 });
 
+test('#204: Seltenheit eines Slabs in seiner Note fürs Messingschild', () => {
+  const population = require('../src/tcg/population');
+  const data = { active: 10, spread: new Map(), pop: new Map([['k', { copies: 40, slabs: { 10: 1, 9: 2, 7: 6 } }], ['h', { copies: 20, slabs: { 6: 5 } }]]) };
+  const top = population.gradeRarity('k', data, 10);
+  assert.equal(top.at, 1);
+  assert.equal(top.higher, 0);
+  assert.equal(top.total, 9);
+  assert.equal(top.copies, 40);
+  assert.equal(top.dist.length, 10);
+  assert.equal(top.dist[9], 1);
+  assert.equal(top.tier.key, 'einzig');
+  assert.equal(population.gradeRarity('k', data, 9).tier.key, 'rar'); // 2 Stück
+  assert.equal(population.gradeRarity('k', data, 9).higher, 1);
+  assert.equal(population.gradeRarity('k', data, 7).tier.key, 'normal'); // 6 von 40 = 15 %
+  assert.equal(population.gradeRarity('h', data, 6).tier.key, 'normal'); // 5 von 20
+  assert.equal(population.gradeRarity('x', data, 8), null);
+  assert.equal(population.gradeRarity('k', null, 8), null);
+});
+
 test('#204 B: Tageslimits getrennt nach NPC und Spieler, Bügeln nur ungebügelt', () => {
   const day = '2026-10-10';
   const done = [{ level: 3, source: 'spieler' }, { level: 3 }, { level: 3, source: 'npc' }, { level: 2 }];

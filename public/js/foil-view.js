@@ -154,17 +154,55 @@
       next.setAttribute('aria-label', 'Nächster Slab');
       prev.addEventListener('click', function () { step(-1); });
       next.addEventListener('click', function () { step(1); });
-      plaque = el('div', 'foil-plaque', modal);
+      plaque = el('div', 'foil-plaque');
+      stage.insertAdjacentElement('afterend', plaque); // direkt unter der Karte, vor „Zertifikat ansehen“
     }
     nav.hidden = !gallery || gallery.list.length < 2;
     plaque.hidden = !group;
-    if (group) {
-      plaque.innerHTML = '';
-      el('strong', '', plaque, d.name);
-      el('span', '', plaque, (d.slabCode ? d.slabCode + ' · ' : '') + (d.gradeWord ? d.gradeWord + ' ' : '') + (d.grade || ''));
-      if (d.pop) el('small', '', plaque, d.pop);
-      if (gallery && gallery.list.length > 1) el('small', 'foil-plaque-count', plaque, (gallery.idx + 1) + ' / ' + gallery.list.length);
+    if (group) fillPlaque(d);
+  }
+
+  /**
+   * Messingschild im Showroom – aufgebaut wie das Etikett der Grading-Vitrine im Album (partials/grade-stats): Kopf mit
+   * Kürzel, Karte und Note groß, dazu die Seltenheit in dieser Note (data-pop-stats aus tcg/population.gradeRarity):
+   * Stufe, Notenspiegel der Karte mit dieser Note hervorgehoben und „x von y Exemplaren“.
+   */
+  function fillPlaque(d) {
+    plaque.innerHTML = '';
+    var grade = +d.grade || 0;
+    plaque.className = 'foil-plaque' + (grade === 10 ? ' is-gem' : '');
+    el('span', 'fp-head', plaque, (d.slabCode || 'BfW') + ' GRADING');
+    var main = el('span', 'fp-main', plaque);
+    var name = el('span', 'fp-name', main);
+    el('strong', '', name, d.name);
+    el('small', '', name, d.rarityLabel || '');
+    var score = el('span', 'fp-score', main);
+    el('span', 'fp-word', score, d.gradeWord || '');
+    el('span', 'fp-grade', score, d.grade || '–');
+
+    var st = null;
+    try { st = d.popStats ? JSON.parse(d.popStats) : null; } catch (err) { st = null; }
+    if (st) {
+      var pop = el('span', 'fp-pop', plaque);
+      var head = el('span', 'fp-pop-head', pop);
+      el('span', 'fp-tier is-' + st.tier.key, head, st.tier.label);
+      el('small', '', head, 'in Note ' + st.grade);
+      var most = Math.max.apply(null, st.dist) || 1;
+      var bars = el('span', 'fp-bars', pop);
+      bars.setAttribute('aria-hidden', 'true');
+      st.dist.forEach(function (n, i) {
+        var b = el('span', 'fp-bar' + (n ? ' has' : '') + (i + 1 === st.grade ? ' is-this' : ''), bars);
+        b.style.setProperty('--h', n ? Math.max(0.18, n / most).toFixed(3) : 0);
+        el('i', '', b);
+        el('b', '', b, String(i + 1));
+      });
+      var parts = [st.at + ' von ' + st.copies + (st.copies === 1 ? ' Exemplar' : ' Exemplaren') + ' mit Note ' + st.grade];
+      parts.push(st.higher ? st.higher + ' besser benotet' : st.grade === 10 ? 'höchste Note' : 'keins besser benotet');
+      el('small', 'fp-pop-text', pop, parts.join(' · '));
+    } else if (d.pop) {
+      el('small', 'fp-pop-text', plaque, d.pop);
     }
+    if (gallery && gallery.list.length > 1) el('small', 'fp-count', plaque, (gallery.idx + 1) + ' / ' + gallery.list.length);
   }
 
   function open(trigger, foiling) {
