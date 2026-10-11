@@ -119,14 +119,14 @@
           <div class="lotto-qty-row">
             <div class="lotto-stepper">
               <button type="button" class="btn" data-step="-1" aria-label="Ein Los weniger">−</button>
-              <input type="number" name="count" min="1" max="<%= maxTickets %>" step="1" value="1" required aria-label="Anzahl Lose">
+              <input type="number" name="count" min="1" max="<%= Math.max(1, maxTickets) %>" step="1" value="1" required aria-label="Anzahl Lose">
               <button type="button" class="btn" data-step="1" aria-label="Ein Los mehr">+</button>
               <button type="button" class="btn lotto-max" data-count="<%= Math.max(1, affordable) %>">Max</button>
             </div>
             <span class="lotto-total" data-lotto-cost></span>
           </div>
-          <button class="btn btn-primary btn-block lotto-buy-btn" type="submit" <%= currentUser.balance < ticketPrice ? 'disabled' : '' %>>Lose kaufen</button>
-          <p class="muted small">Verfügbar: <span data-live="lotto-balance"><%= euro(currentUser.balance) %></span> · max. <%= maxTickets %> Lose pro Kauf</p>
+          <button class="btn btn-primary btn-block lotto-buy-btn" type="submit" <%= currentUser.balance < ticketPrice || maxTickets < 1 ? 'disabled' : '' %>>Lose kaufen</button>
+          <p class="muted small">Verfügbar: <span data-live="lotto-balance"><%= euro(currentUser.balance) %></span> · <%= lotto.maxPerRound ? 'noch ' + roundLeft + ' von ' + lotto.maxPerRound + ' Losen' : 'max. ' + maxTickets + ' Lose pro Kauf' %></p>
         </form>
       <% } else { %>
         <p class="muted">Die Ziehung läuft gerade – die nächste Lotterie startet in Kürze.</p>
@@ -177,7 +177,7 @@
         <% } %>
         <li>Jedes Los hat eine Nummer. Gezogen wird eine Nummer per Zufall – wer das Los besitzt, bekommt den gesamten Topf<%= big ? ' und den Gewinn aus der Bank' : '' %>.</li>
         <% if (big) { %><li>Werden keine Lose verkauft, verfällt der Bank-Gewinn – die nächste Runde bietet ihn neu an.</li><% } %>
-        <li>Mehr Lose = höhere Chance. Maximal <%= maxTickets %> Lose pro Kauf.</li>
+        <li>Mehr Lose = höhere Chance. <%= lotto.maxPerRound ? 'Höchstens ' + lotto.maxPerRound + ' Lose pro Person und ' + lotto.per + '.' : 'Maximal ' + maxTickets + ' Lose pro Kauf.' %></li>
       </ul>
     </details>
   </aside>
