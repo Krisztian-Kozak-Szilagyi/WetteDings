@@ -9,6 +9,7 @@
     "dev": "node scripts/dev.js",
     "dev:verdacht": "node scripts/dev-verdacht.js",
     "dev:knick": "node scripts/dev-knick.js",
+    "dev:auftraege": "node scripts/dev-auftraege.js",
     "test": "node --test",
     "webp": "node scripts/webp.js",
     "sim:bosskampf": "node scripts/bossfight-sim.js"
