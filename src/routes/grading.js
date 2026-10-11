@@ -32,72 +32,111 @@ function requireGrading(req, res, next) {
 }
 router.use('/grading', requireLogin, requireGrading);
 
+// Reiter des Shop-Hubs (#204): Übersicht als Start, die anderen verwalten den Shop
+const HUB_TABS = [
+  { key: 'uebersicht', label: 'Übersicht' },
+  { key: 'auftraege', label: 'Aufträge' },
+  { key: 'vitrine', label: 'Vitrine' },
+  { key: 'preise', label: 'Preise' },
+  { key: 'werkstatt', label: 'Werkstatt' },
+];
+const hubUrl = (tab) => (tab && tab !== 'uebersicht' ? `/grading?reiter=${tab}` : '/grading');
+
+/** Daten für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server */
+function benchData(job, shop) {
+  const card = catalog.cardById[job.card];
+  const player = grading.isPlayerJob(job);
+  return {
+    steps: grading.stepsFor(job), // Bügeln nur bei Karten mit Knick, Spieler-Aufträge nach gebuchten Bausteinen (#204)
+    card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: player ? 0 : grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
+    customer: job.customer,
+    shop: shop ? { name: shop.name, code: shop.code } : null, // Kürzel fürs Slab-Etikett (#204)
+    cert: String(parseInt(String(job._id).slice(-7), 16) % 100000000).padStart(8, '0'), // Zertifikatsnummer fürs Slab-Etikett
+    spots: job.spots,
+    defects: job.defects,
+    // Zentrierung: sichtbarer Versatz (Rand ungleich breit) und für die Auflösung die Höchstnote
+    center: centerShift(job.defects && job.defects.centering, job._id),
+    centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
+    centerScale: centeringScale.map(({ from, to, cap }) => ({ from, to, cap })), // fürs Messwerkzeug: Bereich → Höchstnote
+    minMs: job.spots.length * grading.MS_PER_SPOT,
+    // Bügeln (#204): Lage des Knicks, schon gebügelt? und wohin der Tisch das Ergebnis schickt
+    crease: job.defects && job.defects.crease ? creaseLine(job.cardDoc || job._id) : null,
+    iron: job.iron || null,
+    ironUrl: '/grading/buegeln',
+    startedAt: new Date(job.createdAt).getTime(),
+    // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen – bei Karten von Mitgliedern (#204)
+    // bleibt die echte Note geheim, auf den Slab kommt die Note des Shops
+    guess: job.guess,
+    grade: job.guess !== null && !player ? job.grade : null,
+    player,
+    services: job.services || null,
+  };
+}
+
+// Shop-Hub (#204): Kopf mit Stufe und Tageszählern, „Jetzt dran“ (eine Primäraktion), Reiter für die Verwaltung
 router.get('/grading', async (req, res) => {
   await orders.expireDue();
   const state = await grading.getState(req.user._id);
-  const players = !!state.shop && orders.acceptsOrders(state.shop);
-  // Spieler-Aufträge (#204): Warteschlange, Preis, Kennzahlen und Vitrine des eigenen Shops
-  const [queue, showcase] = await Promise.all([players ? orders.queueFor(req.user._id) : [], state.shop && state.shop.code ? orders.showcaseChoices(req.user._id) : []]);
+  const active = !!state.shop && state.shop.active;
+  const tab = HUB_TABS.some((t) => t.key === req.query.reiter) ? req.query.reiter : 'uebersicht';
+  const players = active && orders.acceptsOrders(state.shop);
+  const coded = !!state.shop && !!state.shop.code;
+  // Spieler-Aufträge: Warteschlange, Verlauf, Kennzahlen und Vitrine des eigenen Shops
+  const [queue, showcase, history, ironable] = await Promise.all([
+    players ? orders.queueFor(req.user._id) : [],
+    coded ? orders.showcaseChoices(req.user._id) : [],
+    coded && tab === 'auftraege' ? orders.shopHistory(req.user._id) : [],
+    active && state.info.level >= grading.IRON_LEVEL ? grading.ironableCards(req.user._id) : [],
+  ]);
   const job = state.open;
-  const card = job ? catalog.cardById[job.card] : null;
   res.render('grading', {
     title: 'Grading-Shop',
     ...state,
+    active,
+    tab,
+    tabs: HUB_TABS,
+    hubUrl,
     levels: grading.LEVELS.map((l) => grading.levelInfo(l.level)),
     pay: grading.PAY,
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
-    // Für den Arbeitstisch (public/js/grading.js) – die echte Note bleibt auf dem Server
-    // Zentrierung → Höchstnote für die Regeln beim Benoten, als Bereiche mit beiden Grenzen (beide eingeschlossen):
-    // 50/50–55/45 → 10, 56/44–60/40 → 9, … – so ist z. B. 59/41 eindeutig (→ 9)
-    centeringScale,
-    jobData: job
-      ? {
-          steps: grading.stepsFor(job), // Bügeln nur bei Karten mit Knick (#204)
-          card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
-          customer: job.customer,
-          shop: state.shop ? { name: state.shop.name, code: state.shop.code } : null, // Kürzel fürs Slab-Etikett (#204)
-          cert: String(parseInt(String(job._id).slice(-7), 16) % 100000000).padStart(8, '0'), // Zertifikatsnummer fürs Slab-Etikett
-          spots: job.spots,
-          defects: job.defects,
-          // Zentrierung: sichtbarer Versatz (Rand ungleich breit) und für die Auflösung die Höchstnote
-          center: centerShift(job.defects && job.defects.centering, job._id),
-          centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
-          centerScale: centeringScale.map(({ from, to, cap }) => ({ from, to, cap })), // fürs Messwerkzeug: Bereich → Höchstnote
-          minMs: job.spots.length * grading.MS_PER_SPOT,
-          // Bügeln (#204): Lage des Knicks, schon gebügelt? und wohin der Tisch das Ergebnis schickt
-          crease: job.defects && job.defects.crease ? creaseLine(job.cardDoc || job._id) : null,
-          iron: job.iron || null,
-          ironUrl: '/grading/buegeln',
-          startedAt: new Date(job.createdAt).getTime(),
-          // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen – bei Karten von Mitgliedern (#204)
-          // bleibt die echte Note geheim, auf den Slab kommt die Note des Shops
-          guess: job.guess,
-          grade: job.guess !== null && !grading.isPlayerJob(job) ? job.grade : null,
-          player: grading.isPlayerJob(job),
-        }
-      : null,
+    openJob: job ? { card: cardInfo(job.card), customer: job.customer, player: grading.isPlayerJob(job), services: job.services || null } : null,
     // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
     shopCode: (state.shop && state.shop.code) || null, // Schaukarte mit dem eigenen Kürzel (#204)
     heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
     doneCards: state.done.map((j) => ({ ...j, cardInfo: catalog.cardById[j.card] || null })),
+    earnedToday: state.done.reduce((s, j) => s + (j.pay || 0), 0),
     players,
     orderLevel: orders.ORDER_LEVEL,
     queue: queue.map((o) => ({ ...o, cardInfo: cardInfo(o.card) })),
+    history: history.map((o) => ({ ...o, cardInfo: cardInfo(o.card) })),
     shopPrices: orders.shopPrices(state.shop),
     servicePrice: grading.settings.servicePrice,
     services: grading.SERVICES,
     orderDays: grading.settings.orderDays,
+    expressDays: grading.settings.expressDays,
     rating: state.shop ? reputation.ratingOf(state.shop) : null,
     showcase,
     showcaseMax: grading.settings.showcaseMax,
     rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
     ironLevel: grading.IRON_LEVEL,
-    ironable:
-      state.shop && state.shop.active && state.info.level >= grading.IRON_LEVEL
-        ? (await grading.ironableCards(req.user._id)).map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info)
-        : [],
+    ironable: ironable.map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info),
+  });
+});
+
+// Werkbank (#204): der Arbeitstisch für den offenen Auftrag – ohne offenen Auftrag zurück zum Hub
+router.get('/grading/werkbank', async (req, res) => {
+  const state = await grading.getState(req.user._id);
+  if (!state.open || !state.shop || !state.shop.active) return res.redirect('/grading');
+  res.render('grading-werkbank', {
+    title: 'Werkbank',
+    shop: state.shop,
+    pay: grading.PAY,
+    // Zentrierung → Höchstnote für die Regeln beim Benoten, als Bereiche mit beiden Grenzen (beide eingeschlossen):
+    // 50/50–55/45 → 10, 56/44–60/40 → 9, … – so ist z. B. 59/41 eindeutig (→ 9)
+    centeringScale,
+    jobData: benchData(state.open, state.shop),
   });
 });
 
@@ -152,7 +191,8 @@ router.post('/grading/eigene/fertig', async (req, res) => {
   }
 });
 
-async function handle(req, res, fn, target = '/grading') {
+// Ziel nach einem Formular: der Reiter, aus dem es kam (Feld reiter), sonst die Übersicht
+async function handle(req, res, fn, target = hubUrl(HUB_TABS.some((t) => t.key === req.body.reiter) ? req.body.reiter : null)) {
   try {
     const msg = await fn();
     if (msg) req.flash('success', msg);
@@ -252,7 +292,7 @@ router.post('/grading/vitrine', (req, res) =>
       await orders.setShowcase({ user: req.user, docs: (Array.isArray(raw) ? raw : raw ? [raw] : []).map(str) });
       return 'Vitrine gespeichert.';
     },
-    '/grading#vitrine'
+    hubUrl('vitrine')
   )
 );
 
@@ -286,11 +326,17 @@ router.post('/grading/ausbauen', (req, res) =>
   })
 );
 
+// Auftrag annehmen und gleich an die Werkbank
 router.post('/grading/auftrag', (req, res) =>
-  handle(req, res, async () => {
-    await grading.takeJob({ user: req.user });
-    return null;
-  })
+  handle(
+    req,
+    res,
+    async () => {
+      await grading.takeJob({ user: req.user });
+      return null;
+    },
+    '/grading/werkbank'
+  )
 );
 
 // Note festlegen (vom Arbeitstisch per fetch) – Antwort: echte Note für die Auflösung

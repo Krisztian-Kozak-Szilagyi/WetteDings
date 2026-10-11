@@ -194,6 +194,10 @@ async function myOrders(userId, now = Date.now()) {
 /** Wartende Aufträge eines Shops (Express zuerst, sonst älteste zuerst) – mit aufbereiteten Bausteinen */
 const queueFor = async (shopId) => (await GradingOrder.find({ shop: shopId, status: 'wartet' }).sort(QUEUE_SORT).lean()).map((o) => ({ ...o, services: servicesOf(o) }));
 
+/** Erledigte Aufträge eines Shops (neueste zuerst) – für den Reiter „Aufträge“ im Hub */
+const shopHistory = async (shopId, limit = 20) =>
+  (await GradingOrder.find({ shop: shopId, status: { $in: ['fertig', 'abgelaufen', 'storniert'] } }).sort({ doneAt: -1 }).limit(limit).lean()).map((o) => ({ ...o, services: servicesOf(o) }));
+
 /** Darf der Kunde diesen Auftrag (noch) bewerten? */
 const canRate = (o, now = Date.now()) => o.status === 'fertig' && o.stars == null && !!o.doneAt && now - new Date(o.doneAt).getTime() <= RATE_DAYS * 864e5;
 
@@ -376,6 +380,7 @@ module.exports = {
   submittable,
   myOrders,
   queueFor,
+  shopHistory,
   setPrices,
   submit,
   cancel,

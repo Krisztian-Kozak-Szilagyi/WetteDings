@@ -6233,3 +6233,57 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .gr-svc-tag.is-express { background: #f59e0b; color: #1a1200; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .gs-stars label { transition: none; } .gs-stars label:hover { transform: none; } }
 .gs-profile { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+/* ---------- Grading-Shop: Hub und Werkbank (#204) ---------- */
+.gh-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.gh-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gh-name { margin: 0; font-size: 34px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.gh-name .gr-shop-code { font-size: 14px; vertical-align: 6px; }
+.gh-rep { display: flex; flex-direction: column; gap: 6px; font-size: 13px; max-width: 360px; }
+.gh-bar { display: block; height: 6px; border-radius: 3px; background: var(--color-neutral-800); overflow: hidden; }
+.gh-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--color-accent-500), var(--color-accent-300)); }
+.gh-today { display: flex; flex-wrap: wrap; gap: 10px; }
+.gh-count { display: flex; flex-direction: column; gap: 4px; min-width: 120px; padding: 10px 14px; border-radius: var(--radius-md); background: var(--color-surface); font-size: 12px; color: var(--color-neutral-400); }
+.gh-count b { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.gh-now {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; padding: 20px 22px; border-radius: var(--radius-lg);
+  background: radial-gradient(70% 120% at 0% 0%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 70%), var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-accent-700), 0 0 40px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.gh-now-text { flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gh-now-text h2 { margin: 0; font-size: 22px; }
+.gh-now-text p { margin: 0; }
+.gh-now-card { width: 72px; height: auto; aspect-ratio: 720 / 1008; border-radius: 6px; box-shadow: 0 0 0 1px var(--rar, var(--color-neutral-700)), 0 8px 24px rgba(0, 0, 0, .45); transform: rotate(-4deg); }
+.gh-now-mail { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; font-size: 32px; background: color-mix(in srgb, var(--color-accent) 16%, transparent); }
+.gh-now .gr-name-form { margin: 8px 0 0; }
+.gh-tabs { margin: 0; }
+.gh-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.gh-kpi { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--color-surface); }
+.gh-kpi span { font-size: 12px; color: var(--color-neutral-400); }
+.gh-kpi b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gh-kpi small { font-size: 11px; color: var(--color-neutral-500); }
+.gh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: start; }
+.gh-card { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-neutral-800); min-width: 0; }
+.gh-card h2 { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 16px; }
+.gh-card h2 a { margin-left: auto; font-weight: 400; }
+.gh-card p { margin: 0; }
+.gh-card .gr-done li:last-child { border-bottom: 0; }
+.gh-vitrine-mini { display: flex; flex-wrap: wrap; gap: 8px; }
+.gh-vitrine-mini .foil-card { width: 64px; }
+.gh-due.is-soon { color: #f59e0b; font-weight: 600; }
+.gh-price-field em { display: block; font-style: normal; font-size: 11px; color: var(--color-neutral-500); }
+.gh-price-field input[aria-invalid="true"] { box-shadow: 0 0 0 2px var(--nein); }
+.gh-preview { cursor: var(--cur-default); }
+.gh-foot { margin: 0; font-size: 13px; }
+.gr-workbench { gap: 14px; }
+.gr-wb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.gr-wb-head .gr-ticket { flex: 1 1 auto; }
+@media (max-width: 560px) {
+  .gh-name { font-size: 26px; }
+  .gh-count { min-width: 0; flex: 1 1 30%; padding: 8px 10px; }
+  .gh-now { padding: 16px; }
+  .gh-now .btn-lg, .gh-now form { width: 100%; }
+  .gh-now form .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .gh-now-card { transform: none; } }
+.gh-more summary { cursor: var(--cur-pointer, pointer); font-size: 13px; color: var(--color-neutral-400); padding: 6px 0; }
