@@ -70,6 +70,7 @@ function benchData(job, shop) {
     grade: job.guess !== null && !player ? job.grade : null,
     player,
     services: job.services || null,
+    tools: (shop && shop.tools) || [], // Werkzeug-Upgrades (#204): Komfort am Tisch
   };
 }
 
@@ -120,6 +121,7 @@ router.get('/grading', async (req, res) => {
     showcaseMax: grading.settings.showcaseMax,
     rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
+    tools: grading.toolsFor(state.shop),
     ironLevel: grading.IRON_LEVEL,
     ironable: ironable.map((x) => ({ ...x, info: cardInfo(x.card) })).filter((x) => x.info),
   });
@@ -316,6 +318,14 @@ router.post('/grading/name', (req, res) =>
     const { name, code, requested } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
     if (requested) return `Dein Shop heißt jetzt „${name}“. Das neue Kürzel ${requested} ist beantragt – ein Admin oder Dev gibt es frei. Bis dahin bleibt ${code}.`;
     return `Dein Shop heißt jetzt „${name}“ – Kürzel ${code}.`;
+  })
+);
+
+// Werkzeug-Upgrade kaufen (#204)
+router.post('/grading/werkzeug', (req, res) =>
+  handle(req, res, async () => {
+    const tool = await grading.buyTool({ user: req.user, key: str(req.body.tool) });
+    return `Neu in der Werkstatt: ${tool.name} – ${tool.perk}.`;
   })
 );
 

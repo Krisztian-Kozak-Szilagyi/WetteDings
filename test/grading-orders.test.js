@@ -106,3 +106,9 @@ test('#204: Lohn nach Posten ergibt dieselbe Summe wie payFor', () => {
   }
   assert.deepEqual(Object.keys(grading.payParts({ level: 3, clean: 100, grade: 5, guess: 5, seal: 50 }).parts), ['clean', 'grade', 'slab']);
 });
+
+test('#204: Werkzeuge – ab ihrer Stufe kaufbar, gekaufte markiert', () => {
+  const list = grading.toolsFor({ level: 1, tools: ['tuch'] });
+  assert.deepEqual(list.map((t) => [t.key, t.owned, t.available]), [['tuch', true, true], ['schablone', false, false], ['eisen', false, false], ['uv', false, false]]);
+  assert.ok(grading.toolsFor({ level: 2 }).every((t) => t.available && !t.owned && t.cost > 0));
+});

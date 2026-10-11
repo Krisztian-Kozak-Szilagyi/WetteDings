@@ -123,6 +123,9 @@
           <% gradingLevels.slice(1).forEach((l, i) => { %>
             <label class="field"><span>Ausbau auf Stufe <%= l.level %> („<%= l.name %>“) in €</span><input type="text" name="gr_cost_<%= l.level %>" inputmode="decimal" value="<%= (gradingSettings.costs[i] / 100).toFixed(2).replace('.', ',') %>" required></label>
           <% }) %>
+          <% gradingTools.forEach((t) => { %>
+            <label class="field"><span>Werkzeug „<%= t.name %>“ in € <em>(ab Stufe <%= t.level %>)</em></span><input type="text" name="gr_tool_<%= t.key %>" inputmode="decimal" value="<%= (gradingSettings.toolCosts[t.key] / 100).toFixed(2).replace('.', ',') %>" required></label>
+          <% }) %>
           <label class="field"><span>Premium-Aufschlag Stufe 4 in %</span><input type="number" name="gr_premium" min="0" max="500" step="1" value="<%= gradingSettings.premium %>" required></label>
         </div>
         <%# #204: Festpreise je Baustein – jeder Shop legt seine Preise in diesem Rahmen fest; der Kunde zahlt die Summe der gebuchten Bausteine %>

@@ -6469,3 +6469,17 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .gr-finish-panel { transform: none; transition: none; }
   .gr-steps li::after { transition: none; }
 }
+.gh-tools { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.gh-tool { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-divider); }
+.gh-tool:last-child { border-bottom: 0; }
+.gh-tool-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; background: var(--color-neutral-800); }
+.gh-tool-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.gh-tool-text b { font-weight: 600; }
+.gh-tool-text small { font-size: 12px; color: var(--color-neutral-400); }
+.gh-tool-state { font-size: 12px; color: var(--color-neutral-400); white-space: nowrap; }
+.gh-tool.is-owned .gh-tool-icon { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.gh-tool.is-owned .gh-tool-state { color: var(--color-accent-300); }
+.gh-tool.is-locked { opacity: .55; }
+.gh-tool form { margin: 0; }
+.gr-stage.uv-pro .gr-uv-light { width: 184px; height: 184px; }
+.gr-stage.uv-pro .gr-uv-shade { background: radial-gradient(circle 210px at var(--ux, 50%) var(--uy, 50%), transparent 0 40%, rgba(8, 4, 22, .62) 100%); }

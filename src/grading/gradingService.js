@@ -35,6 +35,16 @@ const LEVELS = [
 // Ab dieser Stufe kann man bügeln – Kundenkarten und eigene Karten
 const IRON_LEVEL = 2;
 
+// Werkzeug-Upgrades (#204): zweiter Ausbau-Zweig neben den Stufen – nur Komfort am Arbeitstisch, kein Lohn. Ab Stufe
+// level kaufbar, Preise in den Einstellungen (toolCosts). Wirkung im Browser (public/js/grading.js, job.tools)
+const TOOLS = [
+  { key: 'tuch', name: 'Mikrofasertuch', level: 1, perk: 'Größerer Putzradius – Flecken sind schneller erwischt' },
+  { key: 'schablone', name: 'Zentrierschablone', level: 2, perk: 'Messlinien rasten deutlich stärker an der Bildkante ein' },
+  { key: 'eisen', name: 'Profi-Bügeleisen', level: 2, perk: 'Erhitzt langsamer – weniger Gefahr von Brandflecken' },
+  { key: 'uv', name: 'UV-Lampe Pro', level: 2, perk: 'Größerer Lichtkegel – Ecken und Kanten schneller abgeleuchtet' },
+];
+const toolByKey = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
+
 /**
  * Arbeitsschritte eines Auftrags: Bügeln nur, wenn die Kundenkarte einen Knick hat, der noch nicht gebügelt ist.
  * Spieler-Aufträge mit gebuchten Bausteinen (job.services, #204): Bügeln nur, wenn gebucht; Benoten und Versiegeln nur
@@ -87,6 +97,7 @@ const DEFAULTS = {
   orderDays: 3,
   expressDays: 1,
   showcaseMax: 6,
+  toolCosts: { tuch: 30000, schablone: 60000, eisen: 50000, uv: 40000 },
 };
 // Bausteine eines Spieler-Auftrags (#204): base ist immer dabei, dazu mindestens iron oder slab; express ist ein Zuschlag
 const SERVICES = [
@@ -96,7 +107,7 @@ const SERVICES = [
   { key: 'express', label: 'Express-Zuschlag', short: 'Express' },
 ];
 const copyServicePrice = (sp) => Object.fromEntries(SERVICES.map(({ key }) => [key, { ...sp[key] }]));
-const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs], servicePrice: copyServicePrice(DEFAULTS.servicePrice) };
+const settings = { ...DEFAULTS, pay: { ...DEFAULTS.pay }, costs: [...DEFAULTS.costs], servicePrice: copyServicePrice(DEFAULTS.servicePrice), toolCosts: { ...DEFAULTS.toolCosts } };
 const PAY = settings.pay; // gleiches Objekt – Änderungen im Admin-Panel gelten sofort
 const validCents = (v) => Number.isInteger(v) && v >= 0 && v <= 100000000;
 /** Preisrahmen { min, max, def } in Cent mit min ≤ def ≤ max */
@@ -126,6 +137,7 @@ function apply(doc) {
   if (Number.isInteger(doc.orderDays) && doc.orderDays >= 1 && doc.orderDays <= 30) settings.orderDays = doc.orderDays;
   if (Number.isInteger(doc.expressDays) && doc.expressDays >= 1 && doc.expressDays <= 30) settings.expressDays = doc.expressDays;
   if (Number.isInteger(doc.showcaseMax) && doc.showcaseMax >= 0 && doc.showcaseMax <= 24) settings.showcaseMax = doc.showcaseMax;
+  if (doc.toolCosts) for (const { key } of TOOLS) if (validCents(doc.toolCosts[key])) settings.toolCosts[key] = doc.toolCosts[key];
 }
 async function loadSettings() {
   apply(await GradingSettings.findById('grading').lean());
@@ -360,6 +372,31 @@ async function decideCodeRequest({ actor, shopId, approve }) {
     text: approve ? `Dein neues Shop-Kürzel ${wanted} ist freigegeben (von ${actor.username}).` : `Dein Wunsch-Kürzel ${wanted} wurde abgelehnt – es bleibt bei ${shop.code}.`,
   });
   return { code: approve ? wanted : shop.code, old: shop.code };
+}
+
+/** Werkzeuge zum Anzeigen: Katalog mit Preis, gekauft? und ab welcher Stufe */
+function toolsFor(shop) {
+  const owned = new Set((shop && shop.tools) || []);
+  const level = (shop && shop.level) || 1;
+  return TOOLS.map((t) => ({ ...t, cost: settings.toolCosts[t.key], owned: owned.has(t.key), available: level >= t.level }));
+}
+
+/** Werkzeug kaufen (einmal je Werkzeug, ab seiner Stufe) – gebucht wie ein Ausbau */
+async function buyTool({ user, key }) {
+  const tool = toolByKey[key];
+  if (!tool) throw new UserError('Dieses Werkzeug gibt es nicht.');
+  const cost = settings.toolCosts[key];
+  return inTransaction(async (session) => {
+    const shop = await GradingShop.findById(user._id).session(session);
+    if (!shop || !shop.active) throw new UserError('Du arbeitest nicht im Grading-Shop.');
+    if ((shop.level || 1) < tool.level) throw new UserError(`${tool.name} gibt es ab Stufe ${tool.level}.`);
+    if ((shop.tools || []).includes(key)) throw new UserError(`„${tool.name}“ hast du schon.`);
+    const paid = await User.updateOne({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { session });
+    if (!paid.modifiedCount) throw new UserError(`Dafür fehlt dir Spielgeld (${euro(cost)} nötig).`);
+    await GradingShop.updateOne({ _id: user._id }, { $addToSet: { tools: key } }, { session });
+    await Ledger.create([{ user: user._id, type: 'grading_ausbau', amount: -cost, betTitle: tool.name }], { session });
+    return { ...tool, cost };
+  });
 }
 
 /** Nächste Ausbaustufe kaufen */
@@ -661,4 +698,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };

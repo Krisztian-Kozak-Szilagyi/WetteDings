@@ -12,7 +12,9 @@
   var form = bench.querySelector('[data-gr-send]'); // fehlt beim Bügeln eigener Karten (nur ein Schritt, #204)
   var csrf = form ? form.elements._csrf.value : bench.getAttribute('data-csrf');
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var BRUSH = 16; // Radius des Putzlappens in Pixeln (zusätzlich zur Fleckgröße)
+  // Werkzeug-Upgrades (#204, gradingService.TOOLS): nur Komfort – größerer Lappen, stärkerer Magnet, kühleres Eisen, größerer UV-Kegel
+  var hasTool = function (k) { return (job.tools || []).indexOf(k) >= 0; };
+  var BRUSH = hasTool('tuch') ? 24 : 16; // Radius des Putzlappens in Pixeln (zusätzlich zur Fleckgröße)
   var noop = function () {};
   var sound = { clean: noop, snap: noop, flat: noop, seal: noop, send: noop, done: noop }; // echte Töne weiter unten
 
@@ -270,7 +272,8 @@
   // ---------- UV-Lampe ----------
   // Der Zeiger wird zu einem violetten Lichtkegel, die Bühne dunkler. Bestoßene Ecken und Kantenmacken leuchten
   // grün, solange der Kegel sie trifft – auf hellen Karten (Holo, Icon) sind sie im normalen Licht kaum zu sehen.
-  var UV_R = 64; // Radius des Lichtkegels in Pixeln
+  var UV_R = hasTool('uv') ? 92 : 64; // Radius des Lichtkegels in Pixeln
+  if (hasTool('uv')) stage.classList.add('uv-pro');
   el('div', 'gr-uv-shade', stage); // dunkelt alles außerhalb des Kegels ab (Mitte: --ux/--uy)
   el('div', 'gr-uv-light', stage);
   var uvMarks = [].slice.call(defects.querySelectorAll('.gr-corner, .gr-nick')); // höchstens eine Handvoll
@@ -445,7 +448,7 @@
   // derselben Stelle, brennt sie an (Brandfleck, einmal je Stück). Wegbewegen lässt die Stelle wieder abkühlen.
   var IRON_R = 26; // Radius der Bügelfläche in Pixeln
   var FLAT_RATE = 1.5; // Glätte pro Sekunde Kontakt (ein Stück braucht ≈ 0,7 s)
-  var HEAT_RATE = 0.9; // Hitze pro Sekunde Kontakt (Brandfleck nach ≈ 1,1 s am Stück)
+  var HEAT_RATE = hasTool('eisen') ? 0.6 : 0.9; // Hitze pro Sekunde Kontakt (Brandfleck nach ≈ 1,1 s am Stück, Profi-Eisen ≈ 1,7 s)
   var COOL_RATE = 0.6; // Abkühlen pro Sekunde ohne Kontakt
   var ironAt = null; // Position des Bügeleisens, solange gedrückt
   var ironLast = 0;
@@ -553,7 +556,7 @@
   // Wo das Kartenbild wirklich anfängt und aufhört (Anteil der Kartenbreite, wie .gr-front .gr-img im CSS)
   var cxShift = job.center ? Number(job.center.x) || 0 : 0;
   var imgEdge = { l: 0.03 * (1 + cxShift), r: 0.03 * (1 + cxShift) + 0.94 };
-  var SNAP = (job.tools || []).indexOf('schablone') >= 0 ? 0.012 : 0.004; // Magnet: Anteil der Kartenbreite
+  var SNAP = hasTool('schablone') ? 0.012 : 0.004; // Magnet: Anteil der Kartenbreite
   var frontBox = null; // Lage der Vorderseite auf der Bühne (px), beim Messen jedes Bild neu
   var mm = function (v) { return v.toFixed(1).replace('.', ',') + ' mm'; };
   // breitere Seite in ganzen Prozent (wie die Zentrierung gespeichert ist, z. B. 59 = 59/41)

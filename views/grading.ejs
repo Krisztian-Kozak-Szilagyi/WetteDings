@@ -326,6 +326,31 @@
       </section>
 
       <section class="gh-card">
+        <h2>Werkzeuge</h2>
+        <p class="muted small">Machen die Arbeit am Tisch angenehmer – mehr Lohn gibt es dafür nicht. Einmal gekauft, gehören sie dir.</p>
+        <ul class="gh-tools">
+          <% tools.forEach((t) => { %>
+            <li class="gh-tool<%= t.owned ? ' is-owned' : '' %><%= !t.available ? ' is-locked' : '' %>">
+              <span class="gh-tool-icon" aria-hidden="true"><%= { tuch: '🧽', schablone: '📐', eisen: '♨️', uv: '🔦' }[t.key] %></span>
+              <span class="gh-tool-text"><b><%= t.name %></b><small><%= t.perk %></small></span>
+              <% if (t.owned) { %>
+                <span class="gh-tool-state">✓ vorhanden</span>
+              <% } else if (!t.available) { %>
+                <span class="gh-tool-state">ab Stufe <%= t.level %></span>
+              <% } else { %>
+                <form method="post" action="/grading/werkzeug" data-confirm="<%= t.name %> für <%= euro(t.cost) %> kaufen?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <%- tabInput('werkstatt') %>
+                  <input type="hidden" name="tool" value="<%= t.key %>">
+                  <button class="btn btn-sm" type="submit" <%= currentUser.balance < t.cost ? 'disabled' : '' %>><%= euro(t.cost) %></button>
+                </form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+
+      <section class="gh-card">
         <h2>Shop</h2>
         <form method="post" action="/grading/name" class="form">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">

@@ -33,6 +33,7 @@ const shopSchema = new Schema(
     // Kürzel ändern (#204): nach dem ersten Festlegen nur auf Anfrage, freigegeben von Admin oder Dev
     codeRequest: { type: new Schema({ code: String, at: Date }, { _id: false }), default: null },
     codeHistory: { type: [String], default: [] }, // frühere Kürzel (stehen noch auf älteren Slabs)
+    tools: { type: [String], default: [] }, // gekaufte Werkzeug-Upgrades (#204, gradingService.TOOLS)
   },
   { timestamps: true }
 );
@@ -124,6 +125,7 @@ const settingsSchema = new Schema(
     orderDays: Number,
     expressDays: Number,
     showcaseMax: Number,
+    toolCosts: { tuch: Number, schablone: Number, eisen: Number, uv: Number },
     updatedByName: String,
   },
   { timestamps: true }

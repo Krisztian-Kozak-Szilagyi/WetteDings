@@ -268,6 +268,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
     gradingServices: grading.SERVICES,
+    gradingTools: grading.TOOLS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
     gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     // Kartensperren: wählbar sind Karten, die in einem Spielmodus etwas tun (Charakter oder Boost)
@@ -530,18 +531,20 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   const orderDays = int('gr_order_days');
   const expressDays = int('gr_express_days');
   const showcaseMax = int('gr_showcase');
+  // Werkzeug-Upgrades (#204): Preis je Werkzeug
+  const toolCosts = Object.fromEntries(grading.TOOLS.map((t) => [t.key, money(req.body['gr_tool_' + t.key])]));
   if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100 || !Number.isInteger(playerJobs) || playerJobs < 0 || playerJobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
   } else if (badRange) {
     req.flash('error', `Preisrahmen „${badRange.label}“: mindestens ≤ Standard ≤ höchstens (bis 100.000 €).`);
   } else if (!Number.isInteger(orderDays) || orderDays < 1 || orderDays > 30 || !Number.isInteger(expressDays) || expressDays < 1 || expressDays > orderDays || !Number.isInteger(showcaseMax) || showcaseMax < 0 || showcaseMax > 24) {
     req.flash('error', 'Frist: 1 bis 30 Tage, Express-Frist: 1 Tag bis zur normalen Frist, Vitrine: 0 bis 24 Plätze.');
-  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
+  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig) || Object.values(toolCosts).some(tooBig)) {
     req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
   } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
     req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
   } else {
-    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, playerJobs, pay, costs, premium, servicePrice, orderDays, expressDays, showcaseMax, admin: req.user });
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, playerJobs, pay, costs, premium, servicePrice, orderDays, expressDays, showcaseMax, toolCosts, admin: req.user });
     req.flash('success', `Gespeichert: Grading-Shop ${jobs} NPC- und ${playerJobs} Mitglieder-Aufträge pro Tag.`);
   }
   res.redirect(subUrl('spielwerte', 'grading'));
