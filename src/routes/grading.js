@@ -83,6 +83,7 @@ function benchData(job, shop) {
   const card = catalog.cardById[job.card];
   const player = grading.isPlayerJob(job);
   return {
+    id: String(job._id), // geht bei Bügeln, Benoten und Zurückschicken mit: nur dieser Auftrag, auch wenn inzwischen ein anderer aktiv ist
     steps: grading.stepsFor(job), // Bügeln nur bei Karten mit Knick, Spieler-Aufträge nach gebuchten Bausteinen (#204)
     card: card ? { name: card.name, image: card.image, rarity: card.rarity, rarityLabel: catalog.rarityByKey[card.rarity].label, bonus: player ? 0 : grading.rarityBonus(card.rarity), rank: catalog.rarityByKey[card.rarity].rank, season: card.season } : null,
     customer: job.customer,
@@ -99,7 +100,7 @@ function benchData(job, shop) {
     crease: job.defects && job.defects.crease ? creaseLine(job.cardDoc || job._id) : null,
     iron: job.iron || null,
     ironUrl: '/grading/buegeln',
-    startedAt: new Date(job.createdAt).getTime(),
+    startedAt: Date.now() - grading.workedMs(job), // nur die Zeit als aktiver Auftrag zählt
     // schon benotet (z. B. nach Neuladen): Note und Auflösung gleich anzeigen – bei Karten von Mitgliedern (#204)
     // bleibt die echte Note geheim, auf den Slab kommt die Note des Shops
     guess: job.guess,
@@ -134,9 +135,31 @@ router.get('/grading', async (req, res) => {
   const job = state.open;
   // Offener Auftrag auf der Matte: Schritte mit Stand (Bügeln/Benoten sind gespeichert, Putzen und Versiegeln passieren
   // erst beim Zurückschicken) und bei Mitgliedern der Preis
-  const jobOrder = job && job.order ? await GradingOrder.findById(job.order).select('price').lean() : null;
   const jobSteps = job ? grading.stepsFor(job) : [];
   const jobDone = job ? jobSteps.filter((st) => (st === 'iron' && job.iron) || (st === 'grade' && job.guess !== null)) : [];
+  // Angenommene Aufträge (bis MAX_ACCEPTED) für die Auftragsverwaltung: der aktive zuerst, mit Schritten, Lohn und Frist
+  const running = [job, ...state.parked].filter(Boolean);
+  const runOrders = new Map((await GradingOrder.find({ _id: { $in: running.map((j) => j.order).filter(Boolean) } }).select('price expiresAt').lean()).map((o) => [String(o._id), o]));
+  const jobOrder = job && job.order ? runOrders.get(String(job.order)) : null;
+  const acceptedJobs = running.map((j) => {
+    const steps = grading.stepsFor(j);
+    const doneSteps = steps.filter((st) => (st === 'iron' && j.iron) || (st === 'grade' && j.guess !== null));
+    const last = Math.max(-1, ...doneSteps.map((st) => steps.indexOf(st)));
+    const o = j.order ? runOrders.get(String(j.order)) : null;
+    return {
+      id: String(j._id),
+      active: !!job && String(j._id) === String(job._id),
+      card: cardInfo(j.card),
+      customer: j.customer,
+      player: grading.isPlayerJob(j),
+      services: j.services || null,
+      steps,
+      last,
+      next: steps[Math.min(last + 1, steps.length - 1)],
+      price: o ? o.price : null,
+      expiresAt: o ? o.expiresAt : null,
+    };
+  });
   const tools = grading.toolsFor(state.shop);
   const balance = req.user.balance;
   res.render('grading', {
@@ -145,6 +168,9 @@ router.get('/grading', async (req, res) => {
     ...state,
     active,
     tab,
+    ordTab: req.query.ord === 'angenommen' ? 'angenommen' : null, // Eingang öffnet auf dem Reiter „Angenommen“
+    acceptedJobs,
+    maxAccepted: grading.MAX_ACCEPTED,
     hubUrl,
     // Hinweise auf dem Tisch: rotes Badge bzw. Wackeln, wenn dort etwas zu tun ist
     attention: {
@@ -175,6 +201,8 @@ router.get('/grading', async (req, res) => {
     orderDays: grading.settings.orderDays,
     expressDays: grading.settings.expressDays,
     rating: state.shop ? reputation.ratingOf(state.shop) : null,
+    repTiers: reputation.TIERS,
+    repRules: { base: reputation.BASE_GAIN, player: reputation.PLAYER_FACTOR, cap: reputation.SHOWCASE_CAP, star: reputation.STAR_STEP },
     showcase,
     showcaseMax: grading.settings.showcaseMax,
     rarityByKey: catalog.rarityByKey,
@@ -410,23 +438,57 @@ router.post('/grading/ausbauen', (req, res) =>
   })
 );
 
-// Auftrag annehmen und gleich an die Werkbank
-router.post('/grading/auftrag', (req, res) =>
-  handle(
-    req,
-    res,
-    async () => {
-      await grading.takeJob({ user: req.user });
-      return null;
-    },
-    '/grading/werkbank'
-  )
-);
+// Auftrag annehmen (die Werkbank öffnet der Spieler selbst) – ohne Angabe automatisch, aus der Auftragsverwaltung gezielt:
+// order = Auftrag eines Mitglieds, npc=1 = NPC-Auftrag
+router.post('/grading/auftrag', async (req, res) => {
+  try {
+    await grading.takeJob({ user: req.user, orderId: str(req.body.order) || null, npc: req.body.npc === '1' });
+    if (req.get('X-GD-Fetch')) {
+      // Eingang-Popup bleibt offen: neue Zähler, damit es Knöpfe sperren kann, die jetzt nicht mehr gehen
+      const s = await grading.getState(req.user._id);
+      return res.json({ ok: true, accepted: s.accepted, max: grading.MAX_ACCEPTED, npc: { used: s.used, limit: s.limit }, member: { used: s.playerUsed, limit: s.playerLimit } });
+    }
+    // nicht gleich ins Minispiel: zurück auf den Tisch – aus dem Popup auf den Reiter „Angenommen“, dort geht es per „Bearbeiten“ weiter
+    return res.redirect(DESK_SHEETS.includes(req.body.reiter) ? `${hubUrl(req.body.reiter)}&ord=angenommen` : '/grading');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    if (req.get('X-GD-Fetch')) return res.status(400).json({ error: err.message }); // der Browser schickt dann normal ab und zeigt die Meldung
+    req.flash('error', err.message);
+    res.redirect(hubUrl(req.body.reiter)); // Fehler: zurück ins Fenster, aus dem der Auftrag kam
+  }
+});
+
+// Offenen Auftrag abbrechen (aus der Auftragsverwaltung): Mitglieder-Karte zurück in den Eingang, NPC-Auftrag verbraucht
+router.post('/grading/auftrag/abbrechen', async (req, res) => {
+  try {
+    const { player } = await grading.abortJob({ user: req.user, jobId: str(req.body.job) || null });
+    if (req.get('X-GD-Fetch')) return res.json({ ok: true, player }); // Eingang-Popup lädt sich selbst nach
+    req.flash('success', player ? 'Auftrag zurück in den Eingang gelegt.' : 'Auftrag abgebrochen – er zählt für heute trotzdem.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    if (req.get('X-GD-Fetch')) return res.status(400).json({ error: err.message }); // der Browser schickt dann normal ab und zeigt die Meldung
+    req.flash('error', err.message);
+  }
+  res.redirect(hubUrl('auftraege'));
+});
+
+// Angenommenen Auftrag zum aktiven machen (Auftragsverwaltung): der bisher aktive wartet im Hintergrund weiter
+router.post('/grading/auftrag/waehlen', async (req, res) => {
+  try {
+    await grading.selectJob({ user: req.user, jobId: str(req.body.job) });
+    if (req.get('X-GD-Fetch')) return res.json({ ok: true });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    if (req.get('X-GD-Fetch')) return res.status(400).json({ error: err.message });
+    req.flash('error', err.message);
+  }
+  res.redirect(`${hubUrl('auftraege')}&ord=angenommen`);
+});
 
 // Note festlegen (vom Arbeitstisch per fetch) – Antwort: echte Note für die Auflösung
 router.post('/grading/benoten', async (req, res) => {
   try {
-    res.json(await grading.setGuess({ user: req.user, guess: Number.parseInt(str(req.body.grade), 10) }));
+    res.json(await grading.setGuess({ user: req.user, jobId: str(req.body.job), guess: Number.parseInt(str(req.body.grade), 10) }));
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     res.status(400).json({ error: err.message });
@@ -436,7 +498,7 @@ router.post('/grading/benoten', async (req, res) => {
 // Knick bügeln (vom Arbeitstisch per fetch, #204) – Antwort: neue Obergrenze und Mängel für die Auflösung
 router.post('/grading/buegeln', async (req, res) => {
   try {
-    res.json(await grading.ironJob({ user: req.user, smooth: Number(str(req.body.smooth)), burns: Number(str(req.body.burns)) }));
+    res.json(await grading.ironJob({ user: req.user, jobId: str(req.body.job), smooth: Number(str(req.body.smooth)), burns: Number(str(req.body.burns)) }));
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     res.status(400).json({ error: err.message });
@@ -447,9 +509,10 @@ router.post('/grading/buegeln', async (req, res) => {
 router.post('/grading/zuruecksenden', async (req, res, next) => {
   if (!(req.get('accept') || '').includes('application/json')) return next();
   try {
-    const job = await grading.finishJob({ user: req.user, clean: Number(str(req.body.clean)), seal: Number(str(req.body.seal)) });
-    const state = await grading.getState(req.user._id);
-    const canNext = state.used < state.limit || (state.waiting > 0 && state.playerUsed < state.playerLimit);
+    const job = await grading.finishJob({ user: req.user, jobId: str(req.body.job), clean: Number(str(req.body.clean)), seal: Number(str(req.body.seal)) });
+    const state = await grading.getState(req.user._id); // rückt den nächsten angenommenen Auftrag nach
+    const canNext = state.accepted < grading.MAX_ACCEPTED && (state.used < state.limit || (state.waiting > 0 && state.playerUsed < state.playerLimit));
+    const nextCard = state.open ? catalog.cardById[state.open.card] : null;
     res.json({
       pay: job.pay,
       breakdown: job.breakdown,
@@ -466,7 +529,9 @@ router.post('/grading/zuruecksenden', async (req, res, next) => {
       shopCode: job.shopCode,
       foilFound: !!job.foilFound,
       canNext,
-      left: { npc: Math.max(0, state.limit - state.used), players: state.waiting },
+      // schon angenommener Auftrag liegt jetzt auf der Werkbank: damit weiter statt einen neuen anzunehmen
+      nextJob: state.open ? { name: nextCard ? nextCard.name : 'Karte', customer: state.open.customer, more: state.parked.length } : null,
+      left:{ npc: Math.max(0, state.limit - state.used), players: state.waiting },
     });
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
@@ -477,7 +542,7 @@ router.post('/grading/zuruecksenden', (req, res) =>
   handle(req, res, async () => {
     const clean = Number(str(req.body.clean));
     const seal = Number(str(req.body.seal));
-    const job = await grading.finishJob({ user: req.user, clean, seal });
+    const job = await grading.finishJob({ user: req.user, jobId: str(req.body.job), clean, seal });
     if (job.order) return `Slab ${job.shopCode} · Note ${job.guess} geht zurück an ${job.customer} – du bekommst ${euro(job.pay)}.`;
     let msg = `Zurück an ${job.customer} – ${euro(job.pay)} Lohn.`;
     if (job.clean < 100) msg += ` Die Karte war erst zu ${job.clean} % sauber – das hat Lohn gekostet.`;

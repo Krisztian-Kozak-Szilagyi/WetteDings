@@ -880,7 +880,7 @@
       fetch(job.ironUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ _csrf: csrf, smooth: String(r.smooth), burns: String(r.burns) }),
+        body: new URLSearchParams({ _csrf: csrf, job: job.id, smooth: String(r.smooth), burns: String(r.burns) }),
         credentials: 'same-origin',
       })
         .then(function (res) { return res.json(); })
@@ -978,7 +978,7 @@
       fetch('/grading/benoten', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ _csrf: csrf, grade: String(chosen) }),
+        body: new URLSearchParams({ _csrf: csrf, job: job.id, grade: String(chosen) }),
         credentials: 'same-origin',
       })
         .then(function (r) { return r.json(); })
@@ -1195,7 +1195,13 @@
     if (res.foilFound) el('span', 'gr-ok', facts).textContent = '+ 1 Folie im Inventar';
 
     var actions = el('div', 'gr-finish-actions', panel);
-    if (res.canNext) {
+    if (res.nextJob) {
+      // schon angenommen: der nächste liegt bereits auf der Werkbank
+      var nx = el('a', 'btn btn-primary btn-lg gr-glow', actions);
+      nx.href = '/grading/werkbank';
+      nx.textContent = 'Weiter: ' + res.nextJob.name + ' für ' + res.nextJob.customer + (res.nextJob.more ? ' (+' + res.nextJob.more + ')' : '') + ' →';
+      setTimeout(function () { nx.focus(); }, 50);
+    } else if (res.canNext) {
       var f = el('form', '', actions);
       f.method = 'post';
       f.action = '/grading/auftrag';
@@ -1213,7 +1219,7 @@
     var back = el('a', 'btn btn-ghost', actions);
     back.href = '/grading?neu=1'; // der Schreibtisch spießt den neuen Bon auf
     back.textContent = 'Zum Shop';
-    if (!res.canNext) setTimeout(function () { back.focus(); }, 50);
+    if (!res.canNext && !res.nextJob) setTimeout(function () { back.focus(); }, 50);
     requestAnimationFrame(function () { box.classList.add('is-on'); });
     sound.done();
   }

@@ -79,8 +79,12 @@ function startJobs() {
   setTimeout(suspicion, 30 * 1000).unref();
   setInterval(suspicion, 10 * 60 * 1000).unref();
 
-  // Grading (#204): abgelaufene Aufträge von Mitgliedern erstatten – auch wenn niemand die Grading-Seiten öffnet
-  const gradingOrders = () => require('./grading/orderService').expireDue().catch((err) => console.error('Grading-Aufträge-Fehler:', err));
+  // Grading (#204): abgelaufene Aufträge von Mitgliedern erstatten – auch wenn niemand die Grading-Seiten öffnet –
+  // und Shops warnen, deren Frist bald abläuft
+  const gradingOrders = () => {
+    const orders = require('./grading/orderService');
+    return orders.expireDue().then(() => orders.warnDue()).catch((err) => console.error('Grading-Aufträge-Fehler:', err));
+  };
   setTimeout(gradingOrders, 35 * 1000).unref();
   setInterval(gradingOrders, 5 * 60 * 1000).unref();
 

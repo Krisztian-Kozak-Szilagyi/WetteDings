@@ -104,7 +104,7 @@ async function refundOwner(order, session) {
 async function closeWithRefund(orderId, status, session) {
   const order = await GradingOrder.findOneAndUpdate({ _id: orderId, status: { $in: OPEN } }, { $set: { status, doneAt: new Date() } }, { new: true, session }).lean();
   if (!order) return null;
-  if (order.job) await GradingJob.deleteOne({ _id: order.job, status: 'offen' }, { session });
+  if (order.job) await GradingJob.deleteOne({ _id: order.job, status: { $in: ['offen', 'angenommen'] } }, { session });
   await refundOwner(order, session);
   return order;
 }
@@ -122,7 +122,7 @@ async function showcasesOf(shops) {
       (s.showcase || [])
         .map((id) => byId.get(String(id)))
         .filter((d) => d && String(d.user) === String(s._id) && catalog.cardById[d.card])
-        .map((d) => ({ id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade } })),
+        .map((d) => ({ id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade, at: d.slab.at } })),
     ])
   );
 }
@@ -197,7 +197,7 @@ async function submittable(userId) {
       card: catalog.cardById[d.card],
       rarity: d.rarity,
       foiledAt: d.foiledAt,
-      slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null,
+      slab: d.slab ? { code: d.slab.code, grade: d.slab.grade, at: d.slab.at } : null,
       damaged: !!d.damaged,
       creased: !!d.creased,
       ironed: !!d.ironedAt,
@@ -312,6 +312,38 @@ async function expireDue(now = new Date()) {
   return n;
 }
 
+/**
+ * Shops warnen, deren Aufträge bald ablaufen (#204, alle 5 Minuten aus jobs.js): einmal je Frist, wartend im Eingang
+ * oder angenommen. Kürzer als die kürzeste Frist (Express, 1 Tag) – sonst käme die Warnung schon beim Einreichen.
+ */
+const WARN_HOURS = 6;
+async function warnDue(now = new Date()) {
+  const soon = await GradingOrder.find({ status: { $in: OPEN }, warnedAt: null, expiresAt: { $gt: now, $lte: new Date(now.getTime() + WARN_HOURS * 36e5) } })
+    .select('shop card ownerName status')
+    .limit(100)
+    .lean();
+  let n = 0;
+  for (const o of soon) {
+    const r = await GradingOrder.updateOne({ _id: o._id, warnedAt: null }, { $set: { warnedAt: now } });
+    if (!r.modifiedCount) continue;
+    n++;
+    const what = o.status === 'wartet' ? `wartet noch in deinem Eingang` : `muss fertig werden`;
+    await notify(o.shop, { area: 'Grading', href: `${SHOP_HREF}?reiter=auftraege`, text: `Frist läuft ab: „${cardName(o.card)}“ von ${o.ownerName} ${what} – in weniger als ${WARN_HOURS} Stunden geht die Karte samt Geld zurück.` });
+  }
+  return n;
+}
+
+/**
+ * Felder beim Arbeitsbeginn eines Spieler-Auftrags (#204): Die Frist beginnt nur beim ersten Annehmen neu (Express:
+ * kürzer). Nach einem Abbruch läuft sie weiter – sonst ließe sie sich durch Abbrechen und neu Annehmen beliebig
+ * verlängern und Karte und Geld des Kunden blieben unbegrenzt gesperrt.
+ */
+const startSet = (order, now = new Date(), s = settings) => ({
+  status: 'in_arbeit',
+  startedAt: now,
+  ...(order.firstStartedAt ? {} : { firstStartedAt: now, expiresAt: deadline(now.getTime(), s, order.services), warnedAt: null }),
+});
+
 /** Alle offenen Aufträge eines Shops erstatten (Kündigung) – in der Transaktion des Aufrufers; gibt die Aufträge zurück */
 async function refundShop(shopId, session) {
   const open = await GradingOrder.find({ shop: shopId, status: { $in: OPEN } }).select('_id').session(session).lean();
@@ -333,7 +365,7 @@ async function dropOwner(ownerId, session) {
   if (!open.length) return [];
   await GradingOrder.updateMany({ _id: { $in: open.map((o) => o._id) }, status: { $in: OPEN } }, { $set: { status: 'storniert', doneAt: new Date() } }, { session });
   const jobs = open.map((o) => o.job).filter(Boolean);
-  if (jobs.length) await GradingJob.deleteMany({ _id: { $in: jobs }, status: 'offen' }, { session });
+  if (jobs.length) await GradingJob.deleteMany({ _id: { $in: jobs }, status: { $in: ['offen', 'angenommen'] } }, { session });
   return open;
 }
 
@@ -371,6 +403,9 @@ async function shopReviews(shopId, limit = 20) {
     ratedAt: o.ratedAt,
     owner: byId.get(String(o.owner)) || null,
     card: catalog.cardById[o.card] || null,
+    rarityLabel: ((catalog.cardById[o.card] && catalog.rarityByKey[catalog.cardById[o.card].rarity]) || {}).label || '',
+    doc: String(o.doc),
+    sealedAt: o.doneAt,
     result: o.result,
     services: servicesOf(o),
     shopCode: o.shopCode,
@@ -421,7 +456,7 @@ async function showcaseChoices(userId) {
     .filter((d) => catalog.cardById[d.card])
     .map((d) => {
       const r = locked.reasons.get(String(d._id));
-      return { id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade }, shown: shown.has(String(d._id)), lock: r && !['slab', 'vitrine'].includes(r) ? r : null };
+      return { id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade, at: d.slab.at }, shown: shown.has(String(d._id)), lock: r && !['slab', 'vitrine'].includes(r) ? r : null };
     })
     .sort((a, b) => Number(b.shown) - Number(a.shown) || b.slab.grade - a.slab.grade);
 }
@@ -458,6 +493,9 @@ module.exports = {
   submit,
   cancel,
   expireDue,
+  warnDue,
+  WARN_HOURS,
+  startSet,
   refundShop,
   dropOwner,
   closeWithRefund,

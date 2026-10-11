@@ -38,6 +38,7 @@ function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false,
   const s = slab || (grade ? { code: 'BfW', grade } : null);
   if (s) {
     h += ` data-slab-code="${escAttr(s.code || 'BfW')}" data-cert="${escAttr(slabCert(id || fav))}"`;
+    if (s.at || foiledAt) h += ` data-sealed="${escAttr(dayDate(s.at || foiledAt))}"`;
     if (s.grade) h += ` data-grade="${escAttr(s.grade)}" data-grade-word="${escAttr(gradeWord(s.grade))}"`;
   }
   if (center) h += ` data-cx="${escAttr(center.x)}" data-cy="${escAttr(center.y)}"`;

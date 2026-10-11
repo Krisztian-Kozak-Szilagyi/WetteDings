@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
 const { GradingShop, GradingJob, GradingSettings, GradingOrder } = require('../models/Grading');
@@ -212,7 +213,48 @@ const payFor = (input) => payParts(input).total;
  */
 function usedToday({ done, open, level, day, source = 'npc' }) {
   const of = (j) => (j.source || 'npc') === source;
-  return done.filter((j) => j.level === level && of(j)).length + (open && open.day === day && open.level === level && of(open) ? 1 : 0);
+  const running = [].concat(open || []); // aktiver und angenommene Aufträge
+  return done.filter((j) => j.level === level && of(j)).length + running.filter((j) => j.day === day && j.level === level && of(j)).length;
+}
+
+/** So viele Aufträge kann ein Shop gleichzeitig angenommen haben (der aktive mitgezählt) */
+const MAX_ACCEPTED = 5;
+/** Laufende Aufträge: der aktive (offen) und die im Hintergrund (angenommen) */
+const RUNNING = ['offen', 'angenommen'];
+
+/**
+ * Tageskontingente (#204): used = NPC-Aufträge (fertige, abgebrochene und laufende), playerUsed = Aufträge von
+ * Mitgliedern (fertige und laufende – abgebrochene gehen zurück in den Eingang und zählen nicht)
+ */
+const dayQuota = ({ done, dropped = [], running, level, day }) => ({
+  used: usedToday({ done: done.concat(dropped), open: running, level, day }),
+  playerUsed: usedToday({ done, open: running, level, day, source: 'spieler' }),
+});
+
+/**
+ * Arbeitszeit eines Auftrags in ms (#204) für die Mindestzeiten beim Putzen und Bügeln: die gesammelte Zeit plus die
+ * laufende, solange er aktiv ist – das Warten unter „Angenommen“ zählt nicht. Ältere Aufträge ohne activeAt zählen ab createdAt.
+ */
+function workedMs(job, now = Date.now()) {
+  if (job.status !== 'offen') return job.workMs || 0;
+  const since = job.activeAt || (job.workMs ? null : job.createdAt);
+  return (job.workMs || 0) + (since ? Math.max(0, now - new Date(since).getTime()) : 0);
+}
+/** Felder, um einen Auftrag aktiv zu machen bzw. in den Hintergrund zu legen (die Arbeitszeit bleibt erhalten) */
+const activate = (now = new Date()) => ({ status: 'offen', activeAt: now });
+const park = (job, now = new Date()) => ({ status: 'angenommen', activeAt: null, workMs: workedMs(job, now.getTime()) });
+
+/**
+ * Aktiven Auftrag für die Werkbank (#204): die Werkbank schickt mit, an welchem Auftrag sie arbeitet. Ist inzwischen
+ * ein anderer aktiv (zweiter Tab, Zurück-Taste nach „Auswählen“), greift nichts daneben – sonst landeten Note, Bügeln
+ * und Sauberkeit auf der falschen Karte.
+ */
+async function benchJob(user, jobId, session = null) {
+  if (!jobId || !mongoose.isValidObjectId(jobId)) throw new UserError('Die Werkbank ist nicht mehr aktuell – lade die Seite neu.');
+  const job = await GradingJob.findOne({ _id: jobId, user: user._id, status: 'offen' }).session(session);
+  if (job) return job;
+  const any = await GradingJob.exists({ user: user._id, status: 'offen' }).session(session);
+  throw new UserError(any ? 'Auf der Werkbank liegt inzwischen ein anderer Auftrag – lade die Seite neu.' : 'Du hast keinen offenen Auftrag.');
 }
 
 // Wert des Shops im Gesamtvermögen (Rangliste, Profil, Dashboard): die Hälfte der bezahlten Ausbaukosten
@@ -232,12 +274,21 @@ const shopValues = () => LEVELS.map((l) => shopValue(l.level));
  */
 async function getState(userId) {
   const day = today();
-  const [shop, open, done, waiting] = await Promise.all([
+  let [shop, open, parked, done, dropped, waiting] = await Promise.all([
     GradingShop.findById(userId).lean(),
     GradingJob.findOne({ user: userId, status: 'offen' }).lean(),
+    GradingJob.find({ user: userId, status: 'angenommen' }).sort({ createdAt: 1 }).lean(),
     GradingJob.find({ user: userId, day, status: 'fertig' }).sort({ doneAt: -1 }).lean(),
+    GradingJob.find({ user: userId, day, status: 'abgebrochen' }).select('level source').lean(), // zählen fürs Tageslimit mit
     GradingOrder.countDocuments({ shop: userId, status: 'wartet' }),
   ]);
+  // Ist nichts aktiv (fertig oder abgebrochen), rückt der älteste angenommene Auftrag nach
+  if (!open && parked.length) {
+    const promoted = await GradingJob.findOneAndUpdate({ _id: parked[0]._id, status: 'angenommen' }, { $set: activate() }, { new: true }).lean().catch(() => null);
+    open = promoted || (await GradingJob.findOne({ user: userId, status: 'offen' }).lean());
+    parked = parked.filter((j) => !open || String(j._id) !== String(open._id));
+  }
+  const running = [open, ...parked].filter(Boolean);
   const info = levelInfo(shop ? shop.level : 1);
   const players = !!shop && orders().acceptsOrders(shop);
   return {
@@ -245,11 +296,12 @@ async function getState(userId) {
     info,
     next: info.level < LEVELS.length ? levelInfo(info.level + 1) : null,
     open,
+    parked,
+    accepted: running.length,
     done,
     limit: info.jobs,
-    used: usedToday({ done, open, level: info.level, day }),
+    ...dayQuota({ done, dropped, running, level: info.level, day }),
     playerLimit: players ? settings.playerJobs : 0,
-    playerUsed: usedToday({ done, open, level: info.level, day, source: 'spieler' }),
     waiting: players ? waiting : 0,
   };
 }
@@ -276,7 +328,7 @@ async function quit({ user }) {
   // Spieler-Aufträge (#204): wer kündigt, gibt alle offenen zurück – die Kunden bekommen ihr Geld
   const refunded = await inTransaction(async (session) => {
     const orders = await require('./orderService').refundShop(user._id, session);
-    await GradingJob.deleteMany({ user: user._id, status: 'offen' }, { session });
+    await GradingJob.deleteMany({ user: user._id, status: { $in: ['offen', 'angenommen'] } }, { session });
     await GradingShop.updateOne({ _id: user._id }, { $set: { active: false } }, { session });
     return orders;
   });
@@ -424,70 +476,122 @@ async function upgrade({ user }) {
 }
 
 /**
- * Ältesten wartenden Spieler-Auftrag annehmen (#204): Mängel und Note kommen aus der echten Karte, die Flecken sind
- * nur zum Putzen ausgewürfelt. Gibt den Job zurück – oder null, wenn keiner wartet.
+ * Wartenden Spieler-Auftrag annehmen (#204) – den gewählten (orderId) oder Express zuerst, sonst den ältesten: Mängel
+ * und Note kommen aus der echten Karte, die Flecken sind nur zum Putzen ausgewürfelt. Gibt den Job zurück – oder
+ * null, wenn keiner wartet. In der Transaktion von takeJob; ist der gewählte Auftrag nicht mehr da, kommt { error } zurück
+ * statt eines Fehlers – sonst würde die Transaktion samt Erstattung (Karte weg) zurückgerollt.
  */
-async function takePlayerJob(user, info) {
-  return inTransaction(async (session) => {
-    // Express zuerst, sonst der älteste; die Frist läuft ab Arbeitsbeginn neu (Express: kürzer)
-    const next = await GradingOrder.findOne({ shop: user._id, status: 'wartet' }).sort(orders().QUEUE_SORT).select('services').session(session).lean();
-    if (!next) return null;
-    const order = await GradingOrder.findOneAndUpdate(
-      { _id: next._id, status: 'wartet' },
-      { $set: { status: 'in_arbeit', startedAt: new Date(), expiresAt: orders().deadline(Date.now(), settings, next.services) } },
-      { new: true, session }
-    ).lean();
-    if (!order) return null;
-    const card = await TcgCard.findOne({ _id: order.doc, user: order.owner }).select('card condition').session(session).lean();
-    if (!card || !card.condition) {
-      await orders().closeWithRefund(order._id, 'storniert', session); // Karte weg (z. B. vom Team entfernt): Geld zurück
-      return null;
-    }
-    const [job] = await GradingJob.create(
-      [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: orders().servicesOf(order).review ? [] : rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', order: order._id, cardDoc: order.doc, services: orders().servicesOf(order) }],
-      { session }
-    );
-    await GradingOrder.updateOne({ _id: order._id }, { $set: { job: job._id } }, { session });
-    return job;
-  });
+async function takePlayerJob({ user, info, orderId, status, session }) {
+  // Express zuerst, sonst der älteste; die Frist beginnt beim ersten Arbeitsbeginn neu (Express: kürzer), nach einem
+  // Abbruch läuft sie weiter (orderService.startSet)
+  const next = await GradingOrder.findOne({ shop: user._id, status: 'wartet', ...(orderId ? { _id: orderId } : {}) }).sort(orders().QUEUE_SORT).select('services firstStartedAt').session(session).lean();
+  if (!next) return orderId ? { error: 'Dieser Auftrag ist nicht mehr im Eingang – vielleicht wurde er storniert oder ist abgelaufen.' } : null;
+  const order = await GradingOrder.findOneAndUpdate({ _id: next._id, status: 'wartet' }, { $set: orders().startSet(next) }, { new: true, session }).lean();
+  if (!order) return orderId ? { error: 'Dieser Auftrag ist nicht mehr im Eingang.' } : null;
+  const card = await TcgCard.findOne({ _id: order.doc, user: order.owner }).select('card condition').session(session).lean();
+  if (!card || !card.condition) {
+    await orders().closeWithRefund(order._id, 'storniert', session); // Karte weg (z. B. vom Team entfernt): Geld zurück
+    return orderId ? { error: 'Die Karte dieses Auftrags gibt es nicht mehr – der Kunde bekommt sein Geld zurück.' } : null;
+  }
+  const [job] = await GradingJob.create(
+    [{ user: user._id, day: today(), level: info.level, card: card.card, customer: order.ownerName, spots: orders().servicesOf(order).review ? [] : rollSpots(), defects: JSON.parse(JSON.stringify(card.condition.defects)), grade: card.condition.grade, source: 'spieler', ...status, order: order._id, cardDoc: order.doc, services: orders().servicesOf(order) }],
+    { session }
+  );
+  await GradingOrder.updateOne({ _id: order._id }, { $set: { job: job._id } }, { session });
+  return { job };
 }
 
 /**
- * Nächsten Auftrag annehmen (höchstens einer offen): zuerst Aufträge von Mitgliedern (#204, bis playerJobs am Tag),
- * sonst NPC-Aufträge (bis jobs am Tag, Tageslimit nach Stufe)
+ * Nächsten Auftrag annehmen (bis MAX_ACCEPTED gleichzeitig, der erste wird aktiv): zuerst Aufträge von Mitgliedern (#204, bis playerJobs am Tag),
+ * sonst NPC-Aufträge (bis jobs am Tag, Tageslimit nach Stufe). Mit orderId nimmt der Spieler gezielt einen Auftrag
+ * aus dem Eingang an, mit npc = true gezielt einen NPC-Auftrag (Auftragsverwaltung am Schreibtisch).
+ * Alles in einer Transaktion, die zuerst den Shop beschreibt: gleichzeitige Annahmen (Doppelklick) laufen so
+ * nacheinander und zählen die Limits jeweils frisch.
  */
-async function takeJob({ user }) {
+async function takeJob({ user, orderId = null, npc = false }) {
+  if (orderId && !mongoose.isValidObjectId(orderId)) throw new UserError('Diesen Auftrag gibt es nicht.');
   await orders().expireDue();
-  const { shop, info, open, used, limit, playerUsed, playerLimit } = await getState(user._id);
-  if (!shop || !shop.active) throw new UserError('Nimm zuerst den Job im Grading-Shop an.');
-  if (!shop.code) throw new UserError('Gib deinem Shop zuerst einen Namen und ein Kürzel.');
-  if (open) throw new UserError('Du hast noch einen offenen Auftrag.');
-  if (playerUsed < playerLimit) {
-    try {
-      const job = await takePlayerJob(user, info);
-      if (job) return job;
-    } catch (err) {
-      if (err.code === 11000) throw new UserError('Du hast noch einen offenen Auftrag.');
-      throw err;
-    }
-  }
-  if (used >= limit) throw new UserError(playerUsed < playerLimit ? 'Die NPC-Aufträge für heute sind erledigt – warte auf Karten von Mitgliedern.' : 'Für heute sind alle Aufträge erledigt – morgen kommen neue.');
-  const defects = rollDefects();
+  await getState(user._id); // rückt einen angenommenen Auftrag nach, falls keiner aktiv ist
+  let res;
   try {
-    return await GradingJob.create({
-      user: user._id,
-      day: today(),
-      level: info.level,
-      card: rollCard(),
-      customer: pick(CUSTOMERS),
-      spots: rollSpots(),
-      defects,
-      grade: gradeFor(defects),
+    res = await inTransaction(async (session) => {
+      const shop = await GradingShop.findOneAndUpdate({ _id: user._id }, { $set: { takenAt: new Date() } }, { new: true, session }).lean();
+      if (!shop || !shop.active) throw new UserError('Nimm zuerst den Job im Grading-Shop an.');
+      if (!shop.code) throw new UserError('Gib deinem Shop zuerst einen Namen und ein Kürzel.');
+      const info = levelInfo(shop.level);
+      const day = today();
+      // nacheinander statt Promise.all: parallele Abfragen in einer Transaktion verträgt der Treiber nicht
+      const running = await GradingJob.find({ user: user._id, status: { $in: RUNNING } }).select('day level source status').session(session).lean();
+      const ended = await GradingJob.find({ user: user._id, day, status: { $in: ['fertig', 'abgebrochen'] } }).select('level source status').session(session).lean();
+      const { used, playerUsed } = dayQuota({ done: ended.filter((j) => j.status === 'fertig'), dropped: ended.filter((j) => j.status === 'abgebrochen'), running, level: info.level, day });
+      const limit = info.jobs;
+      const playerLimit = orders().acceptsOrders(shop) ? settings.playerJobs : 0;
+      if (running.length >= MAX_ACCEPTED) throw new UserError(`Du hast schon ${MAX_ACCEPTED} Aufträge angenommen – schließe oder brich erst einen ab.`);
+      if (orderId && playerUsed >= playerLimit) throw new UserError('Für heute hast du schon alle Aufträge von Mitgliedern gemacht – morgen geht es weiter.');
+      const now = new Date();
+      const status = running.some((j) => j.status === 'offen') ? { status: 'angenommen' } : activate(now); // der erste wird aktiv
+      if (!npc && playerUsed < playerLimit) {
+        const taken = await takePlayerJob({ user, info, orderId, status, session });
+        if (taken) return taken;
+      }
+      if (used >= limit) throw new UserError(playerUsed < playerLimit ? 'Die NPC-Aufträge für heute sind erledigt – warte auf Karten von Mitgliedern.' : 'Für heute sind alle Aufträge erledigt – morgen kommen neue.');
+      const defects = rollDefects();
+      const [job] = await GradingJob.create(
+        [{ user: user._id, day, level: info.level, card: rollCard(), customer: pick(CUSTOMERS), spots: rollSpots(), defects, grade: gradeFor(defects), ...status }],
+        { session }
+      );
+      return { job };
     });
   } catch (err) {
-    if (err.code === 11000) throw new UserError('Du hast noch einen offenen Auftrag.');
+    if (err.code === 11000) throw new UserError('Das hat gerade nicht geklappt – versuch es noch einmal.');
     throw err;
   }
+  if (res.error) throw new UserError(res.error); // erst nach dem Abschluss: eine Erstattung (Karte weg) bleibt bestehen
+  return res.job;
+}
+
+/**
+ * Angenommenen Auftrag abbrechen (#204, jobId; ohne Angabe der aktive): Die Karte eines Mitglieds geht zurück in den
+ * Eingang – die Frist läuft dabei weiter (auch nach erneutem Annehmen, orderService.startSet), angefangene Schritte
+ * (Bügeln, Note) sind weg, der Kunde bekommt Bescheid. Ein NPC-Auftrag ist verbraucht und zählt fürs Tageslimit mit,
+ * sonst ließen sich Kunden und Karten beliebig neu würfeln. Gibt { player } zurück.
+ */
+async function abortJob({ user, jobId = null }) {
+  if (jobId && !mongoose.isValidObjectId(jobId)) throw new UserError('Diesen Auftrag gibt es nicht.');
+  const res = await inTransaction(async (session) => {
+    const job = await GradingJob.findOne({ user: user._id, status: { $in: RUNNING }, ...(jobId ? { _id: jobId } : { status: 'offen' }) }).session(session);
+    if (!job) throw new UserError('Diesen Auftrag gibt es nicht mehr.');
+    if (!isPlayerJob(job)) {
+      Object.assign(job, { status: 'abgebrochen', doneAt: new Date(), activeAt: null });
+      await job.save({ session });
+      return { player: false };
+    }
+    const order = await GradingOrder.findOneAndUpdate({ _id: job.order, status: 'in_arbeit' }, { $set: { status: 'wartet', job: null, startedAt: null } }, { new: true, session }).select('owner card shopCode expiresAt').lean();
+    await GradingJob.deleteOne({ _id: job._id, status: { $in: RUNNING } }, { session });
+    return { player: true, order };
+  });
+  if (res.order) {
+    const name = (catalog.cardById[res.order.card] || {}).name || res.order.card;
+    await notify(res.order.owner, { area: 'Grading', href: '/grading/einreichen', text: `${res.order.shopCode} hat die Arbeit an deiner Karte „${name}“ unterbrochen – sie liegt wieder im Eingang. Du kannst den Auftrag jetzt auch stornieren.` });
+  }
+  return { player: res.player };
+}
+
+/**
+ * Einen angenommenen Auftrag zum aktiven machen (Werkbank): der bisher aktive wartet mit seinem Fortschritt
+ * (Bügeln, Note, Arbeitszeit) im Hintergrund weiter.
+ */
+async function selectJob({ user, jobId }) {
+  if (!mongoose.isValidObjectId(jobId)) throw new UserError('Diesen Auftrag gibt es nicht.');
+  await inTransaction(async (session) => {
+    const target = await GradingJob.findOne({ _id: jobId, user: user._id, status: { $in: RUNNING } }).session(session);
+    if (!target) throw new UserError('Diesen Auftrag gibt es nicht mehr.');
+    if (target.status === 'offen') return; // schon aktiv
+    const now = new Date();
+    const current = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session).lean();
+    if (current) await GradingJob.updateOne({ _id: current._id, status: 'offen' }, { $set: park(current, now) }, { session });
+    await GradingJob.updateOne({ _id: target._id, status: 'angenommen' }, { $set: activate(now) }, { session });
+  });
 }
 
 /**
@@ -495,10 +599,9 @@ async function takeJob({ user }) {
  * Spieler danach markiert. Ändern lässt sich die Note nicht mehr. Bei Spieler-Aufträgen (#204) bleibt die echte Note
  * geheim (grade: null): auf den Slab kommt die Note des Shops.
  */
-async function setGuess({ user, guess }) {
+async function setGuess({ user, jobId, guess }) {
   if (!(Number.isInteger(guess) && guess >= 1 && guess <= 10)) throw new UserError('Bitte gib eine Note von 1 bis 10.');
-  const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
-  if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
+  const job = (await benchJob(user, jobId)).toObject();
   if (!stepsFor(job).includes('grade')) throw new UserError(job.services ? 'Dieser Auftrag umfasst kein Benoten – nur bügeln und zurückschicken.' : 'Benoten kannst du erst ab Stufe 3.');
   if (stepsFor(job).includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick – danach kannst du benoten.');
   const updated = await GradingJob.findOneAndUpdate({ _id: job._id, status: 'offen', guess: null }, { $set: { guess } }, { new: true }).lean();
@@ -522,13 +625,12 @@ const ironInput = ({ smooth, burns }) => ({
  * Knick einer Kundenkarte bügeln (einmal, vor dem Benoten): neue Mängel und Note. Gibt { smooth, burns, cap,
  * defects } zurück – die Mängel braucht der Arbeitstisch für die Auflösung nach dem Benoten.
  */
-async function ironJob({ user, smooth, burns }) {
-  const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).lean();
-  if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
+async function ironJob({ user, jobId, smooth, burns }) {
+  const job = (await benchJob(user, jobId)).toObject();
   if (!stepsFor(job).includes('iron')) throw new UserError(levelInfo(job.level).steps.includes('iron') ? 'Diese Karte hat keinen Knick.' : `Bügeln kannst du erst ab Stufe ${IRON_LEVEL}.`);
   if (job.iron) throw new UserError('Diese Karte ist schon gebügelt.');
   const input = ironInput({ smooth, burns });
-  if (Date.now() - job.createdAt.getTime() < ironMinMs(input.smooth)) throw new UserError('So schnell kann niemand bügeln – versuch es noch einmal.');
+  if (workedMs(job) < ironMinMs(input.smooth)) throw new UserError('So schnell kann niemand bügeln – versuch es noch einmal.');
   const defects = applyIron(job.defects, input, creaseLine(job.cardDoc || job._id)); // Spielerkarte: Knick wie auf dem Exemplar
   const updated = await GradingJob.findOneAndUpdate(
     { _id: job._id, status: 'offen', iron: null, guess: null },
@@ -659,17 +761,16 @@ async function finishReview({ job, shop, order, now, session }) {
  * Auftrag abschließen und an den Kunden zurückschicken: Lohn gutschreiben (Spieler-Aufträge: den Preis des Auftrags).
  * clean = Sauberkeit 0–100 %. Wer versiegelt (ab Stufe 3), findet mit kleiner Chance eine Folie fürs Inventar.
  */
-async function finishJob({ user, clean, seal }) {
+async function finishJob({ user, jobId, clean, seal }) {
   const done = await inTransaction(async (session) => {
-    const job = await GradingJob.findOne({ user: user._id, status: 'offen' }).session(session);
-    if (!job) throw new UserError('Du hast keinen offenen Auftrag.');
+    const job = await benchJob(user, jobId, session);
     const steps = stepsFor(job);
     // ohne Putzschritt (Zweitprüfung) gilt die Karte als sauber
     const cleanQ = !steps.includes('clean') ? 100 : Number.isFinite(clean) ? Math.round(Math.max(0, Math.min(100, clean))) : 0;
     if (steps.includes('iron') && !job.iron) throw new UserError('Bügle zuerst den Knick.');
     // Putzen (und Bügeln) braucht Zeit: je sauberer, desto länger muss der Auftrag mindestens gelaufen sein
     const ironMs = job.iron ? ironMinMs(job.iron.smooth) : 0;
-    if (Date.now() - job.createdAt.getTime() < (job.spots.length * MS_PER_SPOT * cleanQ) / 100 + ironMs) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
+    if (workedMs(job) < (job.spots.length * MS_PER_SPOT * cleanQ) / 100 + ironMs) throw new UserError('So schnell kann niemand putzen – versuch es noch einmal.');
     if (steps.includes('grade') && job.guess === null) throw new UserError('Bitte benote die Karte zuerst.');
     const sealQ = steps.includes('slab') ? (Number.isFinite(seal) ? Math.round(Math.max(0, Math.min(100, seal))) : 0) : null;
     const card = catalog.cardById[job.card];
@@ -741,4 +842,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, SHOP_NAME_MIN, SHOP_NAME_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, setGuess, finishJob, isWorking };
+module.exports = { TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, SHOP_NAME_MIN, SHOP_NAME_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, abortJob, selectJob, MAX_ACCEPTED, dayQuota, workedMs, activate, park, setGuess, finishJob, isWorking };

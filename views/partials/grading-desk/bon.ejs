@@ -1,15 +1,21 @@
 <%#
-  Kassenzettel (#204): ein erledigter Auftrag als Thermobon – Fenster „Bons“ am Kassenzettel-Spieß.
-  b = { card (Katalog oder null), title, who, at, lines: [[Bezeichnung, Cent]], total (Cent oder null), note, void }
+  Kassenzettel (#204): ein erledigter Auftrag als Thermobon auf dem Spieß – Fenster „Bons“ und Reiter „Erledigt“.
+  Zu sehen sind Karte, Titel, erbrachte Leistungen (Kurzmarken) und Summe; die Posten klappen beim Antippen auf.
+  b = { card (Katalog oder null), title, who, at, svc (optional: Leistungen als Kurzmarken), lines: [[Bezeichnung, Cent]], total (Cent oder null), note, void }
 %>
 <li class="gd-bon<%= b.void ? ' is-void' : '' %><%= b.card ? ' r-' + b.card.rarity : '' %>">
-  <span class="gd-bon-head">
-    <% if (b.card) { %><img src="<%= b.card.image %>" alt="" width="36" height="50" loading="lazy"><% } %>
-    <span><b><%= b.title %></b><small><%= b.who %> · <%= b.at ? date(b.at) : '' %></small></span>
-  </span>
-  <% if (b.lines.length) { %>
-    <span class="gd-bon-lines"><% b.lines.forEach(([label, cents]) => { %><span><span><%= label %></span><span><%= euro(cents) %></span></span><% }) %></span>
-  <% } %>
-  <% if (b.note) { %><span class="gd-bon-note"><%= b.note %></span><% } %>
-  <span class="gd-bon-total"><span>SUMME</span><b><%= b.total != null ? euro(b.total) : '–' %></b></span>
+  <details>
+    <summary class="gd-bon-head">
+      <% if (b.card) { %><img src="<%= b.card.image %>" alt="" width="36" height="50" loading="lazy"><% } %>
+      <span class="gd-bon-who"><b><%= b.title %></b><small><%= b.who %> · <%= b.at ? date(b.at) : '' %></small>
+        <% const marks = (b.svc && b.svc.length ? b.svc : b.lines.map(([label]) => label)).map((l) => l.replace('Annahme & Reinigung', 'Reinigung').replace('Knick bügeln', 'Bügeln').replace('Express-Zuschlag', 'Express')); %>
+        <% if (marks.length) { %><span class="gd-bon-svc"><% marks.forEach((label) => { %><i class="<%= /express/i.test(label) ? 'is-express' : '' %>"><%= label %></i><% }) %></span><% } %>
+      </span>
+      <b class="gd-bon-sum"><%= b.total != null ? euro(b.total) : '–' %></b>
+    </summary>
+    <% if (b.lines.length) { %>
+      <span class="gd-bon-lines"><% b.lines.forEach(([label, cents]) => { %><span><span><%= label %></span><span><%= euro(cents) %></span></span><% }) %></span>
+    <% } %>
+    <% if (b.note) { %><span class="gd-bon-note"><%= b.note %></span><% } %>
+  </details>
 </li>

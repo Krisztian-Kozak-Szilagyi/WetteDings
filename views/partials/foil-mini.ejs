@@ -7,7 +7,7 @@
     <img src="<%= card.image %>" alt="" loading="lazy" width="720" height="1008">
     <span class="foil-sheen" aria-hidden="true"></span>
     <% if (sl) { %>
-    <span class="foil-ticket"><span class="gr-slab-info"><strong><%= sl.code || 'BfW' %></strong><span><%= card.name %> · <%= rarityLabel %></span><% if (locals.id) { %><span class="gr-slab-certno"><%= slabCert(locals.id) %></span><% } %></span><span class="gr-slab-score"><span class="gr-slab-word"><%= sl.grade ? gradeWord(sl.grade) : '' %></span><span class="gr-slab-grade"><%= sl.grade || '–' %></span></span></span>
+    <span class="foil-ticket"><span class="gr-slab-info"><strong><%= sl.code || 'BfW' %></strong><span><%= card.name %> · <%= rarityLabel %></span><% const sealed = sl.at || locals.sealedAt; if (locals.id || sealed) { %><span class="gr-slab-certno"><%= [locals.id ? slabCert(locals.id) : '', sealed ? dayDate(sealed) : ''].filter(Boolean).join(' · ') %></span><% } %></span><span class="gr-slab-score"><span class="gr-slab-word"><%= sl.grade ? gradeWord(sl.grade) : '' %></span><span class="gr-slab-grade"><%= sl.grade || '–' %></span></span></span>
     <% } %>
   </span>
 </span>

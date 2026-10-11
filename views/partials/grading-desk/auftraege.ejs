@@ -1,0 +1,164 @@
+<%#
+  Auftragsverwaltung im Eingang-Popup (#204): Reiter Eingang | Angenommen | Erledigt. Im Eingang wählt der Spieler selbst,
+  welchen Auftrag er annimmt – Liste links, Details und „Annehmen“ rechts (auf dem Handy nacheinander).
+  Reiter „Angenommen“: bis max Aufträge gleichzeitig, einer davon aktiv (Werkbank) – je Auftrag Bearbeiten/Auswählen und Abbrechen.
+  Locals: queue (mit lines), jobs (angenommene Aufträge, der aktive mit active: true), max, history (Bons), npc { left, limit, ok },
+  member { used, limit }, players (nimmt Mitglieder-Aufträge an), orderLevel, days { normal, express }, img, csrfToken,
+  labels (Schritt → Name). Unter orderLevel gibt es nur Laufkundschaft – Annehmen, Auswählen und Abbrechen gehen trotzdem.
+%>
+<%
+  const full = jobs.length >= max;
+  const blocked = full ? 'full' : member.used >= member.limit ? 'limit' : null;
+  const npcBlocked = full ? 'full' : !npc.ok ? 'limit' : null;
+  // Restzeit als kurze Marke: „5 Std“, „2 T“ – rot unter 24 Std, orange unter 48 Std. Dieselbe Rechnung läuft im
+  // Browser weiter (public/js/grading-desk.js, data-due), solange das Fenster offen ist
+  const due = (o) => {
+    const ms = new Date(o.expiresAt) - Date.now(), h = ms / 36e5;
+    return { iso: new Date(o.expiresAt).toISOString(), label: ms <= 0 ? 'abgelaufen' : h < 1 ? Math.ceil(ms / 6e4) + ' Min' : h < 24 ? Math.floor(h) + ' Std' : Math.ceil(h / 24) + ' T', cls: h < 24 ? ' is-urgent' : h < 48 ? ' is-soon' : '' };
+  };
+  const noExpress = (sv) => ({ ...sv, express: false }); // Express zeigt der Stempel statt der Marke
+  const stamp = (big) => `<b class="gd-ord-stamp${big ? ' is-big' : ''}">Express</b>`;
+  // kind: member | npc – der Browser sperrt nach dem Annehmen die Knöpfe, deren Kontingent jetzt voll ist
+  const accept = (fields, why, label, kind) => {
+    if (!why) return `<form method="post" action="/grading/auftrag" class="gd-ord-accept" data-ord-kind="${kind}"><input type="hidden" name="_csrf" value="${csrfToken}"><input type="hidden" name="reiter" value="auftraege">${fields}<button class="gd-go" type="submit">${label} ▶</button></form>`;
+    if (why === 'full') return `<span class="gd-go is-off" aria-disabled="true">Voll ${jobs.length}/${max}</span>`;
+    return '<span class="gd-go is-off" aria-disabled="true">Heute erledigt</span>';
+  };
+%>
+<div class="gd-ord" data-gd-ord data-ord-count="<%= jobs.length %>" data-ord-max="<%= max %>">
+  <div class="gd-ord-bar">
+    <div class="gd-ord-tabs" role="tablist" aria-label="Auftragsverwaltung">
+      <button type="button" role="tab" class="gd-ord-tab is-on" aria-selected="true" data-ord-tab="eingang">Eingang<% if (queue.length) { %> <i><%= queue.length %></i><% } %></button>
+      <button type="button" role="tab" class="gd-ord-tab" aria-selected="false" data-ord-tab="angenommen">Angenommen<% if (jobs.length) { %> <i><%= jobs.length %></i><% } %></button>
+      <button type="button" role="tab" class="gd-ord-tab" aria-selected="false" data-ord-tab="erledigt">Erledigt</button>
+    </div>
+    <p class="gd-ord-stat" aria-label="Tageslimit">
+      <% if (players) { %><span>Mitglieder <b data-ord-stat="member"><%= member.used %>/<%= member.limit %></b></span><% } %>
+      <span>NPC <b data-ord-stat="npc"><%= npc.limit - npc.left %>/<%= npc.limit %></b></span>
+      <span>Angenommen <b data-ord-stat="accepted"><%= jobs.length %>/<%= max %></b></span>
+    </p>
+  </div>
+
+  <%# ---------- Eingang ---------- %>
+  <div class="gd-ord-pane" role="tabpanel" data-ord-pane="eingang">
+    <div class="gd-ord-split">
+      <div class="gd-ord-listcol">
+      <ul class="gd-ord-list" data-ord-list>
+        <% queue.forEach((o) => { const id = String(o._id), express = !!o.services.express, t = due(o); %>
+          <li>
+            <button type="button" class="gd-ord-item<%= express ? ' is-express' : '' %>" aria-pressed="false" data-ord-pick="<%= id %>">
+              <span class="gr-done-thumb <%= o.cardInfo ? 'r-' + o.cardInfo.rarity : '' %>"><% if (o.cardInfo) { %><img src="<%= o.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
+              <span class="gd-ord-info">
+                <span class="gd-ord-name"><b><%= o.cardInfo ? o.cardInfo.name : o.card %></b> <span class="gr-dim">von <%= o.ownerName %></span></span>
+                <span class="gd-ord-meta"><% if (express) { %><%- stamp(false) %><% } %><%- include('../grading-services', { sv: noExpress(o.services) }) %> <span class="gd-ord-due<%= t.cls %>" data-due="<%= t.iso %>" title="Im Eingang bis <%= date(o.expiresAt) %>"><%= t.label === 'abgelaufen' ? '' : 'noch ' %><%= t.label %></span></span>
+              </span>
+              <b class="gr-pay">+<%= euro(o.price) %></b>
+            </button>
+          </li>
+        <% }) %>
+        <% if (!players) { %>
+          <li class="gd-ord-later"><%- img('key', 36) %><span>Karten von Mitgliedern ab Stufe <%= orderLevel %></span></li>
+        <% } %>
+        <li>
+          <button type="button" class="gd-ord-item is-npc" aria-pressed="false" data-ord-pick="npc">
+            <span class="gd-ord-npcicon"><%- img('scroll-open', 36) %></span>
+            <span class="gd-ord-info">
+              <span class="gd-ord-name"><b>Laufkundschaft</b> <span class="gr-dim">NPC-Auftrag</span></span>
+              <span class="gd-ord-meta">Noch <span data-ord-npc-left><%= npc.left %></span> heute · Lohn je Schritt</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+      </div>
+
+      <div class="gd-ord-details">
+        <p class="gd-ord-hint" data-ord-hint aria-hidden="true"><%- img('scroll', 72) %></p>
+        <% queue.forEach((o) => { const id = String(o._id); const d = o.services.express ? days.express : days.normal; %>
+          <section class="gd-ord-detail" data-ord-detail="<%= id %>" hidden>
+            <button type="button" class="gd-ord-back" data-ord-back>‹ Liste</button>
+            <div class="gd-ord-head">
+              <span class="gd-ord-pin"><% if (o.cardInfo) { %><img class="gd-ord-card r-<%= o.cardInfo.rarity %>" src="<%= o.cardInfo.image %>" alt="<%= o.cardInfo.name %> vergrößern" width="120" height="168" tabindex="0" role="button" data-zoom-card data-image="<%= o.cardInfo.image %>" data-name="<%= o.cardInfo.name %>" data-rarity="<%= o.cardInfo.rarity %>" data-rarity-label="<%= o.cardInfo.rarityLabel %>" data-meta-text="von <%= o.ownerName %>"><% } %><% if (o.services.express) { %><%- stamp(true) %><% } %></span>
+              <div>
+                <h3><%= o.cardInfo ? o.cardInfo.name : o.card %></h3>
+                <p class="gd-ord-from">von <b><%= o.ownerName %></b><% if (o.cardInfo) { %> · <%= o.cardInfo.rarityLabel %><% } %></p>
+                <%- include('../grading-services', { sv: noExpress(o.services) }) %>
+              </div>
+            </div>
+            <ul class="gd-ord-lines">
+              <% o.lines.forEach(([label, v]) => { %><li><span><%= label %></span><b><%= euro(v) %></b></li><% }) %>
+              <li class="is-total"><span>Lohn</span><b>+<%= euro(o.price) %></b></li>
+            </ul>
+            <p class="gd-ord-facts"><span>Frist <b><%= d %> <%= d === 1 ? 'Tag' : 'Tage' %></b></span><span>Eingang bis <b><%= date(o.expiresAt) %></b></span></p>
+            <%- accept(`<input type="hidden" name="order" value="${id}">`, blocked, 'Annehmen', 'member') %>
+          </section>
+        <% }) %>
+        <section class="gd-ord-detail" data-ord-detail="npc" hidden>
+          <button type="button" class="gd-ord-back" data-ord-back>‹ Liste</button>
+          <div class="gd-ord-head">
+            <span class="gd-ord-npcicon is-big"><%- img('scroll-open', 88) %></span>
+            <div>
+              <h3>Laufkundschaft</h3>
+              <p class="gd-ord-from">NPC-Auftrag</p>
+            </div>
+          </div>
+          <p class="gd-ord-facts"><span>Noch <b><span data-ord-npc-left><%= npc.left %></span>/<%= npc.limit %></b> heute</span><span>Lohn <b>je Schritt</b></span></p>
+          <%- accept('<input type="hidden" name="npc" value="1">', npcBlocked, 'Annehmen', 'npc') %>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <%# ---------- Angenommen ---------- %>
+  <div class="gd-ord-pane" role="tabpanel" data-ord-pane="angenommen" hidden>
+    <% if (jobs.length) { %>
+      <ul class="gd-jobs">
+        <% jobs.forEach((j) => { const t = j.expiresAt ? due(j) : null; %>
+          <li class="gd-job<%= j.active ? ' is-active' : '' %>" data-job="<%= j.id %>">
+            <% if (j.active) { %><span class="gd-job-flag">Aktiv</span><% } %>
+            <span class="gd-job-thumb gr-done-thumb <%= j.card ? 'r-' + j.card.rarity : '' %>"><% if (j.card) { %><img src="<%= j.card.image %>" alt="<%= j.card.name %> vergrößern" width="56" height="78" tabindex="0" role="button" data-zoom-card data-image="<%= j.card.image %>" data-name="<%= j.card.name %>" data-rarity="<%= j.card.rarity %>" data-rarity-label="<%= j.card.rarityLabel %>" data-meta-text="für <%= j.customer %>"><% } %></span>
+            <div class="gd-job-info">
+              <span class="gd-ord-name"><b><%= j.card ? j.card.name : 'Karte' %></b> <span class="gr-dim">für <%= j.customer %></span></span>
+              <span class="gd-ord-meta">
+                <% if (j.services && j.services.express) { %><%- stamp(false) %><% } %><% if (j.services) { %><%- include('../grading-services', { sv: noExpress(j.services) }) %><% } %>
+                <% if (t) { %><span class="gd-ord-due<%= t.cls %>" data-due="<%= t.iso %>" title="Frist bis <%= date(j.expiresAt) %>"><%= t.label === 'abgelaufen' ? '' : 'noch ' %><%= t.label %></span><% } %>
+                <b class="gr-pay"><%= j.price ? '+' + euro(j.price) : 'Lohn je Schritt' %></b>
+              </span>
+              <ol class="gd-phases gd-job-steps" aria-label="Arbeitsschritte">
+                <% j.steps.forEach((st, i) => { const state = i <= j.last ? 'is-done' : j.active && st === j.next ? 'is-now' : ''; %>
+                  <li class="<%= state %>"><%= state === 'is-done' ? '✓ ' : '' %><%= labels[st] || st %></li>
+                <% }) %>
+              </ol>
+            </div>
+            <div class="gd-job-actions">
+              <% if (j.active) { %>
+                <a class="gd-ord-btn" href="/grading/werkbank">Bearbeiten ▶</a>
+              <% } else { %>
+                <form method="post" action="/grading/auftrag/waehlen" data-ord-select><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="job" value="<%= j.id %>"><button type="submit" class="gd-ord-btn">Auswählen</button></form>
+              <% } %>
+              <form method="post" action="/grading/auftrag/abbrechen" class="gd-ord-abort" data-ord-abort>
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="job" value="<%= j.id %>">
+                <button type="button" class="gd-ord-btn is-danger" data-ord-abort-ask>Abbrechen</button>
+                <span class="gd-ord-confirm" hidden>
+                  <span><%= j.player ? 'Zurück in den Eingang, die Frist läuft weiter' : 'Zählt trotzdem für heute' %></span>
+                  <button type="submit" class="gd-ord-btn is-danger">Ja, abbrechen</button>
+                  <button type="button" class="gd-ord-btn" data-ord-abort-no>Zurück</button>
+                </span>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p class="gd-empty"><%- img('clock', 72) %> Leer</p>
+    <% } %>
+  </div>
+
+  <%# ---------- Erledigt ---------- %>
+  <div class="gd-ord-pane" role="tabpanel" data-ord-pane="erledigt" hidden>
+    <% if (history.length) { %>
+      <ul class="gd-bons"><% history.forEach((b) => { %><%- include('bon', { b }) %><% }) %></ul>
+    <% } else { %>
+      <p class="gd-empty"><%- img('book', 72) %> Leer</p>
+    <% } %>
+  </div>
+</div>

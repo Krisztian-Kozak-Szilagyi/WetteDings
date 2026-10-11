@@ -101,6 +101,7 @@
 
   <form method="post" action="/grading/zuruecksenden" class="gr-panel" data-gr-panel="send" data-gr-send hidden>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="job" value="<%= jobData.id %>">
     <input type="hidden" name="clean" value="">
     <input type="hidden" name="seal" value="">
     <div class="gr-row">

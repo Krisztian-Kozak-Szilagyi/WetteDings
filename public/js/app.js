@@ -49,6 +49,15 @@
     return form.getAttribute('data-confirm') || '';
   }
 
+  // Formular nach einer Rückfrage erneut absenden – mit dem Button, der gedrückt wurde (sonst fehlt dessen name/value,
+  // z. B. decision=ok bei „Freigeben“ und der Server wertet es als „Ablehnen“)
+  var submitters = new WeakMap();
+  function resubmit(form) {
+    var btn = submitters.get(form);
+    if (form.requestSubmit) form.requestSubmit(btn && form.contains(btn) ? btn : undefined); else form.submit();
+  }
+  document.addEventListener('submit', function (e) { if (e.submitter) submitters.set(e.target, e.submitter); }, true);
+
   // Passwortabfrage für Moderations- und Spielwerte-Aktionen (Formulare mit data-reauth, nur für Admin/Devs).
   // Ersetzt dort die Sicherheitsabfrage: der Dialog zeigt deren Text und fragt zusätzlich das Passwort ab.
   var reauth = document.querySelector('[data-reauth-dialog]');
@@ -72,7 +81,7 @@
       field.value = reauthInput.value;
       form.dataset.reauthOk = '1';
       reauth.close();
-      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      resubmit(form);
     });
   }
   function askPassword(form) {
@@ -98,7 +107,7 @@
       confirmBox.close();
       if (!form) return;
       form.dataset.confirmOk = '1';
-      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      resubmit(form);
     });
   }
 
@@ -120,7 +129,7 @@
           confirmBox.querySelector('[data-confirm-dialog-ok]').focus();
         } else if (window.confirm(text)) {
           form.dataset.confirmOk = '1';
-          if (form.requestSubmit) form.requestSubmit(); else form.submit();
+          resubmit(form);
         }
       }
       return;
@@ -149,8 +158,13 @@
     if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
     setTimeout(function () {
       if (e.defaultPrevented) return;
-      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; b.setAttribute('data-sent', ''); });
     }, 0);
+  });
+  // Zurück-Taste: der Browser holt die Seite aus dem Zwischenspeicher – dann sind die gesperrten Buttons wieder frei
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('button[data-sent]').forEach(function (b) { b.disabled = false; b.removeAttribute('data-sent'); });
   });
 
   // ---------- Live-Aktualisierung (alle 5 Sekunden) ----------

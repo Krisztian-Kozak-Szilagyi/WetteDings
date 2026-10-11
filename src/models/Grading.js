@@ -36,6 +36,9 @@ const shopSchema = new Schema(
     tools: { type: [String], default: [] }, // gekaufte Werkzeug-Upgrades (#204, gradingService.TOOLS)
     reviewsSeenAt: { type: Date, default: null }, // Bewertungen bis hierhin gesehen (Badge am Handy auf dem Schreibtisch)
     tourSeenAt: { type: Date, default: null }, // Tour über den Schreibtisch gesehen oder übersprungen
+    // letzte Auftragsannahme – dient als Sperre: gleichzeitige Annahmen schreiben dieses Dokument und laufen so
+    // nacheinander (sonst ginge das Limit gleichzeitig angenommener Aufträge per Doppelklick über)
+    takenAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -54,7 +57,13 @@ const jobSchema = new Schema(
     spots: { type: [new Schema({ side: String, x: Number, y: Number, r: Number, kind: String }, { _id: false })], default: [] },
     defects: { type: defectsSchema, default: () => ({}) }, // Kratzer, Ecken, Kanten, Knick (models/condition.js)
     grade: { type: Number, required: true }, // echte Note 1–10
-    status: { type: String, enum: ['offen', 'fertig'], default: 'offen' },
+    // offen = der aktive Auftrag (Werkbank, höchstens einer), angenommen = weitere angenommene im Hintergrund (bis MAX_ACCEPTED zusammen),
+    // abgebrochen = NPC-Auftrag, der heute trotzdem zählt (#204)
+    status: { type: String, enum: ['offen', 'angenommen', 'fertig', 'abgebrochen'], default: 'offen' },
+    // Arbeitszeit für die Mindestzeiten (Putzen, Bügeln): nur die Zeit als aktiver Auftrag zählt, nicht das Warten unter
+    // „Angenommen“ – activeAt = seit wann aktiv (null = im Hintergrund), workMs = schon gesammelte Zeit davor
+    activeAt: { type: Date, default: null },
+    workMs: { type: Number, default: 0 },
     guess: { type: Number, default: null }, // Note des Spielers
     clean: { type: Number, default: null }, // Sauberkeit beim Zurückschicken 0–100 %
     seal: { type: Number, default: null }, // Qualität der Versiegelung 0–100
@@ -98,8 +107,12 @@ const orderSchema = new Schema(
     status: { type: String, enum: ['wartet', 'in_arbeit', 'fertig', 'abgelaufen', 'storniert'], default: 'wartet' },
     expiresAt: { type: Date, required: true }, // bis dahin muss der Shop anfangen bzw. fertig werden
     startedAt: { type: Date, default: null },
+    // erster Arbeitsbeginn: nur dann beginnt die Frist neu – nach einem Abbruch läuft sie weiter, sonst ließe sie sich
+    // durch Abbrechen und neu Annehmen beliebig verlängern
+    firstStartedAt: { type: Date, default: null },
+    warnedAt: { type: Date, default: null }, // Shop wurde gewarnt, dass die Frist bald abläuft
     doneAt: { type: Date, default: null },
-    job: { type: Schema.Types.ObjectId, ref: 'GradingJob', default: null },
+    job:{ type: Schema.Types.ObjectId, ref: 'GradingJob', default: null },
     // grade = Note des Shops; Zweitprüfung: before = Note auf dem Slab vorher, changed = neuer Slab, issuer = Kürzel vorher
     result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number, before: Number, changed: Boolean, issuer: String }, { _id: false }), default: null },
     stars: { type: Number, default: null }, // Bewertung des Kunden 1–5

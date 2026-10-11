@@ -10,6 +10,7 @@
     "dev:verdacht": "node scripts/dev-verdacht.js",
     "dev:knick": "node scripts/dev-knick.js",
     "dev:auftraege": "node scripts/dev-auftraege.js",
+    "dev:bewertungen": "node scripts/dev-bewertungen.js",
     "dev:stufe": "node scripts/dev-stufe.js",
     "test": "node --test",
     "webp": "node scripts/webp.js",

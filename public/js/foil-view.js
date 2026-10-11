@@ -86,7 +86,7 @@
     var info = el('span', 'gr-slab-info', t);
     el('strong', '', info, d.slabCode);
     el('span', '', info, d.name + ' · ' + d.rarityLabel);
-    if (d.cert) el('span', 'gr-slab-certno', info, d.cert);
+    if (d.cert || d.sealed) el('span', 'gr-slab-certno', info, [d.cert, d.sealed].filter(Boolean).join(' · ')); // Nr. und Versiegelungsdatum teilen sich die dritte Zeile
     var score = el('span', 'gr-slab-score', t);
     el('span', 'gr-slab-word', score, d.gradeWord || '');
     el('span', 'gr-slab-grade', score, d.grade || '–');

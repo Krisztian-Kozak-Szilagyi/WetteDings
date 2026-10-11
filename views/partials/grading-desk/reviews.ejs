@@ -22,21 +22,30 @@
       <% reviews.forEach((v) => { const name = v.owner ? v.owner.username : 'Ehemaliges Mitglied'; %>
         <li class="gd-gr-item">
           <span class="gd-gr-who">
-            <img class="avatar" src="<%= avatarUrl(v.owner) %>" alt="" width="36" height="36" loading="lazy">
-            <span><b><%= name %></b><small><%= relTime(v.ratedAt) %></small></span>
+            <% const href = v.owner ? '/profil/' + encodeURIComponent(v.owner.username) : null; %>
+            <% if (href) { %><a class="gd-gr-avatar" href="<%= href %>" tabindex="-1" aria-hidden="true"><% } %><img class="avatar" src="<%= avatarUrl(v.owner) %>" alt="" width="36" height="36" loading="lazy"><% if (href) { %></a><% } %>
+            <span><% if (href) { %><a class="gd-gr-name" href="<%= href %>"><b><%= name %></b></a><% } else { %><b><%= name %></b><% } %><small><%= relTime(v.ratedAt) %></small></span>
           </span>
           <span class="gd-gr-stars"><span class="gd-stars" aria-label="<%= v.stars %> von 5 Sternen"><%= row(v.stars) %></span></span>
           <% if (v.tags.length) { %><span class="gd-gr-tags"><% v.tags.forEach((t) => { %><span class="<%= t.good ? 'is-good' : 'is-bad' %>"><%= t.label %></span><% }) %></span><% } %>
-          <% if (v.card) { %>
-            <span class="gd-gr-card r-<%= v.card.rarity %>">
-              <img src="<%= v.card.image %>" alt="" width="28" height="39" loading="lazy">
-              <span><%= v.card.name %><% if (v.result && v.result.grade != null) { %> · <b><%= v.shopCode %> <%= v.result.grade %></b><% } else if (v.services.iron) { %> · gebügelt<% } %></span>
-            </span>
+          <% if (v.card) { const graded = v.result && v.result.grade != null; %>
+            <% if (graded) { %>
+              <%# Klick zeigt die Karte im fertigen Slab (Großansicht wie in der Vitrine) %>
+              <button type="button" class="gd-gr-card is-slab r-<%= v.card.rarity %>"<%- foilViewAttrs(v.card, v.rarityLabel, v.sealedAt, { slab: { code: v.shopCode, grade: v.result.grade }, id: v.doc }) %> aria-label="<%= v.card.name %> im Slab ansehen, <%= v.shopCode %> Note <%= v.result.grade %>" title="Im Slab ansehen">
+                <img src="<%= v.card.image %>" alt="" width="28" height="39" loading="lazy">
+                <span><%= v.card.name %> · <b><%= v.shopCode %> <%= v.result.grade %></b></span>
+              </button>
+            <% } else { %>
+              <span class="gd-gr-card r-<%= v.card.rarity %>">
+                <img src="<%= v.card.image %>" alt="" width="28" height="39" loading="lazy">
+                <span><%= v.card.name %><% if (v.services.iron) { %> · gebügelt<% } %></span>
+              </span>
+            <% } %>
           <% } %>
         </li>
       <% }) %>
     </ul>
   <% } else { %>
-    <p class="gd-empty"><span aria-hidden="true">💬</span> Noch keine Bewertung</p>
+    <p class="gd-empty"><span aria-hidden="true">💬</span> Noch keine Bewertung<small>Kunden melden sich nach erledigten Aufträgen.</small></p>
   <% } %>
 </div>

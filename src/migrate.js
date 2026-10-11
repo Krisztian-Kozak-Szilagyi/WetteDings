@@ -272,7 +272,7 @@ async function regradeWithoutTopBottom() {
   };
   const tb = { $gt: 55 };
   const cards = await regrade(TcgCard.collection, { foiledAt: null, 'condition.defects.centering.tb': tb }, 'condition.');
-  const jobs = await regrade(GradingJob.collection, { status: 'offen', guess: null, 'defects.centering.tb': tb }, '');
+  const jobs = await regrade(GradingJob.collection, { status: { $in: ['offen', 'angenommen'] }, guess: null, 'defects.centering.tb': tb }, '');
   return { cards, jobs };
 }
 

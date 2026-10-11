@@ -83,6 +83,68 @@ test('#204 B: Annahme ab Stufe 4', () => {
   assert.equal(orders.acceptsOrders({ active: true, level: 4, code: null }), false);
 });
 
+test('#204: mehrere angenommene Aufträge zählen alle fürs Tageslimit, bis zu 5 gleichzeitig', () => {
+  const day = '2026-10-10';
+  const running = [
+    { day, level: 3, source: 'spieler' },
+    { day, level: 3, source: 'spieler' },
+    { day, level: 3 },
+    { day: '2026-10-09', level: 3 }, // von gestern: zählt nicht zu heute
+    { day, level: 2 }, // andere Stufe
+  ];
+  assert.equal(grading.usedToday({ done: [], open: running, level: 3, day, source: 'spieler' }), 2);
+  assert.equal(grading.usedToday({ done: [], open: running, level: 3, day }), 1);
+  assert.equal(grading.usedToday({ done: [{ level: 3 }], open: running, level: 3, day }), 2); // fertige und angenommene zusammen
+  assert.equal(grading.usedToday({ done: [], open: null, level: 3, day }), 0);
+  assert.equal(grading.MAX_ACCEPTED, 5);
+});
+
+test('#204: abgebrochene NPC-Aufträge zählen fürs Tageslimit, laufende für beide Kontingente', () => {
+  const day = '2026-10-10';
+  const q = grading.dayQuota({
+    done: [{ level: 3 }, { level: 3, source: 'spieler' }],
+    dropped: [{ level: 3 }, { level: 3 }],
+    running: [{ day, level: 3, source: 'spieler' }, { day, level: 3 }],
+    level: 3,
+    day,
+  });
+  assert.deepEqual(q, { used: 4, playerUsed: 2 }); // NPC: 1 fertig + 2 abgebrochen + 1 laufend; Mitglieder: 1 fertig + 1 laufend
+});
+
+test('#204: Arbeitszeit zählt nur, solange ein Auftrag aktiv ist – Warten unter „Angenommen“ nicht', () => {
+  const t0 = Date.UTC(2026, 9, 10, 12);
+  const min = 60 * 1000;
+  // aktiv seit 3 Minuten, davor schon 2 Minuten gearbeitet
+  assert.equal(grading.workedMs({ status: 'offen', activeAt: new Date(t0), workMs: 2 * min, createdAt: new Date(t0 - 60 * min) }, t0 + 3 * min), 5 * min);
+  // im Hintergrund: nur die gesammelte Zeit, egal wie lange er schon wartet
+  assert.equal(grading.workedMs({ status: 'angenommen', activeAt: null, workMs: 2 * min, createdAt: new Date(t0 - 600 * min) }, t0), 2 * min);
+  assert.equal(grading.workedMs({ status: 'angenommen', createdAt: new Date(t0 - 600 * min) }, t0), 0);
+  // ältere Aufträge ohne activeAt: ab createdAt
+  assert.equal(grading.workedMs({ status: 'offen', createdAt: new Date(t0) }, t0 + 4 * min), 4 * min);
+  // parken und wieder aktivieren: die Zeit dazwischen fällt weg
+  const job = { status: 'offen', activeAt: new Date(t0), workMs: 0, createdAt: new Date(t0) };
+  Object.assign(job, grading.park(job, new Date(t0 + 3 * min))); // 3 Min gearbeitet
+  assert.deepEqual({ status: job.status, activeAt: job.activeAt, workMs: job.workMs }, { status: 'angenommen', activeAt: null, workMs: 3 * min });
+  Object.assign(job, grading.activate(new Date(t0 + 120 * min))); // 2 Std später wieder aktiv
+  assert.equal(grading.workedMs(job, t0 + 121 * min), 4 * min);
+});
+
+test('#204: Frist beginnt nur beim ersten Annehmen neu – Abbrechen und neu Annehmen verlängert sie nicht', () => {
+  const s = { orderDays: 3, expressDays: 1 };
+  const t1 = new Date(Date.UTC(2026, 9, 10, 12));
+  const first = orders.startSet({ services: { express: false } }, t1, s);
+  assert.equal(first.status, 'in_arbeit');
+  assert.equal(first.firstStartedAt, t1);
+  assert.equal(first.expiresAt.getTime(), t1.getTime() + 3 * 864e5);
+  assert.equal(first.warnedAt, null);
+  assert.equal(orders.startSet({ services: { express: true } }, t1, s).expiresAt.getTime(), t1.getTime() + 864e5); // Express: kürzer
+  // nach einem Abbruch wieder angenommen: Frist und Warnung bleiben, nur startedAt ist neu
+  const t2 = new Date(t1.getTime() + 2 * 864e5);
+  const again = orders.startSet({ services: { express: false }, firstStartedAt: t1 }, t2, s);
+  assert.deepEqual(again, { status: 'in_arbeit', startedAt: t2 });
+  assert.ok(orders.WARN_HOURS < 24, 'Warnung kürzer als die kürzeste Frist (Express)');
+});
+
 test('#204 B: Tageslimits getrennt nach NPC und Spieler, Bügeln nur ungebügelt', () => {
   const day = '2026-10-10';
   const done = [{ level: 3, source: 'spieler' }, { level: 3 }, { level: 3, source: 'npc' }, { level: 2 }];
