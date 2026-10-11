@@ -1,20 +1,26 @@
 <%#
-  Glasvitrine (#204): ausgestellte Slabs im Regal unter zwei Spotlights – antippen zeigt sie groß im Showroom
+  Glasvitrine (#204): ausgestellte Slabs im Regal, jeder unter seinem Spotlight – antippen zeigt sie groß im Showroom
   (public/js/foil-view.js, Galerie „vitrine“: wischen bzw. ‹ › blättert). Schreibtisch und öffentliche Shop-Seite.
   items = ausgestellte Slabs ({ id, card, rarity, foiledAt, slab }), max = Plätze, popText(x) optional,
-  editHref optional (eigener Shop: Knopf zum Einräumen), rarityByKey
+  editHref optional (eigener Shop: „Einräumen“ und leere Fächer öffnen das Fenster Vitrine), rarityByKey
 %>
 <div class="gd-vitrine<%= items.length ? '' : ' is-empty' %>" data-tour="vitrine">
-  <span class="gd-vit-light" aria-hidden="true"></span><span class="gd-vit-light is-right" aria-hidden="true"></span>
   <div class="gd-vit-shelf">
     <% items.forEach((x) => { const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
-      <button type="button" class="gd-vit-slab r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> data-foil-group="vitrine" data-pop="<%= locals.popText ? popText(x) : '' %>" aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – bewundern">
+      <button type="button" class="gd-vit-slab r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> data-foil-group="vitrine" data-pop="<%= locals.popText ? popText(x) : '' %>" aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – bewundern" title="<%= x.card.name %> – ansehen">
+        <span class="gd-vit-spot" aria-hidden="true"></span>
         <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id }) %></span>
-        <span class="gd-vit-plaque" aria-hidden="true"><%= x.slab.code %> · <%= x.slab.grade %></span>
+        <span class="gd-vit-plaque" aria-hidden="true"><%= x.slab.code %> · Note <%= x.slab.grade %></span>
       </button>
     <% }) %>
-    <% for (let i = items.length; i < max; i++) { %><span class="gd-vit-empty" aria-hidden="true"><span></span></span><% } %>
+    <% for (let i = items.length; i < max; i++) { %>
+      <% if (locals.editHref) { %>
+        <a class="gd-vit-empty is-add" href="<%= editHref %>" data-gd-open="vitrine" aria-label="Freies Fach – Slab ausstellen" title="Slab ausstellen"><span><b aria-hidden="true">+</b><small>Slab ausstellen</small></span></a>
+      <% } else { %>
+        <span class="gd-vit-empty" aria-hidden="true"><span></span></span>
+      <% } %>
+    <% } %>
   </div>
   <span class="gd-vit-glass" aria-hidden="true"></span>
-  <% if (locals.editHref) { %><a class="gd-vit-edit" href="<%= editHref %>" data-gd-open="vitrine" aria-label="Vitrine einräumen" title="Einräumen">✎</a><% } %>
+  <% if (locals.editHref) { %><a class="gd-vit-edit" href="<%= editHref %>" data-gd-open="vitrine"><span aria-hidden="true">✎</span> Einräumen</a><% } %>
 </div>

@@ -26,6 +26,7 @@ sonst unverändert).
 | locked.webp | Fluent Emoji 3D „Locked“ | MIT, © Microsoft Corporation |
 | star.webp | Fluent Emoji 3D „Star“ | MIT, © Microsoft Corporation |
 | file-box.webp | Fluent Emoji 3D „Card file box“ | MIT, © Microsoft Corporation |
+| card.webp | Fluent Emoji 3D „Joker“ | MIT, © Microsoft Corporation |
 | wood.webp | Poly Haven „black_walnut_veneer_02“ (Diffuse, 1k) | CC0 |
 
 - Fluent Emoji: https://github.com/microsoft/fluentui-emoji – MIT License, Copyright (c) Microsoft Corporation.

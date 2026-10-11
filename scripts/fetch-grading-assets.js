@@ -31,6 +31,7 @@ const EMOJI = {
   locked: 'Locked',
   star: 'Star',
   'file-box': 'Card file box',
+  card: 'Joker', // eigene Karten bügeln (Fluent hat kein Bügeleisen)
 };
 // Poly Haven: Datei → Asset (Diffuse, 1k) – Tischplatte, per CSS zu dunklem Nussbaum abgedunkelt
 const TEXTURES = { wood: 'black_walnut_veneer_02' };

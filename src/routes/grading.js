@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { requireLogin } = require('../middleware');
-const { GradingShop } = require('../models/Grading');
+const { GradingShop, GradingOrder } = require('../models/Grading');
 const { TcgCard } = require('../models/Tcg');
 const grading = require('../grading/gradingService');
 const orders = require('../grading/orderService');
@@ -132,6 +132,11 @@ router.get('/grading', async (req, res) => {
     coded ? orders.newReviewCount(state.shop) : 0,
   ]);
   const job = state.open;
+  // Offener Auftrag auf der Matte: Schritte mit Stand (Bügeln/Benoten sind gespeichert, Putzen und Versiegeln passieren
+  // erst beim Zurückschicken) und bei Mitgliedern der Preis
+  const jobOrder = job && job.order ? await GradingOrder.findById(job.order).select('price').lean() : null;
+  const jobSteps = job ? grading.stepsFor(job) : [];
+  const jobDone = job ? jobSteps.filter((st) => (st === 'iron' && job.iron) || (st === 'grade' && job.guess !== null)) : [];
   const tools = grading.toolsFor(state.shop);
   const balance = req.user.balance;
   res.render('grading', {
@@ -153,7 +158,7 @@ router.get('/grading', async (req, res) => {
     pay: grading.PAY,
     contractDays: grading.CONTRACT_DAYS,
     closedForOthers: !grading.settings.open,
-    openJob: job ? { card: cardInfo(job.card), customer: job.customer, player: grading.isPlayerJob(job), services: job.services || null } : null,
+    openJob: job ? { card: cardInfo(job.card), customer: job.customer, player: grading.isPlayerJob(job), services: job.services || null, steps: jobSteps, done: jobDone, price: jobOrder ? jobOrder.price : null } : null,
     // Schaukarte: Glitch-Sigrist im Slab (so, wie der Grading-Shop Karten versiegelt)
     shopCode: (state.shop && state.shop.code) || null, // Schaukarte mit dem eigenen Kürzel (#204)
     heroCard: ((c) => (c ? { ...c, rarityLabel: catalog.rarityByKey[c.rarity].label } : null))(catalog.cardById['sigrist-3-glitch'] || catalog.cardsByRarity.holo[0] || catalog.CARDS[0]),
