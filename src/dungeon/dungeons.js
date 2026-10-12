@@ -62,14 +62,14 @@ const dungeonByKey = Object.fromEntries(DUNGEONS.map((d) => [d.key, d]));
 // und ist der einzige Weg an seine Boss-Karte (nicht im Black Market, der nur DUNGEONS kennt).
 // Flavour-Texte sind absichtlich nur zerfallener Binärcode: wahllos 0 und 1, dazwischen wahllos „?“.
 // Lesbar bleiben nur die Meldung vom neuen Teilnehmer und die Namen der Kämpfe. Farbe: dunkles, kräftiges Lila (CSS .is-chaos).
-// bossCard: die Season-1-Boss-Karte, die noch gezeichnet wird. Bis sie im Katalog steht, merkt sich der Lauf die
-// Beute (members.bossCard) – dungeonService.grantPendingBossCards reicht die Karte nach, sobald es sie gibt.
+// bossCard: die Season-1-Boss-Karte Lucky Dio (src/tcg/cardData.js). Fehlt eine Karte im Katalog, merkt sich der Lauf die
+// Beute (members.bossCard) – dungeonService.grantPendingBossCards reicht sie nach, sobald es sie gibt.
 const CHAOS = {
   key: 'chaos',
   title: 'Chaos & Demise',
   replaces: 'st-ivan',
-  bossCard: 'chaos-boss',
-  image: PLACEHOLDER,
+  bossCard: 'lucky-dio-boss',
+  image: '/img/dungeon/chaos-dungeon-banner.webp',
   intro: '?11011 00110 ?000 11111 10110111 ?0111110 1??11110 00??0 00 1000110 ?01?0 0011 0?10? ??01 11111010 101 01??10 1?010 01 00? 000 0111',
   arrival: 'Ein neuer Teilnehmer ist erschienen …',
   fights: [
