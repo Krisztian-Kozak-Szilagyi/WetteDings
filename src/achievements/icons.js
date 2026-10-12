@@ -200,6 +200,18 @@ const GLYPHS = {
     '<text x="40" y="88" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="13" fill="D">2</text>' +
     '<text x="88" y="92" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="12" fill="D">3</text>' +
     '<path d="M64 30 l3.5 7 7.7 1.1 -5.6 5.4 1.3 7.7 -6.9 -3.6 -6.9 3.6 1.3 -7.7 -5.6 -5.4 7.7 -1.1z" fill="F"/>',
+  // Slab mit Siegelstreifen und „100“ (perfekte Versiegelung)
+  seal100:
+    '<rect x="42" y="28" width="44" height="72" rx="6" fill="none" stroke="S" stroke-width="5"/>' +
+    '<rect x="47" y="33" width="34" height="12" rx="2" fill="F"/>' +
+    '<rect x="48" y="50" width="32" height="44" rx="3" fill="F" opacity=".55"/>' +
+    '<text x="64" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="17" fill="F" stroke="#171826" stroke-width="3" paint-order="stroke">100</text>',
+  // Werkzeugkasten mit Schraubenschlüssel
+  toolbox:
+    '<path d="M52 46 V38 a4 4 0 0 1 4 -4 h16 a4 4 0 0 1 4 4 V46" fill="none" stroke="S" stroke-width="5"/>' +
+    '<rect x="28" y="46" width="72" height="46" rx="6" fill="F"/>' +
+    '<path d="M28 62 H100" stroke="D" stroke-width="3" opacity=".45"/><rect x="58" y="57" width="12" height="10" rx="2" fill="D"/>' +
+    '<path d="M44 86 L62 74" stroke="D" stroke-width="5" stroke-linecap="round"/><circle cx="66" cy="71" r="6" fill="none" stroke="D" stroke-width="4"/>',
   // Pokal
   trophy:
     '<path d="M44 28 H84 V50 a20 20 0 0 1 -40 0Z" fill="F"/>' +

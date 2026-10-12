@@ -527,7 +527,7 @@
     <%- sheetHead('meilensteine', `Erfolge <span class="gr-dim">${milesDone} / ${milestones.length}</span>`) %>
     <div class="gd-sheet-body">
       <%# Trophäenregal: je Meilenstein eine Medaille auf dem Brett – erreicht golden, offen dunkel mit Pixelbalken; Beschreibung beim Darüberfahren %>
-      <% const medalIcon = { 'ruhige-hand': 'mirror', 'grading-profi': 'medal', 'gem-mint': 'diamond', 'slab-fabrik': 'chest', 'buegelmeister': 'fire', 'express-profi': 'clock', 'zweite-meinung': 'book', feierabend: 'key' }; %>
+      <% const medalIcon = { 'ruhige-hand': 'mirror', 'grading-profi': 'medal', 'gem-mint': 'diamond', 'slab-fabrik': 'chest', 'buegelmeister': 'fire', 'express-profi': 'clock', 'zweite-meinung': 'book', luftdicht: 'torch', 'voll-ausgestattet': 'hammer', feierabend: 'key' }; %>
       <ul class="gd-trophy">
         <% milestones.forEach((m) => { const short = m.progress ? (m.progress.text.match(/^[\d.,]+\s*\/\s*[\d.,]+/) || [m.progress.text])[0] : ''; %>
           <li class="gd-tr<%= m.done ? ' is-done' : '' %>" title="<%= m.text %>">

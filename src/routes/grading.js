@@ -67,7 +67,7 @@ router.get('/slab/:nummer', requireLogin, async (req, res) => {
 const DESK_SHEETS = ['auftraege', 'bons', 'vitrine', 'bewertungen', 'preise', 'werkstatt', 'buegeln', 'meilensteine'];
 const hubUrl = (tab) => (DESK_SHEETS.includes(tab) ? `/grading?reiter=${tab}` : '/grading');
 // Erfolge rund ums Grading (#204) – Fortschritt in der Übersicht des Hubs
-const GRADING_ACHIEVEMENTS = ['ruhige-hand', 'grading-profi', 'gem-mint', 'buegelmeister', 'slab-fabrik', 'express-profi', 'zweite-meinung'];
+const GRADING_ACHIEVEMENTS = ['ruhige-hand', 'grading-profi', 'gem-mint', 'buegelmeister', 'slab-fabrik', 'express-profi', 'zweite-meinung', 'luftdicht', 'voll-ausgestattet'];
 
 /** Meilensteine fürs Hub: [{ key, name, text, done, progress: { pct, text } | null }] – erledigte zuletzt */
 async function milestonesOf(userId) {

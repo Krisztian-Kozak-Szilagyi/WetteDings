@@ -3,7 +3,7 @@
   const up = snap.change24h >= 0;
   const pl = value - holding.costCents;
   const eventLabels = { anstieg: 'Kurssprung', einbruch: 'Kurseinbruch', pump: 'Pump', crash: 'Crash', zusammenlegung: 'Split', aufteilung: 'Split' };
-  // Split: change = Kursfaktor − 1 (zusammenlegen: Kurs × 10, aufteilen: Kurs ÷ 10)
+  // Früherer Split (entfernt), alte Ereignisse: change = Kursfaktor − 1 (zusammenlegen: Kurs × 10, aufteilen: Kurs ÷ 10)
   const splitText = (e) => e.change > 0 ? `${Math.round(e.change + 1)} alte = 1 neuer` : `1 alter = ${Math.round(1 / (e.change + 1))} neue`;
   const wx = snap.weather;
   const num1 = (x) => x.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -58,7 +58,7 @@
         <% }) %>
         <span class="chart-range-change muted small" data-range-change></span>
       </div>
-      <div class="chart" id="coin-chart" data-range="24h" data-symbol="<%= sym %>" data-splits="<%= snap.splits %>">
+      <div class="chart" id="coin-chart" data-range="24h" data-symbol="<%= sym %>">
         <svg class="chart-svg" aria-label="Kursverlauf" role="img"></svg>
         <div class="chart-tip" hidden></div>
         <p class="chart-loading muted small">Kursverlauf wird geladen …</p>

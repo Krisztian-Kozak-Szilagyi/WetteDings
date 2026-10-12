@@ -60,6 +60,8 @@ async function trophyMembers(places) {
 }
 /** Höchste Ausbaustufe des Grading-Shops (spät geladen: der Grading-Service zieht viel nach sich) */
 const topShopLevel = () => require('../grading/gradingService').LEVELS.length;
+/** Schlüssel aller Werkzeug-Upgrades des Grading-Shops (spät geladen wie topShopLevel) */
+const toolKeys = () => require('../grading/gradingService').TOOLS.map((t) => t.key);
 // Versiegelte Aufträge (Grading-Meilensteine, #204)
 const SEALED = { status: 'fertig', seal: { $ne: null } };
 
@@ -294,6 +296,20 @@ const ACHIEVEMENTS = [
     text: 'Führe 10 Zweitprüfungen für Slabs anderer Shops durch.',
     icon: { glyph: 'loupe', tone: 'violet', frame: 'silver' },
     holders: () => countAtLeast(GradingOrder, { status: 'fertig', 'services.review': true }, 10, '$shop'),
+  },
+  {
+    key: 'luftdicht',
+    name: 'Luftdicht',
+    text: 'Versiegle im Grading-Shop einen Slab mit perfekter Versiegelung (100 %).',
+    icon: { glyph: 'seal100', tone: 'gold', frame: 'gold' },
+    holders: () => countAtLeast(GradingJob, { status: 'fertig', seal: { $gte: 100 } }, 1),
+  },
+  {
+    key: 'voll-ausgestattet',
+    name: 'Voll ausgestattet',
+    text: 'Kaufe im Grading-Shop alle Werkzeug-Upgrades.',
+    icon: { glyph: 'toolbox', tone: 'silver', frame: 'silver' },
+    holders: () => GradingShop.distinct('_id', { tools: { $all: toolKeys() } }),
   },
   {
     key: 'energy',
@@ -541,6 +557,12 @@ const PROGRESS = {
   'slab-fabrik': async (user) => [part(await GradingJob.countDocuments({ user, ...SEALED }), 100, 'versiegelte Slabs')],
   'express-profi': async (user) => [part(await GradingOrder.countDocuments({ shop: user, status: 'fertig', 'services.express': true }), 20, 'Express-Aufträge')],
   'zweite-meinung': async (user) => [part(await GradingOrder.countDocuments({ shop: user, status: 'fertig', 'services.review': true }), 10, 'Zweitprüfungen')],
+  'voll-ausgestattet': async (user) => {
+    const keys = toolKeys();
+    const shop = await GradingShop.findById(user).select('tools').lean();
+    const owned = new Set((shop && shop.tools) || []);
+    return [part(keys.filter((k) => owned.has(k)).length, keys.length, 'Werkzeuge')];
+  },
   energy: async (user) => {
     const ids = catalog.CARDS.filter((c) => c.name === 'BFW Energy').map((c) => c.id);
     if (!ids.length) return null;

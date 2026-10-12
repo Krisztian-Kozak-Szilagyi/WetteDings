@@ -5,9 +5,6 @@
  * Minuten- und Stundenkerzen werden gesammelt und alle 15 Sekunden in MongoDB gespeichert.
  * War der Server offline, wird die verpasste Zeit beim Start in Minutenschritten nachsimuliert,
  * damit der Kursverlauf lückenlos bleibt.
- * Split (nur Werte mit cfg.rebase): Verlässt der Kurs den Bereich, werden alle Bestände umgerechnet
- * (z. B. 10 alte Coins = 1 neuer, Kurs × 10). Der Wert jedes Depots bleibt gleich; Kursverlauf und Ereignisse
- * werden mit umgerechnet. Käufe und Verkäufe dieses Werts warten währenddessen (exclusive).
  */
 const mongoose = require('mongoose');
 const model = require('./model');
@@ -61,8 +58,6 @@ const RANGES = {
  *        der große Sprung wird nur gewürfelt, solange storm() gilt.
  * @param {{now: () => {mu: number, sentiment: number}}|null} [cfg.drift]
  *        Trend aus einer äußeren Datenquelle (MK Coin): mu = Log-Rendite pro Tag, sentiment −1 … +1 für die Anzeige.
- * @param {{min: number, max: number, factor: number}|null} cfg.rebase
- *        Split: unter min € werden je factor Coins zu einem zusammengelegt, über max € wird jeder in factor aufgeteilt.
  * @param {number} [cfg.backfillDays]  Vorgeschichte beim allerersten Start (Standard 14 Tage; eSports-Teams: 0)
  * @param {() => boolean} [cfg.paused]  true = Kurs steht still (eingefrorenes eSports-Team), die Zeit läuft weiter
  * @param {object} [cfg.team]  eSports-Team ({ id, name }) – nur für die Anzeige
@@ -73,7 +68,6 @@ function createEngine(cfg) {
   const REPORT = !!cfg.report;
   const weather = cfg.weather || null;
   const DRIFT = cfg.drift || null;
-  const REBASE = cfg.rebase || null;
   const BACKFILL = cfg.backfillDays ?? BACKFILL_DAYS;
   const PAUSED = cfg.paused || (() => false);
   const TEAM = cfg.team || null;
@@ -153,7 +147,6 @@ function createEngine(cfg) {
     let n = 0;
     for (let t = fromMs + MIN; t <= toMs; t += MIN) {
       advance(1 / 1440, t);
-      if (rebaseFactor() !== 1) await rebase().catch((err) => console.error(`${NAME}: Split fehlgeschlagen:`, err.message));
       if (++n % 3000 === 0) await flush();
     }
   }
@@ -163,119 +156,25 @@ function createEngine(cfg) {
     const dt = (now - state.lastTickAt.getTime()) / DAY;
     if (dt <= 0) return;
     advance(Math.min(dt, 5 / 1440), now);
-    if (rebaseFactor() !== 1 && now >= rebaseRetryAt) {
-      rebase().catch((err) => {
-        rebaseRetryAt = Date.now() + MIN;
-        console.error(`${NAME}: Split fehlgeschlagen:`, err.message);
-      });
-    }
-  }
-
-  // ---------- Split ----------
-
-  let tradeLock = Promise.resolve();
-  let rebasing = null;
-  let rebaseRetryAt = 0;
-
-  /**
-   * Käufe/Verkäufe und Split nacheinander ausführen, damit kein Handel zwischen Kurs und Bestand umgerechnet wird.
-   * Ohne Split (cfg.rebase) läuft fn sofort.
-   */
-  function exclusive(fn) {
-    if (!REBASE) return fn();
-    const run = tradeLock.then(fn);
-    tradeLock = run.catch(() => {});
-    return run;
-  }
-
-  /** Kursfaktor eines fälligen Splits: factor (zusammenlegen), 1/factor (aufteilen) oder 1 (keiner) */
-  function rebaseFactor() {
-    if (!REBASE) return 1;
-    if (state.price < REBASE.min) return REBASE.factor;
-    if (state.price > REBASE.max) return 1 / REBASE.factor;
-    return 1;
-  }
-
-  /** Fälligen Split ausführen (läuft höchstens einmal gleichzeitig) */
-  function rebase() {
-    if (!rebasing) {
-      rebasing = exclusive(() => {
-        const f = rebaseFactor();
-        if (f === 1) return null;
-        flushChain = flushChain.catch(() => {}).then(() => applyRebase(f)); // nie gleichzeitig mit dem Speichern
-        return flushChain;
-      }).finally(() => {
-        rebasing = null;
-      });
-    }
-    return rebasing;
-  }
-
-  /** Split mit Kursfaktor f: Bestände, gespeicherten Kursverlauf und Ereignisse umrechnen, dann den Speicher */
-  async function applyRebase(f) {
-    await doFlush();
-    const mul = (k) => ({ $multiply: [`$${k}`, f] });
-    const candle = [{ $set: { o: mul('o'), h: mul('h'), l: mul('l'), c: mul('c') } }];
-    // zusammenlegen: Einheiten / factor (abgerundet), aufteilen: Einheiten × factor (exakt)
-    const units = f > 1 ? { $floor: { $divide: ['$units', f] } } : { $multiply: ['$units', Math.round(1 / f)] };
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        await CoinHolding.updateMany({ coin: SYMBOL }, [{ $set: { units } }], { session });
-        await CoinMinute.updateMany({ coin: SYMBOL }, candle, { session });
-        await CoinHour.updateMany({ coin: SYMBOL }, candle, { session });
-        await CoinEvent.updateMany({ coin: SYMBOL }, [{ $set: { price: mul('price') } }], { session });
-        await CoinState.updateOne(
-          { _id: SYMBOL },
-          { $set: { price: state.price * f, ath: state.ath * f }, $inc: { splits: 1 } },
-          { upsert: true, session }
-        );
-      });
-    } finally {
-      await session.endSession();
-    }
-
-    // Ab hier ohne await: Kurs und alles im Speicher auf einen Schlag umrechnen
-    const scale = (c) => {
-      if (!c) return;
-      c.o *= f;
-      c.h *= f;
-      c.l *= f;
-      c.c *= f;
-    };
-    state.price *= f;
-    state.ath *= f;
-    state.splits = (state.splits || 0) + 1;
-    scale(curMin);
-    scale(curHour);
-    pendingMin.forEach(scale);
-    pendingHour.forEach(scale);
-    for (const e of pendingEvents) e.price *= f;
-    for (const k of ['open', 'high', 'low']) if (stats24[k] !== null) stats24[k] *= f;
-    const type = f > 1 ? 'zusammenlegung' : 'aufteilung';
-    pendingEvents.push({ coin: SYMBOL, at: new Date(state.lastTickAt), type, change: f - 1, price: state.price });
-    console.log(`${NAME}: Split (${type}, Kurs × ${f}) – neuer Kurs ${state.price.toFixed(4)} €`);
   }
 
   /**
    * ETF: Kurssprung nach dem Börsenbericht (Log-Rendite) und neue Stimmung (−1 … +1).
    * Läuft erst den fälligen Tick, damit der Sprung auf dem aktuellen Kurs aufsetzt; danach sofort speichern.
    */
-  function jump(log, sentiment) {
+  async function jump(log, sentiment) {
     if (!state) throw new Error('Kurs-Engine läuft nicht.');
-    return exclusive(async () => {
-      tick();
-      const now = Date.now();
-      const before = state.price;
-      state.price = Math.max(PARAMS.floor, before * Math.exp(log));
-      state.sentiment = sentiment;
-      state.lastTickAt = new Date(now);
-      record(state.price, now);
-      const change = Math.expm1(log);
-      if (Math.abs(change) >= EVENT_MIN_CHANGE) pendingEvents.push({ coin: SYMBOL, at: new Date(now), type: change >= 0 ? 'anstieg' : 'einbruch', change, price: state.price });
-      await flush();
-      return { before, after: state.price };
-    });
+    tick();
+    const now = Date.now();
+    const before = state.price;
+    state.price = Math.max(PARAMS.floor, before * Math.exp(log));
+    state.sentiment = sentiment;
+    state.lastTickAt = new Date(now);
+    record(state.price, now);
+    const change = Math.expm1(log);
+    if (Math.abs(change) >= EVENT_MIN_CHANGE) pendingEvents.push({ coin: SYMBOL, at: new Date(now), type: change >= 0 ? 'anstieg' : 'einbruch', change, price: state.price });
+    await flush();
+    return { before, after: state.price };
   }
 
   /**
@@ -283,21 +182,18 @@ function createEngine(cfg) {
    * target darf eine Funktion des aktuellen Kurses sein (z. B. Kurs × 1,35).
    * Wird gespeichert – ein Neustart setzt ihn fort, statt ihn neu zu beginnen.
    */
-  function startGlide(key, target, endAt) {
+  async function startGlide(key, target, endAt) {
     if (!state) throw new Error('Kurs-Engine läuft nicht.');
-    return exclusive(async () => {
-      tick();
-      const to = typeof target === 'function' ? target(state.price) : target;
-      if (!(to > 0)) throw new Error('Ungültiger Zielkurs.');
-      state.glide = { key, target: to, endAt };
-      await flush();
-      return { from: state.price, target: to, endAt };
-    });
+    tick();
+    const to = typeof target === 'function' ? target(state.price) : target;
+    if (!(to > 0)) throw new Error('Ungültiger Zielkurs.');
+    state.glide = { key, target: to, endAt };
+    await flush();
+    return { from: state.price, target: to, endAt };
   }
 
   /**
    * Kleine Kursbewegung sofort (eSports-Teams: Wirkung eines Kaufs/Verkaufs), ohne Warten und ohne eigenes Ereignis.
-   * Nur für Werte ohne Split – dort läuft exclusive() ohnehin sofort.
    */
   function nudge(log) {
     if (!state) throw new Error('Kurs-Engine läuft nicht.');
@@ -391,7 +287,6 @@ function createEngine(cfg) {
         mu: 0,
         muTarget: 0,
         sentiment: 0,
-        splits: 0,
         glide: null,
       };
       record(state.price, startMs);
@@ -411,7 +306,6 @@ function createEngine(cfg) {
         mu: 0, // früherer Aktivitäts-Trend des ETF (entfernt)
         muTarget: 0,
         sentiment: doc.sentiment || 0,
-        splits: doc.splits || 0,
         glide: glideFrom(doc.glide),
       };
       let from = state.lastTickAt.getTime();
@@ -457,7 +351,6 @@ function createEngine(cfg) {
       athAt: state.athAt.getTime(),
       tickMs: TICK_MS,
       sentiment: REPORT ? state.sentiment || 0 : DRIFT ? DRIFT.now().sentiment : null, // Marktstimmung −1 … +1 (ETF: letzter Börsenbericht, MK Coin: Datenquelle)
-      splits: state.splits || 0, // Zahl der Splits – ändert sie sich, lädt die Broker-Seite neu
       weather: weather ? weatherNow() : null, // 51101 Coin: letzte Messung der Boje
       team: TEAM, // eSports-Team-ETF
       frozen: PAUSED(),
@@ -521,7 +414,6 @@ function createEngine(cfg) {
     startGlide,
     nudge,
     flush,
-    exclusive,
   };
 }
 
