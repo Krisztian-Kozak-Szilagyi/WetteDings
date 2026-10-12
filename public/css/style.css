@@ -8586,7 +8586,7 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .mk-against a { color: var(--color-neutral-200); }
 
 /* Sleeve in der Miniatur: Hülle liegt eng an der Karte (ohne Etikettfläche oben wie beim Slab) */
-:is(.tstack-card, .hb-card, .gs-card) .foil-inner.is-sleeve .foil-face img { top: 5%; height: 90%; }
+:is(.tstack-card, .hb-card, .gs-card, .foil-card-slot) .foil-inner.is-sleeve .foil-face img { top: 5%; height: 90%; }
 :is(.tstack-card, .hb-card) .foil-inner.is-sleeve .foil-face { border-radius: calc(var(--w, 70px) * .08); }
 
 /* Seltenheit erklärt: ausklappbares Fenster neben der Sortierung */
