@@ -20,10 +20,12 @@ const runSchema = new Schema(
     freeze: { type: Number, default: 0 }, // Sekunden Stillstand der Deadline (Bloodlust)
     slow: { type: [[Number]], default: undefined }, // Forkbomb: [von, bis, Prozent] – Deadline läuft langsamer
     extend: { type: Number, default: 0 }, // Forkbomb: dadurch gewonnene Sekunden
+    bonus: { type: Number, default: 0 }, // High Stakes (Lucky Dio): durch volle Stacks gewonnene Sekunden
+    bonusAt: { type: [[Number]], default: undefined }, // … und wann: [Spielzeit, Sekunden]
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, stack: Number, bonus: Number, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte
     total: { type: Number, required: true },
     total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },

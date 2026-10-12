@@ -84,7 +84,7 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 const FORKBOMB_STEP = 2;
 
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, stacks: null };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -92,12 +92,18 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   const totals = keys.map(() => 0);
   const open = () => totals.some((x) => x < required);
   const ticks = [];
-  let applied = effects.length === 0;
+  // Eigenschaften der Karte selbst (passive, z. B. High Stakes) gelten von Anfang an, alle anderen zur Halbzeit
+  const passive = effects.filter((e) => e.passive);
+  const later = effects.filter((e) => !e.passive);
+  let applied = later.length === 0;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
   const slow = []; // Forkbomb: [von, bis, Prozent] – in diesen Spiel-Sekunden läuft die Deadline langsamer
   // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen)
   const used = (x) => deadlineUsed(x, half, freeze, slow);
   let t = 0;
+  // High Stakes (Lucky Dio): Stacks aus Krits; volle Stacks verlängern die Deadline (bonus = gewonnene Spiel-Sekunden)
+  let bonus = 0;
+  const bonusAt = []; // [Spielzeit, Sekunden] – für die Anzeige der Deadline im Browser
   // Angezeigte Werte der Karte [Speed, FIA, FIS, BWL]: ändern sie sich (Boost, Debuff, Ende eines Effekts),
   // trägt der Takt sie als st – der Browser schreibt sie dann auf die Karte (src/tcg/cardSvg.js).
   const shown = () => [s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1), s.stats.fia, s.stats.fis, s.stats.bwl].map((v) => Math.round(v));
@@ -108,12 +114,16 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     lastShown = now.join();
     return { ...tick, st: now };
   };
+  if (passive.length) {
+    passive.forEach((e) => e.apply(s));
+    ticks.push(withShown({ t: 0, p: 0, ability: true }));
+  }
   while (open()) {
     let next = t + interval();
     if (!applied && next > half) {
       // Halbzeit: Fähigkeiten aktivieren
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
-      effects.forEach((e) => e.apply(s));
+      later.forEach((e) => e.apply(s));
       applied = true;
       ticks.push(withShown({ t: half, p: 0, ability: true }));
       if (s.extraTicks || s.extraTime) {
@@ -124,13 +134,13 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     }
     // Forkbomb: in dieser Runde läuft die Deadline um s.forkbomb % langsamer (erst ab der Halbzeit)
     if (s.forkbomb > 0 && next > half) slow.push([Math.max(t, half), next, s.forkbomb]);
-    if (used(next) > WORK_TIME + 1e-9) {
+    if (used(next) > WORK_TIME + bonus + 1e-9) {
       if (s.forkbomb > 0 && next > half) slow.pop(); // Runde nicht mehr geschafft
       break;
     }
     if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
     const fake = s.fakeNext;
-    const crit = rand() < CRIT_CHANCE;
+    const crit = rand() < CRIT_CHANCE + s.critBonus;
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
     const factor = ((0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1);
@@ -145,6 +155,19 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       totals[i] += p;
     });
     ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
+    // High Stakes: jeder Krit gibt einen Stack; sind sie voll, wird die Deadline länger und es geht von vorn los
+    if (crit && s.stacks) {
+      const st = s.stacks;
+      st.count += 1;
+      const last = ticks[ticks.length - 1];
+      last.stack = st.count;
+      if (st.count >= st.max) {
+        st.count = 0;
+        bonus += st.seconds;
+        bonusAt.push([last.t, st.seconds]);
+        last.bonus = st.seconds;
+      }
+    }
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
@@ -168,6 +191,9 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     // Forkbomb: verlangsamte Abschnitte und die dadurch gewonnene Zeit (Deadline endet bei WORK_TIME + freeze + extend)
     slow: slow.map(([a, b, p]) => [r1(a), r1(b), p]),
     extend: r1(slowGain(half, freeze, slow)),
+    // High Stakes: Verlängerungen durch volle Stacks (Deadline endet zusätzlich um bonus später)
+    bonus: r1(bonus),
+    bonusAt,
   };
 }
 

@@ -100,4 +100,15 @@ module.exports = {
     abilityName: 'Forkbomb',
     ability: 'Alle gegnerischen Karten werden 30 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
   },
+  // Boss-Karte aus „Chaos & Demise“ (src/dungeon/dungeons.js, CHAOS.bossCard). Rahmen: violet (src/tcg/frames.js)
+  'lucky-dio-boss': {
+    season: 'season-1',
+    frame: 'violet',
+    name: 'Lucky Dio',
+    stats: [99, 99, 90, 95],
+    // High Stakes (src/ihk/abilities.js, Ablauf in ihkService.simulate): mehr Krits, jeder Krit gibt einen Stack, volle
+    // Stacks verlängern die Deadline (Werte: DIO_STACKS, DIO_STACK_SECONDS). Als Booster nur die Krit-Chance.
+    abilityName: 'High Stakes',
+    ability: '+30 % Chance auf kritische Treffer. Jeder kritische Treffer gibt einen Stack – bei 7 Stacks läuft der Timer 3 Sekunden länger. Als Booster: +30 % Krit-Chance.',
+  },
 };

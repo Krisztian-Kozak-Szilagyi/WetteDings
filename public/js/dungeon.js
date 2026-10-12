@@ -684,7 +684,7 @@
         } else if (x.destroy) {
           pop(x.m, 'Zerstört!', 'is-crit');
         } else {
-          pop(x.m, '+' + x.p, x.crit ? 'is-crit' : '');
+          pop(x.m, '+' + x.p + (x.bonus ? ' · +Zeit!' : ''), x.crit ? 'is-crit' : ''); // +Zeit: High Stakes (Lucky Dio), volle Stacks
         }
       }
       const done = f.ticks.slice(0, s.ticks).reduce((sum, x) => sum + (x.p || 0), 0);

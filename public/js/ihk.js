@@ -257,7 +257,10 @@
   function slowGain(t) {
     return slow.reduce(function (sum, x) { return sum + ((overlap(x[0], x[1], 0, t) - overlap(x[0], x[1], half, Math.min(half + freeze, t))) * x[2]) / 100; }, 0);
   }
-  var span = data.workTime + freeze + slowGain(Infinity); // Spielzeit inkl. Stillstand und Verlangsamung
+  // High Stakes (Lucky Dio): volle Stacks verlängern die Deadline ab dem Zeitpunkt, an dem sie voll sind
+  var bonusAt = data.bonusAt || [];
+  function bonusUpTo(t) { return bonusAt.reduce(function (sum, b) { return sum + (b[0] <= t ? b[1] : 0); }, 0); }
+  var span = data.workTime + freeze + slowGain(Infinity) + bonusUpTo(Infinity); // Spielzeit inkl. Stillstand, Verlangsamung und Verlängerung
   var progress = fight.querySelector('[data-ihk-progress]');
   var timebar = fight.querySelector('[data-ihk-timebar]');
   var points = fight.querySelector('[data-ihk-points]');
@@ -332,8 +335,9 @@
       progress2.style.width = (Math.min(1, total2 / data.required) * 100).toFixed(1) + '%';
       points2.textContent = total2 + ' / ' + data.required;
     }
-    var left = Math.max(0, data.workTime - elapsed(t));
-    timebar.style.width = ((left / data.workTime) * 100).toFixed(1) + '%';
+    var limit = data.workTime + bonusUpTo(t);
+    var left = Math.max(0, limit - elapsed(t));
+    timebar.style.width = ((left / limit) * 100).toFixed(1) + '%';
     timeLabel.textContent = Math.ceil(left) + ' s';
   }
   function bump(el, cls) {
@@ -345,7 +349,9 @@
   function floater(tk) {
     var el = document.createElement('span');
     el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
-    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
+    // High Stakes (Lucky Dio): Stack-Zähler am Krit, bei vollen Stacks die Verlängerung der Deadline
+    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '') +
+      (tk.bonus ? ' · HIGH STAKES +' + tk.bonus + ' s!' : tk.stack ? ' · Stack ' + tk.stack : '');
     if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
     el.style.left = (15 + Math.random() * 60) + '%';
     floaters.appendChild(el);

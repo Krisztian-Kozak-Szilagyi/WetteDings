@@ -11,6 +11,11 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
+// Lucky Dio: zusätzliche Krit-Chance in Prozent (als Hauptkarte und als Booster); Stacks bis zur Verlängerung
+// und um wie viele Spiel-Sekunden die Deadline dann länger läuft (die IHK zeigt Spiel-Sekunden: 180 s je Aufgabe)
+const DIO_CRIT = 30;
+const DIO_STACKS = 7;
+const DIO_STACK_SECONDS = 3;
 // Hundekarten (Spells): Hugo und Lilly
 const DOGS = new Set(['hugo', 'lilly']);
 const isDog = (card) => DOGS.has(who(card));
@@ -94,6 +99,15 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
+  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): High Stakes – Eigenschaft der Karte, wirkt von Anfang an (passive).
+  // Als Hauptkarte: +DIO_CRIT % Krit-Chance, jeder Krit gibt einen Stack; bei DIO_STACKS Stacks wird die Deadline um
+  // DIO_STACK_SECONDS Spiel-Sekunden länger und die Stacks beginnen von vorn (siehe ihkService.simulate).
+  // Als Booster: nur die +DIO_CRIT % Krit-Chance.
+  if (m === 'lucky-dio-boss') {
+    add({ key: 'high-stakes', label: 'High Stakes', text: `+${DIO_CRIT} % Krit-Chance – jeder Krit gibt einen Stack, bei ${DIO_STACKS} Stacks läuft die Deadline ${DIO_STACK_SECONDS} s länger.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.critBonus += DIO_CRIT / 100; s.stacks = { count: 0, max: DIO_STACKS, seconds: DIO_STACK_SECONDS }; } });
+  } else if (b === 'lucky-dio-boss') {
+    add({ key: 'high-stakes-boost', label: 'High Stakes', text: `Lucky Dio: +${DIO_CRIT} % Krit-Chance.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.critBonus += DIO_CRIT / 100; } });
+  }
   return out;
 }
 
@@ -111,7 +125,7 @@ function resolveAll(main, boosts) {
 }
 
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
-const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili']);
+const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili', 'lucky-dio-boss']);
 
 // Oliver the Sigrist "kann nicht im Spiel eingesetzt werden".
 // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt (er würde jede Quest
@@ -124,4 +138,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+module.exports = { DIO_CRIT, DIO_STACKS, DIO_STACK_SECONDS, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };

@@ -45,6 +45,23 @@ module.exports = {
   },
 };
 
+// Violetter Boss-Rahmen (Lucky Dio): Fenster wie gilded, Namensschild leer – der Name kommt per Code.
+// Farben passend zum Bild: tiefes Violett, bernsteinfarbenes Gold
+module.exports.violet = {
+  ...module.exports.gilded,
+  name: { x: 240, y: 73, w: 360, size: 36, minSize: 22 },
+  colors: {
+    value: '#ffd68a',
+    label: '#d6a8ff',
+    text: '#f1e6ff',
+    outline: '#13071f',
+    plate: '#2a1145',
+    plateBorder: '#e8a948',
+    up: '#8fe8a8',
+    down: '#ff9b9b',
+  },
+};
+
 // Helden-Karten für den Bosskampf (720 × 1008): leerer Namensbalken (Name per Code), Kampfwerte statt FIA/FIS/BWL –
 // ANG = Schaden am Boss, SCH = Block gegen den nächsten Boss-Angriff, HEI = Heilung. Die Plakette zeigt die
 // Energiekosten. Werte kommen aus card.kampf (values), 0 erscheint als „–“.
