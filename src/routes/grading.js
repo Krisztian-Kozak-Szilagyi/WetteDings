@@ -229,6 +229,7 @@ router.get('/grading/werkbank', async (req, res) => {
   res.render('grading-werkbank', {
     title: 'Werkbank',
     shop: state.shop,
+    deskLevel: deskLevel(state.shop.level), // Tischplatte wie im Shop (gd-desk-1 … 4)
     pay: grading.PAY,
     // Zentrierung → Höchstnote für die Regeln beim Benoten, als Bereiche mit beiden Grenzen (beide eingeschlossen):
     // 50/50–55/45 → 10, 56/44–60/40 → 9, … – so ist z. B. 59/41 eindeutig (→ 9)
@@ -236,6 +237,9 @@ router.get('/grading/werkbank', async (req, res) => {
     jobData: benchData(state.open, state.shop),
   });
 });
+
+/** Ausbaustufe als Tisch-Look (1–4): Werkbank und Bügeltisch sehen aus wie der Schreibtisch des Shops */
+const deskLevel = (level) => Math.min(4, Math.max(1, Number(level) || 1));
 
 /** Karte aus dem Katalog mit Seltenheits-Bezeichnung (null, wenn unbekannt) */
 function cardInfo(id) {
@@ -263,6 +267,7 @@ router.get('/grading/eigene/:doc', async (req, res) => {
   if (!doc) return res.redirect('/grading');
   res.render('grading-eigene', {
     title: 'Karte bügeln',
+    deskLevel: deskLevel(shop.level),
     // Für den Arbeitstisch nur, was man sieht: der Knick – keine Note, keine anderen Mängel (#73)
     jobData: {
       own: true,

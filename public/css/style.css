@@ -8757,3 +8757,107 @@ a.pg-btn, a.pg-btn:hover { color: #3b2503; }
 .gd-vit-plaque .gd-vp-rar { color: var(--pl-dim, #555); }
 .gd-vit-plaque .gd-vp-code { color: var(--pl-code, #333); }
 .gd-vit-plaque.is-gold .gv-sheen { animation-duration: 2.6s; mix-blend-mode: overlay; }
+
+/* ---------- Werkbank im Look des Shops: Tischplatte je Ausbaustufe (gd-desk-1 … 4), Notizzettel daneben ---------- */
+/* Die Tischplatte selbst (Hintergrund, Rand) kommt aus .gd-desk-N; hier Abstände, Arbeitsmatte und Ablagen darauf */
+.gr-wb {
+  --mat: #1d4a3a; --mat-grid: rgba(255, 255, 255, .07); --board: rgba(18, 11, 5, .66); --board-edge: rgba(255, 220, 160, .14);
+  position: relative; display: grid; gap: 18px; padding: 24px 28px 28px; border-radius: 26px; isolation: isolate;
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "bench";
+}
+.gr-wb.gd-desk-1 { box-shadow: inset 0 2px 0 rgba(255, 220, 170, .18), inset 0 -3px 0 rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(0, 0, 0, .4), 0 2px 0 #1b0e05, 0 6px 0 #120902, 0 30px 60px rgba(0, 0, 0, .6); }
+/* Arbeitsmatte je Stufe: 1 grüne Schneidematte · 2 Lederunterlage · 3 antistatische Gummimatte · 4 Samt */
+.gr-wb-2 { --mat: #3a2416; --mat-grid: rgba(255, 214, 150, .07); }
+.gr-wb-3 { --mat: #262c34; --mat-grid: rgba(147, 197, 253, .09); --board: rgba(12, 16, 22, .7); --board-edge: rgba(180, 200, 220, .18); }
+.gr-wb-4 { --mat: #221a52; --mat-grid: rgba(217, 164, 65, .1); --board: rgba(14, 10, 40, .7); --board-edge: rgba(217, 164, 65, .3); }
+.gr-wb.has-notes { grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); grid-template-areas: "head head" "bench notes"; }
+.gr-wb > .gr-wb-head { grid-area: head; padding: 10px 14px; border-radius: 12px; background: var(--board); box-shadow: inset 0 0 0 1px var(--board-edge), 0 4px 10px rgba(0, 0, 0, .35); }
+.gr-wb-2 > .gr-wb-head, .gr-wb-4 > .gr-wb-head { box-shadow: inset 0 0 0 1px #7a5416, inset 0 0 0 2px #d9a441, 0 4px 10px rgba(0, 0, 0, .35); }
+.gr-wb-3 > .gr-wb-head { box-shadow: inset 0 0 0 1px #272e36, inset 0 0 0 2px #8d98a5, 0 4px 10px rgba(0, 0, 0, .35); }
+.gr-wb > .gr-bench { grid-area: bench; min-width: 0; }
+.gr-wb .gr-stage, .gr-wb .gr-stage[data-station] {
+  --tint: transparent;
+  background-color: var(--mat);
+  background-image:
+    linear-gradient(var(--tint), var(--tint)),
+    radial-gradient(ellipse 55% 50% at 50% 26%, rgba(255, 243, 214, .16), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 120%, rgba(0, 0, 0, .5), transparent 60%),
+    linear-gradient(var(--mat-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-grid) 1px, transparent 1px);
+  background-size: auto, auto, auto, 28px 28px, 28px 28px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5), inset 0 0 40px rgba(0, 0, 0, .35), 0 8px 18px rgba(0, 0, 0, .45);
+}
+/* Stimmung der Station bleibt als leichter Schimmer über der Matte */
+.gr-wb .gr-stage[data-station="clean"] { --tint: rgba(80, 160, 220, .08); }
+.gr-wb .gr-stage[data-station="iron"] { --tint: rgba(255, 140, 60, .1); }
+.gr-wb .gr-stage[data-station="grade"] { --tint: rgba(10, 10, 30, .22); }
+.gr-wb .gr-stage[data-station="slab"] { --tint: rgba(140, 170, 220, .08); }
+/* Schritte und Bedienfelder liegen als dunkle Ablage auf der Tischplatte – so bleiben sie gut lesbar */
+.gr-wb .gr-steps, .gr-wb .gr-panel:not([hidden]), .gr-wb .gr-mbar:not([hidden]) {
+  padding: 12px 14px; border-radius: 12px; background: var(--board); box-shadow: inset 0 0 0 1px var(--board-edge); backdrop-filter: blur(2px);
+}
+@media (max-width: 900px) {
+  .gr-wb, .gr-wb.has-notes { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "bench" "notes"; padding: 14px; border-radius: 18px; }
+}
+
+/* Notizzettel: liniertes Papier mit Klebestreifen, leicht schräg auf der Tischplatte */
+.gr-notes { grid-area: notes; align-self: start; position: sticky; top: 84px; }
+@media (max-width: 900px) { .gr-notes { position: static; } }
+.gr-notes-paper {
+  --ink: #26303f; --ink-dim: #5b6474; --line: rgba(80, 120, 190, .2); --margin: rgba(220, 60, 60, .35);
+  position: relative; padding: 22px 16px 14px 30px; border-radius: 3px; color: var(--ink); transform: rotate(.7deg);
+  background:
+    linear-gradient(90deg, transparent 21px, var(--margin) 21px 22px, transparent 22px),
+    repeating-linear-gradient(transparent 0 25px, var(--line) 25px 26px),
+    linear-gradient(#fffdf4, #f8f1dc);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 4px 8px 14px rgba(0, 0, 0, .45), 1px 2px 3px rgba(0, 0, 0, .3);
+}
+.gr-notes-tape { position: absolute; top: -10px; left: 50%; width: 92px; height: 24px; margin-left: -46px; transform: rotate(-3deg); background: rgba(255, 245, 200, .62); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.gr-notes-head { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
+.gr-notes-head h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: .02em; }
+.gr-notes-card { font-size: 12px; color: var(--ink-dim); }
+.gr-notes-sec { margin: 8px 0 10px; }
+.gr-notes-sec h3 { display: flex; align-items: baseline; gap: 6px; margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--ink); }
+.gr-notes-sec h3 small, .gr-notes-field legend small { font-size: 11px; font-weight: 500; color: var(--ink-dim); }
+.gr-notes-field { margin: 0 0 8px; padding: 0; border: 0; }
+.gr-notes-field legend { padding: 0; margin-bottom: 3px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.gr-notes-check { display: flex; align-items: center; gap: 6px; padding: 1px 0; font-size: 13px; color: var(--ink); cursor: var(--cur-pointer, pointer); }
+.gr-notes-check input, .gr-notes-corner input { accent-color: #2f5fb3; }
+.gr-notes-ironed select { padding: 0 4px; height: 24px; border-radius: 4px; border: 1px solid #c9c2ae; background: #fffdf4; color: var(--ink); font: inherit; }
+.gr-notes-center { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.gr-notes-pill { position: relative; cursor: var(--cur-pointer, pointer); }
+.gr-notes-pill input { position: absolute; opacity: 0; pointer-events: none; }
+.gr-notes-pill span { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 5px; border: 1px solid #d5ccb4; background: rgba(255, 255, 255, .55); }
+.gr-notes-pill b { font-size: 14px; color: var(--ink); }
+.gr-notes-pill small { font-size: 9px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.gr-notes-pill input:checked + span { border-color: #2f5fb3; background: #dce8fb; box-shadow: 0 0 0 1px #2f5fb3; }
+.gr-notes-pill input:focus-visible + span { outline: 2px solid #2f5fb3; outline-offset: 1px; }
+.gr-notes-link { margin-top: 4px; padding: 0; border: 0; background: none; font: 600 12px var(--font); color: #2f5fb3; text-decoration: underline; cursor: var(--cur-pointer, pointer); }
+.gr-notes-measured { display: block; font-size: 11px; color: var(--ink-dim); min-height: 1em; }
+.gr-notes-count, .gr-notes-corners { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13px; color: var(--ink); }
+.gr-notes-count > span:first-child, .gr-notes-corners > span:first-child { flex: 1; }
+.gr-notes-count b { min-width: 20px; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+.gr-notes-btn { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid #c9c2ae; background: #fffdf4; color: var(--ink); font: 700 15px/1 var(--font); cursor: var(--cur-pointer, pointer); }
+.gr-notes-btn:hover { border-color: #2f5fb3; color: #2f5fb3; }
+/* Mini-Karte: die vier Ecken zum Abhaken */
+.gr-notes-mini { position: relative; width: 52px; height: 70px; border-radius: 5px; border: 1.5px solid var(--ink-dim); background: repeating-linear-gradient(135deg, rgba(80, 120, 190, .08) 0 4px, transparent 4px 8px); }
+.gr-notes-corner { position: absolute; width: 20px; height: 20px; display: grid; place-items: center; cursor: var(--cur-pointer, pointer); }
+.gr-notes-corner input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
+.gr-notes-corner span { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--ink-dim); background: #fffdf4; }
+.gr-notes-corner input:checked + span { border-color: #c0392b; background: #c0392b; box-shadow: inset 0 0 0 2px #fffdf4; }
+.gr-notes-corner input:focus-visible + span { outline: 2px solid #2f5fb3; outline-offset: 1px; }
+.gr-notes-corner-tl { top: -9px; left: -9px; }
+.gr-notes-corner-tr { top: -9px; right: -9px; }
+.gr-notes-corner-bl { bottom: -9px; left: -9px; }
+.gr-notes-corner-br { bottom: -9px; right: -9px; }
+.gr-notes-corners { margin: 4px 0 8px; }
+.gr-notes-corners .gr-notes-mini { margin-right: 10px; }
+.gr-notes-free { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 10px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.gr-notes-free textarea { resize: vertical; min-height: 44px; padding: 4px 6px; border: 1px dashed #c9c2ae; border-radius: 4px; background: transparent; color: var(--ink); font: 400 13px/1.5 var(--font); }
+.gr-notes-sum { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 6px; border-top: 2px solid var(--ink); font-size: 12px; color: var(--ink-dim); }
+.gr-notes-sum strong { font-size: 20px; color: var(--ink); }
+.gr-notes.has-marks .gr-notes-sum strong { color: #b5371f; }
+.gr-notes-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gr-notes-hint { margin: 6px 0 0; font-size: 11px; color: var(--ink-dim); }
+.gr-notes-hint.is-warn { color: #b5371f; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .gr-notes-paper { transform: none; } }

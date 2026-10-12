@@ -1,6 +1,9 @@
 <%- include('partials/head') %>
-<%# Werkbank (#204): der Arbeitstisch für den offenen Auftrag (public/js/grading.js) – nur Ticket, Bühne, Schritte, Panel %>
-<div class="gr-page gr-workbench">
+<%# Werkbank (#204): der Arbeitstisch für den offenen Auftrag (public/js/grading.js) – nur Ticket, Bühne, Schritte, Panel.
+    Die Tischplatte sieht aus wie der Schreibtisch des Shops (je Ausbaustufe); beim Benoten liegt ein Notizzettel daneben. %>
+<% const notes = jobData.steps.includes('grade'); %>
+<div class="gr-page gr-workbench gd-page">
+<div class="gr-wb gr-wb-<%= deskLevel %> gd-desk-<%= deskLevel %><%= notes ? ' has-notes' : '' %>">
 <div class="gr-wb-head">
   <a class="btn btn-ghost btn-sm" href="/grading" aria-label="Zurück zum Shop">← Shop</a>
   <div class="gr-ticket">
@@ -12,6 +15,8 @@
   </div>
   <button type="button" class="btn btn-ghost btn-sm gr-sound" data-gr-sound aria-pressed="false">🔇 Ton aus</button>
 </div>
+
+<% if (notes) { %><%- include('partials/grading-notes', { jobData, centeringScale }) %><% } %>
 
 <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">
   <%- include('partials/grading-stage', { steps: jobData.steps }) %>
@@ -111,6 +116,8 @@
   </form>
 </section>
 </div>
+</div>
 
 <script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+<% if (notes) { %><script src="/js/grading-notes.js?v=<%= assetVersion %>" defer></script><% } %>
 <%- include('partials/foot') %>

@@ -1,0 +1,76 @@
+<%# Notizzettel neben der Werkbank (public/js/grading-notes.js): Mängel beim Untersuchen abhaken und daraus die Note
+    ausrechnen – wie im Ablauf beim Benoten (src/grading/condition.js): Obergrenze (Knick, Zentrierung) minus 1 je Mangel.
+    Nur, was man selbst einträgt; der Zettel weiß nichts über die Karte. Bleibt beim Neuladen erhalten (je Auftrag). %>
+<aside class="gr-notes" data-gr-notes data-job="<%= jobData.id %>" aria-label="Notizzettel für die Benotung">
+  <div class="gr-notes-paper">
+    <span class="gr-notes-tape" aria-hidden="true"></span>
+    <div class="gr-notes-head">
+      <h2>Notizen</h2>
+      <span class="gr-notes-card"><%= jobData.card ? jobData.card.name + ' · ' + jobData.card.rarityLabel : 'Karte' %></span>
+    </div>
+
+    <section class="gr-notes-sec">
+      <h3>① Obergrenze <small>der niedrigste Wert zählt</small></h3>
+      <fieldset class="gr-notes-field">
+        <legend>Knick</legend>
+        <label class="gr-notes-check"><input type="radio" name="gn-crease" value="none" checked> kein Knick</label>
+        <label class="gr-notes-check"><input type="radio" name="gn-crease" value="4"> Knick → <b>4</b></label>
+        <label class="gr-notes-check gr-notes-ironed">
+          <input type="radio" name="gn-crease" value="ironed"> gebügelt →
+          <select data-gn-ironed aria-label="Obergrenze nach dem Bügeln">
+            <% for (let c = 5; c <= 9; c++) { %><option value="<%= c %>"><%= c %></option><% } %>
+          </select>
+        </label>
+      </fieldset>
+      <fieldset class="gr-notes-field">
+        <legend>Zentrierung <small>links/rechts</small></legend>
+        <div class="gr-notes-center" role="radiogroup" aria-label="Zentrierung">
+          <% centeringScale.forEach((c) => { %>
+            <label class="gr-notes-pill" title="<%= c.fromLabel %> bis <%= c.toLabel %>"><input type="radio" name="gn-center" value="<%= c.cap %>" <%= c.cap === 10 ? 'checked' : '' %>><span><b><%= c.cap %></b><small><%= c.toLabel %></small></span></label>
+          <% }) %>
+        </div>
+        <button type="button" class="gr-notes-link" data-gn-measure>📏 Messung übernehmen</button>
+        <span class="gr-notes-measured" data-gn-measured aria-live="polite"></span>
+      </fieldset>
+    </section>
+
+    <section class="gr-notes-sec">
+      <h3>② Mängel <small>je −1</small></h3>
+      <div class="gr-notes-count">
+        <span>Kratzer</span>
+        <button type="button" class="gr-notes-btn" data-gn-dec="scratches" aria-label="Einen Kratzer weniger">−</button>
+        <b data-gn-val="scratches">0</b>
+        <button type="button" class="gr-notes-btn" data-gn-inc="scratches" aria-label="Einen Kratzer mehr">+</button>
+      </div>
+      <div class="gr-notes-corners">
+        <span>Bestoßene Ecken</span>
+        <div class="gr-notes-mini" role="group" aria-label="Ecken der Karte">
+          <% [['tl', 'oben links'], ['tr', 'oben rechts'], ['bl', 'unten links'], ['br', 'unten rechts']].forEach(([k, label]) => { %>
+            <label class="gr-notes-corner gr-notes-corner-<%= k %>" title="Ecke <%= label %>"><input type="checkbox" data-gn-corner="<%= k %>" aria-label="Ecke <%= label %> bestoßen"><span></span></label>
+          <% }) %>
+        </div>
+      </div>
+      <div class="gr-notes-count">
+        <span>Kantenmacken</span>
+        <button type="button" class="gr-notes-btn" data-gn-dec="edges" aria-label="Eine Kantenmacke weniger">−</button>
+        <b data-gn-val="edges">0</b>
+        <button type="button" class="gr-notes-btn" data-gn-inc="edges" aria-label="Eine Kantenmacke mehr">+</button>
+      </div>
+    </section>
+
+    <label class="gr-notes-free">
+      <span>Sonstiges</span>
+      <textarea data-gn-text rows="2" maxlength="300" placeholder="z. B. Kratzer oben rechts – nochmal im Licht prüfen"></textarea>
+    </label>
+
+    <div class="gr-notes-sum" aria-live="polite">
+      <span data-gn-calc>Obergrenze 10 − 0 Mängel</span>
+      <strong>= Note <span data-gn-grade>10</span></strong>
+    </div>
+    <div class="gr-notes-actions">
+      <button type="button" class="btn btn-primary btn-sm" data-gn-pick>Note übernehmen</button>
+      <button type="button" class="gr-notes-link" data-gn-reset>Zettel leeren</button>
+    </div>
+    <p class="gr-notes-hint" data-gn-hint>Übernehmen wählt die Note nur aus – abgegeben wird erst mit „Note abgeben“.</p>
+  </div>
+</aside>

@@ -5,6 +5,7 @@
     <h1>Karte bügeln</h1>
     <a class="btn btn-ghost btn-sm" href="/grading">Zurück zum Shop</a>
   </div>
+  <div class="gr-wb gr-wb-<%= deskLevel %> gd-desk-<%= deskLevel %>">
   <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>" data-csrf="<%= csrfToken %>">
     <div class="gr-ticket">
       <span class="gr-ticket-label">Eigene Karte</span>
@@ -18,6 +19,7 @@
     </ol>
     <%- include('partials/grading-iron-panel', { own: true }) %>
   </section>
+  </div>
 </div>
 
 <script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
