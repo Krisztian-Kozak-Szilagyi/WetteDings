@@ -128,7 +128,8 @@ function slabRarity(cardId, data, slab) {
   if (!total) return null;
   const tail = Object.entries(data.grades).reduce((s, [g, n]) => s + (Number(g) >= slab.grade ? n : 0), 0) / total;
   const rep = (data.reps && data.reps.get(slab.code)) || 0;
-  const shop = SHOP_FACTOR.find((x) => rep >= x.min);
+  // negativer Ruf (Strafe aus der Zweitprüfung, schlechte Sterne) zählt wie ein Neuling
+  const shop = SHOP_FACTOR.find((x) => rep >= x.min) || SHOP_FACTOR[SHOP_FACTOR.length - 1];
   const p = data.pop.get(cardId);
   const at = (p && p.slabs[slab.grade]) || 0;
   const eff = tail * shop.factor * (at <= 1 ? 0.5 : 1);

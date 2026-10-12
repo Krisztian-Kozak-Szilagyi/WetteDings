@@ -164,6 +164,20 @@ test('#204: Seltenheit eines Slabs in seiner Note fürs Messingschild', () => {
   assert.equal(population.gradeRarity('k', null, 8), null);
 });
 
+test('#204: Seltenheit eines Slabs aus Note, Ruf des Shops und Einzelstück – negativer Ruf zählt als Neuling', () => {
+  const population = require('../src/tcg/population');
+  const data = { active: 10, spread: new Map([['k', { owners: 3, share: 0.3 }]]), grades: { 10: 1, 9: 9, 7: 90 }, reps: new Map([['LEG', 2500], ['BAD', -30]]),
+    pop: new Map([['k', { copies: 40, slabs: { 10: 1, 9: 2 } }]]) };
+  assert.equal(population.slabRarity('k', data, { grade: 10, code: 'LEG' }).key, 'legend'); // 1 % × 0,35 × 0,5
+  const bad = population.slabRarity('k', data, { grade: 9, code: 'BAD' });
+  assert.equal(bad.shop, 'Neuling');
+  assert.equal(bad.key, 'selten'); // 10 % mit Note ≥ 9, zwei Stück
+  assert.equal(population.slabRarity('k', data, { grade: 7, code: 'NEU' }).key, 'normal');
+  assert.equal(population.slabRarity('k', { ...data, grades: {} }, { grade: 9 }), null);
+  assert.deepEqual(population.spreadOf('k', data), { pct: 30, owners: 3, active: 10 });
+  assert.equal(population.spreadOf('k', { ...data, active: 0 }), null);
+});
+
 test('#204 B: Tageslimits getrennt nach NPC und Spieler, Bügeln nur ungebügelt', () => {
   const day = '2026-10-10';
   const done = [{ level: 3, source: 'spieler' }, { level: 3 }, { level: 3, source: 'npc' }, { level: 2 }];
