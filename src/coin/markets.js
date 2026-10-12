@@ -10,7 +10,7 @@ const LIST = [
   createEngine({ symbol: 'SAM', name: 'Samantha Coin', kind: 'coin', startPrice: 10, params: model.PARAMS, surgeWindow: DAY / 2 }),
   createEngine({ symbol: 'COW', name: 'Coinye West', kind: 'coin', startPrice: 10, params: model.COW_PARAMS, surgeWindow: DAY }),
   // 51101 Coin: Das Wetter an der NOAA-Boje 51101 bestimmt, wie wild der Kurs ist; bei Sturm alle 3 Stunden ein Würfelwurf
-  // für den großen Sprung. Statt eines Mindestkurses gibt es Splits: unter 1 € 10:1 zusammenlegen, über 1.000 € 1:10 aufteilen.
+  // für den großen Sprung.
   createEngine({
     symbol: 'BOJE',
     name: '51101 Coin',
@@ -19,10 +19,9 @@ const LIST = [
     params: model.BOJE_PARAMS,
     surgeWindow: DAY / 8,
     weather: { at: (ms) => buoy.at(ms), params: model.bojeParams, storm: model.isStorm },
-    rebase: { min: 1, max: 1000, factor: 10 },
   }),
   // MK Coin: so unruhig wie der Samantha Coin, große Sprünge nur halb so weit; die Richtung kommt aus den Video-Aufrufen eines Schlagworts (tagViews.js):
-  // mehr Zuwachs als im Schnitt der Vortage → Trend nach oben, weniger → nach unten. Splits wie beim 51101 Coin.
+  // mehr Zuwachs als im Schnitt der Vortage → Trend nach oben, weniger → nach unten.
   createEngine({
     symbol: 'MIA',
     name: 'MK Coin',
@@ -31,7 +30,6 @@ const LIST = [
     params: model.MIA_PARAMS,
     surgeWindow: DAY / 2,
     drift: { now: () => tagViews.now() },
-    rebase: { min: 1, max: 1000, factor: 10 },
   }),
   createEngine({
     symbol: 'BTCG',

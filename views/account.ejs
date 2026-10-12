@@ -108,7 +108,7 @@
       </tbody>
     </table>
   </div>
-  <p class="muted small">Mengen stehen so, wie sie bei der Order waren (ein späterer Split ändert sie nicht). <a href="/broker/<%= coin.symbol.toLowerCase() %>">Zum Broker →</a></p>
+  <p class="muted small"><a href="/broker/<%= coin.symbol.toLowerCase() %>">Zum Broker →</a></p>
   <% if (led.pages > 1) { %>
     <div class="log-pager">
       <% if (led.page > 1) { %><a class="btn btn-ghost btn-sm" href="<%= pageLink(led.page - 1) %>">← Neuere</a><% } %>
