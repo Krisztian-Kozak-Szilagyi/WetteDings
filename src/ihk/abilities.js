@@ -11,11 +11,17 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
-// Lucky Dio: zusätzliche Krit-Chance in Prozent (als Hauptkarte und als Booster); Stacks bis zur Verlängerung
-// und um wie viele Spiel-Sekunden die Deadline dann länger läuft (die IHK zeigt Spiel-Sekunden: 180 s je Aufgabe)
-const DIO_CRIT = 30;
-const DIO_STACKS = 7;
-const DIO_STACK_SECONDS = 3;
+// Lucky Dio (Schurke und Glücksspieler mit Knochenwürfeln, Handarmbrust und Dolch): All In.
+// DIO_STEP = Krit-Chance in Prozent je Würfelauge (2W6), DIO_FORTUNA = sichere Krits bei Doppelsechs,
+// DIO_MAX = höchster Multiplikator der Krit-Kette (×2, ×3 …), DIO_JACKPOT = der wievielte Krit der Jackpot ist
+// und wie hoch er mindestens trifft, DIO_REROLL = Casino-Kaffee: unter dieser Summe wird neu gewürfelt,
+// DIO_COIN = Glücksmünze als Booster: Krit-Chance in Prozent bei Kopf
+const DIO_STEP = 4;
+const DIO_FORTUNA = 3;
+const DIO_MAX = 5;
+const DIO_JACKPOT = 7;
+const DIO_REROLL = 9;
+const DIO_COIN = 15;
 // Hundekarten (Spells): Hugo und Lilly
 const DOGS = new Set(['hugo', 'lilly']);
 const isDog = (card) => DOGS.has(who(card));
@@ -99,14 +105,17 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
-  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): High Stakes – Eigenschaft der Karte, wirkt von Anfang an (passive).
-  // Als Hauptkarte: +DIO_CRIT % Krit-Chance, jeder Krit gibt einen Stack; bei DIO_STACKS Stacks wird die Deadline um
-  // DIO_STACK_SECONDS Spiel-Sekunden länger und die Stacks beginnen von vorn (siehe ihkService.simulate).
-  // Als Booster: nur die +DIO_CRIT % Krit-Chance.
+  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): All In – Eigenschaft der Karte, wirkt von Anfang an (passive).
+  // Als Hauptkarte: Würfel-Einsatz zu Beginn, Krit-Kette und Jackpot (Ablauf: ihkService.rollDice und simulate).
+  // Mit Casino-Kaffee (Hausvorteil): bei einer Summe unter DIO_REROLL einmal neu würfeln.
+  // Als Booster: Glücksmünze zur Halbzeit – Kopf: +DIO_COIN % Krit-Chance, Zahl: nichts.
   if (m === 'lucky-dio-boss') {
-    add({ key: 'high-stakes', label: 'High Stakes', text: `+${DIO_CRIT} % Krit-Chance – jeder Krit gibt einen Stack, bei ${DIO_STACKS} Stacks läuft die Deadline ${DIO_STACK_SECONDS} s länger.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.critBonus += DIO_CRIT / 100; s.stacks = { count: 0, max: DIO_STACKS, seconds: DIO_STACK_SECONDS }; } });
+    add({ key: 'all-in', label: 'All In', text: `Würfelt zu Beginn 2W6: je Auge +${DIO_STEP.toLocaleString('de-DE')} % Krit-Chance. Krit auf Krit trifft ×3, ×4 … bis ×${DIO_MAX}, der ${DIO_JACKPOT}. Krit ist ein Jackpot (×${DIO_JACKPOT}). Doppelsechs: ${DIO_FORTUNA} sichere Krits. Schlangenaugen: jeder Krit eine Stufe höher.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.luck = { step: DIO_STEP, fortuna: DIO_FORTUNA, max: DIO_MAX, jackpotAt: DIO_JACKPOT, jackpot: DIO_JACKPOT, reroll: 0, streak: 0, crits: 0, sure: 0, curse: 0 }; } });
+    if (b === 'casino-kaffee') {
+      add({ key: 'hausvorteil', label: 'Hausvorteil', text: `Das Haus gewinnt immer: Würfelt Lucky Dio weniger als ${DIO_REROLL}, darf er einmal neu würfeln – der bessere Wurf zählt.`, fx: 'fx-coffee', target: 'player', passive: true, apply: (s) => { if (s.luck) s.luck.reroll = DIO_REROLL; } });
+    }
   } else if (b === 'lucky-dio-boss') {
-    add({ key: 'high-stakes-boost', label: 'High Stakes', text: `Lucky Dio: +${DIO_CRIT} % Krit-Chance.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.critBonus += DIO_CRIT / 100; } });
+    add({ key: 'gluecksmuenze', label: 'Glücksmünze', text: `Lucky Dio wirft eine Münze – Kopf: +${DIO_COIN} % Krit-Chance, Zahl: Pech gehabt.`, fx: 'fx-energy', target: 'player', apply: (s) => { s.coin = s.rand() < 0.5 ? 'kopf' : 'zahl'; if (s.coin === 'kopf') s.critBonus += DIO_COIN / 100; } });
   }
   return out;
 }
@@ -138,4 +147,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { DIO_CRIT, DIO_STACKS, DIO_STACK_SECONDS, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+module.exports = { DIO_STEP, DIO_FORTUNA, DIO_MAX, DIO_JACKPOT, DIO_REROLL, DIO_COIN, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };

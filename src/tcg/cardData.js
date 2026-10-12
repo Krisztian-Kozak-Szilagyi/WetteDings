@@ -106,9 +106,9 @@ module.exports = {
     frame: 'violet',
     name: 'Lucky Dio',
     stats: [99, 99, 90, 95],
-    // High Stakes (src/ihk/abilities.js, Ablauf in ihkService.simulate): mehr Krits, jeder Krit gibt einen Stack, volle
-    // Stacks verlängern die Deadline (Werte: DIO_STACKS, DIO_STACK_SECONDS). Als Booster nur die Krit-Chance.
-    abilityName: 'High Stakes',
-    ability: '+30 % Chance auf kritische Treffer. Jeder kritische Treffer gibt einen Stack – bei 7 Stacks läuft der Timer 3 Sekunden länger. Als Booster: +30 % Krit-Chance.',
+    // All In (src/ihk/abilities.js, Ablauf in ihkService.simulate): Schurke und Glücksspieler (Würfel, Handarmbrust, Dolch).
+    // Werte: DIO_STEP, DIO_FORTUNA, DIO_MAX, DIO_JACKPOT, DIO_REROLL, DIO_COIN. Vorbote eines Fantasy-Settings (Beta).
+    abilityName: 'All In',
+    ability: 'Würfelt 2W6: je Auge +4 % Krit. Krit auf Krit trifft ×3 bis ×5, der 7. Krit ist ein Jackpot ×7. Doppelsechs: 3 sichere Krits. Schlangenaugen: Krits +1 Stufe. Booster: Glücksmünze.',
   },
 };

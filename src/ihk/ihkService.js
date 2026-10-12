@@ -83,8 +83,29 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 // Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
 const FORKBOMB_STEP = 2;
 
+/**
+ * All In (Lucky Dio): der Einsatz zu Beginn – zwei Würfel (2W6). Jedes Auge gibt luck.step % Krit-Chance;
+ * Doppelsechs (Fortunas Liebling): die ersten luck.fortuna Runden sind sichere Krits; Schlangenaugen (Verfluchtes
+ * Glück): jeder Krit trifft eine Stufe höher. luck.reroll (Casino-Kaffee, Hausvorteil): liegt die Summe darunter,
+ * wird einmal neu gewürfelt und der bessere Wurf zählt. Ergebnis: alle Würfe ([[a, b], …]), der letzte zählt.
+ */
+function rollDice(l, s, rand) {
+  const roll = () => [1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6)];
+  const sum = (d) => d[0] + d[1];
+  const throws = [roll()];
+  if (l.reroll && sum(throws[0]) < l.reroll) {
+    const again = roll();
+    throws.push(sum(again) > sum(throws[0]) ? again : throws[0]);
+  }
+  const [a, b] = throws[throws.length - 1];
+  s.critBonus += ((a + b) * l.step) / 100;
+  if (a === 6 && b === 6) l.sure = l.fortuna;
+  if (a === 1 && b === 1) l.curse = 1;
+  return throws;
+}
+
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, stacks: null };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, luck: null, coin: null, rand };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -92,7 +113,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   const totals = keys.map(() => 0);
   const open = () => totals.some((x) => x < required);
   const ticks = [];
-  // Eigenschaften der Karte selbst (passive, z. B. High Stakes) gelten von Anfang an, alle anderen zur Halbzeit
+  // Eigenschaften der Karte selbst (passive, z. B. All In) gelten von Anfang an, alle anderen zur Halbzeit
   const passive = effects.filter((e) => e.passive);
   const later = effects.filter((e) => !e.passive);
   let applied = later.length === 0;
@@ -101,9 +122,6 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen)
   const used = (x) => deadlineUsed(x, half, freeze, slow);
   let t = 0;
-  // High Stakes (Lucky Dio): Stacks aus Krits; volle Stacks verlängern die Deadline (bonus = gewonnene Spiel-Sekunden)
-  let bonus = 0;
-  const bonusAt = []; // [Spielzeit, Sekunden] – für die Anzeige der Deadline im Browser
   // Angezeigte Werte der Karte [Speed, FIA, FIS, BWL]: ändern sie sich (Boost, Debuff, Ende eines Effekts),
   // trägt der Takt sie als st – der Browser schreibt sie dann auf die Karte (src/tcg/cardSvg.js).
   const shown = () => [s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1), s.stats.fia, s.stats.fis, s.stats.bwl].map((v) => Math.round(v));
@@ -116,7 +134,8 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   };
   if (passive.length) {
     passive.forEach((e) => e.apply(s));
-    ticks.push(withShown({ t: 0, p: 0, ability: true }));
+    const dice = s.luck ? rollDice(s.luck, s, rand) : null;
+    ticks.push(withShown({ t: 0, p: 0, ability: true, ...(dice ? { dice } : {}) }));
   }
   while (open()) {
     let next = t + interval();
@@ -125,7 +144,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
       later.forEach((e) => e.apply(s));
       applied = true;
-      ticks.push(withShown({ t: half, p: 0, ability: true }));
+      ticks.push(withShown({ t: half, p: 0, ability: true, ...(s.coin ? { coin: s.coin } : {}) })); // coin: Glücksmünze (Lucky Dio als Booster)
       if (s.extraTicks || s.extraTime) {
         // Bloodlust: ganze Runden; Reality Check: Sekunden
         freeze = s.extraTicks * interval() + s.extraTime;
@@ -134,16 +153,40 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     }
     // Forkbomb: in dieser Runde läuft die Deadline um s.forkbomb % langsamer (erst ab der Halbzeit)
     if (s.forkbomb > 0 && next > half) slow.push([Math.max(t, half), next, s.forkbomb]);
-    if (used(next) > WORK_TIME + bonus + 1e-9) {
+    if (used(next) > WORK_TIME + 1e-9) {
       if (s.forkbomb > 0 && next > half) slow.pop(); // Runde nicht mehr geschafft
       break;
     }
     if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
     const fake = s.fakeNext;
-    const crit = rand() < CRIT_CHANCE + s.critBonus;
+    let crit = rand() < CRIT_CHANCE + s.critBonus;
+    // All In (Lucky Dio): Krit direkt nach Krit steigert den Multiplikator (×2, ×3 … bis luck.max, Schlangenaugen +1),
+    // der luck.jackpotAt-te Krit der Quest ist ein Jackpot (mindestens ×luck.jackpot). Fortunas Liebling (Doppelsechs):
+    // die ersten luck.sure Runden sind sichere Krits (lucky). chain = Länge der Krit-Kette – der Browser zeigt sie immer krasser an.
+    let mult = crit ? 2 : 1;
+    let lucky = false;
+    let chain = 0;
+    let jackpot = false;
+    if (s.luck) {
+      const l = s.luck;
+      if (l.sure > 0) {
+        if (!crit) crit = lucky = true;
+        l.sure -= 1;
+      }
+      if (crit) {
+        l.streak += 1;
+        l.crits += 1;
+        chain = l.streak;
+        mult = Math.min(l.max, 1 + l.streak) + l.curse;
+        if (l.crits === l.jackpotAt) {
+          mult = Math.max(mult, l.jackpot);
+          jackpot = true;
+        }
+      } else l.streak = 0;
+    }
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
-    const factor = ((0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1);
+    const factor = ((0.8 + 0.4 * rand()) * mult) / (s.doom ? s.doom.factor : 1);
     const ps = keys.map((k) => Math.max(1, Math.round((fake ? 99 : s.stats[k]) * factor)));
     s.fakeNext = false;
     if (s.tempSpeed && --s.tempSpeed.ticks <= 0) {
@@ -154,20 +197,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     ps.forEach((p, i) => {
       totals[i] += p;
     });
-    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
-    // High Stakes: jeder Krit gibt einen Stack; sind sie voll, wird die Deadline länger und es geht von vorn los
-    if (crit && s.stacks) {
-      const st = s.stacks;
-      st.count += 1;
-      const last = ticks[ticks.length - 1];
-      last.stack = st.count;
-      if (st.count >= st.max) {
-        st.count = 0;
-        bonus += st.seconds;
-        bonusAt.push([last.t, st.seconds]);
-        last.bonus = st.seconds;
-      }
-    }
+    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(mult > 2 ? { mult } : {}), ...(chain ? { chain } : {}), ...(lucky ? { lucky: true } : {}), ...(jackpot ? { jackpot: true } : {}), ...(fake ? { fake: true } : {}) }));
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
@@ -191,9 +221,6 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     // Forkbomb: verlangsamte Abschnitte und die dadurch gewonnene Zeit (Deadline endet bei WORK_TIME + freeze + extend)
     slow: slow.map(([a, b, p]) => [r1(a), r1(b), p]),
     extend: r1(slowGain(half, freeze, slow)),
-    // High Stakes: Verlängerungen durch volle Stacks (Deadline endet zusätzlich um bonus später)
-    bonus: r1(bonus),
-    bonusAt,
   };
 }
 

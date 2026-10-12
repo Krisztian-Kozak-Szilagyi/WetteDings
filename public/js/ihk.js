@@ -257,10 +257,7 @@
   function slowGain(t) {
     return slow.reduce(function (sum, x) { return sum + ((overlap(x[0], x[1], 0, t) - overlap(x[0], x[1], half, Math.min(half + freeze, t))) * x[2]) / 100; }, 0);
   }
-  // High Stakes (Lucky Dio): volle Stacks verlängern die Deadline ab dem Zeitpunkt, an dem sie voll sind
-  var bonusAt = data.bonusAt || [];
-  function bonusUpTo(t) { return bonusAt.reduce(function (sum, b) { return sum + (b[0] <= t ? b[1] : 0); }, 0); }
-  var span = data.workTime + freeze + slowGain(Infinity) + bonusUpTo(Infinity); // Spielzeit inkl. Stillstand, Verlangsamung und Verlängerung
+  var span = data.workTime + freeze + slowGain(Infinity); // Spielzeit inkl. Stillstand und Verlangsamung
   var progress = fight.querySelector('[data-ihk-progress]');
   var timebar = fight.querySelector('[data-ihk-timebar]');
   var points = fight.querySelector('[data-ihk-points]');
@@ -335,9 +332,8 @@
       progress2.style.width = (Math.min(1, total2 / data.required) * 100).toFixed(1) + '%';
       points2.textContent = total2 + ' / ' + data.required;
     }
-    var limit = data.workTime + bonusUpTo(t);
-    var left = Math.max(0, limit - elapsed(t));
-    timebar.style.width = ((left / limit) * 100).toFixed(1) + '%';
+    var left = Math.max(0, data.workTime - elapsed(t));
+    timebar.style.width = ((left / data.workTime) * 100).toFixed(1) + '%';
     timeLabel.textContent = Math.ceil(left) + ' s';
   }
   function bump(el, cls) {
@@ -346,19 +342,129 @@
     void el.offsetWidth;
     el.classList.add(cls);
   }
+  // All In (Lucky Dio): Text zur Krit-Kette – je länger sie läuft, desto krasser (Stufen 1–5, siehe .allin-N)
+  function allInText(tk) {
+    var c = tk.chain;
+    if (tk.jackpot) return 'JACKPOT ×' + tk.mult + '!!! ';
+    if (c >= 5) return 'ALL IN ×' + tk.mult + ' · ' + c + 'ER-KETTE!!! ';
+    if (c === 4) return 'ALL IN ×' + tk.mult + '!!! ';
+    if (c === 3) return 'MEUCHELSTOSS ×' + tk.mult + '!! ';
+    if (c === 2) return 'DOPPELSTICH ×' + tk.mult + '! ';
+    return tk.lucky ? 'GLÜCKSTREFFER! ' : 'KRIT! ';
+  }
   function floater(tk) {
     var el = document.createElement('span');
-    el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
-    // High Stakes (Lucky Dio): Stack-Zähler am Krit, bei vollen Stacks die Verlängerung der Deadline
-    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '') +
-      (tk.bonus ? ' · HIGH STAKES +' + tk.bonus + ' s!' : tk.stack ? ' · Stack ' + tk.stack : '');
+    var allIn = tk.crit && tk.chain;
+    el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '') + (allIn ? ' is-allin allin-' + (tk.jackpot ? 'jackpot' : Math.min(5, tk.chain)) : '');
+    var crit = allIn ? allInText(tk) : tk.lucky ? 'GLÜCKSTREFFER! ' : 'KRIT! ';
+    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? crit : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
     if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
-    el.style.left = (15 + Math.random() * 60) + '%';
+    el.style.left = (tk.jackpot ? 4 : allIn ? 8 + Math.random() * 30 : 15 + Math.random() * 60) + '%';
     floaters.appendChild(el);
-    setTimeout(function () { el.remove(); }, 1200);
+    setTimeout(function () { el.remove(); }, allIn ? 1500 : 1200);
+    if (allIn && (tk.chain >= 3 || tk.jackpot)) bump(player, 'fx-allin'); // ab dem Meuchelstoß glüht Dio violett
+    if (allIn) dioCount(tk);
     bump(player, 'is-hit');
     bump(enemy, 'is-shake');
   }
+  // ---------- All In (Lucky Dio): Knochenwürfel zu Beginn, Jackpot-Zähler, Glücksmünze als Booster ----------
+  // Nur transform/opacity werden animiert (läuft auch auf schwachen Rechnern flüssig); beim Rollen wechseln nur die Augen.
+  var diceTick = data.ticks.filter(function (t) { return t.dice; })[0];
+  var DICE_ROLL = 900; // ms, die ein Wurf rollt
+  var DICE_SHOW = 900; // ms, die das Ergebnis danach steht
+  var DICE_STEP = data.diceStep || 4; // Krit-Chance je Auge (abilities.DIO_STEP)
+  var dioBadge = null;
+  var dioCrits = 0;
+  function die(face) {
+    var d = document.createElement('span');
+    d.className = 'dio-die';
+    d.setAttribute('data-face', face);
+    for (var k = 0; k < 9; k++) d.appendChild(document.createElement('i'));
+    return d;
+  }
+  function diceLabel(d) {
+    var sum = d[0] + d[1];
+    if (sum === 12) return ['Fortunas Liebling', 'is-fortuna'];
+    if (sum === 2) return ['Verfluchtes Glück', 'is-curse'];
+    return [sum + ' Augen · ' + (10 + sum * DICE_STEP) + ' % Krit', ''];
+  }
+  function dioBadgeText() {
+    if (!dioBadge) return;
+    var d = diceTick.dice[diceTick.dice.length - 1];
+    dioBadge.querySelector('[data-dio-sum]').textContent = d[0] + d[1];
+    dioBadge.querySelector('[data-dio-jackpot]').textContent = dioCrits >= 7 ? 'Jackpot!' : 'Jackpot ' + dioCrits + '/7';
+    dioBadge.classList.toggle('is-jackpot', dioCrits >= 7);
+  }
+  function dioCount(tk) {
+    dioCrits = Math.max(dioCrits, tk.jackpot ? 7 : dioCrits + 1);
+    dioBadgeText();
+  }
+  function showBadge() {
+    if (!diceTick || !player || dioBadge) return;
+    dioBadge = document.createElement('div');
+    dioBadge.className = 'dio-badge';
+    dioBadge.innerHTML = '<span><b data-dio-sum></b> Augen</span><span data-dio-jackpot></span>';
+    player.appendChild(dioBadge);
+    dioBadgeText();
+  }
+  // Ein Wurf: zwei Würfel rollen herein, die Augen wechseln, dann liegen sie mit Beschriftung
+  function throwDice(box, d, label, done) {
+    var row = box.querySelector('.dio-dice-row');
+    row.innerHTML = '';
+    var dice = [die(1 + Math.floor(Math.random() * 6)), die(1 + Math.floor(Math.random() * 6))];
+    dice.forEach(function (x) { row.appendChild(x); });
+    box.classList.remove('is-landed');
+    void box.offsetWidth;
+    box.classList.add('is-rolling');
+    var spin = setInterval(function () {
+      dice.forEach(function (x) { x.setAttribute('data-face', 1 + Math.floor(Math.random() * 6)); });
+    }, 90);
+    setTimeout(function () {
+      clearInterval(spin);
+      dice[0].setAttribute('data-face', d[0]);
+      dice[1].setAttribute('data-face', d[1]);
+      box.classList.remove('is-rolling');
+      box.classList.add('is-landed');
+      var lab = box.querySelector('.dio-dice-label');
+      lab.textContent = label[0];
+      lab.className = 'dio-dice-label ' + label[1];
+      setTimeout(done, DICE_SHOW);
+    }, DICE_ROLL);
+  }
+  // Würfel-Einsatz zu Beginn; then = Wiedergabe starten. Casino-Kaffee: zweiter Wurf mit „Hausvorteil“.
+  function playDice(then) {
+    if (!diceTick || !player) return then();
+    var box = document.createElement('div');
+    box.className = 'dio-dice';
+    box.innerHTML = '<div class="dio-dice-row"></div><div class="dio-dice-label"></div>';
+    player.appendChild(box);
+    var throws = diceTick.dice;
+    var n = 0;
+    var next = function () {
+      if (done) return box.remove();
+      if (n >= throws.length) {
+        box.classList.add('is-leaving');
+        setTimeout(function () { box.remove(); }, 300);
+        showBadge();
+        return then();
+      }
+      var d = throws[n];
+      var label = n === 0 && throws.length > 1 ? ['Hausvorteil – nochmal!', 'is-house'] : diceLabel(d);
+      n++;
+      throwDice(box, d, label, next);
+    };
+    next();
+  }
+  // Glücksmünze (Lucky Dio als Booster): zur Halbzeit dreht sich eine Münze, dann Kopf oder Zahl
+  var coinTick = data.ticks.filter(function (t) { return t.coin; })[0];
+  function playCoin() {
+    if (!coinTick || !player) return;
+    var c = document.createElement('div');
+    c.className = 'dio-coin is-' + coinTick.coin;
+    c.innerHTML = '<span class="dio-coin-face"></span><span class="dio-coin-label">' + (coinTick.coin === 'kopf' ? 'Kopf! +15 % Krit' : 'Zahl – Pech gehabt') + '</span>';
+    add(player, c, 2600);
+  }
+
   // ---------- Fähigkeits-Effekte (gezeichnet, keine Emojis) ----------
   var SVGNS = 'http://www.w3.org/2000/svg';
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
@@ -504,11 +610,14 @@
     });
     data.ticks.forEach(function (t) { if (t.ability && t.st) showStats(t.st); });
     boostSlots.forEach(function (b) { if (b.querySelector('img')) bump(b, 'fx-flash'); });
+    playCoin();
   }
   function finish() {
     if (done) return;
     done = true;
-    while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
+    while (i < ticks.length) { if (ticks[i].crit && ticks[i].chain) dioCrits = ticks[i].jackpot ? 7 : dioCrits + 1; total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
+    showBadge();
+    dioBadgeText();
     if (hasAbility && (data.success ? last >= half : true)) activate();
     showStats(lastStats(), true);
     render(endT);
@@ -533,7 +642,7 @@
   }
   skip.addEventListener('click', finish);
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
-  else requestAnimationFrame(frame);
+  else playDice(function () { requestAnimationFrame(frame); }); // Lucky Dio würfelt zuerst, dann läuft die Quest
 })();
 
 // ---------- Kartenauswahl: Suchen + Seltenheit (partials/mkt-bar) ----------

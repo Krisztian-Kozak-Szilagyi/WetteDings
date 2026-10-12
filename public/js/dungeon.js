@@ -533,6 +533,40 @@
     logList.prepend(li);
   }
 
+  // All In (Lucky Dio): je länger die Krit-Kette, desto krasser die Einblendung (Stufen 1–5, siehe .allin-N)
+  function allInText(x) {
+    if (!x.crit) return '';
+    if (!x.chain) return x.lucky ? 'Glück! ' : '';
+    if (x.jackpot) return 'JACKPOT ×' + x.mult + '! ';
+    if (x.chain >= 5) return 'ALL IN ×' + x.mult + ' · ' + x.chain + 'er-Kette! ';
+    if (x.chain === 4) return 'ALL IN ×' + x.mult + '! ';
+    if (x.chain === 3) return 'Meuchelstoß ×' + x.mult + '! ';
+    if (x.chain === 2) return 'Doppelstich ×' + x.mult + '! ';
+    return x.lucky ? 'Glückstreffer! ' : 'Krit! ';
+  }
+
+  // All In (Lucky Dio): der Wurf zu Beginn als kleine Einblendung mit zwei Knochenwürfeln (bei Casino-Kaffee der zählende)
+  function diceRoll(m, throws) {
+    const d = throws[throws.length - 1];
+    const sum = d[0] + d[1];
+    const s = pop(m, '', 'is-dice');
+    if (!s) return;
+    const row = document.createElement('span');
+    row.className = 'dio-dice-row';
+    d.forEach((f) => {
+      const die = document.createElement('span');
+      die.className = 'dio-die';
+      die.setAttribute('data-face', f);
+      for (let k = 0; k < 9; k++) die.append(document.createElement('i'));
+      row.append(die);
+    });
+    const label = document.createElement('span');
+    label.className = 'dio-dice-label' + (sum === 12 ? ' is-fortuna' : sum === 2 ? ' is-curse' : '');
+    label.textContent = sum === 12 ? 'Fortunas Liebling' : sum === 2 ? 'Verfluchtes Glück' : sum + ' Augen' + (throws.length > 1 ? ' (Hausvorteil)' : '');
+    s.append(row, label);
+    log(names[m] + ' würfelt ' + d[0] + ' + ' + d[1] + (throws.length > 1 ? ' – Hausvorteil, nach dem Neuwurf' : '') + (sum === 12 ? ' – Fortunas Liebling!' : sum === 2 ? ' – Verfluchtes Glück!' : ''), 'is-ability');
+  }
+
   function pop(m, text, cls) {
     if (first) return;
     const el = slotEls[m] && slotEls[m].querySelector('[data-dg-pops]');
@@ -541,7 +575,7 @@
     s.className = 'dg-pop' + (cls ? ' ' + cls : '');
     s.textContent = text;
     el.append(s);
-    setTimeout(() => s.remove(), 1400);
+    setTimeout(() => s.remove(), cls && cls.includes('is-dice') ? 2400 : 1400); // Würfel (Lucky Dio) bleiben länger stehen
     return s;
   }
 
@@ -681,10 +715,12 @@
             }
           });
           cast(x.m);
+          if (x.dice) diceRoll(x.m, x.dice);
+          if (x.coin) pop(x.m, x.coin === 'kopf' ? 'Kopf! +15 % Krit' : 'Zahl – Pech', 'is-coin');
         } else if (x.destroy) {
           pop(x.m, 'Zerstört!', 'is-crit');
         } else {
-          pop(x.m, '+' + x.p + (x.bonus ? ' · +Zeit!' : ''), x.crit ? 'is-crit' : ''); // +Zeit: High Stakes (Lucky Dio), volle Stacks
+          pop(x.m, allInText(x) + '+' + x.p, x.crit ? 'is-crit' + (x.chain ? ' is-allin allin-' + (x.jackpot ? 'jackpot' : Math.min(5, x.chain)) : '') : '');
         }
       }
       const done = f.ticks.slice(0, s.ticks).reduce((sum, x) => sum + (x.p || 0), 0);

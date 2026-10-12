@@ -35,7 +35,8 @@ partySchema.index({ 'invites.user': 1 });
 partySchema.index({ slot: 1 });
 
 // st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate
-const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
+// mult/chain/lucky/jackpot/dice/coin: All In (Lucky Dio) – Krit-Kette, Würfel und Glücksmünze für die Anzeige
+const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, mult: Number, chain: Number, lucky: Boolean, jackpot: Boolean, dice: { type: [[Number]], default: undefined }, coin: String, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
 
 // Ein Dungeon-Durchlauf (drei Spieler, Bots füllen auf). Alle Kämpfe werden beim Start ausgewürfelt und
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.
