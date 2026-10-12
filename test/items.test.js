@@ -11,7 +11,7 @@ const DAY = 864e5;
 const NOW = Date.UTC(2026, 9, 4, 12);
 
 test('Folie: Standardwerte – 1 % Fundchance, +10 % sofort, +0,9 % pro Tag', () => {
-  assert.deepEqual(foil.DEFAULTS, { gradingChance: 100, bonusPercent: 10, dailyPercent: 0.9, sleevePrice: 1500, slabPrice: 4000, slabDropPercent: 30 });
+  assert.deepEqual(foil.DEFAULTS, { gradingChance: 100, bonusPercent: 10, dailyPercent: 0.9, sleevePrice: 1500, slabPrice: 4000, slabDropPercent: 30, sleeveSell: 1000, slabSell: 2500 });
   assert.ok(ITEM_TYPES.some((t) => t.key === 'folie'));
 });
 

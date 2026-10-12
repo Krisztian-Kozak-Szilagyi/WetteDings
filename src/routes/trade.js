@@ -68,6 +68,17 @@ const viewHelpers = (ctx = { prices: new Map() }, sales = new Map()) => ({
   marketText,
   priceDays: marketPrice.DAYS,
   // Verbreitung und Population (#204 C): "besitzen 12 % · 3 Slabs, 1 × Note 10"
+  // Erklärung der Seltenheiten (Markt: „Seltenheit erklärt“)
+  slabTiers: population.SLAB_TIERS,
+  shopTiers: population.SHOP_FACTOR,
+  activeDays: population.ACTIVE_DAYS,
+  // Seltenheit fürs Angebot (Markt-Kachel): Karte ohne Slab = Anteil der Spieler, die sie besitzen; Slab = Seltenheit in Note und Shop
+  spreadInfo: (l) => {
+    if (!l || items.itemByCardId(l.card)) return null;
+    if (l.slab) { const r = population.slabRarity(l.card, ctx.population, l.slab); return r ? { kind: 'slab', ...r } : null; }
+    const s = population.spreadOf(l.card, ctx.population);
+    return s ? { kind: 'spread', ...s } : null;
+  },
   popText: (l) => (l && !items.itemByCardId(l.card) ? population.popText(l.card, ctx.population, l.slab ? l.slab.grade : null) : ''),
   // Verkaufsgeschichte eines Exemplars (id = Exemplar)
   salesText: (id) => salesText(id && sales.get(String(id))),

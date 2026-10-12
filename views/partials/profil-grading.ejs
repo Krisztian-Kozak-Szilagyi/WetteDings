@@ -1,0 +1,62 @@
+<%#
+  Grading-Shop auf dem öffentlichen Profil (#204): Leiste im Look der Ausbaustufe des Shops – Name, Rang, Bewertung,
+  Qualität und Treffsicherheit, Schlange, Slab-Lager, „ab“-Preis mit Vergleich zum Durchschnitt – und zwei Wege:
+  zur Shop-Seite und, mit dem Shop schon gewählt, zum Einreichen einer eigenen Karte.
+  g = { shop, isMe, accepts, from, avg, diff }
+%>
+<%
+  const s = g.shop;
+  const r = s.rating;
+  const pct = (v) => (v != null ? Math.round(v) : null);
+  const level = Math.min(4, Math.max(1, s.level || 1));
+  const kind = g.diff == null ? '' : g.diff > 0.05 ? 'high' : g.diff < -0.05 ? 'low' : 'mid';
+  const flagText = { low: '▼ ' + Math.round(Math.abs(g.diff || 0) * 100) + ' % unter Ø', mid: '≈ Durchschnittspreis', high: '▲ ' + Math.round(Math.abs(g.diff || 0) * 100) + ' % über Ø' }[kind];
+%>
+<section class="pg-bar is-level-<%= level %>" aria-label="Grading-Shop von <%= profile.username %>">
+  <div class="pg-id">
+    <span class="pg-kicker">Grading-Shop</span>
+    <h2 class="pg-name"><%= s.name %> <span class="gr-shop-code"><%= s.code %></span></h2>
+    <span class="pg-sub">
+      <span class="pg-tier"><%= r.tier.label %></span>
+      <% if (r.stars != null) { %><span class="pg-stars">★ <b><%= r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) %></b> <small>(<%= r.starCount %>)</small></span><% } else { %><small>neu, noch keine Bewertung</small><% } %>
+    </span>
+  </div>
+
+  <div class="pg-meters">
+    <span class="pg-meter" title="Wie sauber der Shop arbeitet">
+      <span>Qualität</span>
+      <span class="pg-bar-track"><i style="--w: <%= pct(r.quality) || 0 %>%"></i></span>
+      <b><%= pct(r.quality) != null ? pct(r.quality) + ' %' : '–' %></b>
+    </span>
+    <span class="pg-meter" title="Wie oft der Shop die Note genau trifft">
+      <span>Treffsicherheit</span>
+      <span class="pg-bar-track"><i style="--w: <%= pct(r.hitRate) || 0 %>%"></i></span>
+      <b><%= pct(r.hitRate) != null ? pct(r.hitRate) + ' %' : '–' %></b>
+    </span>
+  </div>
+
+  <div class="pg-facts">
+    <span class="pg-fact<%= s.queue ? '' : ' is-good' %>" title="Aufträge vor dir">⏳ <%= s.queue ? s.queue + ' in der Schlange' : 'keine Schlange' %></span>
+    <span class="pg-fact<%= s.slabs ? '' : ' is-out' %>" title="Leere Slabs zum Versiegeln"><%= s.slabs ? '🧱 ' + s.slabs + (s.slabs === 1 ? ' Slab' : ' Slabs') + ' frei' : '🚫 keine Slabs' %></span>
+  </div>
+
+  <div class="pg-price">
+    <% if (g.accepts) { %>
+      <span class="pg-price-label">Grading ab</span>
+      <strong><%= euro(g.from) %></strong>
+      <% if (kind) { %><span class="pg-flag is-<%= kind %>" title="Durchschnitt der Shops, die Aufträge annehmen: <%= euro(Math.round(g.avg)) %>"><%= flagText %></span><% } %>
+    <% } else { %>
+      <span class="pg-price-label">Nimmt noch keine Aufträge von Mitgliedern an (ab Stufe 4)</span>
+    <% } %>
+  </div>
+
+  <div class="pg-actions">
+    <a class="pg-btn" href="<%= g.isMe ? '/grading' : '/grading/shop/' + s.code %>"><%= g.isMe ? 'Zu deinem Schreibtisch' : 'Zum Grading-Shop' %></a>
+    <% if (g.accepts && !g.isMe) { %>
+      <a class="pg-btn is-main" href="/grading/einreichen?shop=<%= encodeURIComponent(s.code) %>">Karte einreichen</a>
+    <% } else { %>
+      <%# Immer da, aber ausgegraut, wenn es nicht geht: eigener Shop oder Shop unter Stufe 4 %>
+      <span class="pg-btn is-main is-off" role="link" aria-disabled="true" title="<%= g.isMe ? 'Beim eigenen Shop kannst du keine Karte einreichen.' : 'Dieser Shop nimmt erst ab Stufe 4 Karten von Mitgliedern an.' %>">Karte einreichen</span>
+    <% } %>
+  </div>
+</section>

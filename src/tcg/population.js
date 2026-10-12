@@ -3,6 +3,7 @@
 // Das wird angezeigt und fließt in den geschätzten Marktpreis ein (trade/marketPrice.estimate) – nie in den gemessenen.
 const { TcgCard } = require('../models/Tcg');
 const UserActivity = require('../models/UserActivity');
+const { GradingShop } = require('../models/Grading');
 
 const ACTIVE_DAYS = 30; // aktiv = in den letzten 30 Tagen gesehen (wie die Statistik „Aktiv letzte 30 Tage“)
 const CACHE_MS = 10 * 60 * 1000;
@@ -19,20 +20,25 @@ const invalidate = () => {
  *   active – Zahl der aktiven Spieler
  *   spread – Map Karte → { owners, share } (aktive Besitzer, Anteil 0–1)
  *   pop    – Map Karte → { copies, slabs: { Note: n }, byCode: { Kürzel: { Note: n } } }
+ *   grades – alle Slabs aller Karten je Note: { Note: n }
+ *   reps   – Map Shop-Kürzel (auch frühere) → Reputation des Shops
  */
 async function all(now = Date.now()) {
   if (cache && now - cache.at < CACHE_MS) return cache.data;
   const since = new Date(now - ACTIVE_DAYS * 864e5).toISOString().slice(0, 10);
   const activeIds = await UserActivity.distinct('user', { day: { $gte: since } });
-  const [owners, copies, slabs] = await Promise.all([
+  const [owners, copies, slabs, shops] = await Promise.all([
     activeIds.length ? TcgCard.aggregate([{ $match: { user: { $in: activeIds } } }, { $group: { _id: '$card', users: { $addToSet: '$user' } } }, { $project: { n: { $size: '$users' } } }]) : [],
     TcgCard.aggregate([{ $group: { _id: '$card', n: { $sum: 1 } } }]),
     TcgCard.aggregate([{ $match: { 'slab.grade': { $type: 'number' } } }, { $group: { _id: { card: '$card', grade: '$slab.grade', code: '$slab.code' }, n: { $sum: 1 } } }]),
+    GradingShop.find({ code: { $type: 'string' } }).select('code codeHistory reputation').lean(),
   ]);
   const active = activeIds.length;
   const spread = new Map(owners.map((o) => [o._id, { owners: o.n, share: active ? o.n / active : 0 }]));
   const pop = new Map(copies.map((c) => [c._id, { copies: c.n, slabs: {}, byCode: {} }]));
+  const grades = {};
   for (const s of slabs) {
+    grades[s._id.grade] = (grades[s._id.grade] || 0) + s.n;
     const p = pop.get(s._id.card) || { copies: 0, slabs: {}, byCode: {} };
     pop.set(s._id.card, p);
     p.slabs[s._id.grade] = (p.slabs[s._id.grade] || 0) + s.n;
@@ -40,7 +46,9 @@ async function all(now = Date.now()) {
     p.byCode[code] = p.byCode[code] || {};
     p.byCode[code][s._id.grade] = (p.byCode[code][s._id.grade] || 0) + s.n;
   }
-  const data = { active, spread, pop };
+  const reps = new Map();
+  for (const s of shops) for (const code of [s.code, ...(s.codeHistory || [])]) reps.set(code, s.reputation || 0);
+  const data = { active, spread, pop, grades, reps };
   cache = { at: now, data };
   return data;
 }
@@ -93,4 +101,47 @@ function gradeRarity(cardId, data, grade) {
   return { ...r, tier: { key: tier.key, label: tier.label } };
 }
 
-module.exports = { ACTIVE_DAYS, all, invalidate, slabsAtLeast, popText, gradeRarity, GRADE_RARITY };
+// Wie sehr ein renommierter Shop einen Slab seltener macht: je höher seine Stufe, desto kleiner der Faktor (0,35 = Legende)
+const SHOP_FACTOR = [
+  { min: 2000, factor: 0.35, label: 'Legende' },
+  { min: 500, factor: 0.55, label: 'Renommiert' },
+  { min: 100, factor: 0.8, label: 'Bekannt' },
+  { min: 0, factor: 1, label: 'Neuling' },
+];
+const SLAB_TIERS = [
+  { key: 'legend', label: 'Legendär', max: 0.03 },
+  { key: 'rar', label: 'Sehr selten', max: 0.08 },
+  { key: 'selten', label: 'Selten', max: 0.2 },
+  { key: 'ungewoehnlich', label: 'Ungewöhnlich', max: 0.45 },
+  { key: 'normal', label: 'Verbreitet', max: Infinity },
+];
+
+/**
+ * Seltenheit eines Slabs (#204): Anteil aller Slabs mit mindestens dieser Note (je höher die Note, desto seltener),
+ * gewichtet mit dem Ruf des Shops, der ihn ausgestellt hat (Legende ×0,35 … Neuling ×1), und eine halbe Stufe seltener, wenn
+ * es von dieser Karte nur einen Slab in genau dieser Note gibt. Gibt { key, label, tail, shop, at } oder null ohne Daten:
+ * tail = Anteil der Slabs mit Note ≥ grade (0–1), shop = Stufe des Shops, at = Slabs dieser Karte in genau dieser Note.
+ */
+function slabRarity(cardId, data, slab) {
+  if (!data || !slab || !slab.grade) return null;
+  const total = Object.values(data.grades || {}).reduce((s, n) => s + n, 0);
+  if (!total) return null;
+  const tail = Object.entries(data.grades).reduce((s, [g, n]) => s + (Number(g) >= slab.grade ? n : 0), 0) / total;
+  const rep = (data.reps && data.reps.get(slab.code)) || 0;
+  // negativer Ruf (Strafe aus der Zweitprüfung, schlechte Sterne) zählt wie ein Neuling
+  const shop = SHOP_FACTOR.find((x) => rep >= x.min) || SHOP_FACTOR[SHOP_FACTOR.length - 1];
+  const p = data.pop.get(cardId);
+  const at = (p && p.slabs[slab.grade]) || 0;
+  const eff = tail * shop.factor * (at <= 1 ? 0.5 : 1);
+  const tier = SLAB_TIERS.find((t) => eff <= t.max);
+  return { key: tier.key, label: tier.label, tail, shop: shop.label, at, grade: slab.grade, code: slab.code };
+}
+
+/** Verbreitung einer Karte ohne Slab: Anteil der aktiven Spieler, die sie besitzen (0–100) – oder null ohne Daten */
+function spreadOf(cardId, data) {
+  if (!data || !data.active) return null;
+  const s = data.spread.get(cardId);
+  return { pct: Math.round(100 * (s ? s.share : 0)), owners: s ? s.owners : 0, active: data.active };
+}
+
+module.exports = { ACTIVE_DAYS, all, invalidate, slabsAtLeast, popText, gradeRarity, GRADE_RARITY, slabRarity, spreadOf, SLAB_TIERS, SHOP_FACTOR };

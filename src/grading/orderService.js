@@ -169,7 +169,7 @@ async function slabCapacity(shopIds, session = null) {
   const rows = await GradingOrder.aggregate([{ $match: { shop: { $in: shopIds }, status: { $in: OPEN }, 'services.slab': true } }, { $group: { _id: '$shop', n: { $sum: 1 } } }]).session(session);
   const committed = new Map(rows.map((r) => [String(r._id), r.n]));
   const out = new Map();
-  for (const id of shopIds) out.set(String(id), Math.max(0, (await items.slabStock(id, session)) - (committed.get(String(id)) || 0)));
+  for (const id of shopIds) out.set(String(id), Math.max(0, (await items.slabStock(id, session, true)) - (committed.get(String(id)) || 0)));
   return out;
 }
 

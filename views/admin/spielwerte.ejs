@@ -200,19 +200,55 @@
 
   <% if (sub === 'folie') { %>
   <section class="stats-block" id="folie">
-    <%- blockHead('TCG Sleeve & Slab', 'Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit dieser Chance einen TCG Sleeve (die frühere Folie). Der Bank-Shop im Inventar verkauft Sleeves, die Werkstatt eines Grading-Shops leere Slabs – jeweils zu festen Preisen (mindestens so viel, wie die Bank beim Ankauf zahlt – sonst ließe sich Geld drucken); im Dungeon und im Turm ist ein Teil der Funde ein leerer Slab. Alte BfW-Slabs steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel.') %>
+    <%- blockHead('TCG Sleeve & Slab', 'Preise: Der Bank-Shop im Inventar verkauft Sleeves, die Werkstatt eines Grading-Shops leere Slabs – der Verkaufspreis liegt nie unter dem Ankauf der Bank (sonst ließe sich Geld drucken). Funde: Wer im Grading-Shop eine Karte versiegelt (ab Stufe 3), findet mit der Chance einen TCG Sleeve; im Dungeon und im Turm ist ein Teil der Funde ein leerer Slab. Alte BfW-Slabs steigen im Wert (bezogen auf den Verkaufswert, linear) – das zählt in der Rangliste und im Handel.') %>
     <div class="card">
-      <form method="post" data-reauth action="/admin/folie" class="form panel-form">
+      <form method="post" data-reauth action="/admin/folie" class="form panel-form admin-items">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <div class="admin-gr-grid">
-          <label class="field"><span>Fundchance pro versiegelter Karte in %</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung alter BfW-Slabs: sofort in %</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
-          <label class="field"><span>Wertsteigerung alter BfW-Slabs pro Tag in %</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
-          <label class="field"><span>Bank-Shop: Preis TCG Sleeve in € (Ankauf <%= euro(itemTypes.find((t) => t.key === 'folie').sell) %>)</span><input type="text" name="sleeve" inputmode="decimal" value="<%= (foilSettings.sleevePrice / 100).toFixed(2).replace('.', ',') %>" required></label>
-          <label class="field"><span>Werkstatt: Preis leerer Slab in € (Ankauf <%= euro(itemTypes.find((t) => t.key === 'slab').sell) %>)</span><input type="text" name="slabpreis" inputmode="decimal" value="<%= (foilSettings.slabPrice / 100).toFixed(2).replace('.', ',') %>" required></label>
-          <label class="field"><span>Dungeon/Turm: Anteil der Funde, die ein leerer Slab sind, in %</span><input type="text" name="slabanteil" inputmode="decimal" value="<%= String(foilSettings.slabDropPercent).replace('.', ',') %>" required></label>
-        </div>
-        <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
+        <%
+          const cents = (c) => (c / 100).toFixed(2).replace('.', ',');
+          const it = (key) => itemTypes.find((t) => t.key === key);
+          const rows = [
+            { key: 'folie', sell: 'sleeveankauf', price: 'sleeve', sellValue: foilSettings.sleeveSell, priceValue: foilSettings.sleevePrice, where: 'Bank-Shop im Inventar' },
+            { key: 'slab', sell: 'slabankauf', price: 'slabpreis', sellValue: foilSettings.slabSell, priceValue: foilSettings.slabPrice, where: 'Werkstatt eines Grading-Shops' },
+          ];
+        %>
+        <fieldset class="admin-group">
+          <legend>Preise der Gegenstände</legend>
+          <div class="table-wrap">
+            <table class="table admin-items-table">
+              <thead><tr><th>Gegenstand</th><th>Verkauf an Spieler</th><th>Ankauf durch die Bank</th><th class="num">Spanne</th><th>Gekauft wird</th></tr></thead>
+              <tbody>
+                <% rows.forEach((r) => { const t = it(r.key); %>
+                  <tr>
+                    <td><span class="admin-items-name"><img src="<%= t.image %>" alt="" width="32" height="32"><strong><%= t.label %></strong></span></td>
+                    <td><label class="admin-eur"><input type="text" name="<%= r.price %>" inputmode="decimal" value="<%= cents(r.priceValue) %>" aria-label="Verkaufspreis <%= t.label %>" required><span>€</span></label></td>
+                    <td><label class="admin-eur"><input type="text" name="<%= r.sell %>" inputmode="decimal" value="<%= cents(r.sellValue) %>" aria-label="Ankaufspreis <%= t.label %>" required><span>€</span></label></td>
+                    <td class="num"><%= euro(r.priceValue - r.sellValue) %></td>
+                    <td class="muted"><%= r.where %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted small">Der Verkaufspreis darf nie unter dem Ankauf liegen, sonst ließe sich Geld drucken. Die Preise gelten sofort.</p>
+        </fieldset>
+
+        <fieldset class="admin-group">
+          <legend>Funde</legend>
+          <div class="admin-gr-grid">
+            <label class="field"><span>Grading-Shop: Fundchance pro versiegelter Karte (%)</span><input type="text" name="chance" inputmode="decimal" value="<%= String(foilSettings.gradingChance / 100).replace('.', ',') %>" required></label>
+            <label class="field"><span>Dungeon und Turm: Anteil leerer Slabs an den Funden (%)</span><input type="text" name="slabanteil" inputmode="decimal" value="<%= String(foilSettings.slabDropPercent).replace('.', ',') %>" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="admin-group">
+          <legend>Wertsteigerung alter BfW-Slabs</legend>
+          <div class="admin-gr-grid">
+            <label class="field"><span>Sofort (%)</span><input type="text" name="bonus" inputmode="decimal" value="<%= String(foilSettings.bonusPercent).replace('.', ',') %>" required></label>
+            <label class="field"><span>Pro Tag (%)</span><input type="text" name="daily" inputmode="decimal" value="<%= String(foilSettings.dailyPercent).replace('.', ',') %>" required></label>
+          </div>
+          <p class="muted small">Beispiel: Eine Karte mit 100 € Verkaufswert ist nach 30 Tagen <%= euro(Math.floor(10000 * (100 + foilSettings.bonusPercent + 30 * foilSettings.dailyPercent) / 100)) %> wert. Änderungen gelten sofort für alle folierten Karten.</p>
+        </fieldset>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>
