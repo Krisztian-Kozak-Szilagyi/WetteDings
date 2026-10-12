@@ -295,12 +295,12 @@
 
     var kind = give.count && get.count ? 'tausch' : isMarket || isListing ? 'markt' : 'privat';
     var problems = [];
-    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle unten Karten aus deiner Sammlung – oder Wunschkarten für ein Gesuch.' : 'Wähle Karten – auf einer der beiden Seiten.');
+    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle Karten oder Wunschkarten.' : 'Wähle Karten.');
     if (give.count > maxLines || get.count > maxLines) problems.push('Höchstens ' + maxLines + ' Karten je Seite.');
-    if (give.count && !get.count && !receive) problems.push(isMarket ? 'Gib einen Preis an – oder wähle Wunschkarten, dann wird getauscht.' : 'Ohne Karten zurück: Gib an, wie viel du dafür bekommst.');
-    if (!give.count && get.count && !pay) problems.push('Ohne eigene Karten: Gib an, wie viel du dafür zahlst.');
-    if (!give.count && receive) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du gibst“ ein.');
-    if (!get.count && pay && give.count) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du bekommst“ ein.');
+    if (give.count && !get.count && !receive) problems.push(isMarket ? 'Preis oder Wunschkarten fehlen.' : 'Gib an, was du dafür bekommst.');
+    if (!give.count && get.count && !pay) problems.push('Gib an, was du dafür zahlst.');
+    if (!give.count && receive) problems.push('Ohne Karte: Geld bei „Du gibst“ eintragen.');
+    if (!get.count && pay && give.count) problems.push('Ohne Karte: Geld bei „Du bekommst“ eintragen.');
     if (pay > balance) problems.push('Dein Guthaben reicht dafür nicht (' + euro(balance) + ').');
 
     var nothing = !give.count && !get.count;

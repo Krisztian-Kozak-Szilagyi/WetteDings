@@ -29,7 +29,7 @@
     <a class="hb-back" href="<%= backUrl %>">← <%= mode === 'gegen' ? 'Zur Verhandlung' : 'Handel' %></a>
     <h1><%= title %><% if (partner && mode !== 'neu') { %> <span class="hb-top-partner">an <%= partner.username %></span><% } %></h1>
     <p class="muted">
-      <% if (mode === 'neu') { %>Verkaufen, tauschen oder Karten suchen – auf dem Markt für alle oder direkt mit einem Mitglied, auch mehrere Karten auf einmal.<% } %>
+      <% if (mode === 'neu') { %>Verkaufen, tauschen oder suchen.<% } %>
       <% if (mode === 'markt') { %>Zum Markt-Angebot von <%= partner.username %><%= listing.price ? ' (' + euro(listing.price) + ')' : '' %>: Trag ein, was du insgesamt zahlen willst – auch weniger als verlangt – oder biete Karten an.<% } %>
       <% if (mode === 'gegen') { %>Ändere, was beide Seiten geben. Danach ist <%= partner.username %> am Zug.<% } %>
     </p>
@@ -75,7 +75,7 @@
             <span><strong><%= lineLabel(fixedGives) %></strong><small class="muted">dein Markt-Angebot, steht fest</small></span>
           </div>
         <% } else { %>
-          <ul class="hb-tray" data-hb-tray="gib" aria-live="polite"><li class="hb-tray-empty">Tippe unten Karten aus deiner Sammlung an.</li></ul>
+          <ul class="hb-tray" data-hb-tray="gib" aria-live="polite"><li class="hb-tray-empty">Karten antippen</li></ul>
         <% } %>
         <div class="hb-money-row"><%- moneyField('gib', 'Geld, das du zahlst', pay) %></div>
       </div>
@@ -88,14 +88,10 @@
       <div class="hb-side hb-side-get" data-hb-side-box="will">
         <% if (isMarket) { %>
           <button type="button" class="hb-side-head" data-hb-open="will">
-            <span class="hb-side-label">Du bekommst<span class="hb-side-from"> von wem auch immer</span></span>
+            <span class="hb-side-label">Du bekommst<span class="hb-side-from">vom Markt</span></span>
             <span class="hb-side-value" data-hb-sum="will"></span>
           </button>
-          <label class="hb-price">
-            <span class="sr-only">Preis</span>
-            <input type="text" name="geld_will" inputmode="decimal" placeholder="Preis" value="<%= money(receive) %>" data-hb-money="will"><span class="hb-money-unit">€</span>
-          </label>
-          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Optional: Wunschkarten – mit oder ohne Preis.</li></ul>
+          <ul class="hb-tray hb-tray-wish" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Wunschkarten (optional)</li></ul>
           <%# Wunschkarte suchen: Vorschläge aus allen Karten, fehlende zuerst (public/js/handel-neu.js) %>
           <div class="hb-wish" data-hb-wish>
             <label class="hb-wish-field">
@@ -108,19 +104,19 @@
               <ul class="hb-wish-list" id="hb-wish-list" role="listbox" aria-label="Vorschläge" data-hb-wish-list></ul>
             </div>
           </div>
-          <%# #115: kurze Zeile, die Regeln stehen im ?-Fenster (Verhalten wie überall: public/js/app.js) %>
-          <div class="hb-price-note muted small">
-            <span>Wer zuerst annimmt, bekommt das Angebot.</span>
+          <%# Preis wie das Geldfeld links, unten bündig; die Regeln stehen im ?-Fenster (Verhalten wie überall: public/js/app.js) %>
+          <div class="hb-money-row hb-price-note">
+            <label class="hb-money hb-price-field"><span>Preis</span><input type="text" name="geld_will" inputmode="decimal" placeholder="0,00" value="<%= money(receive) %>" data-hb-money="will" aria-label="Preis"><span class="hb-money-unit">€</span></label>
             <details class="help-tip">
               <summary aria-label="So funktioniert ein Markt-Angebot" title="So funktioniert ein Markt-Angebot">?</summary>
               <div class="help-tip-body">
-                <p>Preis und Wunschkarten gehen einzeln oder zusammen.</p>
-                <p>Wer annimmt, gibt dir alles, was du hier verlangst, und bekommt dafür deine Karten. Bis dahin sind deine Karten gesperrt.</p>
+                <p><b>Wer zuerst annimmt, bekommt das Angebot.</b></p>
+                <p>Preis und Wunschkarten gehen einzeln oder zusammen. Wer annimmt, gibt dir alles, was du hier verlangst, und bekommt dafür deine Karten. Bis dahin sind deine Karten gesperrt.</p>
                 <p>Statt anzunehmen kann man dir auch ein Gegenangebot machen – darüber entscheidest du.</p>
               </div>
             </details>
           </div>
-        <% } else { %>
+<% } else { %>
           <button type="button" class="hb-side-head" data-hb-open="will" <%= showTheirs ? '' : 'disabled' %>>
             <span class="hb-side-label">Du bekommst<span class="hb-side-from"> von <%= partner.username %></span></span>
             <span class="hb-side-value" data-hb-sum="will"></span>
@@ -131,7 +127,7 @@
               <span><strong><%= lineLabel(fixedGets) %></strong><small class="muted">aus dem Markt-Angebot, steht fest</small></span>
             </div>
           <% } else { %>
-            <ul class="hb-tray" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Wähle unten Karten aus der Sammlung von <%= partner.username %>.</li></ul>
+            <ul class="hb-tray" data-hb-tray="will" aria-live="polite"><li class="hb-tray-empty">Karten wählen</li></ul>
           <% } %>
           <div class="hb-money-row"><%- moneyField('will', 'Geld, das ' + partner.username + ' zahlt', receive) %></div>
         <% } %>
@@ -147,7 +143,7 @@
           <div class="hb-bar-summary">
             <span class="hb-bar-line" data-hb-summary><%= isMarket ? 'Wähle Karten und einen Preis.' : 'Wähle aus, was beide Seiten geben.' %></span>
             <span class="hb-bar-note" data-hb-note>
-              <% if (isMarket) { %><%= marketDays %> Tage gültig · deine Karten sind bis dahin gesperrt.<% } else { %><%= privateHours %> Std. gültig · deine Karten sind bis dahin gesperrt.<% } %>
+              <% if (isMarket) { %><%= marketDays %> Tage gültig · Karten gesperrt<% } else { %><%= privateHours %> Std. gültig · Karten gesperrt<% } %>
             </span>
           </div>
           <button class="btn btn-primary hb-submit" type="submit" data-hb-submit><%= isMarket ? 'Auf den Markt stellen' : mode === 'gegen' ? 'Gegenangebot senden' : 'Angebot senden' %></button>
