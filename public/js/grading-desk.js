@@ -9,7 +9,7 @@
   document.querySelectorAll('[data-gd-sheet]').forEach(function (d) { sheets[d.getAttribute('data-gd-sheet')] = d; });
   var base = location.pathname;
   // Zeiten der Auftragsverwaltung in ms – hier an einer Stelle einstellen (das CSS liest sie über Variablen mit)
-  var T = { stamp: 2000, fade: 2000, enter: 2500 }; // Stempel landet · Inhalt blendet aus · Inhalt blendet ein
+  var T = { stamp: 650, fade: 300, enter: 400 }; // Stempel landet · Inhalt blendet aus · Inhalt blendet ein
   var rootStyle = document.documentElement.style;
   rootStyle.setProperty('--ord-t-stamp', T.stamp + 'ms');
   rootStyle.setProperty('--ord-t-fade', T.fade + 'ms');
@@ -255,8 +255,8 @@
     var body = sheets.auftraege && sheets.auftraege.querySelector('.gd-sheet-body');
     if (!body) { location.reload(); return; }
     var calmNow = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var FADE_MS = calmNow ? 0 : quick ? 260 : T.fade; // Auswählen und Abbrechen: kurzer Übergang, Annehmen: langer
-    if (quick) { body.style.setProperty('--ord-t-fade', FADE_MS + 'ms'); body.style.setProperty('--ord-t-enter', '420ms'); }
+    var FADE_MS = calmNow ? 0 : quick ? 140 : T.fade; // Auswählen und Abbrechen: kurzer Übergang, Annehmen: langer
+    if (quick) { body.style.setProperty('--ord-t-fade', FADE_MS + 'ms'); body.style.setProperty('--ord-t-enter', '200ms'); }
     body.classList.add('is-leaving'); // sanft ausblenden, während der neue Stand lädt
     var wait = new Promise(function (done) { setTimeout(done, FADE_MS); });
     var load = fetch(base + '?reiter=auftraege', { credentials: 'same-origin' }).then(function (res) { return res.text(); });
@@ -276,7 +276,7 @@
         if (target) target.click(); // jetzt erst: weiter zum gewünschten Reiter (Annehmen, Auswählen, Abbrechen: „Angenommen“)
         body.classList.remove('is-leaving');
         body.classList.add('is-entering'); // und wieder einblenden
-        setTimeout(function () { body.classList.remove('is-entering'); body.style.removeProperty('--ord-t-fade'); body.style.removeProperty('--ord-t-enter'); }, (quick ? 420 : T.enter) + 100);
+        setTimeout(function () { body.classList.remove('is-entering'); body.style.removeProperty('--ord-t-fade'); body.style.removeProperty('--ord-t-enter'); }, (quick ? 200 : T.enter) + 100);
       })
       .catch(function () { location.reload(); });
   }

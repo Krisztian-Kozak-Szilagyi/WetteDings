@@ -232,7 +232,7 @@
             const rowRare = c.isItem && single ? 'Gegenstand' : !single ? 'bis ' + r.label : !sp ? r.label : sp.kind === 'slab' ? r.label + ' · ' + sp.label : r.label + ' · ' + sp.pct + ' % besitzen';
             const rowOwn = c.isItem ? '–' : kindKey === 'wanted' ? (lacking.length ? 'Fehlt dir frei' : 'Hast du frei') : single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz';
             const rowTip = [ms ? marketText(ms) : '', single && !c.isItem ? [popText(top), salesText(top.copy || top.doc)].filter(Boolean).join(' · ') : ''].filter(Boolean).join(' · ');
-            const dealer = kindKey === 'swap' ? [['Du gibst', linesValue(t.want)], ['Du bekommst', value]] : [['Händler', kindKey === 'wanted' ? linesValue(t.want) : value], ['Markt Ø', mval]];
+            const dealer = kindKey === 'swap' ? [['Du gibst', linesValue(t.want), t.want], ['Du bekommst', value, t.give]] : [['Händler', kindKey === 'wanted' ? linesValue(t.want) : value], ['Markt Ø', mval]];
           %>
           <div class="mk-body">
             <div class="mk-head">
@@ -251,7 +251,7 @@
                 <span class="mk-verdict<%= verdict ? ' is-' + verdict : ' is-none' %>"><%= verdict ? { low: '▼ unter Ø', mid: '≈ Ø', high: '▲ über Ø' }[verdict] : '–' %></span>
               </div>
               <dl class="mk-kv">
-                <% dealer.forEach(([label, v], i) => { %><div><dt><%= label %></dt><dd class="<%= i === 0 && kindKey === 'sale' && t.price < value ? 'pos' : '' %>"><%= v != null ? euro(v) : '–' %><% if (label === 'Markt Ø' && ms && ms.avg == null && mval != null) { %> <small>geschätzt</small><% } %></dd></div><% }) %>
+                <% dealer.forEach(([label, v, cards], i) => { %><div><dt><%= label %></dt><% if (cards) { %><dd class="mk-kv-cards"><%- include('partials/trade-stack', { list: cards, size: 'sm' }) %></dd><% } %><dd class="<%= i === 0 && kindKey === 'sale' && t.price < value ? 'pos' : '' %>"><%= v != null ? euro(v) : '–' %><% if (label === 'Markt Ø' && ms && ms.avg == null && mval != null) { %> <small>geschätzt</small><% } %></dd></div><% }) %>
               </dl>
             </div>
             <span class="mk-seller"><%= kindKey === 'swap' ? 'von ' : '' %><% if (kindKey === 'swap') { %><%- userLink(t.sellerName) %> · <% } %>endet <%= relTime(t.expiresAt) %></span>
