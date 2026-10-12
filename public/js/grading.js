@@ -67,6 +67,17 @@
       for (var si = 0; si < IRON_SEGMENTS; si++) segs.push({ el: el('span', 'gr-crease-seg', creaseEl), flat: 0, heat: 0, burnt: false });
     }
     if (d.ironed || job.iron) creaseEl.classList.add('is-ironed');
+    // Schon gebügelt (Neuladen oder früher gebügelte Karte): so viele Stücke liegen glatt, wie das Ergebnis hergibt –
+    // gleichmäßig über den Knick verteilt, damit man sie beim Benoten abzählen kann (je 2 glatte Stücke = 1 Note mehr)
+    var smoothPct = job.iron ? job.iron.smooth : d.ironed && d.creaseCap ? (d.creaseCap - 4) * 20 : null;
+    if (segs.length && smoothPct != null) {
+      var flatCount = Math.max(0, Math.min(IRON_SEGMENTS, Math.floor(smoothPct / 10)));
+      segs.forEach(function (s, i) {
+        // Stück i ist glatt, wenn die gleichmäßige Verteilung hier eine Grenze überschreitet
+        s.flat = Math.floor(((i + 1) * flatCount) / IRON_SEGMENTS) > Math.floor((i * flatCount) / IRON_SEGMENTS) ? 1 : 0;
+        s.el.style.setProperty('--flat', String(s.flat));
+      });
+    }
   }
   el('div', 'gr-glare', front);
 

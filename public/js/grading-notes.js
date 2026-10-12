@@ -1,6 +1,7 @@
 // Notizzettel an der Werkbank (views/partials/grading-notes.ejs): Mängel abhaken, die Note wie im Ablauf ausrechnen
 // (Obergrenze aus Knick und Zentrierung, minus 1 je Mangel, mindestens 1) und auf Wunsch auswählen. Der Zettel kennt
 // nur, was man selbst einträgt – Messung und Bügel-Ergebnis übernimmt er aus dem, was der Tisch ohnehin anzeigt.
+// Gebügelter Knick: man zählt die glatten der 10 Knick-Stücke ab, daraus folgt die Obergrenze.
 // Die Notizen bleiben beim Neuladen erhalten (je Auftrag im Browser gespeichert).
 (function () {
   'use strict';
@@ -8,7 +9,10 @@
   if (!root) return;
   var KEY = 'gr-notes:' + root.getAttribute('data-job');
   var CORNERS = ['tl', 'tr', 'bl', 'br'];
-  var blank = function () { return { crease: 'none', ironed: 7, center: 10, scratches: 0, edges: 0, corners: {}, text: '' }; };
+  var PIECES = 10; // Knick-Stücke, wie CREASE_SEGMENTS in src/grading/condition.js
+  var blank = function () { return { crease: 'none', pieces: 0, center: 10, scratches: 0, edges: 0, corners: {}, text: '' }; };
+  /** Obergrenze eines gebügelten Knicks aus den glatten Stücken: je 2 eine Note mehr, höchstens 9 (wie ironCap) */
+  var piecesCap = function (n) { return Math.min(9, 4 + Math.floor(n / 2)); };
   var state = blank();
 
   var $ = function (sel) { return root.querySelector(sel); };
@@ -17,7 +21,8 @@
   var hintEl = $('[data-gn-hint]');
   var measuredEl = $('[data-gn-measured]');
   var textEl = $('[data-gn-text]');
-  var ironedSel = $('[data-gn-ironed]');
+  var ironHelp = $('[data-gn-ironhelp]');
+  var pieceBtns = root.querySelectorAll('[data-gn-piece]');
   var defaultHint = hintEl.textContent;
 
   // ---------- Speichern (nur dieser Auftrag; Zettel alter Aufträge werden weggeräumt) ----------
@@ -27,6 +32,9 @@
       if (raw) {
         var s = JSON.parse(raw);
         state = Object.assign(blank(), s, { corners: Object.assign({}, s.corners) });
+        // älterer Zettel: Obergrenze statt glatter Stücke gespeichert
+        if (s.pieces == null && s.ironed) state.pieces = Math.max(0, Math.min(PIECES, (Number(s.ironed) - 4) * 2));
+        delete state.ironed;
       }
       for (var i = window.localStorage.length - 1; i >= 0; i--) {
         var k = window.localStorage.key(i);
@@ -41,7 +49,7 @@
   // ---------- Rechnen und Anzeigen ----------
   function creaseCap() {
     if (state.crease === '4') return 4;
-    if (state.crease === 'ironed') return Number(state.ironed) || 9;
+    if (state.crease === 'ironed') return piecesCap(state.pieces);
     return 10;
   }
   function cornerCount() {
@@ -55,7 +63,15 @@
   function render() {
     var c = root.querySelector('input[name="gn-crease"][value="' + state.crease + '"]');
     if (c) c.checked = true;
-    ironedSel.value = String(state.ironed);
+    ironHelp.hidden = state.crease !== 'ironed';
+    pieceBtns.forEach(function (b) {
+      var on = Number(b.getAttribute('data-gn-piece')) <= state.pieces;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    $('[data-gn-pieces]').textContent = state.pieces;
+    $('[data-gn-pieces-cap]').textContent = piecesCap(state.pieces);
+    $('[data-gn-ironed-cap]').textContent = piecesCap(state.pieces);
     var z = root.querySelector('input[name="gn-center"][value="' + state.center + '"]');
     if (z) z.checked = true;
     $('[data-gn-val="scratches"]').textContent = state.scratches;
@@ -63,7 +79,7 @@
     CORNERS.forEach(function (k) { $('[data-gn-corner="' + k + '"]').checked = !!state.corners[k]; });
     if (document.activeElement !== textEl) textEl.value = state.text;
     var r = result();
-    var by = creaseCap() <= state.center && state.crease !== 'none' ? 'Knick' : state.center < 10 ? 'Zentrierung' : '';
+    var by = state.crease !== 'none' && creaseCap() <= state.center ? (state.crease === 'ironed' ? 'gebügelter Knick' : 'Knick') : state.center < 10 ? 'Zentrierung' : '';
     calcEl.textContent = 'Obergrenze ' + r.cap + (by ? ' (' + by + ')' : '') + ' − ' + r.minus + (r.minus === 1 ? ' Mangel' : ' Mängel');
     gradeEl.textContent = r.grade;
     root.classList.toggle('has-marks', r.minus > 0 || r.cap < 10);
@@ -78,15 +94,23 @@
   root.addEventListener('change', function (e) {
     var t = e.target;
     if (t.name === 'gn-crease') update(function () { state.crease = t.value; });
-    else if (t === ironedSel) update(function () { state.ironed = Number(t.value); state.crease = 'ironed'; });
     else if (t.name === 'gn-center') update(function () { state.center = Number(t.value); });
     else if (t.hasAttribute('data-gn-corner')) update(function () { state.corners[t.getAttribute('data-gn-corner')] = t.checked; });
   });
   root.addEventListener('click', function (e) {
     var inc = e.target.closest('[data-gn-inc]');
     var dec = e.target.closest('[data-gn-dec]');
+    var piece = e.target.closest('[data-gn-piece]');
     if (inc) update(function () { var k = inc.getAttribute('data-gn-inc'); state[k] = Math.min(20, state[k] + 1); });
     if (dec) update(function () { var k = dec.getAttribute('data-gn-dec'); state[k] = Math.max(0, state[k] - 1); });
+    // Stücke von links abhaken; ein Klick auf das letzte abgehakte nimmt es wieder weg
+    if (piece) {
+      update(function () {
+        var n = Number(piece.getAttribute('data-gn-piece'));
+        state.pieces = state.pieces === n ? n - 1 : n;
+        state.crease = 'ironed';
+      });
+    }
   });
   textEl.addEventListener('input', function () {
     state.text = textEl.value.slice(0, 300);
@@ -107,12 +131,12 @@
     measuredEl.textContent = 'Gemessen: ' + (ratio ? ratio.textContent : '') + ' → ' + cap;
   });
 
-  // Bügel-Ergebnis übernehmen, sobald der Tisch es anzeigt („… begrenzt die Note jetzt auf 7“)
+  // Bügel-Ergebnis übernehmen, sobald der Tisch es anzeigt („Zu 64 % glatt – … begrenzt die Note jetzt auf 7“)
   var ironRes = document.querySelector('[data-gr-iron-result]');
   if (ironRes && window.MutationObserver) {
     new MutationObserver(function () {
-      var m = /auf (\d+)/.exec(ironRes.textContent || '');
-      if (m && !ironRes.hidden) update(function () { state.crease = 'ironed'; state.ironed = Math.min(9, Math.max(5, Number(m[1]))); });
+      var m = /(\d+) % glatt/.exec(ironRes.textContent || '');
+      if (m && !ironRes.hidden) update(function () { state.crease = 'ironed'; state.pieces = Math.min(PIECES, Math.floor(Number(m[1]) / 10)); });
     }).observe(ironRes, { childList: true, characterData: true, subtree: true, attributes: true });
   }
 

@@ -8861,3 +8861,49 @@ a.pg-btn, a.pg-btn:hover { color: #3b2503; }
 .gr-notes-hint { margin: 6px 0 0; font-size: 11px; color: var(--ink-dim); }
 .gr-notes-hint.is-warn { color: #b5371f; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .gr-notes-paper { transform: none; } }
+
+/* Notizzettel als Schmierzettel: Kugelschreiber-Handschrift (Systemschriften, kein Nachladen), Kaffeerand, leicht
+   abgegriffenes Papier – Zahlen und Ergebnis bleiben groß und klar */
+.gr-notes-paper {
+  --hand: "Segoe Print", "Bradley Hand", "Chalkboard SE", "Noteworthy", "Comic Sans MS", "Comic Neue", cursive;
+  --ink: #1f3477; --ink-dim: #4a5a86;
+  font-family: var(--hand); line-height: 1.35;
+  background:
+    radial-gradient(circle at 84% 90%, transparent 26px, rgba(150, 100, 50, .16) 27px 29px, transparent 31px),
+    radial-gradient(circle at 84% 90%, rgba(150, 100, 50, .05) 0 26px, transparent 27px),
+    linear-gradient(90deg, transparent 21px, var(--margin) 21px 22px, transparent 22px),
+    repeating-linear-gradient(transparent 0 25px, var(--line) 25px 26px),
+    linear-gradient(170deg, #fffef6, #f6efda 70%, #efe6cc);
+}
+.gr-notes-paper :is(h2, h3, legend, label, span, b, small, strong, p, td, th, caption, textarea, select, .gr-notes-link, .gr-notes-btn) { font-family: var(--hand); }
+.gr-notes-head h2 { font-size: 21px; font-weight: 700; transform: rotate(-1.5deg); transform-origin: left; }
+.gr-notes-sec h3 { font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.gr-notes-check, .gr-notes-count, .gr-notes-corners { font-size: 14px; }
+.gr-notes-sum strong { font-size: 24px; font-weight: 700; }
+.gr-notes-free textarea { font-size: 14px; }
+.gr-notes-pill b { font-family: var(--hand); font-size: 15px; }
+
+/* Hilfe für gebügelte Knicke: 10 Stücke abhaken, Tabelle Stücke → Obergrenze */
+.gr-notes-iron { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 2px; padding: 8px 8px 6px; border: 1.5px dashed rgba(31, 52, 119, .45); border-radius: 6px; background: rgba(255, 255, 255, .45); }
+.gr-notes-iron[hidden] { display: none; }
+.gr-notes-iron-q { font-size: 13px; font-weight: 700; color: var(--ink); }
+.gr-notes-pieces { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.gr-notes-piece {
+  position: relative; height: 22px; padding: 0; border: 0; border-radius: 3px; cursor: var(--cur-pointer, pointer);
+  background: linear-gradient(transparent 8px, #3b3f58 8px 13px, transparent 13px); /* sichtbares Knick-Stück */
+}
+.gr-notes-piece.is-on { background: linear-gradient(transparent 9px, rgba(59, 63, 88, .18) 9px 12px, transparent 12px); }
+.gr-notes-piece.is-on::after { content: "✓"; position: absolute; inset: -2px 0 0; display: grid; place-items: center; font: 700 15px var(--hand); color: #1f7a3a; }
+.gr-notes-piece:focus-visible { outline: 2px solid #2f5fb3; outline-offset: 1px; }
+.gr-notes-iron-a { font-size: 14px; color: var(--ink); }
+.gr-notes-iron-a b { font-size: 16px; }
+.gr-notes-iron-table { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--ink); text-align: center; }
+.gr-notes-iron-table caption { caption-side: bottom; padding-top: 2px; font-size: 11px; color: var(--ink-dim); text-align: left; }
+.gr-notes-iron-table th { padding: 1px 4px 1px 0; text-align: left; font-weight: 700; white-space: nowrap; }
+.gr-notes-iron-table td { padding: 1px 0; border-left: 1px solid rgba(31, 52, 119, .25); font-variant-numeric: tabular-nums; }
+.gr-notes-iron-table tr + tr td { font-weight: 700; font-size: 14px; }
+.gr-notes-iron-tip { font-size: 11px; color: var(--ink-dim); }
+
+/* Bühne: gebügelter Knick mit kleinen Lücken zwischen den Stücken – so lassen sie sich abzählen */
+.gr-crease.is-ironed.is-line { gap: 2px; }
+.gr-crease.is-ironed .gr-crease-seg { border-radius: 2px; }

@@ -15,12 +15,21 @@
         <legend>Knick</legend>
         <label class="gr-notes-check"><input type="radio" name="gn-crease" value="none" checked> kein Knick</label>
         <label class="gr-notes-check"><input type="radio" name="gn-crease" value="4"> Knick → <b>4</b></label>
-        <label class="gr-notes-check gr-notes-ironed">
-          <input type="radio" name="gn-crease" value="ironed"> gebügelt →
-          <select data-gn-ironed aria-label="Obergrenze nach dem Bügeln">
-            <% for (let c = 5; c <= 9; c++) { %><option value="<%= c %>"><%= c %></option><% } %>
-          </select>
-        </label>
+        <label class="gr-notes-check"><input type="radio" name="gn-crease" value="ironed"> gebügelt → <b data-gn-ironed-cap>4</b></label>
+        <%# Hilfe für gebügelte Knicke: Stücke abzählen statt schätzen (src/grading/condition.js: ironCap) %>
+        <div class="gr-notes-iron" data-gn-ironhelp>
+          <span class="gr-notes-iron-q">Wie viele der 10 Knick-Stücke sind glatt?</span>
+          <div class="gr-notes-pieces" role="group" aria-label="Glatte Knick-Stücke">
+            <% for (let i = 1; i <= 10; i++) { %><button type="button" class="gr-notes-piece" data-gn-piece="<%= i %>" aria-label="<%= i %> Stück<%= i === 1 ? '' : 'e' %> glatt" aria-pressed="false"></button><% } %>
+          </div>
+          <span class="gr-notes-iron-a"><b data-gn-pieces>0</b> glatt → Obergrenze <b data-gn-pieces-cap>4</b></span>
+          <table class="gr-notes-iron-table">
+            <caption>je 2 glatte Stücke = 1 Note mehr</caption>
+            <tr><th>glatt</th><td>0–1</td><td>2–3</td><td>4–5</td><td>6–7</td><td>8–9</td><td>10</td></tr>
+            <tr><th>max.</th><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td></tr>
+          </table>
+          <span class="gr-notes-iron-tip">Tipp: Karte flach ins Licht drehen und von links nach rechts zählen – glatte Stücke sind kaum noch zu sehen. Brandflecken auf dem Knick zählen als Kratzer.</span>
+        </div>
       </fieldset>
       <fieldset class="gr-notes-field">
         <legend>Zentrierung <small>links/rechts</small></legend>
