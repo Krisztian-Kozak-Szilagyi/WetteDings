@@ -93,3 +93,29 @@ test('Limit pro Person: Woche 10, Monat 20, täglich ohne Limit', () => {
   assert.equal(ticketsLeft('monat', { tickets: 5, bought: 5 }), 15);
   assert.equal(ticketsLeft('taeglich', { tickets: 500, bought: 500 }), Infinity);
 });
+
+test('Erstattung: letzte Losnummern abschneiden, höhere Nummern rücken auf', () => {
+  const { cutLastTickets, shiftRanges } = require('../src/services/lotteryService');
+  // Anna 1–20 und 31–42 (32 Lose), Ben 21–30 und 43–45
+  const { kept, removed } = cutLastTickets([{ from: 1, to: 20 }, { from: 31, to: 42 }], 12);
+  assert.deepEqual(kept, [{ from: 1, to: 20 }]);
+  assert.deepEqual(removed, [{ from: 31, to: 42 }]);
+  assert.deepEqual(shiftRanges([{ from: 21, to: 30 }, { from: 43, to: 45 }], removed), [{ from: 21, to: 30 }, { from: 31, to: 33 }]);
+  // über mehrere Bereiche hinweg
+  const cut = cutLastTickets([{ from: 1, to: 5 }, { from: 8, to: 9 }], 3);
+  assert.deepEqual(cut.kept, [{ from: 1, to: 4 }]);
+  assert.deepEqual(cut.removed, [{ from: 5, to: 5 }, { from: 8, to: 9 }]);
+  assert.deepEqual(shiftRanges([{ from: 6, to: 7 }, { from: 10, to: 10 }], cut.removed), [{ from: 5, to: 6 }, { from: 7, to: 7 }]);
+});
+
+test('Erstattung: Preis der zuletzt gekauften Lose, bereits erstattete übersprungen', () => {
+  const { refundAmount } = require('../src/services/lotteryService');
+  const ledger = [
+    { amount: -200000, meta: { count: 20 }, createdAt: new Date(1) }, // 100 € je Los
+    { amount: -240000, meta: { count: 12 }, createdAt: new Date(2) }, // 200 € je Los
+  ];
+  assert.equal(refundAmount(ledger, 12), 240000);
+  assert.equal(refundAmount(ledger, 14), 260000);
+  assert.equal(refundAmount([...ledger, { amount: 40000, meta: { count: -2 }, createdAt: new Date(3) }], 10), 200000);
+  assert.equal(refundAmount(ledger, 33), null);
+});

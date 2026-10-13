@@ -274,6 +274,91 @@ async function grantTickets({ userIds, count, kind }) {
   });
 }
 
+/** Schneidet die letzten count Losnummern von den Bereichen ab: { kept, removed } (beides Bereiche) */
+function cutLastTickets(ranges, count) {
+  const kept = ranges.map((r) => ({ from: r.from, to: r.to }));
+  const removed = [];
+  let left = count;
+  for (let i = kept.length - 1; i >= 0 && left > 0; i--) {
+    const r = kept[i];
+    const n = Math.min(left, r.to - r.from + 1);
+    removed.push({ from: r.to - n + 1, to: r.to });
+    r.to -= n;
+    left -= n;
+  }
+  return { kept: kept.filter((r) => r.to >= r.from), removed: removed.reverse() };
+}
+
+/**
+ * Rückt Losnummern nach dem Entfernen von Bereichen auf, damit die Runde wieder lückenlos 1 … tickets nummeriert ist
+ * (neue Käufe vergeben ab round.tickets weiter). Die Bereiche dürfen keine entfernte Nummer enthalten.
+ */
+function shiftRanges(ranges, removed) {
+  const below = (n) => removed.reduce((s, r) => s + (r.to < n ? r.to - r.from + 1 : 0), 0);
+  return ranges.map((r) => ({ from: r.from - below(r.from), to: r.to - below(r.from) }));
+}
+
+/** Preis der letzten count gekauften Lose aus dem Kontoauszug (neueste zuerst, bereits erstattete übersprungen) */
+function refundAmount(ledger, count) {
+  const buys = ledger.filter((l) => l.amount < 0 && l.meta && l.meta.count > 0).sort((a, b) => b.createdAt - a.createdAt);
+  let skip = ledger.filter((l) => l.amount > 0 && l.meta && l.meta.count < 0).reduce((s, l) => s - l.meta.count, 0);
+  let left = count;
+  let sum = 0;
+  for (const b of buys) {
+    let n = b.meta.count;
+    const price = -b.amount / n;
+    const skipped = Math.min(skip, n);
+    skip -= skipped;
+    n = Math.min(n - skipped, left);
+    sum += n * price;
+    left -= n;
+    if (!left) break;
+  }
+  return left ? null : Math.round(sum);
+}
+
+/**
+ * Gekaufte Lose der offenen Wochen-/Monats-Runde zurückgeben (z. B. über dem Limit gekaufte Lose vor dessen Einführung):
+ * die letzten count Losnummern des Mitglieds fallen weg, alle höheren Nummern rücken auf, Topf und Guthaben werden
+ * um den bezahlten Preis korrigiert. Mit dryRun wird nur berechnet, nichts gespeichert.
+ */
+async function refundTickets({ username, count, kind = 'monat', dryRun = false }) {
+  const k = GRANT_KINDS.includes(kind) ? kindByKey(kind) : null;
+  if (!k) throw new UserError('Lose lassen sich nur bei der Wochen- oder Monats-Lotterie erstatten.');
+  const user = await User.findOne({ username, deletedAt: null }).select('_id username').lean();
+  if (!user) throw new UserError(`Mitglied „${username}“ nicht gefunden.`);
+  return inTransaction(async (session) => {
+    const now = new Date();
+    const round = await LotteryRound.findOne({ ...k.filter, status: 'offen' }).session(session);
+    if (!round || round.drawAt <= now) throw new UserError(`Keine offene Runde der ${k.name}.`);
+    const entries = await LotteryEntry.find({ round: round._id }).session(session);
+    const entry = entries.find((e) => String(e.user) === String(user._id));
+    const bought = boughtOf(entry);
+    if (!entry || !bought) throw new UserError(`${user.username} hat in der ${k.name} #${round.number} keine Lose gekauft.`);
+    const n = count == null ? Math.max(0, bought - k.maxPerRound) : count;
+    if (count == null && !n) throw new UserError(`${user.username} hat ${bought} Lose – nicht mehr als das Limit (${k.maxPerRound}), nichts zu erstatten.`);
+    if (!Number.isInteger(n) || n < 1 || n > bought) throw new UserError(`Anzahl ungültig: ${user.username} hat ${bought} Lose gekauft (Limit ${k.maxPerRound}).`);
+    const ledger = await Ledger.find({ user: user._id, type: 'lotto_los', 'meta.kind': k.kind, 'meta.round': round.number }).session(session).lean();
+    const amount = refundAmount(ledger, n);
+    if (amount == null) throw new UserError('Die Käufe im Kontoauszug passen nicht zur Anzahl – bitte von Hand prüfen.');
+
+    const { kept, removed } = cutLastTickets(entry.ranges, n);
+    const result = { username: user.username, kind: k.key, round: round.number, count: n, amount, before: entry.tickets, after: entry.tickets - n, removed };
+    if (dryRun) return result;
+
+    for (const e of entries) {
+      const ranges = shiftRanges(e === entry ? kept : e.ranges, removed);
+      const set = e === entry ? { ranges, tickets: e.tickets - n, bought: bought - n } : { ranges };
+      await LotteryEntry.updateOne({ _id: e._id }, { $set: set }, { session });
+    }
+    await LotteryRound.updateOne({ _id: round._id }, { $inc: { tickets: -n, pot: -amount } }, { session });
+    await User.updateOne({ _id: user._id }, { $inc: { balance: amount } }, { session });
+    // Gegenbuchung zum Loskauf (negative Anzahl), damit Statistik und Kontoauszug netto stimmen
+    await Ledger.create([{ user: user._id, type: 'lotto_los', amount, meta: { kind: k.kind, count: -n, round: round.number, erstattet: true } }], { session });
+    return result;
+  });
+}
+
 /** Losnummer des k-ten Loses (1-basiert) über die Losnummern-Bereiche mehrerer Einträge, der Reihe nach */
 function ticketAt(entries, k) {
   let left = k;
@@ -389,6 +474,10 @@ module.exports = {
   KINDS,
   GRANT_KINDS,
   grantTickets,
+  refundTickets,
+  cutLastTickets,
+  shiftRanges,
+  refundAmount,
   kindByKey,
   kindOfRound,
   ticketsLeft,
