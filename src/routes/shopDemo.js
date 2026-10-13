@@ -1,4 +1,5 @@
-// Shop-Demo: Laden einrichten (2:1-isometrisch, Platzhalter-Möbel aus src/shop/items.json). Vorerst nur für Admins.
+// Shop-Demo: eigener Laden (2:1-isometrisch, Platzhalter aus src/shop/items.json) mit Figur, PC (Bestellen, Preise),
+// Kartons und Regalen. Vorerst nur für Admins.
 // EJS ist nur der Rahmen, gezeichnet wird mit Phaser in public/js/shop-demo.js; Regeln in src/shop/layout.js
 // (dieselbe Datei läuft im Browser als /js/shop-layout.js). Kanacoin = Demo-Geld, getrennt vom Kontostand.
 const path = require('path');
@@ -6,20 +7,24 @@ const express = require('express');
 const { requireAdmin } = require('../middleware');
 const ShopDemo = require('../models/ShopDemo');
 const layout = require('../shop/layout');
-const { CATALOG, GROUPS, UNIT_PRICE } = require('../shop/catalog');
+const { CATALOG, GROUPS, GOODS, UNIT_PRICE } = require('../shop/catalog');
 
 const router = express.Router();
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
-const ACTIONS = ['place', 'move', 'remove', 'buyUnit', 'setCoins', 'reset'];
+const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
+const ACTIONS = ['orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move', 'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset'];
 
 function plain(doc) {
-  if (!doc) return layout.fresh();
-  return {
-    coins: doc.coins,
-    units: doc.units,
-    nextUid: doc.nextUid,
-    items: (doc.items || []).map(({ uid, id, x, y, rot, wall }) => (wall ? { uid, id, x, y, rot, wall } : { uid, id, x, y, rot })),
-  };
+  if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
+  const { coins, units, nextUid, nextBid, carry, prices } = doc;
+  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock }) => {
+    const it = { uid, id, x, y, rot };
+    if (wall) it.wall = wall;
+    if (stock && Object.keys(stock).length) it.stock = stock;
+    return it;
+  });
+  const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
+  return layout.ensureCounter(layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes }), catalog);
 }
 
 router.get('/shop-demo', requireAdmin, (req, res) => {
@@ -38,7 +43,7 @@ router.get('/vendor/phaser.min.js', requireAdmin, (req, res) => {
 router.get('/api/shop-demo', requireAdmin, async (req, res, next) => {
   try {
     const doc = await ShopDemo.findById(req.user._id).lean();
-    res.json({ state: plain(doc), catalog: CATALOG, groups: GROUPS, unitPrice: UNIT_PRICE });
+    res.json({ state: plain(doc), catalog: CATALOG, goods: GOODS, groups: GROUPS, unitPrice: UNIT_PRICE });
   } catch (err) {
     next(err);
   }
@@ -59,15 +64,19 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       type,
       id: typeof a.id === 'string' ? a.id : '',
       uid: Number(a.uid),
+      bid: Number(a.bid),
+      n: Number(a.n),
+      ware: typeof a.ware === 'string' ? a.ware : '',
+      price: Number(a.price),
       x: Number(a.x),
       y: Number(a.y),
       rot: a.rot ? 1 : 0,
       wall: a.wall === 'n' || a.wall === 'w' ? a.wall : undefined,
       amount: Number(a.amount),
-      price: UNIT_PRICE,
+      ...(type === 'buyUnit' ? { price: UNIT_PRICE } : {}),
     };
     const doc = await ShopDemo.findById(req.user._id).lean();
-    const r = layout.apply(plain(doc), catalog, action);
+    const r = layout.apply(plain(doc), catalog, goods, action);
     if (r.error) return res.status(400).json({ error: r.error, state: plain(doc) });
     await ShopDemo.replaceOne({ _id: req.user._id }, r.state, { upsert: true });
     res.json({ state: r.state });
