@@ -421,7 +421,7 @@ const ACHIEVEMENTS = [
   {
     key: 'eingeschweisst',
     name: 'Eingeschweißt',
-    text: 'Foliere deine erste Karte im Inventar.',
+    text: 'Steck deine erste Karte im Inventar in einen TCG Sleeve.',
     icon: { glyph: 'foil', tone: 'blue', frame: 'bronze' },
     holders: () => ItemLog.distinct('user', { type: 'folie', source: 'folieren', delta: { $lt: 0 } }),
   },

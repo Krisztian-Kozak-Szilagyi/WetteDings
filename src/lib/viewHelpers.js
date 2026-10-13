@@ -192,6 +192,8 @@ const ledgerLabels = {
   grading_auftrag: 'Karte zum Grading eingereicht',
   grading_einnahme: 'Grading-Auftrag eines Mitglieds erledigt',
   grading_erstattung: 'Grading-Auftrag erstattet',
+  grading_trinkgeld: 'Trinkgeld an einen Grading-Shop',
+  grading_trinkgeld_erhalt: 'Trinkgeld von einem Kunden',
   grading_ausbau: 'Grading-Shop ausgebaut',
 };
 

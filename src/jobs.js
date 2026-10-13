@@ -83,7 +83,7 @@ function startJobs() {
   // und Shops warnen, deren Frist bald abläuft
   const gradingOrders = () => {
     const orders = require('./grading/orderService');
-    return orders.expireDue().then(() => orders.warnDue()).catch((err) => console.error('Grading-Aufträge-Fehler:', err));
+    return orders.expireDue().then(() => orders.warnDue()).then(() => orders.decayReputations()).catch((err) => console.error('Grading-Aufträge-Fehler:', err));
   };
   setTimeout(gradingOrders, 35 * 1000).unref();
   setInterval(gradingOrders, 5 * 60 * 1000).unref();

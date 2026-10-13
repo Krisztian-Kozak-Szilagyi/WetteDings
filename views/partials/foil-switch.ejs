@@ -1,9 +1,15 @@
-<%# Schalter für Quest, Dungeon und Turm (#204): folierte Exemplare einsetzen – geschützt vor Schaden bei einer
-    Niederlage. Nur sichtbar, wenn es freie folierte Exemplare gibt (foiled: { cardId: Anzahl }). Ohne Haken spielt
-    lieber ein unfoliertes Exemplar; hat eine Karte nur folierte, spielt das folierte. %>
-<% if (Object.keys(foiled || {}).length) { %>
-  <label class="check pick-foil-switch">
+<%# Schalter für Quest, Dungeon und Turm (#204): Karten im TCG Sleeve einsetzen – geschützt vor Schaden bei einer
+    Niederlage. Nur sichtbar, wenn es freie Karten im Sleeve gibt (foiled: { cardId: Anzahl }). Ohne Haken spielt
+    lieber ein Exemplar ohne Sleeve; hat eine Karte nur Sleeve-Exemplare, spielt das Sleeve-Exemplar. Als auffällige
+    Schaltfläche mit Schalter, Zähler und Schutzhinweis, damit der Schutz nicht übersehen wird. %>
+<% if (Object.keys(foiled || {}).length) { const sleeved = Object.values(foiled).reduce((s, n) => s + n, 0); %>
+  <label class="pick-foil-switch">
     <input type="checkbox" name="foil" value="1"<%= typeof foilChecked !== 'undefined' && foilChecked ? ' checked' : '' %>>
-    <span><b>✦ Folierte Exemplare einsetzen</b> – geschützt: Bei einer Niederlage bekommen sie keine Kratzer oder Knicke.</span>
+    <span class="pfs-track" aria-hidden="true"><i></i></span>
+    <span class="pfs-text">
+      <b>🛡 Karten im TCG Sleeve einsetzen</b>
+      <small>Geschützt: Bei einer Niederlage bekommen sie keine Kratzer oder Knicke. Du hast <strong><%= sleeved %> <%= sleeved === 1 ? 'Karte' : 'Karten' %></strong> im Sleeve frei.</small>
+    </span>
+    <span class="pfs-state" aria-hidden="true"><span class="pfs-off">Aus</span><span class="pfs-on">An</span></span>
   </label>
 <% } %>

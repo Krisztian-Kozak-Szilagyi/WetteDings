@@ -7,6 +7,7 @@ const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
 const items = require('../items/itemService');
+const { ITEM_TYPES } = require('../items/types');
 const { itemInventory } = items;
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -50,6 +51,7 @@ router.get('/tcg', async (req, res) => {
     packImage: catalog.PACK_IMAGE,
     packs,
     itemTotal: invItems.reduce((s, i) => s + i.count, 0),
+    invMinis: [{ image: catalog.PACK_IMAGE, label: 'Booster Pack' }, ...ITEM_TYPES.map((t) => ({ image: t.image, label: t.label }))], // Miniaturen auf der Inventar-Kachel
     packType: catalog.DEFAULT_PACK,
     cardsPerPack: catalog.CARDS_PER_PACK,
   });

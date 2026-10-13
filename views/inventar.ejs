@@ -21,29 +21,28 @@
   const cats = [...new Set(slots.map((s) => s.cat))];
   const balance = currentUser.balance;
   const buyable = itemList.filter((i) => i.buy);
+  const isShop = locals.mode === 'shop'; // eigene Seite /inventar/shop – nicht mehr als Reiter im Inventar
 %>
 
 <div class="bag-page">
   <header class="bag-head">
-    <h1>Inventar <%- help('Hier liegt, was du besitzt. Tippe einen Gegenstand an, um ihn zu benutzen, zu verkaufen oder zu handeln. Nachschub gibt es im Reiter „Shop“. Karten in Sleeve oder Slab findest du im Album.') %></h1>
+    <% if (isShop) { %><h1>Shop <%- help('Nachschub für dein Inventar: Packs und Gegenstände. Gekaufte Sachen landen im Inventar.') %></h1><% } else { %><h1>Inventar <%- help('Hier liegt, was du besitzt. Tippe einen Gegenstand an, um ihn zu benutzen, zu verkaufen oder zu handeln. Nachschub gibt es im Shop. Karten in Sleeve oder Slab findest du im Album.') %></h1><% } %>
     <div class="bag-head-r">
       <span class="bag-wallet"><small>Guthaben</small><b><%= euro(balance) %></b></span>
       <a class="btn btn-ghost btn-sm" href="/tcg/album" title="Karten in Sleeve und Slab">🗂️ Album</a>
     </div>
   </header>
 
-  <div class="bag-tabs" role="tablist" aria-label="Bereich">
-    <button type="button" role="tab" class="bag-tab active" aria-selected="true" data-bag-tab="inventar">Inventar <i><%= slots.length %></i></button>
-    <button type="button" role="tab" class="bag-tab is-shop" aria-selected="false" data-bag-tab="shop">Shop</button>
-  </div>
+  <% if (isShop) { %><a class="btn btn-ghost btn-sm" href="/inventar">← Zum Inventar</a><% } else { %><a class="btn btn-ghost btn-sm" href="/inventar/shop">Zum Shop →</a><% } %>
 
   <%# ---------- Inventar: Slots ---------- %>
+  <% if (!isShop) { %>
   <section class="bag-panel" data-bag-panel="inventar">
     <% if (!slots.length) { %>
       <div class="bag-empty">
         <span aria-hidden="true">🎒</span>
         <p>Dein Inventar ist leer.</p>
-        <button type="button" class="btn btn-primary" data-bag-goto="shop">Zum Shop</button>
+        <a class="btn btn-primary" href="/inventar/shop">Zum Shop</a>
       </div>
     <% } else { %>
       <% if (cats.length > 1) { %>
@@ -66,7 +65,8 @@
   </section>
 
   <%# ---------- Shop: kompakte Liste ---------- %>
-  <section class="bag-panel" data-bag-panel="shop" hidden>
+  <% } else { %>
+  <section class="bag-panel" data-bag-panel="shop">
     <ul class="bag-shop">
       <% packs.forEach((p) => { %>
         <li class="bag-row">
@@ -102,6 +102,7 @@
       <% }) %>
     </ul>
   </section>
+<% } %>
 </div>
 
 <%# ---------- Aktionen je Gegenstand (Dialog) ---------- %>
@@ -155,7 +156,7 @@
             </form>
           <% } %>
         <% } %>
-        <button type="button" class="bag-more" data-bag-goto="shop" data-dialog-close>Nachschub im Shop →</button>
+        <a class="bag-more" href="/inventar/shop">Nachschub im Shop →</a>
       </div>
     </div>
   </dialog>

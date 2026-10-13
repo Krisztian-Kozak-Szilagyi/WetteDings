@@ -129,3 +129,8 @@ test('#204: Bügeln – nur ab Stufe 2 und nur bei Karten mit Knick; Lohn nach G
   assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade);
   assert.equal(payFor({ level: 1, iron: 100 }), PAY.clean);
 });
+
+test('Kundenkarte: reichere Kundschaft bei hohem Rang würfelt ohne Fehler (ganzzahlige Gewichte)', () => {
+  const { rollCard } = require('../src/grading/gradingService');
+  for (const richness of [1, 1.25, 1.5, 2]) for (let i = 0; i < 50; i++) assert.ok(rollCard(richness));
+});

@@ -18,6 +18,7 @@ const shopSchema = new Schema(
     jobsDone: { type: Number, default: 0 }, // Aufträge insgesamt
     earned: { type: Number, default: 0 }, // Lohn insgesamt in Cent
     name: { type: String, default: null }, // Name des Shops (#204), Pflicht vor dem ersten Auftrag
+    slogan: { type: String, default: null }, // kurzer Werbespruch, steht in der Shop-Ansicht (gradingService.SHOP_SLOGAN_MAX)
     code: { type: String, default: null }, // Kürzel, z. B. "PSA" – steht auf den Slabs, eindeutig
     // Laufendes Bügeln einer eigenen Karte (#204): welches Exemplar, seit wann (Mindestzeit wie beim Putzen)
     ironing: { type: new Schema({ doc: Schema.Types.ObjectId, startedAt: Date }, { _id: false }), default: null },
@@ -26,6 +27,8 @@ const shopSchema = new Schema(
     prices: { type: pricesSchema, default: () => ({}) },
     showcase: { type: [Schema.Types.ObjectId], default: [] },
     reputation: { type: Number, default: 0 },
+    lastWorkedAt: { type: Date, default: null }, // letzter erledigter Auftrag – ab 7 Tagen Pause verfällt der Ruf (reputation.decayedReputation)
+    repDecayedDays: { type: Number, default: 0 }, // so viele Tage Verfall sind in dieser Pause schon abgezogen
     stars: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Kundenbewertungen 1–5
     quality: { type: new Schema({ sum: Number, n: Number }, { _id: false }), default: () => ({ sum: 0, n: 0 }) }, // Arbeitsqualität 0–100 je Auftrag
     hits: { type: new Schema({ exact: Number, n: Number }, { _id: false }), default: () => ({ exact: 0, n: 0 }) }, // Treffsicherheit (alle benoteten Aufträge)
@@ -116,6 +119,7 @@ const orderSchema = new Schema(
     // grade = Note des Shops; Zweitprüfung: before = Note auf dem Slab vorher, changed = neuer Slab, issuer = Kürzel vorher
     result: { type: new Schema({ grade: Number, clean: Number, seal: Number, iron: Number, before: Number, changed: Boolean, issuer: String }, { _id: false }), default: null },
     stars: { type: Number, default: null }, // Bewertung des Kunden 1–5
+    tip: { type: Number, default: 0 }, // Trinkgeld des Kunden bei der Bewertung in Cent (orderService.TIP_MAX)
     tags: { type: [String], default: undefined }, // Schnell-Tags zur Bewertung (orderService.REVIEW_TAGS)
     ratedAt: { type: Date, default: null },
   },

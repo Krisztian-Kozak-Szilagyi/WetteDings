@@ -1097,7 +1097,7 @@
         if (l.steps.indexOf('grade') >= 0) j += pay.grade * (p.exact + p.near / 2);
         if (l.steps.indexOf('slab') >= 0) j += (pay.slab * p.seal) / 100;
         j = j * (l.premium ? 1 + premium / 100 : 1) * input.factor;
-        if (l.steps.indexOf('slab') >= 0 && p.seal > 0) j += input.foilValue;
+        if (l.steps.indexOf('slab') >= 0 && p.seal > 0) j += input.foilValue - (input.slabCost || 0); // Folienfund minus leerer Slab
         day[p.key] = Math.round(jobs * j);
         set('[data-gc-day="' + l.level + '-' + p.key + '"]', fmt.format(day[p.key] / 100));
       });

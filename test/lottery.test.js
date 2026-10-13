@@ -63,7 +63,7 @@ test('Fällt der 28. auf einen Sonntag, ziehen Wochen- und Monats-Lotterie zur s
 test('Gewinn als Text', () => {
   const n = (t) => t.replace(/\s/g, ' ');
   assert.equal(n(prizeText({ cash: 123400 })), '1.234,00 €');
-  assert.equal(n(prizeText({ cash: 1000000, packs: 50, foils: 2 })), '10.000,00 €, 50 Booster Packs und 2 Folien');
+  assert.equal(n(prizeText({ cash: 1000000, packs: 50, foils: 2 })), '10.000,00 €, 50 Booster Packs und 2 TCG Sleeves');
   assert.equal(n(prizeText({ cash: 500, packs: 1 })), '5,00 € und 1 Booster Pack');
   assert.equal(n(prizeText({ cash: 0, packs: 50 })), '50 Booster Packs');
   assert.equal(n(prizeText({ cash: 0 })), '0,00 €');
