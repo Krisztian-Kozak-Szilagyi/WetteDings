@@ -6,7 +6,6 @@ const assert = require('node:assert');
 const catalog = require('../src/tcg/catalog');
 const { simulate, WORK_TIME } = require('../src/ihk/ihkService');
 const { resolveAll, canBoost, DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN } = require('../src/ihk/abilities');
-const { CHAOS } = require('../src/dungeon/dungeons');
 
 // Fester Zufall (mulberry32), damit die Simulation im Test immer gleich ausgeht
 function seeded(seed) {
@@ -22,7 +21,7 @@ const dio = catalog.cardById['lucky-dio-boss'];
 const attacks = (r) => r.ticks.filter((x) => !x.ability && !x.coin); // normale Angriffe
 const coins = (r) => r.ticks.filter((x) => !x.ability && x.coin); // Zusatztreffer aus dem Münzwurf
 
-test('Lucky Dio: Season-1-Boss-Karte mit violettem Rahmen, Beute aus Chaos & Demise', () => {
+test('Lucky Dio: Season-1-Boss-Karte mit violettem Rahmen', () => {
   assert.ok(dio, 'Karte fehlt im Katalog');
   assert.equal(dio.name, 'Lucky Dio');
   assert.equal(dio.rarity, 'boss');
@@ -31,7 +30,6 @@ test('Lucky Dio: Season-1-Boss-Karte mit violettem Rahmen, Beute aus Chaos & Dem
   assert.deepEqual(dio.stats, { speed: 99, fia: 99, fis: 90, bwl: 95 });
   assert.ok(dio.isCharacter);
   assert.equal(dio.abilityName, 'Krit-Lotterie');
-  assert.equal(CHAOS.bossCard, 'lucky-dio-boss');
   assert.ok(catalog.CARDS.includes(dio), 'erhältlich (nicht unveröffentlicht)');
   assert.deepEqual([DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN], [50, 1, 1, 15]);
   assert.match(dio.ability, /Münze/);

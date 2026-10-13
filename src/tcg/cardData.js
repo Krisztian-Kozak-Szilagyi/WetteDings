@@ -100,7 +100,7 @@ module.exports = {
     abilityName: 'Forkbomb',
     ability: 'Alle gegnerischen Karten werden 30 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
   },
-  // Boss-Karte aus „Chaos & Demise“ (src/dungeon/dungeons.js, CHAOS.bossCard). Rahmen: violet (src/tcg/frames.js)
+  // Boss-Karte, nur als Beute aus dem Raid gegen Lucky Dio erhältlich. Rahmen: violet (src/tcg/frames.js)
   'lucky-dio-boss': {
     season: 'season-1',
     frame: 'violet',

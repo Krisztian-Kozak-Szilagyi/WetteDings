@@ -102,7 +102,7 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
-  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): Krit-Lotterie – Eigenschaft der Karte, wirkt von Anfang an (passive).
+  // Lucky Dio (Boss-Karte, Beute aus dem Raid): Krit-Lotterie – Eigenschaft der Karte, wirkt von Anfang an (passive).
   // Als Hauptkarte fliegt nach jedem Angriff eine Münze und bringt einen Zusatztreffer (Ablauf: ihkService.simulate):
   // Kopf = kritischer Kettentreffer mit der Armbrust, Zahl = Dolchtreffer und ein Glücks-Token (+DIO_TOKEN % Krit-Chance).
   // Als Booster: Glücksmünze zur Halbzeit – Kopf: +DIO_COIN % Krit-Chance, Zahl: nichts.
