@@ -398,7 +398,7 @@ function lottoRow(l, name) {
   return {
     at: l.createdAt,
     player: name || '–',
-    kind: l.type === 'lotto_gewinn' ? 'Gewinn' : 'Lose gekauft',
+    kind: l.type === 'lotto_gewinn' ? 'Gewinn' : m.erstattet ? 'Lose erstattet' : 'Lose gekauft',
     lottery: LOTTO_KIND[m.kind] || 'Tages-Lotterie',
     count: m.count || null, // Zahl der Lose (erst seit diesem Update gespeichert)
     round: m.round || null,
