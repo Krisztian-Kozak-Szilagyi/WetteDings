@@ -4,15 +4,56 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title><%= title %> · <%= appName %></title>
-  <meta name="theme-color" content="#0b0f1c">
+  <meta name="theme-color" content="#14161f">
   <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
   <link rel="stylesheet" href="/css/shop-demo.css?v=<%= assetVersion %>">
 </head>
-<%# Shop-Demo – Vollbild ohne Navigation: leerer Laden bei Nacht auf dem Canvas (public/js/shop-demo.js).
-    WASD/Pfeiltasten = laufen, Umschalt = rennen, Esc = zurück %>
-<body class="sd-body">
-  <canvas class="sd-canvas" data-shop-canvas aria-label="Leerer Laden bei Nacht"></canvas>
-  <div class="sd-hint">WASD laufen · Umschalt rennen · Esc zurück</div>
+<%# Shop-Demo – Laden einrichten, 2:1-isometrisch, Platzhalter-Möbel. Gezeichnet wird mit Phaser (public/js/shop-demo.js),
+    Regeln in src/shop/layout.js (/js/shop-layout.js). Kanacoin = Demo-Geld, getrennt vom Kontostand. %>
+<body class="sd-body" data-shop-root data-csrf="<%= csrfToken %>">
+  <aside class="sd-side">
+    <div class="sd-head">
+      <a class="sd-back" href="/" title="Zurück zur Seite">←</a>
+      <strong>Shop-Demo</strong>
+    </div>
+    <button type="button" class="sd-coins" data-shop-coins title="Kanacoin festlegen">
+      <span class="sd-coin-dot"></span><span data-shop-coins-value>–</span> Kanacoin
+    </button>
+    <div class="sd-list" data-shop-list></div>
+    <div class="sd-foot">
+      <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen zeigen</label>
+      <button type="button" class="sd-reset" data-shop-reset>Neu starten</button>
+    </div>
+  </aside>
+
+  <div class="sd-stage" data-shop-stage></div>
+
+  <div class="sd-panel" data-shop-panel hidden>
+    <div class="sd-panel-name" data-shop-panel-name></div>
+    <div class="sd-panel-info" data-shop-panel-info></div>
+    <div class="sd-panel-btns">
+      <button type="button" data-shop-do="rotate">Drehen (R)</button>
+      <button type="button" data-shop-do="move">Verschieben</button>
+      <button type="button" data-shop-do="remove">Zurückgeben <span data-shop-panel-refund></span></button>
+    </div>
+  </div>
+
+  <div class="sd-hint" data-shop-hint>Möbel links auswählen · Klick = abstellen · R = drehen · Esc = abbrechen · Ziehen/WASD = Ansicht · Mausrad = Zoom</div>
+  <div class="sd-toast" data-shop-toast hidden></div>
+
+  <dialog class="sd-dialog" data-shop-dialog>
+    <form method="dialog" data-shop-dialog-form>
+      <p data-shop-dialog-text></p>
+      <input type="number" min="0" max="10000000" step="1" data-shop-dialog-input hidden>
+      <div class="sd-dialog-btns">
+        <button value="cancel" type="submit" formnovalidate>Abbrechen</button>
+        <button value="ok" type="submit" class="is-main" data-shop-dialog-ok>OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/vendor/phaser.min.js" defer></script>
+  <script src="/js/shop-layout.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/shop-demo.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

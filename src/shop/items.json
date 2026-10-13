@@ -1,0 +1,1410 @@
+[
+  {
+    "id": "cashier_counter",
+    "name_de": "Kassentheke mit PC",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 PC; 1 checkout position",
+    "utility": "Handle checkout and use the PC to restock, review the shop, and change prices.",
+    "placeholder_price": {
+      "amount": 500,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle",
+      "in_use"
+    ],
+    "notes": "PC included; no screen text.",
+    "open_questions": [
+      "What restocking workflow should the PC expose?"
+    ]
+  },
+  {
+    "id": "card_cleaning_table",
+    "name_de": "Kartenreinigungstisch",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 card",
+    "utility": "Clean a card at this workstation.",
+    "placeholder_price": {
+      "amount": 300,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle",
+      "in_use"
+    ],
+    "notes": "Cleaning process unresolved.",
+    "open_questions": [
+      "What input, duration, and result define card cleaning?"
+    ]
+  },
+  {
+    "id": "card_grading_table",
+    "name_de": "Kartenbewertungstisch",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 card",
+    "utility": "Grade a card at this workstation.",
+    "placeholder_price": {
+      "amount": 500,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle",
+      "in_use"
+    ],
+    "notes": "Grading process unresolved.",
+    "open_questions": [
+      "How is grading performed and how does it affect a card?"
+    ]
+  },
+  {
+    "id": "shelf_small",
+    "name_de": "Kleines Brettspielregal",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "6 board game boxes",
+    "utility": "Stock and sell board games from this shelf.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Tall shelf; contents are visual proxies.",
+    "open_questions": []
+  },
+  {
+    "id": "shelf_medium",
+    "name_de": "Mittleres Brettspielregal",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "12 board game boxes",
+    "utility": "Stock and sell board games from this shelf.",
+    "placeholder_price": {
+      "amount": 200,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Same height and depth as small shelf.",
+    "open_questions": []
+  },
+  {
+    "id": "shelf_big",
+    "name_de": "Großes Brettspielregal",
+    "category": "furniture",
+    "footprint": {
+      "w": 3,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "18 board game boxes",
+    "utility": "Stock and sell board games from this shelf.",
+    "placeholder_price": {
+      "amount": 300,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Same height and depth as small shelf.",
+    "open_questions": []
+  },
+  {
+    "id": "drink_refrigerator",
+    "name_de": "Getränkekühlschrank",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "12 drink cans",
+    "utility": "Stock and sell gamer drinks from the refrigerator.",
+    "placeholder_price": {
+      "amount": 400,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Unbranded cans.",
+    "open_questions": []
+  },
+  {
+    "id": "cd_dvd_holder",
+    "name_de": "CD-/DVD-Ständer",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "12 disc cases",
+    "utility": "Place a holder for CD/DVD cases.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Disc goods and selling behavior unresolved.",
+    "open_questions": [
+      "Are CDs/DVDs sale goods, or is the holder decorative?"
+    ]
+  },
+  {
+    "id": "chair",
+    "name_de": "Stuhl",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 person",
+    "utility": "Place seating for customers.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "unoccupied",
+      "occupied"
+    ],
+    "notes": "Occupied state uses a separate person sprite.",
+    "open_questions": []
+  },
+  {
+    "id": "playmat_table",
+    "name_de": "Spieltisch mit Spielmatten",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 2
+    },
+    "placement": "floor",
+    "capacity": "2 players",
+    "utility": "Provide a table where customers play cards.",
+    "placeholder_price": {
+      "amount": 300,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "unused",
+      "in_use"
+    ],
+    "notes": "Chairs separate; seating requirements unresolved.",
+    "open_questions": [
+      "How many players and chairs are required, and what happens during play?"
+    ]
+  },
+  {
+    "id": "arcade_machine",
+    "name_de": "Spielautomat",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 user",
+    "utility": "Place an arcade machine with its interaction still to be decided.",
+    "placeholder_price": {
+      "amount": 500,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "off",
+      "on"
+    ],
+    "notes": "Possible dungeon entrance remains unconfirmed.",
+    "open_questions": [
+      "Is this a playable arcade, a dungeon entrance, or decoration?"
+    ]
+  },
+  {
+    "id": "bulletin_board",
+    "name_de": "Schwarzes Brett",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "4 notices",
+    "utility": "View ads and quests on the board.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Notices use abstract blocks, no text.",
+    "open_questions": []
+  },
+  {
+    "id": "trophy_cabinet",
+    "name_de": "Trophäenschrank",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "6 trophies",
+    "utility": "Display trophies in a cabinet.",
+    "placeholder_price": {
+      "amount": 300,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Trophy acquisition unresolved.",
+    "open_questions": [
+      "Where do trophies come from?"
+    ]
+  },
+  {
+    "id": "dehumidifier",
+    "name_de": "Luftentfeuchter",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": null,
+    "utility": "Use a dehumidifier in storage to protect cards.",
+    "placeholder_price": {
+      "amount": 200,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "off",
+      "on"
+    ],
+    "notes": "Protection range and effect unresolved.",
+    "open_questions": [
+      "What area or number of cards is protected, and how?"
+    ]
+  },
+  {
+    "id": "card_display_case",
+    "name_de": "Kartenvitrine",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "6 single cards",
+    "utility": "Highlight cards and special offers in this case.",
+    "placeholder_price": {
+      "amount": 300,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Offer tag is a separate overlay.",
+    "open_questions": []
+  },
+  {
+    "id": "booster_display",
+    "name_de": "Booster-Aufsteller",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "counter-top",
+    "capacity": "12 booster packs",
+    "utility": "Display booster packs for sale.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Host surface and fit require confirmation.",
+    "open_questions": [
+      "Is counter-top placement correct, and which surface hosts it?"
+    ]
+  },
+  {
+    "id": "pack_opening_counter",
+    "name_de": "Booster-Öffnungstheke",
+    "category": "furniture",
+    "footprint": {
+      "w": 2,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 pack",
+    "utility": "Open a booster pack at this counter.",
+    "placeholder_price": {
+      "amount": 200,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle",
+      "in_use"
+    ],
+    "notes": "Opening process unresolved.",
+    "open_questions": []
+  },
+  {
+    "id": "safe",
+    "name_de": "Tresor",
+    "category": "furniture",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": null,
+    "utility": "Store valuables in a safe.",
+    "placeholder_price": {
+      "amount": 500,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed",
+      "open"
+    ],
+    "notes": "Contents and capacity unresolved.",
+    "open_questions": [
+      "What can the safe hold, and how much?"
+    ]
+  },
+  {
+    "id": "plant",
+    "name_de": "Topfpflanze",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Decorate the shop with a plant.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "No gameplay bonus specified.",
+    "open_questions": []
+  },
+  {
+    "id": "poster",
+    "name_de": "Poster",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Decorate a wall with a poster.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Abstract card motif; no text.",
+    "open_questions": []
+  },
+  {
+    "id": "rug",
+    "name_de": "Teppich",
+    "category": "decoration",
+    "footprint": {
+      "w": 2,
+      "h": 2
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Decorate the floor with a rug.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Furniture overlap and collision unresolved.",
+    "open_questions": [
+      "Can furniture overlap the rug, and is it non-blocking?"
+    ]
+  },
+  {
+    "id": "floor_lamp",
+    "name_de": "Stehlampe",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Place a lamp in the shop.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "off",
+      "on"
+    ],
+    "notes": "On state is visual; no lighting mechanic assumed.",
+    "open_questions": []
+  },
+  {
+    "id": "neon_sign",
+    "name_de": "Neon-Dekoration",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Decorate a wall with a neon shape.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "off",
+      "on"
+    ],
+    "notes": "No text or logo.",
+    "open_questions": []
+  },
+  {
+    "id": "beanbag",
+    "name_de": "Sitzsack",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "1 person",
+    "utility": "Place a decorative beanbag.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Whether customers can sit here is unresolved.",
+    "open_questions": [
+      "Is the beanbag functional seating or decoration only?"
+    ]
+  },
+  {
+    "id": "standee",
+    "name_de": "Pappaufsteller",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Decorate the shop with a standee.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Generic silhouette; no brand.",
+    "open_questions": []
+  },
+  {
+    "id": "trash_bin",
+    "name_de": "Mülleimer",
+    "category": "decoration",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": null,
+    "utility": "Place a trash bin in the shop.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty",
+      "filled"
+    ],
+    "notes": "Waste interaction and capacity unresolved.",
+    "open_questions": [
+      "Is disposal functional, and what is its capacity?"
+    ]
+  },
+  {
+    "id": "floor_wood",
+    "name_de": "Holzboden",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Cover a shop tile with wood flooring.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Seamless 64×32 diamond.",
+    "open_questions": []
+  },
+  {
+    "id": "floor_tile",
+    "name_de": "Fliesenboden",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Cover a shop tile with tiled flooring.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Seamless 64×32 diamond.",
+    "open_questions": []
+  },
+  {
+    "id": "floor_worn",
+    "name_de": "Abgenutzter Boden",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Cover a shop tile with worn flooring.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Wear is cosmetic, separate from dirt.",
+    "open_questions": []
+  },
+  {
+    "id": "wall_straight",
+    "name_de": "Gerade Wand",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Form a straight section of the shop boundary.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Tile-edge module; does not imply an occupied floor tile.",
+    "open_questions": []
+  },
+  {
+    "id": "wall_corner",
+    "name_de": "Wandecke",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Join two wall sections at a corner.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Corner variants unresolved.",
+    "open_questions": [
+      "Which inside/outside corner orientations are needed?"
+    ]
+  },
+  {
+    "id": "wall_window",
+    "name_de": "Wand mit Fenster",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Add a window section to the shop boundary.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Generic fixed window.",
+    "open_questions": []
+  },
+  {
+    "id": "wall_door",
+    "name_de": "Wand mit Tür",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Provide a doorway through a wall.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed",
+      "open"
+    ],
+    "notes": "Door frame included.",
+    "open_questions": []
+  },
+  {
+    "id": "shop_entrance",
+    "name_de": "Ladeneingang mit Glastür",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Provide the shop entrance through a glass door.",
+    "placeholder_price": {
+      "amount": 200,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed",
+      "open"
+    ],
+    "notes": "Frame included; distinguish from generic door.",
+    "open_questions": []
+  },
+  {
+    "id": "storefront_facade",
+    "name_de": "Ladenfassade",
+    "category": "building",
+    "footprint": null,
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Represent the exterior of the shop with a blank sign area.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Width depends on unit dimensions; entrance separate.",
+    "open_questions": [
+      "What are the unit width and wall height?",
+      "Is the facade purchasable or fixed scenery?"
+    ]
+  },
+  {
+    "id": "storage_floor",
+    "name_de": "Lagerraumboden",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Cover a back-room tile with storage flooring.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Room assembled from tiles; size unresolved.",
+    "open_questions": []
+  },
+  {
+    "id": "storage_door",
+    "name_de": "Lagerraumtür",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Connect the shop to its storage room.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed",
+      "open"
+    ],
+    "notes": "Frame included.",
+    "open_questions": []
+  },
+  {
+    "id": "hidden_bookshelf_door",
+    "name_de": "Geheime Bücherregaltür",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Access the hidden room through a bookshelf door.",
+    "placeholder_price": {
+      "amount": 200,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed",
+      "open"
+    ],
+    "notes": "Proposed hidden-door option; room purpose unresolved.",
+    "open_questions": [
+      "Use a bookshelf door, a plain concealed door, or both?",
+      "What is the hidden room used for?"
+    ]
+  },
+  {
+    "id": "hidden_room_floor",
+    "name_de": "Dunkler Boden des Geheimraums",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Cover a hidden-room tile with darker flooring.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "No illegal activity mechanics inferred.",
+    "open_questions": []
+  },
+  {
+    "id": "empty_neighbor_unit",
+    "name_de": "Leere Nachbareinheit",
+    "category": "building",
+    "footprint": null,
+    "placement": "floor",
+    "capacity": null,
+    "utility": "Buy an empty neighboring unit to expand the shop.",
+    "placeholder_price": {
+      "amount": 5000,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed_for_sale",
+      "opened"
+    ],
+    "notes": "Same geometry in both states; closed shutter has FOR SALE sign.",
+    "open_questions": [
+      "What are the unit dimensions and how many neighboring units exist?",
+      "Does purchase open the unit automatically, or require a separate action?"
+    ]
+  },
+  {
+    "id": "unit_connection",
+    "name_de": "Wanddurchbruch",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "wall",
+    "capacity": "none",
+    "utility": "Connect adjoining shop units through a wall opening.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "open"
+    ],
+    "notes": "Opening process and cost unresolved.",
+    "open_questions": [
+      "Does this appear automatically after purchase, or is it placed separately?",
+      "Is there a separate cost?"
+    ]
+  },
+  {
+    "id": "sidewalk",
+    "name_de": "Gehweg",
+    "category": "building",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Form an outside sidewalk strip from repeatable tiles.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "Strip length and ownership unresolved.",
+    "open_questions": [
+      "What strip dimensions are required, and is it editable?"
+    ]
+  },
+  {
+    "id": "booster_pack",
+    "name_de": "Boosterpack",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 sealed pack",
+    "utility": "Stock, sell, or open a booster pack.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "sealed"
+    ],
+    "notes": "64×64 icon; contents per pack unresolved.",
+    "open_questions": [
+      "How many cards are in one pack?"
+    ]
+  },
+  {
+    "id": "booster_box",
+    "name_de": "Booster-Displaybox",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": null,
+    "utility": "Represent a booster box in stock or inventory.",
+    "placeholder_price": {
+      "amount": 100,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed"
+    ],
+    "notes": "64×64 icon; packs per box unresolved.",
+    "open_questions": [
+      "How many packs are in one box, and can the box be sold or opened?"
+    ]
+  },
+  {
+    "id": "single_card",
+    "name_de": "Einzelkarte",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 card",
+    "utility": "Represent a single card in stock or inventory.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "face_down"
+    ],
+    "notes": "64×64 icon; generic card back.",
+    "open_questions": []
+  },
+  {
+    "id": "sleeve_pack",
+    "name_de": "Kartenhüllen-Packung",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": null,
+    "utility": "Represent a sleeve pack in stock or inventory.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "sealed"
+    ],
+    "notes": "64×64 icon; sleeve count and use unresolved.",
+    "open_questions": [
+      "How many sleeves are in a pack, and how are they used or sold?"
+    ]
+  },
+  {
+    "id": "toploader",
+    "name_de": "Toploader",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": null,
+    "utility": "Represent a rigid card protector in inventory.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "empty"
+    ],
+    "notes": "64×64 icon; interaction unresolved.",
+    "open_questions": [
+      "What does it hold, and how is it used or sold?"
+    ]
+  },
+  {
+    "id": "graded_slab",
+    "name_de": "Bewertete Karte im Schutzgehäuse",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 card",
+    "utility": "Represent a graded card in its case.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "encased"
+    ],
+    "notes": "64×64 icon; blank label, no numeric grade.",
+    "open_questions": []
+  },
+  {
+    "id": "board_game_box",
+    "name_de": "Brettspielschachtel",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 board game",
+    "utility": "Stock and sell a boxed board game.",
+    "placeholder_price": {
+      "amount": 50,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "closed"
+    ],
+    "notes": "64×64 icon; no title or brand.",
+    "open_questions": []
+  },
+  {
+    "id": "energy_drink_can",
+    "name_de": "Energy-Drink-Dose",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 drink",
+    "utility": "Stock and sell an energy drink.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "sealed"
+    ],
+    "notes": "64×64 icon; no branding.",
+    "open_questions": []
+  },
+  {
+    "id": "coffee",
+    "name_de": "Kaffee",
+    "category": "goods",
+    "footprint": null,
+    "placement": null,
+    "capacity": "1 drink",
+    "utility": "Represent a coffee drink among the shop goods.",
+    "placeholder_price": {
+      "amount": 10,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "64×64 icon; source and sales location unresolved.",
+    "open_questions": [
+      "How is coffee supplied and where is it sold?"
+    ]
+  },
+  {
+    "id": "dirty_card_overlay",
+    "name_de": "Kartenschmutz",
+    "category": "overlay",
+    "footprint": null,
+    "placement": null,
+    "capacity": "none",
+    "utility": "Show dirt on a card before cleaning.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "dirty"
+    ],
+    "notes": "64×64 transparent overlay; removal represents clean.",
+    "open_questions": []
+  },
+  {
+    "id": "floor_dirt",
+    "name_de": "Bodenschmutz",
+    "category": "overlay",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Show dust or dirt on a floor tile.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "dirty"
+    ],
+    "notes": "64×64 canvas with isometric decal; floor cleaning unresolved.",
+    "open_questions": [
+      "Can the player clean floors, and if so how?"
+    ]
+  },
+  {
+    "id": "price_tag",
+    "name_de": "Preisschild",
+    "category": "overlay",
+    "footprint": null,
+    "placement": null,
+    "capacity": "none",
+    "utility": "Mark the location of a displayed price.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "64×64 blank tag; dynamic text decision unresolved.",
+    "open_questions": [
+      "Should Phaser render numeric prices over a blank sprite?"
+    ]
+  },
+  {
+    "id": "sale_tag",
+    "name_de": "SALE-Schild",
+    "category": "overlay",
+    "footprint": null,
+    "placement": null,
+    "capacity": "none",
+    "utility": "Mark a special offer.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "default"
+    ],
+    "notes": "64×64 tag; SALE is the only text.",
+    "open_questions": []
+  },
+  {
+    "id": "customer_teal",
+    "name_de": "Kunde – Türkis",
+    "category": "person",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Represent a customer with a teal silhouette.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle"
+    ],
+    "notes": "Movement frames and collision unresolved.",
+    "open_questions": [
+      "Are walk, play, and checkout animations needed in the first prototype?"
+    ]
+  },
+  {
+    "id": "customer_orange",
+    "name_de": "Kunde – Orange",
+    "category": "person",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Represent a customer with an orange silhouette.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle"
+    ],
+    "notes": "Same scale and pose family as other customers.",
+    "open_questions": []
+  },
+  {
+    "id": "customer_purple",
+    "name_de": "Kunde – Violett",
+    "category": "person",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Represent a customer with a purple silhouette.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle"
+    ],
+    "notes": "Same scale and pose family as other customers.",
+    "open_questions": []
+  },
+  {
+    "id": "shop_owner",
+    "name_de": "Ladeninhaber",
+    "category": "person",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "capacity": "none",
+    "utility": "Represent the player character in the shop.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "idle"
+    ],
+    "notes": "Distinct apron silhouette; animation unresolved.",
+    "open_questions": []
+  },
+  {
+    "id": "placement_grid_highlight",
+    "name_de": "Platzierungsraster",
+    "category": "ui",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": null,
+    "capacity": "none",
+    "utility": "Show whether a proposed placement is valid or blocked.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "valid_green",
+      "blocked_red"
+    ],
+    "notes": "64×32 tile overlay repeated across the footprint.",
+    "open_questions": []
+  },
+  {
+    "id": "selection_outline",
+    "name_de": "Auswahlumrandung",
+    "category": "ui",
+    "footprint": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": null,
+    "capacity": "none",
+    "utility": "Show which object is selected.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "selected"
+    ],
+    "notes": "Proposed footprint outline; object contour unresolved.",
+    "open_questions": [
+      "Should selection follow the footprint or the sprite contour?"
+    ]
+  },
+  {
+    "id": "buy_expansion_marker",
+    "name_de": "Erweiterung kaufen",
+    "category": "ui",
+    "footprint": null,
+    "placement": null,
+    "capacity": "none",
+    "utility": "Offer the purchase interaction on an empty neighboring unit.",
+    "placeholder_price": {
+      "amount": null,
+      "currency": null,
+      "status": "PLACEHOLDER"
+    },
+    "states": [
+      "available"
+    ],
+    "notes": "Symbol only; hide after purchase; size unresolved.",
+    "open_questions": [
+      "What marker size and interaction area should be used?"
+    ]
+  }
+]
