@@ -328,13 +328,12 @@
     });
   }
 
-  // Vitrine am Schreibtisch (ohne Untermenü): ziehen sortiert um, Klick auf eine Karte öffnet „Austauschen / Entfernen“,
+  // Vitrine am Schreibtisch (ohne Untermenü): ziehen sortiert um, Klick auf eine Karte öffnet die Großansicht (Austauschen / Entfernen),
   // Klick auf ein leeres Fach die Auswahl freier Slabs. Jede Änderung geht sofort an den Server (POST /grading/vitrine).
   var vit = document.querySelector('[data-vit-edit]');
   if (vit) {
     var shelf = vit.querySelector('.gd-vit-shelf');
     var pop = vit.querySelector('[data-vit-pop]');
-    var menuV = pop.querySelector('[data-vit-menu]');
     var pickV = pop.querySelector('[data-vit-pickview]');
     var note = vit.querySelector('[data-vit-note]');
     var vmax = +vit.getAttribute('data-max');
@@ -360,11 +359,7 @@
         .then(function (j) { if (!j.ok) throw new Error(j.error || 'Speichern ging schief.'); })
         .catch(function (err) { say(err.message || 'Speichern ging schief.'); setTimeout(function () { window.location.reload(); }, 1800); });
     };
-    var closePop = function () { pop.hidden = true; menuV.hidden = true; pickV.hidden = true; target = null; };
-    var openAt = function (view, focusSel) {
-      menuV.hidden = view !== menuV; pickV.hidden = view !== pickV; pop.hidden = false;
-      var f = view.querySelector(focusSel); if (f && !f.closest('[hidden]')) f.focus({ preventScroll: true });
-    };
+    var closePop = function () { pop.hidden = true; pickV.hidden = true; target = null; };
     var openPick = function () {
       var have = vitems().map(function (e) { return e.getAttribute('data-id'); });
       var shownN = 0;
@@ -374,7 +369,8 @@
         if (!gone) shownN++;
       });
       pickV.querySelector('.gd-vit-none').hidden = shownN > 0;
-      openAt(pickV, '[data-pick-li]:not([hidden]) button');
+      pickV.hidden = false; pop.hidden = false;
+      var f = pickV.querySelector('[data-pick-li]:not([hidden]) button'); if (f) f.focus({ preventScroll: true });
     };
 
     // ziehen – das Bild-Ziehen des Browsers (Geisterbild) würde sonst die Maus übernehmen und das Ziehen abbrechen
@@ -417,23 +413,23 @@
       d.el.classList.remove('is-dragging');
       d.el.style.transform = '';
       shelf.classList.remove('is-sorting');
-      if (d.moved) { swallow = true; setTimeout(function () { swallow = false; }, 0); if (d.left0 !== d.el.offsetLeft) save(); }
+      if (d.moved) {
+        // der Klick nach dem Ziehen darf weder die Großansicht (foil-view.js, fängt im document) noch etwas hier auslösen
+        var stopClick = function (ev) { ev.preventDefault(); ev.stopPropagation(); };
+        window.addEventListener('click', stopClick, true);
+        setTimeout(function () { window.removeEventListener('click', stopClick, true); }, 0);
+        swallow = true; setTimeout(function () { swallow = false; }, 0);
+        if (d.left0 !== d.el.offsetLeft) save();
+      }
     };
     document.addEventListener('pointerup', endDrag);
     document.addEventListener('pointercancel', endDrag);
 
-    // Klicks: Karte → Menü, leeres Fach → Auswahl
+    // Klicks: Karte → Großansicht mit Austauschen / Entfernen (foil-view.js, Ereignis vit:act), leeres Fach → Auswahl
     vit.addEventListener('click', function (e) {
       if (swallow) { e.preventDefault(); e.stopPropagation(); return; }
       var add = e.target.closest('[data-vit-add]');
       if (add) { target = null; openPick(); return; }
-      var slab = e.target.closest('[data-vit-slab]');
-      if (slab) { target = slab.closest('.gd-vit-item'); openAt(menuV, '[data-vit-act]'); return; }
-      var act = e.target.closest('[data-vit-act]');
-      if (act && target) {
-        if (act.getAttribute('data-vit-act') === 'swap') { menuV.hidden = true; openPick(); return; }
-        target.remove(); closePop(); refill(); save(); return;
-      }
       var pick = e.target.closest('[data-pick]');
       if (pick) {
         var tpl = vit.querySelector('[data-vit-tpl="' + pick.getAttribute('data-pick') + '"]');
@@ -445,6 +441,12 @@
         return;
       }
       if (e.target === pop) closePop(); // Klick neben das Menü schließt es
+    });
+    document.addEventListener('vit:act', function (e) {
+      var el = vitems().filter(function (i) { return i.getAttribute('data-id') === e.detail.id; })[0];
+      if (!el) return;
+      if (e.detail.act === 'swap') { target = el; openPick(); return; }
+      el.remove(); closePop(); refill(); save();
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) { e.stopPropagation(); closePop(); } }, true);
     // ← → am fokussierten Slab sortiert auch per Tastatur
