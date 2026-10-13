@@ -12,11 +12,12 @@ const { CATALOG, GROUPS, GOODS, UNIT_PRICE } = require('../shop/catalog');
 const router = express.Router();
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
-const ACTIONS = ['orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move', 'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset'];
+const ACTIONS = ['openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move', 'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset'];
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports } = doc;
+  const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
   const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock }) => {
     const it = { uid, id, x, y, rot };
     if (wall) it.wall = wall;
@@ -24,7 +25,7 @@ function plain(doc) {
     return it;
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
-  return layout.ensureCounter(layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes }), catalog);
+  return layout.ensureCounter(layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports }), catalog);
 }
 
 router.get('/shop-demo', requireAdmin, (req, res) => {
@@ -33,6 +34,10 @@ router.get('/shop-demo', requireAdmin, (req, res) => {
 
 router.get('/js/shop-layout.js', requireAdmin, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'layout.js'));
+});
+
+router.get('/js/shop-customers.js', requireAdmin, (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'customers.js'));
 });
 
 router.get('/vendor/phaser.min.js', requireAdmin, (req, res) => {
@@ -73,6 +78,13 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       rot: a.rot ? 1 : 0,
       wall: a.wall === 'n' || a.wall === 'w' ? a.wall : undefined,
       amount: Number(a.amount),
+      lines: Array.isArray(a.lines)
+        ? a.lines.slice(0, 10).map((l) => ({ uid: Number(l && l.uid), ware: typeof (l && l.ware) === 'string' ? l.ware : '', qty: Number(l && l.qty) }))
+        : [],
+      stars: Number(a.stars),
+      why: typeof a.why === 'string' ? a.why : '',
+      miss: typeof a.miss === 'string' ? a.miss : '',
+      aborted: !!a.aborted,
       ...(type === 'buyUnit' ? { price: UNIT_PRICE } : {}),
     };
     const doc = await ShopDemo.findById(req.user._id).lean();
