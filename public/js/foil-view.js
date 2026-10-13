@@ -21,7 +21,8 @@
   var unwrapForm = modal.querySelector('[data-foil-unwrap]'); // nur im Album: Sleeve abziehen / Slab aufbrechen
   var tradeLink = modal.querySelector('[data-foil-trade]'); // nur in fremden Sammlungen: „Angebot machen“
   var certBtn = modal.querySelector('[data-foil-cert]'); // Zertifikat eines Slabs
-  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var vitBtns = Array.prototype.slice.call(modal.querySelectorAll('[data-foil-vit]')); // nur am Grading-Schreibtisch: Austauschen / Entfernen
+  var reduceMotion =window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var view = null;
   var certLink = null; // Showroom (Vitrine): Link zum Zertifikat unter dem Messingschild, beim ersten Öffnen angelegt
@@ -243,6 +244,8 @@
           : 'TCG Sleeve von ' + d.name + ' abziehen? Der Sleeve kommt zurück ins Inventar. Die Karte ist danach wieder ungeschützt.');
       }
     }
+    // Vitrine am Schreibtisch: tauschen / entfernen (nur für Slabs mit data-vit-id)
+    vitBtns.forEach(function (b) { b.hidden = !d.vitId; });
     // Fremde Sammlung: Tausch für dieses Exemplar vorschlagen
     if (tradeLink) {
       tradeLink.hidden = !d.tradeHref;
@@ -252,6 +255,7 @@
 
   function open(trigger, foiling) {
     var d = trigger.dataset;
+    current = trigger;
     var card = build(d, foiling);
     stage.className = 'foil-modal-stage r-' + (d.rarity || '');
     stage.innerHTML = '';
@@ -298,6 +302,14 @@
     open(trigger, false);
   }, true);
   modal.querySelector('[data-foil-close]').addEventListener('click', function () { modal.close(); });
+  var current = null; // Auslöser der geöffneten Ansicht
+  vitBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = current && current.dataset.vitId;
+      modal.close();
+      if (id) document.dispatchEvent(new CustomEvent('vit:act', { detail: { act: b.getAttribute('data-foil-vit'), id: id } }));
+    });
+  });
   modal.addEventListener('click', function (e) {
     if (swiped) { swiped = false; return; }
     if (e.target === modal || e.target === stage || e.target === body) modal.close();

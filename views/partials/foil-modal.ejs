@@ -3,6 +3,7 @@
   Aufbau wie die reguläre Großansicht (partials/card-zoom): Karte links, rechts Seltenheit, Name, Status und Aktionen.
   favForm: true im Album und auf dem Dashboard – Favorit; im Album dazu „Im Handel anbieten“ (Ziel "f:<Exemplar>") und
     Sleeve abziehen bzw. Slab aufbrechen. An die Bank lassen sich Karten in Sleeve oder Slab nicht verkaufen.
+  vitrine: true am Grading-Schreibtisch – „Austauschen“ und „Aus Vitrine entfernen“ für Slabs der editierbaren Vitrine (data-vit-id).
   trade: true in fremden Sammlungen – dann führt "Angebot machen" ins Handelsfenster (data-trade-href).
 %>
 <dialog class="foil-modal" data-foil-modal aria-label="Karte ansehen">
@@ -30,6 +31,11 @@
           </form>
         <% } %>
         <% if (locals.trade) { %><a class="btn btn-primary btn-block" data-foil-trade hidden>Angebot machen</a><% } %>
+        <%# Vitrine am Schreibtisch: Slab tauschen oder entfernen (foil-view.js meldet es per „vit:act“ an grading-desk.js) %>
+        <% if (locals.vitrine) { %>
+          <button type="button" class="btn btn-primary btn-block" data-foil-vit="swap" hidden>Austauschen</button>
+          <button type="button" class="btn btn-danger btn-block" data-foil-vit="remove" hidden>Aus Vitrine entfernen</button>
+        <% } %>
         <a class="btn btn-ghost btn-block" data-foil-cert hidden>Zertifikat ansehen →</a>
       </div>
     </div>
