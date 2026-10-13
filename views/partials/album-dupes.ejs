@@ -1,0 +1,13 @@
+<%# Duplikate: an die Bank verkaufen (Geld) oder zerkleinern (Konfetti für den Kosmetik-Shop) – dieselben Karten (nur im eigenen Album) %>
+<div class="album-dupes" title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht angefasst – auch ihre Duplikate nicht.">
+  <span><%= dupCount ? dupCount + (dupCount === 1 ? ' Duplikat' : ' Duplikate') : 'Keine Duplikate' %><% if (dupCount) { %> · <strong><%= euro(dupValue) %></strong><% } %></span>
+  <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
+  </form>
+  <form method="post" action="/tcg/duplikate-zerkleinern" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> zu <%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %> zerkleinern? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-ghost btn-sm" type="submit" <%= dupCount && dupKonfetti ? '' : 'disabled' %>>Zerkleinern<% if (dupKonfetti) { %> · +<%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %><% } %></button>
+  </form>
+  <a class="album-konfetti" href="/kosmetik" title="Zum Kosmetik-Shop"><%= konfetti.toLocaleString('de-DE') %> <%= konfettiName() %></a>
+</div>

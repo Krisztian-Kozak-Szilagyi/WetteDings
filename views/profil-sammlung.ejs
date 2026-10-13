@@ -11,20 +11,13 @@
   </div>
 </div>
 
-<div class="card" id="sammlung">
-  <div class="tcg-coll-head">
-    <h2>Sammlung</h2>
-    <%- include('partials/tcg-filter') %>
-  </div>
+<div class="album-body" id="sammlung">
   <% if (isMe) { %>
     <p class="muted small">So sehen andere deine Sammlung. Verkaufen und Schützen geht im <a href="/tcg/album">Album</a>.</p>
   <% } else { %>
-    <p class="muted small">Tippe eine Karte an, um sie groß anzusehen – dort kannst du <%= profile.username %> ein Angebot dafür machen.</p>
+    <p class="muted small">Tippe eine Karte an, um sie groß anzusehen – dort siehst du die Exemplare nach Wertung und kannst <%= profile.username %> ein Angebot dafür machen.</p>
   <% } %>
-  <% if (!cardCount) { %>
-    <p class="muted"><%= isMe ? 'Du hast' : profile.username + ' hat' %> noch keine Karten.</p>
-  <% } %>
-  <%- include('partials/tcg-grid', { mode: 'view', lockedByCard: {}, linkFor: isMe ? null : tradeLink }) %>
+  <%- include('partials/collection-view', { mode: 'view', linkFor: isMe ? null : tradeLink, shelfTitle: 'Slabs', emptyText: (isMe ? 'Du hast' : profile.username + ' hat') + ' noch keine Karten.' }) %>
 </div>
 
 <%- include('partials/card-zoom') %>

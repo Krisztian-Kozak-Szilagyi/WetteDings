@@ -427,6 +427,14 @@ router.post('/grading/vitrine', async (req, res) => {
   }
 });
 
+// Aus dem Album: einen Slab aus der Vitrine nehmen (Antwort wie bei den Album-Aktionen: zurück ins Album)
+router.post('/grading/vitrine/entfernen', (req, res) =>
+  handle(req, res, async () => {
+    await orders.removeFromShowcase({ user: req.user, doc: str(req.body.doc) });
+    return 'Der Slab steht nicht mehr in deiner Vitrine.';
+  }, '/tcg/album')
+);
+
 router.post('/grading/annehmen', (req, res) =>
   handle(req, res, async () => {
     if (req.body.confirm !== '1') throw new UserError('Bitte bestätige, dass du die Vertragsbedingungen gelesen hast.');

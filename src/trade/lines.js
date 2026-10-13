@@ -2,7 +2,7 @@
 // Geld in eine Richtung. Reine Helfer ohne Datenbank – genutzt von Handel, Protokollen, Statistik und Ansichten.
 //
 // Trade.give = was der Anbieter (seller) gibt, Trade.want = was er vom Empfänger (to) bekommt.
-// Position: { card, copy, doc, foiledAt, grade, slab, damaged, creased, ironed, marks }
+// Position: { card, copy, doc, foiledAt, grade, slab, lastGrade, damaged, creased, ironed, marks }
 //   card – Karten-ID oder "item:<Art>"
 //   copy – ein bestimmtes Exemplar, das verlangt wird: in Folie, im Slab oder mit sichtbarem Schaden (#204).
 //          Ohne copy bekommt die Position ein unfoliertes, unbeschädigtes Exemplar.
@@ -83,9 +83,9 @@ function stateLabel(l) {
   const slab = l.slab || (l.foiledAt && l.grade ? { code: 'BfW', grade: l.grade } : null);
   if (slab) return `Slab ${slab.code} ${slab.grade}`;
   if (l.foiledAt) return 'foliert';
-  if (l.creased) return l.ironed ? 'Knick, gebügelt' : 'Knick';
-  if (l.damaged) return 'Exemplar';
-  return '';
+  const was = l.lastGrade && l.lastGrade.grade ? `zuletzt ${l.lastGrade.code || 'BfW'} ${l.lastGrade.grade}` : ''; // Slab ab, Note des letzten Shops
+  const look = l.creased ? (l.ironed ? 'Knick, gebügelt' : 'Knick') : l.damaged ? 'Exemplar' : '';
+  return [look, was].filter(Boolean).join(', ');
 }
 
 /** Positionen als Text, gleiche Karten zusammengefasst: "2× Aleks (Gold), Luca (Holo, foliert)" – die Seltenheit unterscheidet gleichnamige Karten */

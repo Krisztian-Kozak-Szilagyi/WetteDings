@@ -145,24 +145,25 @@ const sameLines = (a, b) => {
 // Eine Position "Karte" ({ card }) bekommt ein unfoliertes, unbeschädigtes Exemplar. Alles, was man einem Exemplar ansieht,
 // wird gezielt als Exemplar gehandelt ({ copy }): in Folie, im Slab oder mit Kratzern bzw. Knick.
 /** Felder, mit denen ein Exemplar ins Angebot geht (zur Anzeige; beim Annehmen mit dem aktuellen Stand verglichen) */
-const COPY_FIELDS = '_id card foiledAt slab damaged creased ironedAt condition.defects.scratches condition.defects.crease';
+const COPY_FIELDS = '_id card foiledAt slab lastGrade damaged creased ironedAt condition.defects.scratches condition.defects.crease';
 function copyFields(doc) {
   const damaged = !!doc.damaged;
   return {
     foiledAt: doc.foiledAt || null,
     slab: doc.slab ? { code: doc.slab.code, grade: doc.slab.grade } : null,
     grade: doc.slab ? doc.slab.grade : null, // Note nur vom Slab
+    lastGrade: !doc.foiledAt && doc.lastGrade && doc.lastGrade.grade ? { code: doc.lastGrade.code, grade: doc.lastGrade.grade } : null, // ehemaliger Slab
     damaged,
     creased: !!doc.creased,
     ironed: !!(doc.creased && doc.ironedAt),
     marks: damaged && !doc.foiledAt ? visibleMarks(doc.condition && doc.condition.defects, doc._id, !!doc.ironedAt) : null,
   };
 }
-const NO_COPY = { foiledAt: null, slab: null, grade: null, damaged: false, creased: false, ironed: false, marks: null };
+const NO_COPY = { foiledAt: null, slab: null, grade: null, lastGrade: null, damaged: false, creased: false, ironed: false, marks: null };
 /** Felder einer Position übernehmen (ohne Exemplar-Angaben: die einer Karte ohne Folie und Schaden) */
 const keepFields = (l) => ({ ...NO_COPY, ...Object.fromEntries(Object.keys(NO_COPY).filter((k) => l[k] != null).map((k) => [k, l[k]])) });
-/** Gezielt handelbares Exemplar? Folie, Slab oder sichtbarer Schaden – ein unbeschädigtes ist "eine Karte" */
-const isCopy = (doc) => !!doc && (!!doc.foiledAt || !!doc.damaged);
+/** Gezielt handelbares Exemplar? Folie, Slab, sichtbarer Schaden oder frühere Bewertung – ein unbeschädigtes ist "eine Karte" */
+const isCopy = (doc) => !!doc && (!!doc.foiledAt || !!doc.damaged || !!(doc.lastGrade && doc.lastGrade.grade));
 /**
  * Hat sich das Exemplar seit dem Angebot sichtbar verändert (Folie ab, neuer Kratzer, Knick, gebügelt)? Folierte
  * Exemplare nehmen keinen Schaden – bei ihnen zählt nur, ob die Folie noch drauf ist.
@@ -273,7 +274,7 @@ async function resolveLines(ownerId, list, session, who = null) {
   const copyIds = list.filter((l) => !l.doc && l.copy).map((l) => l.copy);
   const [locked, docs, copies] = await Promise.all([
     lockedDocs(ownerId, session),
-    TcgCard.find({ user: ownerId, card: { $in: cardIdsNeeded }, foiledAt: null, damaged: { $ne: true } }).sort({ createdAt: 1 }).select('_id card').session(session).lean(),
+    TcgCard.find({ user: ownerId, card: { $in: cardIdsNeeded }, foiledAt: null, damaged: { $ne: true }, lastGrade: null }).sort({ createdAt: 1 }).select('_id card').session(session).lean(),
     copyIds.length ? TcgCard.find({ _id: { $in: copyIds }, user: ownerId }).select(COPY_FIELDS).session(session).lean() : [],
   ]);
   const used = new Set(list.filter((l) => l.doc).map((l) => String(l.doc)));
@@ -380,7 +381,7 @@ async function prepareLines(list, ownerId, who = null) {
     for (const l of out) if (!l.copy) need[l.card] = (need[l.card] || 0) + 1;
     for (const [card, n] of Object.entries(need)) {
       const item = itemByCardId(card);
-      const have = item ? await Item.countDocuments({ user: ownerId, type: item.key }) : await TcgCard.countDocuments({ user: ownerId, card, foiledAt: null, damaged: { $ne: true } });
+      const have = item ? await Item.countDocuments({ user: ownerId, type: item.key }) : await TcgCard.countDocuments({ user: ownerId, card, foiledAt: null, damaged: { $ne: true }, lastGrade: null });
       if (have < n) throw new UserError(`${who} besitzt ${n > 1 ? n + '× ' : ''}${cardName(card)} nicht${have ? ` (nur ${have})` : ''}.`);
     }
   }

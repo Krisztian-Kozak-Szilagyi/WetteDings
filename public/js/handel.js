@@ -35,6 +35,15 @@
       badge.className = 'tcg-badge r-' + d.rarity;
       // eigener Text (z. B. Gegenstand im Black Market), sonst Händlerpreis und Besitz
       $('[data-zoom-meta]', zoom).textContent = d.metaText || 'Händlerpreis ' + d.sellText + ' · ' + (owned ? 'du besitzt ' + owned + ' Stück' : 'fehlt dir noch');
+      // Sammlung im Album-Look: Exemplare der Karte nach Wertung, jede Zeile öffnet die 3D-Ansicht
+      var copyBox = $('[data-zoom-copylist]', zoom);
+      if (copyBox) {
+        var src = d.cardId ? $('[data-tcg-copies="' + d.cardId.replace(/["\\]/g, '') + '"]') : null;
+        var rows = $('[data-zoom-copyrows]', copyBox);
+        rows.innerHTML = '';
+        if (src) $all('.tcg-copy', src).forEach(function (row) { rows.appendChild(row.cloneNode(true)); });
+        copyBox.hidden = !rows.children.length;
+      }
       // Fremde Sammlung: von hier aus einen Tausch für diese Karte vorschlagen
       var tradeLink = $('[data-zoom-trade]', zoom);
       if (tradeLink) {

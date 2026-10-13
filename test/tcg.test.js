@@ -209,6 +209,10 @@ test('#204: Bank – ungebügelter Knick halber Preis, beschädigte Exemplare ge
   // Duplikate: es bleibt das neueste unbeschädigte
   const none = { reasons: new Map() };
   assert.deepEqual(pickDuplicates([...docs].sort(bankOrder), none).map((d) => d._id), ['c', 'b', 'e', 'a']);
+  // früher bewertete Exemplare (lastGrade) gehen zuletzt an die Bank – sie bleiben als das eine übrig
+  const graded = [{ _id: 'g', createdAt: t(0), lastGrade: { code: 'BfW', grade: 8 } }, { _id: 'h', createdAt: t(9) }];
+  assert.deepEqual([...graded].sort(bankOrder).map((d) => d._id), ['h', 'g']);
+  assert.deepEqual(pickDuplicates([...graded].sort(bankOrder), none).map((d) => d._id), ['h']);
   const holo = require('../src/tcg/catalog').rarityByKey.holo;
   assert.equal(bankProceeds([{ rarity: 'holo', creased: true }, { rarity: 'holo' }]), Math.floor(holo.sell / 2) + holo.sell);
 });
