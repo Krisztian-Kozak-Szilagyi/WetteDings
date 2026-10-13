@@ -15,11 +15,37 @@ test('#204 B: Arbeitsqualität – Ø aus Sauberkeit, Versiegelung und Glätte',
   assert.equal(rep.qualityOf({}), 0);
 });
 
-test('#204 B: Vitrine – Seltenheit × Note über 5, höchstens +100 %', () => {
+test('Vitrine: Wert-Gewicht × Noten-Faktor × Echtheit × Seltenheit, gedeckelt bei +50 %', () => {
   assert.equal(rep.showcaseBoost([]), 0);
-  assert.equal(rep.showcaseBoost([{ rank: 5, grade: 10 }]), 0.3);
-  assert.equal(rep.showcaseBoost([{ rank: 0, grade: 5 }]), 0); // Note 5 bringt nichts
-  assert.equal(rep.showcaseBoost(Array(10).fill({ rank: 5, grade: 10 })), 0.5); // gedeckelt bei +50 %
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, a + ' ≠ ' + b);
+  near(rep.showcaseBoost([{ rarity: 'holo', grade: 10 }]), 0.05);
+  near(rep.showcaseBoost([{ rarity: 'glitch', grade: 10 }]), 0.14);
+  near(rep.showcaseBoost([{ rarity: 'glitch', grade: 9 }]), 0.14 * 0.7); // Noten-Kurve
+  near(rep.showcaseBoost([{ rarity: 'glitch', grade: 8 }]), 0.14 * 0.4);
+  near(rep.showcaseBoost([{ rarity: 'glitch', grade: 7 }]), 0.14 * 0.2);
+  assert.equal(rep.showcaseBoost([{ rarity: 'sith', grade: 6 }]), 0); // Note 6 bringt nichts
+  near(rep.showcaseBoost([{ rarity: 'holo', grade: 10, confirmed: true }]), 0.05 * 1.2); // Zweitprüfung bestätigt
+  near(rep.showcaseBoost([{ rarity: 'holo', grade: 10, scarcity: 1.5 }]), 0.075);
+  near(rep.showcaseBoost([{ rarity: 'unbekannt', rank: 3, grade: 10 }]), 0.04); // Fallback nach Rang
+  assert.equal(rep.showcaseBoost(Array(10).fill({ rarity: 'sith', grade: 10 })), 0.5); // gedeckelt bei +50 %
+  // Sechs Holo 10 bringen nur 30 %, den vollen Deckel braucht Kapital (vier Glitch 10)
+  near(rep.showcaseBoost(Array(6).fill({ rarity: 'holo', grade: 10 })), 0.3);
+  assert.equal(rep.showcaseBoost(Array(4).fill({ rarity: 'glitch', grade: 10 })), 0.5);
+});
+
+test('Seltenheits-Faktor: Besitzer als Anteil der Aktiven, erst ab 30 Slabs', () => {
+  const f = (owners, active = 30, totalSlabs = 100) => rep.scarcityFactor({ owners, active, totalSlabs });
+  assert.equal(f(1), 1.5);
+  assert.equal(f(2), 1.25);
+  assert.equal(f(3), 1.25);
+  assert.equal(f(4), 1);
+  assert.equal(f(10), 1);
+  assert.equal(f(11), 0.85);
+  assert.equal(f(1, 30, 29), 1); // zu wenig Daten
+  assert.equal(f(30, 300), 1.25); // 10 % von 300 Aktiven = 30
+  assert.equal(f(9, 300), 1.5); // 3 % von 300 = 9
+  assert.equal(f(99, 300), 1); // 33 % von 300 = 99
+  assert.equal(f(100, 300), 0.85);
 });
 
 test('#204 B: Reputation je Auftrag, Sterne und Stufen', () => {

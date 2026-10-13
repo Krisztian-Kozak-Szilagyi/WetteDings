@@ -164,7 +164,8 @@ router.get('/grading', async (req, res) => {
   });
   // Leere Slabs (Inventar): so viele braucht der Shop für die angenommenen und neue Aufträge mit „Benoten + Slab“
   const slabFree = active ? await items.slabStock(req.user._id) : 0;
-  const slabCommitted = running.filter((j) => j.services && j.services.slab).length;
+  // Aufträge von Mitgliedern mit Slab-Baustein und NPC-Aufträge ab der Versiegel-Stufe (jede Versiegelung verbraucht einen Slab)
+  const slabCommitted = running.filter((j) => (j.services ? j.services.slab : (j.level || 1) >= grading.SLAB_LEVEL)).length;
   const tools = grading.toolsFor(state.shop);
   const balance = req.user.balance;
   res.render('grading', {
@@ -211,7 +212,7 @@ router.get('/grading', async (req, res) => {
     expressDays: grading.settings.expressDays,
     rating: state.shop ? reputation.ratingOf(state.shop) : null,
     repTiers: reputation.TIERS,
-    repRules: { base: reputation.BASE_GAIN, player: reputation.PLAYER_FACTOR, cap: reputation.SHOWCASE_CAP, star: reputation.STAR_STEP, penalty: reputation.GRADE_PENALTY, gradeless: reputation.GRADELESS_FACTOR, grace: reputation.DECAY_GRACE_DAYS, floor: reputation.DECAY_FLOOR },
+    repRules: { base: reputation.BASE_GAIN, player: reputation.PLAYER_FACTOR, cap: reputation.SHOWCASE_CAP, star: reputation.STAR_STEP, expiry: reputation.EXPIRY_PENALTY, penalty: reputation.GRADE_PENALTY, gradeless: reputation.GRADELESS_FACTOR, grace: reputation.DECAY_GRACE_DAYS, floor: reputation.DECAY_FLOOR },
     // Was die Rufstufe freischaltet: je Stufe { playerJobs, showcase } mit den Admin-Werten, perks = aktuelle Stufe
     tierPerks: reputation.TIERS.map((t) => grading.perksOf({ reputation: t.min })),
     perks: grading.perksOf(state.shop),

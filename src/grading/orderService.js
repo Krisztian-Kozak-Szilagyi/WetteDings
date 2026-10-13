@@ -17,6 +17,7 @@ const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
+const population = require('../tcg/population');
 const { lockedDocs, claim, lockLabel } = require('../tcg/locks');
 const { visibleMarks } = require('./condition');
 const items = require('../items/itemService');
@@ -109,6 +110,10 @@ async function closeWithRefund(orderId, status, session) {
   if (!order) return null;
   if (order.job) await GradingJob.deleteOne({ _id: order.job, status: { $in: ['offen', 'angenommen'] } }, { session });
   await refundOwner(order, session);
+  // Ein angenommener Auftrag (der Shop hat schon angefangen, firstStartedAt) läuft ab: das kostet den Shop Ruf. Ein Auftrag, den
+  // er nie angenommen hat, nicht – dort verliert nur der Kunde Zeit, und der Shop muss ihn nicht annehmen.
+  order.expiryPenalty = status === 'abgelaufen' && !!order.firstStartedAt;
+  if (order.expiryPenalty) await GradingShop.updateOne({ _id: order.shop }, { $inc: { reputation: -reputation.EXPIRY_PENALTY } }, { session });
   return order;
 }
 
@@ -126,18 +131,29 @@ async function showcasesOf(shops) {
         .slice(0, s.reputation === undefined ? undefined : perksOf(s).showcase) // Plätze nach Rang (mit reputation übergeben)
         .map((id) => byId.get(String(id)))
         .filter((d) => d && String(d.user) === String(s._id) && catalog.cardById[d.card])
-        .map((d) => ({ id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade, at: d.slab.at } })),
+        .map((d) => ({ id: String(d._id), card: catalog.cardById[d.card], rarity: d.rarity, foiledAt: d.foiledAt, slab: { code: d.slab.code, grade: d.slab.grade, at: d.slab.at, reviews: (d.slab.reviews || []).length } })),
     ])
   );
 }
 
-/** Vitrinen-Boost eines Shops (Anteil) aus seinen ausgestellten Slabs */
-function boostOf(showcase = []) {
-  return reputation.showcaseBoost(showcase.map((x) => ({ rank: (catalog.rarityByKey[x.rarity] || {}).rank || 0, grade: x.slab.grade })));
+/**
+ * Vitrinen-Boost eines Shops (Anteil) aus seinen ausgestellten Slabs: Wert der Karte × Note × bestätigt (Zweitprüfung) ×
+ * Seltenheit in der Population (pop = population.all(), ohne gilt 1) – siehe reputation.showcaseBoost
+ */
+function boostOf(showcase = [], pop = null) {
+  return reputation.showcaseBoost(
+    showcase.map((x) => ({
+      rarity: x.rarity,
+      rank: (catalog.rarityByKey[x.rarity] || {}).rank || 0,
+      grade: x.slab.grade,
+      confirmed: (x.slab.reviews || 0) > 0,
+      scarcity: pop ? population.slabScarcity(pop, x.card.id, x.slab.grade) : 1,
+    }))
+  );
 }
 
 /** Shop für die Anzeige: Kennzahlen, Preis, Warteschlange, Vitrine, Boost */
-function shopView(s, owners, queues, showcases, slabs = new Map()) {
+function shopView(s, owners, queues, showcases, slabs = new Map(), pop = null) {
   const showcase = showcases.get(String(s._id)) || [];
   return {
     id: String(s._id),
@@ -152,7 +168,7 @@ function shopView(s, owners, queues, showcases, slabs = new Map()) {
     slabs: slabs.get(String(s._id)) || 0, // frei verfügbare leere Slabs für neue Aufträge mit „Benoten + Slab“
     rating: reputation.ratingOf(s),
     showcase,
-    boost: boostOf(showcase),
+    boost: boostOf(showcase, pop),
     jobsDone: s.jobsDone || 0,
     playerJobsDone: s.playerJobsDone || 0,
   };
@@ -181,11 +197,11 @@ async function slabCapacity(shopIds, session = null) {
 async function shopsForOrders() {
   const shops = await GradingShop.find({ active: true, level: { $gte: ORDER_LEVEL }, code: { $type: 'string' } }).lean();
   const ids = shops.map((s) => s._id);
-  const [users, queues, showcases, slabs] = await Promise.all([User.find({ _id: { $in: ids }, deletedAt: null }).select('username').lean(), queuesOf(ids), showcasesOf(shops), slabCapacity(ids)]);
+  const [users, queues, showcases, slabs, pop] = await Promise.all([User.find({ _id: { $in: ids }, deletedAt: null }).select('username').lean(), queuesOf(ids), showcasesOf(shops), slabCapacity(ids), population.all()]);
   const owners = new Map(users.map((u) => [String(u._id), u.username]));
   return shops
     .filter((s) => owners.has(String(s._id)))
-    .map((s) => shopView(s, owners, queues, showcases, slabs))
+    .map((s) => shopView(s, owners, queues, showcases, slabs, pop))
     .sort((a, b) => b.rating.reputation - a.rating.reputation || a.name.localeCompare(b.name, 'de'));
 }
 
@@ -195,7 +211,7 @@ async function shopByCode(code) {
   if (!s) return null;
   const [user, queues, showcases, slabs] = await Promise.all([User.findById(s._id).select('username deletedAt').lean(), queuesOf([s._id]), showcasesOf([s]), slabCapacity([s._id])]);
   if (!user || user.deletedAt) return null;
-  return { ...shopView(s, new Map([[String(s._id), user.username]]), queues, showcases, slabs), accepts: acceptsOrders(s) };
+  return { ...shopView(s, new Map([[String(s._id), user.username]]), queues, showcases, slabs, await population.all()), accepts: acceptsOrders(s) };
 }
 
 /**
@@ -346,7 +362,7 @@ async function expireDue(now = new Date()) {
     if (!order) continue;
     n++;
     await notify(order.owner, { area: 'Grading', href: ORDERS_HREF, text: `${order.shopCode} hat deine Karte „${cardName(order.card)}“ nicht rechtzeitig gegradet – du bekommst ${euro(order.price)} zurück.` });
-    await notify(order.shop, { area: 'Grading', href: SHOP_HREF, text: `Der Auftrag „${cardName(order.card)}“ von ${order.ownerName} ist abgelaufen – das Geld ging zurück.` });
+    await notify(order.shop, { area: 'Grading', href: SHOP_HREF, text: `Der Auftrag „${cardName(order.card)}“ von ${order.ownerName} ist abgelaufen – das Geld ging zurück${order.expiryPenalty ? ` und du verlierst ${reputation.EXPIRY_PENALTY} Ruf, weil du ihn angenommen hattest` : ''}.` });
   }
   return n;
 }

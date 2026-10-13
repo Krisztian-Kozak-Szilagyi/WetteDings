@@ -13,6 +13,22 @@ const GRADELESS_FACTOR = 0.5; // Aufträge ohne Benoten (nur Reinigen oder Büge
 const DECAY_GRACE_DAYS = 7; // so lange darf ein Shop ohne Auftrag bleiben, bevor der Ruf verfällt
 const DECAY_RATE = 0.01; // danach −1 % pro Tag …
 const DECAY_FLOOR = 100; // … aber nie unter „Bekannt“: eine Pause macht niemanden wieder zum Neuling
+const EXPIRY_PENALTY = 30; // ein angenommener Auftrag von einem Mitglied läuft ab (nicht rechtzeitig fertig): −30 Ruf
+
+// Slab-Bonus der Vitrine: je Slab = Wert-Gewicht der Karte × Noten-Faktor × Echtheit × Seltenheit, Summe gedeckelt (SHOWCASE_CAP).
+// Das Gewicht folgt dem Händlerwert der Seltenheit (bei Note 10), nicht dem Rang: eine Boss-Karte bringt mehr als ein Holo,
+// aber weniger als zwei Sith.
+const SLAB_WEIGHT = { crumpled: 0.01, bfwler: 0.02, gold: 0.03, holo: 0.05, bockhaber: 0.09, glitch: 0.14, icon: 0.18, boss: 0.2, sith: 0.25 };
+const GRADE_FACTOR = { 10: 1, 9: 0.7, 8: 0.4, 7: 0.2 }; // Note 6 und darunter bringt nichts
+const CONFIRMED_FACTOR = 1.2; // von einem anderen Shop in einer Zweitprüfung bestätigt
+const SCARCITY_MIN_SLABS = 30; // darunter ist die Datenlage zu dünn: Faktor 1
+// Besitzer-Grenzen: Anteil der aktiven Spieler, mindestens aber 1 / 3 / 10 Spieler (bei ~30 Aktiven also 1 / 3 / 10)
+const SCARCITY_STEPS = [
+  { share: 0.03, min: 1, factor: 1.5 },
+  { share: 0.1, min: 3, factor: 1.25 },
+  { share: 0.33, min: 10, factor: 1 },
+];
+const SCARCITY_DEFAULT = 0.85;
 
 const TIERS = [
   { min: 0, label: 'Neuling' },
@@ -41,13 +57,29 @@ function qualityOf({ clean, seal, iron } = {}) {
   return parts.length ? Math.round(parts.reduce((s, v) => s + v, 0) / parts.length) : 0;
 }
 
+/** Wert-Gewicht der Seltenheit (Anteil bei Note 10); unbekannte Seltenheiten nach Rang (1 % je Rang, höchstens 25 %) */
+const slabWeight = (rarity, rank = 0) => (SLAB_WEIGHT[rarity] !== undefined ? SLAB_WEIGHT[rarity] : Math.min(0.25, 0.01 * (Math.max(0, rank) + 1)));
+
 /**
- * Boost der Vitrine als Anteil (0 … SHOWCASE_CAP): je Slab (Rang der Seltenheit + 1) × Punkte über Note 5, in Prozent.
- * Eine Glitch-Karte (Rang 5) mit Note 10 bringt 6 × 5 = +30 %. slabs: [{ rank, grade }]
+ * Seltenheits-Faktor eines Slabs aus der Population (0,85 … 1,5): wie viele verschiedene Spieler einen Slab dieser Karte mit
+ * mindestens dieser Note besitzen – je weniger, desto seltener. Ohne ausreichend Daten (weniger als SCARCITY_MIN_SLABS Slabs
+ * insgesamt) 1. owners = Zahl der Besitzer, active = aktive Spieler, totalSlabs = alle Slabs.
  */
+function scarcityFactor({ owners = 0, active = 0, totalSlabs = 0 } = {}) {
+  if (totalSlabs < SCARCITY_MIN_SLABS) return 1;
+  const a = Math.max(1, active);
+  for (const step of SCARCITY_STEPS) if (owners <= Math.max(step.min, Math.floor(a * step.share))) return step.factor;
+  return SCARCITY_DEFAULT;
+}
+
+/** Bonus eines einzelnen Slabs als Anteil: { rarity, rank, grade, confirmed, scarcity } */
+function slabBoost({ rarity, rank = 0, grade = 0, confirmed = false, scarcity = 1 } = {}) {
+  return slabWeight(rarity, rank) * (GRADE_FACTOR[grade] || 0) * (confirmed ? CONFIRMED_FACTOR : 1) * scarcity;
+}
+
+/** Boost der Vitrine als Anteil (0 … SHOWCASE_CAP): Summe der Slab-Boni, gedeckelt. slabs: [{ rarity, rank, grade, confirmed, scarcity }] */
 function showcaseBoost(slabs = []) {
-  const points = slabs.reduce((s, x) => s + (Math.max(0, x.rank || 0) + 1) * Math.max(0, (x.grade || 0) - 5), 0);
-  return Math.min(SHOWCASE_CAP, points / 100);
+  return Math.min(SHOWCASE_CAP, slabs.reduce((s, x) => s + slabBoost(x), 0));
 }
 
 /** Zuwachs für einen sauber erledigten Auftrag: Grundwert × Spieler-Faktor × Qualitätsfaktor (0,5–1,5) × (1 + Vitrine) */
@@ -133,6 +165,7 @@ function ratingOf(shop = {}) {
 }
 
 module.exports = {
-  BASE_GAIN, PLAYER_FACTOR, SHOWCASE_CAP, STAR_STEP, GRADE_PENALTY, GRADELESS_FACTOR, DECAY_GRACE_DAYS, DECAY_RATE, DECAY_FLOOR,
+  BASE_GAIN, PLAYER_FACTOR, SHOWCASE_CAP, STAR_STEP, GRADE_PENALTY, GRADELESS_FACTOR, DECAY_GRACE_DAYS, DECAY_RATE, DECAY_FLOOR, EXPIRY_PENALTY,
+  SLAB_WEIGHT, GRADE_FACTOR, CONFIRMED_FACTOR, SCARCITY_MIN_SLABS, slabWeight, slabBoost, scarcityFactor,
   TIERS, TIER_PERKS, qualityOf, showcaseBoost, reputationGain, gradeRepChange, starGain, tierOf, tierIndex, perksOf, decayedReputation, idleDecayDays, ratingOf,
 };

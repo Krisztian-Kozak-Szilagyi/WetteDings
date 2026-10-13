@@ -88,7 +88,8 @@ const DEFAULTS = {
   open: false,
   jobs: 10,
   playerJobs: 10,
-  pay: { clean: 2500, grade: 3000, slab: 3500, iron: 2000 },
+  // slab: Lohn fürs Versiegeln – seit 13.10. verbraucht auch ein NPC-Auftrag einen leeren Slab (Bank-Preis 40 €), darum von 35 € auf 60 € angehoben
+  pay: { clean: 2500, grade: 3000, slab: 6000, iron: 2000 },
   // Stufe 2, 3, 4. Live-Daten (5.–13.10., 22 Spieler): Einkommen bei 10 Aufträgen ca. 255 € (Stufe 1), 265 € (Stufe 2, seit dem Bügel-Umbau am 10.10.), 825 € (Stufe 3), 1.100 € (Stufe 4).
   // Stufe 2 ist vor allem das Tor zu Stufe 3 (kleiner Preis), Stufe 3 und 4 kosten etwa 5–8 Tage Einkommen der Vorstufe: Weg bis ganz oben ca. 12 Tage statt 1–3.
   costs: [100000, 200000, 400000],
@@ -169,7 +170,8 @@ async function saveSettings({ admin, ...values }) {
 function rollCard(richness = 1) {
   const list = CUSTOMER_RARITIES.filter(([k]) => (catalog.cardsByRarity[k] || []).length);
   // Rang des Shops (reputation.perksOf): seltene Kundenkarten (Lohn-Zuschlag > 0) werden wahrscheinlicher
-  const [key] = list[weighted(list.map(([, w, bonus]) => (bonus > 0 ? w * richness : w)))];
+  const weights = list.map(([, w, bonus]) => Math.round(w * (bonus > 0 ? richness : 1) * 100)); // ganze Gewichte: weighted() würfelt ganzzahlig
+  const [key] = list[weighted(weights)];
   return pick(catalog.cardsByRarity[key]).id;
 }
 
@@ -228,6 +230,8 @@ const NO_SLAB = 'Dir fehlt ein leerer Slab für diesen Auftrag – kauf einen in
 const MAX_ACCEPTED = 5;
 /** Laufende Aufträge: der aktive (offen) und die im Hintergrund (angenommen) */
 const RUNNING = ['offen', 'angenommen'];
+// Ab dieser Stufe wird versiegelt – und jede Versiegelung (auch bei NPC-Aufträgen) verbraucht einen leeren Slab
+const SLAB_LEVEL = LEVELS.findIndex((l) => l.steps.includes('slab')) + 1;
 
 /**
  * Tageskontingente (#204): used = NPC-Aufträge (fertige, abgebrochene und laufende), playerUsed = Aufträge von
@@ -557,6 +561,11 @@ async function takeJob({ user, orderId = null, npc = false }) {
         if (taken) return taken;
       }
       if (used >= limit) throw new UserError(playerUsed < playerLimit ? 'Die NPC-Aufträge für heute sind erledigt – warte auf Karten von Mitgliedern.' : 'Für heute sind alle Aufträge erledigt – morgen kommen neue.');
+      // Ab Stufe SLAB_LEVEL verbraucht jeder NPC-Auftrag beim Versiegeln einen leeren Slab: genug für alle schon angenommenen und diesen?
+      if (info.steps.includes('slab')) {
+        const committed = await GradingJob.countDocuments({ user: user._id, status: { $in: RUNNING }, $or: [{ 'services.slab': true }, { services: null, level: { $gte: SLAB_LEVEL } }] }).session(session);
+        if ((await slabStock(user._id, session, true)) <= committed) throw new UserError(NO_SLAB);
+      }
       const defects = rollDefects();
       const [job] = await GradingJob.create(
         [{ user: user._id, day, level: info.level, card: rollCard(perksOf(shop).richness), customer: pick(CUSTOMERS), spots: rollSpots(), defects, grade: gradeFor(defects), ...status }],
@@ -728,7 +737,7 @@ async function scoreShop({ shopId, job, session }) {
   const showcase = shop ? (await orders().showcasesOf([{ _id: shopId, showcase: shop.showcase, reputation: shop.reputation }])).get(String(shopId)) || [] : [];
   const quality = reputation.qualityOf({ clean: job.clean, seal: job.seal, iron: job.iron });
   // Ruf nach der Note (reputation.gradeRepChange): exakt = Zuwachs, ±1 = unverändert, ≥2 daneben = Abzug; ohne Note halber Zuwachs
-  const change = reputation.gradeRepChange({ guess: job.guess, grade: job.grade, quality, player: isPlayerJob(job), boost: orders().boostOf(showcase) });
+  const change = reputation.gradeRepChange({ guess: job.guess, grade: job.grade, quality, player: isPlayerJob(job), boost: orders().boostOf(showcase, await require('../tcg/population').all()) });
   const inc = { 'quality.sum': quality, 'quality.n': 1, reputation: change };
   if (job.guess != null) Object.assign(inc, { 'hits.n': 1, 'hits.exact': job.guess === job.grade ? 1 : 0 });
   await GradingShop.updateOne({ _id: shopId }, { $inc: inc, $set: { lastWorkedAt: new Date(), repDecayedDays: 0 } }, { session });
@@ -808,6 +817,12 @@ async function finishJob({ user, jobId, clean, seal }) {
     const player = isPlayerJob(job);
     const shop = await GradingShop.findById(user._id).select('code').session(session).lean();
     Object.assign(job, { clean: cleanQ, seal: sealQ });
+    // NPC-Auftrag mit Versiegeln: das Gehäuse verbraucht der Shop (wie bei Mitglieder-Aufträgen). Fehlt der Slab, bleibt der Auftrag
+    // offen – nachkaufen und noch einmal senden.
+    if (!player && steps.includes('slab')) {
+      if (!(await slabStock(user._id, session, true))) throw new UserError(NO_SLAB);
+      await takeItems({ userId: user._id, type: 'slab', source: 'versiegeln', session, meta: { card: job.card }, ignoreReserved: true });
+    }
     // Spieler-Auftrag: Karte als Slab zurück, der Shop bekommt den Preis (kein Lohn vom Haus)
     const order = player ? await finishPlayerJob({ job, shop, session }) : null;
     const pay = player ? order.price : payFor({ level: job.level, clean: cleanQ, grade: job.grade, guess: job.guess, seal: sealQ, rarity: card && card.rarity, iron: job.iron ? job.iron.smooth : null });
@@ -850,6 +865,7 @@ function estimateInput() {
     levels: LEVELS.map(({ level, name, steps, premium }) => ({ level, name, steps, premium: !!premium })),
     factor: estimate.rarityFactor(CUSTOMER_RARITIES, (k) => (catalog.cardsByRarity[k] || []).length > 0),
     foilValue: ((foil.settings.gradingChance / 10000) * (folie ? folie.sell : 0)),
+    slabCost: foil.settings.slabPrice, // Kosten des leeren Slabs je versiegeltem Auftrag (jetzt auch bei NPC-Aufträgen)
     profiles: estimate.PROFILES,
     creaseChance: CONDITION_PROFILES.kunde.crease, // so viele Kundenkarten haben einen Knick (Bügeln, #204)
   };
@@ -873,4 +889,4 @@ async function actualStats(days = 30) {
 /** Arbeitet das Mitglied gerade im Grading-Shop? (dann kein Tagesbonus) */
 const isWorking = (userId) => GradingShop.exists({ _id: userId, active: true }).then(Boolean);
 
-module.exports = { perksOf, NO_SLAB, TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, validSlogan, SHOP_NAME_MIN, SHOP_NAME_MAX, SHOP_SLOGAN_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, abortJob, selectJob, MAX_ACCEPTED, dayQuota, workedMs, activate, park, setGuess, finishJob, isWorking };
+module.exports = { perksOf, rollCard, SLAB_LEVEL, NO_SLAB, TOOLS, toolsFor, buyTool, payParts, SERVICES, validRange, requestCode, codeRequests, codeRequestCount, decideCodeRequest, isPlayerJob, scoreShop, IRON_LEVEL, MS_PER_SEGMENT, stepsFor, ironMinMs, ironInput, ironJob, ironableCards, startIroning, finishIroning, validShopName, validSlogan, SHOP_NAME_MIN, SHOP_NAME_MAX, SHOP_SLOGAN_MAX, setName, usedToday, shopValue, shopValues, SHOP_VALUE_PERCENT, estimateInput, estimateNow, actualStats, CONTRACT_DAYS, MS_PER_SPOT, LEVELS, PAY, CUSTOMER_RARITIES, rarityBonus, rollCard, levelInfo, settings, loadSettings, saveSettings, rollSpots, rollDefects, gradeFor, payFor, getState, hire, quit, upgrade, takeJob, abortJob, selectJob, MAX_ACCEPTED, dayQuota, workedMs, activate, park, setGuess, finishJob, isWorking };
