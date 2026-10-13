@@ -91,7 +91,8 @@ const GOODS = Object.entries(WARE)
   .filter(([id]) => byId[id])
   .map(([id, [perBox, color]]) => {
     const market = byId[id].placeholder_price.amount;
-    return { id, name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100 };
+    // tier = ab welcher Stufe Kunden danach fragen (vorbereitet, alles Stufe 1)
+    return { id, name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100, tier: 1 };
   });
 
 // Was in welches Möbel passt (Platz = Stückzahl, jedes Stück braucht einen Platz; gemischt erlaubt)

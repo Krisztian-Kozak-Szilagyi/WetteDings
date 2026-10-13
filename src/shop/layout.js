@@ -9,6 +9,8 @@
 //          stock { wareId: Stück } bei Regalen & Co. (gemischt, jedes Stück braucht einen Platz)
 //   boxes: [{ bid, kind: 'ware'|'moebel', id, qty, x, y }] – Kartons; carry = bid des Kartons in der Hand (oder null)
 //   prices: { wareId: Verkaufspreis } – fehlt einer, gilt der Marktpreis
+//   day (laufender Tag), open (Laden geöffnet), today (Zahlen des laufenden Tages), reviews (letzte Bewertungen),
+//   reports (Tagesberichte, neueste zuletzt) – die Kunden selbst laufen im Browser (src/shop/customers.js)
 // Kataloge kommen von außen: cat = { möbelId: def }, goods = { wareId: def } (src/shop/catalog.js).
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -25,19 +27,43 @@
   const DOOR = [{ x: 3, y: UNIT_D - 1 }, { x: 4, y: UNIT_D - 1 }];
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
+  const KEEP_REVIEWS = 60;
+  const KEEP_REPORTS = 14;
+  const KEEP_RECEIPTS = 60;
+  // Bewertungstexte: der Browser schickt nur den Schlüssel, der Text steht hier
+  const REVIEW_TEXTS = {
+    5: 'Faire Preise, gerne wieder!',
+    4: 'Etwas teuer, aber okay.',
+    3: 'Ganz schön teuer hier.',
+    nothing: 'Nichts Passendes gefunden.',
+    empty: 'Der Laden ist ja fast leer!',
+    waited: 'Ewig an der Kasse gewartet.',
+  };
+
   const cents = (n) => Math.round(n * 100) / 100;
 
+  function freshDay() {
+    return { revenue: 0, sold: {}, visitors: 0, buyers: 0, misses: {}, receipts: [], reviews: 0, starSum: 0 };
+  }
+
   function fresh() {
-    return { coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {} };
+    return {
+      coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
+      day: 1, open: false, today: freshDay(), reviews: [], reports: [],
+    };
   }
 
   /** Fehlende Felder (ältere Stände) ergänzen */
   function normalize(s) {
     const f = fresh();
-    const out = Object.assign({}, f, s);
+    const out = Object.assign({}, f);
+    Object.keys(s || {}).forEach((k) => { if (s[k] !== undefined && s[k] !== null) out[k] = s[k]; });
     out.items = (out.items || []).map((it) => Object.assign({}, it));
     out.boxes = (out.boxes || []).map((b) => Object.assign({}, b));
     out.prices = Object.assign({}, out.prices || {});
+    out.today = Object.assign(freshDay(), out.today || {});
+    out.reviews = (out.reviews || []).slice(-KEEP_REVIEWS);
+    out.reports = (out.reports || []).slice(-KEEP_REPORTS);
     if (!out.boxes.some((b) => b.bid === out.carry)) out.carry = null;
     return out;
   }
@@ -295,6 +321,69 @@
         s.items = s.items.filter((x) => !gone.includes(x));
         return { state: s };
       }
+      case 'openDay': {
+        if (s.open) return fail('Der Laden ist schon offen.');
+        s.open = true;
+        s.today = freshDay();
+        return { state: s };
+      }
+      case 'checkout':
+      case 'leave': {
+        if (!s.open) return fail('Der Laden ist zu.');
+        const t = s.today;
+        t.visitors += 1;
+        if (a.type === 'checkout') {
+          const lines = [];
+          (Array.isArray(a.lines) ? a.lines : []).slice(0, 10).forEach((l) => {
+            let want = Math.max(0, Math.min(50, Math.floor(Number(l.qty)) || 0));
+            if (!goods[l.ware] || !want) return;
+            const p = price(s, goods, l.ware);
+            // zuerst aus dem Regal, aus dem der Kunde genommen hat, sonst aus einem anderen
+            const from = s.items.filter((it) => it.stock && it.stock[l.ware]).sort((x, y) => (y.uid === l.uid) - (x.uid === l.uid));
+            let got = 0;
+            from.forEach((it) => {
+              if (!want) return;
+              const n = Math.min(want, it.stock[l.ware]);
+              it.stock = Object.assign({}, it.stock);
+              it.stock[l.ware] -= n;
+              if (!it.stock[l.ware]) delete it.stock[l.ware];
+              want -= n;
+              got += n;
+            });
+            if (got) lines.push({ ware: l.ware, qty: got, price: p });
+          });
+          if (lines.length) {
+            const total = cents(lines.reduce((sum, l) => sum + l.qty * l.price, 0));
+            s.coins = cents(s.coins + total);
+            t.revenue = cents(t.revenue + total);
+            t.buyers += 1;
+            lines.forEach((l) => { t.sold[l.ware] = (t.sold[l.ware] || 0) + l.qty; });
+            t.receipts = t.receipts.concat({ lines: lines, total: total }).slice(-KEEP_RECEIPTS);
+          }
+        }
+        if (a.miss && goods[a.miss]) t.misses[a.miss] = (t.misses[a.miss] || 0) + 1;
+        const stars = Number(a.stars);
+        const text = Object.prototype.hasOwnProperty.call(REVIEW_TEXTS, a.why) ? REVIEW_TEXTS[a.why] : null;
+        if (Number.isInteger(stars) && stars >= 1 && stars <= 5 && text) {
+          s.reviews = s.reviews.concat({ day: s.day, stars: stars, text: text }).slice(-KEEP_REVIEWS);
+          t.reviews += 1;
+          t.starSum += stars;
+        }
+        return { state: s };
+      }
+      case 'closeDay': {
+        if (!s.open) return fail('Der Laden ist schon zu.');
+        const t = s.today;
+        s.reports = s.reports.concat({
+          day: s.day, revenue: t.revenue, sold: t.sold, visitors: t.visitors, buyers: t.buyers, misses: t.misses,
+          receipts: t.receipts, stars: t.reviews ? Math.round((t.starSum / t.reviews) * 10) / 10 : null, reviews: t.reviews,
+          aborted: !!a.aborted,
+        }).slice(-KEEP_REPORTS);
+        s.open = false;
+        s.day += 1;
+        s.today = freshDay();
+        return { state: s };
+      }
       case 'setPrice': {
         const p = Number(a.price);
         if (!goods[a.ware]) return fail('Unbekannte Ware.');
@@ -324,6 +413,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    REVIEW_TEXTS, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

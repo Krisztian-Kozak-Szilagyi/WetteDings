@@ -102,3 +102,15 @@ html, body.sd-body {
   .sd-tabs { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid #2c3040; }
   .sd-tab-sep { display: none; }
 }
+
+/* Uhr / Öffnungstag oben in der Mitte, Hinweis bei Ladenschluss (neutral, kein Erfolgs-Grün) */
+.sd-clock {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2;
+  height: 34px; display: flex; align-items: center; padding: 0 14px; border-radius: 8px;
+  background: rgba(28, 31, 43, .9); border: 1px solid #3a3f52; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.sd-note {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%); z-index: 9;
+  padding: 8px 14px; border-radius: 8px; background: rgba(28, 31, 43, .96); border: 1px solid #d9a441; font-size: 13px;
+}
+@media (max-width: 700px) { .sd-clock { top: 54px; font-size: 12px; } .sd-note { top: 96px; } }
