@@ -1,0 +1,20 @@
+<%# Ein Fach der Vitrine: x = { id, card, rarity, foiledAt, slab }, editable = am eigenen Schreibtisch (Klick öffnet das Menü, siehe vitrine.ejs) %>
+<% const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
+<div class="gd-vit-item r-<%= x.rarity %>"<%- locals.editable ? ' data-id="' + x.id + '"' : '' %>>
+      <% if (locals.editable) { %><button type="button" class="gd-vit-slab r-<%= x.rarity %>" data-vit-slab aria-haspopup="menu" aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – Optionen" title="<%= x.card.name %>">
+      <% } else { %><button type="button" class="gd-vit-slab r-<%= x.rarity %>"<%- foilViewAttrs(x.card, rl, x.foiledAt, { slab: x.slab, id: x.id }) %> data-foil-group="vitrine" data-pop="<%= locals.popText ? popText(x) : '' %>"<% const st = locals.popStats ? popStats(x) : null; if (st) { %> data-pop-stats="<%= JSON.stringify(st) %>"<% } %> aria-label="<%= x.card.name %>, <%= x.slab.code %> Note <%= x.slab.grade %> – bewundern" title="<%= x.card.name %> – ansehen"><% } %>
+        <span class="gd-vit-spot" aria-hidden="true"></span>
+        <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id, eager: !!locals.editable }) %></span>
+      </button>
+      <%# Schild im Stil des Zertifikats in der Zoomansicht (Etikett ohne Rahmen; Note ab 9 Gold, 6 bis 8 Silber, darunter Bronze): links Kürzel, Name und Seltenheit – der
+          Name bricht um, nichts wird abgeschnitten –, rechts Notenwort über der großen Note %>
+      <span class="gd-vit-plaque <%= x.slab.grade >= 9 ? 'is-gold' : x.slab.grade >= 6 ? 'is-silver' : 'is-bronze' %>" aria-hidden="true">
+        <span class="gd-vp-info">
+          <b class="gd-vp-code"><%= x.slab.code %></b>
+          <span class="gd-vp-name"><%= x.card.name %></span>
+          <span class="gd-vp-rar"><%= rl %></span>
+        </span>
+        <span class="gd-vp-score"><span class="gd-vp-word"><%= gradeWord(x.slab.grade) %></span><b class="gd-vp-grade"><%= x.slab.grade %></b></span>
+        <span class="gv-sheen"></span>
+      </span>
+      </div>

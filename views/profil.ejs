@@ -151,7 +151,7 @@
             <% if (fv.foiledAt) { %>
               <button type="button" class="tcg-slot foil-slot r-<%= c.rarity %>"<%- foilViewAttrs(c, r.label, fv.foiledAt, { slab: fv.slab, id: fv.key, center: fv.center }) %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(fv.foiledAt) %> – ansehen">
                 <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c, rarityLabel: r.label, slab: fv.slab, id: fv.key, center: fv.center }) %></span>
-                <span class="tcg-slot-label"><span class="tcg-dot"></span><%= fv.slab ? 'Slab ' + fv.slab.code + ' · Note ' + fv.slab.grade : 'In Folie · ' + dayDate(fv.foiledAt) %></span>
+                <span class="tcg-slot-label"><span class="tcg-dot"></span><%= fv.slab ? 'Slab ' + fv.slab.code + ' · Note ' + fv.slab.grade : 'Im Sleeve · ' + dayDate(fv.foiledAt) %></span>
               </button>
               <% return; } %>
             <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card

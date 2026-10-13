@@ -231,7 +231,7 @@
                   </td>
                   <td>
                     <% r.members.forEach((m) => {
-                      const loot = [m.reward ? euro(m.reward) : null, m.foil ? 'Folie' : null, m.bossCard ? 'Boss-Karte' : null].filter(Boolean); %>
+                      const loot = [m.reward ? euro(m.reward) : null, m.foil ? 'Sleeve/Slab' : null, m.bossCard ? 'Boss-Karte' : null].filter(Boolean); %>
                       <div>
                         <% if (m.bot) { %><em><%= m.name %></em> <span class="muted small">(Bot)</span><% } else if (m.highlight) { %><strong><%- userLink(m.name, { realName: false }) %></strong><% } else { %><%- userLink(m.name, { realName: false }) %><% } %><%= m.leader ? ' ★' : '' %>
                         <span class="muted small">– <%= m.card %><%= m.boost ? ' + ' + m.boost : '' %></span>

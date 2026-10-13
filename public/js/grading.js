@@ -1190,7 +1190,9 @@
     row('Summe', euro(res.pay), 'is-sum');
 
     var facts = el('div', 'gr-finish-facts', panel);
-    if (res.reputation) el('span', 'gr-finish-rep', facts).textContent = 'Reputation +' + res.reputation;
+    // Ruf nach der Note: exakt = Zuwachs, ±1 = unverändert, weiter daneben = Abzug
+    if (res.reputation) el('span', 'gr-finish-rep' + (res.reputation < 0 ? ' is-bad' : ''), facts).textContent = 'Ruf ' + (res.reputation > 0 ? '+' : '−') + Math.abs(res.reputation);
+    else if (res.graded) el('span', '', facts).textContent = 'Ruf unverändert';
     if (res.quality != null) el('span', '', facts).textContent = 'Qualität ' + res.quality + ' %';
     if (res.player && res.guess) el('span', '', facts).textContent = 'Slab ' + (res.shopCode || '') + ' · Note ' + res.guess;
     if (res.foilFound) el('span', 'gr-ok', facts).textContent = '+ 1 TCG Sleeve im Inventar';

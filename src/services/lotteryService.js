@@ -61,7 +61,7 @@ function settingsError(v) {
   if (!validInt(v.ticketPrice, MAX.ticketPrice, 1)) return 'Lospreis: mindestens 0,01 €.';
   if (!validInt(v.prizeCash, MAX.prizeCash)) return 'Geld aus der Bank: 0 bis 1.000.000.000 €.';
   if (!validInt(v.prizePacks, MAX.prizePacks)) return `Booster Packs: 0 bis ${MAX.prizePacks}.`;
-  if (!validInt(v.prizeFoils, MAX.prizeFoils)) return `Folien: 0 bis ${MAX.prizeFoils}.`;
+  if (!validInt(v.prizeFoils, MAX.prizeFoils)) return `TCG Sleeves: 0 bis ${MAX.prizeFoils}.`;
   return null;
 }
 
@@ -302,11 +302,11 @@ async function drawAmongActive(round, session) {
   return { entry: active.find((e) => e.ranges.some((r) => r.from <= ticket && ticket <= r.to)), ticket };
 }
 
-/** Gewinn als Text, z. B. "12.345,00 €, 50 Booster Packs und 2 Folien" */
+/** Gewinn als Text, z. B. "12.345,00 €, 50 Booster Packs und 2 TCG Sleeves" */
 function prizeText({ cash, packs = 0, foils = 0 }) {
   const parts = cash || (!packs && !foils) ? [euro(cash)] : [];
   if (packs) parts.push(`${packs} ${packs === 1 ? 'Booster Pack' : 'Booster Packs'}`);
-  if (foils) parts.push(`${foils} ${foils === 1 ? 'Folie' : 'Folien'}`);
+  if (foils) parts.push(`${foils} ${foils === 1 ? 'TCG Sleeve' : 'TCG Sleeves'}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} und ${parts[parts.length - 1]}` : parts[0];
 }
 
@@ -375,7 +375,7 @@ async function runLottery() {
       const name = `${k.name} #${r.number}`;
       console.log(
         r.winnerName
-          ? `${name}: Los ${r.winningTicket} von ${r.tickets} gewinnt – ${r.winnerName} erhält ${(r.cash / 100).toFixed(2)} €${r.packs ? `, ${r.packs} Packs` : ''}${r.foils ? `, ${r.foils} Folien` : ''}.`
+          ? `${name}: Los ${r.winningTicket} von ${r.tickets} gewinnt – ${r.winnerName} erhält ${(r.cash / 100).toFixed(2)} €${r.packs ? `, ${r.packs} Packs` : ''}${r.foils ? `, ${r.foils} TCG Sleeves` : ''}.`
           : r.tickets
             ? `${name}: alle Lose gehören gelöschten Konten – der Topf verfällt.`
             : `${name}: keine Lose verkauft.`

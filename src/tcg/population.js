@@ -4,6 +4,7 @@
 const { TcgCard } = require('../models/Tcg');
 const UserActivity = require('../models/UserActivity');
 const { GradingShop } = require('../models/Grading');
+const reputation = require('../grading/reputation');
 
 const ACTIVE_DAYS = 30; // aktiv = in den letzten 30 Tagen gesehen (wie die Statistik „Aktiv letzte 30 Tage“)
 const CACHE_MS = 10 * 60 * 1000;
@@ -21,17 +22,19 @@ const invalidate = () => {
  *   spread – Map Karte → { owners, share } (aktive Besitzer, Anteil 0–1)
  *   pop    – Map Karte → { copies, slabs: { Note: n }, byCode: { Kürzel: { Note: n } } }
  *   grades – alle Slabs aller Karten je Note: { Note: n }
+ *   slabOwners – Map Karte → { Note: Set(Spieler-IDs) } (für den Seltenheits-Faktor der Vitrine, slabScarcity)
  *   reps   – Map Shop-Kürzel (auch frühere) → Reputation des Shops
  */
 async function all(now = Date.now()) {
   if (cache && now - cache.at < CACHE_MS) return cache.data;
   const since = new Date(now - ACTIVE_DAYS * 864e5).toISOString().slice(0, 10);
   const activeIds = await UserActivity.distinct('user', { day: { $gte: since } });
-  const [owners, copies, slabs, shops] = await Promise.all([
+  const [owners, copies, slabs, shops, slabHolders] = await Promise.all([
     activeIds.length ? TcgCard.aggregate([{ $match: { user: { $in: activeIds } } }, { $group: { _id: '$card', users: { $addToSet: '$user' } } }, { $project: { n: { $size: '$users' } } }]) : [],
     TcgCard.aggregate([{ $group: { _id: '$card', n: { $sum: 1 } } }]),
     TcgCard.aggregate([{ $match: { 'slab.grade': { $type: 'number' } } }, { $group: { _id: { card: '$card', grade: '$slab.grade', code: '$slab.code' }, n: { $sum: 1 } } }]),
     GradingShop.find({ code: { $type: 'string' } }).select('code codeHistory reputation').lean(),
+    TcgCard.aggregate([{ $match: { 'slab.grade': { $type: 'number' } } }, { $group: { _id: { card: '$card', grade: '$slab.grade' }, users: { $addToSet: '$user' } } }]),
   ]);
   const active = activeIds.length;
   const spread = new Map(owners.map((o) => [o._id, { owners: o.n, share: active ? o.n / active : 0 }]));
@@ -48,9 +51,28 @@ async function all(now = Date.now()) {
   }
   const reps = new Map();
   for (const s of shops) for (const code of [s.code, ...(s.codeHistory || [])]) reps.set(code, s.reputation || 0);
-  const data = { active, spread, pop, grades, reps };
+  const slabOwners = new Map();
+  for (const h of slabHolders) {
+    const byGrade = slabOwners.get(h._id.card) || {};
+    slabOwners.set(h._id.card, byGrade);
+    byGrade[h._id.grade] = new Set(h.users.map(String));
+  }
+  const data = { active, spread, pop, grades, reps, slabOwners };
   cache = { at: now, data };
   return data;
+}
+
+/**
+ * Seltenheits-Faktor der Vitrine für einen Slab (reputation.scarcityFactor, 0,85–1,5): verschiedene Spieler, die einen Slab dieser
+ * Karte mit mindestens dieser Note besitzen. Ohne Daten (data fehlt) 1.
+ */
+function slabScarcity(data, cardId, grade) {
+  if (!data || !data.slabOwners) return 1;
+  const byGrade = data.slabOwners.get(cardId) || {};
+  const owners = new Set();
+  for (const [g, set] of Object.entries(byGrade)) if (Number(g) >= grade) for (const u of set) owners.add(u);
+  const totalSlabs = Object.values(data.grades || {}).reduce((s, n) => s + n, 0);
+  return reputation.scarcityFactor({ owners: owners.size, active: data.active || 0, totalSlabs });
 }
 
 /** Slabs einer Karte mit mindestens dieser Note (aus pop) */
@@ -103,8 +125,9 @@ function gradeRarity(cardId, data, grade) {
 
 // Wie sehr ein renommierter Shop einen Slab seltener macht: je höher seine Stufe, desto kleiner der Faktor (0,35 = Legende)
 const SHOP_FACTOR = [
-  { min: 2000, factor: 0.35, label: 'Legende' },
-  { min: 500, factor: 0.55, label: 'Renommiert' },
+  { min: 15000, factor: 0.35, label: 'Legende' },
+  { min: 5000, factor: 0.45, label: 'Elite' },
+  { min: 1000, factor: 0.6, label: 'Renommiert' },
   { min: 100, factor: 0.8, label: 'Bekannt' },
   { min: 0, factor: 1, label: 'Neuling' },
 ];
@@ -144,4 +167,4 @@ function spreadOf(cardId, data) {
   return { pct: Math.round(100 * (s ? s.share : 0)), owners: s ? s.owners : 0, active: data.active };
 }
 
-module.exports = { ACTIVE_DAYS, all, invalidate, slabsAtLeast, popText, gradeRarity, GRADE_RARITY, slabRarity, spreadOf, SLAB_TIERS, SHOP_FACTOR };
+module.exports = { ACTIVE_DAYS, all, invalidate, slabScarcity, slabsAtLeast, popText, gradeRarity, GRADE_RARITY, slabRarity, spreadOf, SLAB_TIERS, SHOP_FACTOR };

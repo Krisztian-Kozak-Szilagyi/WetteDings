@@ -30,13 +30,15 @@ function jobPay({ steps, premium }, pay, premiumPercent, profile, factor, crease
 /**
  * Schätzung je Stufe: { level, name, cost, perDay: { [profil]: Cent }, payback: Tage bis sich der Ausbau
  * (gegenüber der Stufe davor, Profil "Durchschnitt") bezahlt hat oder null }.
- * foilValue = erwarteter Wert der Folie pro versiegeltem Auftrag in Cent (Chance × Bankpreis).
+ * foilValue = erwarteter Wert der Folie pro versiegeltem Auftrag in Cent (Chance × Bankpreis), slabCost = Preis des leeren
+ * Slabs, den jede Versiegelung verbraucht (Cent).
  */
-function estimate({ levels, settings, factor, foilValue = 0, profiles = PROFILES, creaseChance = 0 }) {
+function estimate({ levels, settings, factor, foilValue = 0, slabCost = 0, profiles = PROFILES, creaseChance = 0 }) {
   const rows = levels.map((l, i) => {
     const perDay = {};
     for (const pr of profiles) {
-      const foil = l.steps.includes('slab') && pr.seal > 0 ? foilValue : 0;
+      const sealed = l.steps.includes('slab') && pr.seal > 0;
+      const foil = sealed ? foilValue - slabCost : 0; // Folienfund minus der Slab, den jede Versiegelung verbraucht
       perDay[pr.key] = Math.round(settings.jobs * (jobPay(l, settings.pay, settings.premium, pr, factor, creaseChance) + foil));
     }
     return { level: l.level, name: l.name, cost: i ? settings.costs[i - 1] : 0, perDay };

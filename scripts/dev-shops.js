@@ -32,10 +32,10 @@ const tag = '[dev:shops]';
 
 // Preise in Cent (null = Standardpreis); stars/quality/hits: Summe und Anzahl der Bewertungen
 const SHOPS = [
-  { user: 'shop_pixel', name: 'Pixel Grading', code: 'PXL', prices: { base: 1500, iron: 2500, slab: 5000, express: 3000, review: 4000 }, reputation: 82, stars: [47, 10], quality: [880, 10], hits: [8, 10], slabs: 6 },
-  { user: 'shop_goldwaage', name: 'Goldwaage', code: 'GLW', prices: { base: 3000, iron: 4500, slab: 9000, express: 6000, review: 7000 }, reputation: 120, stars: [48, 10], quality: [950, 10], hits: [10, 10], slabs: 3 },
-  { user: 'shop_billig', name: 'Billig-Grade', code: 'BLG', prices: { base: 1000, iron: 1000, slab: 1500, express: 1000, review: 1500 }, reputation: 12, stars: [26, 8], quality: [420, 8], hits: [3, 8], slabs: 10 },
-  { user: 'shop_leer', name: 'Leerlager', code: 'LGR', prices: null, reputation: 40, stars: [0, 0], quality: [0, 0], hits: [0, 0], slabs: 0 },
+  { user: 'shop_pixel', name: 'Pixel Grading', code: 'PXL', slogan: 'Pixelgenau. Note für Note.', prices: { base: 1500, iron: 2500, slab: 5000, express: 3000, review: 4000 }, reputation: 82, stars: [47, 10], quality: [880, 10], hits: [8, 10], slabs: 6 },
+  { user: 'shop_goldwaage', name: 'Goldwaage', code: 'GLW', slogan: 'Gold wert – jede Karte, jedes Mal.', prices: { base: 3000, iron: 4500, slab: 9000, express: 6000, review: 7000 }, reputation: 120, stars: [48, 10], quality: [950, 10], hits: [10, 10], slabs: 3 },
+  { user: 'shop_billig', name: 'Billig-Grade', code: 'BLG', slogan: 'Schnell, günstig, grade genug!', prices: { base: 1000, iron: 1000, slab: 1500, express: 1000, review: 1500 }, reputation: 12, stars: [26, 8], quality: [420, 8], hits: [3, 8], slabs: 10 },
+  { user: 'shop_leer', name: 'Leerlager', code: 'LGR', slogan: 'Heute leider ohne Slabs – aber mit Herz.', prices: null, reputation: 40, stars: [0, 0], quality: [0, 0], hits: [0, 0], slabs: 0 },
 ];
 
 async function main() {
@@ -54,6 +54,7 @@ async function main() {
       lockedUntil: new Date(now.getTime() + 10 * 86400000),
       name: s.name,
       code: s.code,
+      slogan: s.slogan,
       prices: s.prices || {},
       reputation: s.reputation,
       stars: { sum: s.stars[0], n: s.stars[1] },

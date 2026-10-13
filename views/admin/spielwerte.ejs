@@ -150,7 +150,7 @@
         <% if (gradingCalc) { const gc = gradingCalc; const pct = (v) => Math.round(v * 100) + ' %'; %>
           <details class="admin-gr-calc" data-grading-calc="<%= JSON.stringify(gc.input) %>" open>
             <summary><strong>Verdienst pro Tag</strong> <span class="muted small">Schätzung und tatsächliche Werte</span></summary>
-            <p class="muted small"><strong>Jede Zeile ist der gesamte Tagesverdienst, wenn der Shop auf dieser Stufe steht</strong> (Putzen, Benoten und Versiegeln zusammen) – nicht zusätzlich zur Stufe davor; man arbeitet immer nur auf einer Stufe. Rechnet beim Tippen mit den Werten oben – vor dem Speichern ausprobieren. Alle Aufträge des Tages erledigt; inkl. Seltenheits-Zuschlag der Kundenkarten (Ø +<%= Math.round((gc.input.factor - 1) * 100) %> %) und ab Stufe 3 Folienfunde (Ø <%= euro(Math.round(gc.input.foilValue)) %> pro Auftrag).</p>
+            <p class="muted small"><strong>Jede Zeile ist der gesamte Tagesverdienst, wenn der Shop auf dieser Stufe steht</strong> (Putzen, Benoten und Versiegeln zusammen) – nicht zusätzlich zur Stufe davor; man arbeitet immer nur auf einer Stufe. Rechnet beim Tippen mit den Werten oben – vor dem Speichern ausprobieren. Alle Aufträge des Tages erledigt; inkl. Seltenheits-Zuschlag der Kundenkarten (Ø +<%= Math.round((gc.input.factor - 1) * 100) %> %) und ab Stufe 3 Sleeve-Funde (Ø <%= euro(Math.round(gc.input.foilValue)) %> pro Auftrag).</p>
             <div class="table-wrap">
               <table class="table admin-gr-calc-table">
                 <thead><tr><th>Stufe</th><th class="num">Ausbau</th><% gc.input.profiles.forEach((p) => { %><th class="num"><%= p.label %></th><% }) %><th class="num">Mehr als Stufe davor</th><th class="num">Ausbau bezahlt nach</th></tr></thead>
@@ -169,7 +169,7 @@
             </div>
             <p class="muted small">Zum Vergleich: Tagesbonus <strong data-gc-bonus><%= euro(dailyBonus()) %></strong> pro Tag – entfällt, solange man im Grading-Shop arbeitet. „Mehr als Stufe davor“ und „Ausbau bezahlt nach“ (= Ausbaukosten ÷ Mehrverdienst) (Profil „<%= gc.input.profiles[gc.input.profiles.length - 1].label %>“).</p>
             <p class="muted small">Annahmen: <%= gc.input.profiles.map((p) => p.label + ' = ' + p.clean + ' % sauber, ' + pct(p.exact) + ' Noten exakt' + (p.near ? ' + ' + pct(p.near) + ' um 1 daneben' : '') + ', ' + p.seal + ' % versiegelt, ' + p.iron + ' % glatt gebügelt').join(' · ') %>. Gebügelt wird nur bei Kundenkarten mit Knick (<%= pct(gc.input.creaseChance) %>).</p>
-            <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Folien)</h3>
+            <h3 class="admin-ihk-sub">Tatsächlich verdient (letzte 30 Tage, ohne Sleeves)</h3>
             <% if (gc.actual.length) { %>
               <div class="table-wrap">
                 <table class="table admin-gr-calc-table">
@@ -312,7 +312,7 @@
 
   <% if (sub === 'lotterie') { %>
   <section class="stats-block" id="lotterie">
-    <%- blockHead('Lotterien', 'Der Gewinner bekommt alle Einsätze plus den Bank-Gewinn (Geld, Booster Packs, Folien). Ohne verkaufte Lose verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die laufende Runde.') %>
+    <%- blockHead('Lotterien', 'Der Gewinner bekommt alle Einsätze plus den Bank-Gewinn (Geld, Booster Packs, TCG Sleeves). Ohne verkaufte Lose verfällt der Bank-Gewinn. Änderungen gelten sofort, auch für die laufende Runde.') %>
     <% const cents = (v) => (v / 100).toFixed(2).replace('.', ','); %>
     <div class="panel-cols">
     <% [['taeglich', 'Tages-Lotterie'], ['woche', 'Wochen-Lotterie (sonntags)'], ['monat', 'Monats-Lotterie (am 28.)']].forEach(([key, label]) => { const ls = lottoSettings[key]; %>
@@ -325,7 +325,7 @@
             <label class="field"><span>Lospreis in €</span><input type="text" name="price" inputmode="decimal" value="<%= cents(ls.ticketPrice) %>" required></label>
             <label class="field"><span>Geld aus der Bank in €</span><input type="text" name="cash" inputmode="decimal" value="<%= cents(ls.prizeCash) %>" required></label>
             <label class="field"><span>Booster Packs</span><input type="number" name="packs" min="0" max="500" step="1" value="<%= ls.prizePacks %>" required></label>
-            <label class="field"><span>Folien</span><input type="number" name="foils" min="0" max="100" step="1" value="<%= ls.prizeFoils %>" required></label>
+            <label class="field"><span>TCG Sleeves</span><input type="number" name="foils" min="0" max="100" step="1" value="<%= ls.prizeFoils %>" required></label>
           </div>
           <button class="btn btn-primary" type="submit">Speichern</button>
         </form>
@@ -445,8 +445,8 @@
                 ['towerGrowth', 'Anstieg pro Runde (%)', dec(tw.growth), dec(twd.growth)],
                 ['towerRewardBase', 'Lohn Runde 1 pro Spieler (€)', eur(tw.rewardBase), eur(twd.rewardBase)],
                 ['towerRewardStep', 'Mehr Lohn je weitere Runde (€)', eur(tw.rewardStep), eur(twd.rewardStep)],
-                ['towerFoilPerRound', 'Folie: Chance je geschaffte Runde (%)', dec(tw.foilPerRound), dec(twd.foilPerRound)],
-                ['towerFoilMax', 'Folie: höchstens (%)', dec(tw.foilMax), dec(twd.foilMax)],
+                ['towerFoilPerRound', 'Sleeve/Slab: Chance je geschaffte Runde (%)', dec(tw.foilPerRound), dec(twd.foilPerRound)],
+                ['towerFoilMax', 'Sleeve/Slab: höchstens (%)', dec(tw.foilMax), dec(twd.foilMax)],
                 ['towerCardPerRound', 'Boss-Karte: Chance je geschaffte Runde (%)', dec(tw.cardPerRound), dec(twd.cardPerRound)],
                 ['towerCardMax', 'Boss-Karte: höchstens (%)', dec(tw.cardMax), dec(twd.cardMax)],
                 ['towerFightSeconds', 'Wiedergabe je Runde (Sekunden)', tw.fightSeconds, twd.fightSeconds, 'number'],
