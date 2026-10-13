@@ -11,7 +11,7 @@
 //   tradable: im Handel anbietbar (derzeit nur bei storage 'stueck')
 //   sell:     Ankaufspreis der Bank in Cent (0 = Bank kauft nicht an)
 //   buy:      Verkaufspreis der Bank in Cent (0 = nicht im Shop); im Admin-Panel einstellbar (items/foil.js, PRICE_FIELD)
-//   via:      wo man ihn kauft: 'bank' = Bank-Shop im Inventar, 'grading' = nur über die Werkstatt eines Grading-Shops
+//   via:      wo man ihn kauft: 'bank' = Bank-Shop im Inventar, 'grading' = Bank-Shop und Werkstatt, aber nur mit Grading-Shop
 //             (setzt einen aktiven Shop voraus). Ohne buy egal.
 //   image:    Bild (/img/items/…)
 //   text:     Beschreibung im Inventar
@@ -48,7 +48,7 @@ const ITEM_TYPES = [
     buy: 4000,
     via: 'grading',
     image: '/img/items/slab.svg',
-    text: 'Das Gehäuse, in das ein Grading-Shop eine Karte einschweißt – jeder Auftrag mit „Benoten + Slab“ verbraucht einen. Kaufen: Werkstatt deines Grading-Shops oder Handel.',
+    text: 'Das Gehäuse, in das ein Grading-Shop eine Karte einschweißt – jeder Auftrag mit „Benoten + Slab“ verbraucht einen. Kaufen: Bank-Shop oder Werkstatt (mit Grading-Shop) oder Handel.',
   },
 ];
 
