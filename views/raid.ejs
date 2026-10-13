@@ -6,26 +6,31 @@
   const canStart = !running && tries.left > 0 && deck.playable;
 %>
 
-<section class="raid-hero">
-  <div>
-    <h1>Raid: Lucky Dio</h1>
-    <p>Der Glücksspieler mit Handarmbrust und Dolch hat sich in der Stadt verschanzt. Stell ein Deck aus deinen Karten zusammen und besiege ihn in einem rundenbasierten Kampf – nur wer ihn schlägt, hat die Chance, seine Karte zu erbeuten. Planen zählt mehr als die Sammlung: Dio kündigt jeden Angriff eine Runde vorher an.</p>
-    <div class="raid-hero-actions">
-      <% if (running) { %>
-        <a class="btn btn-primary btn-lg" href="/raid/kampf">Kampf fortsetzen (Runde <%= running.runde %>)</a>
-        <span class="raid-tries">Dio: <%= running.bossHp %>/<%= running.bossMax %> · Du: <%= running.spielerHp %> Leben</span>
-      <% } else { %>
-        <form method="post" action="/raid/start">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button class="btn btn-primary btn-lg" type="submit" <%= canStart ? '' : 'disabled' %>>⚔ Kampf beginnen</button>
-        </form>
-        <span class="raid-tries"><%= tries.left %> von <%= tries.limit %> Versuchen heute übrig</span>
-      <% } %>
+<%# Banner wie im Dungeon: Bild, Verlauf darüber, Text unten links %>
+<div class="dg-hero-wrap raid-hero-wrap">
+  <section class="dg-hero raid-hero">
+    <img class="dg-hero-img" src="/img/raid/lucky-dio-banner.webp" alt="" width="1192" height="476">
+    <div class="dg-hero-shade"></div>
+    <div class="dg-hero-text">
+      <span class="kicker">Raid<%= running ? ' · läuft' : '' %></span>
+      <h1>Lucky Dio</h1>
+      <p class="dg-hero-sub">Der Glücksspieler mit Handarmbrust und Dolch hat sich in der Stadt verschanzt. Besiege ihn mit deinem Deck im rundenbasierten Kampf – nur dann hast du die Chance, seine Karte zu erbeuten.</p>
+      <div class="raid-hero-actions">
+        <% if (running) { %>
+          <a class="btn btn-primary" href="/raid/kampf">Kampf fortsetzen (Runde <%= running.runde %>)</a>
+          <span class="dg-when">Dio: <strong><%= running.bossHp %>/<%= running.bossMax %></strong> · Du: <strong><%= running.spielerHp %></strong> Leben</span>
+        <% } else { %>
+          <form method="post" action="/raid/start">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary" type="submit" <%= canStart ? '' : 'disabled' %>>⚔ Kampf beginnen</button>
+          </form>
+          <span class="dg-when"><strong><%= tries.left %> von <%= tries.limit %></strong> Versuchen heute übrig</span>
+        <% } %>
+      </div>
     </div>
-    <% if (!running && !deck.playable) { %><p class="raid-problem"><%= deck.problem %> <a href="/deck">Zum Deckbau</a></p><% } %>
-  </div>
-  <% if (dio) { %><img class="raid-hero-card" src="<%= dio.image %>" alt="Karte Lucky Dio" width="720" height="1008"><% } %>
-</section>
+  </section>
+  <% if (!running && !deck.playable) { %><p class="raid-problem"><%= deck.problem %> <a href="/deck">Zum Deckbau</a></p><% } %>
+</div>
 
 <div class="raid-grid">
   <section class="card">
@@ -58,6 +63,7 @@
       </table>
     </div>
     <p class="small"><strong>Krit-Lotterie</strong> – wie auf seiner Karte: Jeder Angriff trifft mit <%= boss.grundKrit %> % kritisch (×<%= (boss.kritFaktor / 100).toLocaleString('de-DE') %>). Danach fliegt eine Münze: <strong>Kopf</strong> = kritischer Armbrust-Zusatztreffer, <strong>Zahl</strong> = Dolch-Zusatztreffer (<%= boss.zusatzMin %>–<%= boss.zusatzMax %>) und ein Glücks-Token – jeder Token gibt ihm +<%= boss.tokenKrit %> % Krit-Chance.</p>
+    <p class="muted small">Planen zählt mehr als die Sammlung: Dio kündigt jeden Angriff eine Runde vorher an.</p>
     <p class="muted small">Ab <%= boss.wutAb %> % Leben wird Dio wütend: mehr Schaden, und schwere Angriffe kommen doppelt so oft.</p>
   </section>
 
