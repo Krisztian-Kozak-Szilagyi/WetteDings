@@ -73,6 +73,44 @@ const CATALOG = Object.entries(LOOK)
   })
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
 
+// Ware zum Verkaufen: Marktpreis = Platzhalter-Preis aus items.json, Einkauf = BUY_FACTOR davon.
+// [Karton-Inhalt (Stück), Farbe] – Karton-Größen sind Platzhalter (Krisztian, 2026-10-13: erst der Rahmen)
+const BUY_FACTOR = 0.5;
+const WARE = {
+  booster_pack: [24, 0xe0b040],
+  booster_box: [4, 0xc06a2a],
+  single_card: [10, 0x5aa0e0],
+  graded_slab: [2, 0x9fd8e8],
+  sleeve_pack: [10, 0x7a6ad0],
+  toploader: [20, 0xb8c0cc],
+  board_game_box: [4, 0x4fae7a],
+  energy_drink_can: [12, 0x50d0a0],
+  coffee: [12, 0x8a5a3a],
+};
+const GOODS = Object.entries(WARE)
+  .filter(([id]) => byId[id])
+  .map(([id, [perBox, color]]) => {
+    const market = byId[id].placeholder_price.amount;
+    return { id, name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100 };
+  });
+
+// Was in welches Möbel passt (Platz = Stückzahl, jedes Stück braucht einen Platz; gemischt erlaubt)
+const SHELF_GOODS = ['board_game_box', 'booster_box', 'sleeve_pack', 'toploader', 'booster_pack'];
+const HOLDS = {
+  shelf_small: SHELF_GOODS,
+  shelf_medium: SHELF_GOODS,
+  shelf_big: SHELF_GOODS,
+  drink_refrigerator: ['energy_drink_can', 'coffee'],
+  card_display_case: ['single_card', 'graded_slab'],
+  booster_display: ['booster_pack'],
+};
+CATALOG.forEach((d) => {
+  const holds = HOLDS[d.id];
+  if (!holds) return;
+  d.holds = holds;
+  d.slots = parseInt(String(d.capacity).match(/\d+/), 10) || 6;
+});
+
 const UNIT_PRICE = (byId.empty_neighbor_unit && byId.empty_neighbor_unit.placeholder_price.amount) || 5000;
 
-module.exports = { CATALOG, GROUPS, UNIT_PRICE };
+module.exports = { CATALOG, GROUPS, GOODS, UNIT_PRICE };

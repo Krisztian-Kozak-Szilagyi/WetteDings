@@ -8,25 +8,23 @@
   <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
   <link rel="stylesheet" href="/css/shop-demo.css?v=<%= assetVersion %>">
 </head>
-<%# Shop-Demo – Laden einrichten, 2:1-isometrisch, Platzhalter-Möbel. Gezeichnet wird mit Phaser (public/js/shop-demo.js),
+<%# Shop-Demo – eigener Laden in 2:1-Isometrie mit Figur (WASD, E). Bestellt wird am PC (Kassentheke), die Kartons
+    landen auf dem Gehweg und müssen eingeräumt/aufgebaut werden. Gezeichnet wird mit Phaser (public/js/shop-demo.js),
     Regeln in src/shop/layout.js (/js/shop-layout.js). Kanacoin = Demo-Geld, getrennt vom Kontostand. %>
 <body class="sd-body" data-shop-root data-csrf="<%= csrfToken %>">
-  <aside class="sd-side">
-    <div class="sd-head">
-      <a class="sd-back" href="/" title="Zurück zur Seite">←</a>
-      <strong>Shop-Demo</strong>
-    </div>
+  <div class="sd-stage" data-shop-stage></div>
+
+  <div class="sd-hud">
+    <a class="sd-back" href="/" title="Zurück zur Seite">←</a>
     <button type="button" class="sd-coins" data-shop-coins title="Kanacoin festlegen">
       <span class="sd-coin-dot"></span><span data-shop-coins-value>–</span> Kanacoin
     </button>
-    <div class="sd-list" data-shop-list></div>
-    <div class="sd-foot">
-      <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen zeigen</label>
-      <button type="button" class="sd-reset" data-shop-reset>Neu starten</button>
-    </div>
-  </aside>
-
-  <div class="sd-stage" data-shop-stage></div>
+    <div class="sd-hand" data-shop-hand hidden></div>
+  </div>
+  <div class="sd-hud sd-hud-right">
+    <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen</label>
+    <button type="button" class="sd-reset" data-shop-reset>Neu starten</button>
+  </div>
 
   <div class="sd-panel" data-shop-panel hidden>
     <div class="sd-panel-name" data-shop-panel-name></div>
@@ -38,8 +36,29 @@
     </div>
   </div>
 
-  <div class="sd-hint" data-shop-hint>Möbel links auswählen · Klick = abstellen · R = drehen · Esc = abbrechen · Ziehen/WASD = Ansicht · Mausrad = Zoom</div>
+  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
   <div class="sd-toast" data-shop-toast hidden></div>
+
+  <dialog class="sd-win sd-pc" data-shop-pc>
+    <div class="sd-win-head">
+      <strong>PC</strong>
+      <span class="sd-win-coins"><span class="sd-coin-dot"></span><span data-shop-pc-coins></span></span>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <div class="sd-pc-body">
+      <nav class="sd-tabs" data-shop-tabs></nav>
+      <div class="sd-tab-body" data-shop-tab-body></div>
+    </div>
+  </dialog>
+
+  <dialog class="sd-win sd-shelf" data-shop-shelf>
+    <div class="sd-win-head">
+      <strong data-shop-shelf-name></strong>
+      <span class="sd-shelf-used" data-shop-shelf-used></span>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <div class="sd-shelf-body" data-shop-shelf-body></div>
+  </dialog>
 
   <dialog class="sd-dialog" data-shop-dialog>
     <form method="dialog" data-shop-dialog-form>
