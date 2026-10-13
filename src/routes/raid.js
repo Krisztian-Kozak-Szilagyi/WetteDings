@@ -37,7 +37,7 @@ router.get('/raid', async (req, res) => {
     history,
     winners,
     dio: catalog.cardById[raid.DIO] || null,
-    boss: { hp: s.boss.hp, wutAb: s.boss.wutAb, kopfChance: s.boss.kopfChance, kopfFaktor: s.boss.kopfFaktor, tokenProzent: s.boss.tokenProzent },
+    boss: { ...s.boss },
     angriffe: s.angriffe.filter((a) => a.gewicht > 0),
     belohnung: s.belohnung,
     spieler: s.spieler,

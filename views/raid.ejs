@@ -51,12 +51,13 @@
             <tr>
               <td><%= a.name %><% if (a.schwer) { %><span class="raid-tag">schwer</span><% } %></td>
               <td class="num"><%= a.min %>–<%= a.max %></td>
-              <td class="small"><%= a.muenze ? `Münzwurf: Kopf ×${(boss.kopfFaktor / 100).toLocaleString('de-DE')}, Zahl = Glücks-Token (+${boss.tokenProzent} % auf alle folgenden Angriffe)` : a.gift ? `Gift: ${a.gift} Schaden, ${a.giftRunden} Runden` : a.netz ? `Rauch: nächste Runde −${a.netz} Energie` : a.schwer ? 'nie zweimal hintereinander' : '' %></td>
+              <td class="small"><%= a.muenze ? `Münzwurf: Kopf ×${(boss.kopfFaktor / 100).toLocaleString('de-DE')}, Zahl = Glücks-Token` : a.gift ? `Gift: ${a.gift} Schaden, ${a.giftRunden} Runden` : a.netz ? `Rauch: nächste Runde −${a.netz} Energie` : a.schwer ? 'nie zweimal hintereinander' : '' %></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+    <p class="small"><strong>Krit-Lotterie</strong> – wie auf seiner Karte: Jeder Angriff trifft mit <%= boss.grundKrit %> % kritisch (×<%= (boss.kritFaktor / 100).toLocaleString('de-DE') %>). Danach fliegt eine Münze: <strong>Kopf</strong> = kritischer Armbrust-Zusatztreffer, <strong>Zahl</strong> = Dolch-Zusatztreffer (<%= boss.zusatzMin %>–<%= boss.zusatzMax %>) und ein Glücks-Token – jeder Token gibt ihm +<%= boss.tokenKrit %> % Krit-Chance.</p>
     <p class="muted small">Ab <%= boss.wutAb %> % Leben wird Dio wütend: mehr Schaden, und schwere Angriffe kommen doppelt so oft.</p>
   </section>
 

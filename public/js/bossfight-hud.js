@@ -357,6 +357,10 @@
       case 'absicht':
         zeichnenAbsicht();
         return null;
+      case 'zusatz':
+        // Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf nach seinem Angriff
+        popup(spielerBar.el, (e.seite === 'kopf' ? 'Kopf! Armbrust-Krit ' : 'Zahl · Dolch ') + e.wert + (e.seite === 'zahl' ? ' · Glücks-Token ' + e.tokens : ''), e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
+        return warte(450);
       case 'muenze':
         // Münzwurf-Angriff: Kopf trifft mehrfach, Zahl gibt dem Boss einen Glücks-Token (stärkt seine Angriffe)
         popup(bossBar.el, e.seite === 'kopf' ? 'Kopf! Voller Glückstreffer' : 'Zahl – Glücks-Token ' + e.tokens, e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
@@ -420,6 +424,9 @@
     var a = s.absicht;
     var v = R.vorschau(s);
     var muenze = a.muenze && s.bd && s.bd.muenze ? ' · Münzwurf: Kopf ×' + String(s.bd.muenze.kopfFaktor).replace('.', ',') + ', Zahl = Glücks-Token' : '';
+    // Krit-Lotterie: danach immer ein Zusatztreffer aus dem Münzwurf
+    var lot = s.bd && s.bd.lotterie;
+    if (lot) muenze += ' · danach Münzwurf: ' + lot.zusatz[0] + '–' + lot.zusatz[1] + ' (Kopf ×' + String(lot.kritFaktor).replace('.', ',') + ')';
     var extra = (a.gift ? ' + Gift ' + a.gift.schaden + '×' + a.gift.runden : a.netz ? ' + ' + (raid ? 'Rauch' : 'Netz') + ' (−' + a.netz + ' Energie)' : '') + muenze;
     var trifft = v.aus ? 'ausgesetzt' : v.wert !== a.schaden ? 'trifft dich mit ' + v.wert : '';
     absichtEl.innerHTML = '';
@@ -430,7 +437,8 @@
     absichtEl.appendChild(document.createTextNode(extra + (trifft ? ' – ' + trifft : '')));
     absichtEl.classList.toggle('bf-intent-schwer', a.schwer);
     absichtEl.classList.toggle('bf-intent-wut', a.wut);
-    var tok = s.boss && s.boss.tokens ? ' Glücks-Tokens: ' + s.boss.tokens + ' (jeder macht seine Angriffe stärker).' : '';
+    var lotK = s.bd && s.bd.lotterie;
+    var tok = lotK ? ' Krit-Chance seiner Angriffe: ' + Math.round((lotK.grundKrit + (s.boss.tokens || 0) * lotK.tokenKrit) * 100) + ' % (' + (s.boss.tokens || 0) + ' Glücks-Tokens).' : '';
     absichtEl.title = (a.wut ? ((s.bd && s.bd.name) || 'Der Boss') + ' ist wütend: seine Angriffe sind stärker.' : '') + tok;
   }
 

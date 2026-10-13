@@ -2,10 +2,11 @@
    Farben wie Dios Karte: tiefes Violett, bernsteinfarbenes Gold */
 
 /* ---------- Kampf ---------- */
+/* Hintergrund: die Stadt bei Nacht ohne Dio (er steht als eigene Figur davor) */
 .raid-stage {
-  width: max(100vw, calc(100vh * 1192 / 476));
-  height: max(100vh, calc(100vw * 476 / 1192));
-  background: url('/img/raid/lucky-dio-banner.webp') center / cover no-repeat;
+  width: max(100vw, calc(100vh * 1981 / 794));
+  height: max(100vh, calc(100vw * 794 / 1981));
+  background: url('/img/raid/raid-hintergrund.webp') center / cover no-repeat;
 }
 .raid-stage::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;

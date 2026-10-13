@@ -403,7 +403,7 @@
 
         <fieldset class="admin-tax-group">
           <legend>Lucky Dio</legend>
-          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['kopfFaktor', 'Münzwurf: Schaden bei Kopf', '%'], ['tokenProzent', 'Glücks-Token: mehr Schaden je Token', '%']].forEach(([k, l, u]) => { %>
+          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%']].forEach(([k, l, u]) => { %>
             <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="boss_<%= k %>" min="<%= lim.boss[k][0] %>" max="<%= lim.boss[k][1] %>" step="1" value="<%= rs.boss[k] %>" required><small class="muted">Standard <%= rd.boss[k] %></small></label>
           <% }) %>
         </fieldset>

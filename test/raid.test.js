@@ -14,7 +14,8 @@ const snap = () => ({ spieler: logic.spielerDef(opts), boss: logic.bossDef(opts)
 test('Raid: Standardwerte sind gültig und vollständig einstellbar', () => {
   assert.deepEqual(logic.cleanSettings(opts), opts);
   assert.equal(opts.open, false);
-  assert.equal(opts.boss.hp, 330);
+  assert.equal(opts.boss.hp, 285);
+  assert.equal(opts.spieler.hp, 200);
   assert.equal(opts.angriffe.length, logic.ATTACKS.length);
   assert.ok(opts.angriffe.some((a) => a.muenze));
   assert.throws(() => logic.cleanSettings({ ...opts, boss: { ...opts.boss, hp: 0 } }), /Boss hp/);
@@ -48,7 +49,8 @@ test('Raid: Kampfwerte aus den IHK-Werten – Rolle nach dem stärksten Wert', (
 });
 
 test('Raid: Münzwurf-Angriff – Kopf trifft doppelt, Zahl gibt Dio einen Glücks-Token', () => {
-  const boss = { ...logic.bossDef(opts), angriffe: [{ key: 'lotterie', name: 'Krit-Lotterie', schaden: [20, 20], gewicht: 1, muenze: true }] };
+  // nur der Münzwurf-Angriff, ohne Krit-Lotterie (die prüft der nächste Test)
+  const boss = { ...logic.bossDef(opts), lotterie: null, angriffe: [{ key: 'lotterie', name: 'Krit-Lotterie', schaden: [20, 20], gewicht: 1, muenze: true }] };
   // Zufall fest: erst Kopf (0.1 < 0.5), dann Zahl (0.9)
   const play = (coin) => {
     let n = 0;
@@ -70,8 +72,42 @@ test('Raid: Münzwurf-Angriff – Kopf trifft doppelt, Zahl gibt Dio einen Glüc
   assert.ok(zahl.ev.some((e) => e.t === 'muenze' && e.seite === 'zahl' && e.tokens === 1));
   assert.equal(zahl.lost, 20);
   assert.equal(zahl.s.boss.tokens, 1);
-  // der nächste angekündigte Angriff ist um tokenProzent stärker
-  assert.equal(zahl.s.absicht.schaden, Math.round(20 * (1 + opts.boss.tokenProzent / 100)));
+});
+
+test('Raid: Dios Krit-Lotterie – Krit nach Chance, danach Münzwurf mit Zusatztreffer; Zahl gibt Krit-Chance', () => {
+  const boss = { ...logic.bossDef(opts), angriffe: [{ key: 'dolch', name: 'Dolchstich', schaden: [20, 20], gewicht: 1 }], lotterie: { kopfChance: 0.5, kritFaktor: 2, grundKrit: 0.1, tokenKrit: 0.01, zusatz: [5, 5] } };
+  // Zufall der Reihe nach: Krit-Wurf, Münze, Zusatztreffer-Schaden
+  const fight = (krit, muenze) => {
+    const { s } = R.neu(logic.deckCards(ids, opts), { rng: () => 0.5, spieler: logic.spielerDef(opts), boss });
+    const queue = [krit, muenze, 0.5];
+    s.rng = () => (queue.length ? queue.shift() : 0.5);
+    const hp = s.spieler.hp;
+    const ev = R.rundeEnde(s);
+    return { s, ev, lost: hp - s.spieler.hp };
+  };
+  const normalZahl = fight(0.9, 0.9); // kein Krit, Zahl
+  assert.equal(normalZahl.lost, 20 + 5);
+  assert.equal(normalZahl.s.boss.tokens, 1);
+  assert.ok(normalZahl.ev.some((e) => e.t === 'zusatz' && e.seite === 'zahl' && e.waffe === 'Dolch'));
+  const kritKopf = fight(0.05, 0.1); // Krit, Kopf
+  assert.equal(kritKopf.lost, 40 + 10, 'Krit ×2 und kritischer Armbrust-Zusatztreffer ×2');
+  assert.equal(kritKopf.s.boss.tokens, 0);
+  // Block fängt erst den Angriff, der Rest auch den Zusatztreffer
+  const { s } = R.neu(logic.deckCards(ids, opts), { rng: () => 0.5, spieler: logic.spielerDef(opts), boss });
+  s.effekte.push({ art: 'block', key: 'block:x', card: null, name: 'Block', wert: 22, runden: 1, max: 1 });
+  const queue = [0.9, 0.9, 0.5];
+  s.rng = () => (queue.length ? queue.shift() : 0.5);
+  const hp = s.spieler.hp;
+  R.rundeEnde(s);
+  assert.equal(hp - s.spieler.hp, 3, '20 geblockt, vom Zusatztreffer (5) bleiben 2 Block übrig');
+  // Tokens erhöhen die Krit-Chance: mit 5 Tokens krittet ein Wurf von 0,12 (10 % + 5 %)
+  const t = R.neu(logic.deckCards(ids, opts), { rng: () => 0.5, spieler: logic.spielerDef(opts), boss }).s;
+  t.boss.tokens = 5;
+  const q2 = [0.12, 0.9, 0.5];
+  t.rng = () => (q2.length ? q2.shift() : 0.5);
+  const hp2 = t.spieler.hp;
+  R.rundeEnde(t);
+  assert.equal(hp2 - t.spieler.hp, 40 + 5);
 });
 
 test('Raid: Kampf lässt sich aus Startwert und Zügen genau nachspielen', () => {

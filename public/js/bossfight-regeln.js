@@ -72,7 +72,7 @@
       runde: 1,
       energie: sp.energie,
       spieler: { hp: sp.hp, max: sp.hp },
-      boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Münzwurf-Angriff, z. B. Lucky Dio)
+      boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Krit-Lotterie, Lucky Dio) – je Token mehr Krit-Chance
       deck: [],
       hand: [],
       gear: [], // { uid, card, used, hits, bonus }
@@ -124,9 +124,6 @@
     }
     var schaden = wuerfel(s, a.schaden[0], a.schaden[1]);
     if (wut) schaden = Math.round(schaden * s.bd.wutFaktor);
-    // Glücks-Tokens (Münzwurf): jeder macht alle folgenden Angriffe stärker
-    var tok = s.boss.tokens || 0;
-    if (tok && s.bd.muenze) schaden = Math.round(schaden * (1 + (tok * s.bd.muenze.tokenProzent) / 100));
     return { key: a.key, name: a.name, schaden: schaden, gift: a.gift || null, netz: a.netz || 0, schwer: !!a.schwer, wut: wut, muenze: !!a.muenze };
   }
 
@@ -343,13 +340,21 @@
     var ev = [];
     if (s.vorbei) return ev;
     var a = s.absicht;
+    var aussetzen = !!effekteVon(s, 'betaeubt').length;
     // Münzwurf-Angriff (s.bd.muenze): erst beim Ausführen entscheidet die Münze – Kopf: der Angriff trifft
-    // kopfFaktor-fach, Zahl: normaler Schaden und der Boss bekommt einen Glücks-Token (stärkt alle folgenden Angriffe)
-    if (a && a.muenze && s.bd.muenze && !effekteVon(s, 'betaeubt').length) {
+    // kopfFaktor-fach, Zahl: normaler Schaden und der Boss bekommt einen Glücks-Token
+    if (a && a.muenze && s.bd.muenze && !aussetzen) {
       var kopf = s.rng() < s.bd.muenze.kopfChance;
       if (kopf) a = s.absicht = Object.assign({}, a, { schaden: Math.round(a.schaden * s.bd.muenze.kopfFaktor), kopf: true });
       else s.boss.tokens = (s.boss.tokens || 0) + 1;
       ev.push({ t: 'muenze', seite: kopf ? 'kopf' : 'zahl', tokens: s.boss.tokens });
+    }
+    // Krit-Lotterie (s.bd.lotterie, wie Lucky Dios Karte): jeder Angriff kann kritisch treffen – Grundchance plus
+    // tokenKrit je Glücks-Token; die Ankündigung zeigt den normalen Schaden, ob er krittet, entscheidet sich erst jetzt
+    var l = s.bd.lotterie;
+    if (a && l && !aussetzen && s.rng() < l.grundKrit + (s.boss.tokens || 0) * l.tokenKrit) {
+      a = s.absicht = Object.assign({}, a, { schaden: Math.round(a.schaden * l.kritFaktor), krit: true });
+      ev.push({ t: 'info', wo: 'boss', text: 'Kritisch! ×' + String(l.kritFaktor).replace('.', ',') });
     }
     var v = vorschau(s);
     ev.push({ t: 'bossangriff', absicht: a, roh: v.roh, wert: v.wert, details: v.details, aus: v.aus, schild: !!v.schild });
@@ -366,12 +371,36 @@
       });
       if (a.gift) effekt(s, { art: 'gift', key: 'gift:' + a.key, card: null, name: 'Gift', wert: a.gift.schaden, runden: a.gift.runden, max: a.gift.runden });
       if (a.netz) effekt(s, { art: 'netz', key: 'netz:' + a.key, card: null, name: 'Netz', wert: a.netz, runden: 1, max: 1 });
+      if (l && !s.vorbei) zusatztreffer(s, a, ev);
     }
     // Block, Schwächung und Betäubung gelten nur für diesen einen Angriff
     s.effekte = s.effekte.filter(function (e) { return e.art !== 'block' && e.art !== 'schwach' && e.art !== 'betaeubt'; });
     if (s.vorbei) return ev;
     rundeStart(s, ev);
     return ev;
+  }
+
+  /**
+   * Krit-Lotterie (Lucky Dio): nach dem Angriff fliegt eine Münze und bringt einen Zusatztreffer – Kopf: kritischer
+   * Kettentreffer mit der Armbrust (kritFaktor-fach), Zahl: Dolchtreffer und ein Glücks-Token (mehr Krit-Chance).
+   * Abgewehrt wird wie beim Angriff: Schwächung und Schilde wirken, Block nur, soweit der Angriff ihn übrig gelassen hat.
+   */
+  function zusatztreffer(s, a, ev) {
+    var l = s.bd.lotterie;
+    var kopf = s.rng() < l.kopfChance;
+    var roh = Math.round(wuerfel(s, l.zusatz[0], l.zusatz[1]) * (kopf ? l.kritFaktor : 1));
+    var mindern = function (wert) {
+      var schwach = effekteVon(s, 'schwach');
+      if (schwach.length) wert = Math.round(wert * (100 - Math.max.apply(null, schwach.map(function (e) { return e.wert; }))) / 100);
+      var pct = Math.min(90, summe(s.gear.filter(function (g) { return g.card.kampf.typ === 'schild'; }), function (g) { return g.card.kampf.schutz || 0; }));
+      return Math.round(wert * (100 - pct) / 100);
+    };
+    var block = summe(effekteVon(s, 'block'), function (e) { return e.wert; });
+    var rest = Math.max(0, block - mindern(a.schaden)); // was der Hauptangriff vom Block übrig gelassen hat
+    var wert = Math.max(0, mindern(roh) - rest);
+    if (!kopf) s.boss.tokens = (s.boss.tokens || 0) + 1;
+    ev.push({ t: 'zusatz', seite: kopf ? 'kopf' : 'zahl', waffe: kopf ? 'Armbrust' : 'Dolch', roh: roh, wert: wert, krit: kopf, tokens: s.boss.tokens });
+    spielerTreffer(s, wert, kopf ? 'Armbrust (kritisch)' : 'Dolch', ev);
   }
 
   function rundeStart(s, ev) {

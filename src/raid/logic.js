@@ -29,10 +29,13 @@ const DEFAULTS = {
   open: false,
   triesPerDay: 3,
   maxRounds: 30,
-  spieler: { hp: 100, energie: 3, startHand: 5, ziehen: 2, handMax: 8 },
-  // Balance (npm run sim:raid, 2026-10-13): kluges Spiel gewinnt mit Gold/Holo ≈ 40 %, Holo/Bockhaber ≈ 64 %, Glitch ≈ 96 %;
-  // wer zufällig spielt, gewinnt mit denselben Decks ≈ 3 / 10 / 69 % – Planen zählt mehr als die Sammlung
-  boss: { hp: 330, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, tokenProzent: 10 },
+  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8 },
+  // Balance (npm run sim:raid, 2026-10-13, mit Dios Krit-Lotterie): kluges Spiel gewinnt mit Gold/Holo ≈ 47 %,
+  // Holo/Bockhaber ≈ 67 %, Glitch ≈ 93 %; wer zufällig spielt, gewinnt mit denselben Decks ≈ 11 / 25 / 83 %
+  // Krit-Lotterie wie Dios Karte: jeder Angriff krittet mit grundKrit % (+ tokenKrit % je Glücks-Token) und trifft dann
+  // kritFaktor-fach; danach Münzwurf (kopfChance): Kopf = kritischer Armbrust-Zusatztreffer, Zahl = Dolch-Zusatztreffer
+  // und ein Glücks-Token. Zusatztreffer: zusatzMin–zusatzMax Schaden. Der Münzwurf-Angriff trifft bei Kopf kopfFaktor-fach.
+  boss: { hp: 285, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, grundKrit: 10, kritFaktor: 200, tokenKrit: 1, zusatzMin: 4, zusatzMax: 6 },
   angriffe: ATTACKS,
   karten: {
     ang: 40,
@@ -51,7 +54,7 @@ const LIMITS = {
   triesPerDay: [1, 50],
   maxRounds: [5, 200],
   spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15] },
-  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], tokenProzent: [0, 200] },
+  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500] },
   angriff: { min: [0, 1000], max: [0, 1000], gewicht: [0, 100], gift: [0, 100], giftRunden: [0, 10], netz: [0, 5] },
   karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], kosten: [0, 10], staerke: [0, 1000] },
   belohnung: { geld: [0, 100000000], dioChance: [0, 100] },
@@ -80,6 +83,7 @@ function cleanSettings(input) {
   };
   for (const k of Object.keys(LIMITS.spieler)) out.spieler[k] = num(`Spieler ${k}`, s.spieler && s.spieler[k], LIMITS.spieler[k]);
   for (const k of Object.keys(LIMITS.boss)) out.boss[k] = num(`Boss ${k}`, s.boss && s.boss[k], LIMITS.boss[k]);
+  if (out.boss.zusatzMin > out.boss.zusatzMax) errors.push('Zusatztreffer: min größer als max');
   for (const def of ATTACKS) {
     const a = (s.angriffe || []).find((x) => x && x.key === def.key) || {};
     const name = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 40) : def.name;
@@ -176,7 +180,9 @@ function bossDef(opts) {
     hp: b.hp,
     wutAb: b.wutAb / 100,
     wutFaktor: b.wutFaktor / 100,
-    muenze: { kopfChance: b.kopfChance / 100, kopfFaktor: b.kopfFaktor / 100, tokenProzent: b.tokenProzent },
+    muenze: { kopfChance: b.kopfChance / 100, kopfFaktor: b.kopfFaktor / 100 },
+    // Krit-Lotterie wie Dios Karte (public/js/bossfight-regeln.js: rundeEnde, zusatztreffer)
+    lotterie: { kopfChance: b.kopfChance / 100, kritFaktor: b.kritFaktor / 100, grundKrit: b.grundKrit / 100, tokenKrit: b.tokenKrit / 100, zusatz: [b.zusatzMin, b.zusatzMax] },
     angriffe: opts.angriffe
       .filter((a) => a.gewicht > 0)
       .map((a) => ({
@@ -237,7 +243,7 @@ function publicState(s) {
     sp: s.sp,
     spieler: s.spieler,
     boss: s.boss,
-    bd: { key: s.bd.key, name: s.bd.name, hp: s.bd.hp, wutAb: s.bd.wutAb, muenze: s.bd.muenze || null },
+    bd: { key: s.bd.key, name: s.bd.name, hp: s.bd.hp, wutAb: s.bd.wutAb, muenze: s.bd.muenze || null, lotterie: s.bd.lotterie || null },
     hand: s.hand,
     gear: s.gear,
     effekte: s.effekte,
