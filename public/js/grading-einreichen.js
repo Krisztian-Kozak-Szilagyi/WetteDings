@@ -135,9 +135,11 @@
     if (card !== shownCard) {
       shownCard = card;
       ticket.preview.textContent = '';
-      if (card) {
+      // nur eigene Bilder (Pfad unter /img/) übernehmen (CodeQL #82)
+      var src = card ? card.getAttribute('data-image') || '' : '';
+      if (card && /^\/img\/[\w./?=%-]+$/.test(src)) {
         var img = document.createElement('img');
-        img.src = card.getAttribute('data-image');
+        img.src = src;
         img.alt = '';
         img.width = 720;
         img.height = 1008;
