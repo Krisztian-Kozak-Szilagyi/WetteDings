@@ -7,10 +7,12 @@
 // der Boss kündigt den nächsten Angriff an.
 // Karten-Werte (kampf) stehen in src/tcg/cardData.js; Boss und Spieler-Grundwerte hier unten.
 //
-// Spielfeld (Raid): Helden mit kampf.dauer = 'permanent' wirken beim Ausspielen, bleiben dann auf dem Feld liegen (ohne
-// Limit, frei platziert: x = links→rechts, y = vorne→hinten, je 0–100) und wirken zu Beginn jeder weiteren Runde erneut –
-// bis sie zerstört werden (kampf.leben auf 0) oder ein Effekt sie vom Feld nimmt (verlassen). Alle anderen Helden sind
-// Effektkarten: sie wirken einmal und gehen danach auf den Ablagestapel.
+// Spielfeld (Raid): jede Karte wird an einen Platz auf dem Feld gelegt (x = links→rechts, y = vorne→hinten, je 0–100).
+// Helden mit kampf.dauer = 'permanent' bleiben liegen (ohne Limit) und wirken zu Beginn jeder weiteren Runde erneut – bis
+// sie zerstört werden (kampf.leben auf 0) oder ein Effekt sie vom Feld nimmt (verlassen). Alle anderen sind Effektkarten:
+// sie wirken einmal und verlassen das Feld. Was das Feld verlässt, kommt ins Exil (Stapel aus dem Spiel genommener Karten).
+// Energie (Raid, sp.energieStart): zu Beginn energieStart, nach jedem beendeten Zug 1 mehr (höchstens sp.energieMax);
+// ohne energieStart (Bosskampf) jede Runde sp.energie.
 // Ziel des Bosses: mit bd.feldZiel Chance eine Karte statt des Spielers – je weiter vorne, desto eher (bd.vorneFaktor:
 // ganz vorne so viel öfter als ganz hinten). Nahkampf erreicht nur Karten bis bd.nahReichweite, Fernkampf (a.fern,
 // Lucky Dios Armbrust) das ganze Feld.
@@ -81,14 +83,15 @@
       bd: bd,
       uid: 0,
       runde: 1,
-      energie: sp.energie,
+      energie: sp.energieStart != null ? sp.energieStart : sp.energie,
+      maxEnergie: sp.energieStart != null ? sp.energieStart : sp.energie, // so viel Energie gibt es diese Runde
       spieler: { hp: sp.hp, max: sp.hp },
       boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Krit-Lotterie, Lucky Dio) – je Token mehr Krit-Chance
       deck: [],
       hand: [],
       gear: [], // { uid, card, used, hits, bonus }
       feld: [], // permanente Karten: { uid, card, buffs, hp, max, x, y } – y: 0 = ganz vorne (beim Boss), 100 = ganz hinten
-      ablage: [], // ausgespielte Effektkarten und Karten, die das Feld verlassen haben
+      exil: [], // aus dem Spiel genommen: ausgespielte Effektkarten und Karten, die das Feld verlassen haben
       effekte: [], // { art, key, card, name, wert, runden, max }
       gespielt: 0,
       absicht: null,
@@ -116,7 +119,7 @@
     k.hand = s.hand.map(function (i) { return { uid: i.uid, card: i.card, buffs: i.buffs.slice() }; });
     k.gear = s.gear.map(function (g) { return { uid: g.uid, card: g.card, used: g.used, hits: g.hits, bonus: g.bonus }; });
     k.feld = (s.feld || []).map(function (f) { return { uid: f.uid, card: f.card, buffs: f.buffs.slice(), hp: f.hp, max: f.max, x: f.x, y: f.y }; });
-    k.ablage = (s.ablage || []).slice();
+    k.exil = (s.exil || []).slice();
     k.effekte = s.effekte.map(function (e) { var c = {}; for (var x in e) c[x] = e[x]; return c; });
     k.log = { bossSchaden: s.log.bossSchaden, spielerSchaden: s.log.spielerSchaden, geheilt: s.log.geheilt, karten: s.log.karten };
     return k;
@@ -235,14 +238,14 @@
   }
 
   /**
-   * Karte verlässt das Spielfeld und geht auf den Ablagestapel. grund: 'zerstoert' (Leben 0) oder der Name des Effekts,
+   * Karte verlässt das Spielfeld und kommt ins Exil. grund: 'zerstoert' (Leben 0) oder der Name des Effekts,
    * der sie entfernt (für künftige Karten- und Boss-Effekte). Gibt die Karte zurück (null, wenn sie nicht auf dem Feld liegt).
    */
   function verlassen(s, uid, grund, ev) {
     var f = finde(s.feld || [], function (x) { return x.uid === uid; });
     if (!f) return null;
     s.feld.splice(s.feld.indexOf(f), 1);
-    s.ablage.push({ uid: f.uid, card: f.card, buffs: [] });
+    s.exil.push({ uid: f.uid, card: f.card, buffs: [] });
     if (ev) ev.push({ t: 'verlassen', uid: f.uid, card: f.card, grund: grund || 'entfernt' });
     return f;
   }
@@ -291,7 +294,8 @@
     s.gespielt++;
     s.log.karten++;
     var permanent = istPermanent(k);
-    ev.push({ t: 'gespielt', inst: inst, permanent: permanent });
+    var feldPos = pos ? { x: platz(pos.x), y: platz(pos.y) } : null;
+    ev.push({ t: 'gespielt', inst: inst, permanent: permanent, pos: feldPos });
     if (k.typ === 'held') {
       // permanente Karte liegt schon, während sie zum ersten Mal wirkt (so trifft ihr Effekt von ihrem Platz aus)
       if (permanent) {
@@ -300,7 +304,11 @@
         ev.push({ t: 'feld', f: f });
       }
       held(s, inst, vorher, ziel, ev);
-      if (!permanent) s.ablage.push(inst);
+      // Effektkarte: hat gewirkt und verlässt das Feld ins Exil
+      if (!permanent) {
+        s.exil.push(inst);
+        ev.push({ t: 'exil', uid: inst.uid, card: inst.card });
+      }
     } else ausruesten(s, inst, ev);
     return ev;
   }
@@ -489,7 +497,10 @@
     s.runde++;
     s.gespielt = 0;
     var netz = summe(effekteVon(s, 'netz'), function (e) { return e.wert; });
-    s.energie = Math.max(0, s.sp.energie - netz);
+    // Raid: jede Runde 1 Energie mehr (bis energieMax); Bosskampf: immer sp.energie
+    if (s.sp.energieStart != null) s.maxEnergie = Math.min(s.sp.energieMax || 10, (s.maxEnergie || s.sp.energieStart) + 1);
+    else s.maxEnergie = s.sp.energie;
+    s.energie = Math.max(0, s.maxEnergie - netz);
     s.gear.forEach(function (g) { g.used = false; });
     ev.push({ t: 'runde', nr: s.runde, energie: s.energie, netz: netz });
     // Effekte zu Rundenbeginn: Nachladen schlägt ein, Fluch/Blutung trifft den Boss, Gift den Spieler

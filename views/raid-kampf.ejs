@@ -50,6 +50,13 @@
       <button type="button" class="bf-end" data-bf-end>Runde beenden</button>
     </section>
 
+    <%# Exil: Karten, die das Spielfeld verlassen haben (aus dem Spiel genommen) %>
+    <section class="bf-exil" data-bf-exil data-leer aria-label="Exil">
+      <img alt="" draggable="false" hidden>
+      <span class="bf-exil-name">Exil</span>
+      <span class="bf-deck-count" data-bf-exil-count>0</span>
+    </section>
+
     <section class="bf-deck" data-bf-deck aria-label="Deck">
       <span class="bf-deck-card"></span><span class="bf-deck-card"></span><span class="bf-deck-card"></span>
       <span class="bf-deck-count" data-bf-deck-count></span>

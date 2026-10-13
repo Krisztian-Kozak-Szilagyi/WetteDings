@@ -43,9 +43,10 @@ test('Raid: Kampfwerte aus den IHK-Werten – Rolle nach dem stärksten Wert', (
   assert.equal(logic.kampfFor(catalog.cardById['casino-kaffee-6-glitch'], opts), null);
   const test1 = catalog.TEST_CARDS.find((c) => c.kampf);
   assert.equal(logic.kampfFor(test1, opts), test1.kampf);
-  // Stärke je Seltenheit gleicht aus: Crumpled-Angreifer nicht viel schwächer als Glitch-Angreifer
+  // Kosten nach Seltenheit: die günstige Crumpled-Karte ist schwächer, aber nicht viel (1 Karte je Zug)
   const crumpled = logic.kampfFor(catalog.cardById['krisz-1-crumpled'], opts);
-  assert.ok(crumpled.ang > krisz.ang * 0.6, `Crumpled ${crumpled.ang} vs. Glitch ${krisz.ang}`);
+  assert.ok(crumpled.kosten < krisz.kosten && crumpled.ang < krisz.ang);
+  assert.ok(crumpled.ang > krisz.ang * 0.4, 'flache Kurve: auch günstige Karten zählen');
 });
 
 test('Raid: Münzwurf-Angriff – Kopf trifft doppelt, Zahl gibt Dio einen Glücks-Token', () => {
@@ -160,7 +161,7 @@ test('Raid: Spielfeld – permanente Karten bleiben liegen, wirken jede Runde, E
   assert.equal(logic.kampfFor(catalog.cardById[ids[2]], o).dauer, 'effekt');
   // Boss ohne Feld-Angriffe und ohne Krit-Lotterie, damit nur das Spielfeld zählt
   const boss = { ...logic.bossDef(o), lotterie: null, feldZiel: 0, angriffe: [{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }] };
-  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energie: 10 }, boss });
+  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energieStart: 10 }, boss });
   s.hand = [];
   const karte = (id) => ({ id, name: id, image: '', kampf: logic.kampfFor(catalog.cardById[id], o) });
   s.hand.push({ uid: 900, card: karte(permId), buffs: [] }, { uid: 901, card: karte(ids[2]), buffs: [] });
@@ -170,7 +171,7 @@ test('Raid: Spielfeld – permanente Karten bleiben liegen, wirken jede Runde, E
   assert.equal(s.feld[0].hp, o.karten.leben);
   R.spielen(s, 901);
   assert.equal(s.feld.length, 1, 'Effektkarte bleibt nicht liegen');
-  assert.equal(s.ablage.length, 1);
+  assert.equal(s.exil.length, 1);
   // nächste Runde: die permanente Karte wirkt erneut
   const hp = s.boss.hp;
   const runde = R.rundeEnde(s);
@@ -200,7 +201,7 @@ test('Raid: Dio greift Karten auf dem Spielfeld an und zerstört sie', () => {
   o.karten.permanent = [ids[0]];
   o.karten.leben = 15;
   const boss = { ...logic.bossDef(o), lotterie: null, feldZiel: 1, angriffe: [{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }] };
-  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energie: 10 }, boss });
+  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energieStart: 10 }, boss });
   s.hand = [{ uid: 900, card: { id: ids[0], name: 'Wache', image: '', kampf: logic.kampfFor(catalog.cardById[ids[0]], o) }, buffs: [] }];
   R.spielen(s, 900);
   // die Ankündigung wurde vor dem Legen gewürfelt – neu ankündigen lassen (Ziel: die Karte)
@@ -217,7 +218,7 @@ test('Raid: Dio greift Karten auf dem Spielfeld an und zerstört sie', () => {
   const ev2 = R.rundeEnde(s);
   assert.ok(ev2.some((e) => e.t === 'verlassen' && e.grund === 'zerstoert'));
   assert.equal(s.feld.length, 0);
-  assert.ok(s.ablage.some((i) => i.uid === 900));
+  assert.ok(s.exil.some((i) => i.uid === 900));
   assert.equal(s.absicht.ziel, null, 'leeres Feld → Dio zielt wieder auf den Spieler');
   // der Browser sieht das Spielfeld
   assert.ok(Array.isArray(logic.publicState(s).feld));
@@ -275,4 +276,39 @@ test('Raid: Platz auf dem Spielfeld – vorne wird öfter angegriffen, weit hint
   lege(hinten, 803, 90);
   R.rundeEnde(hinten);
   assert.equal(hinten.absicht.ziel, null);
+});
+
+test('Raid: 30 Karten, 5 auf der Hand, 1 je Zug; Energie wächst jede Runde; Kosten je Karte; Exil', () => {
+  const o = JSON.parse(JSON.stringify(opts));
+  assert.deepEqual([o.spieler.startHand, o.spieler.ziehen, o.spieler.energieStart, o.spieler.energieMax], [5, 1, 1, 10]);
+  // Kosten: Seltenheit, einzelne Karte überschreibt
+  const krisz = catalog.cardById['krisz-6-glitch'];
+  assert.equal(logic.kampfFor(krisz, o).kosten, o.karten.kosten.glitch);
+  o.karten.kostenKarte = { 'krisz-6-glitch': 7 };
+  assert.equal(logic.cleanSettings(o).karten.kostenKarte['krisz-6-glitch'], 7);
+  assert.equal(logic.kampfFor(krisz, o).kosten, 7);
+  assert.throws(() => logic.cleanSettings({ ...o, spieler: { ...o.spieler, energieStart: 5, energieMax: 3 } }), /Start größer als Maximum/);
+  // Ablauf
+  const boss = { ...logic.bossDef(o), lotterie: null, angriffe: [{ key: 'dolch', name: 'Dolch', schaden: [1, 1], gewicht: 1 }] };
+  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.4, spieler: logic.spielerDef(o), boss });
+  assert.equal(s.hand.length + s.deck.length, 30);
+  assert.equal(s.hand.length, 5);
+  assert.deepEqual([s.energie, s.maxEnergie], [1, 1]);
+  R.rundeEnde(s);
+  assert.equal(s.hand.length, 6, 'eine Karte je Zug');
+  assert.deepEqual([s.energie, s.maxEnergie], [2, 2]);
+  for (let i = 0; i < 12; i++) R.rundeEnde(s);
+  assert.equal(s.maxEnergie, 10, 'höchstens energieMax');
+  // Effektkarte: an einen Platz gelegt, wirkt, kommt ins Exil
+  s.energie = 10;
+  const inst = s.hand.find((i) => R.spielbar(s, i.uid).ok);
+  const ev = R.spielen(s, inst.uid, undefined, { x: 20, y: 30 });
+  assert.deepEqual(ev[0].pos, { x: 20, y: 30 });
+  assert.ok(ev.some((e) => e.t === 'exil' && e.uid === inst.uid));
+  assert.equal(s.exil.length, 1);
+  assert.ok(logic.publicState(s).exil.length === 1 && logic.publicState(s).maxEnergie === 10);
+  // Bosskampf (ohne energieStart) bleibt bei fester Energie je Runde
+  const spinne = R.neu(logic.deckCards(ids, o), { rng: () => 0.4 }).s;
+  R.rundeEnde(spinne);
+  assert.equal(spinne.energie, R.SPIELER.energie);
 });

@@ -18,7 +18,7 @@ const { logSettingsChange } = require('../stats/settingsLog');
 const logic = require('./logic');
 
 const DIO = 'lucky-dio-boss';
-const MIN_CARDS = 10; // so viele im Raid spielbare Karten braucht ein Deck mindestens
+const MIN_CARDS = 30; // das Raid-Deck besteht aus 30 Karten – alle müssen im Raid spielbar sein
 const HISTORY = 10;
 
 const settings = JSON.parse(JSON.stringify(logic.DEFAULTS));
@@ -66,7 +66,7 @@ async function deckFor(userId) {
   if (deck.check.missing.length) problem = 'In deinem Deck sind Karten, die du nicht mehr besitzt.';
   else if (deck.check.errors.length) problem = 'Dein Deck verstößt gegen die Deckregeln (z. B. Boss-Karten und Items nur einmal).';
   else if (!deck.check.complete) problem = `Dein Deck braucht genau 30 Karten (gerade ${deck.check.size}).`;
-  else if (cards.length < MIN_CARDS) problem = `Im Raid spielen nur Charakterkarten – in deinem Deck sind nur ${cards.length}, nötig sind mindestens ${MIN_CARDS}.`;
+  else if (cards.length < MIN_CARDS) problem = `Das Raid-Deck besteht aus ${MIN_CARDS} Karten, die im Raid spielbar sind – Items wie Kaffee spielen (noch) nicht mit. In deinem Deck sind ${cards.length} spielbar.`;
   return { deck, ids, cards, playable: !problem, problem };
 }
 

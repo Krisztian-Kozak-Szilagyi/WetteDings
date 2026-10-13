@@ -34,9 +34,11 @@ const DEFAULTS = {
   open: false,
   triesPerDay: 3,
   maxRounds: 30,
-  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8 },
-  // Balance (npm run sim:raid, 2026-10-13, mit Dios Krit-Lotterie): kluges Spiel gewinnt mit Gold/Holo ≈ 47 %,
-  // Holo/Bockhaber ≈ 67 %, Glitch ≈ 93 %; wer zufällig spielt, gewinnt mit denselben Decks ≈ 11 / 25 / 83 %
+  // Energie: energieStart im ersten Zug, nach jedem beendeten Zug 1 mehr (höchstens energieMax). 5 Karten zu Beginn, dann 1 je Zug.
+  spieler: { hp: 200, energieStart: 1, energieMax: 10, startHand: 5, ziehen: 1, handMax: 10 },
+  // Balance (npm run sim:raid, 2026-10-13, Energie wächst, 1 Karte je Zug, noch keine permanenten Karten): Crumpled/BFWler
+  // 0 %, Gold/Holo ≈ 51 %, Holo/Bockhaber ≈ 86 %, Glitch ≈ 98 % – die Spielweise macht kaum Unterschied. Offen bis zum
+  // Karten-Rework (Effekte, permanente Karten), danach neu abstimmen.
   // Krit-Lotterie wie Dios Karte: jeder Angriff krittet mit grundKrit % (+ tokenKrit % je Glücks-Token) und trifft dann
   // kritFaktor-fach; danach Münzwurf (kopfChance): Kopf = kritischer Armbrust-Zusatztreffer, Zahl = Dolch-Zusatztreffer
   // und ein Glücks-Token. Zusatztreffer: zusatzMin–zusatzMax Schaden. Der Münzwurf-Angriff trifft bei Kopf kopfFaktor-fach.
@@ -49,9 +51,12 @@ const DEFAULTS = {
     neben: 20,
     leben: 40,
     permanent: [], // Karten-IDs der permanenten Karten (Admin-Panel)
-    kosten: { crumpled: 2, bfwler: 2, gold: 2, holo: 2, bockhaber: 2, glitch: 2, icon: 2, sith: 2, boss: 2, footman: 2, arcane: 2 },
-    // ≈ Zielstärke ÷ Ø Hauptwert der Seltenheit: Crumpled 70 %, BFWler 77 %, Gold 84 %, Holo 90 %, Bockhaber 95 %, Glitch 100 %, Boss 110 %
-    staerke: { crumpled: 256, bfwler: 209, gold: 190, holo: 178, bockhaber: 164, glitch: 100, icon: 110, sith: 110, boss: 106, footman: 209, arcane: 100 },
+    // Energiekosten je Seltenheit; einzelne Karten können eigene Kosten haben (kostenKarte: { Karten-ID: Kosten })
+    kosten: { crumpled: 1, bfwler: 1, gold: 2, holo: 3, bockhaber: 3, glitch: 4, icon: 4, sith: 4, boss: 5, footman: 1, arcane: 4 },
+    kostenKarte: {},
+    // Stärke je Seltenheit: teurere Karten sind stärker, aber flach – mit 1 Karte je Zug zählt jede Karte, nicht die Energie.
+    // Hauptwert ≈ 30 / 36 / 44 / 52 / 60 bei 1 / 2 / 3 / 4 / 5 Energie
+    staerke: { crumpled: 192, bfwler: 157, gold: 171, holo: 196, bockhaber: 180, glitch: 130, icon: 143, sith: 143, boss: 159, footman: 157, arcane: 130 },
   },
   belohnung: { geld: 20000, dioChance: 10 },
 };
@@ -60,10 +65,10 @@ const DEFAULTS = {
 const LIMITS = {
   triesPerDay: [1, 50],
   maxRounds: [5, 200],
-  spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15] },
+  spieler: { hp: [10, 1000], energieStart: [0, 20], energieMax: [1, 20], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15] },
   boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500], feldZiel: [0, 100], vorneFaktor: [1, 20], nahReichweite: [0, 100] },
   angriff: { min: [0, 1000], max: [0, 1000], gewicht: [0, 100], gift: [0, 100], giftRunden: [0, 10], netz: [0, 5] },
-  karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], leben: [1, 1000], kosten: [0, 10], staerke: [0, 1000] },
+  karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], leben: [1, 1000], kosten: [0, 20], staerke: [0, 1000] },
   belohnung: { geld: [0, 100000000], dioChance: [0, 100] },
 };
 
@@ -88,10 +93,11 @@ function cleanSettings(input) {
     spieler: {},
     boss: {},
     angriffe: [],
-    karten: { kosten: {}, staerke: {}, permanent: [] },
+    karten: { kosten: {}, staerke: {}, permanent: [], kostenKarte: {} },
     belohnung: {},
   };
   for (const k of Object.keys(LIMITS.spieler)) out.spieler[k] = num(`Spieler ${k}`, s.spieler && s.spieler[k], LIMITS.spieler[k]);
+  if (out.spieler.energieStart > out.spieler.energieMax) errors.push('Energie: Start größer als Maximum');
   for (const k of Object.keys(LIMITS.boss)) out.boss[k] = num(`Boss ${k}`, s.boss && s.boss[k], LIMITS.boss[k]);
   if (out.boss.zusatzMin > out.boss.zusatzMax) errors.push('Zusatztreffer: min größer als max');
   for (const def of ATTACKS) {
@@ -108,6 +114,11 @@ function cleanSettings(input) {
   // permanente Karten: nur bekannte, im Raid spielbare Karten, jede einmal
   const perm = s.karten && Array.isArray(s.karten.permanent) ? s.karten.permanent : [];
   out.karten.permanent = [...new Set(perm.filter((id) => typeof id === 'string' && PERMANENT_OK(catalog.cardById[id])))].sort();
+  // Kosten einzelner Karten (überschreiben die Kosten ihrer Seltenheit); leer = Seltenheit
+  for (const [id, v] of Object.entries((s.karten && s.karten.kostenKarte) || {})) {
+    if (!PERMANENT_OK(catalog.cardById[id]) || v === null || v === undefined || v === '') continue;
+    out.karten.kostenKarte[id] = num(`Kosten ${catalog.cardById[id].name}`, v, LIMITS.karten.kosten);
+  }
   for (const r of RARITY_KEYS) {
     out.karten.kosten[r] = num(`Kosten ${r}`, s.karten && s.karten.kosten && s.karten.kosten[r], LIMITS.karten.kosten);
     out.karten.staerke[r] = num(`Stärke ${r}`, s.karten && s.karten.staerke && s.karten.staerke[r], LIMITS.karten.staerke);
@@ -134,6 +145,7 @@ function mergeSettings(doc) {
     if (doc.karten) {
       for (const k of ['ang', 'sch', 'hei', 'neben', 'leben']) if (doc.karten[k] !== undefined) merged.karten[k] = doc.karten[k];
       if (Array.isArray(doc.karten.permanent)) merged.karten.permanent = doc.karten.permanent;
+      if (doc.karten.kostenKarte && typeof doc.karten.kostenKarte === 'object') merged.karten.kostenKarte = doc.karten.kostenKarte;
       Object.assign(merged.karten.kosten, doc.karten.kosten || {});
       Object.assign(merged.karten.staerke, doc.karten.staerke || {});
     }
@@ -167,7 +179,7 @@ function kampfFor(card, opts) {
   const v = (key, pct) => Math.max(0, Math.round((st[key] * pct * m * (key === role ? 1 : k.neben / 100)) / 100));
   return {
     typ: 'held',
-    kosten: k.kosten[card.rarity] ?? 2,
+    kosten: (k.kostenKarte || {})[card.id] ?? k.kosten[card.rarity] ?? 2,
     ang: v('fia', k.ang),
     sch: v('fis', k.sch),
     hei: v('bwl', k.hei),
@@ -220,7 +232,7 @@ function bossDef(opts) {
   };
 }
 
-/** Werte des Spielers für die Regeln (zwei Hände für Ausrüstung wie im Bosskampf) */
+/** Werte des Spielers für die Regeln (zwei Hände für Ausrüstung wie im Bosskampf; Energie wächst jede Runde) */
 const spielerDef = (opts) => ({ ...opts.spieler, haende: 2 });
 
 /** Zufall aus einem Startwert (mulberry32) – Server und Tests bekommen bei gleichem Startwert dieselben Würfe */
@@ -269,7 +281,8 @@ function publicState(s) {
     hand: s.hand,
     gear: s.gear,
     feld: s.feld,
-    ablage: s.ablage.length,
+    exil: s.exil,
+    maxEnergie: s.maxEnergie,
     effekte: s.effekte,
     gespielt: s.gespielt,
     absicht: s.absicht,

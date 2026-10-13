@@ -595,6 +595,8 @@ router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwert
         karten: {
           ...part('karten', ['ang', 'sch', 'hei', 'neben', 'leben']),
           permanent: [].concat(b.permanent || []), // angekreuzte Karten bleiben auf dem Spielfeld liegen
+          // eigene Kosten einzelner Karten (Feld leer = Kosten der Seltenheit)
+          kostenKarte: Object.fromEntries(Object.entries(b).filter(([k, v]) => k.startsWith('kk_') && String(v).trim() !== '').map(([k, v]) => [k.slice(3), num(v)])),
           kosten: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`kosten_${r}`])])),
           staerke: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`staerke_${r}`])])),
         },

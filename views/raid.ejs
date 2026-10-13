@@ -45,10 +45,10 @@
     <% if (!deck.deck) { %>
       <p class="muted">Du hast noch kein Deck. <a href="/deck">Jetzt eins bauen</a> – 30 Karten, höchstens 2 gleiche.</p>
     <% } else { %>
-      <p>„<%= deck.deck.name %>“ · <%= deck.deck.check.size %> Karten, davon <strong><%= deck.cards.length %></strong> im Raid spielbar (mindestens <%= minCards %>).</p>
+      <p>„<%= deck.deck.name %>“ · <%= deck.deck.check.size %> Karten, davon <strong><%= deck.cards.length %></strong> im Raid spielbar (nötig: <%= minCards %>).</p>
       <ul class="raid-roles"><% Object.entries(roles).forEach(([r, n]) => { %><li><%= n %>× <%= r %></li><% }) %></ul>
-      <p class="muted small">Im Raid kämpfen deine Charakterkarten. Jede hat eine Rolle nach ihrem stärksten IHK-Wert: <strong>FIA → Angreifer</strong> (Schaden), <strong>FIS → Verteidiger</strong> (blockt Dios nächsten Angriff), <strong>BWL → Heiler</strong>. Jede Karte kostet Energie, du hast <%= spieler.energie %> pro Runde. Items wie Kaffee spielen nicht mit.</p>
-      <p class="muted small"><strong>Spielfeld:</strong> Permanente Karten legst du frei aufs Spielfeld (je <%= karten.leben %> Leben); sie bleiben liegen und wirken jede Runde erneut, bis Dio sie zerstört. Je weiter vorne sie liegen, desto eher greift er sie an – weit hinten erreicht er sie nur mit der Armbrust. Effektkarten wirken einmal und gehen dann auf den Ablagestapel.<% if (permanentImDeck) { %> In deinem Deck: <strong><%= permanentImDeck %> permanent</strong>.<% } %></p>
+      <p class="muted small">Im Raid kämpfen deine Charakterkarten. Jede hat eine Rolle nach ihrem stärksten IHK-Wert: <strong>FIA → Angreifer</strong> (Schaden), <strong>FIS → Verteidiger</strong> (blockt Dios nächsten Angriff), <strong>BWL → Heiler</strong>. Das Deck besteht aus 30 Karten: Du beginnst mit <%= spieler.startHand %> auf der Hand und ziehst jeden Zug <%= spieler.ziehen === 1 ? 'eine' : spieler.ziehen %> nach. Jede Karte kostet so viel Energie, wie auf ihr steht – du startest mit <%= spieler.energieStart %>, nach jedem Zug kommt eine dazu (höchstens <%= spieler.energieMax %>). Items wie Kaffee spielen nicht mit.</p>
+      <p class="muted small"><strong>Spielfeld:</strong> Jede Karte legst du per Klick oder Ziehen an einen Platz auf dem Spielfeld. Permanente Karten (je <%= karten.leben %> Leben) bleiben liegen und wirken jede Runde erneut, bis Dio sie zerstört. Je weiter vorne sie liegen, desto eher greift er sie an – weit hinten erreicht er sie nur mit der Armbrust. Effektkarten wirken einmal. Was das Feld verlässt, kommt ins Exil.<% if (permanentImDeck) { %> In deinem Deck: <strong><%= permanentImDeck %> permanent</strong>.<% } %></p>
       <a class="btn btn-ghost btn-sm" href="/deck">Deck bearbeiten</a>
     <% } %>
   </section>

@@ -27,6 +27,13 @@ for (const part of ['boss', 'spieler', 'karten']) {
     if (v !== null && typeof opts[part][k] === 'number') opts[part][k] = Number(v);
   }
 }
+// --staerke crumpled=190,glitch=130 / --kosten holo=2: Stärke (%) bzw. Kosten einzelner Seltenheiten
+for (const part of ['staerke', 'kosten']) {
+  for (const pair of String(arg(part, '')).split(',').filter(Boolean)) {
+    const [r, v] = pair.split('=');
+    if (r in opts.karten[part]) opts.karten[part][r] = Number(v);
+  }
+}
 // --kosten-alle 1: alle Seltenheiten kosten gleich viel Energie
 if (arg('kosten-alle', null) !== null) for (const r of Object.keys(opts.karten.kosten)) opts.karten.kosten[r] = Number(arg('kosten-alle'));
 

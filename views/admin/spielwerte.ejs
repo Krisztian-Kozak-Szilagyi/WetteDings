@@ -396,7 +396,7 @@
 
         <fieldset class="admin-tax-group">
           <legend>Spieler</legend>
-          <% [['hp', 'Leben'], ['energie', 'Energie pro Runde'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Runde nachziehen'], ['handMax', 'Höchstens Karten auf der Hand']].forEach(([k, l]) => { %>
+          <% [['hp', 'Leben'], ['energieStart', 'Energie im ersten Zug (danach jede Runde +1)'], ['energieMax', 'Höchstens Energie'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Zug nachziehen'], ['handMax', 'Höchstens Karten auf der Hand']].forEach(([k, l]) => { %>
             <label class="field"><span><%= l %></span><input type="number" name="spieler_<%= k %>" min="<%= lim.spieler[k][0] %>" max="<%= lim.spieler[k][1] %>" step="1" value="<%= rs.spieler[k] %>" required><small class="muted">Standard <%= rd.spieler[k] %></small></label>
           <% }) %>
         </fieldset>
@@ -444,7 +444,7 @@
                 <% raid.rarities.forEach((r) => { %>
                   <tr class="r-<%= r.key %>">
                     <td><span class="tcg-dot"></span> <%= r.label %><%= r.hidden ? ' (geheim)' : '' %></td>
-                    <td><input type="number" name="kosten_<%= r.key %>" min="0" max="10" step="1" value="<%= rs.karten.kosten[r.key] %>" required aria-label="Kosten <%= r.label %>"></td>
+                    <td><input type="number" name="kosten_<%= r.key %>" min="0" max="20" step="1" value="<%= rs.karten.kosten[r.key] %>" required aria-label="Kosten <%= r.label %>"></td>
                     <td><input type="number" name="staerke_<%= r.key %>" min="0" max="1000" step="1" value="<%= rs.karten.staerke[r.key] %>" required aria-label="Stärke <%= r.label %>"></td>
                     <td class="num hide-sm muted nowrap"><%= rd.karten.kosten[r.key] %> · <%= rd.karten.staerke[r.key] %> %</td>
                   </tr>
@@ -456,16 +456,19 @@
         </fieldset>
 
         <fieldset class="admin-tax-group">
-          <legend>Spielfeld: permanente Karten</legend>
-          <p class="muted small">Angekreuzte Karten legt man frei auf dem Spielfeld ab (ohne Limit); sie bleiben liegen und wirken zu Beginn jeder Runde erneut, bis Dio sie zerstört oder ein Effekt sie entfernt. Je weiter vorne eine Karte liegt, desto eher greift Dio sie an – weit hinten erreicht er sie nur mit der Armbrust. Alle anderen sind Effektkarten: Sie wirken einmal und gehen dann auf den Ablagestapel.</p>
+          <legend>Karten: permanent und eigene Kosten</legend>
+          <p class="muted small">Angekreuzte Karten legt man frei auf dem Spielfeld ab (ohne Limit); sie bleiben liegen und wirken zu Beginn jeder Runde erneut, bis Dio sie zerstört oder ein Effekt sie entfernt. Je weiter vorne eine Karte liegt, desto eher greift Dio sie an – weit hinten erreicht er sie nur mit der Armbrust. Alle anderen sind Effektkarten: Sie wirken einmal und kommen dann ins Exil. Rechts daneben: eigene Energiekosten der Karte (leer = Kosten ihrer Seltenheit).</p>
           <label class="field"><span>Leben permanenter Karten</span><input type="number" name="karten_leben" min="<%= lim.karten.leben[0] %>" max="<%= lim.karten.leben[1] %>" step="1" value="<%= rs.karten.leben %>" required><small class="muted">Standard <%= rd.karten.leben %></small></label>
-          <% const permSet = new Set(rs.karten.permanent); %>
+          <% const permSet = new Set(rs.karten.permanent); const kk = rs.karten.kostenKarte || {}; %>
           <% raid.rarities.forEach((r) => { const list = raid.cards.filter((c) => c.rarity === r.key); if (!list.length) return; const n = list.filter((c) => permSet.has(c.id)).length; %>
             <details class="raid-perm-group r-<%= r.key %>"<%= n ? ' open' : '' %>>
-              <summary><span class="tcg-dot"></span> <%= r.label %> <span class="muted small">(<%= n %> von <%= list.length %> permanent)</span></summary>
+              <summary><span class="tcg-dot"></span> <%= r.label %> <span class="muted small">(<%= n %> von <%= list.length %> permanent · Standardkosten <%= rs.karten.kosten[r.key] %>)</span></summary>
               <div class="raid-perm-list">
                 <% list.forEach((c) => { %>
-                  <label class="check"><input type="checkbox" name="permanent" value="<%= c.id %>" <%= permSet.has(c.id) ? 'checked' : '' %>> <span><%= c.name %></span></label>
+                  <div class="raid-perm-row">
+                    <label class="check"><input type="checkbox" name="permanent" value="<%= c.id %>" <%= permSet.has(c.id) ? 'checked' : '' %>> <span><%= c.name %></span></label>
+                    <input type="number" name="kk_<%= c.id %>" min="0" max="20" step="1" value="<%= kk[c.id] ?? '' %>" placeholder="<%= rs.karten.kosten[r.key] %>" aria-label="Kosten <%= c.name %> (leer = Seltenheit)" title="Energiekosten – leer = Kosten der Seltenheit">
+                  </div>
                 <% }) %>
               </div>
             </details>

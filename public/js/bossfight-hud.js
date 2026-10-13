@@ -5,8 +5,9 @@
 //   Ausrüstung rechts neben dem Avatar: Waffe/Zauber anklicken = angreifen (einmal pro Runde).
 //   Über dem Avatar laufende Effekte (Ring = verbleibende Runden), unter dem Boss-Leben seine Ankündigung.
 //   Spielfeld über der Hand (nur Raid, [data-bf-feld]): permanente Karten mit eigenem Leben; Dios Ziel leuchtet rot.
-//   Permanente Karte anklicken und dann einen Platz im Feld anklicken – oder direkt aufs Feld ziehen. Oben ist vorne
-//   (nah an Dio, wird öfter angegriffen); hinter der gestrichelten Linie erreicht er Karten nur mit der Armbrust.
+//   Karte anklicken und dann einen Platz im Feld anklicken – oder direkt aufs Feld ziehen. Oben ist vorne (nah an Dio,
+//   wird öfter angegriffen); hinter der gestrichelten Linie erreicht er Karten nur mit der Armbrust. Effektkarten wirken
+//   dort einmal; was das Feld verlässt, fliegt ins Exil (Stapel links neben dem Deck, [data-bf-exil]).
 //   Karte 0,5 s unter der Maus = große Vorschau.
 // Zum Ausprobieren in der Konsole: bossfight.zustand() zeigt den Zustand.
 // Raid (body data-raid="1", views/raid-kampf.ejs): entschieden wird auf dem Server – jeder Zug geht an /raid/aktion,
@@ -23,6 +24,8 @@
   var effekteEl = document.querySelector('[data-bf-effects]');
   var absichtEl = document.querySelector('[data-bf-intent]');
   var feldEl = document.querySelector('[data-bf-feld]');
+  var exilEl = document.querySelector('[data-bf-exil]');
+  var exilZahl = 0; // während der Animation mitgezählt, danach aus dem Zustand
   if (!R || !hand || !deckEl || !gearEl) return;
   var deckCount = deckEl.querySelector('[data-bf-deck-count]');
   var avatar = document.querySelector('.bf-avatar');
@@ -187,8 +190,8 @@
     img.alt = c.name;
     el.title = c.kampf ? c.name : c.name + ' (kann hier nicht gespielt werden)';
     if (c.kampf) el.classList.add('bf-playable');
-    // permanente Karten lassen sich direkt aufs Spielfeld ziehen
-    if (feldEl && R.istPermanent(c.kampf)) {
+    // mit Spielfeld (Raid) lassen sich Karten direkt aufs Feld ziehen
+    if (feldEl && c.kampf && c.kampf.typ === 'held') {
       el.draggable = true;
       el.addEventListener('dragstart', function (e) {
         if (!s || laufend || s.vorbei || !R.spielbar(s, inst.uid).ok) return e.preventDefault();
@@ -311,6 +314,51 @@
     }
   }
 
+  // Effektkarte erscheint an ihrem Platz auf dem Feld (sie wirkt von dort) und fliegt danach ins Exil ('exil')
+  function effektAufFeld(c, pos, von) {
+    var el = document.createElement('div');
+    el.className = 'bf-feld-card bf-feld-effekt';
+    el.innerHTML = '<img alt="" draggable="false">';
+    el.querySelector('img').src = c.image;
+    el.querySelector('img').alt = c.name;
+    el.style.setProperty('--x', pos.x);
+    el.style.setProperty('--y', pos.y);
+    el.style.zIndex = 260;
+    feldEl.appendChild(el);
+    gleiten(el, von);
+    return el;
+  }
+  // Karte fliegt zum Exil-Stapel und verschwindet dort
+  function insExil(el, c) {
+    var ziel = exilEl ? exilEl.getBoundingClientRect() : null;
+    var rc = el.getBoundingClientRect();
+    if (ziel) {
+      el.style.transition = 'transform .55s cubic-bezier(.5, 0, .75, .4), opacity .55s';
+      el.style.transform = 'translate(' + (ziel.left + ziel.width / 2 - rc.left - rc.width / 2) + 'px, ' + (ziel.top + ziel.height / 2 - rc.top - rc.height / 2) + 'px) scale(.6) rotate(8deg)';
+      el.style.opacity = '.2';
+    } else el.classList.add('bf-feld-weg');
+    setTimeout(function () {
+      el.remove();
+      exilOben(c, 1);
+    }, 560);
+  }
+  // Exil-Stapel: oberste Karte und Anzahl (plus = gerade hinzugekommen)
+  function exilOben(c, plus) {
+    if (!exilEl) return;
+    // nie mehr als im Zustand (Animationen können nach dem Neuzeichnen enden)
+    exilZahl = Math.min(exilZahl + (plus || 0), s && s.exil ? s.exil.length : Infinity);
+    var img = exilEl.querySelector('img');
+    if (c) {
+      img.src = c.image;
+      img.alt = c.name;
+    }
+    img.hidden = !exilZahl;
+    exilEl.querySelector('[data-bf-exil-count]').textContent = exilZahl;
+    exilEl.toggleAttribute('data-leer', !exilZahl);
+    exilEl.title = 'Exil: ' + exilZahl + (exilZahl === 1 ? ' Karte' : ' Karten') + ' aus dem Spiel genommen';
+    if (plus) anstossen(exilEl, 'bf-exil-neu');
+  }
+
   // Held-Karte leuchtet kurz neben der Ausrüstung auf und verschwindet
   function aufblitzen(c, von) {
     var flash = document.createElement('div');
@@ -366,6 +414,7 @@
         if (hel) hel.remove();
         layout();
         if (e.permanent) letzteQuelle.set(e.inst.uid, von); // gleitet gleich aufs Spielfeld ('feld')
+        else if (e.pos && feldEl) letzteQuelle.set(e.inst.uid, effektAufFeld(e.inst.card, e.pos, von)); // wirkt an ihrem Platz, dann Exil
         else if (e.inst.card.kampf.typ === 'held') letzteQuelle.set(e.inst.uid, aufblitzen(e.inst.card, von));
         else letzteQuelle.set(e.inst.uid, von);
         return warte(e.inst.card.kampf.typ === 'held' && !e.permanent ? 350 : 0);
@@ -390,13 +439,22 @@
         }
         return warte(300);
       }
+      case 'exil': {
+        // Effektkarte hat gewirkt: vom Feld ins Exil
+        var xel = letzteQuelle.get(e.uid);
+        if (xel instanceof Element && xel.classList.contains('bf-feld-effekt')) insExil(xel, e.card);
+        else exilOben(e.card, 1);
+        return warte(250);
+      }
       case 'verlassen': {
         var vel = feldEls.get(e.uid);
         feldEls.delete(e.uid);
         if (vel) {
           popup(vel, e.grund === 'zerstoert' ? e.card.name + ' zerstört' : e.card.name + ' verlässt das Feld', 'bf-pop-info');
-          vel.classList.add(e.grund === 'zerstoert' ? 'bf-feld-zerstoert' : 'bf-feld-weg');
-          setTimeout(function () { vel.remove(); }, 600);
+          if (e.grund === 'zerstoert') {
+            vel.classList.add('bf-feld-zerstoert');
+            setTimeout(function () { vel.remove(); exilOben(e.card, 1); }, 600);
+          } else insExil(vel, e.card);
         }
         return warte(450);
       }
@@ -494,7 +552,11 @@
   // ---------- Zeichnen aus dem Zustand ----------
   function zeichnen() {
     if (!s) return;
-    if (energieEl) energieEl.textContent = '⚡ ' + s.energie + ' / ' + s.sp.energie;
+    if (energieEl) energieEl.textContent = '⚡ ' + s.energie + ' / ' + (s.maxEnergie || s.sp.energie);
+    if (exilEl && s.exil) {
+      exilZahl = s.exil.length;
+      exilOben(s.exil.length ? s.exil[s.exil.length - 1].card : null, 0);
+    }
     if (endBtn) endBtn.disabled = laufend || !!s.vorbei;
     deckCount.textContent = s.deck.length;
     if (s.deck.length) deckEl.removeAttribute('data-leer');
@@ -614,7 +676,7 @@
     if (!ok.ok) return abspielen([{ t: 'nein', uid: uid, grund: ok.grund }]);
     if (ok.ziel) return zielStart(uid);
     var inst = s.hand.filter(function (i) { return i.uid === uid; })[0];
-    if (feldEl && inst && R.istPermanent(inst.card.kampf)) {
+    if (feldEl && inst && inst.card.kampf.typ === 'held') {
       if (platzWahl && platzWahl.uid === uid) return platzEnde();
       return platzStart(uid);
     }
