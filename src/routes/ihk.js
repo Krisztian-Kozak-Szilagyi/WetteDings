@@ -4,7 +4,7 @@ const { TcgCard } = require('../models/Tcg');
 const catalog = require('../tcg/catalog');
 const ihk = require('../ihk/ihkService');
 const { questById, difficulty, isHybrid } = require('../ihk/quests');
-const { canBoost, DIO_STEP } = require('../ihk/abilities');
+const { canBoost, DIO_TOKEN } = require('../ihk/abilities');
 const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
 const { str, UserError } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
@@ -68,7 +68,7 @@ router.get('/ihk', async (req, res) => {
     limit,
     closedForOthers: !ihk.settings.open,
     workTime: ihk.WORK_TIME,
-    diceStep: DIO_STEP, // All In (Lucky Dio): Krit-Chance je Würfelauge für die Anzeige
+    tokenStep: DIO_TOKEN, // Krit-Lotterie (Lucky Dio): Kopf-Chance in Prozent je Glücks-Token für die Anzeige
   });
 });
 

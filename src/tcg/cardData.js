@@ -106,9 +106,9 @@ module.exports = {
     frame: 'violet',
     name: 'Lucky Dio',
     stats: [99, 99, 90, 95],
-    // All In (src/ihk/abilities.js, Ablauf in ihkService.simulate): Schurke und Glücksspieler (Würfel, Handarmbrust, Dolch).
-    // Werte: DIO_STEP, DIO_FORTUNA, DIO_MAX, DIO_JACKPOT, DIO_REROLL, DIO_COIN. Vorbote eines Fantasy-Settings (Beta).
-    abilityName: 'All In',
-    ability: 'Würfelt 2W6: je Auge +4 % Krit. Krit auf Krit trifft ×3 bis ×5, der 7. Krit ist ein Jackpot ×7. Doppelsechs: 3 sichere Krits. Schlangenaugen: Krits +1 Stufe. Booster: Glücksmünze.',
+    // Krit-Lotterie (src/ihk/abilities.js, Ablauf in ihkService.simulate): Schurke und Glücksspieler (Handarmbrust, Dolch).
+    // Werte: DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN. Vorbote eines Fantasy-Settings (Beta).
+    abilityName: 'Krit-Lotterie',
+    ability: 'Nach jedem Angriff fliegt eine Münze für einen Zusatztreffer. Kopf: kritischer Kettentreffer mit der Armbrust. Zahl: Dolchtreffer und ein Glücks-Token (+1 % Krit-Chance). Booster: Glücksmünze.',
   },
 };

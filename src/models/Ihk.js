@@ -23,7 +23,7 @@ const runSchema = new Schema(
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, mult: Number, chain: Number, lucky: Boolean, jackpot: Boolean, dice: { type: [[Number]], default: undefined }, coin: String, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte; mult/chain/lucky/jackpot/dice/coin = All In (Lucky Dio)
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, coin: String, tokens: Number, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte; coin/tokens = Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf (kopf = Armbrust-Krit, zahl = Dolch) und Glücks-Tokens danach
     total: { type: Number, required: true },
     total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },

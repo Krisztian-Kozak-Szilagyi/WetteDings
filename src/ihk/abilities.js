@@ -11,16 +11,13 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
-// Lucky Dio (Schurke und Glücksspieler mit Knochenwürfeln, Handarmbrust und Dolch): All In.
-// DIO_STEP = Krit-Chance in Prozent je Würfelauge (2W6), DIO_FORTUNA = sichere Krits bei Doppelsechs,
-// DIO_MAX = höchster Multiplikator der Krit-Kette (×2, ×3 …), DIO_JACKPOT = der wievielte Krit der Jackpot ist
-// und wie hoch er mindestens trifft, DIO_REROLL = Casino-Kaffee: unter dieser Summe wird neu gewürfelt,
+// Lucky Dio (Schurke und Glücksspieler mit Handarmbrust und Dolch): Krit-Lotterie.
+// DIO_HEADS = Chance auf Kopf in Prozent, DIO_TOKEN = so viel Krit-Chance in Prozent je Glücks-Token,
+// DIO_CHAIN = Stärke des kritischen Armbrust-Kettentreffers bei Kopf (1 = normaler Krit ×2),
 // DIO_COIN = Glücksmünze als Booster: Krit-Chance in Prozent bei Kopf
-const DIO_STEP = 4;
-const DIO_FORTUNA = 3;
-const DIO_MAX = 5;
-const DIO_JACKPOT = 7;
-const DIO_REROLL = 9;
+const DIO_HEADS = 50;
+const DIO_TOKEN = 1;
+const DIO_CHAIN = 1;
 const DIO_COIN = 15;
 // Hundekarten (Spells): Hugo und Lilly
 const DOGS = new Set(['hugo', 'lilly']);
@@ -105,15 +102,12 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
-  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): All In – Eigenschaft der Karte, wirkt von Anfang an (passive).
-  // Als Hauptkarte: Würfel-Einsatz zu Beginn, Krit-Kette und Jackpot (Ablauf: ihkService.rollDice und simulate).
-  // Mit Casino-Kaffee (Hausvorteil): bei einer Summe unter DIO_REROLL einmal neu würfeln.
+  // Lucky Dio (Boss-Karte aus „Chaos & Demise“): Krit-Lotterie – Eigenschaft der Karte, wirkt von Anfang an (passive).
+  // Als Hauptkarte fliegt nach jedem Angriff eine Münze und bringt einen Zusatztreffer (Ablauf: ihkService.simulate):
+  // Kopf = kritischer Kettentreffer mit der Armbrust, Zahl = Dolchtreffer und ein Glücks-Token (+DIO_TOKEN % Krit-Chance).
   // Als Booster: Glücksmünze zur Halbzeit – Kopf: +DIO_COIN % Krit-Chance, Zahl: nichts.
   if (m === 'lucky-dio-boss') {
-    add({ key: 'all-in', label: 'All In', text: `Würfelt zu Beginn 2W6: je Auge +${DIO_STEP.toLocaleString('de-DE')} % Krit-Chance. Krit auf Krit trifft ×3, ×4 … bis ×${DIO_MAX}, der ${DIO_JACKPOT}. Krit ist ein Jackpot (×${DIO_JACKPOT}). Doppelsechs: ${DIO_FORTUNA} sichere Krits. Schlangenaugen: jeder Krit eine Stufe höher.`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.luck = { step: DIO_STEP, fortuna: DIO_FORTUNA, max: DIO_MAX, jackpotAt: DIO_JACKPOT, jackpot: DIO_JACKPOT, reroll: 0, streak: 0, crits: 0, sure: 0, curse: 0 }; } });
-    if (b === 'casino-kaffee') {
-      add({ key: 'hausvorteil', label: 'Hausvorteil', text: `Das Haus gewinnt immer: Würfelt Lucky Dio weniger als ${DIO_REROLL}, darf er einmal neu würfeln – der bessere Wurf zählt.`, fx: 'fx-coffee', target: 'player', passive: true, apply: (s) => { if (s.luck) s.luck.reroll = DIO_REROLL; } });
-    }
+    add({ key: 'krit-lotterie', label: 'Krit-Lotterie', text: `Nach jedem Angriff fliegt eine Münze: Kopf = kritischer Kettentreffer mit der Armbrust, Zahl = Dolchtreffer und ein Glücks-Token (+${DIO_TOKEN} % Krit-Chance).`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.lottery = { heads: DIO_HEADS / 100, step: DIO_TOKEN / 100, chain: DIO_CHAIN, tokens: 0 }; } });
   } else if (b === 'lucky-dio-boss') {
     add({ key: 'gluecksmuenze', label: 'Glücksmünze', text: `Lucky Dio wirft eine Münze – Kopf: +${DIO_COIN} % Krit-Chance, Zahl: Pech gehabt.`, fx: 'fx-energy', target: 'player', apply: (s) => { s.coin = s.rand() < 0.5 ? 'kopf' : 'zahl'; if (s.coin === 'kopf') s.critBonus += DIO_COIN / 100; } });
   }
@@ -147,4 +141,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { DIO_STEP, DIO_FORTUNA, DIO_MAX, DIO_JACKPOT, DIO_REROLL, DIO_COIN, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+module.exports = { DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };

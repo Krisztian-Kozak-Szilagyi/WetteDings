@@ -5892,110 +5892,13 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   .dg-event-alert, .dg-page.is-chaos-alert .dg-hero, .dg-page.is-chaos-reveal .dg-hero-img { animation: none; }
 }
 
-/* All In (Lucky Dio): Krit-Einblendungen in den Farben seines violetten Rahmens – je länger die Krit-Kette, desto krasser.
-   1 = Krit, 2 = Doppelstich, 3 = Meuchelstoß (Karte glüht), 4 = All In, 5+ = All In mit Kettenzähler */
-.ihk-floater.is-allin, .dg-pop.is-allin {
-  z-index: 2; white-space: nowrap; font-weight: 900; letter-spacing: .03em; color: #d6a8ff;
-  text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 10px rgba(168, 85, 247, .7);
-  animation: allin-pop 1.5s cubic-bezier(.2, .8, .3, 1) forwards;
-}
-.is-allin.allin-1 { font-size: 1.35rem; }
-.is-allin.allin-2 { font-size: 1.6rem; color: #f1e6ff; text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 14px #a855f7, 0 0 26px rgba(168, 85, 247, .6); }
-.is-allin.allin-3 { font-size: 1.9rem; color: #ffd68a; text-shadow: 0 0 2px #13071f, 0 2px 5px #13071f, 0 0 16px #a855f7, 0 0 32px rgba(232, 169, 72, .7); animation-name: allin-pop-shake; }
-.is-allin.allin-4, .is-allin.allin-5 {
-  font-size: clamp(1.5rem, 5vw, 2.2rem); color: transparent; text-shadow: none; animation-name: allin-pop-shake;
-  background: linear-gradient(100deg, #ffd68a 10%, #fff7e0 35%, #d6a8ff 55%, #e8a948 80%); background-size: 200% 100%;
-  -webkit-background-clip: text; background-clip: text;
-  filter: drop-shadow(0 0 1px #13071f) drop-shadow(0 2px 3px #13071f) drop-shadow(0 0 14px #a855f7);
-}
-.is-allin.allin-5 {
-  font-size: clamp(1.6rem, 5.5vw, 2.6rem);
-  filter: drop-shadow(0 0 1px #13071f) drop-shadow(0 2px 3px #13071f) drop-shadow(0 0 16px #a855f7) drop-shadow(0 0 30px #e8a948);
-  animation: allin-pop-shake 1.5s cubic-bezier(.2, .8, .3, 1) forwards, allin-shine .6s linear infinite;
-}
-@keyframes allin-pop {
-  0% { transform: translateY(0) scale(.3); opacity: 0; }
-  15% { transform: translateY(-4px) scale(1.25); opacity: 1; }
-  30% { transform: translateY(-8px) scale(1); }
-  100% { transform: translateY(-70px) scale(1); opacity: 0; }
-}
-@keyframes allin-pop-shake {
-  0% { transform: translateY(0) scale(.3) rotate(0); opacity: 0; }
-  12% { transform: translateY(-4px) scale(1.35) rotate(-4deg); opacity: 1; }
-  18% { transform: translateY(-6px) scale(1.2) rotate(4deg); }
-  24% { transform: translateY(-7px) scale(1.1) rotate(-2deg); }
-  32% { transform: translateY(-9px) scale(1) rotate(0); }
-  100% { transform: translateY(-70px) scale(1); opacity: 0; }
-}
-@keyframes allin-shine { to { background-position: -200% 0, 0 0; } }
-@keyframes fx-allin { 30% { filter: drop-shadow(0 0 4px #d6a8ff) drop-shadow(0 0 22px #a855f7) brightness(1.15); } }
-.fx-allin img, .fx-allin > svg { animation: fx-allin .9s ease-out; }
-@media (prefers-reduced-motion: reduce) { .is-allin, .fx-allin img, .fx-allin > svg { animation: none !important; } }
-
-/* All In (Lucky Dio): Jackpot – die größte Krit-Einblendung */
-.is-allin.allin-jackpot {
-  font-size: clamp(1.7rem, 6vw, 2.8rem); color: transparent; text-shadow: none;
-  background: linear-gradient(100deg, #ffd68a 10%, #fff7e0 35%, #d6a8ff 55%, #e8a948 80%); background-size: 200% 100%;
-  -webkit-background-clip: text; background-clip: text;
-  filter: drop-shadow(0 0 1px #13071f) drop-shadow(0 2px 3px #13071f) drop-shadow(0 0 18px #e8a948);
-  animation: allin-pop-shake 1.6s cubic-bezier(.2, .8, .3, 1) forwards, allin-shine .6s linear infinite;
-}
-
-/* All In (Lucky Dio): Knochenwürfel. Nur transform/opacity werden animiert, alles andere ist statisch. */
-.dio-dice {
-  position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  background: radial-gradient(ellipse at center, rgba(19, 7, 31, .72), rgba(19, 7, 31, .25) 70%, transparent);
-  animation: dio-fade .25s ease-out;
-}
-.dio-dice.is-leaving { opacity: 0; transition: opacity .3s ease-in; }
-.dio-dice-row { display: flex; gap: 12px; }
-.dio-die {
-  position: relative; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); place-items: center;
-  width: 46px; height: 46px; padding: 6px; box-sizing: border-box; border-radius: 22%;
-  background: linear-gradient(145deg, #faf3e1 0%, #e9dcbc 55%, #cdb88a 100%);
-  border: 2px solid #8a6a3a;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -3px 0 rgba(107, 79, 42, .35), 0 4px 8px rgba(0, 0, 0, .5);
-  will-change: transform;
-}
-/* eingravierte Innenlinie – wirkt wie ein alter, geschnitzter Würfel */
-.dio-die::before { content: ""; position: absolute; inset: 3px; border: 1px solid rgba(138, 106, 58, .4); border-radius: 18%; }
-.dio-die i { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #6b3a9a, #1d0b2e 70%); opacity: 0; }
-.dio-die[data-face="1"] i:nth-child(5),
-.dio-die[data-face="2"] i:nth-child(3), .dio-die[data-face="2"] i:nth-child(7),
-.dio-die[data-face="3"] i:nth-child(3), .dio-die[data-face="3"] i:nth-child(5), .dio-die[data-face="3"] i:nth-child(7),
-.dio-die[data-face="4"] i:nth-child(1), .dio-die[data-face="4"] i:nth-child(3), .dio-die[data-face="4"] i:nth-child(7), .dio-die[data-face="4"] i:nth-child(9),
-.dio-die[data-face="5"] i:nth-child(1), .dio-die[data-face="5"] i:nth-child(3), .dio-die[data-face="5"] i:nth-child(5), .dio-die[data-face="5"] i:nth-child(7), .dio-die[data-face="5"] i:nth-child(9),
-.dio-die[data-face="6"] i:nth-child(1), .dio-die[data-face="6"] i:nth-child(3), .dio-die[data-face="6"] i:nth-child(4), .dio-die[data-face="6"] i:nth-child(6), .dio-die[data-face="6"] i:nth-child(7), .dio-die[data-face="6"] i:nth-child(9) { opacity: 1; }
-.dio-dice.is-rolling .dio-die { animation: dio-roll .9s cubic-bezier(.25, .7, .35, 1) both; }
-.dio-dice.is-rolling .dio-die + .dio-die { animation-name: dio-roll-2; }
-.dio-dice.is-landed .dio-die { animation: dio-land .3s ease-out; }
-.dio-dice-label {
-  padding: 3px 12px; border-radius: 999px; white-space: nowrap;
-  font: 700 13px/1.4 Georgia, "Times New Roman", serif; font-variant: small-caps; letter-spacing: .06em;
-  color: #ffd68a; background: #2a1145; border: 1px solid #e8a948; box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
-  opacity: 0; transform: translateY(4px); transition: opacity .25s, transform .25s;
-}
-.dio-dice.is-landed .dio-dice-label { opacity: 1; transform: none; }
-.dio-dice-label.is-fortuna { color: #2a1145; background: linear-gradient(135deg, #fff4cf, #e9c766 50%, #c79a3c); border-color: #fff4cf; box-shadow: 0 0 14px rgba(233, 199, 102, .8); }
-.dio-dice-label.is-curse { color: #e9d5ff; background: #13071f; border-color: #a855f7; box-shadow: 0 0 14px rgba(168, 85, 247, .7); }
-.dio-dice-label.is-house { color: #fef3c7; background: #3b2412; border-color: #c08a4a; }
+/* Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf – Kopf (Armbrust-Krit) golden, Zahl (Dolch) silbern-violett */
+.ihk-floater.is-coin, .dg-pop.is-coin { font-family: Georgia, "Times New Roman", serif; font-variant: small-caps; font-weight: 700; }
+.ihk-floater.is-coin.coin-kopf, .dg-pop.is-coin.coin-kopf { color: #ffd68a; text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 14px rgba(232, 169, 72, .75); }
+.ihk-floater.is-coin.coin-zahl, .dg-pop.is-coin.coin-zahl { color: #e4d4ff; text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 10px rgba(168, 85, 247, .55); }
 @keyframes dio-fade { from { opacity: 0; } }
-@keyframes dio-roll {
-  0% { transform: translate(-70px, -40px) rotate(-420deg) scale(.6); opacity: 0; }
-  20% { opacity: 1; }
-  70% { transform: translate(4px, 6px) rotate(12deg) scale(1.05); }
-  100% { transform: none; }
-}
-@keyframes dio-roll-2 {
-  0% { transform: translate(70px, -50px) rotate(480deg) scale(.6); opacity: 0; }
-  20% { opacity: 1; }
-  70% { transform: translate(-4px, 5px) rotate(-10deg) scale(1.05); }
-  100% { transform: none; }
-}
-@keyframes dio-land { 40% { transform: scale(1.12); } }
 
-/* Wurf und Jackpot-Zähler bleiben klein auf der Karte stehen – über dem Textfeld, damit Name und Werte frei bleiben */
+/* Zähler der Glücks-Tokens bleibt klein auf der Karte stehen – über dem Textfeld, damit Name und Werte frei bleiben */
 .dio-badge {
   position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); z-index: 2; pointer-events: none;
   display: flex; gap: 6px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
@@ -6003,9 +5906,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
   color: #f1e6ff; background: rgba(42, 17, 69, .92); border: 1px solid #e8a948;
 }
 .dio-badge b { color: #ffd68a; font-size: 12px; }
-.dio-badge span + span::before { content: "·"; margin-right: 6px; opacity: .6; }
-.dio-badge.is-jackpot { color: #2a1145; background: linear-gradient(135deg, #fff4cf, #e9c766 50%, #c79a3c); }
-.dio-badge.is-jackpot b { color: #2a1145; }
 
 /* Glücksmünze (Lucky Dio als Booster): Münze dreht sich (scaleX), dann Kopf oder Zahl */
 .dio-coin { position: absolute; inset: 0; z-index: 3; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
@@ -6034,14 +5934,9 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 @keyframes dio-fade-out { to { opacity: 0; } }
 
 /* Dungeon: kleine Würfel in der Einblendung */
-.dg-pop.is-dice { display: flex; flex-direction: column; align-items: center; gap: 4px; animation-duration: 2.4s; }
-.dg-pop.is-dice .dio-die { width: 30px; height: 30px; padding: 4px; }
-.dg-pop.is-dice .dio-die i { width: 5px; height: 5px; }
-.dg-pop.is-dice .dio-dice-row { gap: 6px; }
-.dg-pop.is-dice .dio-dice-label { opacity: 1; transform: none; font-size: 12px; }
 .dg-pop.is-coin { color: #ffd68a; font: 700 18px/1.3 Georgia, "Times New Roman", serif; font-variant: small-caps; }
 
 @media (prefers-reduced-motion: reduce) {
-  .dio-dice, .dio-die, .dio-coin, .dio-coin-face, .dio-coin-label, .is-allin.allin-jackpot { animation: none !important; }
+  .dio-coin, .dio-coin-face, .dio-coin-label { animation: none !important; }
   .dio-coin-label { opacity: 1; }
 }

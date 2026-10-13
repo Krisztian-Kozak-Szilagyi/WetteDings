@@ -83,29 +83,11 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 // Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
 const FORKBOMB_STEP = 2;
 
-/**
- * All In (Lucky Dio): der Einsatz zu Beginn – zwei Würfel (2W6). Jedes Auge gibt luck.step % Krit-Chance;
- * Doppelsechs (Fortunas Liebling): die ersten luck.fortuna Runden sind sichere Krits; Schlangenaugen (Verfluchtes
- * Glück): jeder Krit trifft eine Stufe höher. luck.reroll (Casino-Kaffee, Hausvorteil): liegt die Summe darunter,
- * wird einmal neu gewürfelt und der bessere Wurf zählt. Ergebnis: alle Würfe ([[a, b], …]), der letzte zählt.
- */
-function rollDice(l, s, rand) {
-  const roll = () => [1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6)];
-  const sum = (d) => d[0] + d[1];
-  const throws = [roll()];
-  if (l.reroll && sum(throws[0]) < l.reroll) {
-    const again = roll();
-    throws.push(sum(again) > sum(throws[0]) ? again : throws[0]);
-  }
-  const [a, b] = throws[throws.length - 1];
-  s.critBonus += ((a + b) * l.step) / 100;
-  if (a === 6 && b === 6) l.sure = l.fortuna;
-  if (a === 1 && b === 1) l.curse = 1;
-  return throws;
-}
+// Krit-Lotterie (Lucky Dio): so viele Spiel-Sekunden nach dem Angriff folgt der Zusatztreffer aus dem Münzwurf
+const COIN_GAP = 0.3;
 
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, luck: null, coin: null, rand };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, lottery: null, coin: null, rand };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -113,7 +95,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   const totals = keys.map(() => 0);
   const open = () => totals.some((x) => x < required);
   const ticks = [];
-  // Eigenschaften der Karte selbst (passive, z. B. All In) gelten von Anfang an, alle anderen zur Halbzeit
+  // Eigenschaften der Karte selbst (passive, z. B. Krit-Lotterie) gelten von Anfang an, alle anderen zur Halbzeit
   const passive = effects.filter((e) => e.passive);
   const later = effects.filter((e) => !e.passive);
   let applied = later.length === 0;
@@ -134,8 +116,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   };
   if (passive.length) {
     passive.forEach((e) => e.apply(s));
-    const dice = s.luck ? rollDice(s.luck, s, rand) : null;
-    ticks.push(withShown({ t: 0, p: 0, ability: true, ...(dice ? { dice } : {}) }));
+    ticks.push(withShown({ t: 0, p: 0, ability: true }));
   }
   while (open()) {
     let next = t + interval();
@@ -159,31 +140,10 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     }
     if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
     const fake = s.fakeNext;
-    let crit = rand() < CRIT_CHANCE + s.critBonus;
-    // All In (Lucky Dio): Krit direkt nach Krit steigert den Multiplikator (×2, ×3 … bis luck.max, Schlangenaugen +1),
-    // der luck.jackpotAt-te Krit der Quest ist ein Jackpot (mindestens ×luck.jackpot). Fortunas Liebling (Doppelsechs):
-    // die ersten luck.sure Runden sind sichere Krits (lucky). chain = Länge der Krit-Kette – der Browser zeigt sie immer krasser an.
-    let mult = crit ? 2 : 1;
-    let lucky = false;
-    let chain = 0;
-    let jackpot = false;
-    if (s.luck) {
-      const l = s.luck;
-      if (l.sure > 0) {
-        if (!crit) crit = lucky = true;
-        l.sure -= 1;
-      }
-      if (crit) {
-        l.streak += 1;
-        l.crits += 1;
-        chain = l.streak;
-        mult = Math.min(l.max, 1 + l.streak) + l.curse;
-        if (l.crits === l.jackpotAt) {
-          mult = Math.max(mult, l.jackpot);
-          jackpot = true;
-        }
-      } else l.streak = 0;
-    }
+    // Krit-Lotterie (Lucky Dio): jeder Glücks-Token gibt l.step mehr Krit-Chance auf den normalen Angriff
+    const l = s.lottery;
+    const crit = rand() < CRIT_CHANCE + s.critBonus + (l ? l.tokens * l.step : 0);
+    const mult = crit ? 2 : 1;
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
     const factor = ((0.8 + 0.4 * rand()) * mult) / (s.doom ? s.doom.factor : 1);
@@ -197,7 +157,20 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     ps.forEach((p, i) => {
       totals[i] += p;
     });
-    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(mult > 2 ? { mult } : {}), ...(chain ? { chain } : {}), ...(lucky ? { lucky: true } : {}), ...(jackpot ? { jackpot: true } : {}), ...(fake ? { fake: true } : {}) }));
+    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
+    // Nach dem Angriff fliegt die Münze (Chance auf Kopf: l.heads) und bringt einen Zusatztreffer:
+    // Kopf = kritischer Kettentreffer mit der Armbrust (×2 · l.chain), Zahl = Dolchtreffer (×1) und ein Glücks-Token
+    const coinAt = next + COIN_GAP;
+    if (l && open() && used(coinAt) <= WORK_TIME + 1e-9) {
+      const coin = rand() < l.heads ? 'kopf' : 'zahl';
+      const f2 = ((0.8 + 0.4 * rand()) * (coin === 'kopf' ? 2 * l.chain : 1)) / (s.doom ? s.doom.factor : 1);
+      const pc = keys.map((k) => Math.max(1, Math.round(s.stats[k] * f2)));
+      pc.forEach((p, i) => {
+        totals[i] += p;
+      });
+      if (coin === 'zahl') l.tokens += 1;
+      ticks.push(withShown({ t: Math.round(coinAt * 10) / 10, p: pc[0], ...(hybrid ? { p2: pc[1] } : {}), coin, ...(coin === 'kopf' ? { crit: true } : { tokens: l.tokens }) }));
+    }
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
