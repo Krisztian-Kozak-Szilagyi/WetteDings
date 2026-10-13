@@ -8763,6 +8763,7 @@ button.gd-vit-empty b { font-size: 46px; }
 .ge-tier.is-t3 { background: #ffe9a8; box-shadow: 0 0 0 1px #c8932a; }
 .ge-tier.is-t4 { background: linear-gradient(135deg, #6d28d9, #2e1065); color: #fde68a; box-shadow: 0 0 0 1px #f2c14e, 0 0 10px rgba(124, 58, 237, .6); }
 .gs-shop[hidden] { display: none; }
+<<<<<<< Updated upstream
 /* Werkstatt breit: fünf Blöcke (Shop · Ausbau · Werkzeuge · Material · Ruf) in einer Reihe, Fenster entsprechend breiter */
 @media (min-width: 1500px) {
   .gd-sheet.gd-pop.gd-pop-xl { width: min(1560px, calc(100vw - 16px)); }
@@ -8793,3 +8794,14 @@ button.gd-vit-empty b { font-size: 46px; }
 }
 /* Erklärtexte (Tour und ?-Knopf im Werkstatt-Fenster): Zeilenumbrüche aus dem Text übernehmen */
 .gd-info, .gd-tour-bubble p { white-space: pre-line; }
+=======
+/* Inventar-Kachel (TCG): Pack und Gegenstände als aufgefächerter Kartenstapel, beim Darüberfahren rücken sie auseinander */
+.inv-tile-art.inv-tile-minis { display: flex; align-items: center; width: auto; min-width: 52px; padding-left: 4px; }
+.inv-tile-minis img { flex: none; width: 42px; height: 60px; margin-left: -22px; object-fit: cover; border-radius: 4px; box-shadow: 0 5px 12px rgba(0, 0, 0, .5); transform: rotate(var(--fan, 0deg)); transition: margin-left .25s ease, transform .25s ease; }
+.inv-tile-minis img:first-child { margin-left: 0; --fan: -7deg; }
+.inv-tile-minis img:nth-child(2) { --fan: 0deg; position: relative; z-index: 1; }
+.inv-tile-minis img:nth-child(3) { --fan: 7deg; position: relative; z-index: 2; }
+.inv-tile-minis img:nth-child(n+4) { --fan: 12deg; position: relative; z-index: 3; }
+.inv-tile:hover .inv-tile-minis img + img, .inv-tile:focus-visible .inv-tile-minis img + img { margin-left: -8px; }
+@media (prefers-reduced-motion: reduce) { .inv-tile-minis img { transition: none; } }
+>>>>>>> Stashed changes
