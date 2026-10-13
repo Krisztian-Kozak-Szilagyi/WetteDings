@@ -124,6 +124,7 @@ body.bf-platzwahl .bf-feld-card:not(.bf-feld-geist) { pointer-events: none; }
 .raid-hero h1 { color: #ffd68a; text-shadow: 0 0 18px rgba(232, 169, 72, .45); }
 .raid-hero .dg-hero-sub { color: #e4d4ff; }
 .raid-hero .kicker { background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 60%, rgba(168, 85, 247, .14)); }
+.raid-debug { border: 1px dashed rgba(255, 214, 138, .7); color: #ffd68a; background: rgba(13, 5, 26, .55); }
 .raid-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; }
 .raid-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .raid-grid .card h2 { margin-top: 0; }

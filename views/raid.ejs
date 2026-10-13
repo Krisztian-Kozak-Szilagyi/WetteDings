@@ -24,6 +24,13 @@
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn btn-primary" type="submit" <%= canStart ? '' : 'disabled' %>>⚔ Kampf beginnen</button>
           </form>
+          <% if (debugTools) { %>
+            <%# nur Testumgebung (npm run dev) und Admins %>
+            <form method="post" action="/raid/debug/versuche">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost raid-debug" type="submit" title="Nur in der Testumgebung sichtbar">🛠 Versuche auffüllen</button>
+            </form>
+          <% } %>
           <span class="dg-when"><strong><%= tries.left %> von <%= tries.limit %></strong> Versuchen heute übrig</span>
         <% } %>
       </div>

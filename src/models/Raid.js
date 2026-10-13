@@ -18,6 +18,7 @@ const runSchema = new Schema(
     bossMax: Number,
     reward: { geld: { type: Number, default: 0 }, dio: { type: Boolean, default: false } },
     endedAt: { type: Date, default: null },
+    debugFrei: { type: Boolean, default: undefined }, // Testumgebung: zählt nicht mehr als Versuch („Versuche auffüllen“)
   },
   { timestamps: true }
 );

@@ -45,6 +45,7 @@ router.get('/raid', async (req, res) => {
     permanentImDeck: deck.cards.filter((c) => c.kampf.dauer === 'permanent').length,
     maxRounds: s.maxRounds,
     minCards: raid.MIN_CARDS,
+    debugTools: raid.debugTools(req.user),
   });
 });
 
@@ -52,6 +53,18 @@ router.post('/raid/start', async (req, res) => {
   try {
     await raid.start({ user: req.user });
     return res.redirect('/raid/kampf');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/raid');
+});
+
+// Testumgebung (npm run dev, nur Admins): Versuche für heute wieder auffüllen
+router.post('/raid/debug/versuche', async (req, res) => {
+  try {
+    await raid.refillTries({ user: req.user });
+    req.flash('success', 'Debug: Versuche für heute wieder aufgefüllt.');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

@@ -48,7 +48,7 @@ const today = () => toZonedLocalInput(new Date(), config.timezone).slice(0, 10);
 
 /** Versuche heute: { used, left, limit } */
 async function tries(userId) {
-  const used = await RaidRun.countDocuments({ user: userId, day: today() });
+  const used = await RaidRun.countDocuments({ user: userId, day: today(), debugFrei: { $ne: true } });
   return { used, left: Math.max(0, settings.triesPerDay - used), limit: settings.triesPerDay };
 }
 
@@ -160,4 +160,11 @@ const history = (userId) => RaidRun.find({ user: userId, status: { $ne: 'laeuft'
 /** Wer hat Lucky Dio schon erbeutet (für die Raid-Seite) */
 const dioWinners = () => RaidRun.find({ 'reward.dio': true }).sort({ endedAt: -1 }).limit(10).select('username endedAt').lean();
 
-module.exports = { DIO, MIN_CARDS, settings, loadSettings, saveSettings, mayPlay, tries, deckFor, current, start, act, finish, abandon, history, dioWinners };
+/** Nur Testumgebung (npm run dev): die heutigen Kämpfe zählen nicht mehr als Versuch – volle Versuche zum Ausprobieren */
+const debugTools = (user) => config.env === 'development' && !!user && !!user.isAdmin;
+async function refillTries({ user }) {
+  if (!debugTools(user)) throw new UserError('Nur in der Testumgebung verfügbar.');
+  await RaidRun.updateMany({ user: user._id, day: today() }, { $set: { debugFrei: true } });
+}
+
+module.exports = { DIO, MIN_CARDS, settings, loadSettings, saveSettings, mayPlay, tries, debugTools, refillTries, deckFor, current, start, act, finish, abandon, history, dioWinners };
