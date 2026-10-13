@@ -6,6 +6,8 @@
 //   Über dem Avatar laufende Effekte (Ring = verbleibende Runden), unter dem Boss-Leben seine Ankündigung.
 //   Karte 0,5 s unter der Maus = große Vorschau.
 // Zum Ausprobieren in der Konsole: bossfight.zustand() zeigt den Zustand.
+// Raid (body data-raid="1", views/raid-kampf.ejs): entschieden wird auf dem Server – jeder Zug geht an /raid/aktion,
+// zurück kommen die Ereignisse und der neue Zustand (src/raid/raidService.js). Gezeichnet wird genauso wie im Bosskampf.
 (function () {
   var R = window.BossRegeln;
   var hand = document.querySelector('[data-bf-hand]');
@@ -26,6 +28,9 @@
   var handEls = new Map(); // uid -> Element in der Hand
   var gearEls = new Map(); // uid -> Element der Ausrüstung
   var ziel = null; // Druide, der gerade ein Ziel sucht: { uid, el }
+  var raid = document.body.getAttribute('data-raid') === '1';
+  var csrf = document.body.getAttribute('data-csrf') || '';
+  var raidEnde = null; // { sieg, reward } vom Server, sobald der Raid vorbei ist
 
   // ---------- Lebensbalken ----------
   function HpBar(el) {
@@ -346,15 +351,20 @@
         return warte(200);
       case 'runde':
         if (roundEl) roundEl.textContent = 'Runde ' + e.nr;
-        if (e.netz) popup(energieEl || spielerBar.el, 'Netz: −' + e.netz + ' Energie', 'bf-pop-info');
+        if (e.netz) popup(energieEl || spielerBar.el, (raid ? 'Rauch' : 'Netz') + ': −' + e.netz + ' Energie', 'bf-pop-info');
         zeichnenGear();
         return warte(200);
       case 'absicht':
         zeichnenAbsicht();
         return null;
+      case 'muenze':
+        // Münzwurf-Angriff: Kopf trifft mehrfach, Zahl gibt dem Boss einen Glücks-Token (stärkt seine Angriffe)
+        popup(bossBar.el, e.seite === 'kopf' ? 'Kopf! Voller Glückstreffer' : 'Zahl – Glücks-Token ' + e.tokens, e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
+        return warte(650);
       case 'ende':
         if (resultEl) {
-          resultEl.textContent = e.sieg ? 'Sieg!' : 'Niederlage';
+          if (raid) ergebnisRaid(e);
+          else resultEl.textContent = e.sieg ? 'Sieg!' : 'Niederlage';
           resultEl.hidden = false;
         }
         document.body.classList.add('bf-over');
@@ -409,7 +419,8 @@
     if (!absichtEl || !s || !s.absicht) return;
     var a = s.absicht;
     var v = R.vorschau(s);
-    var extra = a.gift ? ' + Gift ' + a.gift.schaden + '×' + a.gift.runden : a.netz ? ' + Netz (−' + a.netz + ' Energie)' : '';
+    var muenze = a.muenze && s.bd && s.bd.muenze ? ' · Münzwurf: Kopf ×' + String(s.bd.muenze.kopfFaktor).replace('.', ',') + ', Zahl = Glücks-Token' : '';
+    var extra = (a.gift ? ' + Gift ' + a.gift.schaden + '×' + a.gift.runden : a.netz ? ' + ' + (raid ? 'Rauch' : 'Netz') + ' (−' + a.netz + ' Energie)' : '') + muenze;
     var trifft = v.aus ? 'ausgesetzt' : v.wert !== a.schaden ? 'trifft dich mit ' + v.wert : '';
     absichtEl.innerHTML = '';
     var b = document.createElement('b');
@@ -419,7 +430,8 @@
     absichtEl.appendChild(document.createTextNode(extra + (trifft ? ' – ' + trifft : '')));
     absichtEl.classList.toggle('bf-intent-schwer', a.schwer);
     absichtEl.classList.toggle('bf-intent-wut', a.wut);
-    absichtEl.title = a.wut ? 'Die Spinne ist wütend: ihre Angriffe sind stärker.' : '';
+    var tok = s.boss && s.boss.tokens ? ' Glücks-Tokens: ' + s.boss.tokens + ' (jeder macht seine Angriffe stärker).' : '';
+    absichtEl.title = (a.wut ? ((s.bd && s.bd.name) || 'Der Boss') + ' ist wütend: seine Angriffe sind stärker.' : '') + tok;
   }
 
   // Laufende Effekte über dem Avatar: Kartenbild im Kreis (Boss-Effekte mit Symbol), Ring = verbleibende Runden
@@ -474,17 +486,67 @@
       if (R.ziele(s, ziel.uid).indexOf(uid) < 0) return nope(handEls.get(uid));
       var druide = ziel.uid;
       zielEnde();
-      return abspielen(R.spielen(s, druide, uid));
+      return zug(function () { return R.spielen(s, druide, uid); }, { a: 'spielen', uid: druide, ziel: uid });
     }
     var ok = R.spielbar(s, uid);
     if (!ok.ok) return abspielen([{ t: 'nein', uid: uid, grund: ok.grund }]);
     if (ok.ziel) return zielStart(uid);
-    abspielen(R.spielen(s, uid));
+    zug(function () { return R.spielen(s, uid); }, { a: 'spielen', uid: uid });
   }
   function klickGear(uid) {
     if (!s || laufend || s.vorbei || ziel) return;
+    if (raid) return zug(null, { a: 'einsetzen', uid: uid });
     var ev = R.einsetzen(s, uid);
     if (ev.length) abspielen(ev);
+  }
+
+  // Ein Zug: im Bosskampf direkt mit den Regeln, im Raid über den Server (der entscheidet und würfelt)
+  function zug(lokal, aktion) {
+    if (!raid) return abspielen(lokal());
+    laufend = true;
+    if (endBtn) endBtn.disabled = true;
+    var body = new URLSearchParams({ _csrf: csrf, a: aktion.a });
+    if (aktion.uid != null) body.set('uid', aktion.uid);
+    if (aktion.ziel != null) body.set('ziel', aktion.ziel);
+    return fetch('/raid/aktion', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.error) throw new Error(res.error);
+        s = vomServer(res.state);
+        if (res.ende) raidEnde = res.ende;
+        laufend = false;
+        return abspielen(res.ev);
+      })
+      .catch(function (err) {
+        laufend = false;
+        zeichnen();
+        popup(spielerBar.el, err.message || 'Der Zug kam nicht an – bitte die Seite neu laden.', 'bf-pop-info');
+      });
+  }
+  // Zustand vom Server: der Nachziehstapel kommt nur als Anzahl (die Reihenfolge bleibt geheim)
+  function vomServer(st) {
+    st.deck = new Array(st.deck || 0);
+    return st;
+  }
+  // Ende im Raid: Ergebnis und Belohnung, zurück zur Raid-Seite
+  function ergebnisRaid(e) {
+    var r = (raidEnde && raidEnde.reward) || {};
+    resultEl.innerHTML = '';
+    var h = document.createElement('div');
+    h.className = 'bf-result-titel';
+    h.textContent = e.sieg ? 'Lucky Dio besiegt!' : e.flucht ? 'Lucky Dio ist entkommen' : 'Niederlage';
+    resultEl.appendChild(h);
+    var p = document.createElement('div');
+    p.className = 'bf-result-text';
+    var euro = function (c) { return (c / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }); };
+    p.textContent = e.sieg ? (r.geld ? euro(r.geld) + ' Beute' : 'Sieg') + (r.dio ? ' – und er hat seine Karte fallen lassen: Lucky Dio ist jetzt in deinem Album!' : ' – seine Karte hat er diesmal behalten.') : 'Versuch es mit einem anderen Deck oder einem besseren Plan noch einmal.';
+    resultEl.appendChild(p);
+    var a = document.createElement('a');
+    a.className = 'bf-result-link';
+    a.href = '/raid';
+    a.textContent = 'Zurück zum Raid';
+    resultEl.appendChild(a);
+    if (r.dio) document.body.classList.add('bf-dio-drop');
   }
 
   // Druide: Zielkarte wählen (gültige Ziele leuchten, die anderen werden blass)
@@ -519,10 +581,43 @@
     endBtn.addEventListener('click', function () {
       if (!s || laufend || s.vorbei) return;
       zielEnde();
-      abspielen(R.rundeEnde(s));
+      zug(function () { return R.rundeEnde(s); }, { a: 'ende' });
     });
   }
   window.addEventListener('resize', layout);
+
+  // ---------- Start im Raid: laufenden Kampf vom Server laden ----------
+  if (raid) {
+    if (endBtn) endBtn.disabled = true;
+    fetch('/raid/zustand', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) throw new Error(data.error);
+        s = vomServer(data.state);
+        bossBar.setMax(s.boss.max);
+        bossBar.set(s.boss.hp);
+        spielerBar.setMax(s.spieler.max);
+        spielerBar.set(s.spieler.hp);
+        if (data.ev && data.ev.length) {
+          // erster Aufruf: Startkarten ziehen lassen
+          var hand0 = s.hand;
+          s.hand = [];
+          zeichnen();
+          s.hand = hand0;
+          setTimeout(function () { abspielen(data.ev); }, 300);
+        } else {
+          s.hand.forEach(function (inst) { var el = handKarte(inst); el.classList.remove('bf-flipped'); hand.appendChild(el); });
+          zeichnen();
+          layout();
+        }
+      })
+      .catch(function (err) {
+        console.error(err);
+        hint('Der Kampf konnte nicht geladen werden. <a href="/raid">Zurück zum Raid</a>');
+      });
+    window.bossfight = { zustand: function () { return s; }, regeln: R };
+    return;
+  }
 
   // ---------- Start: zuletzt geändertes Deck laden ----------
   bossBar.setMax(R.SPINNE.hp);

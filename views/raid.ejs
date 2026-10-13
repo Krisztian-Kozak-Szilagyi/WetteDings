@@ -1,0 +1,99 @@
+<%- include('partials/head') %>
+<link rel="stylesheet" href="/css/raid.css?v=<%= assetVersion %>">
+<%
+  // Raid gegen Lucky Dio: Übersicht vor dem Kampf (src/routes/raid.js). Gekämpft wird auf /raid/kampf.
+  const RESULT = { sieg: 'Sieg', niederlage: 'Niederlage', aufgegeben: 'Aufgegeben' };
+  const canStart = !running && tries.left > 0 && deck.playable;
+%>
+
+<section class="raid-hero">
+  <div>
+    <h1>Raid: Lucky Dio</h1>
+    <p>Der Glücksspieler mit Handarmbrust und Dolch hat sich in der Stadt verschanzt. Stell ein Deck aus deinen Karten zusammen und besiege ihn in einem rundenbasierten Kampf – nur wer ihn schlägt, hat die Chance, seine Karte zu erbeuten. Planen zählt mehr als die Sammlung: Dio kündigt jeden Angriff eine Runde vorher an.</p>
+    <div class="raid-hero-actions">
+      <% if (running) { %>
+        <a class="btn btn-primary btn-lg" href="/raid/kampf">Kampf fortsetzen (Runde <%= running.runde %>)</a>
+        <span class="raid-tries">Dio: <%= running.bossHp %>/<%= running.bossMax %> · Du: <%= running.spielerHp %> Leben</span>
+      <% } else { %>
+        <form method="post" action="/raid/start">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn btn-primary btn-lg" type="submit" <%= canStart ? '' : 'disabled' %>>⚔ Kampf beginnen</button>
+        </form>
+        <span class="raid-tries"><%= tries.left %> von <%= tries.limit %> Versuchen heute übrig</span>
+      <% } %>
+    </div>
+    <% if (!running && !deck.playable) { %><p class="raid-problem"><%= deck.problem %> <a href="/deck">Zum Deckbau</a></p><% } %>
+  </div>
+  <% if (dio) { %><img class="raid-hero-card" src="<%= dio.image %>" alt="Karte Lucky Dio" width="720" height="1008"><% } %>
+</section>
+
+<div class="raid-grid">
+  <section class="card">
+    <h2>Dein Deck</h2>
+    <% if (!deck.deck) { %>
+      <p class="muted">Du hast noch kein Deck. <a href="/deck">Jetzt eins bauen</a> – 30 Karten, höchstens 2 gleiche.</p>
+    <% } else { %>
+      <p>„<%= deck.deck.name %>“ · <%= deck.deck.check.size %> Karten, davon <strong><%= deck.cards.length %></strong> im Raid spielbar (mindestens <%= minCards %>).</p>
+      <ul class="raid-roles"><% Object.entries(roles).forEach(([r, n]) => { %><li><%= n %>× <%= r %></li><% }) %></ul>
+      <p class="muted small">Im Raid kämpfen deine Charakterkarten. Jede hat eine Rolle nach ihrem stärksten IHK-Wert: <strong>FIA → Angreifer</strong> (Schaden), <strong>FIS → Verteidiger</strong> (blockt Dios nächsten Angriff), <strong>BWL → Heiler</strong>. Jede Karte kostet Energie, du hast <%= spieler.energie %> pro Runde. Items wie Kaffee spielen nicht mit.</p>
+      <a class="btn btn-ghost btn-sm" href="/deck">Deck bearbeiten</a>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <h2>Lucky Dio</h2>
+    <p><strong><%= boss.hp %> Leben</strong> · du hast <%= spieler.hp %> Leben · höchstens <%= maxRounds %> Runden, dann entkommt er.</p>
+    <div class="table-wrap">
+      <table class="table raid-attacks">
+        <thead><tr><th>Angriff</th><th class="num">Schaden</th><th>Besonderes</th></tr></thead>
+        <tbody>
+          <% angriffe.forEach((a) => { %>
+            <tr>
+              <td><%= a.name %><% if (a.schwer) { %><span class="raid-tag">schwer</span><% } %></td>
+              <td class="num"><%= a.min %>–<%= a.max %></td>
+              <td class="small"><%= a.muenze ? `Münzwurf: Kopf ×${(boss.kopfFaktor / 100).toLocaleString('de-DE')}, Zahl = Glücks-Token (+${boss.tokenProzent} % auf alle folgenden Angriffe)` : a.gift ? `Gift: ${a.gift} Schaden, ${a.giftRunden} Runden` : a.netz ? `Rauch: nächste Runde −${a.netz} Energie` : a.schwer ? 'nie zweimal hintereinander' : '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted small">Ab <%= boss.wutAb %> % Leben wird Dio wütend: mehr Schaden, und schwere Angriffe kommen doppelt so oft.</p>
+  </section>
+
+  <section class="card">
+    <h2>Beute</h2>
+    <p>Jeder Sieg bringt <strong><%= euro(belohnung.geld) %></strong>. Mit <strong><%= String(belohnung.dioChance).replace('.', ',') %> %</strong> Chance lässt Dio dazu seine Karte fallen – <strong>Lucky Dio</strong> gibt es nur hier.</p>
+    <% if (winners.length) { %>
+      <h3 class="small">Lucky Dio erbeutet haben</h3>
+      <ul class="small"><% winners.forEach((w) => { %><li><%- userLink(w.username) %> · <%= date(w.endedAt) %></li><% }) %></ul>
+    <% } else { %>
+      <p class="muted small">Noch hat niemand Dios Karte erbeutet.</p>
+    <% } %>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Deine letzten Kämpfe</h2>
+  <% if (!history.length) { %>
+    <p class="muted">Noch keine Kämpfe gegen Lucky Dio.</p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Wann</th><th>Ergebnis</th><th class="num">Runden</th><th class="num">Dio übrig</th><th>Beute</th></tr></thead>
+        <tbody>
+          <% history.forEach((h) => { %>
+            <tr>
+              <td class="nowrap"><%= date(h.createdAt) %></td>
+              <td><span class="raid-result is-<%= h.status %>"><%= RESULT[h.status] %></span></td>
+              <td class="num"><%= h.runde %></td>
+              <td class="num"><%= h.bossHp %>/<%= h.bossMax %></td>
+              <td><%= h.reward && h.reward.geld ? euro(h.reward.geld) : '–' %><%= h.reward && h.reward.dio ? ' + Lucky Dio!' : '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<%- include('partials/foot') %>

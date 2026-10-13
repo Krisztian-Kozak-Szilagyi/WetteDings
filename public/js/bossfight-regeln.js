@@ -72,7 +72,7 @@
       runde: 1,
       energie: sp.energie,
       spieler: { hp: sp.hp, max: sp.hp },
-      boss: { hp: bd.hp, max: bd.hp },
+      boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Münzwurf-Angriff, z. B. Lucky Dio)
       deck: [],
       hand: [],
       gear: [], // { uid, card, used, hits, bonus }
@@ -98,7 +98,7 @@
     var k = {};
     for (var key in s) if (Object.prototype.hasOwnProperty.call(s, key)) k[key] = s[key];
     k.spieler = { hp: s.spieler.hp, max: s.spieler.max };
-    k.boss = { hp: s.boss.hp, max: s.boss.max };
+    k.boss = { hp: s.boss.hp, max: s.boss.max, tokens: s.boss.tokens || 0 };
     k.deck = s.deck.slice();
     k.hand = s.hand.map(function (i) { return { uid: i.uid, card: i.card, buffs: i.buffs.slice() }; });
     k.gear = s.gear.map(function (g) { return { uid: g.uid, card: g.card, used: g.used, hits: g.hits, bonus: g.bonus }; });
@@ -124,7 +124,10 @@
     }
     var schaden = wuerfel(s, a.schaden[0], a.schaden[1]);
     if (wut) schaden = Math.round(schaden * s.bd.wutFaktor);
-    return { key: a.key, name: a.name, schaden: schaden, gift: a.gift || null, netz: a.netz || 0, schwer: !!a.schwer, wut: wut };
+    // Glücks-Tokens (Münzwurf): jeder macht alle folgenden Angriffe stärker
+    var tok = s.boss.tokens || 0;
+    if (tok && s.bd.muenze) schaden = Math.round(schaden * (1 + (tok * s.bd.muenze.tokenProzent) / 100));
+    return { key: a.key, name: a.name, schaden: schaden, gift: a.gift || null, netz: a.netz || 0, schwer: !!a.schwer, wut: wut, muenze: !!a.muenze };
   }
 
   // ---------- Werte einer Karte (mit Stärkungen) ----------
@@ -340,6 +343,14 @@
     var ev = [];
     if (s.vorbei) return ev;
     var a = s.absicht;
+    // Münzwurf-Angriff (s.bd.muenze): erst beim Ausführen entscheidet die Münze – Kopf: der Angriff trifft
+    // kopfFaktor-fach, Zahl: normaler Schaden und der Boss bekommt einen Glücks-Token (stärkt alle folgenden Angriffe)
+    if (a && a.muenze && s.bd.muenze && !effekteVon(s, 'betaeubt').length) {
+      var kopf = s.rng() < s.bd.muenze.kopfChance;
+      if (kopf) a = s.absicht = Object.assign({}, a, { schaden: Math.round(a.schaden * s.bd.muenze.kopfFaktor), kopf: true });
+      else s.boss.tokens = (s.boss.tokens || 0) + 1;
+      ev.push({ t: 'muenze', seite: kopf ? 'kopf' : 'zahl', tokens: s.boss.tokens });
+    }
     var v = vorschau(s);
     ev.push({ t: 'bossangriff', absicht: a, roh: v.roh, wert: v.wert, details: v.details, aus: v.aus, schild: !!v.schild });
     if (!v.aus) {

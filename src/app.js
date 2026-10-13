@@ -94,6 +94,7 @@ function createApp() {
     lotteryTime: config.lotteryTime,
     ihkOpen: () => ihkSettings.open, // IHK für alle freigegeben? (Admin-Panel)
     dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
+    raidOpen: () => require('./raid/raidService').settings.open, // Raid gegen Lucky Dio für alle freigegeben?
     esportsOpen: (user) => !!user && require('./dungeon/dungeonService').towerOpen(user), // eSports hängt am Mage Tower
     blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
@@ -253,6 +254,7 @@ function createApp() {
   app.use(require('./routes/grading'));
   app.use(require('./routes/deck'));
   app.use(require('./routes/bossfight'));
+  app.use(require('./routes/raid'));
   app.use(require('./routes/shopDemo'));
 
   app.use((req, res) => {

@@ -18,7 +18,8 @@
     "dev:tests": "node scripts/dev-tests.js",
     "test": "node --test",
     "webp": "node scripts/webp.js",
-    "sim:bosskampf": "node scripts/bossfight-sim.js"
+    "sim:bosskampf": "node scripts/bossfight-sim.js",
+    "sim:raid": "node scripts/raid-sim.js"
   },
   "engines": {
     "node": ">=20"

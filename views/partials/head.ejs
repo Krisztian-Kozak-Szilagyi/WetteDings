@@ -63,6 +63,7 @@
         const dungeonItem = { href: '/dungeon', label: 'Dungeon', active: currentPath === '/dungeon' || currentPath.startsWith('/dungeon/'), badges: [] };
         navItems.push(esportsOpen(currentUser) ? navGroup('dungeon', 'Dungeon', [dungeonItem, { href: '/esports', label: 'eSports', active: currentPath === '/esports', badges: [] }]) : dungeonItem);
       }
+      if (raidOpen() || currentUser.isAdmin) navItems.push({ href: '/raid', label: 'Raid', active: currentPath === '/raid' || currentPath.startsWith('/raid/'), badges: [] });
       if (gradingOpen() || currentUser.isAdmin) navItems.push({ href: '/grading', label: 'Grading', active: currentPath === '/grading', badges: [] });
       const forumBadges = [];
       if (forumOther) forumBadges.push({ n: forumOther, cls: 'nav-badge-market', title: 'Neues im Forum', aria: forumOther + ' Themen mit neuen Beiträgen' });
