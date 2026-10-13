@@ -7,8 +7,9 @@
 // Raster: Zelle (x, y) → Bildschirm ((x − y)·32, (x + y)·16); Wand 'n' liegt bei y = 0, Wand 'w' bei x = 0.
 (function () {
   const root = document.querySelector('[data-shop-root]');
-  if (!root || !window.Phaser || !window.ShopLayout) return;
+  if (!root || !window.Phaser || !window.ShopLayout || !window.ShopCustomers) return;
   const L = window.ShopLayout;
+  const C = window.ShopCustomers;
   const $ = (sel) => document.querySelector(sel);
 
   const TW = 32; // halbe Kachelbreite
@@ -124,17 +125,17 @@
     ['ware', 'Ware bestellen'],
     ['preise', 'Preise'],
     ['bestand', 'Bestand'],
-    '–',
-    ['ruf', 'Ruf'],
     ['verkauf', 'Verkäufe / Tag'],
     ['bewertungen', 'Bewertungen'],
     ['belege', 'Belege'],
+    '–',
+    ['ruf', 'Ruf'],
     ['lizenzen', 'Lizenzen'],
     ['kleidung', 'Kleidung'],
     ['propaganda', 'Propaganda drucken'],
     ['level', 'Level'],
   ];
-  const LATER = ['ruf', 'verkauf', 'bewertungen', 'belege', 'lizenzen', 'kleidung', 'propaganda', 'level'];
+  const LATER = ['ruf', 'lizenzen', 'kleidung', 'propaganda', 'level'];
 
   function openPc() {
     const dlg = $('[data-shop-pc]');
@@ -161,6 +162,9 @@
     else if (pcTab === 'ware') pcWare(body);
     else if (pcTab === 'preise') pcPreise(body);
     else if (pcTab === 'bestand') pcBestand(body);
+    else if (pcTab === 'verkauf') pcVerkauf(body);
+    else if (pcTab === 'bewertungen') pcBewertungen(body);
+    else if (pcTab === 'belege') pcBelege(body);
     else body.appendChild(el('p', 'sd-later', 'Kommt später – hier ist erst der Platz vorgesehen.'));
     body.scrollTop = keep;
     return dlg;
@@ -460,6 +464,7 @@
       this.prompt = this.add.text(0, 0, '', { fontSize: '12px', color: '#fff3c8', backgroundColor: '#1c1f2bdd', padding: { x: 6, y: 3 } })
         .setOrigin(0.5, 1).setDepth(30000).setResolution(2);
       this.items = [];
+      this.bubbles = [];
       this.labels = [];
       this.extra = [];
       this.hulls = [];
@@ -512,14 +517,334 @@
       drawAll();
     },
     update: function (time, dt) {
-      walk(this.keys, Math.min(dt, 50) / 1000);
+      const sec = Math.min(dt, 50) / 1000;
+      walk(this.keys, sec);
+      tickDay(sec);
+      drawCustomers();
       drawHero();
+      this.clockT = (this.clockT || 0) + sec;
+      if (this.clockT > 0.5) { this.clockT = 0; refreshClock(); }
       const cam = this.cameras.main;
       const p = iso(player.x, player.y);
       cam.scrollX += (p.x - cam.width / 2 - cam.scrollX) * 0.12;
       cam.scrollY += (p.y - 40 - cam.height / 2 - cam.scrollY) * 0.12;
     },
   };
+
+  // ---------- Öffnungstag & Kunden ----------
+  // Der Tag läuft nur im Browser: Kunden kommen zu festen Zeitpunkten, laufen auf Rasterwegen (ShopCustomers.path)
+  // zu Regalen, entscheiden (ShopCustomers.shop), stellen sich an die Kasse und warten, bis man sie mit E kassiert.
+  // Jeder Abschluss/Abgang geht sofort an den Server (checkout/leave); nach Ladenschluss und wenn alle weg sind: closeDay.
+  const CUSTOMER_SPEED = 2.4;
+  const LOOK_SECONDS = 1.2;
+  const COLORS = [0xd0503a, 0x3aa0a0, 0x9a5ad0, 0xd09a2a, 0x5a8a3a, 0xc05a8a, 0x4a6ad0];
+  const day = { t: 0, rng: null, queue: [], customers: [], nextId: 1, closing: false };
+  const reserved = {}; // "uid|ware" → Stück, die Kunden schon im Korb haben
+
+  const resKey = (uid, ware) => uid + '|' + ware;
+  function freeStock(it, ware) {
+    return Math.max(0, ((it.stock && it.stock[ware]) || 0) - (reserved[resKey(it.uid, ware)] || 0));
+  }
+  function release(c) {
+    (c.basket || []).forEach((b) => {
+      const k = resKey(b.uid, b.ware);
+      reserved[k] = Math.max(0, (reserved[k] || 0) - b.qty);
+    });
+  }
+  function shopStock() {
+    return state.items.reduce((a, it) => a + L.used(it), 0);
+  }
+  const holders = () => state.items.filter((it) => catalog[it.id].holds);
+  const counter = () => state.items.find((it) => it.id === L.PC_ID);
+
+  function openDay() {
+    if (state.open) return;
+    if (!act(doAct('openDay'))) return;
+    day.t = 0;
+    day.rng = C.rngFrom((Date.now() ^ (state.day * 7919)) >>> 0);
+    day.queue = C.arrivals(C.customersPerDay(C.rating(state.reviews)), day.rng);
+    day.customers = [];
+    day.closing = false;
+    Object.keys(reserved).forEach((k) => delete reserved[k]);
+  }
+
+  function tickDay(sec) {
+    if (!state || !state.open || !day.rng) return;
+    day.t += sec;
+    const frac = day.t / C.DAY_SECONDS;
+    while (day.queue.length && day.queue[0] <= frac) {
+      day.queue.shift();
+      spawn();
+    }
+    day.customers.forEach((c) => tickCustomer(c, sec));
+    day.customers.forEach((c) => { if (c.gone && c.g) c.g.destroy(); });
+    day.customers = day.customers.filter((c) => !c.gone);
+    if (frac >= 1 && !day.customers.length && !day.closing) {
+      day.closing = true;
+      const n = state.day;
+      if (act(doAct('closeDay'))) note('Tag ' + n + ' ist vorbei – der Bericht liegt am PC.');
+    }
+  }
+
+  function spawn() {
+    const c = C.newCustomer(day.rng, goodsList, 1);
+    const sx = Math.floor(day.rng() * state.units * L.UNIT_W);
+    Object.assign(c, {
+      id: day.nextId++, x: sx + 0.5, y: L.UNIT_D + L.SIDEWALK - 0.4, path: [], phase: 'enter', wait: 0,
+      color: COLORS[Math.floor(day.rng() * COLORS.length)], seen: [], visit: [], bubble: '', bubbleT: 0, basket: [],
+    });
+    const door = L.DOOR[Math.floor(day.rng() * L.DOOR.length)];
+    goTo(c, new Set([door.x + ',' + door.y]));
+    // Regale, die er ansehen will: mit Wunschware zuerst, dann zufällige, höchstens 3
+    const all = holders();
+    const withWish = all.filter((it) => c.wish && freeStock(it, c.wish) > 0);
+    const rest = all.filter((it) => !withWish.includes(it)).sort(() => day.rng() - 0.5);
+    c.visit = withWish.slice(0, 2).concat(rest).slice(0, 3).map((it) => it.uid);
+    day.customers.push(c);
+  }
+
+  function goTo(c, goals) {
+    const start = { x: Math.floor(c.x), y: Math.floor(c.y) };
+    const p = goals.size ? C.path(state, catalog, start, goals, blockSet) : null;
+    c.path = p || [];
+    return !!p;
+  }
+
+  function say(c, text, sec) {
+    c.bubble = text;
+    c.bubbleT = sec || 2.5;
+  }
+
+  function nextLeg(c) {
+    while (c.visit.length) {
+      const it = state.items.find((i) => i.uid === c.visit[0]);
+      if (it && goTo(c, C.approach(state, catalog, it, blockSet))) { c.phase = 'look'; c.lookAt = it.uid; return; }
+      c.visit.shift();
+    }
+    decide(c);
+  }
+
+  function decide(c) {
+    // Angebote aus den angesehenen Regalen (ohne schon reservierte Stücke)
+    const offers = [];
+    c.seen.forEach((uid) => {
+      const it = state.items.find((i) => i.uid === uid);
+      if (!it || !it.stock) return;
+      Object.keys(it.stock).forEach((w) => offers.push({ uid: uid, ware: w, qty: freeStock(it, w), price: L.price(state, goods, w) }));
+    });
+    const r = C.shop(c, offers, goods, day.rng);
+    c.result = r;
+    c.basket = r.basket;
+    c.basket.forEach((b) => { reserved[resKey(b.uid, b.ware)] = (reserved[resKey(b.uid, b.ware)] || 0) + b.qty; });
+    if (r.missWish) say(c, 'Habt ihr ' + goods[c.wish].name + '?', 3);
+    else if (r.tooExpensive.length && !r.basket.length) say(c, 'Viel zu teuer!', 2.5);
+    else if (r.stars < 5 && r.basket.length) say(c, 'Hmm, teuer …', 2);
+    if (r.basket.length) { c.phase = 'queue'; c.wait = 0; queueUp(c); }
+    else leave(c, C.review(r, shopStock(), day.rng));
+  }
+
+  /** Warteplätze an der Kasse: freie Zellen neben der Theke, dann dahinter */
+  function queueSpots() {
+    const pc = counter();
+    if (!pc) return [];
+    const first = Array.from(C.approach(state, catalog, pc, blockSet));
+    const spots = first.slice();
+    const seen = new Set(first);
+    for (let i = 0; i < spots.length && spots.length < 12; i++) {
+      const [x, y] = spots[i].split(',').map(Number);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const k = x + dx + ',' + (y + dy);
+        if (!seen.has(k) && y + dy < L.UNIT_D && C.walkableCell(state, blockSet, x + dx, y + dy)) { seen.add(k); spots.push(k); }
+      });
+    }
+    return spots;
+  }
+
+  function queueUp(c) {
+    const waiting = day.customers.filter((o) => o.phase === 'queue' && o !== c);
+    const spots = queueSpots();
+    const spot = spots[Math.min(waiting.length, spots.length - 1)];
+    if (!spot) { release(c); leave(c, null); return; }
+    goTo(c, new Set([spot]));
+  }
+
+  function leave(c, rev, kind) {
+    c.phase = 'leave';
+    const miss = c.result && c.result.missWish ? c.wish : '';
+    if (kind !== 'paid') act(doAct('leave', Object.assign({ miss: miss }, rev || {})));
+    const exits = new Set();
+    for (let x = 0; x < state.units * L.UNIT_W; x++) exits.add(x + ',' + (L.UNIT_D + L.SIDEWALK - 1));
+    if (!goTo(c, exits)) c.gone = true;
+  }
+
+  function firstInLine() {
+    return day.customers
+      .filter((c) => c.phase === 'queue' && !c.path.length)
+      .sort((a, b) => b.wait - a.wait)[0] || null;
+  }
+
+  function serve(c) {
+    const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
+    const rev = C.review(c.result, shopStock(), day.rng);
+    release(c);
+    const total = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
+    act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '' }, rev || {})));
+    say(c, '+' + fmt(total) + ' Kanacoin', 2);
+    leave(c, null, 'paid');
+  }
+
+  function tickCustomer(c, sec) {
+    if (c.bubbleT > 0) { c.bubbleT -= sec; if (c.bubbleT <= 0) c.bubble = ''; }
+    if (c.path.length) {
+      const n = c.path[0];
+      const tx = n.x + 0.5;
+      const ty = n.y + 0.5;
+      const dx = tx - c.x;
+      const dy = ty - c.y;
+      const d = Math.hypot(dx, dy);
+      const stepLen = CUSTOMER_SPEED * sec;
+      if (d <= stepLen) { c.x = tx; c.y = ty; c.path.shift(); } else { c.x += (dx / d) * stepLen; c.y += (dy / d) * stepLen; }
+      return;
+    }
+    if (c.phase === 'enter') { nextLeg(c); return; }
+    if (c.phase === 'look') {
+      c.wait += sec;
+      if (c.wait >= LOOK_SECONDS) {
+        c.wait = 0;
+        c.seen.push(c.lookAt);
+        c.visit.shift();
+        nextLeg(c);
+      }
+      return;
+    }
+    if (c.phase === 'queue') {
+      c.wait += sec;
+      if (c.wait >= C.PATIENCE) {
+        release(c);
+        say(c, 'Zu lange gewartet!', 2.5);
+        leave(c, C.angryReview());
+      }
+      return;
+    }
+    if (c.phase === 'leave') c.gone = true;
+  }
+
+  function drawCustomers() {
+    scene.bubbles.forEach((b) => b.setVisible(false));
+    day.customers.forEach((c, i) => {
+      if (!c.g) c.g = scene.add.graphics();
+      const g = c.g;
+      g.clear();
+      g.setDepth((c.x + c.y) * 10 + 0.4);
+      const p = iso(c.x, c.y);
+      g.fillStyle(0x000000, 0.25);
+      g.fillEllipse(p.x, p.y, 22, 10);
+      g.fillStyle(c.color, 1);
+      g.fillRoundedRect(p.x - 8, p.y - 30, 16, 26, 6);
+      g.fillStyle(0xe8c09a, 1);
+      g.fillCircle(p.x, p.y - 37, 8);
+      if (c.basket.length && c.phase !== 'leave') { g.fillStyle(0xf0d48a, 1); g.fillRect(p.x + 6, p.y - 20, 8, 7); }
+      if (c.phase === 'queue' && !c.path.length) {
+        const left = Math.max(0, 1 - c.wait / C.PATIENCE);
+        g.fillStyle(0x000000, 0.6);
+        g.fillRect(p.x - 12, p.y - 52, 24, 4);
+        g.fillStyle(left > 0.5 ? 0x4fd17a : left > 0.25 ? 0xe0b040 : 0xe0525a, 1);
+        g.fillRect(p.x - 12, p.y - 52, 24 * left, 4);
+      }
+      if (c.bubble) {
+        let b = scene.bubbles[i];
+        if (!b) {
+          b = scene.add.text(0, 0, '', { fontSize: '11px', color: '#1c1f2b', backgroundColor: '#fff3c8', padding: { x: 5, y: 2 } })
+            .setOrigin(0.5, 1).setDepth(29000).setResolution(2);
+          scene.bubbles[i] = b;
+        }
+        b.setText(c.bubble).setPosition(p.x, p.y - 56).setVisible(true);
+      }
+    });
+  }
+
+  function refreshClock() {
+    const elc = $('[data-shop-clock]');
+    if (!elc) return;
+    const r = C.rating(state.reviews);
+    const stars = '★ ' + r.toLocaleString('de-DE', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+    if (state.open && day.rng) {
+      const frac = day.t / C.DAY_SECONDS;
+      elc.textContent = 'Tag ' + state.day + ' · ' + (frac >= 1 ? 'Ladenschluss' : C.clock(frac) + ' · geöffnet') + ' · ' + stars;
+    } else elc.textContent = 'Tag ' + state.day + ' · geschlossen · ' + stars;
+  }
+
+  let noteTimer = 0;
+  function note(msg) {
+    const n = $('[data-shop-note]');
+    n.textContent = msg;
+    n.hidden = false;
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => { n.hidden = true; }, 6000);
+  }
+
+  // ---------- PC: Berichte ----------
+  function stars(n) {
+    return n === null || n === undefined ? '–' : n.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' ★';
+  }
+
+  function pcVerkauf(body) {
+    const reps = state.reports.slice().reverse();
+    if (!reps.length) { body.appendChild(el('p', 'sd-later', 'Noch kein Tag abgeschlossen. Öffne den Laden an der Tür.')); return; }
+    const { t, tb } = table([['Tag'], ['Kunden', 1], ['Käufer', 1], ['Einnahmen', 1], ['Bewertung', 1]]);
+    reps.forEach((r) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', 'Tag ' + r.day + (r.aborted ? ' (abgebrochen)' : '')));
+      tr.appendChild(el('td', 'num', String(r.visitors)));
+      tr.appendChild(el('td', 'num', String(r.buyers)));
+      tr.appendChild(el('td', 'num', fmt(r.revenue)));
+      tr.appendChild(el('td', 'num', stars(r.stars)));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+    const last = reps[0];
+    body.appendChild(el('div', 'sd-group', 'Tag ' + last.day + ': verkauft'));
+    const sold = Object.keys(last.sold || {});
+    body.appendChild(el('p', 'sd-later', sold.length ? sold.map((w) => last.sold[w] + '× ' + goods[w].name).join(', ') : 'Nichts.'));
+    const miss = Object.keys(last.misses || {});
+    if (miss.length) {
+      body.appendChild(el('div', 'sd-group', 'Gesucht, aber nicht gefunden'));
+      body.appendChild(el('p', 'sd-later', miss.map((w) => goods[w].name + ' (' + last.misses[w] + '×)').join(', ')));
+    }
+  }
+
+  function pcBewertungen(body) {
+    const r = C.rating(state.reviews);
+    const n = state.reviews.slice(-C.REVIEW_WINDOW).length;
+    body.appendChild(el('p', '', 'Durchschnitt: ' + stars(Math.round(r * 10) / 10) + (n ? ' aus den letzten ' + n + ' Bewertungen' : ' (neuer Laden)') +
+      ' · erwartet ca. ' + C.customersPerDay(r) + ' Kunden pro Tag'));
+    const list2 = state.reviews.slice().reverse();
+    if (!list2.length) return;
+    const { t, tb } = table([['Tag'], ['Sterne'], ['Kommentar']]);
+    list2.forEach((v) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', 'Tag ' + v.day));
+      tr.appendChild(el('td', '', '★'.repeat(v.stars) + '☆'.repeat(5 - v.stars)));
+      tr.appendChild(el('td', '', v.text));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+  }
+
+  function pcBelege(body) {
+    const src = state.open ? { day: state.day, receipts: state.today.receipts } : state.reports[state.reports.length - 1];
+    if (!src || !src.receipts || !src.receipts.length) { body.appendChild(el('p', 'sd-later', 'Noch keine Belege.')); return; }
+    body.appendChild(el('div', 'sd-group', 'Tag ' + src.day));
+    const { t, tb } = table([['#'], ['Waren'], ['Summe', 1]]);
+    src.receipts.slice().reverse().forEach((r, i) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', String(src.receipts.length - i)));
+      tr.appendChild(el('td', '', r.lines.map((l) => l.qty + '× ' + goods[l.ware].name + ' à ' + fmt(l.price)).join(', ')));
+      tr.appendChild(el('td', 'num', fmt(r.total)));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+  }
 
   // ---------- Figur ----------
   let blockSet = new Set();
@@ -609,7 +934,13 @@
     const pc = near.find((o) => o.it.id === 'cashier_counter');
     const holders = near.filter((o) => catalog[o.it.id].holds);
     let t = null;
-    if (h && h.kind === 'moebel') {
+    const waiting = pc && state.open ? firstInLine() : null;
+    const atDoor = !state.open && L.DOOR.some((d) => Math.hypot(d.x + 0.5 - player.x, d.y + 1 - player.y) < 1.3);
+    if (waiting) {
+      t = { label: 'E: Kunde kassieren', run: () => serve(waiting) };
+    } else if (atDoor && !h) {
+      t = { label: 'E: Laden öffnen (Tag ' + state.day + ')', run: openDay };
+    } else if (h && h.kind === 'moebel') {
       t = { label: 'E: ' + catalog[h.id].name + ' aufbauen', run: () => { mode = { kind: 'build', id: h.id, rot: 0 }; selected = null; refresh(); } };
     } else if (h) {
       const fit = holders.find((o) => catalog[o.it.id].holds.includes(h.id) && L.used(o.it) < catalog[o.it.id].slots);
@@ -761,6 +1092,7 @@
 
   function refresh() {
     refreshHud();
+    refreshClock();
     drawAll();
     if (scene) findTarget();
     if ($('[data-shop-pc]').open) renderPc();
@@ -827,6 +1159,9 @@
       selected = null;
       player.x = 4;
       player.y = L.UNIT_D + 0.8;
+      day.customers.forEach((c) => { if (c.g) c.g.destroy(); });
+      day.customers = [];
+      day.rng = null;
       act(doAct('reset'));
     });
   });
@@ -848,6 +1183,8 @@
       catalog = Object.fromEntries(list.map((d) => [d.id, d]));
       goods = Object.fromEntries(goodsList.map((g) => [g.id, g]));
       refreshHud();
+      // Ein offener Tag kann nach dem Neuladen nicht weiterlaufen (die Kunden leben nur im Browser)
+      if (state.open && act(doAct('closeDay', { aborted: true }))) note('Der letzte Tag wurde beim Neuladen abgebrochen.');
       new Phaser.Game({
         type: Phaser.AUTO,
         parent: document.querySelector('[data-shop-stage]'),

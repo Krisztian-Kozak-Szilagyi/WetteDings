@@ -10,7 +10,7 @@
 </head>
 <%# Shop-Demo – eigener Laden in 2:1-Isometrie mit Figur (WASD, E). Bestellt wird am PC (Kassentheke), die Kartons
     landen auf dem Gehweg und müssen eingeräumt/aufgebaut werden. Gezeichnet wird mit Phaser (public/js/shop-demo.js),
-    Regeln in src/shop/layout.js (/js/shop-layout.js). Kanacoin = Demo-Geld, getrennt vom Kontostand. %>
+    Regeln in src/shop/layout.js (/js/shop-layout.js), Kunden in src/shop/customers.js (/js/shop-customers.js). Kanacoin = Demo-Geld, getrennt vom Kontostand. %>
 <body class="sd-body" data-shop-root data-csrf="<%= csrfToken %>">
   <div class="sd-stage" data-shop-stage></div>
 
@@ -21,6 +21,8 @@
     </button>
     <div class="sd-hand" data-shop-hand hidden></div>
   </div>
+  <div class="sd-clock" data-shop-clock></div>
+  <div class="sd-note" data-shop-note hidden></div>
   <div class="sd-hud sd-hud-right">
     <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen</label>
     <button type="button" class="sd-reset" data-shop-reset>Neu starten</button>
@@ -36,7 +38,7 @@
     </div>
   </div>
 
-  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
+  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen (Tür = Laden öffnen, Kasse = kassieren) · Q Karton abstellen · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
   <div class="sd-toast" data-shop-toast hidden></div>
 
   <dialog class="sd-win sd-pc" data-shop-pc>
@@ -73,6 +75,7 @@
 
   <script src="/vendor/phaser.min.js" defer></script>
   <script src="/js/shop-layout.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/shop-customers.js?v=<%= assetVersion %>" defer></script>
   <script src="/js/shop-demo.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>
