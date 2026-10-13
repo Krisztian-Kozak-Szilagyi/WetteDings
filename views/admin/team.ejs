@@ -1,5 +1,5 @@
 <section class="stats-block" id="codes">
-  <%- blockHead('Mitglieder einladen', `Neue Mitglieder können sich nur mit einem Einladungscode registrieren. Erzeuge einen Code und schick ihn der Person, die du einladen möchtest. Jeder Code gilt so lange wie beim Erzeugen gewählt (<strong>${ttlText(ttlOptions[0])}</strong> bis <strong>${ttlText(ttlOptions[ttlOptions.length - 1])}</strong>) und für <strong>genau eine Person</strong> – danach wird er automatisch gelöscht.${currentUser.isAdmin ? '' : ' Löschen kannst du deine eigenen Codes.'}`) %>
+  <%- blockHead('Mitglieder einladen', `Neue Mitglieder registrieren sich nur mit einem Einladungscode: Code erzeugen und der Person schicken.<br>• Gültig <strong>${ttlText(ttlOptions[0])}</strong> bis <strong>${ttlText(ttlOptions[ttlOptions.length - 1])}</strong> (bei Erzeugung gewählt)<br>• Für <strong>genau eine Person</strong>, danach automatisch gelöscht${currentUser.isAdmin ? '' : '<br>• Eigene Codes kannst du löschen'}`) %>
   <div class="card">
     <form method="post" action="/admin/codes" class="admin-generate">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -15,7 +15,7 @@
 </section>
 
 <section class="stats-block" id="einladungslinks">
-  <%- blockHead('Einladungslink für ein Mitglied', `Wünscht sich ein Mitglied einen Einladungslink, erstellst du ihn hier für dieses Mitglied. Es findet ihn unter <strong>Mein Konto → Einladungen</strong> (mit Benachrichtigung) und schickt ihn weiter. Registriert sich jemand darüber, bekommt das Mitglied die hier festgelegte Provision als Booster Packs – nicht, wenn das neue Konto von seinem Gerät kommt. Der Link gilt wie ein Code für <strong>genau eine Person</strong> und erscheint unten in der Liste.`) %>
+  <%- blockHead('Einladungslink für ein Mitglied', `Auf Wunsch eines Mitglieds erstellst du hier einen Einladungslink für es.<br>• Das Mitglied findet ihn unter <strong>Mein Konto → Einladungen</strong> (mit Benachrichtigung) und schickt ihn weiter.<br>• Wer sich darüber registriert, bringt dem Mitglied die hier festgelegte Provision in Booster Packs – nicht, wenn das neue Konto von dessen Gerät kommt.<br>• Gilt wie ein Code für <strong>genau eine Person</strong>, steht unten in der Liste.`) %>
   <div class="card">
     <form method="post" action="/admin/codes/einladungslink" class="admin-generate">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -129,7 +129,7 @@
 
 <% if (currentUser.isAdmin) { %>
 <section class="stats-block" id="passwort">
-  <%- blockHead('Passwort zurücksetzen', 'Hat ein Mitglied sein Passwort vergessen, erzeugst du hier einen <strong>Einmal-Code</strong> (24 Stunden gültig) und schickst ihn der Person. Sie meldet sich mit ihrem Namen und dem Code statt des Passworts an und muss sofort ein neues Passwort wählen. Der Code wird nur <strong>einmal</strong> angezeigt; das alte Passwort gilt weiter, bis ein neues gesetzt ist. Ein neuer Code ersetzt den alten.') %>
+  <%- blockHead('Passwort zurücksetzen', 'Passwort vergessen? Erzeuge einen <strong>Einmal-Code</strong> (24 Stunden gültig) und schick ihn der Person.<br>• Sie meldet sich mit Namen und Code an und muss sofort ein neues Passwort wählen.<br>• Der Code wird nur <strong>einmal</strong> angezeigt.<br>• Das alte Passwort gilt weiter, bis ein neues gesetzt ist. Ein neuer Code ersetzt den alten.') %>
   <div class="card">
     <% if (resetShown) { %>
       <div class="code-item code-item-single">

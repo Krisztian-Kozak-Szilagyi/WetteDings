@@ -227,7 +227,7 @@
 
     <% if (b.pulls) { %>
       <div class="card">
-        <p class="muted small stats-card-title"><%= b.pulls.total %> gezogene Karten im Zeitraum <%- help('Der Balken zeigt die tatsächliche Häufigkeit im Verhältnis zur eingestellten Chance – die Linie in der Mitte ist genau „wie eingestellt“. Erst ab etwa 5 erwarteten Karten ist eine Aussage möglich.') %></p>
+        <p class="muted small stats-card-title"><%= b.pulls.total %> gezogene Karten im Zeitraum <%- help('Balken = tatsächliche Häufigkeit im Verhältnis zur eingestellten Chance, die Mittellinie heißt „wie eingestellt“. Aussagekräftig erst ab etwa 5 erwarteten Karten.') %></p>
         <div class="table-wrap">
           <table class="table stats-pulls">
             <thead><tr><th>Seltenheit</th><th class="num">Chance</th><th class="num">Erwartet</th><th class="num">Gezogen</th><th class="hide-sm">Ist ÷ Soll</th><th>Bewertung</th></tr></thead>
