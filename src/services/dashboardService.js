@@ -111,6 +111,12 @@ async function openBets(user) {
   return { list: list.slice(0, BETS_MAX), total: list.reduce((s, b) => s + b.stake, 0), count: list.length };
 }
 
+/** Erledigt / gesamt – ausgegraute Punkte (off) zählen nicht mit, z. B. 4/4 statt 4/5 */
+const tally = (items) => {
+  const counted = items.filter((i) => !i.off);
+  return { items, done: counted.filter((i) => i.done).length, total: counted.length };
+};
+
 /** Was heute ansteht: Tagesbonus, IHK, Grading, Dungeon, Tages-Lotterie */
 async function todayStatus(user) {
   const isAdmin = user.isAdmin;
@@ -123,11 +129,13 @@ async function todayStatus(user) {
     show.dungeon ? DungeonParty.findOne({ 'members.user': user._id }).select('slot').lean() : null,
     LotteryEntry.findOne({ round: round._id, user: user._id }).select('tickets').lean(),
   ]);
+  // Tagesbonus und Grading-Job schließen sich aus: wer im Grading-Shop arbeitet, bekommt keinen Tagesbonus – und wer
+  // den Tagesbonus bekommt, hat keinen Job. Der jeweils andere Punkt ist ausgegraut (off) und zählt nicht mit.
   const items = [];
   const bonus = bonusService.settings.amount;
   if (bonus) {
     const got = !working && user.lastBonusDay === bonusService.today();
-    items.push({ key: 'bonus', label: 'Tagesbonus', href: '/konto/auszug', done: got, text: working ? 'Entfällt – du arbeitest im Grading-Shop' : got ? `${(bonus / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} gutgeschrieben` : `Ab ${config.bonusTime} Uhr` });
+    items.push({ key: 'bonus', label: 'Tagesbonus', href: '/konto/auszug', done: got, off: !!working, text: working ? 'Entfällt – du arbeitest im Grading-Shop' : got ? `${(bonus / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} gutgeschrieben` : `Ab ${config.bonusTime} Uhr` });
   }
   if (ihkState) {
     const run = ihkState.running;
@@ -135,7 +143,9 @@ async function todayStatus(user) {
   }
   if (gradingState) {
     const active = gradingState.shop && gradingState.shop.active;
-    items.push({ key: 'grading', label: 'Grading-Shop', href: '/grading', done: active && gradingState.used >= gradingState.limit, progress: active ? [gradingState.used, gradingState.limit] : null, text: !active ? 'Kein Job – jetzt bewerben' : gradingState.open ? 'Auftrag offen' : gradingState.used >= gradingState.limit ? 'Alle Aufträge erledigt' : `${gradingState.limit - gradingState.used} Aufträge warten` });
+    // ohne Job (und mit Tagesbonus): ausgegraut, zählt nicht – bewerben geht über den Link trotzdem
+    const off = !active && !!bonus;
+    items.push({ key: 'grading', label: 'Grading-Shop', href: '/grading', done: active && gradingState.used >= gradingState.limit, off, progress: active ? [gradingState.used, gradingState.limit] : null, text: !active ? (off ? 'Entfällt – du bekommst den Tagesbonus' : 'Kein Job – jetzt bewerben') : gradingState.open ? 'Auftrag offen' : gradingState.used >= gradingState.limit ? 'Alle Aufträge erledigt' : `${gradingState.limit - gradingState.used} Aufträge warten` });
   }
   if (show.dungeon) {
     const slot = party ? party.slot : dungeon.registrationSlot();
@@ -143,7 +153,7 @@ async function todayStatus(user) {
   }
   const tickets = entry ? entry.tickets : 0;
   items.push({ key: 'lotto', label: 'Tages-Lotterie', href: '/lotterie', done: tickets > 0, text: tickets ? `${tickets} ${tickets === 1 ? 'Los' : 'Lose'} im Topf` : 'Noch kein Los', at: round.drawAt });
-  return { items, done: items.filter((i) => i.done).length };
+  return tally(items);
 }
 
 /** Termine: Black Market, Ziehungen der Lotterien, nächster Dungeon */
@@ -227,4 +237,4 @@ async function load(user) {
   return { greeting: greeting(), wealth: w, bets, today, countdowns: cds, threads, ticker: tick, favorites: coll.favorites, favMax: coll.favMax, cardCount: coll.cardCount, cardValue: coll.cardValue, album: coll.album, notesMax: NOTES_MAX };
 }
 
-module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, albumFan, randomFavorites, load };
+module.exports = { CURVE_DAYS, dayBefore, curve, change, greeting, upcoming, albumFan, randomFavorites, tally, load };

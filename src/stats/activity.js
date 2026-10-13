@@ -25,7 +25,6 @@ const AREAS = {
   profil: 'profil',
   rangliste: 'profil',
   konto: 'konto',
-  support: 'support',
   admin: 'admin',
   regeln: 'info',
   'so-gehts': 'info',

@@ -14,7 +14,7 @@ const RankStint = require('../models/RankStint');
 const { IhkRun } = require('../models/Ihk');
 const { Trade } = require('../models/Trade');
 const { DungeonRun } = require('../models/Dungeon');
-const { GradingJob } = require('../models/Grading');
+const { GradingJob, GradingOrder } = require('../models/Grading');
 const ScriptSignal = require('../models/ScriptSignal');
 const ActionTrace = require('../models/ActionTrace');
 const { DeviceAlert } = require('../models/Device');
@@ -22,6 +22,7 @@ const achievements = require('../achievements/list');
 const catalog = require('../tcg/catalog');
 const itemService = require('../items/itemService');
 const deviceService = require('../device/deviceService');
+const { KIND: deviceVerdictKind } = require('../device/deviceVerdictLog');
 const dungeonService = require('../dungeon/dungeonService');
 const gradingService = require('../grading/gradingService');
 const deviceLogic = require('../device/deviceLogic');
@@ -29,7 +30,9 @@ const logs = require('../stats/logs');
 const config = require('../config');
 const { euro } = require('../lib/viewHelpers');
 const { toZonedLocalInput } = require('../lib/time');
+const { UserError } = require('../lib/util');
 const logic = require('./suspicionLogic');
+const marketPrice = require('../trade/marketPrice');
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -59,6 +62,17 @@ function groupByUser(docs, map = (d) => d) {
 }
 
 const times = (docs) => groupByUser(docs, (d) => d.createdAt);
+
+/**
+ * Wert einer Position für die Wertverschiebung (#204): der höhere aus Händlerpreis und gemessenem Marktpreis – so gilt
+ * ein Slab, der korrekt teuer verkauft wird, nicht als Geldverschiebung. prices aus trade/marketPrice.all().
+ */
+const valueWith = (prices) => (cardId, line) => {
+  const bank = valueOf(cardId);
+  if (!line || !prices) return bank;
+  const m = prices.get(marketPrice.keyOf(line));
+  return Math.max(bank, marketPrice.measured(m) ? m.avg : 0); // nur gemessene Preise, keine Einzelfälle
+};
 
 /** Bankwert einer Karte oder eines Gegenstands in Cent */
 function valueOf(cardId) {
@@ -112,7 +126,9 @@ async function findAll(now = new Date()) {
       { $match: { type: { $in: Object.keys(logic.INCOME_SOURCES) }, amount: { $gt: 0 }, createdAt: { $gt: since } } },
       { $group: { _id: { user: '$user', type: '$type' }, amount: { $sum: '$amount' }, from: { $min: '$createdAt' }, to: { $max: '$createdAt' } } },
     ]),
-    Trade.find({ status: 'verkauft', closedAt: { $gt: circSince } }).select('kind seller buyer to sellerName buyerName toName give.card give.doc want.card want.doc price extraFrom closedAt').lean(),
+    Trade.find({ status: 'verkauft', closedAt: { $gt: circSince } })
+      .select('kind seller buyer to sellerName buyerName toName give.card give.doc give.slab give.foiledAt give.grade give.damaged want.card want.doc want.slab want.foiledAt want.grade want.damaged price extraFrom closedAt')
+      .lean(),
     deviceService.flaggedPairs(),
     // Duelle mit Karten: die Karte des Verlierers geht an den Gewinner (betService)
     Bet.find({ status: 'entschieden', 'duel.cards.0': { $exists: true }, resolvedAt: { $gt: circSince } }).select('creator duel.opponent duel.cards outcome resolvedAt').lean(),
@@ -217,11 +233,15 @@ async function findAll(now = new Date()) {
   // Kartenkreislauf, Platz 1 mit geliehenem Wert, Sammelkonten
   found.push(...(await valueFlowFindings({ trades, duels, earned, stints, pairs, now })));
 
-  // Wertverschiebung (letzte 7 Tage), zusammengefasst je Konten-Paar
+  // Grading unter Bekannten (#204): Gefälligkeitsnoten und Aufträge zwischen Mehrfach-Konten
+  found.push(...(await gradingFindings({ since: circSince, pairs })));
+
+  // Wertverschiebung (letzte 7 Tage), zusammengefasst je Konten-Paar – Slabs und Exemplare zum Marktpreis (#204)
+  const valueAt = valueWith(await marketPrice.all());
   const byPair = new Map();
   const names = new Map();
   for (const t of trades.filter((x) => x.closedAt > valueSince)) {
-    const f = logic.valueFinding(t, valueOf);
+    const f = logic.valueFinding(t, valueAt);
     if (!f) continue;
     names.set(String(t.seller), t.sellerName);
     names.set(String(t.buyer || t.to), t.buyerName || t.toName);
@@ -236,6 +256,49 @@ async function findAll(now = new Date()) {
     // nur nennenswerte Karten (die Crumpled als Gegenleistung interessiert nicht)
     found1.details.cards = [...items].sort((x, y) => new Date(x.at) - new Date(y.at)).slice(-5).flatMap((i) => i.copies).filter((c) => valueOf(c.card) >= logic.VALUE_MIN_CENTS).slice(0, 8);
     found.push(found1);
+  }
+  return found;
+}
+
+/**
+ * Grading-Hinweise (#204, Etappe C): Gefälligkeitsnoten je Paar aus Shop und Kunde (Note des Shops ≥ 2 über der
+ * echten) und Aufträge zwischen Konten, die als Mehrfach-Konto erkannt sind.
+ */
+async function gradingFindings({ since, pairs }) {
+  const [jobs, orders] = await Promise.all([
+    GradingJob.find({ source: 'spieler', status: 'fertig', doneAt: { $gt: since } }).select('user card guess grade order doneAt').lean(),
+    GradingOrder.find({ createdAt: { $gt: since }, status: { $in: ['wartet', 'in_arbeit', 'fertig'] } }).select('owner ownerName shop card price createdAt').lean(),
+  ]);
+  const orderById = new Map(orders.map((o) => [String(o._id), o]));
+  const ids = new Set(orders.flatMap((o) => [String(o.owner), String(o.shop)]));
+  const users = ids.size ? await User.find({ _id: { $in: [...ids] } }).select('username').lean() : [];
+  const names = new Map(users.map((u) => [String(u._id), u.username]));
+  const cardName = (id) => (catalog.cardById[id] ? catalog.cardById[id].name : id);
+  const found = [];
+  // Gefälligkeitsnoten: je Paar (Shop, Kunde)
+  const byPair = new Map();
+  for (const j of jobs) {
+    const o = orderById.get(String(j.order));
+    if (!o) continue;
+    const key = deviceLogic.pairKey(o.shop, o.owner);
+    if (!byPair.has(key)) byPair.set(key, []);
+    byPair.get(key).push({ shop: o.shop, owner: o.owner, guess: j.guess, grade: j.grade, card: cardName(j.card), price: o.price, at: j.doneAt });
+  }
+  for (const [key, list] of byPair) {
+    const f = logic.favorFinding(list, names, pairs.has(key));
+    if (f) found.push({ key: `gefaellig:${key}`, kind: 'gefaellig', action: null, users: f.users, ...pick(f, ['count', 'total', 'jobs']), ...base(f) });
+  }
+  // Aufträge zwischen Mehrfach-Konten
+  const netPairs = new Map();
+  for (const o of orders) {
+    const key = deviceLogic.pairKey(o.shop, o.owner);
+    if (!pairs.has(key)) continue;
+    if (!netPairs.has(key)) netPairs.set(key, []);
+    netPairs.get(key).push({ shop: o.shop, owner: o.owner, price: o.price, at: o.createdAt, card: cardName(o.card) });
+  }
+  for (const [key, list] of netPairs) {
+    const f = logic.gradingNetFinding(list, names);
+    if (f) found.push({ key: `gradingnetz:${key}`, kind: 'gradingnetz', action: null, users: f.users, ...pick(f, ['count', 'total', 'jobs']), ...base(f) });
   }
   return found;
 }
@@ -328,8 +391,9 @@ const pick = (obj, keys) => ({ details: Object.fromEntries(keys.map((k) => [k, o
 const base = (f) => ({ level: f.level, summary: f.summary, from: f.from, evidenceAt: f.to });
 
 /**
- * Hinweis anlegen bzw. auf den neuen Stand bringen. Ein erledigter Hinweis öffnet sich wieder, wenn es danach neue
- * Belege gibt oder die Stufe steigt – sonst bleibt er erledigt (wie bei den Mehrfach-Konten).
+ * Hinweis anlegen bzw. auf den neuen Stand bringen. Ein ohne Urteil erledigter Hinweis öffnet sich wieder, wenn es
+ * danach neue Belege gibt oder die Stufe steigt. Ein beurteilter Hinweis (bestätigt oder Fehlalarm) öffnet sich nur
+ * bei höherer Stufe; neue Belege zählt er still mit (repeatLastAt), das Panel zeigt sie als "erneut aufgetreten".
  */
 async function upsert(f) {
   const alert = await SuspicionAlert.findOne({ key: f.key });
@@ -340,16 +404,23 @@ async function upsert(f) {
     return;
   }
   const newer = new Date(f.evidenceAt) > new Date(alert.evidenceAt);
-  const reopen = alert.doneAt && ((newer && new Date(f.evidenceAt) > alert.doneAt) || f.level > alert.level);
+  const afterDone = newer && alert.doneAt && new Date(f.evidenceAt) > alert.doneAt;
+  const reopen = alert.doneAt && ((afterDone && !alert.verdict) || f.level > alert.level);
   if (!newer && f.level <= alert.level && !reopen) return; // nichts Neues
   Object.assign(alert, { summary: f.summary, details: f.details, level: Math.max(f.level, alert.level), evidenceAt: newer ? f.evidenceAt : alert.evidenceAt });
   if (newer && f.from) alert.from = f.from;
   if (reopen) {
     alert.doneAt = null;
     alert.doneByName = null;
+    alert.repeatLastAt = null;
+    alert.repeatSeenAt = null;
+    alert.repeatCount = 0;
+  } else if (afterDone) {
+    alert.repeatLastAt = f.evidenceAt;
+    alert.repeatCount = (alert.repeatCount || 0) + 1;
   }
   await alert.save();
-  // beurteilter Hinweis geht wieder auf: bestätigt und macht weiter, oder ein Fehlalarm wird doch stärker
+  // beurteilter Hinweis geht wieder auf, weil seine Stufe gestiegen ist (z. B. ein Fehlalarm wird doch stärker)
   if (reopen && alert.verdict) await logEvent(alert.toObject(), 'neue_belege');
 }
 
@@ -453,6 +524,28 @@ async function deviceLevels() {
   return out;
 }
 
+/** Beurteilte Hinweise, die seit dem Urteil erneut aufgetreten und noch nicht auf "Gesehen" gesetzt sind (Abzeichen, dezent) */
+const REPEAT_OPEN = { verdict: { $ne: null }, doneAt: { $ne: null }, repeatLastAt: { $ne: null } };
+const repeatPending = (a) => a.repeatLastAt && a.doneAt && new Date(a.repeatLastAt) > new Date(a.doneAt) && (!a.repeatSeenAt || new Date(a.repeatLastAt) > new Date(a.repeatSeenAt));
+
+/** Anzahl Spieler (bzw. Paare) mit erneut aufgetretenen, beurteilten Hinweisen, die noch nicht gesehen wurden */
+async function repeatCount() {
+  const alerts = await SuspicionAlert.find(REPEAT_OPEN).select('users doneAt repeatLastAt repeatSeenAt').lean();
+  return new Set(alerts.filter(repeatPending).map((a) => a.users.map(String).sort().join(':'))).size;
+}
+
+/** "Gesehen": erneut aufgetretene beurteilte Hinweise für jetzt abhaken (kein Urteil, keine Änderung der Trefferquote) */
+async function markRepeatSeen(ids) {
+  await SuspicionAlert.updateMany({ _id: { $in: ids }, ...REPEAT_OPEN }, { $set: { repeatSeenAt: new Date() } }, { timestamps: false });
+}
+
+/** Eigene Fälle beurteilt man nicht selbst: Sind die Konten des Hinweises dabei, bricht das Urteil bzw. Erledigen ab */
+function assertNotOwn(alerts, actor) {
+  if (!actor || !actor._id) return;
+  const me = String(actor._id);
+  if (alerts.some((a) => a.users.some((u) => String(u) === me))) throw new UserError('Hinweise zu deinem eigenen Konto kannst du nicht beurteilen oder erledigen.');
+}
+
 /** Spieler (bzw. Konten-Paare) mit Gesamtbewertung ab "Verdacht" – für das Abzeichen am Admin-Menüpunkt */
 async function openCount() {
   const alerts = await SuspicionAlert.find({ doneAt: null }).select('kind level users evidenceAt').lean();
@@ -467,7 +560,7 @@ async function list() {
   const ids = [...new Set(alerts.flatMap((a) => a.users.map(String)))];
   const users = await User.find({ _id: { $in: ids } }).select('username bannedUntil deletedAt').lean();
   const userById = new Map(users.map((u) => [String(u._id), u]));
-  const LOG_OF = { ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
+  const LOG_OF = { ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', gefaellig: 'grading', gradingnetz: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
   return alerts
     .map((a) => {
       const list = a.users.map((id) => userById.get(String(id)));
@@ -486,6 +579,7 @@ async function list() {
             ? [{ href: `/admin/kartenhistorie/${a.key.split(':')[1]}`, label: 'Kartenhistorie' }]
             : ((a.details && a.details.cards) || []).map((c) => ({ href: `/admin/kartenhistorie/${c.doc}`, label: `Verlauf: ${c.label}` })),
         extras: logic.extrasOf(a.details),
+        repeatPending: !!repeatPending(a),
       };
     })
     .filter(Boolean);
@@ -499,16 +593,18 @@ async function listGroups() {
 
 /** Mehrere Hinweise auf einmal erledigen bzw. wieder öffnen ("Alle erledigt" je Spieler) */
 async function setDoneMany(ids, done, actor) {
+  assertNotOwn(await SuspicionAlert.find({ _id: { $in: ids } }).select('users').lean(), actor); // vorab, damit nichts halb erledigt wird
   for (const id of ids) await setDone(id, done, actor);
 }
 
 /** Erledigen bzw. wieder öffnen. Wieder öffnen nimmt auch ein Urteil zurück (es war wohl voreilig) – das wird protokolliert. */
 async function setDone(id, done, actor) {
+  assertNotOwn(await SuspicionAlert.find({ _id: id }).select('users').lean(), actor);
   const $set = { doneAt: done ? new Date() : null, doneByName: done && actor ? actor.username : null };
   if (!done) {
     const alert = await SuspicionAlert.findById(id).lean();
     if (alert && alert.verdict) await logEvent(alert, 'zurueckgenommen', actor ? actor.username : null, null);
-    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null, verdictSummary: null });
+    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null, verdictSummary: null, repeatLastAt: null, repeatSeenAt: null, repeatCount: 0 });
   }
   await SuspicionAlert.updateOne({ _id: id }, { $set }, { timestamps: false });
 }
@@ -521,6 +617,7 @@ async function setVerdictMany(ids, verdict, actor) {
   if (!VERDICTS.includes(verdict) || !ids.length) return;
   const alerts = await SuspicionAlert.find({ _id: { $in: ids } }).lean();
   if (!alerts.length) return;
+  assertNotOwn(alerts, actor);
   const rating = await ratingFor(alerts[0].users);
   const at = new Date();
   const by = actor ? actor.username : null;
@@ -528,7 +625,7 @@ async function setVerdictMany(ids, verdict, actor) {
     await logEvent(a, verdict, by, rating);
     await SuspicionAlert.updateOne(
       { _id: a._id },
-      { $set: { verdict, verdictAt: at, verdictByName: by, verdictLevel: a.level, verdictSummary: a.summary, doneAt: at, doneByName: by } },
+      { $set: { verdict, verdictAt: at, verdictByName: by, verdictLevel: a.level, verdictSummary: a.summary, doneAt: at, doneByName: by, repeatLastAt: null, repeatSeenAt: null, repeatCount: 0 } },
       { timestamps: false }
     );
   }
@@ -539,13 +636,15 @@ const setVerdict = (id, verdict, actor) => setVerdictMany([id], verdict, actor);
 /** Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (logic.precisionRows) */
 async function precision() {
   const [events, counts] = await Promise.all([
-    SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt').lean(),
+    SuspicionVerdict.find({ event: { $in: [...VERDICTS, 'zurueckgenommen'] } }).select('key event kind level createdAt byName names').lean(),
     SuspicionAlert.aggregate([{ $group: { _id: '$kind', n: { $sum: 1 } } }]),
   ]);
-  return logic.precisionRows(events, new Map(counts.map((c) => [c._id, c.n])));
+  const byKind = new Map(counts.map((c) => [c._id, c.n]));
+  byKind.set(deviceVerdictKind, await DeviceAlert.countDocuments()); // Mehrfach-Konten stehen in einer eigenen Sammlung
+  return logic.precisionRows(events, byKind);
 }
 
 /** Konto gelöscht: seine Hinweise und Browser-Merkmale entfernen, das Urteils-Protokoll anonymisieren */
 const forgetUser = (userId) => Promise.all([SuspicionAlert.deleteMany({ users: userId }), ScriptSignal.deleteMany({ user: userId }), ActionTrace.deleteMany({ user: userId }), anonymizeVerdicts(userId)]);
 
-module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, list, listGroups, setDone, setDoneMany, setVerdict, setVerdictMany, precision, anonymizeVerdicts, forgetUser };
+module.exports = { WINDOW_MS, AWAKE_WINDOW_MS, DUNGEON_WINDOW_MS, IHK_WINDOW_MS, VALUE_WINDOW_MS, FLOW_WINDOW_MS, CIRC_WINDOW_MS, VERDICTS, daysBetween, valueOf, findAll, upsert, scan, openCount, repeatCount, markRepeatSeen, list, listGroups, setDone, setDoneMany, setVerdict, setVerdictMany, precision, anonymizeVerdicts, forgetUser };

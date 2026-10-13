@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Position = require('../models/Position');
 const catalog = require('../tcg/catalog');
 const { str } = require('../lib/util');
-const { requireLogin, requireStaff } = require('../middleware');
+const { requireLogin } = require('../middleware');
 const config = require('../config');
 const deviceLogic = require('../device/deviceLogic');
 const rankService = require('../services/rankService');
@@ -12,11 +12,17 @@ const { collection } = require('../tcg/collection');
 const tcgSettings = require('../tcg/settings');
 const achievementService = require('../achievements/achievementService');
 const giftService = require('../services/giftService');
+const devMessageService = require('../services/devMessageService');
 const achievementLogic = require('../achievements/logic');
 const markets = require('../coin/markets');
 const trade = require('../coin/tradeService');
 const { profileStats } = require('../stats/profileStats');
 const avatars = require('../profile/avatars');
+const cosmetics = require('../cosmetics/cosmeticService');
+const cosmeticLogic = require('../cosmetics/logic');
+const grading = require('../grading/gradingService');
+const gradingOrders = require('../grading/orderService');
+const { GradingShop } = require('../models/Grading');
 
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
@@ -63,8 +69,25 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
   const earnedRows = achievements.filter((a) => a.earned);
   const pinnedKeys = (profile.pinnedAchievements || []).filter((k) => earnedRows.some((a) => a.key === k));
   const pinned = pinnedKeys.length ? pinnedKeys.map((k) => earnedRows.find((a) => a.key === k)) : earnedRows.slice(0, achievementLogic.PIN_MAX);
+  // eigener Fortschritt bei den gesperrten Erfolgen (andere sehen nur, ob ein Erfolg da ist)
+  const progress = isMe ? await achievementService.progressOf(profile._id, earned.map((e) => e.key)) : {};
+  for (const a of achievements) a.progress = (!a.earned && progress[a.key]) || null;
+  // Grading-Shop des Mitglieds (#204): Leiste auf dem Profil – nur, wenn der Shop für alle offen ist (oder ich Admin bin)
+  let gradingBar = null;
+  if (grading.settings.open || req.user.isAdmin) {
+    const gs = await GradingShop.findById(profile._id).select('active code').lean();
+    const shop = gs && gs.active && gs.code ? await gradingOrders.shopByCode(gs.code) : null;
+    if (shop) {
+      // „ab“-Preis wie bei der Shop-Auswahl: Grading mit Slab (ohne Lager: Bügeln), verglichen mit dem Durchschnitt der Shops
+      const from = (x) => (x.slabs >= 1 ? x.prices.base + x.prices.slab : x.prices.base + x.prices.iron);
+      const all = (await gradingOrders.shopsForOrders()).map(from);
+      const avg = all.length > 1 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+      gradingBar = { shop, isMe, accepts: !!shop.accepts, from: from(shop), avg, diff: avg ? (from(shop) - avg) / avg : null };
+    }
+  }
   const has = new Set(owned.map((o) => o._id));
   res.render('profil', {
+    gradingBar,
     title: profile.username,
     profile,
     isMe,
@@ -81,22 +104,25 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     maxBanHours: req.user.isAdmin ? deviceLogic.MAX_BAN_HOURS : deviceLogic.DEV_MAX_BAN_HOURS,
     // Zeit auf Platz 1 der Rangliste als Text; leer, wenn das Mitglied nie Erster war
     top1: rankService.top1Text(profile.top1Seconds),
+    profileIsTeam: rankService.isTeam(profile), // Team-Mitglieder sammeln die Zeit auf Platz 1 der Team-Wertung
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
     totalCards: catalog.CARDS.length,
-    cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
+    cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung der Slabs
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln
     rarityByKey: catalog.rarityByKey,
     achievements,
+    // eingeklappte Liste: die angehefteten (bzw. neuesten) bleiben sichtbar, der Rest klappt auf
+    achievementsRest: achievements.filter((a) => !pinned.includes(a)),
     achievementCount: earnedRows.length,
     achievementTotal: achievements.filter((a) => !a.unique || a.earned).length,
     pinnedAchievements: pinned,
     pinnedChosen: pinnedKeys.length > 0,
     pinnedKeys,
     playmates,
-    // Profilbild wählen: vorerst nur Admin und Devs im eigenen Profil
-    avatarChoices: isMe && req.user.isStaff ? avatars.AVATARS : null,
+    // Profilbild wählen (eigenes Profil): gekaufte Avatare, für Admin und Devs auch die Logos
+    avatarChoices: isMe ? [...(req.user.isStaff ? avatars.AVATARS : []), ...cosmetics.avatars().filter((a) => cosmeticLogic.ownsAvatar(req.user.cosmetics, a.key)).map((a) => ({ id: a.key, name: a.name, url: a.url }))] : null,
     countTier: achievementLogic.countTier,
     shareText: achievementLogic.shareText,
     bioMax: achievementLogic.BIO_MAX,
@@ -124,10 +150,11 @@ router.post('/profil/statistik', requireLogin, async (req, res) => {
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}#statistik`);
 });
 
-// Profilbild wählen (vorerst nur Admin und Devs); leer oder unbekannt = Platzhalter
-router.post('/profil/bild', requireStaff, async (req, res) => {
+// Profilbild wählen: gekaufter Avatar, Logo (nur Admin und Devs); leer oder unbekannt = Platzhalter
+router.post('/profil/bild', requireLogin, async (req, res) => {
   const id = str(req.body.bild);
-  await User.updateOne({ _id: req.user._id }, { $set: { avatar: avatars.has(id) ? id : null } });
+  const ok = cosmeticLogic.ownsAvatar(req.user.cosmetics, id) || (req.user.isStaff && avatars.has(id));
+  await User.updateOne({ _id: req.user._id }, { $set: { avatar: ok ? id : null } });
   res.redirect(`/profil/${encodeURIComponent(req.user.username)}`);
 });
 
@@ -151,7 +178,7 @@ router.post('/profil/anheften', requireLogin, async (req, res) => {
 
 // Rücksprung nach "Weiter" im Erfolg-/Geschenk-Fenster (nur ohne JavaScript): nur auf einen dieser Bereiche,
 // nie auf eine frei übergebene Adresse (CodeQL #74–#76). Das Ziel kommt aus der Liste, nicht aus der Anfrage.
-const BACK_PAGES = ['/', '/wetten', '/duell', '/rangliste', '/broker', '/lotterie', '/tcg', '/inventar', '/handel', '/ihk', '/dungeon', '/grading', '/forum', '/patchnotes', '/benachrichtigungen', '/konto', '/regeln', '/support', '/admin'];
+const BACK_PAGES = ['/', '/wetten', '/duell', '/rangliste', '/broker', '/lotterie', '/tcg', '/inventar', '/handel', '/ihk', '/dungeon', '/grading', '/forum', '/patchnotes', '/benachrichtigungen', '/konto', '/regeln', '/admin'];
 /** Bereich der Seite, auf der das Fenster erschien (erster Pfadteil), sonst das Dashboard; Profile → eigenes Profil */
 function popupBack(req) {
   const first = '/' + (str(req.session.popupBack).split(/[?#]/)[0].split('/')[1] || '');
@@ -174,6 +201,15 @@ router.post('/geschenke/gesehen', requireLogin, async (req, res) => {
   await giftService.markSeen(req.user._id, str(req.body.id));
   if (req.accepts(['html', 'json']) === 'json') {
     return res.json({ next: giftService.popup(await giftService.nextUnseen(req.user._id)) });
+  }
+  res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
+});
+
+// Fenster "Nachricht vom Entwickler-Team" mit Gelesen bestätigt (#132)
+router.post('/entwickler-nachrichten/gesehen', requireLogin, async (req, res) => {
+  await devMessageService.markSeen(req.user._id, str(req.body.id));
+  if (req.accepts(['html', 'json']) === 'json') {
+    return res.json({ next: devMessageService.popup(await devMessageService.nextUnseen(req.user)) });
   }
   res.redirect(popupBack(req)); // Bereich aus der Sitzung (src/app.js), Ziel aus BACK_PAGES
 });

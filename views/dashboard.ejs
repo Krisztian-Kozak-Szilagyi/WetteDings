@@ -1,4 +1,4 @@
-<%- include('partials/head') %>
+<%- include('partials/head', { pageCss: ['dashboard'] }) %>
 <%
   // Redesign 2026-10 (Nocturne). Same data as before: dash = dashboardService.load(user)
   const d = dash;
@@ -38,7 +38,7 @@
     <div class="dx-hero-text">
       <span class="dx-kicker"><%= todayText %></span>
       <h1><%= d.greeting %>,<br><span class="dx-name"><%= currentUser.username %></span></h1>
-      <% if (t.items.length) { %><p class="dx-sub"><%= t.done === t.items.length ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.items.length} Punkten für heute erledigt.` %></p><% } %>
+      <% if (t.total) { %><p class="dx-sub"><%= t.done === t.total ? 'Alles für heute erledigt – stark.' : `${t.done} von ${t.total} Punkten für heute erledigt.` %></p><% } %>
     </div>
 
     <% if (d.countdowns.length) { %>
@@ -105,7 +105,7 @@
   <div class="dx-row">
     <section class="dx-col-wide dx-favs" aria-labelledby="dx-favs-h">
       <div class="dx-head">
-        <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(d.cardValue) %></div><% } %></div>
+        <div><h3 id="dx-favs-h">Deine Favoriten</h3><% if (d.cardCount) { %><div class="dx-meta"><%= d.cardCount %> <%= d.cardCount === 1 ? 'Karte' : 'Karten' %> · Händlerwert <%= euro(d.cardValue) %></div><% } %></div>
         <a class="dx-link" href="/tcg/album">Zum Album →</a>
       </div>
       <% if (!d.cardCount) { %><p class="muted small">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p><% } %>
@@ -115,20 +115,20 @@
     <section class="dx-col-side" aria-labelledby="dx-today-h">
       <div class="dx-head dx-head-center">
         <h3 id="dx-today-h">Heute</h3>
-        <span class="dx-ring" title="<%= t.done %> von <%= t.items.length %> erledigt">
+        <span class="dx-ring" title="<%= t.done %> von <%= t.total %> erledigt">
           <svg viewBox="0 0 52 52" aria-hidden="true">
             <circle class="dx-ring-bg" cx="26" cy="26" r="22"/>
-            <circle class="dx-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.items.length ? t.done / t.items.length : 0))).toFixed(1) %>"/>
+            <circle class="dx-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="<%= ring.toFixed(1) %>" stroke-dashoffset="<%= (ring * (1 - (t.total ? t.done / t.total : 0))).toFixed(1) %>"/>
           </svg>
-          <span><%= t.done %>/<%= t.items.length %></span>
+          <span><%= t.done %>/<%= t.total %></span>
         </span>
       </div>
       <div class="dx-tasks">
         <% t.items.forEach((it) => { %>
-          <a class="dx-task<%= it.done ? ' is-done' : '' %>" href="<%= it.href %>">
+          <a class="dx-task<%= it.done ? ' is-done' : '' %><%= it.off ? ' is-off' : '' %>" href="<%= it.href %>">
             <span class="dx-check" aria-hidden="true"><% if (it.done) { %>✓<% } %></span>
-            <span class="dx-task-text"><strong><%= it.label %></strong><small><%= it.text %><% if (it.at && !it.done) { %> · <%= relTime(it.at) %><% } %></small></span>
-            <% if (it.progress && !it.done) { %><span class="dx-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>"><span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span></span><% } %>
+            <span class="dx-task-text"><strong><%= it.label %></strong><small><%= it.text %><% if (it.at && !it.done && !it.off) { %> · <%= relTime(it.at) %><% } %></small></span>
+            <% if (it.progress && !it.done && !it.off) { %><span class="dx-task-progress" aria-label="<%= it.progress[0] %> von <%= it.progress[1] %>"><span style="width: <%= Math.min(100, it.progress[1] ? (it.progress[0] / it.progress[1]) * 100 : 0).toFixed(0) %>%"></span></span><% } %>
           </a>
         <% }) %>
       </div>
@@ -216,7 +216,6 @@
 
 <%- include('partials/card-zoom', { favForm: true }) %>
 <%- include('partials/foil-modal', { favForm: true }) %>
-<link rel="stylesheet" href="/css/dashboard.css?v=<%= assetVersion %>">
 <%# tcg.js: 3D-Neigung der vergrößerten Karte (window.tcgBindTilt) – wie in der Dungeon-Lobby %>
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/favorites.js?v=<%= assetVersion %>" defer></script>

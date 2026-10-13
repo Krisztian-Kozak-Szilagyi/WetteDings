@@ -55,13 +55,6 @@ module.exports = {
   miaCoinTag: (process.env.MIA_COIN_TAG || '').trim().slice(0, 80),
   // TCG: Preis eines Booster Packs (5 Karten)
   tcgPackPrice: eurosToCents(process.env.TCG_PACK_EUR, 90),
-  // Support-Bot (Groq API). Ohne Schlüssel ist der Chat ausgeblendet.
-  groqApiKey: process.env.GROQ_API_KEY || '',
-  // Modelle der Reihe nach (bei Limit/Überlastung wird das nächste versucht), kommagetrennt
-  groqModels: (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
   // Gesamtprovision in % vom Topf (gilt für neu erstellte Wetten). Wettersteller und
   // Schiedsrichter teilen sie sich zur Hälfte (siehe lib/payout → splitFee).
   creatorFeePercent: Math.min(100, Math.max(0, Number(process.env.CREATOR_FEE_PERCENT ?? 8) || 0)),

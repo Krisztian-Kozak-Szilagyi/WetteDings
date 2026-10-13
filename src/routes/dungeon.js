@@ -5,6 +5,10 @@ const catalog = require('../tcg/catalog');
 const dungeon = require('../dungeon/dungeonService');
 const { DUNGEONS, defOf, dungeonForSlot, TOWER } = require('../dungeon/dungeons');
 const { floorByKey } = require('../dungeon/tower');
+const LIVE = require('../dungeon/liveTower');
+const liveTower = require('../dungeon/liveTowerService');
+const { EsportsTeam } = require('../models/Esports');
+const { TcgCard } = require('../models/Tcg');
 const { str, UserError } = require('../lib/util');
 const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
@@ -42,6 +46,10 @@ const slotView = (m, me, leaderId, banMode = null) => {
     reward: m.reward,
     foil: m.foil,
     bossCard: m.bossCard,
+    // Live-Turm (eSports): Vorrat und Bereit
+    coffee: m.coffee && m.coffeeDoc ? catalog.cardById[m.coffee] : null,
+    energy: !!m.energyDoc,
+    ready: !!m.ready,
   };
 };
 
@@ -71,8 +79,9 @@ router.get('/dungeon', async (req, res) => {
   const me = req.user._id;
   const now = Date.now();
   await dungeon.finishOwnDue(me);
-  const [{ party, invitations, run, unseen, rev }, rareLoot, towerPlayed] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot(), dungeon.playedTowerToday(me)]);
+  const [{ party, invitations, run, unseen, rev }, rareLoot, towerLeft] = await Promise.all([dungeon.pageState(me), dungeon.rareLoot(), dungeon.towerRunsLeft(me)]);
   const running = run && run.status === 'laeuft' ? run : null;
+  if (running && running.live) return res.redirect('/dungeon/live'); // eSports-Live-Turm hat eine eigene Seite
   // Mage Tower: eigene Anmeldung ohne Termin (der Leiter startet) – oder ein laufender Turm-Durchlauf
   const tower = running ? running.mode === 'tower' : !!party && party.mode === 'tower';
   const slot = party && !tower ? party.slot : dungeon.registrationSlot(now);
@@ -103,11 +112,23 @@ router.get('/dungeon', async (req, res) => {
   // Start-Kacheln (wie "Zum Album"): eigene Charaktere als Fächer, fehlende als graue Beispielkarten
   const samples = catalog.CARDS.filter((c) => c.isCharacter && !(catalog.rarityByKey[c.rarity] || {}).hidden);
   const fanOf = (n) => {
-    const own = (cards ? cards.characters : []).slice(0, n).map((card) => ({ card, sample: false }));
+    const own = (cards ? cards.characters.filter((c) => cards.counts[c.id] > 0) : []).slice(0, n).map((card) => ({ card, sample: false }));
     for (let i = 0; own.length < n && i < samples.length; i++) if (!own.some((f) => f.card.id === samples[i].id)) own.push({ card: samples[i], sample: true });
     return own;
   };
   const startFans = phase === 'frei' ? { solo: fanOf(1), gruppe: fanOf(3) } : null;
+  // eSports-Team in der Turm-Lobby: Live-Lauf mit Vorrat (Kaffee, Energy) und Bereit
+  const esTeamId = tower && party && !party.solo && phase === 'gruppe' ? await dungeon.esportsLobby(party, now) : null;
+  const esLobby = !!esTeamId;
+  const esTeam = esTeamId ? await EsportsTeam.findById(esTeamId).select('name ticker').lean() : null;
+  // frei = eigene Exemplare ohne die als Haupt- oder Boost-Karte gewählten (die eigenen Vorrats-Exemplare zählen als frei)
+  const inUse = (id) => (mine ? [mine.card, mine.boost].filter((x) => x === id).length : 0);
+  // Kaffee und Energy werden verbraucht – dafür nie ein foliertes Exemplar (setSupplies), also ohne die folierten
+  const freeOf = (id) => (cards ? Math.max(0, (cards.counts[id] || 0) - (cards.foiled[id] || 0) - inUse(id)) : 0);
+  // Schalter „Folierte Exemplare einsetzen“ (#204): an, wenn die gewählte Karte schon ein foliertes Exemplar ist
+  const myDocs = mine ? [mine.cardDoc, mine.boostDoc].filter(Boolean) : [];
+  const foilChecked = myDocs.length > 0 && !!(await TcgCard.exists({ _id: { $in: myDocs }, foiledAt: { $ne: null } }));
+  const coffeeChoices = esLobby ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: freeOf(id), asBoost: !!mine && mine.boost === id })).filter((c) => c.card) : [];
 
   // Beute-Fenster: einmal nach dem Ende des Durchlaufs
   // (bleibt, bis es mit „Weiter“ geschlossen wird – auch nach Neuladen oder einem Besuch anderer Seiten)
@@ -140,7 +161,16 @@ router.get('/dungeon', async (req, res) => {
     // Turm-Kacheln vor dem Beitritt: verfügbar? heute schon gespielt? Startet der Leiter erst, wenn alle gewählt haben
     towerShown: dungeon.towerOpen(req.user),
     towerTitle: TOWER.title,
-    towerPlayed,
+    towerPlayed: towerLeft <= 0,
+    towerLeft,
+    towerRuns: dungeon.settings.tower.dailyRuns,
+    esLobby,
+    esTeam,
+    coffeePct: LIVE.COFFEE,
+    coffeeChoices,
+    energyFree: esLobby ? freeOf(LIVE.ENERGY_CARD) : 0,
+    energyAsBoost: esLobby && !!mine && mine.boost === LIVE.ENERGY_CARD,
+    allReady: !!party && party.members.every((m) => m.ready),
     towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost)),
     // Mage Tower: Karten, die Mitspieler schon gewählt haben (jede Karte nur einmal im Team)
     teamTaken: tower && party ? dungeon.teamTaken(party.members, me) : new Set(),
@@ -152,6 +182,7 @@ router.get('/dungeon', async (req, res) => {
     playback: running && runDungeon ? playback(running, runDungeon, now) : null,
     hasChat: Boolean(running || (party && !party.solo)),
     cards,
+    foilChecked,
     shortcuts,
     startFans,
     current: mine ? { card: mine.card, boost: mine.boost } : null,
@@ -222,7 +253,7 @@ router.get('/dungeon/geschichte/:key', (req, res, next) => {
 // Karten in der Lobby wählen: aus dem Auswahl-Fenster per fetch (JSON, Fehler erscheinen im Fenster), sonst wie gewohnt
 const wantsJson = (req) => (req.get('Accept') || '').includes('application/json');
 router.post('/dungeon/karten', async (req, res) => {
-  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null });
+  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null, foiled: str(req.body.foil) === '1' });
   if (!wantsJson(req)) return handle(req, res, () => pick().then(() => null));
   try {
     await pick();
@@ -284,5 +315,55 @@ router.post('/dungeon/sofort-starten', (req, res) =>
     return null;
   })
 );
+
+// ---------- Live-Turm (eSports) ----------
+router.post('/dungeon/turm/vorrat', (req, res) =>
+  handle(req, res, () => dungeon.setSupplies({ user: req.user, coffee: str(req.body.coffee) || null, energy: req.body.energy === '1' }).then(() => null))
+);
+router.post('/dungeon/turm/bereit', (req, res) => handle(req, res, () => dungeon.toggleReady({ user: req.user }).then(() => null)));
+
+// Seite des Live-Turms: läuft gerade einer – oder das Ergebnis des letzten (einen Tag lang)
+router.get('/dungeon/live', async (req, res) => {
+  const now = Date.now();
+  const run = (await liveTower.loadFor(req.user._id, now)) || (await liveTower.lastFinished(req.user._id, now));
+  if (!run) return res.redirect('/dungeon');
+  const week = run.esportsTeam ? await require('../esports/esportsService').teamWeekRuns(run.esportsTeam, now) : [];
+  res.render('dungeon-live', { title: 'Mage Tower – live', state: liveTower.view(run, req.user._id, now), week, traits: LIVE.TRAITS });
+});
+
+// Zustand für die Seite (public/js/live-tower.js fragt jede Sekunde)
+router.get('/dungeon/live/stand', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const now = Date.now();
+  const run = (await liveTower.loadFor(req.user._id, now)) || (await liveTower.lastFinished(req.user._id, now));
+  if (!run) return res.json({ gone: true });
+  res.json(liveTower.view(run, req.user._id, now));
+});
+
+// Freie eigene Charakterkarten für den Kartenwechsel
+router.get('/dungeon/live/karten', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ cards: await liveTower.switchChoices(req.user._id) });
+});
+
+// Aktionen in der Pause (per fetch): Fähigkeit, Weiter, Kaffee, Energy, Kartenwechsel
+const LIVE_ACTIONS = {
+  waehlen: (req) => liveTower.choose({ user: req.user, key: str(req.body.key), target: req.body.target === undefined || req.body.target === '' ? null : Number.parseInt(str(req.body.target), 10) }),
+  weiter: (req) => liveTower.weiter({ user: req.user }),
+  kaffee: (req) => liveTower.coffee({ user: req.user }),
+  energy: (req) => liveTower.drink({ user: req.user, mode: str(req.body.mode), target: req.body.target === undefined || req.body.target === '' ? null : Number.parseInt(str(req.body.target), 10) }),
+  wechsel: (req) => liveTower.switchCard({ user: req.user, cardId: str(req.body.card) }),
+};
+router.post('/dungeon/live/:aktion', async (req, res) => {
+  const entry = Object.entries(LIVE_ACTIONS).find(([k]) => k === req.params.aktion);
+  if (!entry) return res.status(404).json({ ok: false, error: 'Unbekannte Aktion.' });
+  try {
+    const run = await entry[1](req);
+    res.json({ ok: true, state: liveTower.view(run, req.user._id) });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
 
 module.exports = router;

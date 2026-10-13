@@ -1,0 +1,47 @@
+<%#
+  Glasvitrine (#204): ausgestellte Slabs im Regal, jeder unter seinem Spotlight – antippen zeigt sie groß im Showroom
+  (public/js/foil-view.js, Galerie „vitrine“: wischen bzw. ‹ › blättert). Schreibtisch und öffentliche Shop-Seite.
+  items = ausgestellte Slabs ({ id, card, rarity, foiledAt, slab }), max = Plätze, popText(x) und popStats(x) optional
+  (Population als Text bzw. Seltenheit in der Note fürs Messingschild, tcg/population.gradeRarity), rarityByKey.
+  editable (eigener Schreibtisch, ohne Untermenü): Slabs lassen sich ziehen (Reihenfolge), ein Klick auf eine Karte öffnet
+  „Austauschen / Entfernen“, ein Klick auf ein leeres Fach die Auswahl freier Slabs (public/js/grading-desk.js).
+  Dazu cands = alle freien Slabs ({ id, card, rarity, foiledAt, slab }) und csrfToken.
+%>
+<% const editable = !!locals.editable; %>
+<div class="gd-vitrine<%= items.length ? '' : ' is-empty' %>" data-tour="vitrine" style="--vit-slots: <%= Math.max(1, max) %>"<%- editable ? ` data-vit-edit data-max="${max}" data-csrf="${csrfToken}"` : '' %>><%# Zahl der Fächer: daraus die Fachbreite (CSS) %>
+  <div class="gd-vit-shelf">
+    <% items.forEach((x) => { %><%- include('vitrine-item', { x, editable }) %><% }) %>
+    <% for (let i = items.length; i < max; i++) { %>
+      <% if (editable) { %>
+        <button type="button" class="gd-vit-empty is-add" data-vit-add aria-label="Freies Fach – Slab auswählen"><span><b aria-hidden="true">+</b></span></button>
+      <% } else { %>
+        <span class="gd-vit-empty" aria-hidden="true"><span></span></span>
+      <% } %>
+    <% } %>
+  </div>
+  <span class="gd-vit-glass" aria-hidden="true"></span>
+  <% if (editable) { %>
+    <%# Vorlagen für JS: Fach und leeres Fach zum Einsetzen ohne Neuladen %>
+    <div hidden data-vit-tpls>
+      <template data-vit-empty><button type="button" class="gd-vit-empty is-add" data-vit-add aria-label="Freies Fach – Slab auswählen"><span><b aria-hidden="true">+</b></span></button></template>
+      <% cands.forEach((x) => { %><template data-vit-tpl="<%= x.id %>"><%- include('vitrine-item', { x, editable }) %></template><% }) %>
+    </div>
+    <div class="gd-vit-pop" data-vit-pop hidden>
+      <div class="gd-vit-panel" role="menu" data-vit-menu hidden>
+        <button type="button" class="gd-ord-btn" role="menuitem" data-vit-act="swap">Austauschen</button>
+        <button type="button" class="gd-ord-btn is-danger" role="menuitem" data-vit-act="remove">Aus Vitrine entfernen</button>
+      </div>
+      <div class="gd-vit-panel is-pick" data-vit-pickview hidden>
+        <ul class="gd-vit-picklist">
+          <% cands.forEach((x) => { const rl = (rarityByKey[x.rarity] || {}).label || ''; %>
+            <li data-pick-li="<%= x.id %>"><button type="button" class="gd-vit-pickitem r-<%= x.rarity %>" data-pick="<%= x.id %>" title="<%= x.card.name %>" aria-label="<%= x.card.name %>, Note <%= x.slab.grade %>">
+              <span class="foil-card foil-card-slot"><%- include('../foil-mini', { card: x.card, rarityLabel: rl, slab: x.slab, id: x.id, eager: true }) %></span>
+            </button></li>
+          <% }) %>
+        </ul>
+        <p class="gd-vit-none" hidden>Kein freier Slab</p>
+      </div>
+    </div>
+    <p class="gd-vit-note" role="status" data-vit-note hidden></p>
+  <% } %>
+</div>

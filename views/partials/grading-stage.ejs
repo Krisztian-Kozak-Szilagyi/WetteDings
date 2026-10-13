@@ -1,0 +1,43 @@
+<%# Bühne des Arbeitstischs (public/js/grading.js): drehbare Karte, Lupe und Maus-Werkzeuge – für Kundenaufträge und
+    das Bügeln eigener Karten (#204). steps = Arbeitsschritte (welche Werkzeuge es gibt) %>
+<div class="gr-stage" data-gr-stage>
+  <div class="gr-lamp" aria-hidden="true"></div>
+  <div class="gr-zoom" data-gr-zoom>
+    <div class="gr-obj" data-gr-obj></div>
+  </div>
+  <div class="gr-hint" data-gr-hint></div>
+  <%# Messen: Ränder und Zentrierung aus den Messlinien (grading.js), nur beim Benoten %>
+  <div class="gr-measure-read" data-gr-measure-read aria-live="polite" hidden></div>
+  <%# Maus-Werkzeug: Drehen, Putzen, Bügeln, Messen oder UV-Lampe (Tasten D, P, B, M und U) %>
+  <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
+    <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
+    <% if (steps.includes('clean')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button><% } %>
+    <% if (steps.includes('iron')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="iron" title="Bügeln (Taste B)" hidden><span aria-hidden="true">♨️</span> Bügeln</button><% } %>
+    <% if (steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
+    <% if (steps.includes('grade')) { %><button type="button" class="gr-mode gr-mode-uv" role="radio" data-gr-mode="uv" title="UV-Lampe: Macken an Ecken und Kanten leuchten auf (Taste U)" hidden><span aria-hidden="true">🔦</span> UV-Lampe</button><% } %>
+  </div>
+  <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
+  <div class="gr-zoom-btns">
+    <button type="button" class="gr-round" data-gr-zoom-step="-1" title="Verkleinern" aria-label="Verkleinern">−</button>
+    <button type="button" class="gr-round" data-gr-zoom-step="1" title="Vergrößern" aria-label="Vergrößern">+</button>
+    <button type="button" class="gr-round" data-gr-zoom-step="0" title="Zurücksetzen" aria-label="Zurücksetzen">⟲</button>
+  </div>
+</div>
+<% if (steps.includes('grade')) { %>
+<%# Messleiste (#204): Ränder, Verhältnis und Feinjustierung je Linie – nur beim Messen sichtbar %>
+<div class="gr-mbar" data-gr-mbar hidden>
+  <div class="gr-mbar-side">
+    <span class="gr-mbar-label">Links</span>
+    <button type="button" class="gr-round" data-gr-nudge="-1" data-guide="l" aria-label="Linke Linie nach links">‹</button>
+    <b data-gr-mval="l">–</b>
+    <button type="button" class="gr-round" data-gr-nudge="1" data-guide="l" aria-label="Linke Linie nach rechts">›</button>
+  </div>
+  <div class="gr-mbar-mid"><b data-gr-mratio>–</b><small data-gr-mcap></small></div>
+  <div class="gr-mbar-side">
+    <span class="gr-mbar-label">Rechts</span>
+    <button type="button" class="gr-round" data-gr-nudge="-1" data-guide="r" aria-label="Rechte Linie nach links">‹</button>
+    <b data-gr-mval="r">–</b>
+    <button type="button" class="gr-round" data-gr-nudge="1" data-guide="r" aria-label="Rechte Linie nach rechts">›</button>
+  </div>
+</div>
+<% } %>

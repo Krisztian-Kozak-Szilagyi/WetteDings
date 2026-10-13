@@ -83,6 +83,7 @@ const TEST_HELDEN = {
 const unreleased = (name, ids) => Object.fromEntries(ids.map((id) => [id, { season: 'season-1', name, unreleased: true }]));
 const SEASON1_UNRELEASED = {
   ...unreleased('Mark Suntouched', ['mark-suntouched-1-footman', 'mark-suntouched-2-gold', 'mark-suntouched-3-holo', 'mark-suntouched-4-arcane']),
+  ...unreleased('The Gracebringer', ['the-gracebringer-1-footman', 'the-gracebringer-2-gold', 'the-gracebringer-3-holo', 'the-gracebringer-4-arcane']),
 };
 
 module.exports = {

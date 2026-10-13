@@ -1,0 +1,278 @@
+<%- include('partials/head') %>
+<%#
+  Karte graden lassen (#204): Annahmeschalter im Werkstatt-Stil. Links die drei Schritte (Karte, Leistung, Shop),
+  rechts der Auftragszettel, der mit der Auswahl wächst (Vorschau, Posten, Summe, Einreichen) – public/js/grading-einreichen.js.
+  Darunter die eigenen Aufträge nach Status gefiltert (stornieren, bewerten).
+%>
+<%
+  const STATUS = { wartet: 'Wartet', in_arbeit: 'In Arbeit', fertig: 'Zurück', abgelaufen: 'Abgelaufen – erstattet', storniert: 'Storniert – erstattet' };
+  const others = shops.filter((s) => !s.own);
+  const svc = Object.fromEntries(services.map((s) => [s.key, s]));
+  // Erklärungen hinter einem ?-Knopf statt Fließtext (Klick, am Desktop auch Mouseover – grading-einreichen.js)
+  const tip = (html, label = 'Erklärung') => `<details class="help-tip"><summary aria-label="${label}">?</summary><div class="help-tip-body">${html}</div></details>`;
+%>
+<div class="gr-page gd-page ge-page">
+<div class="ge-desk">
+  <header class="ge-head">
+    <div class="ge-head-text">
+      <h1>Annahmeschalter</h1>
+      <p>Karte an den Shop eines Mitglieds schicken</p>
+    </div>
+    <a class="ge-go is-calm" href="/grading">Zum eigenen Shop</a>
+  </header>
+
+  <% if (!others.length) { %>
+    <section class="ge-panel ge-empty"><h2>Noch kein Shop offen</h2><p>Gerade nimmt kein Grading-Shop Karten von Mitgliedern an. Shops ab Stufe 4 (Premium-Labor) erscheinen hier.</p></section>
+  <% } else if (!cards.length) { %>
+    <section class="ge-panel ge-empty"><h2>Keine Karte frei</h2><p>Du hast gerade keine Karte, die sich einreichen lässt (Karten im Slab erst aufbrechen; Karten im Handel, auf Quest oder in der Vitrine sind gesperrt).</p></section>
+  <% } else { %>
+    <form method="post" action="/grading/einreichen" class="gs-form ge-form" data-gs-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <ol class="ge-steps" aria-label="Fortschritt">
+        <li data-ge-step="shop"><button type="button" data-ge-go="0"><i>1</i> Shop</button></li>
+        <li data-ge-step="card"><button type="button" data-ge-go="1"><i>2</i> Karte</button></li>
+        <li data-ge-step="svc"><button type="button" data-ge-go="2"><i>3</i> Paket</button></li>
+      </ol>
+
+      <div class="ge-layout">
+        <div class="ge-main">
+          <section class="ge-panel gs-step" id="ge-s1" data-ge-pane="0">
+            <div class="ge-pane-head">
+              <h2>Shop wählen</h2>
+              <label class="ge-sort">Sortiert nach
+                <select data-ge-sort>
+                  <option value="rep">Reputation</option>
+                  <option value="price">Preis</option>
+                  <option value="queue">Warteschlange</option>
+                </select>
+              </label>
+              <label class="ge-sort">Ab Stufe
+                <select data-ge-minrank>
+                  <option value="0">Alle</option>
+                  <% repTiers.slice(1).forEach((t, i) => { %><option value="<%= i + 1 %>"><%= t.label %></option><% }) %>
+                </select>
+              </label>
+            </div>
+            <div class="gs-shops ge-shops" data-ge-shops>
+              <% others.forEach((s, i) => { %>
+                <label class="gs-shop ge-shop" data-prices="<%= JSON.stringify(s.prices) %>" data-code="<%= s.code %>" data-tier="<%= s.rating.tier.index %>" data-slabs="<%= s.slabs %>" data-rep="<%= Math.round(s.rating.reputation) %>" data-queue="<%= s.queue %>" data-order="<%= i %>">
+                  <input type="radio" name="shop" value="<%= s.code %>" <%= pick && pick === s.code ? 'checked' : '' %> required>
+                  <%
+                    const rt = s.rating;
+                    const pct = (v) => (v != null ? Math.round(v) : null);
+                  %>
+                  <span class="ge-shop-top">
+                    <span class="ge-shop-id">
+                      <b class="ge-shop-name"><%= s.name %></b>
+                      <span class="gr-shop-code"><%= s.code %></span>
+                    </span>
+                    <span class="gs-shop-price"><b data-gs-total><%= euro(s.prices.base + s.prices.slab) %></b><small class="ge-flag" data-ge-flag hidden></small></span>
+                  </span>
+                  <% if (s.slogan) { %><span class="ge-shop-slogan"><%= s.slogan %></span><% } %>
+                  <span class="ge-shop-sub">
+                    <span class="ge-tier is-t<%= rt.tier.index %>"><%= rt.tier.label %></span>
+                    <span class="ge-stars-line" title="<%= rt.stars != null ? 'Kundenbewertung' : 'noch keine Bewertung' %>"><% if (rt.stars != null) { %>★ <b><%= rt.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) %></b> <small>(<%= rt.starCount %>)</small><% } else { %><small>neu, noch keine Bewertung</small><% } %></span>
+                    <span class="ge-owner">von <%= s.owner %></span>
+                  </span>
+                  <span class="ge-meters">
+                    <span class="ge-meter-row" title="Wie sauber der Shop arbeitet">
+                      <span>Qualität</span>
+                      <span class="ge-bar"><i style="--w: <%= pct(rt.quality) || 0 %>%"></i></span>
+                      <b><%= pct(rt.quality) != null ? pct(rt.quality) + ' %' : '–' %></b>
+                    </span>
+                    <span class="ge-meter-row" title="Wie oft der Shop die Note genau trifft">
+                      <span>Treffsicherheit</span>
+                      <span class="ge-bar"><i style="--w: <%= pct(rt.hitRate) || 0 %>%"></i></span>
+                      <b><%= pct(rt.hitRate) != null ? pct(rt.hitRate) + ' %' : '–' %></b>
+                    </span>
+                  </span>
+                  <span class="ge-shop-facts">
+                    <span class="ge-fact<%= s.queue ? '' : ' is-good' %>" title="Aufträge vor dir">⏳ <%= s.queue ? s.queue + ' in der Schlange' : 'keine Schlange' %></span>
+                    <span class="gs-shop-stock ge-fact<%= s.slabs ? '' : ' is-out' %>" data-gs-stock title="Leere Slabs zum Versiegeln"><%= s.slabs ? '🧱 ' + s.slabs + (s.slabs === 1 ? ' Slab' : ' Slabs') + ' frei' : '🚫 keine Slabs' %></span>
+                  </span>
+                  <% if (s.showcase.length) { %>
+                    <span class="gs-shop-showcase">
+                      <% s.showcase.slice(0, 4).forEach((x) => { %><span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: x.card, rarityLabel: (rarityByKey[x.rarity] || {}).label || '', slab: x.slab, id: x.id }) %></span><% }) %>
+                    </span>
+                  <% } %>
+                  <span class="ge-shop-foot">
+                    <span class="gs-shop-list"><%- tip('<b>Preisliste</b><br>' + services.map((sv) => sv.short + ' ' + euro(s.prices[sv.key])).join('<br>'), 'Preisliste') %> <small>Preisliste</small></span>
+                    <a class="ge-shop-link" href="/grading/shop/<%= s.code %>">Shop ansehen →</a>
+                  </span>
+                </label>
+              <% }) %>
+            </div>
+          </section>
+
+          <section class="ge-panel gs-step" id="ge-s2" data-ge-pane="1" hidden>
+            <h2>Karte wählen</h2>
+            <div class="ge-search" data-ge-search>
+              <input type="search" class="ge-search-input" placeholder="Karte suchen …" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ge-suggest" aria-label="Eigene Karte suchen" data-ge-q>
+              <ul class="ge-suggest" id="ge-suggest" role="listbox" data-ge-suggest hidden></ul>
+            </div>
+            <div class="tcg-grid gs-cards ge-cards">
+              <% cards.forEach((c) => { const r = rarityByKey[c.rarity] || { label: '' }; const ironable = c.creased && !c.ironed; %>
+                <label class="tcg-slot gs-card r-<%= c.rarity %>" data-kind="<%= c.slab ? 'slab' : [c.damaged ? 'spuren' : '', ironable ? 'knick' : ''].join(' ') %>">
+                  <input type="radio" name="doc" value="<%= c.id %>" data-ironable="<%= ironable ? 1 : 0 %>" data-sleeve="<%= c.foiledAt && !c.slab ? 1 : 0 %>" data-slab="<%= c.slab ? c.slab.code : '' %>" data-name="<%= c.card.name %>" data-image="<%= c.card.image %>" required>
+                  <% if (c.slab) { %>
+                    <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c.card, rarityLabel: r.label, slab: c.slab, id: c.id }) %></span>
+                  <% } else if (c.foiledAt) { %>
+                    <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: c.card, rarityLabel: r.label }) %></span>
+                  <% } else { %>
+                    <span class="tcg-art">
+                      <img src="<%= c.card.image %>" alt="" loading="lazy" width="720" height="1008">
+                      <% if (c.creased) { %><span class="tcg-crease-tag"><%= c.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+                      <% if (c.marks) { %><button type="button" class="hb-loupe"<%- copyViewAttrs(c.card, r.label, c.marks, { note: 'Exemplar' }) %> aria-label="<%= c.card.name %> genau ansehen" title="Genau ansehen">🔍</button><% } %>
+                    </span>
+                  <% } %>
+                  <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.creased ? (c.ironed ? ' · gebügelt' : ' · Knick') : c.damaged ? ' · Spuren' : '' %></span>
+                </label>
+              <% }) %>
+            </div>
+            <p class="ge-none" data-ge-none hidden>Keine passende Karte.</p>
+            <div class="ge-pager" data-ge-pager hidden>
+              <button type="button" class="ge-btn" data-ge-prev aria-label="Vorherige Karten">‹</button>
+              <span data-ge-page aria-live="polite"></span>
+              <button type="button" class="ge-btn" data-ge-nextpage aria-label="Nächste Karten">›</button>
+            </div>
+          </section>
+
+              <section class="ge-panel gs-step" id="ge-s3" data-ge-pane="2" hidden>
+            <h2>Paket wählen</h2>
+            <input type="hidden" name="review" value="" data-gs-review-input>
+            <%# Die Bausteine für den Server bleiben Kontrollkästchen, gesetzt wird sie vom gewählten Paket (grading-einreichen.js) %>
+            <input type="checkbox" name="iron" value="1" data-gs-svc="iron" hidden>
+            <input type="checkbox" name="slab" value="1" data-gs-svc="slab" hidden>
+            <input type="checkbox" name="express" value="1" data-gs-svc="express" hidden>
+            <%
+              // Pakete: jedes gibt es normal und als Express-Variante (Express = Zuschlag, Karte kommt vor allen anderen dran)
+              const PKGS = [
+                { key: 'grade', title: 'Grading', text: 'Putzen, benoten und im Slab versiegeln.', keys: 'base,slab', show: true },
+                { key: 'full', title: 'Komplett', text: 'Zusätzlich den Knick bügeln – für eine höhere Note.', keys: 'base,iron,slab' },
+                { key: 'iron', title: 'Nur Bügeln', text: 'Putzen und Knick glätten, ohne Slab.', keys: 'base,iron' },
+                { key: 'review', title: 'Zweitprüfung', text: 'Ein anderer Shop benotet den Slab blind – bestätigt oder neu versiegelt.', keys: 'review' },
+              ];
+              const fastText = 'Kommt vor allen anderen dran: ' + expressDays + (expressDays === 1 ? ' Tag' : ' Tage') + ' statt ' + orderDays + '.';
+            %>
+            <div class="ge-pkgs" role="radiogroup" aria-label="Servicepaket">
+              <% PKGS.forEach((pk) => [false, true].forEach((fast) => { %>
+                <label class="ge-pkg<%= fast ? ' is-fast' : '' %>" data-pkg="<%= pk.key + (fast ? '-x' : '') %>" data-keys="<%= pk.keys + (fast ? ',express' : '') %>"<%= pk.show && !fast ? '' : ' hidden' %>>
+                  <input type="radio" name="pkg" value="<%= pk.key + (fast ? '-x' : '') %>">
+                  <span class="ge-pkg-body"><b><%= pk.title %><% if (fast) { %> <em class="ge-fast">⚡ Express</em><% } %></b><span><%= pk.text %><% if (fast) { %> <%= fastText %><% } %></span></span>
+                  <span class="ge-pkg-price" data-pkg-price></span>
+                </label>
+              <% })) %>
+            </div>
+          </section>
+
+        </div>
+
+        <%# Auftragszettel: wächst mit der Auswahl (grading-einreichen.js) %>
+        <aside class="ge-ticket" aria-live="polite">
+          <h2>Auftragszettel</h2>
+          <p class="ge-ticket-shop" data-ge-shopname hidden></p>
+          <div class="ge-ticket-card" data-ge-preview><span class="ge-ticket-empty">Karte folgt</span></div>
+          <p class="ge-ticket-name" data-ge-name hidden></p>
+          <ul class="ge-lines" data-ge-lines></ul>
+          <p class="ge-total"><span>Summe</span><b data-ge-sum>–</b></p>
+          <p class="ge-note small" data-ge-note></p>
+          <p class="gs-summary" data-gs-summary hidden>Wähle eine Karte.</p>
+          <button class="ge-go" type="submit" data-gs-submit disabled>Einreichen</button>
+          <button class="ge-go" type="button" data-ge-next>Weiter ›</button>
+          <button class="ge-go ge-back" type="button" data-ge-back disabled>‹ Zurück</button>
+        </aside>
+      </div>
+    </form>
+  <% } %>
+
+  <% if (orders.length) {
+    const group = (o) => (o.status === 'wartet' || o.status === 'in_arbeit' ? 'laufend' : o.status === 'fertig' ? 'fertig' : 'beendet');
+    const count = { laufend: 0, fertig: 0, beendet: 0 };
+    orders.forEach((o) => { count[group(o)]++; });
+    const firstTab = count.laufend ? 'laufend' : count.fertig ? 'fertig' : 'beendet';
+  %>
+    <section class="ge-orders" data-ge-orders>
+      <h2 class="ge-orders-title">Deine Aufträge <%- tip('Bewerten kannst du bis ' + rateDays + ' Tage nach der Rückgabe – einmal je Auftrag.') %></h2>
+      <% [['laufend', 'Laufend'], ['fertig', 'Zurück beim Besitzer'], ['beendet', 'Storniert / abgelaufen']].forEach(([grp, gLabel]) => { if (!count[grp]) return; %>
+      <details class="ge-group" <%= grp === firstTab || (grp === 'fertig' && orders.some((o) => o.rateable)) ? 'open' : '' %>>
+        <summary><%= gLabel %> <span class="ge-count"><%= count[grp] %></span></summary>
+        <ul class="ge-order-list">
+          <% orders.filter((o) => group(o) === grp).forEach((o) => {
+            const c = o.cardInfo;
+            const sv = o.services || {};
+            const what = [sv.review ? 'Zweitprüfung' : 'Reinigung', sv.iron ? 'Bügeln' : '', sv.slab ? 'Benoten + Slab' : '', sv.express ? '⚡ Express' : ''].filter(Boolean).join(' · ');
+            const stage = { wartet: 0, in_arbeit: 1, fertig: 2 }[o.status];
+          %>
+            <li class="ge-order is-<%= o.status %>">
+              <span class="ge-order-thumb"><% if (c) { %><img src="<%= c.image %>" alt="" width="64" height="90" loading="lazy"><% } %></span>
+              <span class="ge-order-main">
+                <b class="ge-order-name"><%= c ? c.name : o.card %></b>
+                <span class="ge-order-sub">Shop <a href="/grading/shop/<%= o.shopCode %>"><%= o.shopCode %></a> · <%= euro(o.price) %></span>
+                <span class="ge-order-what"><%= what %></span>
+              </span>
+              <span class="ge-order-state">
+                <% if (stage != null && o.status !== 'fertig') { %>
+                  <ol class="ge-rail" aria-label="Status: <%= STATUS[o.status] %>">
+                    <% ['Eingereicht', 'In Arbeit', 'Zurück'].forEach((lab, i) => { %><li class="<%= i < stage ? 'is-done' : i === stage ? 'is-now' : '' %>"><i></i><span><%= lab %></span></li><% }) %>
+                  </ol>
+                  <span class="ge-order-note">Frist bis <%= date(o.expiresAt) %></span>
+                <% } else if (o.status === 'fertig' && o.result) { %>
+                  <% if (o.result.grade != null) { %>
+                    <span class="ge-result">
+                      <span class="ge-grade"><b><%= o.result.grade %></b><small>Note</small></span>
+                      <span class="ge-result-text">
+                        <% if (sv.review) { %><%= o.result.changed ? 'Neuer Slab ' + o.shopCode : 'Note bestätigt' %><small><%= o.result.changed ? 'vorher Note ' + o.result.before : 'Der Aussteller lag richtig' %></small>
+                        <% } else { %>Slab <%= o.shopCode %><small>Karte zurück im Besitz</small><% } %>
+                      </span>
+                    </span>
+                  <% } else if (o.result.iron != null) { %>
+                    <span class="ge-result"><span class="ge-grade"><b><%= o.result.iron %> %</b><small>glatt</small></span><span class="ge-result-text">Gebügelt<small>Karte zurück im Besitz</small></span></span>
+                  <% } %>
+                <% } else { %>
+                  <span class="ge-refund"><b><%= o.status === 'storniert' ? 'Storniert' : 'Abgelaufen' %></b><small><%= euro(o.price) %> erstattet</small></span>
+                <% } %>
+              </span>
+              <% if (o.status === 'wartet') { %>
+                <span class="ge-order-actions">
+                  <form method="post" action="/grading/auftrag/<%= o._id %>/storno" data-confirm="Auftrag stornieren? Du bekommst <%= euro(o.price) %> zurück.">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="ge-btn ge-btn-sm is-danger" type="submit">Stornieren</button>
+                  </form>
+                </span>
+              <% } else if (o.stars) { %>
+                <span class="ge-order-actions"><span class="ge-rated">Deine Bewertung<b class="ge-stars"><%= '★'.repeat(o.stars) %><i><%= '★'.repeat(5 - o.stars) %></i></b></span></span>
+              <% } %>
+              <% if (o.rateable) { %>
+                <form method="post" action="/grading/auftrag/<%= o._id %>/bewerten" class="gs-rate ge-rate">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <span class="ge-rate-q">Wie war der Shop?</span>
+                  <span class="gs-stars" role="radiogroup" aria-label="Sterne">
+                    <% for (let s = 5; s >= 1; s--) { %><input type="radio" id="st-<%= o._id %>-<%= s %>" name="stars" value="<%= s %>" required><label for="st-<%= o._id %>-<%= s %>" title="<%= s %> <%= s === 1 ? 'Stern' : 'Sterne' %>">★</label><% } %>
+                  </span>
+                  <%# Schnell-Tags (#204): erscheinen nach den Sternen – 4–5 Sterne Lob, 1–3 Kritik %>
+                  <span class="gs-tags" data-gs-tags data-max="<%= tagMax %>" hidden>
+                    <% reviewTags.forEach((t) => { %><label class="gs-tag <%= t.good ? 'is-good' : 'is-bad' %>"><input type="checkbox" name="tags" value="<%= t.key %>"><span><%= t.label %></span></label><% }) %>
+                  </span>
+                  <%# Trinkgeld (optional): geht beim Bewerten direkt an den Shop %>
+                  <span class="gs-tip" role="radiogroup" aria-label="Trinkgeld">
+                    <span class="gs-tip-label">Trinkgeld</span>
+                    <label class="gs-tag"><input type="radio" name="tip" value="0" checked><span>Kein</span></label>
+                    <% tipSteps.forEach((c) => { %><label class="gs-tag is-good"><input type="radio" name="tip" value="<%= c %>" <%= balance < c ? 'disabled' : '' %>><span><%= euro(c) %></span></label><% }) %>
+                  </span>
+                  <button class="ge-btn ge-btn-sm" type="submit">Bewerten</button>
+                </form>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </details>
+      <% }) %>
+    </section>
+  <% } %>
+</div>
+</div>
+
+<script src="/js/grading-einreichen.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foil-modal') %>
+<%- include('partials/foot') %>

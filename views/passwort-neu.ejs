@@ -1,0 +1,30 @@
+<%- include('partials/head') %>
+
+<div class="narrow narrow-sm">
+  <div class="card">
+    <h1>Neues Passwort</h1>
+    <p class="muted">Du hast dich mit einem Einmal-Code angemeldet. Wähle jetzt ein eigenes Passwort – erst danach geht es weiter.</p>
+
+    <% if (error) { %><div class="form-errors" role="alert"><%= error %></div><% } %>
+
+    <form method="post" action="/passwort-neu" class="form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="text" name="username" value="<%= currentUser.username %>" autocomplete="username" hidden>
+      <label class="field">
+        <span>Neues Passwort (mind. 8 Zeichen)</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="200" required autofocus>
+      </label>
+      <label class="field">
+        <span>Neues Passwort wiederholen</span>
+        <input type="password" name="password2" autocomplete="new-password" minlength="8" maxlength="200" required>
+      </label>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Passwort speichern</button>
+    </form>
+    <form method="post" action="/abmelden" class="center">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn btn-ghost btn-sm" type="submit">Abmelden</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/foot') %>

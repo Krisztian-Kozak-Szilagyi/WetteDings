@@ -222,6 +222,17 @@ test('Dungeon: jeder Termin rund um die Uhr, sofort angemeldet, Beute nie angesc
   // sofort angemeldet, aber tagsüber und Beute angeschaut: nur möglich
   const quick = human.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 20e3) }));
   assert.equal(s.dungeonFinding(quick, opts).level, LEVEL.moeglich);
+  // Dauerspieler mit Wecker: 13 Termine in Folge, aber erst 40 Min. nach Öffnen angemeldet, Beute angeschaut: nur möglich
+  const alarm = bot.map((r) => ({ ...r, joinedAt: new Date(r.slot.getTime() - 2 * H + 40 * 60e3), seen: true }));
+  const af = s.dungeonFinding(alarm, opts);
+  assert.equal(af.level, LEVEL.moeglich);
+  assert.equal(af.streak, 13);
+  // Serie mit nie angeschauter Beute bleibt wahrscheinlich
+  assert.equal(s.dungeonFinding(alarm.map((r) => ({ ...r, seen: false })), opts).level, LEVEL.wahrscheinlich);
+  // langer Termin-Abstand (24 Std.): erst ab 6 Terminen in Folge eine Serie, und auch dann nur möglich
+  const daily = (n) => Array.from({ length: n }, (_, i) => ({ slot: new Date(start + i * 24 * H), joinedAt: null, seen: true, finished: true }));
+  assert.equal(s.dungeonFinding(daily(5), { ...opts, intervalMs: 24 * H }), null);
+  assert.equal(s.dungeonFinding(daily(6), { ...opts, intervalMs: 24 * H }).level, LEVEL.moeglich);
   // zu wenige Durchläufe
   assert.equal(s.dungeonFinding(bot.slice(0, 5), opts), null);
 });
@@ -429,4 +440,34 @@ test('Gesamtbewertung bestimmt die Reihenfolge der Spieler', () => {
   // bei einem Konten-Paar zählt das Mehrfach-Konto eines der beiden nicht
   const pair = s.groupAlerts([{ users: [u('zweit'), u('x')], kind: 'wert', level: 1, evidenceAt: new Date(t0), doneAt: null }], new Map([['zweit', 3]]));
   assert.equal(pair[0].rating.stage, s.STAGE.beobachten);
+});
+
+test('#204 C: Gefälligkeitsnote – Shop schreibt einem Kunden wiederholt zu hohe Noten auf den Slab', () => {
+  const names = new Map([['shop', 'Shopper'], ['kunde', 'Kunde']]);
+  const job = (guess, grade, at) => ({ shop: 'shop', owner: 'kunde', guess, grade, card: 'Karte', price: 8000, at: new Date(at) });
+  assert.equal(s.favorFinding([job(9, 6, 1), job(8, 7, 2)], names), null); // nur einmal ≥ 2 daneben
+  const f = s.favorFinding([job(9, 6, 1), job(10, 8, 2), job(7, 7, 3)], names);
+  assert.equal(f.level, LEVEL.moeglich);
+  assert.deepEqual([f.count, f.total, f.users], [2, 16000, ['shop', 'kunde']]);
+  assert.match(f.summary, /Shopper hat Kunde 2× eine um mindestens 2 zu hohe Note/);
+  assert.equal(s.favorFinding([job(9, 6, 1), job(10, 8, 2)], names, true).level, LEVEL.wahrscheinlich); // Mehrfach-Konto
+  assert.equal(s.favorFinding([1, 2, 3, 4].map((i) => job(10, 7, i)), names).level, LEVEL.wahrscheinlich);
+  assert.equal(s.favorFinding([job(9, 4, 1), job(null, 4, 2)], names), null);
+});
+
+test('#204 C: Grading-Aufträge zwischen Mehrfach-Konten', () => {
+  const names = new Map([['shop', 'A'], ['kunde', 'B']]);
+  const o = (price, at) => ({ shop: 'shop', owner: 'kunde', price, at: new Date(at), card: 'Karte' });
+  assert.equal(s.gradingNetFinding([], names), null);
+  assert.equal(s.gradingNetFinding([o(5000, 1)], names).level, LEVEL.moeglich);
+  assert.equal(s.gradingNetFinding([o(50000, 1)], names).level, LEVEL.wahrscheinlich);
+  assert.equal(s.gradingNetFinding([o(100, 1), o(100, 2), o(100, 3)], names).level, LEVEL.wahrscheinlich);
+});
+
+test('#204 C: Wertverschiebung – die Position geht an valueOf (Slab zum Marktpreis)', () => {
+  const t = { seller: 'a', buyer: 'b', give: [{ card: 'x', slab: { code: 'T', grade: 10 } }], want: [], price: 30000, extraFrom: 'to' };
+  const bankOnly = (card) => (card === 'x' ? 1000 : 0);
+  const withMarket = (card, line) => (line && line.slab ? 30000 : bankOnly(card));
+  assert.ok(s.valueFinding(t, bankOnly)); // nach Händlerpreis: 300 € für eine 10-€-Karte – sieht nach Verschiebung aus
+  assert.equal(s.valueFinding(t, withMarket), null); // zum Marktpreis des Slabs: fair
 });

@@ -49,6 +49,9 @@ const settingsSchema = new Schema(
     gradingChance: Number, // Chance in 1/10.000 pro versiegelter Karte im Grading-Shop
     bonusPercent: Number, // Wertsteigerung beim Folieren in %
     dailyPercent: Number, // Wertsteigerung pro vollem Tag in %
+    sleevePrice: Number, // Bank-Shop: Preis eines TCG Sleeves in Cent
+    slabPrice: Number, // Bank-Shop: Preis eines leeren Slabs in Cent
+    slabDropPercent: Number, // Anteil der Dungeon-/Turm-Funde, die ein leerer Slab statt eines Sleeves sind (in %)
     updatedByName: String,
   },
   { timestamps: true }

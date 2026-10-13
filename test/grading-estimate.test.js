@@ -32,3 +32,14 @@ test('Grading-Schätzung: pro Tag, Folie ab Stufe 3, Amortisation', () => {
   assert.deepEqual(rows.map((r) => r.cost), [0, 150000, 500000, 1200000]);
   assert.deepEqual(rows.map((r) => r.payback), [null, 8, 34, 67]); // 150000/20000 = 7,5 -> 8 Tage
 });
+
+test('#204: Bügeln zählt nur mit dem Anteil der Kundenkarten mit Knick', () => {
+  const withIron = { level: 2, name: 'B', steps: ['clean', 'iron', 'grade'] };
+  const pay = { ...SETTINGS.pay, iron: 2000 };
+  assert.equal(jobPay(withIron, pay, 30, perfect, 1), 4500); // ohne Knick-Anteil: wie bisher
+  assert.equal(jobPay(withIron, pay, 30, perfect, 1, 0.06), 4500 + 120); // 6 % Karten mit Knick × 20 €
+  assert.equal(jobPay(LEVELS[1], pay, 30, perfect, 1, 0.06), 4500); // Stufe ohne Bügeln
+  assert.ok(PROFILES.every((p) => p.iron > 0 && p.iron <= 100));
+  const rows = estimate({ levels: [LEVELS[0], withIron], settings: { ...SETTINGS, pay }, factor: 1, profiles: [perfect], creaseChance: 0.06 });
+  assert.deepEqual(rows.map((r) => r.perDay.perfekt), [25000, 46200]);
+});

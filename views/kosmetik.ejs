@@ -1,0 +1,47 @@
+<%- include('partials/head') %>
+<%# Kosmetik-Shop: gekauft wird mit Konfetti (zerkleinerte Karten im Album), alles bleibt am Konto (kein Handel).
+    Je Art ein Abschnitt – vorerst nur Avatare, später Banner, Rahmen, Namensschilder … %>
+
+<div class="cos-head">
+  <div>
+    <h1>Kosmetik</h1>
+    <p class="muted">Bezahlt wird mit <%= konfettiName() %>: Zerkleinere im <a href="/tcg/album">Album</a> Karten, die du nicht mehr brauchst. Gekauftes gehört für immer dir.</p>
+  </div>
+  <a class="cos-balance" href="/tcg/album" title="Karten im Album zerkleinern">
+    <span class="cos-balance-label"><%= konfettiName() %></span>
+    <strong><%= konfetti.toLocaleString('de-DE') %></strong>
+  </a>
+</div>
+
+<% kinds.forEach((k) => { %>
+  <section class="cos-section" aria-labelledby="cos-<%= k.key %>">
+    <h2 id="cos-<%= k.key %>"><%= k.label %> <span class="muted small"><%= k.items.filter((it) => it.owned).length %> / <%= k.items.length %></span></h2>
+    <div class="cos-grid">
+      <% k.items.forEach((it) => { %>
+        <article class="cos-item<%= it.owned ? ' is-owned' : '' %><%= it.worn ? ' is-worn' : '' %>" id="<%= k.key %>-<%= it.key %>">
+          <img class="cos-img<%= it.effect ? ' cos-fx cos-fx-' + it.effect : '' %>" src="<%= it.url %>?v=<%= assetVersion %>" alt="" width="152" height="152" loading="lazy">
+          <h3 class="cos-name"><%= it.name %></h3>
+          <% if (it.worn) { %>
+            <button class="btn btn-ghost btn-sm btn-block" type="button" disabled>Getragen</button>
+          <% } else if (it.owned) { %>
+            <form method="post" action="/kosmetik/tragen">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="art" value="<%= k.key %>">
+              <input type="hidden" name="key" value="<%= it.key %>">
+              <button class="btn btn-ghost btn-sm btn-block" type="submit">Tragen</button>
+            </form>
+          <% } else { %>
+            <form method="post" action="/kosmetik/kaufen" data-confirm="<%= it.name %> für <%= it.price.toLocaleString('de-DE') %> <%= konfettiName() %> kaufen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="art" value="<%= k.key %>">
+              <input type="hidden" name="key" value="<%= it.key %>">
+              <button class="btn btn-primary btn-sm btn-block" type="submit" <%= konfetti >= it.price ? '' : 'disabled' %>><%= it.price ? it.price.toLocaleString('de-DE') + ' ' + konfettiName() : 'Gratis' %></button>
+            </form>
+          <% } %>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+<% }) %>
+
+<%- include('partials/foot') %>

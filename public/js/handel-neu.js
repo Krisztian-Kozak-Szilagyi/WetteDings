@@ -3,7 +3,7 @@
 
   // Handelsfenster (/handel/neu und Gegenangebote): Karten antippen oder ins Fenster ziehen legt sie in die Ablage
   // oben, "−" oder Herausziehen nimmt eine weg.
-  // Geld fließt nur in eine Richtung; Zusammenfassung mit Kartenwert, Wertvergleich und Steuer.
+  // Geld fließt nur in eine Richtung; Zusammenfassung mit Händlerpreis, Wertvergleich und Steuer.
   // Ohne JS gehen die Zahlenfelder unter den Karten direkt.
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -281,26 +281,26 @@
     $all('[data-hb-sum]', root).forEach(function (el) {
       var side = el.getAttribute('data-hb-sum');
       var sel = side === 'gib' ? give : get;
-      el.textContent = sel.count ? 'Wert ' + euro(sel.value) : '';
+      el.textContent = sel.count ? 'Händlerpreis ' + euro(sel.value) : '';
     });
-    // Wertvergleich: was ich bekomme minus was ich gebe (Kartenwert + Geld)
+    // Wertvergleich: was ich bekomme minus was ich gebe (Händlerpreis + Geld)
     if (balanceBox) {
       var diff = get.value + receive - give.value - pay;
       var any = give.count || get.count;
       balanceBox.hidden = !any;
       balanceBox.textContent = !diff ? 'gleicher Wert' : (diff > 0 ? '+' : '−') + euro(Math.abs(diff));
       balanceBox.className = 'hb-balance' + (diff > 0 ? ' is-pos' : diff < 0 ? ' is-neg' : '');
-      balanceBox.title = diff > 0 ? 'Du bekommst mehr Kartenwert, als du gibst' : diff < 0 ? 'Du gibst mehr Kartenwert, als du bekommst' : '';
+      balanceBox.title = diff > 0 ? 'Du bekommst mehr nach Händlerpreis, als du gibst' : diff < 0 ? 'Du gibst mehr nach Händlerpreis, als du bekommst' : '';
     }
 
     var kind = give.count && get.count ? 'tausch' : isMarket || isListing ? 'markt' : 'privat';
     var problems = [];
-    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle unten Karten aus deiner Sammlung – oder Wunschkarten für ein Gesuch.' : 'Wähle Karten – auf einer der beiden Seiten.');
+    if (!give.count && !get.count) problems.push(isMarket ? 'Wähle Karten oder Wunschkarten.' : 'Wähle Karten.');
     if (give.count > maxLines || get.count > maxLines) problems.push('Höchstens ' + maxLines + ' Karten je Seite.');
-    if (give.count && !get.count && !receive) problems.push(isMarket ? 'Gib einen Preis an – oder wähle Wunschkarten, dann wird getauscht.' : 'Ohne Karten zurück: Gib an, wie viel du dafür bekommst.');
-    if (!give.count && get.count && !pay) problems.push('Ohne eigene Karten: Gib an, wie viel du dafür zahlst.');
-    if (!give.count && receive) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du gibst“ ein.');
-    if (!get.count && pay && give.count) problems.push('Wer keine Karte gibt, muss zahlen – trag das Geld bei „Du bekommst“ ein.');
+    if (give.count && !get.count && !receive) problems.push(isMarket ? 'Preis oder Wunschkarten fehlen.' : 'Gib an, was du dafür bekommst.');
+    if (!give.count && get.count && !pay) problems.push('Gib an, was du dafür zahlst.');
+    if (!give.count && receive) problems.push('Ohne Karte: Geld bei „Du gibst“ eintragen.');
+    if (!get.count && pay && give.count) problems.push('Ohne Karte: Geld bei „Du bekommst“ eintragen.');
     if (pay > balance) problems.push('Dein Guthaben reicht dafür nicht (' + euro(balance) + ').');
 
     var nothing = !give.count && !get.count;

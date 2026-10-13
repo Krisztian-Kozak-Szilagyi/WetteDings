@@ -1,6 +1,8 @@
 <%#
-  Ein offenes Angebot als Zeile (Reiter "An mich" und "Meine Angebote" auf /handel): t = Angebot, me = meine ID.
-  Links, was ich bekomme, rechts, was ich gebe – jeweils mit Geld und Kartenwert. reiter = Rückweg nach Aktionen.
+  Ein offenes Angebot als Karte (Reiter "An mich" und "Meine Angebote" auf /handel): t = Angebot, me = meine ID.
+  Oben Art, Partner und Stand, in der Mitte links was ich bekomme und rechts was ich gebe – beide Seiten mit denselben
+  Zeilen wie eine Markt-Kachel (Zustand, Seltenheit, Besitz, Geld, Händler | Markt Ø) –, unten Ablauf und Aktionen.
+  reiter = Rückweg nach Aktionen.
 %>
 <%
   const role = roleOf(t, me);
@@ -11,37 +13,81 @@
   const unread = !listingRow && isUnread(t, role);
   const sideText = (list, cents) => [lineLabel(list), cents > 0 ? euro(cents) : ''].filter(Boolean).join(' + ') || 'nichts';
   const lacksMoney = myTurn && p.pay > balance;
+  const ownCounts = locals.coll ? coll.counts : {};
+  const rankOf = (l) => (rarityByKey[cardInfo(l.card).rarity] || { rank: -1 }).rank;
+  // Eine Seite des Angebots mit denselben Fakten wie eine Markt-Kachel
+  const describe = (list, cents, mine) => {
+    const single = list.length === 1;
+    const top = list.reduce((best, l) => (!best || rankOf(l) > rankOf(best) ? l : best), null);
+    const c = top ? cardInfo(top.card) : null;
+    const r = c ? rarityByKey[c.rarity] || { label: '' } : null;
+    const sp = single && c && !c.isItem && locals.spreadInfo ? spreadInfo(top) : null;
+    const lacking = list.filter((l) => !String(l.card).startsWith('item:') && !(ownCounts[l.card] || 0)).length;
+    const ms = list.length ? marketAvg(list) : null;
+    const mval = ms ? (ms.avg != null ? ms.avg : ms.est) : null;
+    return {
+      list, cents, c, r, top, single,
+      name: list.length ? lineLabel(list) : cents > 0 ? 'Geld' : 'nichts',
+      state: !list.length ? '–' : single ? (c.isItem ? 'Gegenstand' : (stateLabel(top) || 'Normal').replace('foliert', 'Sleeve')) : list.some((l) => l.foiledAt || l.damaged) ? 'gemischt' : 'Normal',
+      rare: !list.length ? '–' : c.isItem && single ? 'Gegenstand' : !single ? 'bis ' + r.label : !sp ? r.label : sp.kind === 'slab' ? r.label + ' · ' + sp.label : r.label + ' · ' + sp.pct + ' % besitzen',
+      own: !list.length || mine ? '–' : single ? (c.isItem ? '–' : lacking ? 'Fehlt dir' : 'Im Besitz' + ((ownCounts[c.id] || 0) > 1 ? ' ×' + ownCounts[c.id] : '')) : lacking ? lacking + ' fehlen dir' : 'Alle im Besitz',
+      isNew: !mine && lacking > 0,
+      money: cents > 0 ? euro(cents) : '–',
+      dealer: list.length ? linesValue(list) : null,
+      market: mval, estimated: !!ms && ms.avg == null && mval != null,
+    };
+  };
+  // Tausch: Differenz aus meiner Sicht (Geld eingerechnet) – positiv = ich bekomme mehr wert, als ich gebe
+  const isSwap = p.gets.length > 0 && p.gives.length > 0;
+  const diffOf = (get, give) => (get == null || give == null ? null : get + p.receive - (give + p.pay));
+  const signed = (c) => (c == null ? '–' : (c > 0 ? '+ ' : c < 0 ? '− ' : '') + euro(Math.abs(c)));
+  const tone = (c) => (c == null || c === 0 ? '' : c > 0 ? 'pos' : 'neg');
+  const sides = [
+    { label: 'Du bekommst', d: describe(p.gets, p.receive, false) },
+    { label: 'Du gibst', d: describe(p.gives, p.pay, true) },
+  ];
 %>
 <li class="offer-row<%= myTurn ? ' is-turn' : '' %><%= unread ? ' is-unread' : '' %>">
+  <div class="offer-head">
+    <span class="offer-kind"><%= offerLabel(t) %></span>
+    <span class="offer-who"><% if (listingRow) { %><%= t.counters ? t.counters + (t.counters === 1 ? ' Gegenangebot' : ' Gegenangebote') : 'noch kein Gegenangebot' %><% } else { %>mit <%- userLink(partnerName) %><% } %></span>
+    <span class="offer-end">läuft ab <%= relTime(t.expiresAt) %></span>
+    <% if (!listingRow) { %>
+      <span class="offer-state<%= myTurn ? ' is-turn' : '' %>"><%= myTurn ? 'Du bist am Zug' : 'Wartet auf ' + partnerName %></span>
+      <% if (unread) { %><span class="offer-new" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } %>
+    <% } %>
+  </div>
   <a class="offer-deal" href="/handel/angebot/<%= t._id %>">
-    <span class="offer-side">
-      <span class="offer-side-label">Du bekommst</span>
-      <%- include('trade-stack', { list: p.gets, size: 'sm' }) %>
-      <span class="offer-side-text"><%= sideText(p.gets, p.receive) %></span>
-      <% if (p.gets.length) { %><span class="offer-side-value">Kartenwert <%= euro(linesValue(p.gets)) %></span><% } %>
-    </span>
-    <svg class="offer-arrow" viewBox="0 0 24 24" width="18" height="18" aria-label="gegen"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
-    <span class="offer-side">
-      <span class="offer-side-label">Du gibst</span>
-      <%- include('trade-stack', { list: p.gives, size: 'sm' }) %>
-      <span class="offer-side-text"><%= sideText(p.gives, p.pay) %></span>
-      <% if (p.gives.length) { %><span class="offer-side-value">Kartenwert <%= euro(linesValue(p.gives)) %></span><% } %>
-    </span>
+    <% sides.forEach(({ label, d }, i) => { %>
+      <% if (i) { %>
+        <% if (isSwap) { const dd = diffOf(sides[0].d.dealer, sides[1].d.dealer); const dm = diffOf(sides[0].d.market, sides[1].d.market); %>
+          <span class="offer-diff" title="Unterschied zwischen dem, was du bekommst, und dem, was du gibst – Geld eingerechnet">
+            <svg class="offer-arrow" viewBox="0 0 24 24" width="18" height="18" aria-label="gegen"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg>
+            <span class="offer-diff-row"><i>Händler</i><b class="<%= tone(dd) %>"><%= signed(dd) %></b></span>
+            <span class="offer-diff-row"><i>Markt</i><b class="<%= tone(dm) %>"><%= signed(dm) %></b></span>
+          </span>
+        <% } else { %><svg class="offer-arrow" viewBox="0 0 24 24" width="18" height="18" aria-label="gegen"><path fill="currentColor" d="M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7V7Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11v2Z"/></svg><% } %>
+      <% } %>
+      <span class="offer-panel">
+        <span class="offer-panel-top">
+          <span class="offer-side-label"><%= label %></span>
+          <span class="offer-art"><%- include('trade-stack', { list: d.list, size: 'sm' }) %></span>
+          <span class="offer-name" title="<%= d.name %>"><%= d.name %></span>
+        </span>
+        <dl class="mk-facts">
+          <div><dt>Zustand</dt><dd><%= d.state %></dd></div>
+          <div><dt>Seltenheit</dt><dd><% if (d.c && d.single && !d.c.isItem) { %><span class="tcg-dot r-<%= d.c.rarity %>"></span><% } %><%= d.rare %></dd></div>
+          <div><dt>Besitz</dt><dd class="<%= d.isNew ? 'is-new' : '' %>"><%= d.own %></dd></div>
+          <div><dt>Geld</dt><dd><%= d.money %></dd></div>
+        </dl>
+        <dl class="mk-kv">
+          <div><dt>Händler</dt><dd><%= d.dealer != null ? euro(d.dealer) : '–' %></dd></div>
+          <div><dt>Markt Ø</dt><dd><%= d.market != null ? euro(d.market) : '–' %><% if (d.estimated) { %> <small>geschätzt</small><% } %></dd></div>
+        </dl>
+      </span>
+    <% }) %>
   </a>
   <div class="offer-foot">
-    <span class="offer-meta">
-      <span class="offer-kind"><%= offerLabel(t) %></span>
-      <% if (listingRow) { %>
-        <span><%= t.counters ? t.counters + (t.counters === 1 ? ' Gegenangebot' : ' Gegenangebote') : 'noch kein Gegenangebot' %></span>
-      <% } else { %>
-        <span>mit <%- userLink(partnerName) %></span>
-      <% } %>
-      <span>läuft ab <%= relTime(t.expiresAt) %></span>
-      <% if (!listingRow) { %>
-        <span class="offer-state<%= myTurn ? ' is-turn' : '' %>"><%= myTurn ? 'Du bist am Zug' : 'Wartet auf ' + partnerName %></span>
-        <% if (unread) { %><span class="nav-badge nav-badge-inline" title="Neue Nachricht oder neuer Vorschlag">Neu</span><% } %>
-      <% } %>
-    </span>
     <span class="offer-actions">
       <% if (myTurn) { %>
         <form method="post" action="/handel/angebot/<%= t._id %>/annehmen" data-confirm="Annehmen? Du bekommst <%= sideText(p.gets, p.receive) %> und gibst <%= sideText(p.gives, p.pay) %>.">

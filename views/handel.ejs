@@ -64,7 +64,7 @@
           </button>
           <div class="bm-info">
             <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><% if (!isItem) { %><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' : 'Fehlt dir' %></span><% } %></span>
-            <span class="bm-price"><strong><%= euro(o.price) %></strong><span><%= isItem ? 'Bank zahlt' : 'Wert' %> <%= euro(value) %></span></span>
+            <span class="bm-price"><strong><%= euro(o.price) %></strong><span><%= isItem ? 'Bank zahlt' : 'Händlerpreis' %> <%= euro(value) %></span></span>
             <% if (sold) { %>
               <span class="muted small">an <%- userLink(o.buyerName) %></span>
             <% } else { %>
@@ -80,6 +80,46 @@
     </div>
   <% } %>
 </<%= bm.open ? 'details' : 'section' %>>
+<% } %>
+
+<% if (bazaar) { const bz = bazaar; %>
+<%# Lil Dré's Bazaar: nur für spielfähige eSports-Teams; Plätze gelten fürs ganze Team, neue Ware täglich um 00:00 %>
+<details class="bm bz is-open" id="bazaar">
+  <summary class="bm-head bz-head">
+    <span class="bz-face" aria-hidden="true"><img src="/img/bazaar/lil-dre.webp" alt="" width="600" height="900"></span>
+    <div class="bm-title bz-title">
+      <div class="bm-title-row">
+        <h2>Lil Dré's Bazaar</h2>
+      </div>
+      <span class="bz-restock">Neue Ware in <strong data-countdown-parts="<%= bz.restockAt.getTime() %>"><span data-cd="h">–</span>:<span data-cd="m">–</span>:<span data-cd="s">–</span></strong></span>
+    </div>
+    <span class="bm-arrow" aria-hidden="true"></span>
+  </summary>
+  <div class="bm-grid">
+    <% bz.offers.forEach((o, i) => { const c = cardInfo(o.card); const r = rarityByKey[o.rarity] || { label: o.rarity }; const sold = !!o.buyer; const n = coll.counts[c.id] || 0; %>
+      <div class="bm-offer r-<%= o.rarity %><%= sold ? ' is-sold' : '' %>">
+        <button type="button" class="bm-card r-<%= o.rarity %>" data-zoom-card data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= o.rarity %>" data-rarity-label="<%= r.label %>"
+          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= n %>" aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
+          <img src="<%= c.image %>" alt="" width="720" height="1008">
+          <% if (sold) { %><span class="bm-stamp">Verkauft</span><% } %>
+        </button>
+        <div class="bm-info">
+          <span class="bm-rarity"><span class="tcg-dot r-<%= o.rarity %>"></span><span class="bm-rarity-text"><%= r.label %> · <%= c.name %></span><span class="own-tag<%= n ? '' : ' own-new' %>"><%= n ? 'Im Besitz' : 'Fehlt dir' %></span></span>
+          <span class="bm-price"><strong><%= euro(o.price) %></strong><span>Wert <%= euro(r.sell || 0) %></span></span>
+          <% if (sold) { %>
+            <span class="muted small">an <%- userLink(o.buyerName) %></span>
+          <% } else { %>
+            <form method="post" action="/handel/bazaar" data-confirm="<%= c.name %> (<%= r.label %>) für <%= euro(o.price) %> kaufen?">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="index" value="<%= i %>">
+              <button class="bm-buy" type="submit" <%= bal < o.price ? 'disabled' : '' %>>Kaufen</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</details>
 <% } %>
 
 <div class="hx-tabs" role="tablist" aria-label="Bereiche im Handel" data-hx-tabs>
@@ -128,6 +168,31 @@
           <option value="ablauf">Läuft bald ab</option>
         </select>
       </label>
+      <details class="mk-info">
+        <summary><span class="mk-info-q" aria-hidden="true">?</span>Seltenheit erklärt</summary>
+        <div class="mk-info-body">
+          <section>
+            <h3>Karten</h3>
+            <p>Von häufig nach selten – je seltener, desto höher der Händlerpreis.</p>
+            <ul class="mk-info-rar">
+              <% [...rarities].sort((a, b) => a.rank - b.rank).forEach((x) => { %><li class="r-<%= x.key %>"><span class="tcg-dot"></span><b><%= x.label %></b><span><%= euro(x.sell || 0) %></span></li><% }) %>
+            </ul>
+          </section>
+          <section>
+            <h3>Verbreitung</h3>
+            <p>Bei Karten ohne Slab steht, wie viel Prozent der aktiven Spieler (letzte <%= activeDays %> Tage) sie besitzen. Wenige Besitzer heißt: schwer zu bekommen.</p>
+          </section>
+          <section>
+            <h3>Slabs</h3>
+            <p>Ein Slab ist umso seltener, je höher seine Note ist, je angesehener der Shop ist, der ihn ausgestellt hat, und wenn es von der Karte nur einen Slab in dieser Note gibt.</p>
+            <ul class="mk-info-tiers">
+              <% slabTiers.slice().reverse().forEach((x) => { %><li class="is-<%= x.key %>"><b><%= x.label %></b><span><%= x.max === Infinity ? 'alles darüber' : 'bis ' + Math.round(x.max * 100) + ' %' %></span></li><% }) %>
+            </ul>
+            <p class="mk-info-small">Gerechnet wird mit dem Anteil aller Slabs, die mindestens diese Note haben. Der Ruf des Shops verkleinert ihn:
+              <%= shopTiers.map((x) => x.label + ' ×' + String(x.factor).replace('.', ',')).join(' · ') %>. Kleiner heißt seltener.</p>
+          </section>
+        </div>
+      </details>
     </div>
     <p class="muted hx-none" data-mk-empty hidden>Kein Angebot passt zu deiner Auswahl.</p>
     <ul class="mk-grid" data-mk-grid>
@@ -153,34 +218,43 @@
           data-bundle="<%= t.give.length > 1 ? 1 : 0 %>" data-swap="<%= kindKey === 'swap' ? 1 : 0 %>" data-wanted="<%= kindKey === 'wanted' ? 1 : 0 %>">
           <div class="mk-art">
             <%- include('partials/trade-stack', { list, size: 'md' }) %>
-            <% if (kindKey !== 'sale') { %><span class="mk-kind"><%= kindKey === 'swap' ? 'Tausch' : 'Gesucht' %></span><% } else if (!single) { %><span class="mk-bundle"><%= countText(list) %></span><% } %>
           </div>
+          <%
+            // Jede Kachel zeigt dieselben Zeilen in derselben Reihenfolge – nur die Werte unterscheiden sich
+            const ms = kindKey === 'swap' ? null : marketAvg(kindKey === 'wanted' ? t.want : t.give);
+            const mval = ms ? (ms.avg != null ? ms.avg : ms.est) : null;
+            const per = ms ? Math.floor(t.price / ms.count) : 0;
+            const verdict = kindKey === 'sale' && mval ? (per < mval * 0.95 ? 'low' : per > mval * 1.05 ? 'high' : 'mid') : '';
+            const sp = single && kindKey !== 'wanted' ? spreadInfo(top) : null;
+            const stateOf = (l) => (c.isItem && single ? 'Gegenstand' : (stateLabel(l) || 'Normal').replace('foliert', 'Sleeve'));
+            const rowKind = { sale: 'Verkauf', swap: 'Tausch', wanted: 'Gesuch' }[kindKey] + (single ? '' : ' · ' + list.length + ' Karten');
+            const rowState = single ? stateOf(top) : list.some((l) => l.foiledAt || l.damaged) ? 'gemischt' : 'Normal';
+            const rowRare = c.isItem && single ? 'Gegenstand' : !single ? 'bis ' + r.label : !sp ? r.label : sp.kind === 'slab' ? r.label + ' · ' + sp.label : r.label + ' · ' + sp.pct + ' % besitzen';
+            const rowOwn = c.isItem ? '–' : kindKey === 'wanted' ? (lacking.length ? 'Fehlt dir frei' : 'Hast du frei') : single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz';
+            const rowTip = [ms ? marketText(ms) : '', single && !c.isItem ? [popText(top), salesText(top.copy || top.doc)].filter(Boolean).join(' · ') : ''].filter(Boolean).join(' · ');
+            const dealer = kindKey === 'swap' ? [['Du gibst', linesValue(t.want), t.want], ['Du bekommst', value, t.give]] : [['Händler', kindKey === 'wanted' ? linesValue(t.want) : value], ['Markt Ø', mval]];
+          %>
           <div class="mk-body">
-            <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
-            <span class="mk-rarity">
-              <span class="tcg-dot r-<%= c.rarity %>"></span><%= single ? r.label : 'bis ' + r.label %>
-              <% if (single && top.foiledAt) { %><span class="foil-tag" title="Foliert am <%= dayDate(top.foiledAt) %>">Foliert<%= top.grade ? ' · Note ' + top.grade : '' %></span><% } %>
-              <% if (kindKey !== 'wanted' && !c.isItem) { %>
-                <span class="own-tag<%= missing ? ' own-new' : '' %>"><%= single ? (missing ? 'Fehlt dir' : 'Im Besitz' + ((coll.counts[c.id] || 0) > 1 ? ' ×' + coll.counts[c.id] : '')) : missing ? missing + ' fehlen dir' : 'Alle im Besitz' %></span>
-              <% } %>
-              <% if (kindKey === 'wanted' && !lacking.length) { %><span class="own-tag own-new">Hast du frei</span><% } %>
-            </span>
-            <% if (kindKey === 'swap') { %>
-              <span class="mk-wants">
-                <span class="mk-wants-label">gegen</span>
-                <%- include('partials/trade-stack', { list: t.want, size: 'sm', max: 3 }) %>
-                <span class="mk-wants-text"><%= sideText(t.want, p.pay) %><% if (p.receive) { %> <span class="pos">+ <%= euro(p.receive) %> für dich</span><% } %></span>
-              </span>
-              <span class="mk-price mk-price-sub"><span>Wert <%= euro(value) %> gegen <%= euro(linesValue(t.want)) %></span></span>
-            <% } else if (kindKey === 'wanted') { %>
-              <span class="mk-price"><strong><%= euro(t.price) %></strong><span>zahlt <%= t.sellerName %></span></span>
-            <% } else { %>
-              <span class="mk-price">
-                <strong><%= euro(t.price) %></strong>
-                <span class="<%= t.price < value ? 'pos' : '' %>">Wert <%= euro(value) %></span>
-              </span>
-            <% } %>
-            <span class="mk-seller">von <%- userLink(t.sellerName) %> · endet <%= relTime(t.expiresAt) %></span>
+            <div class="mk-head">
+              <span class="mk-name" title="<%= lineLabel(list) %>"><%= single ? c.name : lineLabel(list) %></span>
+              <span class="mk-against"><% if (kindKey === 'swap') { %>gegen <%= sideText(t.want, p.pay) %><% } else { %><%= kindKey === 'wanted' ? 'sucht' : 'von' %> <%- userLink(t.sellerName) %><% } %></span>
+            </div>
+            <dl class="mk-facts">
+              <div><dt>Angebot</dt><dd><%= rowKind %></dd></div>
+              <div><dt>Zustand</dt><dd><%= rowState %></dd></div>
+              <div><dt>Seltenheit</dt><dd><span class="tcg-dot r-<%= c.rarity %>"></span><%= rowRare %></dd></div>
+              <div><dt>Besitz</dt><dd class="<%= missing || (kindKey === 'wanted' && !lacking.length) ? 'is-new' : '' %>"><%= rowOwn %></dd></div>
+            </dl>
+            <div class="mk-money"<%- rowTip ? ` title="${rowTip.replace(/"/g, '&quot;')}"` : '' %>>
+              <div class="mk-price-main">
+                <strong><%= t.price > 0 ? euro(t.price) : '–' %></strong>
+                <span class="mk-verdict<%= verdict ? ' is-' + verdict : ' is-none' %>"><%= verdict ? { low: '▼ unter Ø', mid: '≈ Ø', high: '▲ über Ø' }[verdict] : '–' %></span>
+              </div>
+              <dl class="mk-kv">
+                <% dealer.forEach(([label, v, cards], i) => { %><div><dt><%= label %></dt><% if (cards) { %><dd class="mk-kv-cards"><%- include('partials/trade-stack', { list: cards, size: 'sm' }) %></dd><% } %><dd class="<%= i === 0 && kindKey === 'sale' && t.price < value ? 'pos' : '' %>"><%= v != null ? euro(v) : '–' %><% if (label === 'Markt Ø' && ms && ms.avg == null && mval != null) { %> <small>geschätzt</small><% } %></dd></div><% }) %>
+              </dl>
+            </div>
+            <span class="mk-seller"><%= kindKey === 'swap' ? 'von ' : '' %><% if (kindKey === 'swap') { %><%- userLink(t.sellerName) %> · <% } %>endet <%= relTime(t.expiresAt) %></span>
             <div class="mk-actions">
               <form method="post" action="/handel/angebot/<%= t._id %>/kaufen" data-confirm="<%= action %>? Du gibst <%= sideText(p.gives, p.pay) %> und bekommst <%= sideText(p.gets, p.receive) %>.">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">

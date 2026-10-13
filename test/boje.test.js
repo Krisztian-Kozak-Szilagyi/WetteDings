@@ -58,7 +58,7 @@ function dailyLogs(c, days, seed) {
     const open = s.price;
     for (let i = 0; i < 288; i++) s = step(s, 1 / 288, rng, params);
     logs.push(Math.log(s.price / open));
-    s = { ...s, price: 10 }; // wie ein Split: immer im gleichen Bereich weiter
+    s = { ...s, price: 10 }; // jeden Tag neu bei 10 €, damit der Mindestkurs nicht mitspielt
   }
   return logs;
 }

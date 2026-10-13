@@ -185,8 +185,6 @@
     fetch('/broker/api/kurs?wert=' + encodeURIComponent(SYMBOL), { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (s) {
-        // Split (51101 Coin): Bestand und Kursverlauf sind umgerechnet – Seite neu laden
-        if (String(s.splits) !== String(chartEl.getAttribute('data-splits'))) { location.reload(); return; }
         updateBuoy(s.weather);
         var priceEl = document.querySelector('[data-live-price]');
         if (lastPrice !== null && s.price !== lastPrice) flash(priceEl, s.price > lastPrice);
@@ -340,6 +338,7 @@
   window.addEventListener('resize', function () { clearTimeout(fitEvents.t); fitEvents.t = setTimeout(fitEvents, 120); });
 
   loadHistory();
-  setInterval(poll, POLL_MS);
-  historyTimer = setInterval(loadHistory, HISTORY_REFRESH_MS);
+  // verborgener Tab: keine Abfragen (Serverlast)
+  setInterval(function () { if (!document.hidden) poll(); }, POLL_MS);
+  historyTimer = setInterval(function () { if (!document.hidden) loadHistory(); }, HISTORY_REFRESH_MS);
 })();

@@ -33,6 +33,13 @@ const deviceAlertSchema = new Schema(
     level: { type: Number, required: true },
     // vom Admin als erledigt markiert; ein stärkerer Treffer öffnet den Hinweis wieder
     doneAt: { type: Date, default: null },
+    doneByName: { type: String, default: null },
+    // Urteil beim Erledigen: bestätigt (dasselbe Gerät, Mehrfach-Konto) oder Fehlalarm (z. B. Geschwister, baugleiche
+    // Geräte). Jedes Urteil steht zusätzlich im Urteils-Protokoll (models/SuspicionVerdict, siehe deviceVerdictLog.js).
+    verdict: { type: String, enum: ['bestaetigt', 'fehlalarm', null], default: null },
+    verdictByName: { type: String, default: null },
+    verdictAt: { type: Date, default: null },
+    verdictLevel: { type: Number, default: null },
   },
   { timestamps: true }
 );

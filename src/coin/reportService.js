@@ -14,7 +14,7 @@ const { UserError } = require('../lib/util');
 const { toZonedLocalInput, parseZonedLocal } = require('../lib/time');
 const report = require('./marketReport');
 const markets = require('./markets');
-const { BOERSE } = require('../forum/systemAuthors');
+const { BOERSE, WOCHENRUECKBLICK } = require('../forum/systemAuthors');
 
 const REPORT_TIME = '18:45';
 const DAY = 24 * 60 * 60 * 1000;
@@ -44,7 +44,7 @@ async function collect(endMs) {
       { $group: { _id: { t: '$type', u: '$user', i: windowExpr(end) }, n: { $sum: 1 } } },
     ]),
     ForumPost.aggregate([
-      { $match: { createdAt: { $gte: since, $lt: end }, deleted: false, author: { $ne: BOERSE.id } } },
+      { $match: { createdAt: { $gte: since, $lt: end }, deleted: false, author: { $nin: [BOERSE.id, WOCHENRUECKBLICK.id] } } },
       { $group: { _id: { u: '$author', i: windowExpr(end) }, n: { $sum: 1 } } },
     ]),
     ActivityPulse.find({ t: { $gte: since, $lt: end } }).lean(),

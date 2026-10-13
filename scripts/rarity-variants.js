@@ -1,24 +1,48 @@
-// Seltenheits-Varianten einer Season-1-Karte mit türkisem Rahmen (720 × 1008) erzeugen:
-// Footman (Original), Gold, Holo, Arcane. Die Rahmen-Geometrie unten ist an „Mark Suntouched“ gemessen.
-// node scripts/rarity-variants.js <bild> <ausgabe-ordner> <karten-name>  ->  <name>-1-footman.webp … <name>-4-arcane.webp
+// Seltenheits-Varianten einer Season-1-Karte (720 × 1008) erzeugen: Footman (Original), Gold, Holo, Arcane.
+// node scripts/rarity-variants.js <bild> <ausgabe-ordner> <karten-name> [rahmen]  ->  <name>-1-footman.webp … <name>-4-arcane.webp
+// rahmen: "tuerkis" (Standard, gemessen an „Mark Suntouched“) oder "violett" (gemessen an „The Gracebringer“).
+// Arcane bekommt hier nur Farben – Runen, Funken und Leuchten kommen animiert aus dem CSS (.tcg-fx-arcane).
 const path = require('path');
 const sharp = require('sharp');
-const [SRC, OUT, BASE] = process.argv.slice(2);
+const [SRC, OUT, BASE, FRAME = 'tuerkis'] = process.argv.slice(2);
 const W = 720;
 const H = 1008;
 
-// Rahmen-Geometrie (gemessen): Außenband, Namensbalken, 3 Wertefenster, Textfenster, Edelsteine
 const rr = (x1, y1, x2, y2, r) => `<rect x="${x1}" y="${y1}" width="${x2 - x1}" height="${y2 - y1}" rx="${r}"/>`;
 const gem = (cx, cy, r) => `<path d="M${cx} ${cy - r} L${cx + r} ${cy} L${cx} ${cy + r} L${cx - r} ${cy} Z"/>`;
-const GEMS = [[551, 97], [551, 216], [553, 334], [362, 792]];
-const FRAME_SVG =
+const frameSvg = (inner, boxes, gems, gemR) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#000"/><g fill="#fff">` +
-  `<path fill-rule="evenodd" d="M0 0H${W}V${H}H0Z M29 28H691V980H29Z"/>` +
-  rr(39, 44, 444, 113, 32) +
-  rr(546, 46, 658, 148, 22) + rr(546, 164, 658, 266, 22) + rr(546, 281, 658, 386, 22) +
-  rr(74, 779, 653, 968, 26) +
-  GEMS.map(([x, y]) => gem(x, y, 19)).join('') +
-  '</g></svg>';
+  `<path fill-rule="evenodd" d="M0 0H${W}V${H}H0Z M${inner[0]} ${inner[1]}H${inner[2]}V${inner[3]}H${inner[0]}Z"/>` +
+  boxes.map((b) => rr(...b)).join('') + gems.map(([x, y]) => gem(x, y, gemR)).join('') + '</g></svg>';
+const nearGem = (gems, x, y) => gems.some(([gx, gy]) => Math.abs(x - gx) + Math.abs(y - gy) < 20);
+
+// Rahmen-Geometrie (gemessen): Außenband, Namensbalken, 3 Wertefenster, Textfenster, Edelsteine.
+// trim = Zierlinien/Goldpunkte (bleiben hell), gemAt = Edelstein-Pixel, nameText = Schrift im Namensbalken,
+// lk = Helligkeits-Faktor für die Gold-/Arcane-Verläufe (der violette Rahmen ist von Haus aus heller)
+const FRAMES = {
+  tuerkis: (() => {
+    const gems = [[551, 97], [551, 216], [553, 334], [362, 792]];
+    return {
+      lk: 1.55,
+      svg: frameSvg([29, 28, 691, 980], [[39, 44, 444, 113, 32], [546, 46, 658, 148, 22], [546, 164, 658, 266, 22], [546, 281, 658, 386, 22], [74, 779, 653, 968, 26]], gems, 19),
+      trim: (h, s, l) => h > 25 && h < 60 && s > 0.4 && l > 0.3,
+      gemAt: (h, s, l, x, y) => (h < 20 || h > 340) && s > 0.45 && nearGem(gems, x, y),
+      nameText: (h, s, l, x, y) => x > 80 && x < 400 && y > 55 && y < 102 && l > 0.72 && s < 0.25,
+    };
+  })(),
+  violett: (() => {
+    const gems = [[184, 452], [184, 580], [186, 706], [358, 793]];
+    return {
+      lk: 1.05,
+      svg: frameSvg([26, 26, 694, 984], [[562, 46, 657, 443, 22], [79, 398, 192, 503, 16], [79, 526, 192, 631, 16], [79, 653, 192, 757, 16], [74, 782, 656, 970, 24]], gems, 15),
+      trim: (h, s, l) => (h > 25 && h < 60 && s > 0.4 && l > 0.3) || (s < 0.3 && l > 0.5),
+      gemAt: (h, s, l, x, y) => s > 0.25 && l < 0.7 && nearGem(gems, x, y),
+      nameText: (h, s, l, x, y) => x > 578 && x < 642 && y > 60 && y < 428 && l > 0.62,
+    };
+  })(),
+};
+const F = FRAMES[FRAME];
+if (!F) throw new Error(`Unbekannter Rahmen „${FRAME}“ – erlaubt: ${Object.keys(FRAMES).join(', ')}`);
 
 const clamp = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 function rgb2hsl(r, g, b) {
@@ -63,21 +87,14 @@ const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
 const screen = (a, b, k) => a.map((v, i) => v + (1 - (1 - v) * (1 - b[i]) - v) * k);
 
-// Pixel-Klassen im Rahmen
-const isTeal = (h, s, l) => h > 150 && h < 215 && s > 0.12 && l < 0.75;
-const isGoldTrim = (h, s, l) => h > 25 && h < 60 && s > 0.4 && l > 0.3;
-const isRedGem = (h, s, l, x, y) => (h < 20 || h > 340) && s > 0.45 && GEMS.some(([gx, gy]) => Math.abs(x - gx) + Math.abs(y - gy) < 20);
-const isNameText = (h, s, l, x, y) => x > 80 && x < 400 && y > 55 && y < 102 && l > 0.72 && s < 0.25;
-
 const VARIANTS = {
   // Gold: Bronze-Gold-Rahmen, warm vergoldetes Motiv
   gold: {
     frame(c, [h, s, l], x, y) {
-      if (isNameText(h, s, l, x, y)) return hex('#ffe9a8');
-      if (isRedGem(h, s, l, x, y)) return null;
-      if (!isGoldTrim(h, s, l)) return ramp([[0, hex('#140c02')], [0.18, hex('#4a3208')], [0.38, hex('#a77a22')], [0.6, hex('#f3cf72')], [1, hex('#fff4cf')]], l * 1.55);
-      if (isGoldTrim(h, s, l)) return mix(c, hex('#fff0bd'), 0.35);
-      return null;
+      if (F.nameText(h, s, l, x, y)) return hex('#ffe9a8');
+      if (F.gemAt(h, s, l, x, y)) return null;
+      if (F.trim(h, s, l)) return mix(c, hex('#fff0bd'), 0.35);
+      return ramp([[0, hex('#140c02')], [0.18, hex('#4a3208')], [0.38, hex('#a77a22')], [0.6, hex('#f3cf72')], [1, hex('#fff4cf')]], l * F.lk);
     },
     art(c) {
       const t = lum(...c);
@@ -89,13 +106,13 @@ const VARIANTS = {
   holo: {
     frame(c, [h, s, l], x, y) {
       const hue = 230 + 70 * Math.sin((x * 0.6 + y * 0.8) / 120);
-      if (isNameText(h, s, l, x, y)) return [1, 1, 1];
-      if (!isGoldTrim(h, s, l) && !isRedGem(h, s, l, x, y)) return hsl2rgb(hue, 0.45, clamp(0.16 + l * 0.95));
-      if (isGoldTrim(h, s, l)) {
+      if (F.nameText(h, s, l, x, y)) return [1, 1, 1];
+      if (F.gemAt(h, s, l, x, y)) return null;
+      if (F.trim(h, s, l)) {
         const chrome = hsl2rgb(hue, 0.35, 0.55 + l * 0.35);
         return mix([l, l, l].map((v) => clamp(v * 1.15)), chrome, 0.55);
       }
-      return null;
+      return hsl2rgb(hue, 0.45, clamp(0.16 + l * 0.95));
     },
     art(c, x, y) {
       const hue = (x * 0.4 + y * 0.55) % 360;
@@ -107,83 +124,38 @@ const VARIANTS = {
       return o;
     },
   },
-  // Arcane: violett-mystischer Rahmen, Motiv in Mondlicht-Violett, Runen-Halo und Funken (Overlay)
+  // Arcane: violett-mystischer Rahmen, türkis leuchtende Edelsteine, Motiv in Mondlicht-Violett
   arcane: {
     frame(c, [h, s, l], x, y) {
-      if (isNameText(h, s, l, x, y)) return hex('#f1e4ff');
-      if (isRedGem(h, s, l, x, y)) return hsl2rgb(185, 0.95, Math.min(0.85, 0.35 + l * 0.7));
-      if (!isGoldTrim(h, s, l)) return ramp([[0, hex('#07030f')], [0.2, hex('#251046')], [0.42, hex('#5b2aa0')], [0.7, hex('#b48cff')], [1, hex('#f3eaff')]], l * 1.5);
-      if (isGoldTrim(h, s, l)) return ramp([[0, hex('#3a1f63')], [0.5, hex('#b98bff')], [1, hex('#f4ecff')]], l);
-      return null;
+      if (F.nameText(h, s, l, x, y)) return hex('#f1e4ff');
+      if (F.gemAt(h, s, l, x, y)) return hsl2rgb(185, 0.95, Math.min(0.85, 0.35 + l * 0.7));
+      if (F.trim(h, s, l)) return ramp([[0, hex('#3a1f63')], [0.5, hex('#b98bff')], [1, hex('#f4ecff')]], l);
+      return ramp([[0, hex('#07030f')], [0.2, hex('#251046')], [0.42, hex('#5b2aa0')], [0.7, hex('#b48cff')], [1, hex('#f3eaff')]], l * F.lk);
     },
     art(c) {
       const t = lum(...c);
       const v = ramp([[0, hex('#04010a')], [0.22, hex('#1a0938')], [0.48, hex('#4f259a')], [0.72, hex('#a27cf2')], [0.9, hex('#ebe0ff')], [1, hex('#ffffff')]], Math.pow(t, 1.2));
       return mix(c, v, 0.86);
     },
-    overlay: arcaneOverlay,
   },
 };
 
-// Runen-Halo hinter Marks Kopf + Funken, als SVG (wird per "screen" aufgelegt)
-function arcaneOverlay() {
-  const cx = 282, cy = 318;
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs>` +
-    `<radialGradient id="g" cx="${cx}" cy="${cy}" r="230" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9b6bff" stop-opacity=".32"/><stop offset=".55" stop-color="#4a1fa0" stop-opacity=".1"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>` +
-    `<filter id="b"><feGaussianBlur stdDeviation="5"/></filter></defs>` +
-    `<rect width="${W}" height="${H}" fill="#000"/><circle cx="${cx}" cy="${cy}" r="230" fill="url(#g)"/>`;
-  const ring = (r, w, o) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#d9c2ff" stroke-width="${w}" stroke-opacity="${o}"/>`;
-  let runes = '';
-  // Runen aus einfachen Strichen (keine Schrift nötig): 24 Zeichen auf dem Ring
-  const R = 150;
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
-    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
-    const deg = (a * 180) / Math.PI + 90;
-    const k = i % 4;
-    const p = k === 0 ? 'M0 -9 V9 M0 -9 L6 -3 M0 -1 L6 5' : k === 1 ? 'M-5 9 L0 -9 L5 9 M-3 2 H3' : k === 2 ? 'M0 -9 V9 M-6 -9 L6 9' : 'M-5 -9 L5 0 L-5 9 M5 -9 V9';
-    runes += `<path transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${deg.toFixed(1)})" d="${p}" fill="none" stroke="#eadcff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  }
-  const halo = ring(R + 18, 2, 0.7) + ring(R - 18, 2, 0.7) + ring(R + 26, 1, 0.4) + runes;
-  s += `<g filter="url(#b)">${halo}</g><g filter="url(#b)">${halo}</g><g opacity=".85">${halo}</g>`;
-  // Funken: kleine Vierstrahl-Sterne, feste Positionen (Pseudo-Zufall mit Seed)
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 46; i++) {
-    const x = 40 + rnd() * 640, y = 125 + rnd() * 640, r = 2.5 + rnd() * 7;
-    if (x > 540 && y < 395) continue; // nicht auf die Wertefenster
-    const op = (0.45 + rnd() * 0.55).toFixed(2);
-    s += `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r}Z" fill="#f2e8ff" opacity="${op}"/>`;
-    s += `<circle cx="${x}" cy="${y}" r="${(r * 1.6).toFixed(1)}" fill="#a77bff" opacity="${(op * 0.25).toFixed(2)}"/>`;
-  }
-  return Buffer.from(s + '</svg>');
-}
-
 (async () => {
   const { data } = await sharp(SRC).resize(W, H).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const mask = (await sharp(Buffer.from(FRAME_SVG)).blur(0.8).extractChannel(0).raw().toBuffer());
+  const mask = (await sharp(Buffer.from(F.svg)).blur(0.8).extractChannel(0).raw().toBuffer());
   const FILES = { footman: 1, gold: 2, holo: 3, arcane: 4 };
   const file = (k) => path.join(OUT, `${BASE}-${FILES[k]}-${k}.webp`);
   await sharp(SRC).resize(W, H).webp({ quality: 88 }).toFile(file('footman'));
   for (const [key, v] of Object.entries(VARIANTS)) {
     const buf = Buffer.alloc(W * H * 3);
-    let over = null;
-    if (v.overlay) over = await sharp(v.overlay()).flatten({ background: '#000' }).removeAlpha().raw().toBuffer();
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const i = y * W + x;
         const c = [data[i * 3] / 255, data[i * 3 + 1] / 255, data[i * 3 + 2] / 255];
         const m = mask[i] / 255;
-        let a = v.art(c, x, y);
-        if (over && m < 1) {
-          const o = [over[i * 3] / 255, over[i * 3 + 1] / 255, over[i * 3 + 2] / 255];
-          a = screen(a, o, 1 - m);
-        }
+        const a = v.art(c, x, y);
         let f = c;
-        if (m > 0) {
-          const r = v.frame(c, rgb2hsl(...c), x, y);
-          f = r || c;
-        }
+        if (m > 0) f = v.frame(c, rgb2hsl(...c), x, y) || c;
         const px = mix(a, f, m);
         for (let j = 0; j < 3; j++) buf[i * 3 + j] = Math.round(clamp(px[j]) * 255);
       }

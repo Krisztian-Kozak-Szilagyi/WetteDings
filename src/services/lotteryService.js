@@ -31,10 +31,18 @@ const BIG_DRAW_DELAY = 30; // Minuten nach der täglichen Ziehung
 // Lotterie-Arten. filter = Abfrage auf LotteryRound.kind (tägliche Runden haben kein kind-Feld).
 const KINDS = [
   { key: 'taeglich', kind: undefined, filter: { kind: null }, path: '/lotterie', title: 'Lotterie', name: 'Tages-Lotterie', short: 'Täglich' },
-  { key: 'woche', kind: 'woche', filter: { kind: 'woche' }, path: '/lotterie/woche', title: 'Wochen-Lotterie', name: 'Wochen-Lotterie', short: 'Wöchentlich' },
-  { key: 'monat', kind: 'monat', filter: { kind: 'monat' }, path: '/lotterie/monat', title: 'Monats-Lotterie', name: 'Monats-Lotterie', short: 'Monatlich' },
+  { key: 'woche', kind: 'woche', filter: { kind: 'woche' }, path: '/lotterie/woche', title: 'Wochen-Lotterie', name: 'Wochen-Lotterie', short: 'Wöchentlich', maxPerRound: 10, per: 'Woche' },
+  { key: 'monat', kind: 'monat', filter: { kind: 'monat' }, path: '/lotterie/monat', title: 'Monats-Lotterie', name: 'Monats-Lotterie', short: 'Monatlich', maxPerRound: 20, per: 'Monat' },
 ];
 const kindByKey = (key) => KINDS.find((k) => k.key === key) || null;
+/** Gekaufte Lose eines Eintrags (ältere Einträge ohne bought-Feld: alle Lose) */
+const boughtOf = (entry) => (entry ? (entry.bought ?? entry.tickets ?? 0) : 0);
+/** Wie viele Lose man in dieser Runde noch kaufen darf (Wochen-/Monats-Lotterie haben ein Limit pro Person) */
+function ticketsLeft(key, entry) {
+  const k = kindByKey(key);
+  if (!k || !k.maxPerRound) return Infinity;
+  return Math.max(0, k.maxPerRound - boughtOf(entry));
+}
 /** Art einer Runde (aus ihrem kind-Feld) */
 const kindOfRound = (round) => KINDS.find((k) => k.kind === (round.kind || undefined));
 
@@ -53,7 +61,7 @@ function settingsError(v) {
   if (!validInt(v.ticketPrice, MAX.ticketPrice, 1)) return 'Lospreis: mindestens 0,01 €.';
   if (!validInt(v.prizeCash, MAX.prizeCash)) return 'Geld aus der Bank: 0 bis 1.000.000.000 €.';
   if (!validInt(v.prizePacks, MAX.prizePacks)) return `Booster Packs: 0 bis ${MAX.prizePacks}.`;
-  if (!validInt(v.prizeFoils, MAX.prizeFoils)) return `Folien: 0 bis ${MAX.prizeFoils}.`;
+  if (!validInt(v.prizeFoils, MAX.prizeFoils)) return `TCG Sleeves: 0 bis ${MAX.prizeFoils}.`;
   return null;
 }
 
@@ -186,6 +194,14 @@ async function buyTickets({ user, count, kind = 'taeglich' }) {
       throw new UserError('Die Ziehung läuft gerade – die nächste Lotterie startet in Kürze.');
     }
 
+    const existing = await LotteryEntry.findOne({ round: current._id, user: user._id }).session(session);
+    const left = ticketsLeft(k.key, existing);
+    if (count > left) {
+      throw new UserError(left > 0
+        ? `Pro ${k.per} höchstens ${k.maxPerRound} Lose pro Person – du kannst noch ${left} kaufen.`
+        : `Pro ${k.per} höchstens ${k.maxPerRound} Lose pro Person – du hast schon alle.`);
+    }
+
     const round = await LotteryRound.findOneAndUpdate(
       { _id: current._id, status: 'offen', drawAt: { $gt: now } },
       { $inc: { tickets: count, pot: cost } },
@@ -201,11 +217,12 @@ async function buyTickets({ user, count, kind = 'taeglich' }) {
     if (!debited) throw new UserError('Dein Guthaben reicht dafür nicht aus.');
 
     const range = { from: round.tickets - count + 1, to: round.tickets };
-    const existing = await LotteryEntry.findOne({ round: round._id, user: user._id }).session(session);
     if (existing) {
-      await LotteryEntry.updateOne({ _id: existing._id }, { $inc: { tickets: count }, $push: { ranges: range } }, { session });
+      const inc = existing.bought == null ? { tickets: count } : { tickets: count, bought: count };
+      const set = existing.bought == null ? { $set: { bought: existing.tickets + count } } : {};
+      await LotteryEntry.updateOne({ _id: existing._id }, { $inc: inc, ...set, $push: { ranges: range } }, { session });
     } else {
-      await LotteryEntry.create([{ round: round._id, user: user._id, username: user.username, tickets: count, ranges: [range] }], {
+      await LotteryEntry.create([{ round: round._id, user: user._id, username: user.username, tickets: count, bought: count, ranges: [range] }], {
         session,
       });
       await LotteryRound.updateOne({ _id: round._id }, { $inc: { participants: 1 } }, { session });
@@ -285,11 +302,11 @@ async function drawAmongActive(round, session) {
   return { entry: active.find((e) => e.ranges.some((r) => r.from <= ticket && ticket <= r.to)), ticket };
 }
 
-/** Gewinn als Text, z. B. "12.345,00 €, 50 Booster Packs und 2 Folien" */
+/** Gewinn als Text, z. B. "12.345,00 €, 50 Booster Packs und 2 TCG Sleeves" */
 function prizeText({ cash, packs = 0, foils = 0 }) {
   const parts = cash || (!packs && !foils) ? [euro(cash)] : [];
   if (packs) parts.push(`${packs} ${packs === 1 ? 'Booster Pack' : 'Booster Packs'}`);
-  if (foils) parts.push(`${foils} ${foils === 1 ? 'Folie' : 'Folien'}`);
+  if (foils) parts.push(`${foils} ${foils === 1 ? 'TCG Sleeve' : 'TCG Sleeves'}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} und ${parts[parts.length - 1]}` : parts[0];
 }
 
@@ -358,7 +375,7 @@ async function runLottery() {
       const name = `${k.name} #${r.number}`;
       console.log(
         r.winnerName
-          ? `${name}: Los ${r.winningTicket} von ${r.tickets} gewinnt – ${r.winnerName} erhält ${(r.cash / 100).toFixed(2)} €${r.packs ? `, ${r.packs} Packs` : ''}${r.foils ? `, ${r.foils} Folien` : ''}.`
+          ? `${name}: Los ${r.winningTicket} von ${r.tickets} gewinnt – ${r.winnerName} erhält ${(r.cash / 100).toFixed(2)} €${r.packs ? `, ${r.packs} Packs` : ''}${r.foils ? `, ${r.foils} TCG Sleeves` : ''}.`
           : r.tickets
             ? `${name}: alle Lose gehören gelöschten Konten – der Topf verfällt.`
             : `${name}: keine Lose verkauft.`
@@ -374,6 +391,7 @@ module.exports = {
   grantTickets,
   kindByKey,
   kindOfRound,
+  ticketsLeft,
   settings,
   DEFAULTS,
   loadSettings,

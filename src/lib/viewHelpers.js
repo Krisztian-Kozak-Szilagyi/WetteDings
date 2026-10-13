@@ -16,18 +16,49 @@ const euro = (cents) => euroFmt.format((cents || 0) / 100);
 const date = (d) => (d ? `${dateFmt.format(new Date(d))} Uhr` : '–');
 const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 /**
+ * Zertifikatsnummer eines Slabs (#204): achtstellig, fest aus der Exemplar-ID (wie centerShift) – "f:<ID>" geht auch.
+ * Ohne ID: ''.
+ */
+function slabCert(id) {
+  const hex = String(id || '').replace(/^f:/, '').slice(-8);
+  const n = Number.parseInt(hex, 16);
+  return Number.isFinite(n) ? String(n % 1e8).padStart(8, '0') : '';
+}
+
+/**
  * Attribute für einen Auslöser der Großansicht folierter Karten (public/js/foil-view.js), mit <%- %> ausgeben.
  * fav: im Album die Favoriten-ID "f:<Exemplar>", favOn: ist sie schon Favorit?
  * trade: in fremden Sammlungen der Link zum Tauschangebot für dieses Exemplar
- * grade: Note des Exemplars (geheimer Zustand, #73) – steht auf dem Etikett der Folie
+ * slab: { code, grade } – Slab mit Etikett (#204); ohne: Schutzhülle (Sleeve) ohne Note. grade: ältere Aufrufer (= Slab "BfW")
+ * id: Exemplar-ID (Zertifikatsnummer auf dem Slab)
  * center: sichtbarer Versatz { x, y } aus der Zentrierung (grading/condition.centerShift)
  */
-function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, center = null } = {}) {
+function foilViewAttrs(card, rarityLabel, foiledAt, { fav = null, favOn = false, trade = null, grade = null, slab = null, id = null, center = null, no = null } = {}) {
   let h = ` data-foil-view data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}" data-date="${escAttr(dayDate(foiledAt))}"`;
-  if (grade) h += ` data-grade="${escAttr(grade)}" data-grade-word="${escAttr(gradeWord(grade))}"`;
+  const s = slab || (grade ? { code: 'BfW', grade } : null);
+  if (s) {
+    h += ` data-slab-code="${escAttr(s.code || 'BfW')}" data-cert="${escAttr(slabCert(id || fav))}"`;
+    if (s.at || foiledAt) h += ` data-sealed="${escAttr(dayDate(s.at || foiledAt))}"`;
+    if (s.grade) h += ` data-grade="${escAttr(s.grade)}" data-grade-word="${escAttr(gradeWord(s.grade))}"`;
+  }
+  if (no) h += ` data-no="${escAttr(no)}"`; // Kartennummer in der Season (#41), steht im Panel der Großansicht
   if (center) h += ` data-cx="${escAttr(center.x)}" data-cy="${escAttr(center.y)}"`;
   if (fav) h += ` data-fav="${escAttr(fav)}" data-fav-on="${favOn ? 1 : 0}"`;
   if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
+  return h;
+}
+/**
+ * Attribute für die Großansicht eines unfolierten Exemplars mit sichtbarem Schaden (#204) – dieselbe 3D-Ansicht wie
+ * bei folierten Karten (public/js/foil-view.js), nur ohne Hülle und mit Kratzern bzw. Knick (grading/condition.visibleMarks).
+ * offer: Link „Im Handel anbieten“ (eigenes Album), trade: „Angebot machen“ (fremde Sammlung), note: Zeile unter der Karte
+ */
+function copyViewAttrs(card, rarityLabel, marks, { offer = null, trade = null, note = '', no = null } = {}) {
+  let h = ` data-foil-view data-bare data-image="${escAttr(card.image)}" data-name="${escAttr(card.name)}" data-rarity="${escAttr(card.rarity)}" data-rarity-label="${escAttr(rarityLabel)}" data-season="${escAttr(card.season || '')}"`;
+  h += ` data-marks="${escAttr(JSON.stringify(marks || {}))}"`;
+  if (no) h += ` data-no="${escAttr(no)}"`;
+  if (offer) h += ` data-offer-href="${escAttr(offer)}"`;
+  if (trade) h += ` data-trade-href="${escAttr(trade)}"`;
+  if (note) h += ` data-copy-note="${escAttr(note)}"`;
   return h;
 }
 /** Nur das Datum, z. B. "04.10.2026" (Foliendatum) */
@@ -134,7 +165,10 @@ const ledgerLabels = {
   lotto_gewinn: 'Lotteriegewinn',
   tcg_pack: 'Booster Pack gekauft',
   tcg_verkauf: 'TCG-Karte verkauft',
+  tcg_zerkleinert: 'TCG-Karten zerkleinert',
+  kosmetik_kauf: 'Kosmetik gekauft',
   item_verkauf: 'Gegenstand verkauft',
+  item_kauf: 'Gegenstand gekauft',
   ihk_lohn: 'IHK-Quest geschafft',
   dungeon_lohn: 'Dungeon-Beute',
   erfolg: 'Erfolg freigeschaltet',
@@ -143,6 +177,7 @@ const ledgerLabels = {
   esports_anteil: 'eSports: Anteil an einer Austrittsgebühr',
   esports_konkurs: 'eSports: Konkurs',
   esports_auszahlung: 'eSports: Auszahlung nach Auflösung',
+  esports_preis: 'eSports: Trophäe der Woche',
   schuld_tilgung: 'Schulden getilgt',
   team_gutschrift: 'Gutschrift vom Team',
   team_abzug: 'Abzug durch das Team',
@@ -151,8 +186,14 @@ const ledgerLabels = {
   handel_tausch_zahlung: 'Aufpreis gezahlt (Tausch)',
   handel_tausch_erhalt: 'Aufpreis erhalten (Tausch)',
   black_market: 'Gekauft (Black Market)', // Karte oder Gegenstand – was genau, steht im Buchungstext
+  bazaar_kauf: "Gekauft (Lil Dré's Bazaar)", // Kaffee oder BfW Energy im Team-Laden
   konto_geloescht: 'Konto gelöscht (Guthaben verfallen)',
   grading_lohn: 'Grading-Auftrag erledigt',
+  grading_auftrag: 'Karte zum Grading eingereicht',
+  grading_einnahme: 'Grading-Auftrag eines Mitglieds erledigt',
+  grading_erstattung: 'Grading-Auftrag erstattet',
+  grading_trinkgeld: 'Trinkgeld an einen Grading-Shop',
+  grading_trinkgeld_erhalt: 'Trinkgeld von einem Kunden',
   grading_ausbau: 'Grading-Shop ausgebaut',
 };
 
@@ -183,7 +224,9 @@ module.exports = {
   date,
   dayDate,
   foilViewAttrs,
+  copyViewAttrs,
   gradeWord,
+  slabCert,
   dateSec,
   relTime,
   timeSpan,

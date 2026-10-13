@@ -6,6 +6,11 @@ const userSchema = new Schema(
     usernameLower: { type: String, required: true, unique: true },
     email: { type: String, required: true, lowercase: true, trim: true, unique: true },
     passwordHash: { type: String, required: true },
+    // Passwort zurücksetzen (Admin-Panel → Team): Hash des Einmal-Codes und sein Ablauf (services/passwordReset.js).
+    // mustChangePassword: nach der Anmeldung mit dem Code ist nur die Seite „Neues Passwort“ erreichbar.
+    resetHash: { type: String, default: null },
+    resetExpires: { type: Date, default: null },
+    mustChangePassword: { type: Boolean, default: false },
     // Kontostand in Cent
     balance: { type: Number, required: true, min: 0 },
     debt: { type: Number, default: 0, min: 0 }, // offene Schulden in Cent (z. B. eSports-Konkurs), getilgt aus jeder Einnahme (debtService)
@@ -31,8 +36,8 @@ const userSchema = new Schema(
     tcgLooted: { type: [String], default: undefined },
     // Letzte Namensänderung (Wartezeit bis zur nächsten)
     usernameChangedAt: { type: Date, default: null },
-    // Einwilligung in die Übermittlung der Chat-Nachrichten an den KI-Dienst (Support-Chat)
-    supportConsentAt: { type: Date, default: null },
+    // Chat: Mitglieder, die einem nicht schreiben dürfen (und man ihnen nicht)
+    chatBlocked: { type: [Schema.Types.ObjectId], default: [] },
     // Echter Name (freiwillig) – erscheint in Klammern neben dem Benutzernamen
     realName: { type: String, default: null },
     // Registrierung: benutzter Einladungscode und wer ihn erzeugt hat (für das Registrierungs-Protokoll).
@@ -51,8 +56,12 @@ const userSchema = new Schema(
     pinnedAchievements: { type: [String], default: [] },
     // Broker-Wert, den das Mitglied im Profil zeigt (Symbol aus src/coin/markets.js, z. B. "COW"), null = keiner
     profileAsset: { type: String, default: null },
-    // Profilbild: ID aus src/profile/avatars.js, null = Platzhalter (wählen vorerst nur Admin und Devs)
+    // Profilbild: ID aus src/profile/avatars.js (Logos nur Admin/Devs) oder ein gekaufter Avatar, null = Platzhalter
     avatar: { type: String, default: null },
+    // Konfetti: Währung aus zerkleinerten Karten (ganze Einheiten, kein Geld), nur für Kosmetik
+    konfetti: { type: Number, default: 0, min: 0 },
+    // gekaufte Kosmetik, an das Konto gebunden: "avatar:anna" … (src/cosmetics/catalog.js)
+    cosmetics: { type: [String], default: [] },
     // Profil-Statistik (Vermögen, Gewinn, Umsatz …): standardmäßig nur für einen selbst, auf Wunsch für alle Mitglieder
     statsPublic: { type: Boolean, default: false },
     // Letzter Besuch des Forums (für die Abzeichen am Menüpunkt)

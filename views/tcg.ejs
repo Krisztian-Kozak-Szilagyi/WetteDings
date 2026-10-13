@@ -64,7 +64,7 @@
     <div class="tcg-favs-box" id="favoriten">
       <div>
         <h2>Meine Favoriten</h2>
-        <p class="tcg-sub"><%= cardCount %> <%= cardCount === 1 ? 'Karte' : 'Karten' %> · Wert <%= euro(collectionValue) %></p>
+        <p class="tcg-sub"><%= cardCount %> <%= cardCount === 1 ? 'Karte' : 'Karten' %> · Händlerwert <%= euro(collectionValue) %></p>
       </div>
       <% if (!cardCount) { %>
         <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack!</p>
@@ -114,10 +114,10 @@
     </div>
 
     <%# Kachel im Stil des IHK-Start-Knopfs: Karte und Folie, beim Darüberfahren rutscht die Folie über die Karte %>
-    <a class="inv-tile" href="/inventar" id="packs">
-      <span class="inv-tile-art" aria-hidden="true">
-        <img class="inv-tile-pack" src="<%= (cardById['st-ivan-boss'] || {}).image || packImage %>" alt="" width="720" height="1008" loading="lazy">
-        <span class="inv-tile-foil"></span>
+    <div class="inv-tiles">
+    <a class="inv-tile is-inv" href="/inventar" id="packs">
+      <span class="inv-tile-art inv-tile-minis" aria-hidden="true">
+        <% invMinis.forEach((m) => { %><img src="<%= m.image %>" alt="" width="40" height="56" loading="lazy"><% }) %>
       </span>
       <span class="inv-tile-text">
         <span class="kicker">Packs &amp; Gegenstände</span>
@@ -127,6 +127,19 @@
       <% if (newPacks) { %><span class="nav-badge inv-tile-badge" title="Neue Booster Packs" aria-label="<%= newPacks %> neue Booster Packs"><%= newPacks > 99 ? '99+' : newPacks %></span><% } %>
       <span class="inv-tile-arrow" aria-hidden="true">→</span>
     </a>
+    <%# Eigener Knopf unter dem Inventar: Packs und Gegenstände kaufen %>
+    <a class="inv-tile is-shop" href="/inventar/shop">
+      <span class="inv-tile-art" aria-hidden="true">
+        <img class="inv-tile-icon" src="/img/items/folie.svg" alt="" width="52" height="72" loading="lazy">
+      </span>
+      <span class="inv-tile-text">
+        <span class="kicker">Nachschub kaufen</span>
+        <span class="inv-tile-title">Zum Shop</span>
+        <span class="inv-tile-hint">Packs · Sleeves · Gegenstände</span>
+      </span>
+      <span class="inv-tile-arrow" aria-hidden="true">→</span>
+    </a>
+    </div>
   </section>
 </div>
 

@@ -131,7 +131,11 @@ const pollVoteSchema = new Schema(
 );
 pollVoteSchema.index({ poll: 1, user: 1 }, { unique: true });
 
+// Feste Bereiche (key aus forum/starters.js), die Admin/Dev gelöscht hat – ensureDefaults legt sie nicht wieder an
+const removedKeySchema = new Schema({ _id: { type: String }, at: { type: Date, default: Date.now } }, { versionKey: false });
+
 module.exports = {
+  ForumRemovedKey: model('ForumRemovedKey', removedKeySchema),
   ForumCategory: model('ForumCategory', categorySchema),
   ForumThread: model('ForumThread', threadSchema),
   ForumPost: model('ForumPost', postSchema),

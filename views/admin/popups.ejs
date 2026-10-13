@@ -1,0 +1,73 @@
+<%#
+  Pop-ups (#132): Devs und Admin schreiben eine Nachricht an alle Mitglieder. Sie erscheint als Fenster – sofort bei allen,
+  die gerade online sind (app.js fragt alle paar Sekunden nach), sonst beim nächsten Besuch – und bleibt, bis das Mitglied
+  „Gelesen“ drückt. Wahlweise mit Ablaufdatum: danach erscheint sie niemandem mehr.
+  Service: src/services/devMessageService.js, Fenster: partials/foot.ejs
+%>
+<%# Bestätigung nach dem Senden: unten eingeblendet, verschwindet nach 3 Sekunden (public/js/app.js, data-auto-hide) %>
+<% if (popupSent) { %>
+  <div class="flash flash-success flash-toast" role="status" data-auto-hide="3000">Nachricht an alle versendet.</div>
+<% } %>
+<section class="stats-block" id="neu">
+  <%- blockHead('Neues Pop-up', 'Die Nachricht erscheint <strong>allen Mitgliedern</strong> (außer dem Admin und dir als Verfasser) als Fenster, das sich erst mit „Gelesen“ schließen lässt – so ist sicher, dass sie jeder gesehen hat. Wer gerade online ist, bekommt sie innerhalb weniger Sekunden, alle anderen beim nächsten Besuch.<br><br><strong>Bis gelesen:</strong> bleibt aktiv, bis du sie beendest.<br><strong>Mit Ablaufdatum:</strong> erscheint danach niemandem mehr – auch nicht denen, die sie noch nicht gesehen haben.<br><br>Zeilenumbrüche im Text bleiben erhalten. Veröffentlichen musst du mit deinem Passwort bestätigen.') %>
+  <form method="post" data-reauth action="/admin/popups" class="card form popup-form" data-confirm="Dieses Pop-up wirklich an alle Mitglieder senden?">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="field"><span>Titel</span>
+      <input type="text" name="title" maxlength="<%= devMessageLimits.titleMax %>" placeholder="z. B. Wartung am Samstag" required>
+    </label>
+    <label class="field"><span>Nachricht <small class="muted">(<span id="popup-text-count">0</span> / <%= devMessageLimits.textMax %> Zeichen)</small></span>
+      <textarea name="text" rows="6" minlength="<%= devMessageLimits.textMin %>" maxlength="<%= devMessageLimits.textMax %>" data-count="popup-text-count" placeholder="Was sollen alle Mitglieder wissen?" required></textarea>
+    </label>
+    <fieldset class="field">
+      <legend>Gültigkeit</legend>
+      <div class="stats-range grant-arts" role="radiogroup">
+        <label class="grant-art"><input type="radio" name="gueltig" value="gelesen" checked><span>Bis gelesen</span></label>
+        <label class="grant-art"><input type="radio" name="gueltig" value="ablauf"><span>Mit Ablaufdatum</span></label>
+      </div>
+    </fieldset>
+    <label class="field popup-expiry"><span>Läuft ab am <small class="muted">(deutsche Zeit, nur bei „Mit Ablaufdatum“)</small></span>
+      <input type="datetime-local" name="expiresAt" min="<%= devMessageMinExpiry %>">
+    </label>
+    <div class="grant-submit"><button class="btn btn-primary" type="submit">An alle senden</button></div>
+  </form>
+</section>
+
+<section class="stats-block" id="liste">
+  <%- blockHead('Bisherige Pop-ups', 'Gelesen = wie viele Empfänger die Nachricht mit „Gelesen“ bestätigt haben. Empfänger sind alle aktuellen Mitglieder außer dem Admin und dem Verfasser. Beenden nimmt ein aktives Pop-up sofort zurück; wer es schon gelesen hat, bleibt gezählt.') %>
+  <div class="card">
+    <% if (!devMessages.length) { %>
+      <p class="muted">Es wurde noch kein Pop-up verschickt.</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table trade-log popup-log">
+          <thead><tr><th>Gesendet</th><th>Von</th><th>Nachricht</th><th>Gültig</th><th class="num">Gelesen</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% devMessages.forEach((m) => { %>
+              <tr>
+                <td class="nowrap"><%= dateSec(m.createdAt) %></td>
+                <td><%- userLink(m.byName, { realName: false }) %></td>
+                <td class="popup-log-text"><strong><%= m.title %></strong><br><span class="muted small"><%= m.text %></span></td>
+                <td class="nowrap"><%= m.expiresAt ? 'bis ' + dateSec(m.expiresAt) : 'bis gelesen' %></td>
+                <td class="num nowrap"><%= m.seen %> / <%= m.members %></td>
+                <td class="nowrap">
+                  <% if (m.status === 'aktiv') { %><span class="badge badge-offen">Aktiv</span>
+                  <% } else if (m.status === 'abgelaufen') { %><span class="badge badge-entschieden">Abgelaufen</span>
+                  <% } else { %><span class="badge badge-streitig">Beendet</span><% if (m.endedByName) { %> <span class="muted small">von <%= m.endedByName %></span><% } %><% } %>
+                </td>
+                <td>
+                  <% if (m.active) { %>
+                    <form method="post" action="/admin/popups/beenden" data-confirm="Dieses Pop-up beenden? Es erscheint dann niemandem mehr.">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="id" value="<%= m.id %>">
+                      <button class="btn btn-ghost btn-sm" type="submit">Beenden</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</section>

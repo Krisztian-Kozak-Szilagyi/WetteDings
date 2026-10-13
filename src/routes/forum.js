@@ -104,6 +104,10 @@ router.get('/forum', async (req, res) => {
     newChoices: cats.filter((c) => forum.can.createThread(req.user, c)),
     canManage: forum.can.manage(req.user),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
+    // Admin/Dev: Bereiche, die direkt in der Übersicht gelöscht werden können (nicht die, die die Seite braucht)
+    deletable: forum.can.deleteCategory(req.user)
+      ? cats.filter((c) => !forum.isProtected(c) && !cats.some((s) => String(s.parent) === String(c._id) && forum.isProtected(s))).map((c) => String(c._id))
+      : [],
     // Hauptbereiche, unter denen dieses Mitglied Unterbereiche anlegen darf
     parentChoices: cats.filter((c) => !c.parent && forum.can.manageCategory(req.user, c, null)),
   });
@@ -133,7 +137,7 @@ router.get('/forum/k/:id', async (req, res) => {
     cat,
     hof: cat.key === HALL_OF_FAME_KEY ? await hallOfFame.load() : null, // Bestenlisten als Kopf über den Themen
     parent,
-    subs: subsRaw.map((s) => ({ ...s, stats: stats.get(String(s._id)) || EMPTY })),
+    subs: subsRaw.map((s) => ({ ...s, stats: stats.get(String(s._id)) || EMPTY, deletable: forum.can.deleteCategory(req.user) && !forum.isProtected(s) })),
     threads: threads.map((t) => ({ ...t, unread: forum.isUnread(reads, t) })),
     page,
     pages,
@@ -142,7 +146,7 @@ router.get('/forum/k/:id', async (req, res) => {
     canManage: forum.can.manageCategory(req.user, cat, parent),
     canAddSub: !cat.parent && forum.can.manage(req.user) && forum.can.manageCategory(req.user, cat, null),
     canSetStaffOnly: forum.can.setStaffOnly(req.user),
-    canDeleteCat: forum.can.deleteCategory(req.user) && !cat.key,
+    canDeleteCat: forum.can.deleteCategory(req.user) && !forum.isProtected(cat) && !subsRaw.some(forum.isProtected),
   });
 });
 

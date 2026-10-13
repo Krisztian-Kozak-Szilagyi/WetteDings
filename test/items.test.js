@@ -11,7 +11,7 @@ const DAY = 864e5;
 const NOW = Date.UTC(2026, 9, 4, 12);
 
 test('Folie: Standardwerte – 1 % Fundchance, +10 % sofort, +0,9 % pro Tag', () => {
-  assert.deepEqual(foil.DEFAULTS, { gradingChance: 100, bonusPercent: 10, dailyPercent: 0.9 });
+  assert.deepEqual(foil.DEFAULTS, { gradingChance: 100, bonusPercent: 10, dailyPercent: 0.9, sleevePrice: 1500, slabPrice: 4000, slabDropPercent: 30, sleeveSell: 1000, slabSell: 2500 });
   assert.ok(ITEM_TYPES.some((t) => t.key === 'folie'));
 });
 
@@ -26,9 +26,21 @@ test('Folie: Wert steigt linear mit vollen Tagen', () => {
   assert.equal(foil.foilPercent(null, NOW, s), 0);
 });
 
+test('#204: Wertsteigerung nur im Slab – eine Folie (Schutzhülle) steigert den Wert nicht', () => {
+  const s = { bonusPercent: 10, dailyPercent: 0.9 };
+  const at = new Date(NOW - DAY);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: null }), null);
+  assert.equal(foil.growthFrom({ foiledAt: null, slab: null }), null);
+  assert.equal(foil.growthFrom(null), null);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), at);
+  assert.equal(foil.growthFrom({ foiledAt: at, slab: { code: 'TST', grade: 10 } }), null); // Slab aus einem Spieler-Shop: Wert macht der Markt
+  assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: null }), NOW, s), 15000);
+  assert.equal(foil.cardValue(15000, foil.growthFrom({ foiledAt: at, slab: { code: 'BfW', grade: 9 } }), NOW, s), 16635);
+});
+
 test('Folie: Ranglisten-Ausdruck rechnet mit den aktuellen Einstellungen', () => {
   const expr = JSON.stringify(foil.factorExpr());
-  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt'));
+  assert.ok(expr.includes('$$NOW') && expr.includes('$foiledAt') && expr.includes('$slab.code') && expr.includes('"BfW"'));
   assert.ok(expr.includes(`${foil.settings.bonusPercent}`) && expr.includes(`${foil.settings.dailyPercent}`));
 });
 
@@ -88,4 +100,51 @@ test('Gegenstände: Wegnehmen nur in einer Transaktion, unbekannte Quelle ist ei
   await assert.rejects(addItems({ userIds: [], type: 'folie', source: 'irgendwo' }), /Quelle/);
   await assert.rejects(addItems({ userIds: [], type: 'gibtsnicht', source: 'admin' }), /gibt es nicht/);
   await assert.rejects(addItems({ userIds: [], type: 'folie', count: 0, source: 'admin' }), /Anzahl/);
+});
+
+test('Sleeve und leerer Slab: beide handelbar, Shop-Preis nie unter dem Ankauf (kein Geld drucken)', () => {
+  const { ITEM_TYPES, validateTypes, itemTypeByKey } = require('../src/items/types');
+  const { itemByCardId, itemCardId, buyPrice } = require('../src/items/itemService');
+  assert.equal(itemTypeByKey.folie.label, 'TCG Sleeve');
+  assert.equal(itemTypeByKey.slab.label, 'Leerer Slab');
+  assert.equal(itemTypeByKey.slab.category, 'material');
+  for (const t of ITEM_TYPES) {
+    assert.equal(t.storage, 'stueck');
+    assert.ok(t.tradable, t.key);
+    assert.ok(t.buy >= t.sell, `${t.key}: Shop-Preis ≥ Ankauf`);
+    assert.equal(itemByCardId(itemCardId(t.key)).key, t.key); // im Handel wie eine Karte
+  }
+  assert.throws(() => validateTypes([{ ...itemTypeByKey.slab, buy: itemTypeByKey.slab.sell - 1 }]), /Geld drucken/);
+  assert.throws(() => validateTypes([{ ...itemTypeByKey.slab, via: 'markt' }]), /via/);
+  // Wo man kauft: Sleeve im Bank-Shop (Inventar), leerer Slab nur in der Werkstatt eines Grading-Shops
+  assert.equal(itemTypeByKey.folie.via, 'bank');
+  assert.equal(itemTypeByKey.slab.via, 'grading');
+  assert.equal(buyPrice(itemTypeByKey.folie), foil.settings.sleevePrice);
+  assert.equal(buyPrice(itemTypeByKey.slab), foil.settings.slabPrice);
+  assert.ok(foil.validPrice('slab', itemTypeByKey.slab.sell));
+  assert.ok(!foil.validPrice('slab', itemTypeByKey.slab.sell - 1));
+  assert.ok(!foil.validPrice('folie', 1500.5));
+  assert.ok(!foil.validPrice('folie', null));
+});
+
+test('Dungeon/Turm: Funde teilen sich in Sleeves und leere Slabs nach dem eingestellten Anteil', () => {
+  const { splitFoilDrops } = require('../src/items/itemService');
+  const users = ['a', 'b', 'c', 'd'];
+  const rolls = [10, 29.99, 30, 99.99]; // unter 30 % → Slab
+  let i = 0;
+  const out = splitFoilDrops(users, 30, () => rolls[i++]);
+  assert.deepEqual(out, { slabs: ['a', 'b'], sleeves: ['c', 'd'] });
+  assert.deepEqual(splitFoilDrops(users, 0, () => 0), { sleeves: users, slabs: [] }); // 0 % → nur Sleeves
+  assert.deepEqual(splitFoilDrops(users, 100, () => 99.99), { sleeves: [], slabs: users }); // 100 % → nur Slabs
+  assert.deepEqual(splitFoilDrops([], 30), { sleeves: [], slabs: [] });
+});
+
+test('Kaufen: jede Sorte nur an ihrem Ort, ohne Datenbankzugriff abgelehnt', async () => {
+  const { buyItems } = require('../src/items/itemService');
+  const user = { _id: '000000000000000000000001' };
+  await assert.rejects(buyItems({ user, type: 'slab', via: 'bank' }), /nicht im Bank-Shop/); // Slabs gibt es nur in der Werkstatt
+  await assert.rejects(buyItems({ user, type: 'folie', via: 'grading' }), /nicht in der Werkstatt/);
+  await assert.rejects(buyItems({ user, type: 'gibtsnicht' }), /gibt es nicht/);
+  await assert.rejects(buyItems({ user, type: 'folie', count: 0 }), /1 bis/);
+  await assert.rejects(buyItems({ user, type: 'folie', count: 101 }), /1 bis/);
 });

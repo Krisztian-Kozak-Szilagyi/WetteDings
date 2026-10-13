@@ -27,7 +27,7 @@
       <% } else { %>
         <p class="dg-hero-sub"><%= dg.intro %></p>
         <% if (tower) { %>
-          <p class="dg-when">Ein Versuch pro Tag · startet, sobald <%= isLeader ? 'du' : 'der Gruppenleiter' %> den Turm <%= isLeader ? 'betrittst' : 'betritt' %></p>
+          <p class="dg-when"><%= towerRuns === 1 ? 'Ein Versuch' : towerRuns + ' Versuche' %> pro Tag · startet, sobald <%= isLeader ? 'du' : 'der Gruppenleiter' %> den Turm <%= isLeader ? 'betrittst' : 'betritt' %></p>
         <% } else { %>
           <p class="dg-when">Start um <strong><%= slotTime %> Uhr</strong> · <span data-dg-countdown>–</span></p>
         <% } %>
@@ -78,14 +78,14 @@
       </span>
     </form>
   <% }) %>
-  <%# Mage Tower: einmal am Tag, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
+  <%# Mage Tower: Läufe pro Tag laut Admin-Panel, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
   <% if (towerShown) { %>
     <form method="post" action="/dungeon/turm/anmelden" class="dg-tower-entry">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <span class="dg-tower-text">
-        <span class="kicker">Mage Tower · einmal am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>
+        <span class="kicker">Mage Tower · <%= towerRuns === 1 ? 'einmal' : towerRuns + '×' %> am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>
         <strong><%= towerTitle %></strong>
-        <span class="muted"><%= towerPlayed ? 'Du warst heute schon oben – ab Mitternacht geht es wieder.' : 'Runde für Runde schwerer, bis ihr scheitert. Je höher ihr kommt, desto besser die Beute.' %></span>
+        <span class="muted"><%= towerPlayed ? 'Für heute bist du durch – ab Mitternacht geht es wieder.' : (towerRuns > 1 && towerLeft < towerRuns ? 'Heute noch ' + towerLeft + (towerLeft === 1 ? ' Lauf. ' : ' Läufe. ') : '') + 'Runde für Runde schwerer, bis ihr scheitert. Je höher ihr kommt, desto besser die Beute.' %></span>
       </span>
       <span class="dg-tower-btns">
         <button class="btn btn-primary" type="submit" name="mode" value="solo" <%= towerPlayed ? 'disabled' : '' %>>Allein</button>
@@ -95,6 +95,10 @@
   <% } %>
 <% } %>
 
+<% if (esLobby) { %>
+  <%# eSports-Team: eigene Vorbereitung (Design „1 · Vorbereitung“) statt Tisch und Lobby-Leiste %>
+  <%- include('partials/es-prep') %>
+<% } else { %>
 <%# Tisch: drei Plätze nebeneinander (vor dem Beitritt: Solo/Party-Kacheln), rechts Chat bzw. Anleitung %>
 <section class="dg-table<%= hasChat || phase === 'frei' ? '' : ' no-chat' %>" id="dg-tisch">
   <% if (phase === 'frei') { %>
@@ -153,6 +157,14 @@
               <span class="dg-boost-name muted">kein Boost</span>
             <% } %>
           </div>
+          <% if (esLobby) { %>
+            <%# eSports-Live-Turm: Vorrat (wird beim Benutzen verbraucht) und Bereit %>
+            <div class="dg-supply">
+              <span class="dg-supply-row<%= s.coffee ? '' : ' is-empty' %>"><span class="dg-supply-dot r-<%= s.coffee ? s.coffee.rarity : 'none' %>"></span><%= s.coffee ? s.coffee.name : 'kein Kaffee' %></span>
+              <span class="dg-supply-row<%= s.energy ? '' : ' is-empty' %>"><span class="dg-supply-dot <%= s.energy ? 'r-gold' : 'r-none' %>"></span><%= s.energy ? 'BfW Energy' : 'kein Energy' %></span>
+              <span class="dg-ready<%= s.ready ? ' is-ready' : '' %>"><%= s.ready ? 'Bereit' : 'wählt noch …' %></span>
+            </div>
+          <% } %>
         </div>
       <% } else if (s.invited) { %>
         <div class="dg-slot is-empty is-invited">
@@ -218,7 +230,21 @@
       <% if (meSlot && meSlot.choosing && !lockedIn) { %>
         <p class="dg-lobby-warn"><strong>Wähle deinen Charakter</strong> – klick oben auf deinen Platz. Ohne Charakter bist du beim Start nicht dabei.</p>
       <% } %>
-      <% if (tower) { %>
+      <% if (esLobby) { %>
+        <p class="muted"><strong>eSports-Lauf live:</strong> Nach jedem Stockwerk habt ihr eine kurze Pause für Team-Fähigkeiten. Wählt eure Karten, nehmt Kaffee oder BfW Energy mit (geht beim Benutzen verloren) – <%= isLeader ? 'du startest' : 'der Kapitän startet' %>, sobald alle bereit sind.</p>
+        <% const meParty = party.members.find((m) => String(m.user) === String(currentUser._id)) || {}; %>
+        <form method="post" action="/dungeon/turm/vorrat" class="dg-supply-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label class="field"><span>Kaffee</span>
+            <select name="coffee">
+              <option value="">keiner</option>
+              <% coffeeChoices.forEach((c) => { %><option value="<%= c.id %>" <%= meParty.coffee === c.id ? 'selected' : '' %> <%= c.free ? '' : 'disabled' %>><%= c.card.name %> · +<%= c.pct %> % Bock<%= c.free ? '' : ' (keine frei)' %></option><% }) %>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="energy" value="1" <%= meParty.energyDoc ? 'checked' : '' %> <%= energyFree || meParty.energyDoc ? '' : 'disabled' %>> <span>BfW Energy mitnehmen</span></label>
+          <button class="btn btn-ghost btn-sm" type="submit">Übernehmen</button>
+        </form>
+      <% } else if (tower) { %>
         <% if (phase === 'solo') { %>
           <p class="muted">Mage Tower allein: Die beiden anderen Plätze übernehmen Bots. Betritt den Turm, sobald du deine Karten gewählt hast.</p>
         <% } else if (isLeader) { %>
@@ -248,7 +274,19 @@
           <button class="btn btn-primary" type="submit">Einladen</button>
         </form>
       <% } %>
-      <% if (tower && (isLeader || phase === 'solo')) { %>
+      <% if (esLobby) { %>
+        <% const meReady = (party.members.find((m) => String(m.user) === String(currentUser._id)) || {}).ready; %>
+        <form method="post" action="/dungeon/turm/bereit">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn <%= meReady ? 'btn-ghost' : 'btn-primary' %>" type="submit"><%= meReady ? 'Doch nicht bereit' : 'Ich bin bereit' %></button>
+        </form>
+        <% if (isLeader) { %>
+          <form method="post" action="/dungeon/turm/starten">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn btn-primary" type="submit" <%= towerReady && allReady ? '' : 'disabled' %>>Turm starten</button>
+          </form>
+        <% } %>
+      <% } else if (tower && (isLeader || phase === 'solo')) { %>
         <form method="post" action="/dungeon/turm/starten">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button class="btn btn-primary" type="submit" <%= towerReady ? '' : 'disabled' %> title="<%= towerReady ? 'Das Ergebnis wird sofort ausgewürfelt' : 'Erst wenn alle einen Charakter gewählt haben' %>">Turm betreten</button>
@@ -260,6 +298,8 @@
       </form>
     </div>
   </section>
+<% } %>
+
 <% } %>
 
 <%# Kartenauswahl in der Lobby (#114): ein zentriertes Fenster je Platz (Charakter, Boost) – oben Suche und Filter,
@@ -287,12 +327,14 @@
       <% } %>
       <% if (favCount) { %><h3 class="pick-group" data-pick-group="fav">★ Favoriten</h3><% } %>
       <% if (sc.freq.size) { %><h3 class="pick-group" data-pick-group="freq" style="order: -101" hidden>Häufig verwendet</h3><% } %>
-      <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); %>
-        <%# Gesperrte Karten (Kartensperren): sichtbar, aber nicht wählbar %>
-        <label class="dg-pick r-<%= c.rarity %><%= banned || taken ? ' is-blocked is-banned' : '' %>" data-dg-item <%= banned || taken ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %> title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
-          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= banned || taken ? 'disabled' : '' %>>
+      <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); const lock = cards.locks[c.id]; const busy = !banned && !taken && !(cards.counts[c.id] > 0); const off = banned || taken || busy; %>
+        <%# Gesperrte Karten (Kartensperren, Im Team) und Karten ohne freies Exemplar (Auf Quest, Im Handel …): sichtbar, aber nicht wählbar.
+            Ist nur ein Teil der Exemplare gesperrt, bleibt die Karte wählbar und zeigt es klein an (z. B. „1× Auf Quest“). %>
+        <label class="dg-pick r-<%= c.rarity %><%= off ? ' is-blocked is-banned' : '' %>" data-dg-item <%= off ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %> title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : busy ? 'Kein freies Exemplar (' + lock.label + ')' : lock ? label + ' – ' + lock.n + '× ' + lock.label : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
+          <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= off ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
-          <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } %>
+          <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } else if (busy) { %><span class="dg-ban-tag"><%= lock.label %></span><% } else if (lock) { %><span class="dg-lock-tag"><%= lock.n %>× <%= lock.label %></span><% } %>
+          <% if (!off && cards.foiled[c.id]) { %><span class="pick-foil-tag" title="Exemplar im TCG Sleeve – geschützt vor Schaden">🛡 im Sleeve</span><% } %>
           <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>
@@ -310,8 +352,10 @@
           <h2 id="dg-picker-<%= kind %>"><%= title %></h2>
           <button type="button" class="dg-picker-close" data-dg-picker-close aria-label="Schließen">×</button>
         </div>
+        <%# Schalter nur einmal im Formular (im Charakter-Fenster) – er gilt für Charakter und Boost %>
+        <% if (kind === 'card') { %><%- include('partials/foil-switch', { foiled: cards.foiled, foilChecked }) %><% } %>
         <% if (kind === 'card' && !list.length) { %>
-          <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest, im Handel oder foliert können nicht mit.</p>
+          <p class="muted">Du hast keine freie Charakterkarte. Karten auf einer Quest oder im Handel können nicht mit.</p>
         <% } else { %>
           <% pickList(kind, list, current) %>
         <% } %>
@@ -340,13 +384,13 @@
 <section class="dg-rare tcg-rare-feed">
   <span class="kicker kicker-muted">Seltene Beute</span>
   <% if (!rareLoot.length) { %>
-    <p class="muted small">Noch hat niemand eine Folie oder eine Boss-Karte erbeutet.</p>
+    <p class="muted small">Noch hat niemand einen Sleeve, einen Slab oder eine Boss-Karte erbeutet.</p>
   <% } else { %>
     <ul class="tcg-feed">
       <% rareLoot.forEach((l) => { %>
         <li class="<%= l.card ? 'r-' + l.card.rarity : 'dg-rare-foil' %>">
           <span class="tcg-dot"></span>
-          <span><strong><%- userLink(l.name) %></strong> erbeutete <%= l.card ? 'die Boss-Karte „' + l.card.name + '“' : '' %><%= l.card && l.foil ? ' und ' : '' %><%= l.foil ? 'eine Folie' : '' %> <span class="muted">(<%= l.dungeon %>)</span></span>
+          <span><strong><%- userLink(l.name) %></strong> erbeutete <%= l.card ? 'die Boss-Karte „' + l.card.name + '“' : '' %><%= l.card && l.foil ? ' und ' : '' %><%= l.foil ? 'einen TCG Sleeve oder leeren Slab' : '' %> <span class="muted">(<%= l.dungeon %>)</span></span>
           <span class="muted small nowrap"><%= relTime(l.at) %></span>
         </li>
       <% }) %>
@@ -368,7 +412,7 @@
       <% loot.players.forEach((p) => { %>
         <% const items = []; %>
         <% if (p.reward) items.push({ cls: 'is-money', text: euro(p.reward) }); %>
-        <% if (p.foil) items.push({ cls: 'is-foil', text: 'Folie' }); %>
+        <% if (p.foil) items.push({ cls: 'is-foil', text: 'TCG Sleeve oder Slab' }); %>
         <% if (p.bossCard) items.push({ cls: 'is-card', text: loot.bossCard ? loot.bossCard.name : 'Boss-Karte' }); %>
         <% if (!items.length) items.push({ cls: 'is-none', text: 'keine Beute' }); %>
         <% items.forEach((it) => { %>

@@ -2,19 +2,21 @@
 // Gegenstands-Arten stehen in ./types.js (neue Art = ein Eintrag dort). Jede Bewegung läuft über addItems/takeItems,
 // die je nach Art (storage 'stueck' / 'stapel') das richtige Modell benutzen und ins ItemLog schreiben –
 // nie direkt Item/ItemStack anfassen.
-// Eine folierte Karte gewinnt mit der Zeit an Wert, kann aber weder an die Bank verkauft noch auf Quests
-// (oder künftige Dungeons) geschickt werden – nur behalten oder im Handel weitergeben (siehe tcg/locks).
+// Eine Karte im Sleeve kann nicht an die Bank verkauft oder im Duell gesetzt werden.
+// Auf Quests, in den Dungeon und den Turm darf sie mit – dort schützt die Folie vor Schaden (#204, siehe tcg/locks).
 const crypto = require('crypto');
 const { Item, ItemStack, ItemLog } = require('../models/Item');
 const { TcgCard } = require('../models/Tcg');
+const { GradingShop, GradingOrder } = require('../models/Grading');
 const { Trade, openFilter } = require('../models/Trade');
 const { lockedFor, ITEM_PREFIX } = require('../trade/lines');
 const User = require('../models/User');
 const Ledger = require('../models/Ledger');
-const { lockedDocs, claim } = require('../tcg/locks');
+const { lockedDocs, claim, lockLabel, isStateLock } = require('../tcg/locks');
 const { inTransaction } = require('../services/betService');
 const { notify } = require('../services/notifyService');
 const { UserError } = require('../lib/util');
+const { euro } = require('../lib/viewHelpers');
 const catalog = require('../tcg/catalog');
 const foil = require('./foil');
 const { ITEM_TYPES, itemTypeByKey, itemType, SOURCES } = require('./types');
@@ -22,6 +24,7 @@ const { centerShift } = require('../grading/condition');
 
 const MAX_GRANT = 50; // Admin-Vergabe pro Mitglied
 const MAX_SELL = 100;
+const MAX_BUY = 100;
 // Obergrenze pro Vorgang (Schutz vor Fehlern im Code): Stücke sind einzelne Dokumente, ein Stapel nur eine Zahl
 const maxAdd = (t) => (t.storage === 'stapel' ? 10000 : 500);
 
@@ -56,13 +59,26 @@ async function lockedItemIds(userId, session) {
   return new Set(trades.flatMap((t) => lockedFor(t, userId)).map(String));
 }
 
-/** Freie Stücke einer Art (storage 'stueck', nicht im Handel), älteste zuerst */
-async function freeItems(userId, type, session) {
+/**
+ * Leere Slabs, die ein Grading-Shop für laufende Spieler-Aufträge zurückhält (#204): jeder Auftrag „in Arbeit“ mit
+ * „Benoten + Slab“ hat seinen Slab reserviert – er lässt sich weder verkaufen noch handeln, bis der Auftrag fertig ist,
+ * abgebrochen wird oder abläuft. Aufträge ohne Angabe der Bausteine zählen als Bügeln + Slab (orderService.servicesOf).
+ */
+const reservedSlabs = (userId, session) =>
+  GradingOrder.countDocuments({ shop: userId, status: 'in_arbeit', $or: [{ 'services.slab': true }, { services: null }] }).session(session || null);
+
+/**
+ * Freie Stücke einer Art (storage 'stueck', nicht im Handel), älteste zuerst. Slabs: ohne die für laufende Aufträge
+ * reservierten (ignoreReserved = true nur für den Auftrag, der sie verbraucht).
+ */
+async function freeItems(userId, type, session, ignoreReserved = false) {
   const [docs, locked] = await Promise.all([
     Item.find({ user: userId, type }).sort({ createdAt: 1 }).select('_id').session(session || null).lean(),
     lockedItemIds(userId, session),
   ]);
-  return docs.filter((d) => !locked.has(String(d._id)));
+  const free = docs.filter((d) => !locked.has(String(d._id)));
+  if (type !== 'slab' || ignoreReserved) return free;
+  return free.slice(0, Math.max(0, free.length - (await reservedSlabs(userId, session))));
 }
 
 /** Gegenstände per Schreibzugriff beanspruchen (gleichzeitiger Verkauf/Handel/Folieren kollidiert, siehe tcg/locks.claim) */
@@ -73,12 +89,12 @@ async function claimItems(docs, userId, session) {
 }
 
 /** Wie viele Stück einer Art frei verfügbar sind (nicht im Handel) */
-async function freeCount(userId, t, session) {
+async function freeCount(userId, t, session, ignoreReserved = false) {
   if (t.storage === 'stapel') {
     const s = await ItemStack.findOne({ user: userId, type: t.key }).select('count').session(session || null).lean();
     return s ? s.count : 0;
   }
-  return (await freeItems(userId, t.key, session)).length;
+  return (await freeItems(userId, t.key, session, ignoreReserved)).length;
 }
 
 /**
@@ -110,7 +126,7 @@ async function addItems({ userIds, type, count = 1, source, session, meta }) {
  * (nicht im Handel); newest = die neuesten zuerst (sonst die ältesten). Vorher mit freeCount prüfen, um eine
  * passende Meldung zu zeigen – hier gibt es nur die allgemeine.
  */
-async function takeItems({ userId, type, count = 1, source, session, newest = false, meta }) {
+async function takeItems({ userId, type, count = 1, source, session, newest = false, meta, ignoreReserved = false }) {
   const t = needType(type);
   needSource(source);
   if (!session) throw new Error('takeItems braucht eine Transaktion');
@@ -120,7 +136,7 @@ async function takeItems({ userId, type, count = 1, source, session, newest = fa
     const res = await ItemStack.updateOne({ user: userId, type: t.key, count: { $gte: count } }, { $inc: { count: -count } }, { session });
     if (res.modifiedCount !== 1) throw changed();
   } else {
-    const free = await freeItems(userId, t.key, session);
+    const free = await freeItems(userId, t.key, session, ignoreReserved);
     if (free.length < count) throw changed();
     const docs = newest ? free.slice(-count) : free.slice(0, count);
     await claimItems(docs, userId, session);
@@ -164,6 +180,30 @@ async function sellItems({ user, type, count = 1 }) {
   });
 }
 
+/** Shop-Preis (Bank verkauft) einer Art in Cent, 0 = nicht im Shop – die Preise stellt der Admin ein (items/foil.js) */
+const buyPrice = (t) => (foil.PRICE_FIELD[t.key] ? foil.settings[foil.PRICE_FIELD[t.key]] : t.buy) || 0;
+
+/**
+ * Gegenstände von der Bank kaufen: zum aktuellen Shop-Preis, nie unter dem Ankaufspreis. via = wo gekauft wird: 'bank'
+ * (Bank-Shop im Inventar) oder 'grading' (Werkstatt – nur mit aktivem Grading-Shop); jede Art gibt es nur an ihrem Ort (types.via).
+ */
+async function buyItems({ user, type, count = 1, via = 'bank' }) {
+  const t = needType(type);
+  const price = buyPrice(t);
+  if (!price) throw new UserError(`${t.label} verkauft die Bank nicht.`);
+  if ((t.via || 'bank') !== via) throw new UserError(via === 'bank' ? `${t.label} gibt es nicht im Bank-Shop – du bekommst sie in der Werkstatt deines Grading-Shops.` : `${t.label} gibt es nicht in der Werkstatt.`);
+  if (via === 'grading' && !(await GradingShop.exists({ _id: user._id, active: true }))) throw new UserError('Leere Slabs verkauft die Werkstatt nur an Grading-Shops – sonst bleibt der Handel mit anderen Mitgliedern.');
+  if (!Number.isInteger(count) || count < 1 || count > MAX_BUY) throw new UserError(`Du kannst 1 bis ${MAX_BUY} Stück auf einmal kaufen.`);
+  return inTransaction(async (session) => {
+    const cost = price * count;
+    const paid = await User.findOneAndUpdate({ _id: user._id, balance: { $gte: cost } }, { $inc: { balance: -cost } }, { new: true, session });
+    if (!paid) throw new UserError(`Dein Guthaben reicht nicht – ${count}× ${t.label} kosten ${euro(cost)}.`);
+    await addItems({ userIds: [user._id], type: t.key, count, source: 'bank', session });
+    await Ledger.create([{ user: user._id, type: 'item_kauf', amount: -cost, betTitle: `${count}× ${t.label}`, meta: { item: t.key, count, price } }], { session });
+    return { type: t, count, cost };
+  });
+}
+
 /**
  * Gegenstände aus dem Inventar entfernen (Admin/Dev, z. B. nach einer falschen Vergabe). Gegenstände in einem
  * offenen Handelsangebot bleiben. Gibt { type, removed, remaining } zurück.
@@ -183,10 +223,10 @@ async function revokeItems({ userId, type, count = 1 }) {
 /** Älterer Name von addItems (Admin-Vergabe, Dungeon, Grading, Lotto) */
 const grantItems = addItems;
 
-/** Folierte Karten eines Nutzers, neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
+/** Folierte Karten eines Nutzers (Sleeves und Slabs), neueste Folie zuerst – mit aktuellem Wert und Sperre (Handel) */
 async function foiledCards(userId, now = Date.now()) {
   const [docs, locked] = await Promise.all([
-    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('+condition').sort({ foiledAt: -1 }).lean(), // folierte Karten zeigen ihre Note
+    TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('card rarity foiledAt slab condition.defects.centering').sort({ foiledAt: -1 }).lean(), // nur Slabs zeigen eine Note
     lockedDocs(userId),
   ]);
   return docs
@@ -200,13 +240,14 @@ async function foiledCards(userId, now = Date.now()) {
         card,
         rarity: r,
         foiledAt: d.foiledAt,
-        grade: d.condition ? d.condition.grade : null,
+        slab: d.slab ? { code: d.slab.code, grade: d.slab.grade } : null,
+        grade: d.slab ? d.slab.grade : null, // Note nur auf dem Slab (#204)
         center: d.condition ? centerShift(d.condition.defects && d.condition.defects.centering, d._id) : null, // sichtbarer Versatz (Zentrierung)
         days: foil.foilDays(d.foiledAt, now),
-        percent: foil.foilPercent(d.foiledAt, now),
+        percent: foil.foilPercent(foil.growthFrom(d), now),
         sell: r.sell,
-        value: foil.cardValue(r.sell, d.foiledAt, now),
-        lock: reason && reason !== 'folie' ? reason : null, // 'handel' | 'quest' | 'dungeon'
+        value: foil.cardValue(r.sell, foil.growthFrom(d), now),
+        lock: reason && reason !== 'folie' && reason !== 'slab' ? reason : null, // 'handel' | 'quest' | 'dungeon'
       };
     });
 }
@@ -227,36 +268,48 @@ async function foilableCards(userId) {
 }
 
 /**
- * Eine Karte folieren: verbraucht eine Folie, nimmt das älteste freie, unfolierte Exemplar.
- * Gibt { copyId, grade } zurück – mit der Folie wird die Note des Exemplars sichtbar (#73).
+ * Eine Karte in einen TCG Sleeve stecken: verbraucht einen Sleeve (die ehemalige Folie), nimmt das älteste freie, unfolierte Exemplar – unbeschädigte zuerst,
+ * damit die Folie nicht an einer Karte mit Knick landet (#204). Die Folie ist eine Schutzhülle (Sleeve): Die Note bleibt
+ * geheim, nur ein Slab zeigt sie. Gibt { copyId, damaged } zurück.
  */
 async function foilCard({ user, cardId }) {
   const card = catalog.cardById[cardId];
   if (!card) throw new UserError('Bitte wähle eine Karte aus.');
   return inTransaction(async (session) => {
     const locked = await lockedDocs(user._id, session);
-    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id condition.grade').session(session).lean();
-    const doc = docs.find((d) => !locked.reasons.has(String(d._id)));
+    const docs = await TcgCard.find({ user: user._id, card: card.id, foiledAt: null }).sort({ createdAt: 1 }).select('_id damaged').session(session).lean();
+    const free = docs.filter((d) => !locked.reasons.has(String(d._id)));
+    const doc = free.find((d) => !d.damaged) || free[0];
     if (!doc) throw new UserError(docs.length ? 'Alle unfolierten Exemplare dieser Karte sind gerade gesperrt (Quest oder Handel).' : 'Du hast kein unfoliertes Exemplar dieser Karte.');
-    // eine freie Folie (nicht im Handel) verbrauchen
-    if (!(await freeCount(user._id, itemTypeByKey.folie, session))) throw new UserError('Du hast keine freie Folie mehr (oder sie steht im Handel).');
+    // einen freien Sleeve (nicht im Handel) verbrauchen
+    if (!(await freeCount(user._id, itemTypeByKey.folie, session))) throw new UserError('Du hast keinen freien TCG Sleeve mehr (oder er steht im Handel).');
     await takeItems({ userId: user._id, type: 'folie', source: 'folieren', session, meta: { card: card.id } });
     await claim([doc], user._id, session);
     await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: new Date() } }, { session });
-    return { copyId: String(doc._id), grade: doc.condition ? doc.condition.grade : null };
+    return { copyId: String(doc._id), damaged: !!doc.damaged };
   });
 }
 
-/** Folie abziehen: Die Karte ist danach wieder normal (Bankwert, Quests), die Folie ist kaputt. */
+/**
+ * Sleeve abziehen bzw. Slab aufbrechen (#204): Die Karte ist danach wieder ohne Hülle (Händlerpreis, Quests). Der Sleeve
+ * kommt zurück ins Inventar (wiederverwendbar, handelbar); beim Slab sind Kürzel und Note weg und das Gehäuse zerstört.
+ * Gibt { card, sleeve } zurück: sleeve = true, wenn ein Sleeve zurückkam.
+ */
 async function unfoilCard({ user, copyId }) {
   return inTransaction(async (session) => {
-    const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card').session(session).lean();
+    const doc = await TcgCard.findOne({ _id: copyId, user: user._id, foiledAt: { $ne: null } }).select('_id card slab').session(session).lean();
     if (!doc) throw new UserError('Diese folierte Karte gibt es nicht (mehr).');
     const reason = (await lockedDocs(user._id, session)).reasons.get(String(doc._id));
     if (reason === 'handel') throw new UserError('Die Karte ist gerade im Handel. Zieh zuerst das Angebot zurück.');
+    if (reason === 'vitrine') throw new UserError('Der Slab steht in deiner Vitrine. Nimm ihn zuerst heraus.');
+    // Folierte Karten spielen mit (#204): unterwegs bleibt die Folie dran – sonst wäre die Karte beim Abschluss ungeschützt
+    if (reason && !isStateLock(reason)) throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Den Sleeve kannst du danach abziehen.`);
     await claim([doc], user._id, session);
-    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null } }, { session });
-    return catalog.cardById[doc.card] || null;
+    // Slab aufbrechen (#204): Kürzel, Note und Wertsteigerung sind weg – die Karte kann neu eingereicht werden
+    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null, slab: null } }, { session });
+    // nur ein Sleeve kommt zurück – ein aufgebrochener Slab ist kaputt (Beschaffung: Shop, Dungeon)
+    if (!doc.slab) await addItems({ userIds: [user._id], type: 'folie', source: 'folieren', session, meta: { card: doc.card, back: true } });
+    return { card: catalog.cardById[doc.card] || null, sleeve: !doc.slab };
   });
 }
 
@@ -269,6 +322,20 @@ async function rollGradingFoil({ userId, session, roll = () => crypto.randomInt(
   await grantItems({ userIds: [userId], type: 'folie', source: 'grading', session });
   return true;
 }
+
+/**
+ * Funde aus Dungeon und Turm aufteilen: Ein Teil (slabPercent in %) ist ein leerer Slab, der Rest ein TCG Sleeve.
+ * Reine Funktion: roll() liefert 0 … 99.99 (Tests geben feste Werte vor). Gibt { sleeves: [userId], slabs: [userId] } zurück.
+ */
+function splitFoilDrops(userIds, slabPercent = foil.settings.slabDropPercent, roll = () => crypto.randomInt(10000) / 100) {
+  const out = { sleeves: [], slabs: [] };
+  for (const id of userIds) (roll() < slabPercent ? out.slabs : out.sleeves).push(id);
+  return out;
+}
+
+/** Freie leere Slabs eines Shops (nicht im Handel) – die braucht er zum Versiegeln (grading/gradingService) */
+/** ignoreReserved = true: Bestand inklusive der für laufende Aufträge reservierten Slabs (für die Aufträge selbst) */
+const slabStock = (userId, session, ignoreReserved = false) => freeCount(userId, itemTypeByKey.slab, session, ignoreReserved);
 
 /** Neue Gegenstände seit dem letzten Besuch des Inventars (gleiche Marke wie bei den Packs) – für das Leuchten an „TCG“ */
 async function newItemCount(user) {
@@ -284,4 +351,4 @@ async function newItemCount(user) {
 const notifyGift = (userIds, t, count) =>
   notify(userIds, { area: 'Inventar', href: '/inventar', text: `Du hast ${count > 1 ? count + '× ' : 'eine '}${t.label} geschenkt bekommen.` });
 
-module.exports = { newItemCount, revokeItems, ITEM_TYPES, itemTypeByKey, itemType, addItems, takeItems, freeCount, logItems, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };
+module.exports = { reservedSlabs, buyItems, buyPrice, MAX_BUY, splitFoilDrops, slabStock, newItemCount, revokeItems, ITEM_TYPES, itemTypeByKey, itemType, addItems, takeItems, freeCount, logItems, MAX_GRANT, MAX_SELL, ITEM_RARITY, itemCardId, itemByCardId, itemCard, lockedItemIds, freeItems, claimItems, sellItems, itemInventory, grantItems, foiledCards, foilableCards, foilCard, unfoilCard, rollGradingFoil, notifyGift };

@@ -79,10 +79,24 @@ function startJobs() {
   setTimeout(suspicion, 30 * 1000).unref();
   setInterval(suspicion, 10 * 60 * 1000).unref();
 
+  // Grading (#204): abgelaufene Aufträge von Mitgliedern erstatten – auch wenn niemand die Grading-Seiten öffnet –
+  // und Shops warnen, deren Frist bald abläuft
+  const gradingOrders = () => {
+    const orders = require('./grading/orderService');
+    return orders.expireDue().then(() => orders.warnDue()).then(() => orders.decayReputations()).catch((err) => console.error('Grading-Aufträge-Fehler:', err));
+  };
+  setTimeout(gradingOrders, 35 * 1000).unref();
+  setInterval(gradingOrders, 5 * 60 * 1000).unref();
+
   // Börsenbericht: jede Minute prüfen, ob der Bericht des Tages (18:45 Uhr) fällig ist – danach springt der ETF
   const boerse = () => reportService.runDue().catch((err) => console.error('Börsenbericht-Fehler:', err));
   setTimeout(boerse, 45 * 1000).unref();
   setInterval(boerse, 60 * 1000).unref();
+
+  // Wochenrückblick: jede Minute prüfen, ob der Rückblick (freitags 11:30 Uhr) fällig ist
+  const weekly = () => require('./stats/weeklyReviewService').runDue().catch((err) => console.error('Wochenrückblick-Fehler:', err));
+  setTimeout(weekly, 55 * 1000).unref();
+  setInterval(weekly, 60 * 1000).unref();
 
   // eSports: Wochenbericht (sonntags) und Konkurs eingefrorener Teams – jede Minute bzw. stündlich prüfen
   const esports = require('./esports/esportsService');

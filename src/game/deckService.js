@@ -13,7 +13,7 @@ async function ownedCounts(userId) {
 
 /** Karten, die der Spieler besitzt, mit Anzahl und Deck-Grenze */
 function poolFor(owned) {
-  return catalog.CARDS.filter((c) => owned[c.id]).map((c) => ({
+  return [...catalog.CARDS, ...catalog.TEST_CARDS].filter((c) => owned[c.id]).map((c) => ({
     id: c.id,
     name: c.name,
     rarity: c.rarity,

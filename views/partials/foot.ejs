@@ -7,7 +7,7 @@
     </div>
     <p>Tippe in Safari unten auf <strong>Teilen</strong> und dann auf <strong>Zum Home-Bildschirm</strong>.</p>
   </dialog>
-  <% if (currentUser && supportEnabled) { %><%- include('support') %><% } %>
+  <% if (currentUser) { %><%- include('chat') %><% } %>
   <% if (currentUser && currentUser.isStaff) { %><%- include('reauth') %><% } %>
   <%# Neuer Erfolg: Fenster wie das Beute-Fenster. Steht für jedes angemeldete Mitglied bereit; ist schon ein Erfolg offen,
       öffnet app.js es sofort, sonst fragt app.js alle paar Sekunden nach (/erfolge/neu). Esc schließt nicht – erst „Weiter“. %>
@@ -56,6 +56,23 @@
         <button class="btn btn-primary ach-pop-ok" type="submit">Weiter</button>
       </form>
       <p class="muted small ach-pop-more" data-gift-more<%= gp && gp.left > 1 ? '' : ' hidden' %>><%= gp && gp.left > 1 ? 'Noch ' + (gp.left - 1) + (gp.left - 1 === 1 ? ' weiteres Geschenk wartet.' : ' weitere Geschenke warten.') : '' %></p>
+    </dialog>
+  <% } %>
+  <%# Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): geht erst mit „Gelesen“ zu, Esc schließt nicht.
+      Ist gerade ein anderes Fenster offen (Erfolg, Geschenk), kommt die Nachricht danach (public/js/app.js).
+      Der Admin bekommt keine Pop-ups (devMessageService.receives) – für ihn gibt es das Fenster gar nicht. %>
+  <% if (currentUser && !currentUser.isAdmin) { const dp = typeof devPopup !== 'undefined' && devPopup ? devPopup : null; %>
+    <dialog class="dg-loot ach-pop dev-pop" data-dev-pop<%= dp ? ' data-open' : '' %> aria-labelledby="dev-pop-title" aria-describedby="dev-pop-text">
+      <span class="kicker">Nachricht vom Entwickler-Team</span>
+      <h2 id="dev-pop-title" data-dev-title><%= dp ? dp.title : '' %></h2>
+      <p id="dev-pop-text" class="dev-pop-text" data-dev-text><%= dp ? dp.text : '' %></p>
+      <p class="dev-pop-by muted small">– <span data-dev-by><%= dp ? dp.byName : '' %></span>, <span data-dev-at><%= dp ? dp.at : '' %></span></p>
+      <form method="post" action="/entwickler-nachrichten/gesehen" data-dev-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="id" value="<%= dp ? dp.id : '' %>" data-dev-id>
+        <button class="btn btn-primary ach-pop-ok" type="submit">Gelesen</button>
+      </form>
+      <p class="muted small ach-pop-more" data-dev-more<%= dp && dp.left > 1 ? '' : ' hidden' %>><%= dp && dp.left > 1 ? 'Noch ' + (dp.left - 1) + (dp.left - 1 === 1 ? ' weitere Nachricht wartet.' : ' weitere Nachrichten warten.') : '' %></p>
     </dialog>
   <% } %>
   <footer class="footer">

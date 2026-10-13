@@ -63,7 +63,7 @@ test('Fällt der 28. auf einen Sonntag, ziehen Wochen- und Monats-Lotterie zur s
 test('Gewinn als Text', () => {
   const n = (t) => t.replace(/\s/g, ' ');
   assert.equal(n(prizeText({ cash: 123400 })), '1.234,00 €');
-  assert.equal(n(prizeText({ cash: 1000000, packs: 50, foils: 2 })), '10.000,00 €, 50 Booster Packs und 2 Folien');
+  assert.equal(n(prizeText({ cash: 1000000, packs: 50, foils: 2 })), '10.000,00 €, 50 Booster Packs und 2 TCG Sleeves');
   assert.equal(n(prizeText({ cash: 500, packs: 1 })), '5,00 € und 1 Booster Pack');
   assert.equal(n(prizeText({ cash: 0, packs: 50 })), '50 Booster Packs');
   assert.equal(n(prizeText({ cash: 0 })), '0,00 €');
@@ -83,4 +83,13 @@ test('Tages-Lotterie: Bank-Topf im Admin-Panel einstellbar, Standard 0', () => {
   const config = require('../src/config');
   assert.deepStrictEqual(lottery.settings.taeglich, { ticketPrice: config.lotteryTicketPrice, prizeCash: 0, prizePacks: 0, prizeFoils: 0 });
   assert.strictEqual(lottery.ticketPrice('taeglich'), config.lotteryTicketPrice);
+});
+
+test('Limit pro Person: Woche 10, Monat 20, täglich ohne Limit', () => {
+  const { ticketsLeft } = require('../src/services/lotteryService');
+  assert.equal(ticketsLeft('woche', null), 10);
+  assert.equal(ticketsLeft('woche', { tickets: 4, bought: 3 }), 7);
+  assert.equal(ticketsLeft('woche', { tickets: 90 }), 0); // alter Eintrag ohne bought-Feld
+  assert.equal(ticketsLeft('monat', { tickets: 5, bought: 5 }), 15);
+  assert.equal(ticketsLeft('taeglich', { tickets: 500, bought: 500 }), Infinity);
 });

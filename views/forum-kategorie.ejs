@@ -26,7 +26,7 @@
           <span class="forum-crow-icon"><%- include('partials/forum-icon', { name: 'folder', size: 18 }) %></span>
           <span class="forum-trow-main">
             <a class="forum-crow-title forum-stretch" href="/forum/k/<%= c._id %>"><%= c.title %><% if (s.unread) { %><span class="forum-dot" title="Neues für dich"></span><% } %></a>
-
+            <% if (c.deletable) { %><form method="post" action="/forum/bereiche/<%= c._id %>/loeschen" class="forum-del-form forum-del-row" data-reauth data-confirm="Unterbereich „<%= c.title %>“ mit allen Themen löschen? Das kann nicht rückgängig gemacht werden."><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="forum-cat-del">Löschen</button></form><% } %>
           </span>
           <span class="forum-count"><%= s.threads %> <%= s.threads === 1 ? 'Thema' : 'Themen' %> · <%= s.posts %> <%= s.posts === 1 ? 'Beitrag' : 'Beiträge' %></span>
           <span class="forum-crow-last">

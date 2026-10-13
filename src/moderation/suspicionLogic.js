@@ -81,7 +81,8 @@ const MARKET_SKIP = new Set(['zusammenlegung', 'aufteilung']); // Splits sind ke
 
 const DUNGEON_MIN_RUNS = 6; // so viele Durchläufe braucht es für eine Aussage
 const DUNGEON_JOIN_MS = MIN; // Median: angemeldet so kurz, nachdem die Anmeldung für den Termin aufging
-const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts)
+const DUNGEON_STREAK_MS = 20 * HOUR; // an jedem Termin dabei, ohne Lücke über so lange (auch nachts) …
+const DUNGEON_STREAK_MIN = 6; // … und an mindestens so vielen Terminen (sonst genügten bei langem Termin-Abstand zwei)
 const DUNGEON_UNSEEN_SHARE = 0.8; // Beute so oft nie angeschaut (die Seite meldet das beim Ansehen)
 const DUNGEON_NIGHT = 2; // so viele Termine zwischen 0 und 6 Uhr machen schnelles Anmelden wahrscheinlich
 
@@ -123,7 +124,7 @@ const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
 const RATING_AREAS = {
   verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer', 'markt'] },
   technik: { label: 'Technik', kinds: ['browser', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'] },
-  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert', 'kreislauf', 'rang', 'netz'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
+  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert', 'kreislauf', 'rang', 'netz', 'gefaellig', 'gradingnetz'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
 };
 const RATING_POINTS = { 1: 1, 2: 3 }; // Punkte je Stufe des stärksten Hinweises im Bereich (möglich, wahrscheinlich)
 const RATING_EXTRA = 1; // jeder weitere Hinweis im selben Bereich
@@ -135,7 +136,7 @@ const STAGE_LABEL = { 1: 'Beobachten', 2: 'Verdacht', 3: 'Starker Verdacht', 4: 
 const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
 const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
 const INCOME_MIN_CENTS = 10000; // … und mindestens 100 €
-const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
+const INCOME_SOURCES = { ihk_lohn: 'IHK', dungeon_lohn: 'Dungeon', grading_lohn: 'Grading', grading_einnahme: 'Grading', tcg_verkauf: 'Bank-Verkäufe', item_verkauf: 'Bank-Verkäufe' };
 
 const KIND_LABEL = {
   tempo: 'Tempo',
@@ -157,6 +158,9 @@ const KIND_LABEL = {
   rang: 'Platz 1 mit geliehenem Wert',
   netz: 'Sammelkonto',
   markt: 'Reaktion auf Kurssprünge',
+  gefaellig: 'Gefälligkeitsnote',
+  gradingnetz: 'Grading unter Mehrfach-Konten',
+  mehrfachkonto: 'Mehrfach-Konto', // aus der Geräte-Erkennung (device/deviceVerdictLog.js), nur im Urteils-Protokoll
 };
 
 // ---------- Hilfen ----------
@@ -373,7 +377,8 @@ function scalpFinding(trades) {
 // ---------- Wertverschiebung ----------
 
 /**
- * Wertfluss eines abgeschlossenen Geschäfts. valueOf(cardId) = Bankwert in Cent.
+ * Wertfluss eines abgeschlossenen Geschäfts. valueOf(cardId, line) = Wert in Cent – line ist die Position (#204: so kann
+ * der Aufrufer für Slabs und Exemplare den gemessenen Marktpreis statt des Händlerpreises nehmen).
  * trade: { seller, buyer, to, give, want, price, extraFrom } wie im Trade-Modell: der Anbieter gibt give, die
  * Gegenseite (buyer bzw. to) gibt want, das Geld zahlt extraFrom (ohne Angabe die Gegenseite, siehe trade/lines.js).
  * Liefert { from, to, given, received, shifted } (from gibt mehr, als es bekommt) oder null ohne Gegenseite.
@@ -381,7 +386,7 @@ function scalpFinding(trades) {
 function tradeFlow(trade, valueOf) {
   const other = trade.buyer || trade.to;
   if (!other) return null;
-  const sum = (lines) => (lines || []).reduce((s, l) => s + (valueOf(l.card) || 0), 0);
+  const sum = (lines) => (lines || []).reduce((s, l) => s + (valueOf(l.card, l) || 0), 0);
   const sellerPays = trade.extraFrom === 'seller';
   const a = sum(trade.give) + (sellerPays ? trade.price || 0 : 0); // Anbieter-Seite
   const b = sum(trade.want) + (sellerPays ? 0 : trade.price || 0); // Gegenseite
@@ -424,6 +429,62 @@ function valuePairFinding(items, names, flagged = false) {
       `${items.length === 1 ? 'Ein Geschäft' : `${items.length} Geschäfte`} mit sehr ungleichem Wert, zusammen ${euro(total)} zugunsten von ${names.get(winner) || 'unbekannt'}` +
       (flagged ? ' – die Konten sind auch als Mehrfach-Konto erkannt' : ''),
     trades: sorted.slice(-5).map((i) => i.text),
+  };
+}
+
+// ---------- Grading unter Bekannten (#204, Etappe C) ----------
+// Der Server kennt die echte Note jeder Karte – anders als echte Grading-Firmen sieht er also direkt, wenn ein Shop einem
+// Kunden geschönte Noten auf den Slab schreibt. Und Aufträge zwischen erkannten Mehrfach-Konten sind ein Weg, Geld
+// zu verschieben (der Preis ist frei wählbar).
+const FAVOR_DIFF = 2; // Note des Shops mindestens so viel über der echten
+const FAVOR_MIN = 2; // so viele geschönte Aufträge für denselben Kunden: möglich
+const FAVOR_STRONG = 4; // so viele (oder Mehrfach-Konto): wahrscheinlich
+const GRADING_NET_STRONG_CENTS = 50000; // Aufträge unter Mehrfach-Konten: ab 500 € wahrscheinlich
+const GRADING_NET_STRONG_COUNT = 3;
+
+/**
+ * Gefälligkeitsnoten eines Shops für einen Kunden. jobs: Spieler-Aufträge dieses Paares [{ shop, owner, guess, grade,
+ * card, price, at }], names: Map userId → Name, flagged: das Paar ist als Mehrfach-Konto erkannt. Liefert ein Finding
+ * oder null.
+ */
+function favorFinding(jobs, names, flagged = false) {
+  const favored = jobs.filter((j) => Number.isFinite(j.guess) && Number.isFinite(j.grade) && j.guess - j.grade >= FAVOR_DIFF);
+  if (favored.length < FAVOR_MIN) return null;
+  const sorted = [...favored].sort((x, y) => toMs(x.at) - toMs(y.at));
+  const { shop, owner } = sorted[0];
+  const total = favored.reduce((s, j) => s + (j.price || 0), 0);
+  return {
+    level: favored.length >= FAVOR_STRONG || flagged ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    users: [String(shop), String(owner)],
+    count: favored.length,
+    total,
+    from: new Date(toMs(sorted[0].at)),
+    to: new Date(toMs(sorted[sorted.length - 1].at)),
+    summary:
+      `${names.get(String(shop)) || 'Ein Shop'} hat ${names.get(String(owner)) || 'einem Kunden'} ${favored.length}× eine um mindestens ${FAVOR_DIFF} zu hohe Note auf den Slab geschrieben` +
+      (flagged ? ' – die Konten sind auch als Mehrfach-Konto erkannt' : ''),
+    jobs: sorted.slice(-5).map((j) => `${j.card}: Note ${j.guess} statt ${j.grade} (${euro(j.price || 0)})`),
+  };
+}
+
+/**
+ * Grading-Aufträge zwischen Konten, die als Mehrfach-Konto erkannt sind (nur für solche Paare aufrufen).
+ * orders: [{ shop, owner, price, at, card }] – liefert ein Finding oder null (ohne Aufträge).
+ */
+function gradingNetFinding(orders, names) {
+  if (!orders.length) return null;
+  const sorted = [...orders].sort((x, y) => toMs(x.at) - toMs(y.at));
+  const total = orders.reduce((s, o) => s + (o.price || 0), 0);
+  const { shop, owner } = sorted[0];
+  return {
+    level: total >= GRADING_NET_STRONG_CENTS || orders.length >= GRADING_NET_STRONG_COUNT ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    users: [String(shop), String(owner)],
+    count: orders.length,
+    total,
+    from: new Date(toMs(sorted[0].at)),
+    to: new Date(toMs(sorted[sorted.length - 1].at)),
+    summary: `${orders.length === 1 ? 'Ein Grading-Auftrag' : `${orders.length} Grading-Aufträge`} für zusammen ${euro(total)} von ${names.get(String(owner)) || 'unbekannt'} an ${names.get(String(shop)) || 'unbekannt'} – die Konten sind als Mehrfach-Konto erkannt`,
+    jobs: sorted.slice(-5).map((o) => `${o.card}: ${euro(o.price || 0)}`),
   };
 }
 
@@ -643,7 +704,7 @@ function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
     else cur = { from: slotMs[i], to: slotMs[i], count: 1 };
     if (cur.count > best.count) best = { ...cur };
   }
-  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS;
+  const streakHit = best.to - best.from >= DUNGEON_STREAK_MS && best.count >= DUNGEON_STREAK_MIN;
 
   const finished = list.filter((r) => r.finished);
   const unseen = finished.filter((r) => !r.seen);
@@ -654,7 +715,9 @@ function dungeonFinding(runs, { intervalMs, lockMs = 0, timeZone }) {
     const h = hourIn(t, timeZone);
     return h >= IHK_NIGHT[0] && h < IHK_NIGHT[1];
   }).length;
-  const strong = streakHit || (joinHit && (night >= DUNGEON_NIGHT || unseenHit));
+  // Die Serie allein ist nur möglich: ein engagierter Dauerspieler mit Wecker schafft sie auch von Hand (Fehlalarme Dio, oemer).
+  // Wahrscheinlich erst, wenn die Anmeldung sofort kam oder die Beute nie angesehen wurde.
+  const strong = (joinHit && (night >= DUNGEON_NIGHT || unseenHit)) || (streakHit && unseenHit);
   const parts = [];
   if (streakHit) parts.push(`${best.count} Termine in Folge ohne Lücke (${hoursText(best.to - best.from)})`);
   if (joinHit) parts.push(`im Schnitt ${seconds(joinMs)} nach Öffnen der Anmeldung angemeldet`);
@@ -1002,6 +1065,8 @@ const COUNT_LABEL = {
   rang: 'Abschnitte',
   netz: 'Geber',
   markt: 'Reaktionen',
+  gefaellig: 'zu hohe Noten',
+  gradingnetz: 'Aufträge',
 };
 
 /**
@@ -1037,7 +1102,7 @@ function factsOf(kind, details = {}) {
   add(num(d.night) && d.night > 0, `${d.night}×`, 'nachts');
   add(num(d.windows), `${d.windows}×`, 'Zeitfenster');
   add(num(d.devices), String(d.devices), 'Geräte');
-  const TOTAL_LABEL = { ertrag: 'eingenommen', kreislauf: 'Kartenwert', rang: 'netto erhalten', netz: 'netto erhalten' };
+  const TOTAL_LABEL = { ertrag: 'eingenommen', kreislauf: 'Kartenwert', rang: 'netto erhalten', netz: 'netto erhalten', gefaellig: 'bezahlt', gradingnetz: 'bezahlt' };
   add(num(d.total), euro(d.total), TOTAL_LABEL[kind] || 'verschoben');
   add(num(d.back) && d.back > 0, euro(d.back), 'zurück');
   add(num(d.factor), `${Math.round(d.factor)}×`, 'das Übliche');
@@ -1045,12 +1110,15 @@ function factsOf(kind, details = {}) {
 }
 
 const VERDICT_EVENTS = new Set(['bestaetigt', 'fehlalarm', 'zurueckgenommen']);
+/** Urteil eines Betroffenen über den eigenen Fall – ohne Aussagekraft (Altdaten: der Name steht im Protokoll) */
+const isSelfVerdict = (e) => !!e.byName && Array.isArray(e.names) && e.names.some((n) => String(n).toLowerCase() === String(e.byName).toLowerCase());
 const rateOf = (c) => ({ ...c, rate: c.confirmed + c.falseAlarms ? c.confirmed / (c.confirmed + c.falseAlarms) : null });
 
 /**
  * Trefferquote je Muster und Stufe aus dem Urteils-Protokoll (models/SuspicionVerdict).
  * events: [{ key, event, kind, level, createdAt }] in beliebiger Reihenfolge. Je Hinweis zählt nur sein letztes Urteil,
  * mit der Stufe, die er dabei hatte; ein zurückgenommenes Urteil zählt nicht, "neue_belege" ändert nichts.
+ * Urteile, die ein Betroffener über sich selbst gefällt hat (byName steht in names), zählen nicht.
  * counts: Map kind → Zahl der aktuellen Hinweise (Spalte "Hinweise").
  * Liefert [{ kind, label, total, confirmed, falseAlarms, rate, levels: { 1: {...}, 2: {...} } }], rate =
  * bestätigt ÷ (bestätigt + Fehlalarm) bzw. null ohne Urteil. Muster mit Urteilen zuerst, dann nach Zahl der Hinweise.
@@ -1059,6 +1127,7 @@ function precisionRows(events, counts = new Map()) {
   const last = new Map(); // key → letztes Urteil
   for (const e of events) {
     if (!VERDICT_EVENTS.has(e.event)) continue;
+    if (isSelfVerdict(e)) continue;
     const prev = last.get(e.key);
     if (!prev || toMs(e.createdAt) >= toMs(prev.createdAt)) last.set(e.key, e);
   }
@@ -1159,6 +1228,9 @@ module.exports = {
   scalpFinding,
   tradeFlow,
   valueFinding,
+  favorFinding,
+  gradingNetFinding,
+  FAVOR_DIFF,
   valuePairFinding,
   circulationFinding,
   rankFinding,

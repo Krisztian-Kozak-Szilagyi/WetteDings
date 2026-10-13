@@ -5,6 +5,7 @@ const { Device, DeviceAlert } = require('../models/Device');
 const { Trade } = require('../models/Trade');
 const { UserError } = require('../lib/util');
 const logic = require('./deviceLogic');
+const verdictLog = require('./deviceVerdictLog');
 
 const MAX_LOGINS = 20; // so viele Anmeldezeiten bleiben pro Gerät erhalten
 const MAX_IPS = 5;
@@ -66,9 +67,14 @@ async function updatePair(userA, userB, common) {
   } else if (!level) {
     await DeviceAlert.deleteOne({ _id: alert._id });
   } else if (level !== alert.level) {
-    if (level > alert.level) alert.doneAt = null; // stärkerer Treffer als bisher: wieder als neu anzeigen
+    const reopened = level > alert.level && alert.doneAt; // stärkerer Treffer als bisher: wieder als neu anzeigen
+    if (level > alert.level) {
+      alert.doneAt = null;
+      alert.doneByName = null;
+    }
     alert.level = level;
     await alert.save();
+    if (reopened && alert.verdict) await verdictLog.logEvent(alert, 'neue_belege'); // beurteilter Hinweis geht wieder auf
   }
 }
 
@@ -167,6 +173,9 @@ async function listAlerts() {
         level: a.level,
         label: logic.LEVEL_LABEL[a.level],
         doneAt: a.doneAt,
+        doneByName: a.doneByName || null,
+        verdict: a.verdict || null,
+        verdictLevel: a.verdictLevel || null,
         updatedAt: a.updatedAt,
         users: [ua, ub].map((u) => ({ _id: u._id, username: u.username, createdAt: u.createdAt, banned: logic.isBanned(u) })),
         shared: shared.slice(0, 3).map((s) => ({
@@ -180,8 +189,40 @@ async function listAlerts() {
     .filter(Boolean);
 }
 
-async function setAlertDone(id, done) {
-  await DeviceAlert.updateOne({ _id: id }, { $set: { doneAt: done ? new Date() : null } }, { timestamps: false });
+/** Eigene Fälle beurteilt man nicht selbst */
+function assertNotOwn(alert, actor) {
+  if (!alert || !actor || !actor._id) return;
+  const me = String(actor._id);
+  if (alert.users.some((u) => String(u) === me)) throw new UserError('Hinweise zu deinem eigenen Konto kannst du nicht beurteilen oder erledigen.');
+}
+
+/**
+ * Erledigen bzw. wieder öffnen. Wieder öffnen nimmt auch ein Urteil zurück (es war wohl voreilig) – das wird im
+ * Urteils-Protokoll vermerkt.
+ */
+async function setAlertDone(id, done, actor) {
+  const alert = await DeviceAlert.findById(id).lean();
+  if (!alert) return;
+  assertNotOwn(alert, actor);
+  const by = actor ? actor.username : null;
+  const $set = { doneAt: done ? new Date() : null, doneByName: done ? by : null };
+  if (!done) {
+    if (alert.verdict) await verdictLog.logEvent(alert, 'zurueckgenommen', by);
+    Object.assign($set, { verdict: null, verdictByName: null, verdictAt: null, verdictLevel: null });
+  }
+  await DeviceAlert.updateOne({ _id: id }, { $set }, { timestamps: false });
+}
+
+/** Urteil festhalten (bestätigt oder Fehlalarm): erledigt den Hinweis zugleich und schreibt ins Urteils-Protokoll */
+async function setAlertVerdict(id, verdict, actor) {
+  if (!['bestaetigt', 'fehlalarm'].includes(verdict)) return;
+  const alert = await DeviceAlert.findById(id).lean();
+  if (!alert) return;
+  assertNotOwn(alert, actor);
+  const by = actor ? actor.username : null;
+  const at = new Date();
+  await verdictLog.logEvent(alert, verdict, by);
+  await DeviceAlert.updateOne({ _id: id }, { $set: { verdict, verdictByName: by, verdictAt: at, verdictLevel: alert.level, doneAt: at, doneByName: by } }, { timestamps: false });
 }
 
 // ---------- Sperren ----------
@@ -299,4 +340,4 @@ async function forgetUser(userId) {
   await Promise.all([Device.deleteMany({ user: userId }), DeviceAlert.deleteMany({ users: userId })]);
 }
 
-module.exports = { recomputeAlerts, flaggedPairs, tradePairKey, tradeFilterForPairs, suspiciousTradeCount, record, alertCount, listAlerts, setAlertDone, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };
+module.exports = { recomputeAlerts, flaggedPairs, tradePairKey, tradeFilterForPairs, suspiciousTradeCount, record, alertCount, listAlerts, setAlertDone, setAlertVerdict, ensureFresh, blockedDevice, userBan, banMessage, ban, unban, listBans, forgetUser };

@@ -3,7 +3,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-test-sec
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { cleanBio, togglePin, countTier, profileList, shareText, BIO_MAX } = require('../src/achievements/logic');
+const { cleanBio, togglePin, countTier, profileList, shareText, progressView, BIO_MAX } = require('../src/achievements/logic');
 const { ACHIEVEMENTS, SPECIAL, REWARD, find } = require('../src/achievements/list');
 const icons = require('../src/achievements/icons');
 
@@ -87,4 +87,27 @@ test('Symbole: gültiges SVG ohne Skript, ohne doppelte Attribute und ohne übri
       assert.equal(new Set(names).size, names.length, `${a.key}: ${tag}`);
     }
   }
+});
+
+test('Fortschritt: Text je Art, Mittel mehrerer Teile, gesperrt nie 100 %', () => {
+  assert.deepEqual(progressView([{ have: 12, need: 25, label: 'gewonnene Wetten' }]), { pct: 48, text: '12 / 25 gewonnene Wetten' });
+  assert.deepEqual(progressView([{ have: 5, need: 5, label: 'Siege' }, { have: 1, need: 3, label: 'Gegner' }]), { pct: 66, text: '5 / 5 Siege · 1 / 3 Gegner' });
+  assert.equal(progressView([{ have: 31250, need: 100000, label: 'höchster Einsatz', kind: 'euro' }]).text, '312 € / 1.000 € höchster Einsatz');
+  assert.equal(progressView([{ have: -2000, need: 50000, label: 'Gewinn', kind: 'euro' }]).pct, 0);
+  assert.equal(progressView([{ have: 5 * 3600 + 59, need: 86400, label: 'auf Platz 1', kind: 'hours' }]).text, '5 Std. / 24 Std. auf Platz 1');
+  assert.equal(progressView([{ have: 3.2, need: 5, label: 'bester Gewinn', kind: 'times' }]).text, '3,2× / 5× bester Gewinn');
+  assert.equal(progressView([{ have: 30, need: 10 }]).pct, 99);
+  assert.equal(progressView(null), null);
+  assert.equal(progressView([{ have: 1, need: 0 }]), null);
+});
+
+test('Neue Erfolge: eSports, Inventar, Black Market, Grading-Shop, Turm, Boss-Beute', () => {
+  for (const key of ['esports-team', 'esports-turm', 'esports-podium', 'esports-sieg', 'eingeschweisst', 'schattenhaendler', 'ladenkette', 'himmelsstuermer', 'boss-beute']) {
+    const a = find(key);
+    assert.ok(a && typeof a.holders === 'function' && !a.unique, key);
+  }
+  assert.equal(find('esports-sieg').name, 'Gekommen, um zu siegen');
+  // Fortschritt nur bei zählbaren Erfolgen, nie bei geheimen oder Einzelstücken
+  for (const a of ACHIEVEMENTS) if (a.progress) assert.ok(!a.secret && !a.unique, a.key);
+  assert.ok(find('orakel').progress && find('himmelsstuermer').progress && !find('esports-sieg').progress);
 });

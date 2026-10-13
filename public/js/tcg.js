@@ -125,6 +125,9 @@
     var protectForm = $('[data-tcg-protect]', modal);
     var favoriteForm = $('[data-tcg-favorite]', modal);
     var protectNote = $('[data-tcg-protect-note]', modal);
+    var shredOne = $('[data-tcg-shred-one]', modal);
+    var shredDupes = $('[data-tcg-shred-dupes]', modal);
+    var konfettiName = shredOne ? shredOne.getAttribute('data-konfetti-name') : 'Konfetti';
 
     document.addEventListener('click', function (e) {
       var slot = e.target.closest('[data-tcg-card]');
@@ -134,6 +137,11 @@
       var rank = parseInt(d.rank, 10) || 0;
       var sell = parseInt(d.sell, 10) || 0;
       var noBank = d.noBank === '1'; // Boss-Karten: die Bank kauft sie nicht, Schutz vor dem Duplikat-Verkauf ist überflüssig
+      // #204: Exemplare mit ungebügeltem Knick gehen zuerst weg und bringen die Hälfte (tcgService.bankPrice)
+      var creased = Math.min(parseInt(d.creased, 10) || 0, count);
+      var half = Math.floor(sell / 2);
+      var euroFmt = function (cents) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(cents / 100); };
+      var worth = function (n, f) { var k = Math.min(creased, n); return k * f(half) + (n - k) * f(sell); };
 
       var former = d.former === '1';
       var note = $('[data-tcg-modal-note]', modal);
@@ -145,9 +153,12 @@
       $('[data-tcg-modal-dot]', modal).className = 'tcg-dot r-' + d.rarity;
       $('[data-tcg-modal-rarity]', modal).textContent = d.rarityLabel + (d.no ? ' · #' + d.no : '');
       var foiled = parseInt(d.foiled, 10) || 0;
+      // gesperrte Exemplare (Quest, Dungeon, Handel, Duell) zählen zum Besitz, lassen sich aber nicht verkaufen
+      var locked = parseInt(d.locked, 10) || 0;
+      var owned = count + locked;
       $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
-        : (count ? (count === 1 ? '1× im Besitz' : count + '× im Besitz') : '') + (foiled ? (count ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
-        + (noBank ? ' · Wert ' + d.sellText + ' (nur Handel, die Bank kauft sie nicht)' : '');
+        : (owned ? owned + '× im Besitz' : '') + (locked ? ' · ' + locked + '× ' + d.lockLabel : '') + (foiled ? (owned ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
+        + (noBank ? ' · Grundwert ' + d.sellText + ' (nur Handel, kein Händlerpreis)' : ' · Händlerpreis ' + d.sellText);
       $('[data-tcg-owned-actions]', modal).hidden = former;
       $('[data-tcg-former-action]', modal).hidden = !former;
       if (former) {
@@ -158,9 +169,10 @@
 
       sellOne.hidden = count < 1 || noBank; // nur folierte Exemplare: die Bank kauft sie nicht
       sellOne.querySelector('input[name="card"]').value = d.tcgCard;
-      $('[data-tcg-sell-text]', sellOne).textContent = d.sellText;
+      var oneText = creased ? euroFmt(half) + ' (mit Knick)' : d.sellText;
+      $('[data-tcg-sell-text]', sellOne).textContent = oneText;
       if (rank >= RARE_RANK) {
-        sellOne.setAttribute('data-confirm', d.name + ' (' + d.rarityLabel + ') wirklich für ' + d.sellText + ' verkaufen?');
+        sellOne.setAttribute('data-confirm', d.name + ' (' + d.rarityLabel + ') wirklich für ' + oneText + ' verkaufen?');
       } else {
         sellOne.removeAttribute('data-confirm');
       }
@@ -176,10 +188,25 @@
 
       sellDupes.hidden = count < 2 || isProtected || noBank;
       if (count > 1 && !isProtected && !noBank) {
-        var total = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(((count - 1) * sell) / 100);
+        var total = euroFmt(worth(count - 1, function (v) { return v; }));
         sellDupes.querySelector('input[name="card"]').value = d.tcgCard;
         sellDupes.querySelector('button').textContent = 'Duplikate verkaufen (' + (count - 1) + '×) · ' + total;
         sellDupes.setAttribute('data-confirm', (count - 1) + '× ' + d.name + ' verkaufen und eine behalten?');
+      }
+
+      // Zerkleinern: Konfetti = Bankwert in ganzen Euro; Boss-Karten auch (nur nicht folierte Exemplare)
+      var konfetti = Math.floor(sell / 100);
+      var kText = function (n) { return '+' + worth(n, function (v) { return Math.floor(v / 100); }).toLocaleString('de-DE') + ' ' + konfettiName; };
+      shredOne.hidden = count < 1 || konfetti < 1;
+      shredOne.querySelector('input[name="card"]').value = d.tcgCard;
+      shredOne.querySelector('button').textContent = '1 zerkleinern · ' + kText(1);
+      if (rank >= RARE_RANK || noBank) shredOne.setAttribute('data-confirm', d.name + ' (' + d.rarityLabel + ') wirklich zu ' + worth(1, function (v) { return Math.floor(v / 100); }).toLocaleString('de-DE') + ' ' + konfettiName + ' zerkleinern? Die Karte ist danach weg.');
+      else shredOne.removeAttribute('data-confirm');
+      shredDupes.hidden = count < 2 || isProtected || konfetti < 1;
+      if (!shredDupes.hidden) {
+        shredDupes.querySelector('input[name="card"]').value = d.tcgCard;
+        shredDupes.querySelector('button').textContent = 'Duplikate zerkleinern (' + (count - 1) + '×) · ' + kText(count - 1);
+        shredDupes.setAttribute('data-confirm', (count - 1) + '× ' + d.name + ' zerkleinern und eine behalten?');
       }
 
       if (typeof modal.showModal === 'function') modal.showModal();

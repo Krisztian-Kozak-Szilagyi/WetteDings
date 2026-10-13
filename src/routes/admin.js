@@ -19,12 +19,19 @@ const cardBans = require('../tcg/cardBans');
 const { canBoost } = require('../ihk/abilities');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
+const towerTexts = require('../dungeon/tower');
 const bonusService = require('../services/bonusService');
 const inviteService = require('../services/inviteService');
 const grading = require('../grading/gradingService');
 const itemService = require('../items/itemService');
 const giftService = require('../services/giftService');
+const devMessageService = require('../services/devMessageService');
+const { parseZonedLocal, toZonedLocalInput } = require('../lib/time');
 const foil = require('../items/foil');
+const cosmetics = require('../cosmetics/cosmeticService');
+const esportsService = require('../esports/esportsService');
+const esportsLeague = require('../esports/league');
+const cosmeticCatalog = require('../cosmetics/catalog');
 const lotteryService = require('../services/lotteryService');
 const taxService = require('../services/taxService');
 const { DIFFICULTIES } = require('../ihk/quests');
@@ -32,11 +39,14 @@ const { parseEuro } = require('../lib/util');
 const { euro, date } = require('../lib/viewHelpers');
 const config = require('../config');
 const deviceService = require('../device/deviceService');
+const passwordReset = require('../services/passwordReset');
+const bcrypt = require('bcryptjs');
 const suspicionService = require('../moderation/suspicionService');
 const cardHistory = require('../moderation/cardHistory');
 const logs = require('../stats/logs');
 const { MAX_BAN_HOURS, DEV_MAX_BAN_HOURS, isForever } = require('../device/deviceLogic');
 const { ForumReport, ForumPost } = require('../models/Forum');
+const chatService = require('../chat/chatService');
 const { CODE_TTL_OPTIONS, ttlText, remainingText, parseTtl, formatCode, createCode, listActiveCodes, revokeCode } = require('../services/codeService');
 
 const router = express.Router();
@@ -47,8 +57,9 @@ const PANEL_SECTIONS = [
   { key: 'uebersicht', label: 'Übersicht', icon: 'grid', description: 'Offene Aufgaben und die wichtigsten Zahlen.' },
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Lotterie, IHK und Dungeon.' },
-  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods.' },
+  { key: 'popups', label: 'Pop-ups', icon: 'message', description: 'Nachrichten, die allen Mitgliedern als Fenster erscheinen, bis sie gelesen sind.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Kosmetik, Lotterie, IHK und Dungeon.' },
+  { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods, Passwort zurücksetzen.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
 const sectionsFor = (user) => PANEL_SECTIONS.filter((s) => !s.adminOnly || user.isAdmin);
@@ -58,20 +69,24 @@ const SUBTABS = {
   moderation: [
     { key: 'streit', label: 'Streitfälle' },
     { key: 'meldungen', label: 'Meldungen' },
+    { key: 'chat', label: 'Chat-Meldungen' },
     { key: 'bans', label: 'Bans' },
     { key: 'geraete', label: 'Mehrfach-Konten' },
     { key: 'auffaelligkeiten', label: 'Auffälligkeiten' },
     { key: 'karten', label: 'Kartensperren' },
+    { key: 'kuerzel', label: 'Kürzel-Anfragen' },
   ],
   spielwerte: [
     { key: 'tcg', label: 'TCG' },
     { key: 'steuer', label: 'Steuern' },
     { key: 'bonus', label: 'Tagesbonus' },
     { key: 'grading', label: 'Grading' },
-    { key: 'folie', label: 'Folie' },
+    { key: 'folie', label: 'Sleeve & Slab' },
+    { key: 'kosmetik', label: 'Kosmetik' },
     { key: 'lotterie', label: 'Lotterie' },
     { key: 'ihk', label: 'IHK' },
     { key: 'dungeon', label: 'Dungeon' },
+    { key: 'esports', label: 'eSports' },
   ],
 };
 
@@ -116,21 +131,23 @@ router.get('/admin', requireStaff, async (req, res) => {
   const needs = (...tabs) => tabs.includes(tab);
 
   // Offene Aufgaben – für die Übersicht und die Zähler an den Reitern
-  const [reportCount, bans] = await Promise.all([ForumReport.countDocuments({ done: false }), deviceService.listBans()]);
+  const [reportCount, chatReportCount, bans, codeRequestCount] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount(), deviceService.listBans(), grading.codeRequestCount()]);
   const counts = {
     disputes: res.locals.betDisputes || 0,
     reports: reportCount,
+    chatReports: chatReportCount,
     deviceAlerts: res.locals.deviceAlerts || 0,
     suspicionAlerts: res.locals.suspicionAlerts || 0,
     suspicious: res.locals.tradeAlerts || 0,
     packLogNew: res.locals.packLogNew || 0,
     bans: bans.length,
+    codeRequests: codeRequestCount,
   };
-  counts.moderation = counts.disputes + counts.reports + counts.deviceAlerts + counts.suspicionAlerts;
+  counts.moderation = counts.disputes + counts.reports + counts.chatReports + counts.deviceAlerts + counts.suspicionAlerts + counts.codeRequests;
   counts.vergaben = counts.packLogNew;
   counts.protokolle = counts.suspicious;
   // Zähler je Unterreiter
-  const subCounts = { streit: counts.disputes, meldungen: counts.reports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans };
+  const subCounts = { streit: counts.disputes, meldungen: counts.reports, chat: counts.chatReports, geraete: counts.deviceAlerts, auffaelligkeiten: counts.suspicionAlerts, bans: counts.bans, kuerzel: counts.codeRequests };
 
   // Unterreiter: aus der Adresse, sonst der erste mit offenen Aufgaben (Moderation) bzw. der erste
   const subs = SUBTABS[tab] || null;
@@ -143,12 +160,13 @@ router.get('/admin', requireStaff, async (req, res) => {
       : [];
   // Protokolle: auf Wunsch nur ein Spieler (?spieler=Name)
   const player = needs('protokolle') ? await logs.resolvePlayer(req.query) : null;
-  const [stats, disputes, reports, deviceMatches, suspicions, precision, codes, grants, log] = await Promise.all([
+  const [stats, disputes, reports, chatReports, deviceMatches, suspicions, precision, codes, grants, log, devMessages, openResets] = await Promise.all([
     needs('uebersicht')
       ? Promise.all([User.countDocuments({ deletedAt: null }), Bet.countDocuments({ status: 'offen' }), Bet.countDocuments()]).then(([userCount, openBets, totalBets]) => ({ userCount, openBets, totalBets }))
       : null,
     needsSub('moderation', 'streit') ? disputeList(me) : [],
     needsSub('moderation', 'meldungen') ? openReports() : [],
+    needsSub('moderation', 'chat') ? chatService.openReports() : [],
     needsSub('moderation', 'geraete') ? deviceService.listAlerts() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.listGroups() : [],
     needsSub('moderation', 'auffaelligkeiten') ? suspicionService.precision() : [],
@@ -156,7 +174,13 @@ router.get('/admin', requireStaff, async (req, res) => {
     needs('vergaben') ? recentGrants() : [],
     // gewählter Log; unbekannter Spieler: nichts laden
     needs('protokolle') && !(player.q && !player.user) ? logs.loadLog(req.query, { player: player.user, seenAt: me.suspiciousSeenAt }) : null,
+    needs('popups') ? devMessageService.list() : [],
+    // Passwort zurücksetzen (nur Admin): offene Einmal-Codes
+    needs('team') && isAdmin ? User.find({ deletedAt: null, resetExpires: { $gt: new Date() } }).select('username resetExpires').sort({ resetExpires: 1 }).lean() : [],
   ]);
+  // Gerade erzeugter Einmal-Code: wird genau einmal angezeigt
+  const resetShown = needs('team') && isAdmin && req.session.resetShown ? req.session.resetShown : null;
+  if (resetShown) delete req.session.resetShown;
   // Handel-Log angesehen: neue Geschäfte zwischen Mehrfach-Konten gelten als gesehen (Abzeichen verschwindet)
   const newSuspicious = log && log.key === 'handel' ? counts.suspicious : 0;
   if (newSuspicious) {
@@ -185,6 +209,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     noteMin: betService.NOTE_MIN,
     noteMax: betService.NOTE_MAX,
     reports,
+    chatReports,
     deviceMatches, // (deviceAlerts ist der Zähler fürs Menü-Abzeichen)
     suspicionGroups: suspicions, // je Spieler gebündelt, mit Gesamtbewertung
     suspicionPrecision: precision, // Trefferquote je Muster (Urteile bestätigt/Fehlalarm)
@@ -194,17 +219,28 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Devs bannen befristet (höchstens 7 Tage), der Admin auch dauerhaft
     maxBanHours: isAdmin ? MAX_BAN_HOURS : DEV_MAX_BAN_HOURS,
     users,
+    openResets,
+    resetShown,
     packTypes: tcgCatalog.PACK_TYPES,
     itemTypes: itemService.ITEM_TYPES,
     foilSettings: foil.settings,
+    // Kosmetik: Währungsname und je Avatar Preis, Effekt, Name
+    cosmeticAdmin: needsSub('spielwerte', 'kosmetik') && isAdmin ? { currency: cosmetics.currencyName(), avatars: cosmetics.avatars(), effects: cosmeticCatalog.EFFECTS, expectedPack: tcgCatalog.expectedPackValue(), defaults: Object.fromEntries(cosmeticCatalog.AVATARS.map((a) => [a.key, a])) } : null,
     lottoSettings: lotteryService.settings,
+    // eSports: Preis je Trophäe (Geld + Packs) und Mindestzahl der Teams mit Punkten
+    esportsAdmin: needsSub('spielwerte', 'esports') && isAdmin ? { foundCost: esportsService.foundCost(), prizes: esportsService.prizeList(), minTeams: esportsService.settings.minTeams, maxPacks: esportsLeague.MAX_PRIZE_PACKS } : null,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
     // noch nicht erhältliche Karten (z. B. Mark Suntouched) nur für Admins
-    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.concat(isAdmin ? tcgCatalog.UNRELEASED_CARDS : []).filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
+    grantCards: tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.concat(isAdmin ? [...tcgCatalog.UNRELEASED_CARDS, ...tcgCatalog.TEST_CARDS] : []).filter((c) => c.rarity === r.key) })).filter((g) => g.cards.length),
     grants: grants.map((g) => ({ ...g, isNew: isAdmin && g.createdAt > grantsSeenAt && !g.by.equals(me._id) })),
     reasonMin: giftService.REASON_MIN,
     reasonMax: giftService.REASON_MAX,
+    // Pop-ups (#132): Nachrichten mit Lesestand; Ablaufdatum frühestens jetzt (deutsche Zeit, für datetime-local)
+    devMessages,
+    popupSent: needs('popups') && takeOnce(req.session, 'popupSent'),
+    devMessageLimits: { titleMax: devMessageService.TITLE_MAX, textMin: devMessageService.TEXT_MIN, textMax: devMessageService.TEXT_MAX },
+    devMessageMinExpiry: toZonedLocalInput(new Date(Date.now() + 5 * 60000), config.timezone),
     packLogNew: counts.packLogNew,
     codes,
     formatCode,
@@ -228,13 +264,16 @@ router.get('/admin', requireStaff, async (req, res) => {
           }
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
-    dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS },
+    dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
+    gradingServices: grading.SERVICES,
+    gradingTools: grading.TOOLS,
     // Verdienst-Schätzung pro Tag (live im Browser nachgerechnet) und tatsächliche Werte der letzten 30 Tage
     gradingCalc: needsSub('spielwerte', 'grading') && isAdmin ? { input: grading.estimateInput(), rows: grading.estimateNow(), actual: await grading.actualStats(30) } : null,
     // Kartensperren: wählbar sind Karten, die in einem Spielmodus etwas tun (Charakter oder Boost)
     cardBanModes: cardBans.MODES,
+    codeRequests: needsSub('moderation', 'kuerzel') ? await grading.codeRequests() : [], // Shop-Kürzel ändern (#204)
     cardBanList: needsSub('moderation', 'karten') ? cardBans.list().map((b) => ({ ...b, rarityLabel: (tcgCatalog.rarityByKey[b.card.rarity] || {}).label || '' })) : [],
     cardBanCards: needsSub('moderation', 'karten')
       ? tcgCatalog.ALL_RARITIES.map((r) => ({ rarity: r, cards: tcgCatalog.CARDS.filter((c) => c.rarity === r.key && (c.isCharacter || canBoost(c))) })).filter((g) => g.cards.length)
@@ -277,6 +316,20 @@ const DISPUTE_URL = subUrl('moderation', 'streit');
 // Frühere eigene Seite – jetzt ein Unterreiter der Moderation
 router.get('/admin/streitfaelle', requireStaff, (req, res) => res.redirect(DISPUTE_URL));
 
+// Grading-Shop: Kürzel-Anfrage freigeben oder ablehnen (#204) – Admin und Devs
+router.post('/admin/grading-kuerzel/:shop', requireStaff, requireReauth('/admin?bereich=moderation&teil=kuerzel'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.shop)) throw new UserError('Diese Anfrage gibt es nicht.');
+    const approve = req.body.decision === 'ok';
+    const r = await grading.decideCodeRequest({ actor: req.user, shopId: req.params.shop, approve });
+    req.flash('success', approve ? `Kürzel ${r.old} → ${r.code} freigegeben.` : `Anfrage abgelehnt – es bleibt bei ${r.code}.`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect('/admin?bereich=moderation&teil=kuerzel');
+});
+
 router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(DISPUTE_URL), async (req, res) => {
   const outcome = str(req.body.outcome);
   try {
@@ -304,9 +357,19 @@ router.post('/admin/streitfaelle/:id/entscheiden', requireStaff, requireReauth(D
   res.redirect(DISPUTE_URL);
 });
 
-// ---------- Mehrfach-Konten: Hinweise abhaken (Admin und Devs) ----------
-router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
-  if (mongoose.isValidObjectId(req.params.id)) await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen');
+// ---------- Mehrfach-Konten: Hinweise beurteilen oder abhaken (Admin und Devs) ----------
+// Ohne Passwortabfrage (häufige Entscheidungen): im Browser bestätigt ein zweites Fenster (data-confirm-dialog)
+router.post('/admin/geraete/:id', requireStaff, async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const verdict = verdictOf(req.body.action);
+    try {
+      if (verdict) await deviceService.setAlertVerdict(req.params.id, verdict, req.user);
+      else await deviceService.setAlertDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
+  }
   res.redirect(subUrl('moderation', 'geraete'));
 });
 
@@ -315,19 +378,31 @@ router.post('/admin/geraete/:id', requireStaff, requireReauth('/admin?bereich=mo
 const verdictOf = (action) => (suspicionService.VERDICTS.includes(action) ? action : null);
 
 // Je Spieler: die offenen Hinweise der Gruppe (ids durch Komma getrennt) erledigen oder alle beurteilen
-router.post('/admin/auffaelligkeiten/gruppe', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/gruppe', requireStaff, async (req, res) => {
   const ids = String(req.body.ids || '').split(',').filter((id) => mongoose.isValidObjectId(id)).slice(0, 50);
   const verdict = verdictOf(req.body.action);
-  if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
-  else await suspicionService.setDoneMany(ids, true, req.user);
+  try {
+    if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen(ids);
+    else if (verdict) await suspicionService.setVerdictMany(ids, verdict, req.user);
+    else await suspicionService.setDoneMany(ids, true, req.user);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
 
-router.post('/admin/auffaelligkeiten/:id', requireStaff, requireReauth('/admin?bereich=moderation'), async (req, res) => {
+router.post('/admin/auffaelligkeiten/:id', requireStaff, async (req, res) => {
   if (mongoose.isValidObjectId(req.params.id)) {
     const verdict = verdictOf(req.body.action);
-    if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
-    else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    try {
+      if (req.body.action === 'gesehen') await suspicionService.markRepeatSeen([req.params.id]);
+      else if (verdict) await suspicionService.setVerdict(req.params.id, verdict, req.user);
+      else await suspicionService.setDone(req.params.id, req.body.action !== 'oeffnen', req.user);
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err;
+      req.flash('error', err.message);
+    }
   }
   res.redirect(subUrl('moderation', 'auffaelligkeiten'));
 });
@@ -365,6 +440,13 @@ router.post('/admin/sperren', requireStaff, requireReauth('/admin?bereich=modera
 });
 
 // Kartensperre setzen, ändern oder aufheben (keine Modi angehakt = aufheben). Admin und Devs.
+// Chat-Meldung erledigt (eingreifen: Ban im Reiter „Bans“)
+router.post('/admin/chat-meldungen/:id/erledigt', requireStaff, requireReauth('/admin?bereich=moderation&teil=chat'), async (req, res) => {
+  const ok = await chatService.closeReport(req.params.id, req.user);
+  req.flash(ok ? 'info' : 'error', ok ? 'Meldung erledigt.' : 'Diese Meldung ist schon erledigt.');
+  res.redirect(subUrl('moderation', 'chat'));
+});
+
 const CARD_BAN_URL = subUrl('moderation', 'karten');
 router.post('/admin/kartensperre', requireStaff, requireReauth(CARD_BAN_URL), async (req, res) => {
   try {
@@ -438,17 +520,32 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   }
   const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
-  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab) };
+  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
-  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100) {
+  // Spieler-Aufträge (#204, Etappe B)
+  const int = (k) => Number.parseInt(typeof req.body[k] === 'string' ? req.body[k] : '', 10);
+  const playerJobs = int('gr_player_jobs');
+  // Preisrahmen je Baustein: gr_sp_<baustein>_min/def/max
+  const servicePrice = Object.fromEntries(grading.SERVICES.map(({ key }) => [key, { min: money(req.body[`gr_sp_${key}_min`]), max: money(req.body[`gr_sp_${key}_max`]), def: money(req.body[`gr_sp_${key}_def`]) }]));
+  const badRange = grading.SERVICES.find(({ key }) => Object.values(servicePrice[key]).some(tooBig) || !grading.validRange(servicePrice[key]));
+  const orderDays = int('gr_order_days');
+  const expressDays = int('gr_express_days');
+  const showcaseMax = int('gr_showcase');
+  // Werkzeug-Upgrades (#204): Preis je Werkzeug
+  const toolCosts = Object.fromEntries(grading.TOOLS.map((t) => [t.key, money(req.body['gr_tool_' + t.key])]));
+  if (!Number.isInteger(jobs) || jobs < 0 || jobs > 100 || !Number.isInteger(playerJobs) || playerJobs < 0 || playerJobs > 100) {
     req.flash('error', 'Aufträge pro Tag: 0 bis 100.');
-  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig)) {
+  } else if (badRange) {
+    req.flash('error', `Preisrahmen „${badRange.label}“: mindestens ≤ Standard ≤ höchstens (bis 100.000 €).`);
+  } else if (!Number.isInteger(orderDays) || orderDays < 1 || orderDays > 30 || !Number.isInteger(expressDays) || expressDays < 1 || expressDays > orderDays || !Number.isInteger(showcaseMax) || showcaseMax < 0 || showcaseMax > 24) {
+    req.flash('error', 'Frist: 1 bis 30 Tage, Express-Frist: 1 Tag bis zur normalen Frist, Vitrine: 0 bis 24 Plätze.');
+  } else if (Object.values(pay).some(tooBig) || costs.some(tooBig) || Object.values(toolCosts).some(tooBig)) {
     req.flash('error', 'Bitte gültige Beträge für Lohn und Ausbau angeben (0 bis 100.000 €).');
   } else if (!Number.isInteger(premium) || premium < 0 || premium > 500) {
     req.flash('error', 'Premium-Aufschlag: 0 bis 500 %.');
   } else {
-    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, pay, costs, premium, admin: req.user });
-    req.flash('success', `Gespeichert: Grading-Shop ${jobs} Aufträge pro Tag.`);
+    await grading.saveSettings({ open: req.body.gradingOpen === '1', jobs, playerJobs, pay, costs, premium, servicePrice, orderDays, expressDays, showcaseMax, toolCosts, admin: req.user });
+    req.flash('success', `Gespeichert: Grading-Shop ${jobs} NPC- und ${playerJobs} Mitglieder-Aufträge pro Tag.`);
   }
   res.redirect(subUrl('spielwerte', 'grading'));
 });
@@ -482,6 +579,8 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
         cardMax: pct(req.body.towerCardMax),
         fightSeconds: num(req.body.towerFightSeconds),
         pauseSeconds: num(req.body.towerPauseSeconds),
+        dailyRuns: num(req.body.towerDailyRuns),
+        esportsRuns: num(req.body.towerEsportsRuns),
       },
       admin: req.user,
     });
@@ -491,6 +590,54 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
     req.flash('error', err.message);
   }
   res.redirect(subUrl('spielwerte', 'dungeon'));
+});
+
+// Mage Tower: Namen und Texte der Stockwerke (feste Liste der Stockwerke, Feldnamen floor_<key>_<feld>)
+router.post('/admin/dungeon/turm-texte', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const field = (key, name) => (typeof req.body[`floor_${key}_${name}`] === 'string' ? req.body[`floor_${key}_${name}`] : '');
+  const input = Object.fromEntries(towerTexts.TOWER.floors.map((fl) => [fl.key, Object.fromEntries(Object.keys(towerTexts.TEXT_FIELDS).map((name) => [name, field(fl.key, name)]))]));
+  try {
+    await dungeonService.saveTowerTexts({ input, admin: req.user });
+    req.flash('success', 'Texte der Stockwerke gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'dungeon'));
+});
+
+// ---------- Pop-ups (#132): Nachricht an alle Mitglieder, erscheint als Fenster bis „Gelesen“ ----------
+/** Merker aus der Sitzung lesen und gleich löschen (nur einmal anzeigen) */
+function takeOnce(session, key) {
+  const v = !!session[key];
+  delete session[key];
+  return v;
+}
+const POPUP_URL = panelUrl('popups');
+router.post('/admin/popups', requireStaff, requireReauth(POPUP_URL), async (req, res) => {
+  // Gültigkeit: bis gelesen (kein Ablauf) oder mit Ablaufdatum (deutsche Zeit aus datetime-local)
+  const withExpiry = str(req.body.gueltig) === 'ablauf';
+  const expiresAt = withExpiry ? parseZonedLocal(str(req.body.expiresAt), config.timezone) || new Date(NaN) : null;
+  try {
+    await devMessageService.create({ title: req.body.title, text: req.body.text, expiresAt, author: req.user });
+    // Statt des normalen Hinweises oben: kurze Bestätigung unten, die nach 3 Sekunden verschwindet (views/admin/popups.ejs)
+    req.session.popupSent = true;
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(POPUP_URL);
+});
+
+router.post('/admin/popups/beenden', requireStaff, async (req, res) => {
+  try {
+    await devMessageService.end({ id: str(req.body.id), author: req.user });
+    req.flash('success', 'Pop-up beendet – es erscheint niemandem mehr.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(POPUP_URL);
 });
 
 // ---------- IHK (Mini-Game): Tageslimit und Belohnungen ----------
@@ -574,6 +721,25 @@ router.post('/admin/tcg', requireAdmin, requireReauth('/admin?bereich=spielwerte
   res.redirect(subUrl('spielwerte', 'tcg'));
 });
 
+// ---------- Kosmetik: Name der Währung, Preise und Effekte der Avatare ----------
+router.post('/admin/kosmetik', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  // Felder je Avatar: preis_<key>, effekt_<key>, name_<key> (Schlüssel nur aus der festen Liste)
+  const entries = Object.fromEntries(
+    cosmeticCatalog.AVATARS.map((a) => {
+      const raw = str(req.body[`preis_${a.key}`]).trim();
+      return [a.key, { price: /^[0-9]{1,7}$/.test(raw) ? Number(raw) : NaN, effect: str(req.body[`effekt_${a.key}`]), name: str(req.body[`name_${a.key}`]) }];
+    })
+  );
+  try {
+    await cosmetics.saveSettings({ admin: req.user, currency: str(req.body.waehrung), entries });
+    req.flash('success', 'Kosmetik gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'kosmetik'));
+});
+
 // ---------- Folie: Fundchance im Grading-Shop und Wertsteigerung ----------
 router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   // Prozent mit Komma oder Punkt, z. B. "0,9"
@@ -584,13 +750,24 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
   const chance = percent(req.body.chance);
   const bonusPercent = percent(req.body.bonus);
   const dailyPercent = percent(req.body.daily);
-  if (!(chance >= 0 && chance <= 100)) {
+  const slabDropPercent = percent(req.body.slabanteil);
+  const sleevePrice = parseEuro(req.body.sleeve);
+  const slabPrice = parseEuro(req.body.slabpreis);
+  const sleeveSell = parseEuro(req.body.sleeveankauf);
+  const slabSell = parseEuro(req.body.slabankauf);
+  if (!foil.validSell(sleeveSell) || !foil.validSell(slabSell)) {
+    req.flash('error', 'Ankaufspreise: ganze Cent, höchstens 1.000 €.');
+  } else if (!foil.validPrice('folie', sleevePrice, sleeveSell) || !foil.validPrice('slab', slabPrice, slabSell)) {
+    req.flash('error', 'Verkaufspreise: ganze Cent, mindestens so hoch wie der Ankauf der Bank und höchstens 1.000 €.');
+  } else if (!(slabDropPercent >= 0 && slabDropPercent <= 100)) {
+    req.flash('error', 'Slab-Anteil: 0 bis 100 %.');
+  } else if (!(chance >= 0 && chance <= 100)) {
     req.flash('error', 'Fundchance: 0 bis 100 % (höchstens zwei Nachkommastellen).');
   } else if (!(bonusPercent >= 0 && bonusPercent <= 1000) || !(dailyPercent >= 0 && dailyPercent <= 1000)) {
     req.flash('error', 'Wertsteigerung: 0 bis 1000 % (höchstens zwei Nachkommastellen).');
   } else {
-    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent });
-    req.flash('success', `Folie gespeichert: ${String(chance).replace('.', ',')} % Fundchance, +${String(bonusPercent).replace('.', ',')} % sofort, +${String(dailyPercent).replace('.', ',')} % pro Tag.`);
+    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent, sleevePrice, slabPrice, slabDropPercent, sleeveSell, slabSell });
+    req.flash('success', `Gespeichert: ${String(chance).replace('.', ',')} % Fundchance, Sleeve ${euro(sleevePrice)} (Ankauf ${euro(sleeveSell)}), Slab ${euro(slabPrice)} (Ankauf ${euro(slabSell)}), ${String(slabDropPercent).replace('.', ',')} % der Dungeon-Funde sind Slabs.`);
   }
   res.redirect(subUrl('spielwerte', 'folie'));
 });
@@ -617,6 +794,21 @@ router.post('/admin/lotterie', requireAdmin, requireReauth('/admin?bereich=spiel
     }
   }
   res.redirect(subUrl('spielwerte', 'lotterie'));
+});
+
+// ---------- eSports: Gründungskosten und Preise der Trophäen (Platz 1–3 im Wochenbericht) ----------
+router.post('/admin/esports', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const count = (v) => (/^\d{1,3}$/.test(str(v).trim()) ? Number(str(v).trim()) : NaN);
+  // Felder je Platz: cash_<n>, packs_<n> (n nur aus der festen Liste)
+  const prizes = esportsLeague.PLACES.map((p) => ({ cash: parseEuro(str(req.body[`cash_${p.place}`])) ?? NaN, packs: count(req.body[`packs_${p.place}`]) }));
+  try {
+    await esportsService.saveSettings({ admin: req.user, prizes, minTeams: count(req.body.minTeams), foundCost: parseEuro(str(req.body.foundCost)) ?? NaN });
+    req.flash('success', 'eSports-Einstellungen gespeichert.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'esports'));
 });
 
 // ---------- Vergaben: Booster Packs und Karten (nur für Bugfixes, Tests und Aktionen) ----------
@@ -971,6 +1163,32 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
   res.redirect(panelUrl('team', role === 'mod' ? 'mods' : 'devs'));
 });
 
+// ---------- Passwort zurücksetzen (nur Admin) ----------
+// Erzeugt einen Einmal-Code für ein Mitglied. Der Code steht nur als Hash in der Datenbank und wird dem Admin
+// genau einmal angezeigt. Mit ihm meldet sich das Mitglied an und muss sofort ein neues Passwort wählen.
+const RESET_URL = panelUrl('team', 'passwort');
+router.post('/admin/passwort-reset', requireAdmin, requireReauth(RESET_URL), async (req, res) => {
+  const userId = typeof req.body.user === 'string' ? req.body.user : '';
+  const user = mongoose.isValidObjectId(userId) ? await User.findOne({ _id: userId, deletedAt: null }).select('username usernameLower').lean() : null;
+  if (!user) req.flash('error', 'Bitte ein Mitglied auswählen.');
+  else if (config.adminUsernames.includes(user.usernameLower)) req.flash('error', 'Das Passwort des Admins lässt sich hier nicht zurücksetzen.');
+  else {
+    const code = passwordReset.makeCode();
+    const expiresAt = new Date(Date.now() + passwordReset.VALID_MS);
+    await User.updateOne({ _id: user._id }, { $set: { resetHash: await bcrypt.hash(code, 12), resetExpires: expiresAt } });
+    req.session.resetShown = { username: user.username, code: passwordReset.formatCode(code), expiresAt: expiresAt.toISOString() };
+  }
+  res.redirect(RESET_URL);
+});
+
+router.post('/admin/passwort-reset/:id/zurueckziehen', requireAdmin, async (req, res) => {
+  if (mongoose.isValidObjectId(req.params.id)) {
+    const user = await User.findOneAndUpdate({ _id: req.params.id }, { $set: { resetHash: null, resetExpires: null } }).select('username').lean();
+    if (user) req.flash('success', `Der Einmal-Code von ${user.username} gilt nicht mehr.`);
+  }
+  res.redirect(RESET_URL);
+});
+
 // ---------- Einladungen: Registrierungscodes (Admin und Devs) ----------
 router.post('/admin/codes', requireStaff, async (req, res) => {
   const ttl = parseTtl(req.body.ttl);
@@ -1002,7 +1220,8 @@ router.post('/admin/codes/:id/loeschen', requireStaff, async (req, res) => {
 
 /** Reiterleiste des Panels für andere Seiten im Panel-Rahmen (Statistik): sichtbare Reiter und Zähler */
 async function panelNav(user, locals) {
-  const reports = await ForumReport.countDocuments({ done: false });
+  const [forumReports, chatReports] = await Promise.all([ForumReport.countDocuments({ done: false }), chatService.openReportCount()]);
+  const reports = forumReports + chatReports;
   return {
     panelSections: sectionsFor(user),
     panelBadges: {

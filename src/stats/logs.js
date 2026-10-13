@@ -59,9 +59,9 @@ const LOGS = [
 const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
-const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung' };
-const SELL_TYPES = ['tcg_verkauf', 'item_verkauf', 'black_market'];
-const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', item_verkauf: 'Gegenstand verkauft', black_market: 'Black Market gekauft' };
+const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung', esports: 'eSports-Trophäe' };
+const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'item_kauf', 'black_market', 'bazaar_kauf'];
+const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', item_kauf: 'Gegenstand gekauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
 
 // ab dieser Seltenheit werden gezogene Karten im Log hervorgehoben
 const RARE_FROM = tcgCatalog.rarityByKey.holo ? tcgCatalog.rarityByKey.holo.rank : 3;
@@ -199,8 +199,8 @@ async function packLog(query, { player = null, all = false } = {}) {
 function sellRow(l, name) {
   const m = l.meta || {};
   let items;
-  if (l.type === 'tcg_verkauf') items = cardSummary(m.cards);
-  else if (l.type === 'black_market' && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
+  if (l.type === 'tcg_verkauf' || l.type === 'tcg_zerkleinert') items = cardSummary(m.cards);
+  else if ((l.type === 'black_market' || l.type === 'bazaar_kauf') && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
   else {
     // verkaufter Gegenstand oder Gegenstand aus dem Black Market (meta.item)
     const t = itemService.itemTypeByKey[m.item];
@@ -422,9 +422,9 @@ function gradingRow(j, name) {
     at: j.doneAt || j.createdAt,
     startedAt: j.createdAt,
     player: name || '–',
-    shop: level ? level.name : `Stufe ${j.level}`,
+    shop: (level ? level.name : `Stufe ${j.level}`) + (j.shopCode ? ` · ${j.shopCode}` : ''),
     card: cardLabel(j.card),
-    customer: j.customer,
+    customer: j.source === 'spieler' ? `${j.customer} (Mitglied)` : j.customer, // Spieler-Auftrag (#204): Slab mit der Note des Shops
     done: j.status === 'fertig',
     grade: j.grade,
     guess: j.guess,
@@ -437,7 +437,7 @@ function gradingRow(j, name) {
 
 async function gradingLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound doneAt createdAt', all);
+  const { docs, ...pg } = await paged(GradingJob, filter, { createdAt: -1, _id: -1 }, query.gradingseite, 'user level card customer grade status guess clean seal pay foilFound shopCode source doneAt createdAt', all);
   const names = await namesOf(docs.map((j) => j.user));
   return { ...pg, rows: docs.map((j) => gradingRow(j, names.get(String(j.user)))) };
 }
@@ -488,7 +488,7 @@ async function registrationLog(query, { player = null, all = false } = {}) {
 
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
-const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Sleeve & Slab', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
 const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function settingsRow(c) {
@@ -834,7 +834,7 @@ const CSV = {
     rows: (l) => [[csvDate(l.at), l.player, l.kind, l.text, csvEuro(l.amount)]],
   },
   grading: {
-    head: ['Angenommen', 'Erledigt', 'Spieler', 'Shop', 'Karte', 'Kunde', 'Echte Note', 'Geschätzte Note', 'Sauberkeit (%)', 'Versiegelung', 'Lohn (€)', 'Folie gefunden'],
+    head: ['Angenommen', 'Erledigt', 'Spieler', 'Shop', 'Karte', 'Kunde', 'Echte Note', 'Geschätzte Note', 'Sauberkeit (%)', 'Versiegelung', 'Lohn (€)', 'TCG Sleeve gefunden'],
     rows: (j) => [[csvDate(j.startedAt), j.done ? csvDate(j.at) : '', j.player, j.shop, j.card, j.customer, j.done ? j.grade : '', csvNum(j.guess, 0), csvNum(j.clean, 0), csvNum(j.seal, 0), j.done ? csvEuro(j.pay) : '', yesNo(j.foil)]],
   },
   handel: {
@@ -854,7 +854,7 @@ const CSV = {
     rows: (r) => [[csvDate(r.at), csvDate(r.endsAt), r.player, r.quest, r.difficulty, r.card, r.boosts.join(', '), IHK_STATE[r.state], r.state === 'laeuft' ? '' : csvEuro(r.reward), r.pack || '', csvDate(r.collectedAt)]],
   },
   dungeon: {
-    head: ['Gestartet', 'Ende', 'Dungeon', 'Ergebnis', 'Kämpfe gewonnen', 'Gescheitert an', 'Teilnehmer', 'Bot', 'Anführer', 'Karte', 'Boost', 'Lohn (€)', 'Folie', 'Boss-Karte'],
+    head: ['Gestartet', 'Ende', 'Dungeon', 'Ergebnis', 'Kämpfe gewonnen', 'Gescheitert an', 'Teilnehmer', 'Bot', 'Anführer', 'Karte', 'Boost', 'Lohn (€)', 'Sleeve/Slab', 'Boss-Karte'],
     rows: (r) =>
       r.members.map((m) => [
         csvDate(r.startedAt),

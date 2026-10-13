@@ -3,8 +3,9 @@
   const statusLabel = { offen: 'Sucht Mitglieder', aktiv: 'Gehandelt', eingefroren: 'Eingefroren', aufgeloest: 'Aufgelöst' };
   const eur = (c) => euro(c);
   const pctText = (x) => x === null || x === undefined ? '–' : signedPercent(x);
-  const live = teams.filter((t) => t.status !== 'aufgeloest');
-  const closed = teams.filter((t) => t.status === 'aufgeloest');
+  const live = teams; // aufgelöste Teams zeigt die Seite nirgends
+  const teamHref = (t) => `/esports/team/${t.ticker.toLowerCase()}`;
+
 %>
 <div class="page-head">
   <h1>eSports</h1>
@@ -38,7 +39,7 @@
         <div class="es-team-head">
           <div>
             <span class="kicker">Dein Team</span>
-            <h2><%= mine.name %> <span class="es-ticker"><%= mine.ticker %></span></h2>
+            <h2><a class="es-team-link" href="<%= teamHref(mine) %>"><%= mine.name %></a> <span class="es-ticker"><%= mine.ticker %></span></h2>
           </div>
           <span class="es-status is-<%= mine.status %>"><%= statusLabel[mine.status] %></span>
         </div>
@@ -91,7 +92,7 @@
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <label class="field"><span>Teamname</span><input type="text" name="name" minlength="3" maxlength="24" required></label>
           <label class="field es-ticker-field"><span>Kürzel im Broker</span><input type="text" name="ticker" minlength="3" maxlength="5" pattern="[A-Za-z]{3,5}" required></label>
-          <button class="btn btn-primary" type="submit"<%= currentUser.balance < rules.FOUND_COST ? ' disabled' : '' %>>Gründen · <%= eur(rules.FOUND_COST) %></button>
+          <button class="btn btn-primary" type="submit"<%= currentUser.balance < foundCost ? ' disabled' : '' %>>Gründen<%= foundCost ? ' · ' + eur(foundCost) : '' %></button>
         </form>
       </section>
     <% } %>
@@ -101,43 +102,67 @@
       <% if (!live.length) { %>
         <p class="muted">Noch kein Team gegründet.</p>
       <% } else { %>
-        <div class="table-wrap">
-          <table class="table es-table">
-            <thead><tr><th class="num">Platz</th><th>Team</th><th>Kürzel</th><th class="num">Kurs</th><th class="num hide-sm">Letzte Woche</th><th class="num">Mitglieder</th><th class="hide-sm">Status</th></tr></thead>
-            <tbody>
-              <% live.forEach((t) => { %>
-                <tr class="<%= mine && String(mine._id) === String(t._id) ? 'is-mine' : '' %>">
-                  <td class="num"><%= t.lastRank || '–' %></td>
-                  <td><strong><%= t.name %></strong></td>
-                  <td><% if (t.path) { %><a href="<%= t.path %>"><%= t.ticker %></a><% } else { %><span class="muted"><%= t.ticker %></span><% } %></td>
-                  <td class="num"><%= t.price !== null ? coinPrice(t.price) : '–' %></td>
-                  <td class="num hide-sm"><%= pctText(t.lastChange) %></td>
-                  <td class="num"><%= t.members.length %>/<%= rules.MAX_MEMBERS %></td>
-                  <td class="hide-sm"><span class="es-status is-<%= t.status %>"><%= statusLabel[t.status] %></span></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="es-team-grid">
+          <% live.forEach((t) => { const pic = t.avatar; %>
+            <a class="es-tc<%= mine && String(mine._id) === String(t._id) ? ' is-mine' : '' %>" href="<%= teamHref(t) %>">
+              <div class="es-tc-head">
+                <span class="es-tc-rank" title="Platz in der letzten Woche"><%= t.lastRank ? t.lastRank + '.' : '–' %></span>
+                <% if (pic) { %><img class="es-tc-pic" src="<%= avatarUrl({ avatar: t.avatar }) %>?v=<%= assetVersion %>" alt="" width="56" height="56" loading="lazy"><% } else { %><span class="es-tc-pic es-monogram<%= rules.findColor(t.color) ? ' es-color-' + t.color : '' %>" aria-hidden="true"><%= Array.from(t.name)[0].toUpperCase() %></span><% } %>
+                <span class="es-tc-name"><strong><%= t.name %></strong><span class="es-ticker"><%= t.ticker %></span></span>
+              </div>
+              <dl class="es-tc-stats">
+                <div><dt>Kurs</dt><dd><%= t.price !== null ? coinPrice(t.price) : '–' %></dd></div>
+                <div><dt>Letzte Woche</dt><dd><%= pctText(t.lastChange) %></dd></div>
+                <div><dt>Mitglieder</dt><dd><%= t.members.length %>/<%= rules.MAX_MEMBERS %></dd></div>
+              </dl>
+              <div class="es-tc-foot">
+                <span class="es-status is-<%= t.status %>"><%= statusLabel[t.status] %></span>
+                <% if (t.trophies.length) { %><span class="es-cup-count" title="Trophäen">🏆 <%= t.trophies.length %></span><% } %>
+              </div>
+            </a>
+          <% }) %>
         </div>
-      <% } %>
-      <% if (closed.length) { %>
-        <p class="muted small">Aufgelöst: <%= closed.map((t) => t.name).join(', ') %></p>
       <% } %>
     </section>
   </div>
 
-  <aside class="card es-card es-rules">
-    <h2>So funktioniert's</h2>
+  <aside class="es-side">
+  <%# Tutorial im Stil der Album-Kachel %>
+  <a class="tcg-album-tile es-guide-tile" href="/esports/deep-dive">
+    <span class="tcg-fan" aria-hidden="true">
+      <% guideFan.forEach((c) => { %><img src="<%= c.image %>" alt="" width="720" height="1008" loading="lazy"><% }) %>
+    </span>
+    <span class="tcg-album-foot">
+      <span class="tcg-album-text">
+        <span class="kicker">Tutorial</span>
+        <span class="tcg-album-title">eSports Deep Dive</span>
+        <span class="dg-help-hint">Live-Turm Fenster für Fenster erklärt</span>
+      </span>
+      <span class="tcg-album-arrow" aria-hidden="true">→</span>
+    </span>
+  </a>
+  <%# Regeln: zugeklappt, auf Klick ausklappbar %>
+  <details class="card es-card es-rules">
+    <summary><h2>So funktioniert's</h2></summary>
     <ul>
-      <li>Gründen kostet <%= eur(rules.FOUND_COST) %>. Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
+      <li><%= foundCost ? 'Gründen kostet ' + eur(foundCost) + '.' : 'Gründen ist kostenlos.' %> Der Kapitän lädt ein, höchstens <%= rules.MAX_MEMBERS %> Mitglieder, jeder Spieler in einem Team.</li>
       <li>Ab <%= rules.TEAM_SIZE %> Mitgliedern wird euer Team-ETF im Broker gehandelt – auch ihr selbst dürft kaufen.</li>
-      <li>Für die Liga zählen nur Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind (schon vor Beginn der Woche). Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
+      <li>Für die Liga zählen Mage-Tower-Läufe, in denen alle drei Spieler Mitglieder eures Teams sind – sie laufen live mit Pausen und Team-Fähigkeiten. Die <%= rules.TOP_RUNS %> besten Läufe der Woche ergeben eure Punkte.</li>
       <li>Jeden Sonntag wird ausgewertet: Euer Ergebnis entscheidet, in welche Richtung sich der Wert eures ETFs bewegt.</li>
+      <li>Die besten drei Teams der Woche bekommen eine Trophäe fürs Teamprofil – und jedes Mitglied, das schon vor der Woche dabei war, einen Preis:
+        <ul class="es-prizes">
+          <% prizes.forEach((p) => { %><li><strong><%= p.label %>:</strong> <%= [p.cash ? eur(p.cash) : '', p.packs ? p.packs + ' Booster ' + (p.packs === 1 ? 'Pack' : 'Packs') : ''].filter(Boolean).join(' + ') || '–' %></li><% }) %>
+        </ul>
+        <span class="muted small">Trophäen gibt es nur, wenn mindestens <%= minTeams %> <%= minTeams === 1 ? 'Team' : 'Teams' %> in der Woche Punkte geholt <%= minTeams === 1 ? 'hat' : 'haben' %>.</span></li>
+      <li>Der Kapitän gestaltet das Teamprofil: Text, Motto, Farbe und Teambild (Avatare aus dem Kosmetik-Shop zum halben Preis). Er kann die Kapitänsrolle auch abgeben.</li>
       <li>Im Dungeon kommen Teammitglieder in der Solo-Anmeldung bevorzugt zusammen.</li>
+      <li><strong>Lil Dré's Bazaar:</strong> Ab <%= rules.TEAM_SIZE %> Mitgliedern könnt ihr im <a href="/handel#bazaar">Handel</a> bei Lil Dré einkaufen: Casino-Kaffee (Crumpled, BfW-ler, Gold) und BFW Energy Gold – alles, was ihr im Live-Turm braucht. Kauft ein Mitglied etwas, ist es für das ganze Team weg.</li>
       <li>Austritt aus einem gehandelten Team: <%= eur(rules.LEAVE_FEE) %> an die übrigen Mitglieder. Unter <%= rules.TEAM_SIZE %> Mitgliedern friert der ETF ein; nach <%= rules.FREEZE_DAYS %> Tagen ohne Ersatz folgt der Konkurs: Anleger bekommen den letzten Kurs ausgezahlt, jedes Mitglied zahlt <%= eur(rules.BANKRUPT_FEE) %>. Reicht das Guthaben nicht, bleibt der Rest als Schuld und wird von jeder Einnahme abgezogen.</li>
     </ul>
+  </details>
   </aside>
 </div>
 
 <link rel="stylesheet" href="/css/esports.css?v=<%= assetVersion %>">
+<link rel="stylesheet" href="/css/esports-guide.css?v=<%= assetVersion %>">
 <%- include('partials/foot') %>

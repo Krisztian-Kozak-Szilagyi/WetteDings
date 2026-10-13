@@ -49,6 +49,15 @@
     return form.getAttribute('data-confirm') || '';
   }
 
+  // Formular nach einer Rückfrage erneut absenden – mit dem Button, der gedrückt wurde (sonst fehlt dessen name/value,
+  // z. B. decision=ok bei „Freigeben“ und der Server wertet es als „Ablehnen“)
+  var submitters = new WeakMap();
+  function resubmit(form) {
+    var btn = submitters.get(form);
+    if (form.requestSubmit) form.requestSubmit(btn && form.contains(btn) ? btn : undefined); else form.submit();
+  }
+  document.addEventListener('submit', function (e) { if (e.submitter) submitters.set(e.target, e.submitter); }, true);
+
   // Passwortabfrage für Moderations- und Spielwerte-Aktionen (Formulare mit data-reauth, nur für Admin/Devs).
   // Ersetzt dort die Sicherheitsabfrage: der Dialog zeigt deren Text und fragt zusätzlich das Passwort ab.
   var reauth = document.querySelector('[data-reauth-dialog]');
@@ -72,7 +81,7 @@
       field.value = reauthInput.value;
       form.dataset.reauthOk = '1';
       reauth.close();
-      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      resubmit(form);
     });
   }
   function askPassword(form) {
@@ -86,9 +95,45 @@
     return true;
   }
 
+  // Zweite Bestätigung ohne Passwort (Formulare mit data-confirm-dialog): Fenster mit dem Text aus data-confirm.
+  // Ohne Text (z. B. "Gesehen") wird direkt abgeschickt; ohne Fenster im Dokument greift window.confirm.
+  var confirmBox = document.querySelector('[data-confirm-dialog-box]');
+  var confirmTarget = null;
+  if (confirmBox) {
+    confirmBox.querySelector('[data-confirm-dialog-cancel]').addEventListener('click', function () { confirmBox.close(); });
+    confirmBox.querySelector('[data-confirm-dialog-form]').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var form = confirmTarget;
+      confirmBox.close();
+      if (!form) return;
+      form.dataset.confirmOk = '1';
+      resubmit(form);
+    });
+  }
+
   // Sicherheitsabfragen vor unumkehrbaren Aktionen (delegiert, damit sie auch nach Live-Updates greifen)
   document.addEventListener('submit', function (e) {
     var form = e.target;
+    if (form.hasAttribute('data-confirm-dialog')) {
+      if (form.dataset.confirmOk === '1') {
+        delete form.dataset.confirmOk; // bestätigt: jetzt wirklich absenden
+        return;
+      }
+      var text = form.getAttribute('data-confirm');
+      if (text) {
+        e.preventDefault();
+        if (confirmBox) {
+          confirmTarget = form;
+          confirmBox.querySelector('[data-confirm-dialog-text]').textContent = text;
+          confirmBox.showModal();
+          confirmBox.querySelector('[data-confirm-dialog-ok]').focus();
+        } else if (window.confirm(text)) {
+          form.dataset.confirmOk = '1';
+          resubmit(form);
+        }
+      }
+      return;
+    }
     if (form.hasAttribute('data-reauth')) {
       if (form.dataset.reauthOk === '1') {
         delete form.dataset.reauthOk; // Passwort ist eingetragen: jetzt wirklich absenden
@@ -113,8 +158,13 @@
     if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
     setTimeout(function () {
       if (e.defaultPrevented) return;
-      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+      form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; b.setAttribute('data-sent', ''); });
     }, 0);
+  });
+  // Zurück-Taste: der Browser holt die Seite aus dem Zwischenspeicher – dann sind die gesperrten Buttons wieder frei
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('button[data-sent]').forEach(function (b) { b.disabled = false; b.removeAttribute('data-sent'); });
   });
 
   // ---------- Live-Aktualisierung (alle 5 Sekunden) ----------
@@ -931,6 +981,84 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   });
 
+  // Kurze Bestätigung, die von selbst verschwindet: data-auto-hide="<Millisekunden>" (z. B. „Nachricht an alle versendet“)
+  onReady(function () {
+    document.querySelectorAll('[data-auto-hide]').forEach(function (el) {
+      var ms = Number(el.getAttribute('data-auto-hide')) || 3000;
+      setTimeout(function () {
+        el.classList.add('is-gone');
+        setTimeout(function () { el.remove(); }, 450); // nach dem Ausblenden (CSS: .flash-toast.is-gone)
+      }, ms);
+    });
+  });
+
+  // Nachricht vom Entwickler-Team (Dev-Panel → Pop-ups, #132): wie das Geschenk-Fenster. Erscheint bei allen, die gerade
+  // online sind (Abfrage alle 15 Sekunden), sonst beim nächsten Seitenaufruf. Schließt nur mit „Gelesen“ – nicht mit Esc.
+  onReady(function () {
+    var pop = document.querySelector('[data-dev-pop]');
+    if (!pop || !pop.showModal) return;
+    var form = pop.querySelector('[data-dev-form]');
+    var q = function (sel) { return pop.querySelector(sel); };
+    pop.addEventListener('cancel', function (e) { e.preventDefault(); });
+    var otherOpen = function () { return !!document.querySelector('dialog[open]:not([data-dev-pop])'); };
+
+    var fill = function (d) {
+      q('[data-dev-id]').value = d.id;
+      q('[data-dev-title]').textContent = d.title;
+      q('[data-dev-text]').textContent = d.text;
+      q('[data-dev-by]').textContent = d.byName;
+      q('[data-dev-at]').textContent = d.at;
+      var more = q('[data-dev-more]');
+      var left = (d.left || 1) - 1;
+      more.hidden = left < 1;
+      more.textContent = left === 1 ? 'Noch 1 weitere Nachricht wartet.' : 'Noch ' + left + ' weitere Nachrichten warten.';
+      pop.classList.remove('is-fresh');
+      void pop.offsetWidth;
+      pop.classList.add('is-fresh');
+    };
+    var pending = null;
+    var open = function (d) {
+      if (otherOpen()) { pending = d || pending; return; }
+      if (d) fill(d);
+      if (!pop.open) pop.showModal();
+    };
+    var initial = pop.hasAttribute('data-open');
+    // Ein anderes Fenster (Erfolg, Geschenk) wird geschlossen -> wartende Nachricht zeigen
+    document.querySelectorAll('dialog:not([data-dev-pop])').forEach(function (dlg) {
+      dlg.addEventListener('close', function () {
+        setTimeout(function () {
+          if (otherOpen() || pop.open) return; // gleich danach öffnet sich vielleicht schon das nächste Fenster
+          if (initial) { initial = false; open(null); return; }
+          if (pending) { var d = pending; pending = null; open(d); }
+        }, 0);
+      });
+    });
+    if (initial) setTimeout(function () { if (!otherOpen()) { initial = false; open(null); } }, 0);
+
+    var busy = false;
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      fetch(form.action, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: new URLSearchParams(new FormData(form)) })
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (res) { if (res.next) fill(res.next); else pop.close(); })
+        .catch(function () { form.submit(); })
+        .then(function () { busy = false; });
+    });
+
+    var poll = function () {
+      if (pop.open || document.hidden) return;
+      fetch('/entwickler-nachrichten/neu', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) { if (res && res.popup) open(res.popup); })
+        .catch(function () {});
+    };
+    setInterval(poll, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  });
+
   // Zeichenzähler für Textfelder: data-count="<id des Zählers>" (Emojis zählen als ein Zeichen)
   document.addEventListener('input', function (e) {
     var el = e.target;
@@ -956,7 +1084,7 @@
   var set = function (sel, text) { var el = box.querySelector(sel); if (el) el.textContent = text; };
   var recalc = function () {
     var jobs = val('gr_jobs');
-    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100 };
+    var pay = { clean: val('gr_pay_clean') * 100, grade: val('gr_pay_grade') * 100, slab: val('gr_pay_slab') * 100, iron: val('gr_pay_iron') * 100 };
     var premium = val('gr_premium');
     var ref = input.profiles[input.profiles.length - 1].key;
     var prev = null;
@@ -965,10 +1093,11 @@
       var day = {};
       input.profiles.forEach(function (p) {
         var j = (pay.clean * p.clean) / 100;
+        if (l.steps.indexOf('iron') >= 0) j += (pay.iron * (input.creaseChance || 0) * (p.iron || 0)) / 100; // nur Karten mit Knick
         if (l.steps.indexOf('grade') >= 0) j += pay.grade * (p.exact + p.near / 2);
         if (l.steps.indexOf('slab') >= 0) j += (pay.slab * p.seal) / 100;
         j = j * (l.premium ? 1 + premium / 100 : 1) * input.factor;
-        if (l.steps.indexOf('slab') >= 0 && p.seal > 0) j += input.foilValue;
+        if (l.steps.indexOf('slab') >= 0 && p.seal > 0) j += input.foilValue - (input.slabCost || 0); // Folienfund minus leerer Slab
         day[p.key] = Math.round(jobs * j);
         set('[data-gc-day="' + l.level + '-' + p.key + '"]', fmt.format(day[p.key] / 100));
       });

@@ -15,10 +15,17 @@ const messageSchema = new Schema(
 const lineSchema = new Schema(
   {
     card: { type: String, required: true },
-    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // ein bestimmtes foliertes Exemplar wird verlangt
+    copy: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null }, // ein bestimmtes Exemplar wird verlangt (foliert, Slab oder beschädigt)
     doc: { type: Schema.Types.ObjectId, default: null }, // gesperrtes Exemplar (TcgCard bzw. Item), sobald der Besitzer zugesagt hat
     foiledAt: { type: Date, default: null }, // Exemplar ist foliert (seit) – zur Anzeige
-    grade: { type: Number, default: null }, // dessen Note auf der Folie (#73)
+    grade: { type: Number, default: null }, // Note auf dem Slab (#73, #204: eine Folie allein zeigt keine)
+    // Sichtbarer Zustand des Exemplars (#204) – zur Anzeige und für den Ø-Marktpreis (trade/marketPrice)
+    slab: { type: new Schema({ code: String, grade: Number }, { _id: false }), default: null },
+    damaged: { type: Boolean, default: false }, // Kratzer oder Knick
+    creased: { type: Boolean, default: false }, // davon: Knick
+    ironed: { type: Boolean, default: false }, // der Knick ist gebügelt
+    // Sichtbare Spuren eines unfolierten Exemplars ({ s, c, i } aus grading/condition.visibleMarks) – Großansicht im Angebot
+    marks: { type: Schema.Types.Mixed, default: null },
   },
   { _id: false }
 );
@@ -53,6 +60,9 @@ const tradeSchema = new Schema(
     buyerName: { type: String, default: null },
     closedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // wer gekauft bzw. angenommen hat – die andere Seite wird benachrichtigt
     closedVia: { type: Schema.Types.ObjectId, ref: 'Trade', default: null }, // Markt-Angebot: über dieses Gegenangebot abgeschlossen
+    // Ø-Marktpreis (#204, trade/marketPrice): sauberer Verkauf einer Kartenart in einem Zustand – Schlüssel, Stückzahl,
+    // Stückpreis (Cent). Beim Abschluss gesetzt; null = kein sauberer Verkauf (Tausch, Paket, Gegenstand)
+    priceRef: { type: new Schema({ key: String, n: Number, unit: Number, code: String }, { _id: false }), default: undefined }, // code: Kürzel bei Slabs
     taxPercent: { type: Number, default: 0 },
     tax: { type: Number, default: 0 }, // Cent
     closedAt: { type: Date, default: null },
@@ -64,6 +74,7 @@ tradeSchema.index({ to: 1, status: 1 });
 tradeSchema.index({ seller: 1, status: 1 });
 tradeSchema.index({ listing: 1, status: 1 });
 tradeSchema.index({ buyer: 1, closedAt: -1 }); // Protokolle: Geschäfte eines Spielers
+tradeSchema.index({ 'priceRef.key': 1, closedAt: -1 }, { partialFilterExpression: { 'priceRef.key': { $type: 'string' } } }); // Ø-Marktpreis
 // Ein Exemplar kann nur in einem offenen Angebot gesperrt sein
 tradeSchema.index({ lockDocs: 1 }, { unique: true, partialFilterExpression: { status: 'offen', lockDocs: { $exists: true } } });
 

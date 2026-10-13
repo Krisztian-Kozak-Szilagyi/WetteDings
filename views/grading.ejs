@@ -1,19 +1,20 @@
 <%- include('partials/head') %>
-<% const active = shop && shop.active; const locked = active && shop.lockedUntil && new Date(shop.lockedUntil) > new Date(); %>
+<%#
+  Grading-Shop (#204): ohne Job das Stellenangebot, mit Job der Schreibtisch – Holzplatte von oben mit Namensschild,
+  Glasvitrine, Schneidematte (genau eine Hauptaktion) und Objekten, die je ein Fenster öffnen (public/js/grading-desk.js).
+  Erklärungen stehen in der Tour (public/js/grading-tour.js), nicht auf dem Tisch.
+%>
+<% const locked = active && shop.lockedUntil && new Date(shop.lockedUntil) > new Date(); %>
+<% const tabInput = (t) => `<input type="hidden" name="reiter" value="${t}">`; %>
 
-<div class="gr-page">
-<div class="gr-head">
-  <h1>Grading-Shop</h1>
-  <% if (active) { %>
-    <div class="gr-today">
-      <span>Heute <b><%= used %> / <%= limit %></b></span>
-      <span class="gr-pips" aria-hidden="true"><% for (let i = 0; i < limit; i++) { %><span class="<%= i < used ? 'is-on' : '' %>"></span><% } %></span>
-    </div>
-  <% } %>
-</div>
+<div class="gr-page<%= active ? ' gd-page' : '' %>">
 <% if (closedForOthers) { %><p class="muted small">Nur für Admins sichtbar – im Admin-Panel für alle freigeben.</p><% } %>
 
 <% if (!active) { %>
+  <div class="gr-head">
+    <h1>Grading-Shop</h1>
+    <a class="btn btn-ghost btn-sm gr-submit-link" href="/grading/einreichen">Eigene Karte graden lassen →</a>
+  </div>
   <%# ---------- Noch kein Job: Vorstellung und Vertrag ---------- %>
   <section class="gr-hero">
     <div class="gr-hero-text">
@@ -36,8 +37,8 @@
         <%# Versiegelte Karte im Slab – wie nach einem Auftrag (Etikett oben, Note 10) %>
         <div class="gr-hero-slab">
           <div class="gr-hero-slab-label">
-            <div class="gr-slab-info"><strong>BfW GRADING</strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span><span class="gr-slab-word">GEM MINT</span></div>
-            <div class="gr-slab-grade">10</div>
+            <div class="gr-slab-info"><strong><%= locals.shopCode || 'BfW' %></strong><span><%= heroCard.name %> · <%= heroCard.rarityLabel %></span></div>
+            <div class="gr-slab-score"><span class="gr-slab-word">GEM MINT</span><span class="gr-slab-grade">10</span></div>
           </div>
           <span class="tcg-slot gr-hero-slab-slot r-<%= heroCard.rarity %>">
             <span class="tcg-art">
@@ -51,212 +52,483 @@
     </div>
   </section>
 <% } else { %>
-  <div class="gr-layout">
-    <div class="gr-main">
-      <% if (jobData) { %>
-        <%# ---------- Arbeitstisch (public/js/grading.js) ---------- %>
-        <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">
-          <div class="gr-ticket">
-            <span class="gr-ticket-label">Auftrag</span>
-            <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
-            <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %><% if (jobData.card.bonus) { %> · +<%= jobData.card.bonus %> % Lohn<% } %></span><% } %>
-            <span class="gr-ticket-for">für <%= jobData.customer %></span>
-          </div>
+  <%
+    const shown = showcase.filter((s) => s.shown);
+    const r = rating;
+    const fmtStars = (v) => (v != null ? v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
+    const starRow = (v) => { const n = Math.round(v || 0); return '★'.repeat(n) + '☆'.repeat(5 - n); };
+    const tier = r && r.tier;
+    const repPct = tier ? (tier.next ? Math.max(0, Math.min(100, Math.round(((r.reputation - tier.min) / (tier.next - tier.min)) * 100))) : 100) : 0;
+    // Pixel-Icons (34 × 34 px, scharf vergrößert per CSS; public/img/grading, Lizenzen in LICENSES.md)
+    const img = (name, w, cls = '') => `<img class="gd-img gd-px${cls ? ' ' + cls : ''}" src="/img/grading/${name}.png" alt="" width="${w}" height="${w}" decoding="async">`;
+    // Station im Inventar-Slot: Goldrahmen, dunkler Grund, Icon; extra = Badge bzw. Schlüssel, attrs = zusätzliche Attribute
+    const slot = (name, extra = '', attrs = '') => `<span class="gd-art gd-slot"${attrs}>${img(name, 88)}${extra}</span>`;
+    const badge = (text, title, cls = '') => `<span class="gd-badge${cls}" title="${title}">${text}</span>`;
+    const sheetIcon = { auftraege: 'scroll', bons: 'book', vitrine: 'diamond', bewertungen: 'heart', preise: 'coin', werkstatt: 'hammer', buegeln: 'fire', meilensteine: 'medal' };
+    // Fenster-Schema des Eingangs für alle Popups: Rahmen und Farben je Ausbaustufe
+    const popCls = `gd-sheet gd-pop gd-pop-${Math.min(4, Math.max(1, info.level || 1))}`;
+    const sheetHead = (key, title) => `<header class="gd-sheet-head"><span class="gd-sheet-grip" aria-hidden="true"></span>${img(sheetIcon[key], 36, 'gd-sheet-icon')}<h2 id="gd-${key}-t">${title}</h2><button type="button" class="gd-sheet-help" data-tour-info="${key}" aria-label="Kurz erklärt">?</button><button type="button" class="gd-sheet-close" data-gd-close aria-label="Schließen">×</button></header>`;
+    // Kassenzettel: NPC-Lohn je Schritt bzw. gebuchte Bausteine eines Mitglieds
+    const npcLabels = { clean: 'Reinigung', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln', extra: 'Zuschlag' };
+    const svcLabels = Object.fromEntries(services.map((s) => [s.key, s.label]));
+    const linesOf = (parts, player) => Object.entries(parts || {}).filter(([k, v]) => v && (player ? svcLabels : npcLabels)[k]).map(([k, v]) => [(player ? svcLabels : npcLabels)[k], v]);
+    const bonNote = (j) => [
+      j.guess !== null && j.source === 'spieler' ? `Slab ${j.shopCode || ''} · Note ${j.guess}` : j.guess !== null ? `Note ${j.guess}${j.guess === j.grade ? ' ✓' : ' · richtig ' + j.grade}` : j.source === 'spieler' ? 'gebügelt' : '',
+      j.foilFound ? '+ 1 TCG Sleeve' : '',
+    ].filter(Boolean).join(' · ');
+    const bons = doneCards.map((j) => ({ card: j.cardInfo, title: j.cardInfo ? j.cardInfo.name : j.card, who: j.customer, at: j.doneAt, lines: linesOf(j.parts, j.source === 'spieler'), total: j.pay, note: bonNote(j) }));
+    // Mitglieder-Aufträge im Verlauf als Bons (Kassenzettel und Eingang › Erledigt)
+    const histBons = history.map((o) => {
+      const done = o.status === 'fertig';
+      const res = !done ? (o.status === 'abgelaufen' ? 'abgelaufen – erstattet' : 'storniert') : o.services.review ? (o.result.changed ? `Zweitprüfung: Note ${o.result.grade} statt ${o.result.before}` : `Zweitprüfung: Note ${o.result.grade} bestätigt`) : o.result && o.result.grade != null ? `Slab · Note ${o.result.grade}` : 'gebügelt';
+      const sv = o.services || {}; // Leistungen als Kurzmarken – auch bei Aufträgen ohne gespeicherte Einzelposten
+      const svc = sv.review ? ['Zweitprüfung'] : ['Reinigung', sv.iron && 'Bügeln', sv.slab && 'Benoten + Slab', sv.express && 'Express'].filter(Boolean);
+      return { card: o.cardInfo, title: o.cardInfo ? o.cardInfo.name : o.card, who: o.ownerName, at: o.doneAt, svc, lines: linesOf(o.priceParts, true), total: done ? o.price : null, note: res + (o.stars ? ' · ' + '★'.repeat(o.stars) : ''), void: !done };
+    });
+    // nächster Auftrag auf der Matte: der erste, den der Shop auch erledigen kann (Slab-Aufträge brauchen einen leeren Slab)
+    const nextOrder = waiting && playerUsed < playerLimit ? queue.find((o) => !o.services.slab || slabs.left > 0) || null : null;
+    const canTake = used < limit || !!nextOrder;
+    const ownedTools = tools.filter((t) => t.owned).length;
+    const milesDone = milestones.filter((m) => m.done).length;
+    // Tour (public/js/grading-tour.js): die Erklärungen, die nicht auf dem Tisch stehen – je Objekt (data-tour) eine
+    // Station; sheet = Fenster, dessen ?-Knopf denselben Text zeigt. Fehlt ein Objekt, wird die Station übersprungen.
+    const tour = [
+      { key: 'schild', title: 'Dein Shop', text: 'Links Name und Kürzel, in der Mitte Stufe und Ruf – der Ruf wächst mit sauberer Arbeit und guten Bewertungen. Rechts: heute verdient und wie viele Aufträge heute noch gehen.' },
+      { key: 'matte', title: 'Hier wird gearbeitet', text: 'Schritt 2: Hier liegt der aktuelle Auftrag. Der Knopf sagt, was als Nächstes dran ist – putzen, bügeln, benoten, versiegeln. Je sauberer und genauer, desto mehr Lohn.' },
+      { key: 'eingang', sheet: 'auftraege', title: 'Eingang', text: (players ? `Deine Auftragsverwaltung. Im Eingang wählst du selbst, was du annimmst: Karten von Mitgliedern zu deinen Festpreisen (Express steht oben und ist orange) oder Laufkundschaft. Tipp auf die Karte zeigt sie groß. Nach dem ersten Annehmen hast du ${orderDays} Tage, mit Express ${expressDays}; wartet ein Auftrag zu lange im Eingang oder wirst du nicht rechtzeitig fertig, geht die Karte samt Geld zurück. ` : `Deine Auftragsverwaltung: Hier nimmst du Laufkundschaft an – ab Stufe ${orderLevel} schicken dir auch Mitglieder ihre Karten, zu deinen Preisen. `) + `Reiter „Angenommen“: bis zu ${maxAccepted} Aufträge gleichzeitig. Der aktive (Aktiv-Marke) liegt auf der Werkbank – „Bearbeiten“ öffnet sie, „Auswählen“ macht einen anderen aktiv, sein Fortschritt bleibt erhalten. „Abbrechen“ ` + (players ? 'gibt eine Mitglieder-Karte zurück in den Eingang (die Frist läuft weiter), ein NPC-Auftrag zählt für heute trotzdem. „Erledigt“: der Verlauf. Die echte Note bleibt geheim: auf den Slab kommt deine.' : 'gibt einen Auftrag auf – er zählt für heute trotzdem.') },
+      { key: 'spiess', sheet: 'bons', title: 'Kassenzettel', text: 'Jeder erledigte Auftrag landet als Bon auf dem Spieß. Oben zeigt das Kassendisplay, was du heute verdient hast. Antippen eines Bons klappt die einzelnen Posten auf. Darunter stehen ältere Aufträge von Mitgliedern.' },
+      { key: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je wertvoller die Karte, je höher die Note (ab 7) und je seltener der Slab, desto schneller wächst deine Reputation – bis +50 %. Ein leeres Fach antippen wählt einen Slab, eine Karte antippen tauscht sie aus oder nimmt sie raus – und ziehen sortiert um. Ausgestellte Slabs lassen sich nicht handeln.' },
+      { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen aus dem Admin-Panel. Neue Preise gelten für neue Aufträge, offene behalten ihren Preis. Günstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
+      { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte. Gute Bewertungen bringen Reputation – und neue Kunden.' },
+      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `Shop: Name ändern geht frei, ein neues Kürzel muss ein Admin freigeben – ältere Slabs behalten das alte. Ausbau: jede Stufe schaltet neue Arbeitsschritte frei und bringt mehr Lohn; Mauszeiger über eine Stufe zeigt, was sie bringt. Werkzeuge: Komfort am Tisch, ohne Extra-Lohn – Mauszeiger darüber zeigt die Wirkung.${players ? ' Material: Für jeden Auftrag mit „Benoten + Slab“ verbraucht dein Shop einen leeren Slab – hier kaufst du Nachschub (oder im Handel).' : ''} Ruf: wächst mit +${repRules.base} je Auftrag (bei guter Qualität mehr), ×${repRules.player} bei Mitglieder-Aufträgen, ±${repRules.star} je Stern über oder unter 3 und bis +${Math.round(repRules.cap * 100)} % durch Slabs in der Vitrine. Die Fahnen sind die vier Ruf-Stufen, der gelbe Mast füllt sich bis zu deinem Stand.` },
+      { key: 'meilensteine', sheet: 'meilensteine', title: 'Erfolge', text: 'Meilensteine rund ums Grading, als Medaillen im Regal. Golden = geschafft, dunkel = noch offen mit Fortschrittsbalken. Mauszeiger über eine Medaille zeigt die Aufgabe.' },
+      { key: 'buegeln', sheet: 'buegeln', title: 'Eigene Karten bügeln', text: 'Karten mit Knick aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – Vorsicht vor Brandflecken. Ein Versuch je Karte.' },
+      { key: 'karton', title: 'Selbst einreichen', text: 'Lass eigene Karten bei einem anderen Shop graden – so kommst du an Slabs für deine Vitrine.' },
+    ];
+  %>
+  <script type="application/json" data-gd-tour><%- JSON.stringify(tour) %></script><%# feste Texte ohne Nutzereingaben %>
+  <%
+    // Matte: Schritte des offenen Auftrags – erledigt ist alles bis zum letzten gespeicherten Schritt (Bügeln/Benoten)
+    const STEP = { clean: ['Putzen', 'Putzen'], iron: ['Bügeln', 'Bügeln'], grade: ['Benoten', 'Benoten'], slab: ['Versiegeln', 'Versiegeln'] };
+    const lastDone = openJob ? Math.max(-1, ...openJob.done.map((st) => openJob.steps.indexOf(st))) : -1;
+    const activeStep = openJob ? openJob.steps[Math.min(lastDone + 1, openJob.steps.length - 1)] : null;
+    const queueExpress = queue.some((o) => o.services.express);
+    const priceFrom = shopPrices.base + shopPrices.slab;
+    const shopStatus = attention.upgrade ? 'Ausbau möglich' : attention.tool ? 'Werkzeug kaufbar' : `Stufe ${info.level}/${levels.length}`;
+  %>
+  <div class="gd-desk gd-desk-<%= Math.min(4, Math.max(1, info.level || 1)) %>" data-gd-desk<% if (tab) { %> data-gd-start="<%= tab %>"<% } %><% if (ordTab) { %> data-gd-ord-tab="<%= ordTab %>"<% } %><% if (shop.code && !shop.tourSeenAt) { %> data-gd-tour-auto<% } %>>
+    <%# ---------- Namensschild: Identität | Fortschritt | Ressourcen | Tour ---------- %>
+    <header class="gd-plate gd-plate-<%= Math.min(4, Math.max(1, info.level || 1)) %>" data-tour="schild">
+      <div class="gd-zone gd-zone-id gd-sign gd-sign-<%= Math.min(4, Math.max(1, info.level || 1)) %>">
+        <h1><span class="gd-name"><%= shop.name || 'Dein Grading-Shop' %></span><% if (shop.code) { %><span class="gd-stamp" aria-label="Kürzel <%= shop.code %>"><%= shop.code %></span><% } %><% if (shop.codeRequest) { %><span class="gd-seal" title="Neues Kürzel beantragt – wartet auf Freigabe">⏳ <%= shop.codeRequest.code %></span><% } %></h1>
+      </div>
+      <div class="gd-zone gd-zone-progress">
+        <span class="gd-row"><span class="gd-label">Stufe <%= info.level %>/<%= levels.length %></span><span class="gd-level" aria-hidden="true"><% levels.forEach((l) => { %><i class="<%= l.level <= info.level ? 'is-on' : '' %>"></i><% }) %></span><b><%= info.name %></b></span>
+        <% if (tier && shop.code) { %>
+          <span class="gd-row"><span class="gd-label">Ruf</span><span class="gd-meter" role="progressbar" aria-label="Ruf: <%= tier.label %>" aria-valuenow="<%= Math.round(r.reputation) %>" aria-valuemin="<%= tier.min %>" aria-valuemax="<%= tier.next || Math.round(r.reputation) %>"><span style="width: <%= repPct %>%"></span></span><b><%= tier.label %></b><span class="gd-num"><%= Math.round(r.reputation) %><%= tier.next ? '/' + tier.next : '' %></span></span>
+        <% } %>
+      </div>
+      <div class="gd-zone gd-zone-res">
+        <span class="gd-res" data-gd-coins><%- img('coin', 34) %><span><span class="gd-label">Heute</span><b><%= euro(earnedToday) %></b></span></span>
+        <span class="gd-res"><%- img('scroll-open', 34) %><span><span class="gd-label">Aufträge</span><b><%= used %>/<%= limit %></b></span></span>
+        <% if (players) { %><span class="gd-res"><%- img('scroll', 34) %><span><span class="gd-label">Mitglieder</span><b><%= playerUsed %>/<%= playerLimit %></b></span></span><% } %>
+      </div>
+      <button type="button" class="gd-help" data-tour-start title="Tour: So funktioniert dein Shop" aria-label="Tour: So funktioniert dein Shop">?</button>
+    </header>
 
-          <div class="gr-stage" data-gr-stage>
-            <div class="gr-lamp" aria-hidden="true"></div>
-            <div class="gr-zoom" data-gr-zoom>
-              <div class="gr-obj" data-gr-obj></div>
-            </div>
-            <div class="gr-hint" data-gr-hint></div>
-            <%# Messen: Ränder und Zentrierung aus den Messlinien (grading.js), nur beim Benoten %>
-            <div class="gr-measure-read" data-gr-measure-read aria-live="polite" hidden></div>
-            <%# Maus-Werkzeug: Drehen, Putzen, Messen oder UV-Lampe (Tasten D, P, M und U) %>
-            <div class="gr-modes" role="radiogroup" aria-label="Maus-Werkzeug">
-              <button type="button" class="gr-mode" role="radio" data-gr-mode="rotate" title="Drehen (Taste D)"><span aria-hidden="true">✋</span> Drehen</button>
-              <button type="button" class="gr-mode" role="radio" data-gr-mode="clean" title="Putzen (Taste P)"><span aria-hidden="true">🧽</span> Putzen</button>
-              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode" role="radio" data-gr-mode="measure" title="Zentrierung messen (Taste M)" hidden><span aria-hidden="true">📏</span> Messen</button><% } %>
-              <% if (jobData.steps.includes('grade')) { %><button type="button" class="gr-mode gr-mode-uv" role="radio" data-gr-mode="uv" title="UV-Lampe: Macken an Ecken und Kanten leuchten auf (Taste U)" hidden><span aria-hidden="true">🔦</span> UV-Lampe</button><% } %>
-            </div>
-            <%# Lupe auch ohne Mausrad (Telefon, Tablet) %>
-            <div class="gr-zoom-btns">
-              <button type="button" class="gr-round" data-gr-zoom-step="-1" title="Verkleinern" aria-label="Verkleinern">−</button>
-              <button type="button" class="gr-round" data-gr-zoom-step="1" title="Vergrößern" aria-label="Vergrößern">+</button>
-              <button type="button" class="gr-round" data-gr-zoom-step="0" title="Zurücksetzen" aria-label="Zurücksetzen">⟲</button>
-            </div>
-          </div>
+    <%# ---------- Glasvitrine ---------- %>
+    <% if (shop.code) { %>
+      <%- include('partials/grading-desk/vitrine', { items: shown, max: showcaseMax, editable: true, cands: showcase.filter((x) => !x.lock) }) %>
+    <% } %>
 
-          <ol class="gr-steps" data-gr-steps>
-            <li data-step="clean">Reinigen</li>
-            <% if (jobData.steps.includes('grade')) { %><li data-step="grade">Benoten</li><% } %>
-            <% if (jobData.steps.includes('slab')) { %><li data-step="slab">Versiegeln</li><% } %>
-            <li data-step="send">Zurückschicken</li>
-          </ol>
+    <%# ---------- Ablauf: ① Eingang → ② Werkbank → ③ Bons ---------- %>
+    <a data-tip="<%= players && queue.length ? queue.length + ' warten' + (queueExpress ? ', Express dabei' : '') : 'noch ' + Math.max(0, limit - used) + ' heute' %>" class="gd-obj gd-tray" href="<%= hubUrl('auftraege') %>" data-gd-open="auftraege" data-tour="eingang" aria-label="Eingang: <%= players ? queue.length + ' Karten von Mitgliedern warten' : 'noch ' + Math.max(0, limit - used) + ' Aufträge heute' %>">
+      <%- slot('scroll', queue.length ? badge((queueExpress ? '⚡' : '') + queue.length, queue.length + ' warten' + (queueExpress ? ', Express dabei' : ''), queueExpress ? ' is-express' : '') : '') %>
+      <span class="gd-tag"><b><i class="gd-step">1</i> Eingang</b></span>
+    </a>
 
-          <div class="gr-panel" data-gr-panel="clean">
-            <div class="gr-row">
-              <p class="gr-text">Nimm das Werkzeug <b>Putzen</b> und reibe mit gedrückter Maustaste über die Flecken. Mit <b>Drehen</b> wendest du die Karte – auch hinten kann Schmutz sein. Ob sie wirklich sauber ist, musst du selbst entscheiden.
-                <span class="gr-note">Ganz sauber: <%= euro(pay.clean) %> – jeder Rest Schmutz kostet Lohn.</span></p>
-              <button type="button" class="btn btn-primary" data-gr-clean-ok>Fertig geputzt</button>
-            </div>
-          </div>
-
-          <% if (jobData.steps.includes('grade')) { %>
-          <div class="gr-panel" data-gr-panel="grade" hidden>
-            <p class="gr-text">Untersuche die Vorderseite und vergib eine Note. Kratzer blitzen nur auf, wenn du die Karte schräg ins Licht drehst – zoomen mit Mausrad oder <b>+</b>. Mit <b>Messen</b> ziehst du Linien an den linken und rechten Rand des Kartenbilds und liest die seitliche Zentrierung ab. Die <b>UV-Lampe</b> lässt bestoßene Ecken und Kantenmacken grün aufleuchten – fahr damit langsam am Rand entlang.</p>
-            <%# Bewertung in drei Stufen (src/grading/condition.js: gradeCap, gradeFor) – erst die Obergrenze, dann abziehen %>
-            <ol class="gr-flow">
-              <li class="gr-flow-step is-cap">
-                <span class="gr-flow-num">1</span>
-                <div class="gr-flow-body">
-                  <span class="gr-flow-title">Obergrenze <small>der niedrigste Wert zählt</small></span>
-                  <div class="gr-cap-row">
-                    <span class="gr-cap-crease"><span>Knick</span><b>4</b></span>
-                    <div class="gr-cap-center">
-                      <small>Zentrierung <span>– Rand ungleich breit</span></small>
-                      <ol class="gr-center-scale">
-                        <% centeringScale.forEach((c) => { %><li title="<%= c.fromLabel %> bis einschließlich <%= c.toLabel %>"><span><%= c.fromLabel %>–</span><span><%= c.toLabel %></span><b><%= c.cap %></b></li><% }) %>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-              </li>
-              <li class="gr-flow-step">
-                <span class="gr-flow-num">2</span>
-                <div class="gr-flow-body">
-                  <span class="gr-flow-title">Davon abziehen <small>je Mangel</small></span>
-                  <ul class="gr-minus-list">
-                    <li>Kratzer <b>−1</b></li>
-                    <li>Bestoßene Ecke <b>−1</b></li>
-                    <li>Kantenmacke <b>−1</b></li>
-                  </ul>
-                </div>
-              </li>
-              <li class="gr-flow-step is-result">
-                <span class="gr-flow-num">3</span>
-                <div class="gr-flow-body"><span class="gr-flow-title">= Note <small>mindestens 1</small></span></div>
-              </li>
+    <%# Schneidematte: genau eine Hauptaktion %>
+    <section class="gd-mat <%= openJob ? 'is-work' : !shop.code ? 'is-name' : canTake ? 'is-mail' : 'is-closed' %>" data-tour="matte" aria-label="Werkbank">
+      <span class="gd-mat-step" aria-hidden="true"><i class="gd-step">2</i> Werkbank</span>
+      <% if (openJob) { %>
+        <div class="gd-mat-row">
+          <% if (openJob.card) { %><img class="gd-mat-card r-<%= openJob.card.rarity %>" src="<%= openJob.card.image %>" alt="" width="150" height="210"><% } %>
+          <div class="gd-mat-text">
+            <h2><%= openJob.card ? openJob.card.name : 'Karte' %></h2>
+            <span class="gd-mat-who">für <%= openJob.customer %><% if (openJob.price) { %> · <b>+<%= euro(openJob.price) %></b><% } else { %> · Lohn je Schritt<% } %></span>
+            <% if (openJob.services) { %><%- include('partials/grading-services', { sv: openJob.services }) %><% } %>
+            <ol class="gd-phases" aria-label="Arbeitsschritte">
+              <% openJob.steps.forEach((st, i) => { const state = i <= lastDone ? 'is-done' : st === activeStep ? 'is-now' : ''; %>
+                <li class="<%= state %>"><%= state === 'is-done' ? '✓ ' : '' %><%= STEP[st] ? STEP[st][0] : st %></li>
+              <% }) %>
             </ol>
-            <div class="gr-grades" data-gr-grades>
-              <% for (let g = 1; g <= 10; g++) { %><button type="button" class="gr-grade" data-grade="<%= g %>"><%= g %></button><% } %>
-            </div>
-            <div class="gr-row gr-grade-row">
-              <span class="gr-note">Exakt +<%= euro(pay.grade) %> · um 1 daneben +<%= euro(pay.grade / 2) %></span>
-              <button type="button" class="btn btn-primary" data-gr-grade-ok disabled>Note abgeben</button>
-            </div>
-            <div class="gr-result">
-              <div class="gr-verdict" data-gr-verdict hidden></div>
-              <button type="button" class="btn btn-primary" data-gr-grade-next hidden>Weiter</button>
-            </div>
+            <a class="gd-go" href="/grading/werkbank">Weiter: <%= STEP[activeStep] ? STEP[activeStep][1] : 'Arbeiten' %> ▶</a>
+            <% if (acceptedJobs.length > 1) { %><a class="gd-mat-more" href="<%= hubUrl('auftraege') %>&ord=angenommen" data-gd-open="auftraege" data-gd-open-tab="angenommen">+<%= acceptedJobs.length - 1 %> weitere angenommen</a><% } %>
           </div>
-          <% } %>
-
-          <% if (jobData.steps.includes('slab')) { %>
-          <div class="gr-panel" data-gr-panel="slab" hidden>
-            <p class="gr-text">Stoppe den Regler möglichst genau in der Mitte – so sitzt die Karte gerade im Slab <span class="gr-note">(bis +<%= euro(pay.slab) %>)</span>.</p>
-            <div class="gr-row">
-              <div class="gr-meter" data-gr-meter><span class="gr-meter-zone"></span><span class="gr-meter-needle" data-gr-needle></span></div>
-              <button type="button" class="btn btn-primary" data-gr-seal>Versiegeln</button>
-            </div>
-            <p class="gr-seal-result" data-gr-seal-result></p>
-          </div>
-          <% } %>
-
-          <form method="post" action="/grading/zuruecksenden" class="gr-panel" data-gr-panel="send" data-gr-send hidden>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="clean" value="">
-            <input type="hidden" name="seal" value="">
-            <div class="gr-row">
-              <p class="gr-text"><b>Fertig!</b> Die Karte ist bereit für <%= jobData.customer %>.</p>
-              <button class="btn btn-primary btn-lg gr-glow" type="submit">An <%= jobData.customer %> zurückschicken</button>
-            </div>
-          </form>
-        </section>
-      <% } else { %>
-        <section class="gr-empty">
-          <% if (used < limit) { %>
-            <h2>Neuer Auftrag?</h2>
-            <p>Im Briefkasten warten noch <b><%= limit - used %></b> Karten auf dich.</p>
+        </div>
+      <% } else if (!shop.code) { %>
+        <form method="post" action="/grading/name" class="gd-namecard">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <h2>Wie heißt dein Shop?</h2>
+          <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" placeholder="Günthers Klinik" required></label>
+          <label class="field"><span>Kürzel – steht auf jedem Slab</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
+          <label class="field"><span>Slogan (optional)</span><input type="text" name="slogan" maxlength="<%= shopSloganMax %>" placeholder="Jede Karte verdient eine zweite Chance"></label>
+          <button class="gd-go" type="submit">Shop eröffnen ▶</button>
+        </form>
+      <% } else if (canTake) { %>
+        <div class="gd-mat-row">
+          <span class="gd-envelope<%= nextOrder && nextOrder.services.express ? ' is-express' : '' %>" aria-hidden="true">
+            <% if (nextOrder && nextOrder.cardInfo) { %><img class="gd-mat-card r-<%= nextOrder.cardInfo.rarity %>" src="<%= nextOrder.cardInfo.image %>" alt="" width="150" height="210"><% } else { %><%- img('scroll', 136, 'gd-mat-icon') %><% } %>
+            <% if (nextOrder && nextOrder.services.express) { %><span class="gd-envelope-stamp">EXPRESS</span><% } %>
+          </span>
+          <div class="gd-mat-text">
+            <% if (nextOrder) { %>
+              <h2><%= nextOrder.cardInfo ? nextOrder.cardInfo.name : nextOrder.card %></h2>
+              <span class="gd-mat-who">von <%= nextOrder.ownerName %> · <b>+<%= euro(nextOrder.price) %></b></span>
+              <%- include('partials/grading-services', { sv: nextOrder.services }) %>
+            <% } else { %>
+              <h2>Neuer Auftrag</h2>
+              <span class="gd-mat-who">Noch <%= limit - used %> heute · Lohn je Schritt</span>
+            <% } %>
             <form method="post" action="/grading/auftrag">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="btn btn-primary btn-lg gr-glow" type="submit">Nächsten Auftrag annehmen</button>
+              <button class="gd-go" type="submit">Auftrag annehmen ▶</button>
             </form>
-          <% } else { %>
-            <h2>Feierabend!</h2>
-            <p>Alle <%= limit %> Aufträge für heute sind erledigt. Morgen ab <%= bonusTime %> Uhr kommen neue.</p>
-          <% } %>
-        </section>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="gd-mat-row">
+          <span class="gd-mug" aria-hidden="true"><%- img('clock', 136, 'gd-mat-icon') %></span>
+          <div class="gd-mat-text">
+            <h2>Feierabend</h2>
+            <span class="gd-mat-who">Neue Aufträge ab <%= bonusTime %> Uhr<% if (waiting) { %> · <%= waiting %> im Eingang<% } %></span>
+          </div>
+        </div>
       <% } %>
+    </section>
 
-      <% if (doneCards.length) { %>
-        <section class="gr-done-wrap">
-          <h2>Heute erledigt</h2>
-          <ul class="gr-done">
-            <% doneCards.forEach((j) => { %>
-              <li class="<%= j.cardInfo ? 'r-' + j.cardInfo.rarity : '' %>">
-                <span class="gr-done-thumb"><% if (j.cardInfo) { %><img src="<%= j.cardInfo.image %>" alt="" width="36" height="50" loading="lazy"><% } %></span>
-                <span class="gr-done-info">
-                  <span><b><%= j.cardInfo ? j.cardInfo.name : j.card %></b> <span class="gr-dim">für <%= j.customer %></span></span>
-                  <span class="gr-done-meta">
-                    <% if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } %>
-                    <% if (j.seal !== null) { %><span> · Versiegelung <%= j.seal %> %</span><% } %>
-                    <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
-                  </span>
-                </span>
-                <b class="gr-pay">+<%= euro(j.pay) %></b>
-              </li>
-            <% }) %>
-          </ul>
-        </section>
+    <a data-tip="<%= bons.length ? bons.length + ' heute erledigt' : 'noch keiner heute' %>" class="gd-obj gd-spike" href="<%= hubUrl('bons') %>" data-gd-open="bons" data-tour="spiess" aria-label="Kassenzettel: heute <%= bons.length %> erledigt, <%= euro(earnedToday) %>">
+      <%- slot('book', bons.length ? badge(bons.length, bons.length + ' heute erledigt', ' is-count') : '', ' data-gd-spike') %>
+      <span class="gd-tag"><b><i class="gd-step">3</i> Bons</b></span>
+    </a>
+
+    <%# ---------- Unter dem Ablauf, nach Spalten gegliedert wie ① Annahme · ② Arbeit · ③ Ergebnis: je Spalte ein mittleres und ein kleines Objekt ---------- %>
+    <div class="gd-cell gd-cell-l"><%# Annahme: Preise (was Kunden zahlen) und Einreichen (eigene Karten wegschicken) %>
+      <a data-tip="<%= players ? 'ab ' + euro(priceFrom).replace(/,00\s?€/, ' €') + ' mit Slab' : 'ab Stufe ' + orderLevel %>" class="gd-obj is-t2 gd-clip<%= players ? '' : ' is-locked' %>" href="<%= hubUrl('preise') %>" data-gd-open="preise" data-tour="preise" aria-label="Preise<%= players ? ': ab ' + euro(priceFrom) + ' für Reinigung und Slab' : ': ab Stufe ' + orderLevel %>">
+        <%- slot('coin', players ? '' : img('key', 34, 'gd-art-lock')) %>
+        <span class="gd-tag"><b>Preise</b></span>
+      </a>
+      <a data-tip="bei anderem Shop" class="gd-obj is-t3 gd-box" href="/grading/einreichen" data-tour="karton" aria-label="Eigene Karte bei einem anderen Shop graden lassen">
+        <%- slot('chest') %>
+        <span class="gd-tag"><b>Einreichen</b></span>
+      </a>
+    </div>
+    <div class="gd-cell gd-cell-c"><%# Arbeit: Werkstatt (Werkzeuge, Ausbau) und Bügeln (eigene Karten) %>
+      <a data-tip="<%= shopStatus %>" class="gd-obj is-t2 gd-roll" href="<%= hubUrl('werkstatt') %>" data-gd-open="werkstatt" data-tour="werkstatt" aria-label="Werkstatt: <%= shopStatus %>">
+        <%- slot('hammer', attention.upgrade || attention.tool ? badge('!', shopStatus) : '') %>
+        <span class="gd-tag"><b>Werkstatt</b></span>
+      </a>
+      <% if (ironable.length) { %>
+        <a data-tip="<%= ironable.length %> mit Knick" class="gd-obj is-t3 gd-iron" href="<%= hubUrl('buegeln') %>" data-gd-open="buegeln" data-tour="buegeln" aria-label="Eigene Karten bügeln: <%= ironable.length %> mit Knick">
+          <%- slot('fire', badge(ironable.length, ironable.length + ' Karten mit Knick')) %>
+          <span class="gd-tag"><b>Bügeln</b></span>
+        </a>
       <% } %>
     </div>
+    <div class="gd-cell gd-cell-r"><%# Ergebnis: Bewertungen und Erfolge %>
+      <a data-tip="<%= r && r.stars != null ? '★ ' + fmtStars(r.stars) + ' · ' + r.starCount + (newReviews ? ' · ' + newReviews + ' neu' : '') : 'noch keine' %>" class="gd-obj is-t2 gd-phone" href="<%= hubUrl('bewertungen') %>" data-gd-open="bewertungen" data-tour="handy" aria-label="Bewertungen: <%= r && r.stars != null ? fmtStars(r.stars) + ' Sterne aus ' + r.starCount : 'noch keine' %><%= newReviews ? ', ' + newReviews + ' neu' : '' %>">
+        <%- slot('heart', newReviews ? badge(newReviews, newReviews + (newReviews === 1 ? ' neue Bewertung' : ' neue Bewertungen')).replace('<span class="gd-badge"', '<span class="gd-badge" data-gd-new-reviews') : '') %>
+        <span class="gd-tag"><b>Bewertungen</b></span>
+      </a>
+      <% if (milestones.length) { %>
+        <a data-tip="<%= milesDone %> von <%= milestones.length %>" class="gd-obj is-t3 gd-cup" href="<%= hubUrl('meilensteine') %>" data-gd-open="meilensteine" data-tour="meilensteine" aria-label="Erfolge: <%= milesDone %> von <%= milestones.length %>">
+          <%- slot('medal') %>
+          <span class="gd-tag"><b>Erfolge</b></span>
+        </a>
+      <% } %>
+    </div>
+  </div>
 
-    <aside class="gr-side">
-      <section class="gr-shop">
-        <p class="gr-kicker">Stufe <%= info.level %></p>
-        <h2><%= info.name %></h2>
-        <dl class="gr-facts">
-          <dt>Aufträge pro Tag</dt><dd><%= info.jobs %></dd>
-          <dt>Erledigt insgesamt</dt><dd><%= shop.jobsDone %></dd>
-          <dt>Verdient insgesamt</dt><dd><%= euro(shop.earned) %></dd>
-          <dt>Vertrag</dt><dd><%= locked ? 'bis ' + date(shop.lockedUntil) : 'kündbar' %></dd>
-        </dl>
-      </section>
+  <%# ================= Fenster ================= %>
 
-      <section class="gr-tree-wrap">
-        <p class="gr-label">Ausbau</p>
-        <ol class="gr-tree">
-          <% levels.forEach((l) => { const done = l.level <= info.level; %>
-            <li class="<%= done ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>">
-              <span class="gr-tree-dot"><%= done ? '✓' : l.level %></span>
-              <span class="gr-tree-body">
-                <span class="gr-tree-name"><%= l.name %><% if (l.cost) { %><span><%= euro(l.cost) %></span><% } %></span>
-                <span class="gr-tree-perk"><%= l.perk %></span>
-              </span>
-            </li>
-          <% }) %>
-        </ol>
-        <% if (next) { %>
-          <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen für <%= euro(next.cost) %></button>
-            <p class="muted small">Danach heute noch einmal <%= next.jobs %> Aufträge.</p>
-          </form>
-        <% } %>
-      </section>
-
-      <% if (locked) { %>
-        <p class="gr-note gr-side-note">Kündigen möglich ab <%= date(shop.lockedUntil) %></p>
+  <%# Eingang: Warteschlange der Mitglieder-Aufträge %>
+  <dialog class="<%= popCls %> gd-pop-wide" data-gd-sheet="auftraege" aria-labelledby="gd-auftraege-t">
+    <%- sheetHead('auftraege', 'Eingang') %>
+    <div class="gd-sheet-body">
+      <% if (!shop.code) { %>
+        <p class="gd-locked"><%- img('key', 72) %> Erst den Shop eröffnen</p>
       <% } else { %>
-        <form method="post" action="/grading/kuendigen" class="gr-side-note" data-confirm="Wirklich kündigen? Ab morgen gibt es wieder den Tagesbonus.">
+        <%# ab Stufe 1: Laufkundschaft annehmen, auswählen, abbrechen – Karten von Mitgliedern erst ab orderLevel %>
+        <%- include('partials/grading-desk/auftraege', {
+          queue: queue.map((o) => ({ ...o, lines: linesOf(o.priceParts, true) })),
+          jobs: acceptedJobs,
+          max: maxAccepted,
+          labels: Object.fromEntries(Object.entries(STEP).map(([k, v]) => [k, v[0]])),
+          history: histBons,
+          slabs,
+          players,
+          orderLevel,
+          member: { used: playerUsed, limit: playerLimit },
+          npc: { left: Math.max(0, limit - used), limit, ok: used < limit },
+          days: { normal: orderDays, express: expressDays },
+          img,
+          csrfToken,
+        }) %>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Kassenzettel: heute erledigt, darunter ältere Mitglieder-Aufträge %>
+  <dialog class="<%= popCls %>" data-gd-sheet="bons" aria-labelledby="gd-bons-t">
+    <%- sheetHead('bons', 'Kassenzettel') %>
+    <div class="gd-sheet-body">
+      <p class="gd-sum-line"><span>Heute</span><b><%= euro(earnedToday) %></b></p>
+      <% if (bons.length) { %>
+        <ul class="gd-bons"><% bons.forEach((b) => { %><%- include('partials/grading-desk/bon', { b }) %><% }) %></ul>
+      <% } else { %>
+        <p class="gd-empty"><%- img('book', 72) %> Noch kein Bon</p>
+      <% } %>
+      <% if (history.length) { %>
+        <h3 class="gd-sheet-sub">Mitglieder</h3>
+        <ul class="gd-bons">
+          <% histBons.forEach((b) => { %>
+            <%- include('partials/grading-desk/bon', { b }) %>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Bewertungen %>
+  <dialog class="<%= popCls %>" data-gd-sheet="bewertungen" aria-labelledby="gd-bewertungen-t">
+    <%- sheetHead('bewertungen', 'Bewertungen') %>
+    <div class="gd-sheet-body">
+      <% if (r) { %>
+        <div class="gd-review-facts">
+          <div class="gd-kpi" title="Durchschnitt aus Sauberkeit, Versiegelung und – wenn gebügelt – Glätte deiner erledigten Aufträge. Je höher, desto mehr Ruf pro Auftrag.">
+            <span class="gd-kpi-label">Arbeitsqualität</span>
+            <b class="gd-kpi-num"><%= r.quality != null ? Math.round(r.quality) + ' %' : '–' %></b>
+          </div>
+          <div class="gd-kpi" title="Anteil der Aufträge, bei denen deine Note-Schätzung genau stimmte. Gezählt werden nur Aufträge, bei denen du getippt hast.">
+            <span class="gd-kpi-label">Noten getroffen</span>
+            <b class="gd-kpi-num"><%= r.hitRate != null ? Math.round(r.hitRate) + ' %' : '–' %></b>
+          </div>
+          <div class="gd-kpi">
+            <span class="gd-kpi-label">Aufträge</span>
+            <b class="gd-kpi-num"><%= shop.jobsDone %></b>
+          </div>
+        </div>
+        <div class="gd-phone-screen"><%- include('partials/grading-desk/reviews', { r, histogram, reviews }) %></div>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Preise: Festpreise je Baustein im Rahmen aus dem Admin-Panel %>
+  <dialog class="<%= popCls %>" data-gd-sheet="preise" aria-labelledby="gd-preise-t">
+    <%- sheetHead('preise', 'Preisliste') %>
+    <div class="gd-sheet-body">
+      <% if (players) { %>
+        <form method="post" action="/grading/preis" class="form gd-prices" data-gh-prices>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('preise') %>
+          <% services.forEach((sv) => { const pr = servicePrice[sv.key]; %>
+            <label class="gd-price-row"><span><%= sv.label %><small><%= euro(pr.min) %> – <%= euro(pr.max) %></small></span>
+              <input type="text" name="<%= sv.key %>" inputmode="decimal" value="<%= (shopPrices[sv.key] / 100).toFixed(2).replace('.', ',') %>" data-min="<%= pr.min %>" data-max="<%= pr.max %>" required aria-label="<%= sv.label %> in Euro"></label>
+          <% }) %>
+          <div class="gs-shop gh-preview" aria-label="So sehen Kunden dich">
+            <span class="gs-shop-head"><b><%= shop.name %></b> <span class="gr-shop-code"><%= shop.code %></span></span>
+            <span class="gs-shop-price"><b data-gh-sum><%= euro(shopPrices.base + shopPrices.slab) %></b> Reinigung + Slab</span>
+            <span class="gs-shop-list muted small">mit Bügeln <b data-gh-sum-iron><%= euro(shopPrices.base + shopPrices.iron + shopPrices.slab) %></b> · Express +<span data-gh-express><%= euro(shopPrices.express) %></span></span>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Speichern</button>
+        </form>
+      <% } else { %>
+        <p class="gd-locked"><%- img('key', 72) %> Ab Stufe <%= orderLevel %></p>
+      <% } %>
+    </div>
+  </dialog>
+
+  <%# Werkstatt: Ausbau, Werkzeuge, Shop, Vertrag %>
+  <dialog class="<%= popCls %> gd-pop-xl" data-gd-sheet="werkstatt" aria-labelledby="gd-werkstatt-t">
+    <%- sheetHead('werkstatt', 'Werkstatt') %>
+    <div class="gd-sheet-body">
+     <div class="gd-wk">
+      <div class="gd-wk-col">
+      <h3 class="gd-sheet-sub">Shop</h3>
+      <form method="post" action="/grading/name" class="form gd-shopform">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <%- tabInput('werkstatt') %>
+        <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" value="<%= shop.name %>" required></label>
+        <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
+        <label class="field"><span>Slogan – steht in der Shop-Ansicht</span><input type="text" name="slogan" maxlength="<%= shopSloganMax %>" value="<%= shop.slogan || '' %>" placeholder="Jede Karte verdient eine zweite Chance"></label>
+        <button class="btn btn-sm" type="submit">Speichern</button>
+        <% if (shop.codeRequest) { %><p class="small">⏳ <b><%= shop.codeRequest.code %></b> wartet auf Freigabe</p><% } %>
+      </form>
+      <dl class="gr-facts">
+        <dt>Aufträge/Tag</dt><dd<% if (players) { %> title="<%= info.jobs %> Laufkundschaft + <%= playerLimit %> Mitglieder"<% } %>><%= info.jobs %><% if (players) { %> + <%= playerLimit %><% } %></dd>
+        <dt>Erledigt</dt><dd><%= shop.jobsDone %> · <%= euro(shop.earned) %></dd>
+        <dt>Vertrag</dt><dd<% if (locked) { %> title="gebunden bis <%= date(shop.lockedUntil) %>"<% } %>><%= locked ? 'bis ' + dayDate(shop.lockedUntil) : 'kündbar' %></dd>
+      </dl>
+      <% if (!locked) { %>
+        <form method="post" action="/grading/kuendigen" data-confirm="Wirklich kündigen? Ab morgen gibt es wieder den Tagesbonus.">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button class="btn btn-ghost btn-sm" type="submit">Kündigen</button>
         </form>
       <% } %>
-    </aside>
-  </div>
+
+      </div>
+      <div class="gd-wk-col">
+      <h3 class="gd-sheet-sub">Ausbau</h3>
+      <ol class="gr-tree">
+        <% levels.forEach((l) => { const done = l.level <= info.level; %>
+          <li class="<%= done ? 'is-done' : '' %> <%= next && l.level === next.level ? 'is-next' : '' %>" title="<%= l.perk %>">
+            <span class="gr-tree-dot"><%= done ? '✓' : l.level %></span>
+            <span class="gr-tree-body">
+              <span class="gr-tree-name"><%= l.name %><% if (l.cost) { %><span><%= euro(l.cost) %></span><% } %></span>
+              <span class="gr-tree-perk"><%= l.perk %></span>
+            </span>
+          </li>
+        <% }) %>
+      </ol>
+      <% if (next) { %>
+        <form method="post" action="/grading/ausbauen" data-confirm="Für <%= euro(next.cost) %> auf Stufe <%= next.level %> („<%= next.name %>“) ausbauen?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('werkstatt') %>
+          <button class="btn btn-primary btn-block" type="submit" <%= currentUser.balance < next.cost ? 'disabled' : '' %>>Ausbauen · <%= euro(next.cost) %></button>
+        </form>
+      <% } %>
+
+      </div>
+      <div class="gd-wk-col">
+      <h3 class="gd-sheet-sub">Werkzeuge</h3>
+      <ul class="gh-tools">
+        <% tools.forEach((t) => { %>
+          <li class="gh-tool<%= t.owned ? ' is-owned' : '' %><%= !t.available ? ' is-locked' : '' %>" title="<%= t.name %>: <%= t.perk %>">
+            <span class="gh-tool-icon" aria-hidden="true"><%- img({ tuch: 'fabric', schablone: 'mirror', eisen: 'fire', uv: 'torch' }[t.key], 34) %></span>
+            <span class="gh-tool-text"><b><%= t.name %></b><small><%= t.perk %></small></span>
+            <% if (t.owned) { %>
+              <span class="gh-tool-state">✓</span>
+            <% } else if (!t.available) { %>
+              <span class="gh-tool-state"><%- img('key', 16, 'gd-inline') %> Stufe <%= t.level %></span>
+            <% } else { %>
+              <form method="post" action="/grading/werkzeug" data-confirm="<%= t.name %> für <%= euro(t.cost) %> kaufen?">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <%- tabInput('werkstatt') %>
+                <input type="hidden" name="tool" value="<%= t.key %>">
+                <button class="btn btn-sm" type="submit" <%= currentUser.balance < t.cost ? 'disabled' : '' %>><%= euro(t.cost) %></button>
+              </form>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+      </div>
+      <%# Material: leere Slabs kaufen – jeder Auftrag mit „Benoten + Slab“ verbraucht einen (src/items, gradingService.NO_SLAB) %>
+      <% if (players) { %>
+      <section class="gd-wk-col gd-stock" aria-label="Material">
+        <h3 class="gd-sheet-sub">Material</h3>
+        <div class="gd-stock-card">
+          <img class="gd-stock-img" src="<%= slabShop.image %>" alt="" width="56" height="78" loading="lazy">
+          <div class="gd-stock-text">
+            <b>Leerer Slab</b>
+            <small>Das Gehäuse zum Versiegeln – jede Versiegelung verbraucht einen, auch bei Laufkundschaft.</small>
+          </div>
+        </div>
+        <dl class="gr-facts">
+          <dt>Auf Lager</dt><dd data-gd-stock-free><%= slabs.free %></dd>
+          <dt>Für Aufträge reserviert</dt><dd title="Angenommene und wartende Aufträge mit „Benoten + Slab“"><%= slabs.free - slabs.left %></dd>
+          <dt>Noch frei für neue</dt><dd><%= slabs.left %></dd>
+        </dl>
+        <form method="post" action="/grading/slabs-kaufen" class="gd-stock-buy" data-gd-qty data-price="<%= slabShop.price %>" data-label="Leere Slabs" data-confirm="1× Leerer Slab für <%= euro(slabShop.price) %> kaufen?">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <%- tabInput('werkstatt') %>
+          <span class="gd-qty" role="group" aria-label="Anzahl">
+            <button type="button" data-gd-qty-step="-1" aria-label="Einen weniger">−</button>
+            <input type="number" name="count" min="1" max="<%= slabShop.max %>" value="1" inputmode="numeric" aria-label="Anzahl">
+            <button type="button" data-gd-qty-step="1" aria-label="Einen mehr">+</button>
+          </span>
+          <button class="btn btn-primary" type="submit" data-gd-qty-submit <%= currentUser.balance < slabShop.price ? 'disabled' : '' %>>Kaufen · <span data-gd-qty-total><%= euro(slabShop.price) %></span></button>
+        </form>
+        <p class="small gd-stock-note">Zu <%= euro(slabShop.price) %> das Stück. Auch im <a href="/handel">Handel</a> von anderen Mitgliedern zu haben; die Bank kauft einen leeren Slab für <%= euro(slabShop.sell) %> zurück.</p>
+      </section>
+      <% } %>
+      <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.max(0, Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min))) : 0; const pct = Math.min(100 - 50 / nT, 50 / nT + (ti + prog) * (100 / nT)); const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast', 'Weltruhm']; %>
+      <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: Stimmt deine Note, gibt es +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine. Eine Note daneben ändert nichts, weiter daneben kostet <%= repRules.penalty %> je Punkt über 1. Aufträge ohne Benoten zählen nur halb, ein angenommener Auftrag von einem Mitglied, der abläuft, kostet <%= repRules.expiry %>, ±<%= repRules.star %> je Stern über oder unter 3. Ohne Auftrag verfällt der Ruf nach <%= repRules.grace %> Tagen (1 % je Tag, nie unter <%= repRules.floor %>).">
+        <h3 class="gd-sheet-sub">Ruf</h3>
+        <div class="gd-rep-mast" role="progressbar" aria-label="Ruf: <%= tier.label %>" aria-valuenow="<%= Math.round(r.reputation) %>" aria-valuemin="0" aria-valuemax="<%= repTiers[nT - 1].min %>" style="--rep-pct: <%= pct.toFixed(1) %>%">
+          <ol class="gd-rf-list">
+            <% repTiers.forEach((t, k) => { %>
+              <li class="gd-rf gd-rf-<%= k + 1 %><%= k < ti ? ' is-done' : k === ti ? ' is-now' : '' %>" title="<%= nicks[k] || '' %>">
+                <span class="gd-rf-flag">
+                  <span class="gd-rf-art" style="--art: url(/img/grading/ruf-<%= Math.min(k + 1, 5) %>.svg)" aria-hidden="true"></span>
+                  <span class="gd-rf-txt"><b><%= t.label %></b></span>
+                </span>
+              </li>
+            <% }) %>
+          </ol>
+        </div>
+        <p class="gd-rep-next"><% if (tier.next) { %>Noch <b><%= Math.max(0, Math.ceil(tier.next - r.reputation)) %></b> bis <b><%= repTiers[ti + 1].label %></b><% const nx = tierPerks[ti + 1]; if (nx) { const cur = tierPerks[ti]; const gains = [nx.playerJobs > cur.playerJobs ? '+' + (nx.playerJobs - cur.playerJobs) + ' Aufträge/Tag' : '', nx.showcase > cur.showcase ? '+' + (nx.showcase - cur.showcase) + ' Vitrinenplatz' : '', nx.richness > cur.richness ? 'reichere Kundschaft' : ''].filter(Boolean); if (gains.length) { %> <span class="gd-rep-gain"><%= gains.join(' · ') %></span><% } } } else { %><b>Höchste Stufe erreicht</b><% } %></p>
+        <p class="gd-rep-perk"><%= perks.playerJobs %> Aufträge/Tag · <%= perks.showcase %> Vitrinenplätze</p>
+      </section>
+      <% } %>
+     </div>
+    </div>
+  </dialog>
+
+  <%# Eigene Karten mit Knick bügeln %>
+  <% if (ironable.length) { %>
+  <dialog class="<%= popCls %>" data-gd-sheet="buegeln" aria-labelledby="gd-buegeln-t">
+    <%- sheetHead('buegeln', 'Bügeln') %>
+    <div class="gd-sheet-body">
+      <div class="gd-iron-grid">
+        <% ironable.forEach((x) => { %>
+          <form method="post" action="/grading/eigene/<%= x.id %>/start" class="gd-iron-item r-<%= x.info.rarity %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" aria-label="<%= x.info.name %> bügeln">
+              <img src="<%= x.info.image %>" alt="" width="90" height="126" loading="lazy">
+              <span><%= x.info.name %></span>
+            </button>
+          </form>
+        <% }) %>
+      </div>
+    </div>
+  </dialog>
+  <% } %>
+
+  <%# Meilensteine %>
+  <% if (milestones.length) { %>
+  <dialog class="<%= popCls %>" data-gd-sheet="meilensteine" aria-labelledby="gd-meilensteine-t">
+    <%- sheetHead('meilensteine', `Erfolge <span class="gr-dim">${milesDone} / ${milestones.length}</span>`) %>
+    <div class="gd-sheet-body">
+      <%# Trophäenregal: je Meilenstein eine Medaille auf dem Brett – erreicht golden, offen dunkel mit Pixelbalken; Beschreibung beim Darüberfahren %>
+      <% const medalIcon = { 'ruhige-hand': 'mirror', 'grading-profi': 'medal', 'gem-mint': 'diamond', 'slab-fabrik': 'chest', 'buegelmeister': 'fire', 'express-profi': 'clock', 'zweite-meinung': 'book', luftdicht: 'torch', 'voll-ausgestattet': 'hammer', feierabend: 'key' }; %>
+      <ul class="gd-trophy">
+        <% milestones.forEach((m) => { const short = m.progress ? (m.progress.text.match(/^[\d.,]+\s*\/\s*[\d.,]+/) || [m.progress.text])[0] : ''; %>
+          <li class="gd-tr<%= m.done ? ' is-done' : '' %>" title="<%= m.text %>">
+            <span class="gd-tr-ribbon" aria-hidden="true"></span>
+            <span class="gd-tr-medal"><%- img(medalIcon[m.key] || 'medal', 40) %></span>
+            <b class="gd-tr-name"><%= m.name %></b>
+            <% if (m.done) { %><span class="gd-tr-state">✓ geschafft</span>
+            <% } else if (m.progress) { %><% const on = m.progress.pct > 0 ? Math.max(1, Math.round(m.progress.pct / 10)) : 0; %><span class="gd-tr-bar" aria-hidden="true"><% for (let n = 0; n < 10; n++) { %><i<%= n < on ? ' class=on' : '' %>></i><% } %></span><small class="gd-tr-count"><%= short %></small>
+            <% } else { %><span class="gd-tr-state is-open">offen</span><% } %>
+          </li>
+        <% }) %>
+        <% for (let i = milestones.length; i % 4; i++) { %><li class="gd-tr is-empty" aria-hidden="true"></li><% } %>
+      </ul>
+      <a class="btn btn-sm gd-tr-all" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Alle Erfolge →</a>
+    </div>
+  </dialog>
+  <% } %>
 <% } %>
 </div>
 
-<script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+<% if (active) { %>
+  <%# Karte groß ansehen: gemeinsamer Zoom mit 3D-Neigung (partials/card-zoom, tcg.js liefert die Neigung, handel.js öffnet ihn) %>
+  <%- include('partials/card-zoom') %>
+  <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/handel.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/grading-desk.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/grading-tour.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/grading-hub.js?v=<%= assetVersion %>" defer></script>
+<% } %>
+<%- include('partials/foil-modal') %>
 <%- include('partials/foot') %>

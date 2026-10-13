@@ -11,6 +11,7 @@ const deviceLogic = require('../device/deviceLogic');
 const deviceService = require('../device/deviceService');
 const activity = require('../stats/activity');
 const { date } = require('../lib/viewHelpers');
+const passwordReset = require('../services/passwordReset');
 
 const router = express.Router();
 
@@ -111,7 +112,13 @@ router.post('/anmelden', authLimiter, async (req, res) => {
   const weiter = safeRedirect(req.body.weiter, '/');
 
   const user = login ? await User.findOne(login.includes('@') ? { email: login } : { usernameLower: login }) : null;
-  const ok = await bcrypt.compare(password, user ? user.passwordHash : DUMMY_HASH);
+  let ok = await bcrypt.compare(password, user ? user.passwordHash : DUMMY_HASH);
+  // Einmal-Code vom Admin (Passwort zurückgesetzt): gilt genau einmal, danach muss ein neues Passwort her
+  let viaCode = false;
+  if (!ok && passwordReset.hasValidCode(user) && passwordReset.looksLikeCode(password)) {
+    viaCode = await bcrypt.compare(passwordReset.normalizeCode(password), user.resetHash);
+    ok = viaCode;
+  }
 
   if (!user || !ok) {
     return res.status(401).render('login', {
@@ -126,6 +133,19 @@ router.post('/anmelden', authLimiter, async (req, res) => {
   const ban = config.adminUsernames.includes(user.usernameLower) ? null : deviceService.userBan(user) || req.deviceBan();
   if (ban) {
     return res.status(403).render('login', { title: 'Anmelden', error: deviceService.banMessage(ban, date), values: { login: str(req.body.login) }, weiter });
+  }
+
+  if (viaCode) {
+    // Code entwerten – nur wenn er noch derselbe ist (zwei gleichzeitige Anmeldungen mit demselben Code: nur eine zählt)
+    const used = await User.updateOne(
+      { _id: user._id, resetHash: user.resetHash },
+      { $set: { resetHash: null, resetExpires: null, mustChangePassword: true } }
+    );
+    if (!used.modifiedCount) {
+      return res.status(401).render('login', { title: 'Anmelden', error: 'Benutzername/E-Mail oder Passwort ist falsch.', values: { login: str(req.body.login) }, weiter });
+    }
+    await startSession(req, user._id);
+    return res.redirect(passwordReset.CHANGE_PATH);
   }
 
   const target = safeRedirect(req.session.loginTarget, '/'); // vor dem Sitzungswechsel lesen
@@ -153,6 +173,27 @@ router.post('/geraet', async (req, res) => {
     }
   }
   res.status(204).end();
+});
+
+// Neues Passwort nach der Anmeldung mit einem Einmal-Code (Passwort vom Admin zurückgesetzt)
+router.get(passwordReset.CHANGE_PATH, (req, res) => {
+  if (!req.user) return res.redirect('/anmelden');
+  if (!req.user.mustChangePassword) return res.redirect('/');
+  res.render('passwort-neu', { title: 'Neues Passwort', error: null });
+});
+
+router.post(passwordReset.CHANGE_PATH, authLimiter, async (req, res) => {
+  if (!req.user) return res.redirect('/anmelden');
+  if (!req.user.mustChangePassword) return res.redirect('/');
+  const password = str(req.body.password);
+  const password2 = str(req.body.password2);
+  let error = null;
+  if (password.length < 8 || password.length > 200) error = 'Das neue Passwort muss mindestens 8 Zeichen lang sein.';
+  else if (password !== password2) error = 'Die Passwörter stimmen nicht überein.';
+  if (error) return res.status(400).render('passwort-neu', { title: 'Neues Passwort', error });
+
+  await User.updateOne({ _id: req.user._id }, { $set: { passwordHash: await bcrypt.hash(password, 12), mustChangePassword: false } });
+  res.redirect('/');
 });
 
 router.post('/abmelden', (req, res, next) => {

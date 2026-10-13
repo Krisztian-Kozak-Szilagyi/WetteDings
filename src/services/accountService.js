@@ -114,8 +114,15 @@ async function deleteAccount({ user, password }) {
 
   const id = user._id;
   const anon = `geloescht-${String(id).slice(-8)}`;
+  let gradingRefunds = [];
+  let gradingDropped = [];
   await inTransaction(async (session) => {
     const opt = { session };
+    // Grading (#204): offene Aufträge an den eigenen Shop gehen samt Geld an die Kunden zurück; eigene eingereichte
+    // Karten verschwinden mit dem Konto – diese Aufträge enden ohne Erstattung
+    const orders = require('../grading/orderService');
+    gradingRefunds = await orders.refundShop(id, session);
+    gradingDropped = await orders.dropOwner(id, session);
     // Vorher-Stand zurückgeben: das restliche Guthaben wird unten als Abgang gebucht
     const old = await User.findOneAndUpdate(
       { _id: id },
@@ -136,7 +143,7 @@ async function deleteAccount({ user, password }) {
           tcgSeen: [],
           tcgLooted: [],
         },
-        $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '' },
+        $unset: { lastBonusDay: '', marketSeenAt: '', packsSeenAt: '', patchSeenAt: '', usernameChangedAt: '', supportConsentAt: '', chatBlocked: '' },
       },
       { ...opt, projection: { balance: 1 } }
     );
@@ -172,6 +179,8 @@ async function deleteAccount({ user, password }) {
       // abgeschlossene Ergebnisse nicht rückwirkend (wie bei den Spielverläufen oben)
       ForumReaction.deleteMany({ user: id }, opt),
       require('../models/Notification').deleteMany({ user: id }, opt),
+      // Chat: eigene Nachrichten, Gesprächsliste und Meldungen
+      require('../chat/chatService').deleteUserData(id, session),
       // Erfolge löschen – nur Einzelstücke bleiben an der neutralen Hülle, damit sie nie ein zweites Mal vergeben werden
       require('../models/Achievement').deleteMany({ user: id, key: { $nin: require('../achievements/list').SPECIAL.map(([k]) => k) } }, opt),
       // Wett-Gruppen: eigene werden aufgelöst, aus fremden tritt das Konto aus
@@ -190,6 +199,10 @@ async function deleteAccount({ user, password }) {
     await DungeonRun.updateMany({ 'members.user': id, status: 'laeuft' }, { $set: { 'members.$[m].user': null, 'members.$[m].reward': 0, 'members.$[m].foil': false, 'members.$[m].bossCard': false } }, { ...opt, arrayFilters: [{ 'm.user': id }] });
   });
   await roles.load();
+  const { notify } = require('./notifyService');
+  const { euro } = require('../lib/viewHelpers');
+  for (const o of gradingRefunds) await notify(o.owner, { area: 'Grading', href: '/grading/einreichen', text: `${o.shopCode} hat geschlossen – du bekommst ${euro(o.price)} zurück.` });
+  for (const o of gradingDropped) await notify(o.shop, { area: 'Grading', href: '/grading', text: `Ein Auftrag ist weggefallen – das Konto des Kunden wurde gelöscht.` });
   // alle Sitzungen dieses Kontos beenden (connect-mongo speichert die Sitzung als JSON-Text)
   await deviceService.forgetUser(id); // Geräte und Mehrfach-Konten-Hinweise
   await require('../moderation/suspicionService').forgetUser(id); // Auffälligkeiten (Manipulationserkennung)

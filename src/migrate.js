@@ -7,8 +7,8 @@ const { migrateTradeDoc } = require('./trade/lines');
 const User = require('./models/User');
 const Ledger = require('./models/Ledger');
 const { LotteryRound } = require('./models/Lottery');
-const { rollCondition, gradeFor } = require('./grading/condition');
-const { GradingJob } = require('./models/Grading');
+const { rollCondition, gradeFor, conditionV3 } = require('./grading/condition');
+const { GradingJob, GradingShop } = require('./models/Grading');
 
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
@@ -27,10 +27,24 @@ async function migrate() {
   await LotteryRound.createIndexes();
   // Erfolge: der eindeutige Index (Mitglied + Erfolg) muss stehen, bevor der erste Erfolg vergeben wird
   await require('./models/Achievement').createIndexes();
-  // Mage Tower: ein Versuch pro Tag – der eindeutige Index muss vor dem ersten Turm-Start stehen
-  await require('./models/Dungeon').TowerAttempt.createIndexes();
+  // Mage Tower: mehrere Läufe pro Tag möglich – der alte Index (ein Versuch pro Tag) muss weg, alte Einträge sind Lauf 1;
+  // der neue eindeutige Index muss vor dem ersten Turm-Start stehen
+  const { TowerAttempt } = require('./models/Dungeon');
+  const towerIdx = await TowerAttempt.collection.indexes().catch(() => []);
+  if (towerIdx.some((i) => i.name === 'user_1_day_1')) {
+    await TowerAttempt.collection.dropIndex('user_1_day_1');
+    console.log('Migration: Mage-Tower-Index user_1_day_1 entfernt.');
+  }
+  await TowerAttempt.collection.updateMany({ n: { $exists: false } }, { $set: { n: 1, esports: false } });
+  await TowerAttempt.createIndexes();
   // eSports: ein Spieler in höchstens einem Team – eindeutiger Index vor dem ersten Beitritt
   await require('./models/Esports').EsportsTeam.createIndexes();
+  // Grading-Shop (#204): Kürzel eindeutig – Index vor dem ersten Benennen
+  await GradingShop.createIndexes();
+  // #204: Festpreise je Baustein statt eines Paketpreises – der alte Preis abzüglich der Standard-Reinigung wird der
+  // Preis für Benoten + Slab (geklemmt wird beim Lesen, orderService.shopPrices)
+  const repriced = await migrateShopPrices();
+  if (repriced) console.log(`Migration: Paketpreis von ${repriced} Grading-Shop(s) auf Bausteinpreise umgestellt.`);
 
   // v1 -> v2: totalJa/totalNein wurden zu einer Options-Liste
   const res = await Bet.collection.updateMany({ options: { $exists: false } }, [
@@ -144,16 +158,34 @@ async function migrate() {
   const regraded = await regradeWithoutTopBottom();
   if (regraded.cards || regraded.jobs) console.log(`Migration: Note ohne Oben/Unten-Zentrierung neu berechnet (${regraded.cards} Karte(n), ${regraded.jobs} Auftrag/Aufträge).`);
 
-  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel)
-  const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null } };
+  // #204: frische Karten haben keine Kratzer und Knicke mehr – unfolierte verlieren sie, folierte bleiben, wie sie sind
+  const v3 = await cleanFreshConditionsV3();
+  if (v3) console.log(`Migration: Zustand von ${v3} Karte(n) auf Version 3 gehoben (ohne Kratzer/Knick, wenn unfoliert).`);
+
+  // Offene Angebote mit foliertem Exemplar: Note wie das Foliendatum an der Position vermerken (Anzeige im Handel).
+  // Nur alte Positionen ohne Feld slab (#204) – neue Folien sind Schutzhüllen, deren Note geheim bleibt
+  const missing = { $elemMatch: { foiledAt: { $ne: null }, grade: null, slab: { $exists: false } } };
   const trades = await Trade.find({ status: 'offen', $or: [{ give: missing }, { want: missing }] }).select('give want').lean();
   if (trades.length) {
     const ids = trades.flatMap((t) => [...t.give, ...t.want].filter((l) => l.foiledAt).map((l) => l.doc || l.copy).filter(Boolean));
     const grades = new Map((await TcgCard.find({ _id: { $in: ids } }).select('condition.grade').lean()).map((d) => [String(d._id), d.condition && d.condition.grade]));
     const withGrade = (l) => (l.foiledAt && l.grade == null ? { ...l, grade: grades.get(String(l.doc || l.copy)) || null } : l);
-    await Trade.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
+    // roh: über das Schema bekämen die Positionen slab: null und gälten danach als Schutzhülle (foilToSlab)
+    await Trade.collection.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: t.give.map(withGrade), want: t.want.map(withGrade) } } } })));
     console.log(`Migration: Note bei ${trades.length} offenen Angebot(en) mit folierter Karte vermerkt.`);
   }
+
+  // #204: Folie wird Schutzhülle (Sleeve, ohne Note) – bisher folierte Karten zeigten ihre Note und werden BfW-Slabs
+  const slabbed = await foilToSlab();
+  if (slabbed.cards || slabbed.damaged || slabbed.trades) console.log(`Migration: ${slabbed.cards} folierte Karte(n) zu BfW-Slabs, ${slabbed.damaged} mit sichtbarem Schaden markiert, ${slabbed.trades} Angebot(e) ergänzt.`);
+  // #204: Ø-Marktpreis – abgeschlossene Geschäfte bekommen ihren Preisbezug (nach foilToSlab: Positionen kennen slab)
+  const priced = await backfillPriceRefs();
+  if (priced) console.log(`Migration: Preisbezug für ${priced} abgeschlossene(s) Geschäft(e) nachgetragen.`);
+  // #204: Slabs bekommen ihre Zertifikatsnummer gespeichert (die Cert-Seite sucht danach)
+  const certs = await backfillSlabCerts();
+  if (certs) console.log(`Migration: Zertifikatsnummer bei ${certs} Slab(s) nachgetragen.`);
+  const coded = await backfillPriceCodes();
+  if (coded) console.log(`Migration: Shop-Kürzel bei ${coded} Slab-Verkauf/-Verkäufen nachgetragen.`);
 
   // #89: Hinweise auf Mehrfach-Konten mit den aktuellen Regeln neu bewerten (baugleiche Geräte im selben WLAN,
   // geteilte Netze wie das Schulnetz)
@@ -169,7 +201,7 @@ async function migrate() {
 async function grantTestItems() {
   const catalog = require('./tcg/catalog');
   const { copyLimit } = require('./game/deck');
-  const items = catalog.CARDS.filter((c) => c.rarity === 'test-item');
+  const items = catalog.TEST_CARDS;
   if (!items.length || !config.adminUsernames.length) return;
   const admins = await User.find({ usernameLower: { $in: config.adminUsernames } }).select('_id').lean();
   let added = 0;
@@ -240,8 +272,131 @@ async function regradeWithoutTopBottom() {
   };
   const tb = { $gt: 55 };
   const cards = await regrade(TcgCard.collection, { foiledAt: null, 'condition.defects.centering.tb': tb }, 'condition.');
-  const jobs = await regrade(GradingJob.collection, { status: 'offen', guess: null, 'defects.centering.tb': tb }, '');
+  const jobs = await regrade(GradingJob.collection, { status: { $in: ['offen', 'angenommen'] }, guess: null, 'defects.centering.tb': tb }, '');
   return { cards, jobs };
 }
 
-module.exports = { migrate, regradeWithoutTopBottom };
+/**
+ * #204: Zustände auf Version 3 heben (conditionV3) – unfolierte Karten ohne Kratzer und Knick, folierte unverändert;
+ * ein Knick, den man auf der Folie sieht, wird als sichtbares creased vermerkt. In Blöcken, idempotent über die
+ * Version (auch im Filter: ein inzwischen erlittener Schaden wird nie überschrieben). Gibt die Zahl der Karten zurück.
+ */
+async function cleanFreshConditionsV3(batch = 1000) {
+  const coll = TcgCard.collection; // roh: condition ist im Schema select: false
+  const old = { 'condition.v': { $lt: 3 } };
+  let done = 0;
+  for (;;) {
+    const docs = await coll.find(old).project({ condition: 1, foiledAt: 1 }).limit(batch).toArray();
+    if (!docs.length) return done;
+    const ops = docs.map((d) => {
+      const condition = conditionV3(d.condition, !!d.foiledAt);
+      return { updateOne: { filter: { _id: d._id, ...old }, update: { $set: { condition, creased: !!condition.defects.crease } } } };
+    });
+    done += (await coll.bulkWrite(ops, { ordered: false })).modifiedCount;
+    if (docs.length < batch) return done;
+  }
+}
+
+/** Sichtbarer Schaden aus den Mängeln (#204): mindestens ein Kratzer oder ein Knick */
+const isDamaged = (defects) => !!defects && ((defects.scratches || []).length > 0 || !!defects.crease);
+
+/**
+ * #204: Bisher folierte Karten zeigten ihre Note auf einem Etikett „BfW GRADING“ – sie werden BfW-Slabs (Note sichtbar,
+ * Wertsteigerung wie bisher). Ab jetzt ist eine neue Folie nur eine Schutzhülle ohne Note. Außerdem: damaged für alle
+ * Karten mit Kratzer oder Knick, und Handelspositionen mit foliertem Exemplar bekommen slab (aus ihrer Note).
+ * Idempotent: Karten mit Feld slab bzw. damaged und Positionen mit slab werden übersprungen. Läuft nach Version 3.
+ */
+async function foilToSlab(batch = 1000) {
+  const coll = TcgCard.collection; // roh: condition ist im Schema select: false
+  let cards = 0;
+  for (;;) {
+    const docs = await coll.find({ foiledAt: { $ne: null }, slab: { $exists: false } }).project({ foiledAt: 1, 'condition.grade': 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    const ops = docs.map((d) => ({ updateOne: { filter: { _id: d._id, slab: { $exists: false } }, update: { $set: { slab: { code: 'BfW', grade: (d.condition && d.condition.grade) || null, at: d.foiledAt } } } } }));
+    cards += (await coll.bulkWrite(ops, { ordered: false })).modifiedCount;
+    if (docs.length < batch) break;
+  }
+  // Neue Folien nach dieser Migration bekommen slab: null (Schema-Default) – nur Karten ohne das Feld sind alte
+  await coll.updateMany({ foiledAt: null, slab: { $exists: false } }, { $set: { slab: null } });
+  let damaged = 0;
+  for (;;) {
+    const docs = await coll.find({ damaged: { $exists: false } }).project({ 'condition.defects.scratches': 1, 'condition.defects.crease': 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    const ops = docs.map((d) => ({ updateOne: { filter: { _id: d._id, damaged: { $exists: false } }, update: { $set: { damaged: isDamaged(d.condition && d.condition.defects) } } } }));
+    await coll.bulkWrite(ops, { ordered: false });
+    damaged += docs.filter((d) => isDamaged(d.condition && d.condition.defects)).length;
+    if (docs.length < batch) break;
+  }
+  const noSlab = { $elemMatch: { foiledAt: { $ne: null }, slab: { $exists: false } } };
+  const trades = await Trade.collection.find({ $or: [{ give: noSlab }, { want: noSlab }] }).project({ give: 1, want: 1 }).toArray();
+  const withSlab = (l) => (l.foiledAt && l.slab === undefined ? { ...l, slab: { code: 'BfW', grade: l.grade == null ? null : l.grade } } : l);
+  if (trades.length) {
+    await Trade.collection.bulkWrite(trades.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { give: (t.give || []).map(withSlab), want: (t.want || []).map(withSlab) } } } })), { ordered: false });
+  }
+  return { cards, damaged, trades: trades.length };
+}
+
+/** #204: priceRef für abgeschlossene Geschäfte ohne das Feld (null = kein sauberer Verkauf). Idempotent. Gibt die Zahl zurück. */
+async function backfillPriceRefs(batch = 1000) {
+  const { priceRefOf } = require('./trade/marketPrice');
+  const coll = Trade.collection;
+  let done = 0;
+  for (;;) {
+    const docs = await coll.find({ status: 'verkauft', priceRef: { $exists: false } }).project({ give: 1, want: 1, price: 1, extraFrom: 1 }).limit(batch).toArray();
+    if (!docs.length) return done;
+    await coll.bulkWrite(docs.map((t) => ({ updateOne: { filter: { _id: t._id, priceRef: { $exists: false } }, update: { $set: { priceRef: priceRefOf(t) || null } } } })), { ordered: false });
+    done += docs.length;
+    if (docs.length < batch) return done;
+  }
+}
+
+/**
+ * #204 Etappe C: Slab-Verkäufe mit Preisbezug, aber ohne Kürzel (vor Etappe C abgeschlossen) bekommen es nachgetragen
+ * (null, wenn verschiedene Shops im Paket waren). Idempotent über das Feld. Gibt die Zahl zurück.
+ */
+async function backfillPriceCodes() {
+  const { priceRefOf } = require('./trade/marketPrice');
+  const coll = Trade.collection;
+  const docs = await coll.find({ 'priceRef.key': /\|slab-/, 'priceRef.code': { $exists: false } }).project({ give: 1, want: 1, price: 1, extraFrom: 1 }).toArray();
+  if (!docs.length) return 0;
+  await coll.bulkWrite(docs.map((t) => ({ updateOne: { filter: { _id: t._id }, update: { $set: { 'priceRef.code': (priceRefOf(t) || {}).code || null } } } })), { ordered: false });
+  return docs.length;
+}
+
+/**
+ * #204: Grading-Shops mit altem Paketpreis (Feld price) bekommen Bausteinpreise – Reinigung zum Standard, der Rest geht
+ * auf Benoten + Slab, Bügeln und Express bleiben beim Standard. Idempotent über das Feld price. Gibt die Zahl zurück.
+ */
+async function migrateShopPrices() {
+  const coll = GradingShop.collection;
+  const docs = await coll.find({ price: { $exists: true } }).project({ price: 1 }).toArray();
+  if (!docs.length) return 0;
+  const base = require('./grading/gradingService').settings.servicePrice.base.def;
+  await coll.bulkWrite(
+    docs.map((d) => ({
+      updateOne: {
+        filter: { _id: d._id },
+        update: Number.isInteger(d.price) ? { $set: { prices: { base: null, iron: null, slab: Math.max(0, d.price - base), express: null } }, $unset: { price: '' } } : { $unset: { price: '' } },
+      },
+    })),
+    { ordered: false }
+  );
+  return docs.length;
+}
+
+/** #204: Slabs ohne gespeicherte Zertifikatsnummer bekommen sie (aus der Exemplar-ID, wie auf dem Etikett). Idempotent. */
+async function backfillSlabCerts(batch = 1000) {
+  const { slabCert } = require('./lib/viewHelpers');
+  const coll = TcgCard.collection;
+  let n = 0;
+  for (;;) {
+    const docs = await coll.find({ slab: { $type: 'object' }, 'slab.cert': { $exists: false } }).project({ _id: 1 }).limit(batch).toArray();
+    if (!docs.length) break;
+    await coll.bulkWrite(docs.map((d) => ({ updateOne: { filter: { _id: d._id }, update: { $set: { 'slab.cert': slabCert(d._id) } } } })), { ordered: false });
+    n += docs.length;
+    if (docs.length < batch) break;
+  }
+  return n;
+}
+
+module.exports = { migrate, migrateShopPrices, backfillSlabCerts, regradeWithoutTopBottom, cleanFreshConditionsV3, foilToSlab, isDamaged, backfillPriceRefs, backfillPriceCodes };

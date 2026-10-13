@@ -1,7 +1,8 @@
 <%#
   Kartenauswahl im Handelsfenster (public/js/handel-neu.js): Karte antippen oder ins Fenster ziehen = eine mehr, "−" = eine weniger.
   Ohne JS stehen die Zahlenfelder unter den Karten. side = 'gib' | 'will' (Feldnamen "gib:<Karte>" = Anzahl,
-  "gib" = "f:<Exemplar>" für folierte Karten), pool = { cards: [{ card, max }], foiled: [...], goods: [{ card, max }], counts },
+  "gib" = "f:<Exemplar>" für einzelne Exemplare – foliert, Slab oder beschädigt, #204),
+  pool = { cards: [{ card, max }] (unfoliert, unbeschädigt), foiled: [...], marked: [...] (beschädigt), goods: [{ card, max }], counts },
   preset = { counts, copies }, own = eigene Sammlung, partnerName = Name des Mitglieds,
   wish = Wunschkarten eines Markt-Angebots (alle Karten; "du hast …" statt Bestand).
 %>
@@ -9,9 +10,19 @@
   const pickRar = (c) => rarityByKey[c.rarity] || { label: '', sell: 0 };
   const wish = !!locals.wish;
   const holds = (x) => (wish ? (x.owned ? 'du hast ' + x.owned : 'fehlt dir') : x.max + (own ? ' frei' : ' im Besitz'));
-  const total = pool.cards.length + pool.foiled.length + pool.goods.length;
-  const present = rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key));
-  const inRarity = (key) => pool.cards.filter((x) => x.card.rarity === key).length + pool.foiled.filter((f) => f.card.rarity === key).length;
+  // Gleiche Kachel-Struktur wie auf dem Markt: Name, Chips (Seltenheit, Zustand, Bestand), Händler- und Marktwert nebeneinander
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const kv = (dealer, list, extra) => {
+    const s = list ? marketAvg(list) : null;
+    const m = s ? (s.avg != null ? { v: s.avg, est: false } : s.est != null ? { v: s.est, est: true } : null) : null;
+    const tip = [s ? marketText(s) : '', extra].filter(Boolean).join(' · ');
+    return `<span class="hb-kv"${tip ? ` title="${esc(tip)}"` : ''}><span><i>Händler</i><b>${euro(dealer)}</b></span>` + (list ? `<span><i>Markt Ø</i><b>${m ? euro(m.v) : '–'}</b>${m && m.est ? '<small>geschätzt</small>' : ''}</span>` : '') + '</span>';
+  };
+  const chip = (text, cls = '') => `<span class="hb-chip${cls ? ' ' + cls : ''}">${esc(text)}</span>`;
+  const marked = pool.marked || [];
+  const total = pool.cards.length + pool.foiled.length + marked.length + pool.goods.length;
+  const present = rarities.filter((r) => pool.cards.some((x) => x.card.rarity === r.key) || pool.foiled.some((f) => f.card.rarity === r.key) || marked.some((m) => m.card.rarity === r.key));
+  const inRarity = (key) => pool.cards.filter((x) => x.card.rarity === key).length + pool.foiled.filter((f) => f.card.rarity === key).length + marked.filter((m) => m.card.rarity === key).length;
   const step = (name, label, max, n) => { %>
     <button type="button" class="hb-minus" data-hb-step="-1" aria-label="Eine <%= label %> weniger">−</button>
     <span class="hb-step">
@@ -29,7 +40,7 @@
       <%- include('mkt-bar', { name: 'hb-' + side, placeholder: own ? 'Eigene Karten suchen' : wish ? 'Wunschkarte suchen' : 'Karten von ' + partnerName + ' suchen', searchAttr: 'hb-search', groups: [
         { attr: 'tcg-filter', title: 'Seltenheit', allCount: total, opts: present.map((r) => ({ key: r.key, label: r.label, count: inRarity(r.key) })) },
       ] }) %>
-      <span class="hb-picker-hint muted small"><%= own ? 'Antippen oder nach oben ins Fenster ziehen' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></span>
+      <details class="help-tip hb-picker-help"><summary aria-label="Hinweis zur Auswahl">?</summary><div class="help-tip-body"><%= own ? 'Antippen oder nach oben ins Fenster ziehen.' : wish ? 'Welche Karten möchtest du dafür? Jedes Mitglied, das sie frei hat, kann sofort tauschen.' : 'Gesperrte Karten gehen auch – ' + partnerName + ' kann erst annehmen, wenn sie frei sind.' %></div></details>
     </div>
     <div class="tcg-grid hb-grid">
       <% pool.goods.forEach((g) => { const n = Math.min(preset.counts[g.card.id] || 0, g.max); %>
@@ -39,7 +50,8 @@
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
           </span>
           <span class="hb-card-name"><%= g.card.name %></span>
-          <span class="hb-card-sub"><%= wish ? 'Gegenstand' : g.max + (own ? ' frei' : ' im Besitz') %> · <%= euro(g.card.sell) %></span>
+          <span class="hb-card-chips"><%- chip('Gegenstand') %><%- chip(wish ? 'Gegenstand' : g.max + (own ? ' frei' : ' im Besitz'), 'is-hold') %></span>
+          <%- kv(g.card.sell, null) %>
           <% step(side + ':' + g.card.id, g.card.name, g.max, n) %>
         </div>
       <% }) %>
@@ -49,17 +61,33 @@
             <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
             <span class="hb-qty" data-hb-badge <%= n ? '' : 'hidden' %>>×<%= n %></span>
           </span>
-          <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub"><%= holds(x) %> · <%= euro(r.sell || 0) %></span>
+          <span class="hb-card-name"><%= c.name %></span>
+          <span class="hb-card-chips"><span class="hb-chip"><span class="tcg-dot"></span><%= r.label %></span><%- chip(holds(x), 'is-hold') %></span>
+          <%- kv(r.sell || 0, [{ card: c.id }], popText({ card: c.id })) %>
           <% step(side + ':' + c.id, c.name, x.max, n) %>
         </div>
       <% }) %>
       <% pool.foiled.forEach((f) => { const c = f.card; const r = pickRar(c); const on = preset.copies.has(f.id); %>
         <label class="tcg-slot hb-card hb-foil r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-name="<%= c.name.toLowerCase() %> foliert" data-label="<%= c.name %> (foliert)" data-image="<%= c.image %>" data-value="<%= f.value %>" data-foil>
           <input type="checkbox" name="<%= side %>" value="f:<%= f.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, foliert am <%= dayDate(f.foiledAt) %>">
-          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, grade: f.grade, center: f.center }) %></span>
-          <span class="hb-card-name"><span class="tcg-dot"></span><%= c.name %></span>
-          <span class="hb-card-sub">Foliert<%= f.grade ? ' · Note ' + f.grade : '' %> · <%= euro(f.value) %><%= f.lock ? ' · gesperrt' : '' %></span>
+          <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: f.slab, id: f.id, center: f.center }) %></span>
+          <span class="hb-card-name"><%= c.name %></span>
+          <span class="hb-card-chips"><span class="hb-chip"><span class="tcg-dot"></span><%= r.label %></span><%- chip(f.slab ? 'Slab ' + f.slab.code + ' · ' + f.slab.grade : 'Sleeve', 'is-state') %><% if (f.lock) { %><%- chip('gesperrt', 'is-lock') %><% } %></span>
+          <%- kv(f.value, [{ card: c.id, foiledAt: f.foiledAt, slab: f.slab }], [popText({ card: c.id, slab: f.slab }), salesText(f.id)].filter(Boolean).join(' · ')) %>
+        </label>
+      <% }) %>
+      <%# Beschädigte Exemplare (#204): einzeln wählbar; die Lupe zeigt Kratzer und Knick (public/js/foil-view.js) %>
+      <% marked.forEach((m) => { const c = m.card; const r = pickRar(c); const on = preset.copies.has(m.id); const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : 'Gebrauchsspuren'; %>
+        <label class="tcg-slot hb-card hb-foil hb-copy r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= c.name.toLowerCase() %> <%= r.label.toLowerCase() %> exemplar" data-label="<%= c.name %> (<%= what %>)" data-image="<%= c.image %>" data-value="<%= m.value %>">
+          <input type="checkbox" name="<%= side %>" value="f:<%= m.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar (<%= what %>)">
+          <span class="tcg-art hb-art">
+            <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+            <% if (m.creased) { %><span class="tcg-crease-tag"><%= m.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+            <button type="button" class="hb-loupe"<%- copyViewAttrs(c, r.label, m.marks, { note: 'Exemplar · ' + what }) %> aria-label="<%= c.name %> genau ansehen" title="Genau ansehen">🔍</button>
+          </span>
+          <span class="hb-card-name"><%= c.name %></span>
+          <span class="hb-card-chips"><span class="hb-chip"><span class="tcg-dot"></span><%= r.label %></span><%- chip(what, 'is-state') %><% if (m.lock) { %><%- chip('gesperrt', 'is-lock') %><% } %></span>
+          <%- kv(m.value, [{ card: c.id, damaged: true }], salesText(m.id)) %>
         </label>
       <% }) %>
     </div>
