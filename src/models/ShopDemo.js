@@ -8,6 +8,10 @@ const shopDemoSchema = new Schema(
     coins: { type: Number, required: true },
     units: { type: Number, required: true },
     nextUid: { type: Number, required: true },
+    nextBid: { type: Number, default: 1 },
+    carry: { type: Number, default: null },
+    prices: { type: Schema.Types.Mixed, default: {} },
+    boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {
         _id: false,
@@ -17,6 +21,7 @@ const shopDemoSchema = new Schema(
         y: Number,
         rot: Number,
         wall: String,
+        stock: Schema.Types.Mixed,
       },
     ],
   },
