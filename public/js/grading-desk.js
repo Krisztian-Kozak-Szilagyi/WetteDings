@@ -328,22 +328,139 @@
     });
   }
 
-  // Vitrine einräumen: höchstens max Slabs ankreuzbar
-  var drawer = document.querySelector('[data-gd-drawer]');
-  if (drawer) {
-    var max = +drawer.getAttribute('data-max');
-    var sync = function () {
-      var boxes = drawer.querySelectorAll('input[name="doc"]');
-      var n = drawer.querySelectorAll('input[name="doc"]:checked').length;
-      boxes.forEach(function (b) {
-        if (b.closest('.is-locked')) return;
-        b.disabled = !b.checked && n >= max;
-      });
-      var head = drawer.closest('dialog').querySelector('h2 .gr-dim');
-      if (head) head.textContent = n + ' / ' + max;
+  // Vitrine am Schreibtisch (ohne Untermenü): ziehen sortiert um, Klick auf eine Karte öffnet „Austauschen / Entfernen“,
+  // Klick auf ein leeres Fach die Auswahl freier Slabs. Jede Änderung geht sofort an den Server (POST /grading/vitrine).
+  var vit = document.querySelector('[data-vit-edit]');
+  if (vit) {
+    var shelf = vit.querySelector('.gd-vit-shelf');
+    var pop = vit.querySelector('[data-vit-pop]');
+    var menuV = pop.querySelector('[data-vit-menu]');
+    var pickV = pop.querySelector('[data-vit-pickview]');
+    var note = vit.querySelector('[data-vit-note]');
+    var vmax = +vit.getAttribute('data-max');
+    var target = null; // das Fach, das gerade getauscht wird (null = ins nächste freie Fach einsetzen)
+    var vitems = function () { return Array.prototype.slice.call(shelf.querySelectorAll('.gd-vit-item[data-id]')); };
+    var say = function (text) {
+      note.textContent = text; note.hidden = false;
+      clearTimeout(say.t); say.t = setTimeout(function () { note.hidden = true; }, 2600);
     };
-    drawer.addEventListener('change', sync);
-    sync();
+    // so viele leere Fächer wie noch frei sind – immer hinter den Slabs
+    var refill = function () {
+      shelf.querySelectorAll('.gd-vit-empty').forEach(function (e) { e.remove(); });
+      var tpl = vit.querySelector('[data-vit-empty]');
+      for (var i = vitems().length; i < vmax; i++) shelf.appendChild(tpl.content.firstElementChild.cloneNode(true));
+      vit.classList.toggle('is-empty', !vitems().length);
+    };
+    var save = function () {
+      var body = new URLSearchParams();
+      body.append('_csrf', vit.getAttribute('data-csrf'));
+      vitems().forEach(function (e) { body.append('doc', e.getAttribute('data-id')); });
+      return fetch('/grading/vitrine', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (!j.ok) throw new Error(j.error || 'Speichern ging schief.'); })
+        .catch(function (err) { say(err.message || 'Speichern ging schief.'); setTimeout(function () { window.location.reload(); }, 1800); });
+    };
+    var closePop = function () { pop.hidden = true; menuV.hidden = true; pickV.hidden = true; target = null; };
+    var openAt = function (view, focusSel) {
+      menuV.hidden = view !== menuV; pickV.hidden = view !== pickV; pop.hidden = false;
+      var f = view.querySelector(focusSel); if (f && !f.closest('[hidden]')) f.focus({ preventScroll: true });
+    };
+    var openPick = function () {
+      var have = vitems().map(function (e) { return e.getAttribute('data-id'); });
+      var shownN = 0;
+      pickV.querySelectorAll('[data-pick-li]').forEach(function (li) {
+        var gone = have.indexOf(li.getAttribute('data-pick-li')) >= 0;
+        li.hidden = gone;
+        if (!gone) shownN++;
+      });
+      pickV.querySelector('.gd-vit-none').hidden = shownN > 0;
+      openAt(pickV, '[data-pick-li]:not([hidden]) button');
+    };
+
+    // ziehen – das Bild-Ziehen des Browsers (Geisterbild) würde sonst die Maus übernehmen und das Ziehen abbrechen
+    shelf.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    var drag = null;
+    var swallow = false;
+    shelf.addEventListener('pointerdown', function (e) {
+      var el = e.target.closest('.gd-vit-item[data-id]');
+      if (!el || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      drag = { el: el, id: e.pointerId, x0: e.clientX, left0: el.offsetLeft, moved: false };
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var shift = function () { return e.clientX - drag.x0 - (drag.el.offsetLeft - drag.left0); };
+      if (!drag.moved) {
+        if (Math.abs(shift()) < 8) return;
+        drag.moved = true;
+        drag.el.classList.add('is-dragging');
+        shelf.classList.add('is-sorting');
+        try { drag.el.setPointerCapture(drag.id); } catch (err) { /* egal */ } // erst beim Ziehen, damit ein einfacher Klick seine Schaltfläche trifft
+        closePop();
+      }
+      drag.el.style.transform = 'translateX(' + shift() + 'px)';
+      var on = vitems();
+      var i = on.indexOf(drag.el);
+      var r = drag.el.getBoundingClientRect();
+      var mid = r.left + r.width / 2;
+      var next = on[i + 1];
+      var prev = on[i - 1];
+      if (next) { var rn = next.getBoundingClientRect(); if (mid > rn.left + rn.width / 2) shelf.insertBefore(drag.el, next.nextSibling); }
+      if (prev) { var rp = prev.getBoundingClientRect(); if (mid < rp.left + rp.width / 2) shelf.insertBefore(drag.el, prev); }
+      drag.el.style.transform = 'translateX(' + shift() + 'px)';
+      var edge = shelf.getBoundingClientRect(); // am Rand weiterscrollen
+      if (e.clientX > edge.right - 40) shelf.scrollLeft += 14; else if (e.clientX < edge.left + 40) shelf.scrollLeft -= 14;
+    });
+    var endDrag = function (e) {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      var d = drag;
+      drag = null;
+      d.el.classList.remove('is-dragging');
+      d.el.style.transform = '';
+      shelf.classList.remove('is-sorting');
+      if (d.moved) { swallow = true; setTimeout(function () { swallow = false; }, 0); if (d.left0 !== d.el.offsetLeft) save(); }
+    };
+    document.addEventListener('pointerup', endDrag);
+    document.addEventListener('pointercancel', endDrag);
+
+    // Klicks: Karte → Menü, leeres Fach → Auswahl
+    vit.addEventListener('click', function (e) {
+      if (swallow) { e.preventDefault(); e.stopPropagation(); return; }
+      var add = e.target.closest('[data-vit-add]');
+      if (add) { target = null; openPick(); return; }
+      var slab = e.target.closest('[data-vit-slab]');
+      if (slab) { target = slab.closest('.gd-vit-item'); openAt(menuV, '[data-vit-act]'); return; }
+      var act = e.target.closest('[data-vit-act]');
+      if (act && target) {
+        if (act.getAttribute('data-vit-act') === 'swap') { menuV.hidden = true; openPick(); return; }
+        target.remove(); closePop(); refill(); save(); return;
+      }
+      var pick = e.target.closest('[data-pick]');
+      if (pick) {
+        var tpl = vit.querySelector('[data-vit-tpl="' + pick.getAttribute('data-pick') + '"]');
+        if (!tpl) return;
+        var node = tpl.content.firstElementChild.cloneNode(true);
+        if (target) target.replaceWith(node);
+        else { var firstEmpty = shelf.querySelector('.gd-vit-empty'); if (firstEmpty) shelf.insertBefore(node, firstEmpty); else shelf.appendChild(node); }
+        closePop(); refill(); save();
+        return;
+      }
+      if (e.target === pop) closePop(); // Klick neben das Menü schließt es
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) { e.stopPropagation(); closePop(); } }, true);
+    // ← → am fokussierten Slab sortiert auch per Tastatur
+    shelf.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var el = e.target.closest && e.target.closest('.gd-vit-item[data-id]');
+      if (!el) return;
+      var on = vitems();
+      var i = on.indexOf(el);
+      var j = i + (e.key === 'ArrowRight' ? 1 : -1);
+      if (j < 0 || j >= on.length) return;
+      e.preventDefault();
+      if (j < i) shelf.insertBefore(el, on[j]); else shelf.insertBefore(el, on[j].nextSibling);
+      var b = el.querySelector('[data-vit-slab]'); if (b) b.focus();
+      save();
+    });
   }
   // Werkstatt › Material: Anzahl wählen (− / +), der Preis rechnet mit und die Rückfrage nennt die Summe
   document.querySelectorAll('[data-gd-qty]').forEach(function (form) {

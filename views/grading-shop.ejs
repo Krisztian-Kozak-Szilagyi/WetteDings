@@ -7,6 +7,7 @@
     <a class="btn btn-ghost btn-sm" href="/grading/einreichen">Alle Shops</a>
   </div>
   <section class="gs-profile">
+    <% if (shop.slogan) { %><p class="gs-slogan"><%= shop.slogan %></p><% } %>
     <p class="gr-rep"><b><%= r.tier.label %></b> · Reputation <%= Math.round(r.reputation) %> · Stufe <%= shop.level %> · von <%= shop.owner %></p>
     <dl class="gr-facts">
       <dt>Bewertung</dt><dd><%= r.stars != null ? '★ ' + r.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' aus ' + r.starCount : 'noch keine' %></dd>

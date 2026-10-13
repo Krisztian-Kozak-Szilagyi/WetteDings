@@ -4,7 +4,7 @@
 <% const sl = locals.slab || (locals.grade ? { code: 'BfW', grade: locals.grade } : null); const ctr = locals.center || null; %>
 <span class="foil-inner <%= sl ? 'is-slab' : 'is-sleeve' %>"<%- ctr ? ` style="--cx: ${ctr.x}; --cy: ${ctr.y}"` : '' %>>
   <span class="foil-face foil-front">
-    <img src="<%= card.image %>" alt="" loading="lazy" width="720" height="1008">
+    <img src="<%= card.image %>" alt="" loading="<%= locals.eager ? 'eager' : 'lazy' %>" decoding="async" width="720" height="1008">
     <span class="foil-sheen" aria-hidden="true"></span>
     <% if (sl) { %>
     <span class="foil-ticket"><span class="gr-slab-info"><strong><%= sl.code || 'BfW' %></strong><span><%= card.name %> · <%= rarityLabel %></span><% const sealed = sl.at || locals.sealedAt; if (locals.id || sealed) { %><span class="gr-slab-certno"><%= [locals.id ? slabCert(locals.id) : '', sealed ? dayDate(sealed) : ''].filter(Boolean).join(' · ') %></span><% } %></span><span class="gr-slab-score"><span class="gr-slab-word"><%= sl.grade ? gradeWord(sl.grade) : '' %></span><span class="gr-slab-grade"><%= sl.grade || '–' %></span></span></span>

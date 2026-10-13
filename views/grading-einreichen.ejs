@@ -47,10 +47,16 @@
                   <option value="queue">Warteschlange</option>
                 </select>
               </label>
+              <label class="ge-sort">Ab Stufe
+                <select data-ge-minrank>
+                  <option value="0">Alle</option>
+                  <% repTiers.slice(1).forEach((t, i) => { %><option value="<%= i + 1 %>"><%= t.label %></option><% }) %>
+                </select>
+              </label>
             </div>
             <div class="gs-shops ge-shops" data-ge-shops>
               <% others.forEach((s, i) => { %>
-                <label class="gs-shop ge-shop" data-prices="<%= JSON.stringify(s.prices) %>" data-code="<%= s.code %>" data-slabs="<%= s.slabs %>" data-rep="<%= Math.round(s.rating.reputation) %>" data-queue="<%= s.queue %>" data-order="<%= i %>">
+                <label class="gs-shop ge-shop" data-prices="<%= JSON.stringify(s.prices) %>" data-code="<%= s.code %>" data-tier="<%= s.rating.tier.index %>" data-slabs="<%= s.slabs %>" data-rep="<%= Math.round(s.rating.reputation) %>" data-queue="<%= s.queue %>" data-order="<%= i %>">
                   <input type="radio" name="shop" value="<%= s.code %>" <%= pick && pick === s.code ? 'checked' : '' %> required>
                   <%
                     const rt = s.rating;
@@ -63,8 +69,9 @@
                     </span>
                     <span class="gs-shop-price"><b data-gs-total><%= euro(s.prices.base + s.prices.slab) %></b><small class="ge-flag" data-ge-flag hidden></small></span>
                   </span>
+                  <% if (s.slogan) { %><span class="ge-shop-slogan"><%= s.slogan %></span><% } %>
                   <span class="ge-shop-sub">
-                    <span class="ge-tier"><%= rt.tier.label %></span>
+                    <span class="ge-tier is-t<%= rt.tier.index %>"><%= rt.tier.label %></span>
                     <span class="ge-stars-line" title="<%= rt.stars != null ? 'Kundenbewertung' : 'noch keine Bewertung' %>"><% if (rt.stars != null) { %>★ <b><%= rt.stars.toLocaleString('de-DE', { maximumFractionDigits: 1 }) %></b> <small>(<%= rt.starCount %>)</small><% } else { %><small>neu, noch keine Bewertung</small><% } %></span>
                     <span class="ge-owner">von <%= s.owner %></span>
                   </span>
@@ -246,6 +253,12 @@
                   <%# Schnell-Tags (#204): erscheinen nach den Sternen – 4–5 Sterne Lob, 1–3 Kritik %>
                   <span class="gs-tags" data-gs-tags data-max="<%= tagMax %>" hidden>
                     <% reviewTags.forEach((t) => { %><label class="gs-tag <%= t.good ? 'is-good' : 'is-bad' %>"><input type="checkbox" name="tags" value="<%= t.key %>"><span><%= t.label %></span></label><% }) %>
+                  </span>
+                  <%# Trinkgeld (optional): geht beim Bewerten direkt an den Shop %>
+                  <span class="gs-tip" role="radiogroup" aria-label="Trinkgeld">
+                    <span class="gs-tip-label">Trinkgeld</span>
+                    <label class="gs-tag"><input type="radio" name="tip" value="0" checked><span>Kein</span></label>
+                    <% tipSteps.forEach((c) => { %><label class="gs-tag is-good"><input type="radio" name="tip" value="<%= c %>" <%= balance < c ? 'disabled' : '' %>><span><%= euro(c) %></span></label><% }) %>
                   </span>
                   <button class="ge-btn ge-btn-sm" type="submit">Bewerten</button>
                 </form>

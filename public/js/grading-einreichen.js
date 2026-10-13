@@ -226,6 +226,11 @@
     });
     if (els.some(function (el, i) { return shopsBox.children[i] !== el; })) els.forEach(function (el) { shopsBox.appendChild(el); });
   }
+  // Filter „ab Stufe“: Shops unterhalb der gewählten Rufstufe ausblenden
+  var rankSel = form.querySelector('[data-ge-minrank]');
+  if (rankSel) rankSel.addEventListener('change', function () {
+    Array.prototype.forEach.call(shopsBox.children, function (el) { el.hidden = +el.getAttribute('data-tier') < +rankSel.value; });
+  });
   var sortSel = form.querySelector('[data-ge-sort]');
   if (sortSel) sortSel.addEventListener('change', function () { sortKey = sortSel.value; sortShops(); });
 

@@ -58,7 +58,7 @@
     const fmtStars = (v) => (v != null ? v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–');
     const starRow = (v) => { const n = Math.round(v || 0); return '★'.repeat(n) + '☆'.repeat(5 - n); };
     const tier = r && r.tier;
-    const repPct = tier ? (tier.next ? Math.min(100, Math.round(((r.reputation - tier.min) / (tier.next - tier.min)) * 100)) : 100) : 0;
+    const repPct = tier ? (tier.next ? Math.max(0, Math.min(100, Math.round(((r.reputation - tier.min) / (tier.next - tier.min)) * 100))) : 100) : 0;
     // Pixel-Icons (34 × 34 px, scharf vergrößert per CSS; public/img/grading, Lizenzen in LICENSES.md)
     const img = (name, w, cls = '') => `<img class="gd-img gd-px${cls ? ' ' + cls : ''}" src="/img/grading/${name}.png" alt="" width="${w}" height="${w}" decoding="async">`;
     // Station im Inventar-Slot: Goldrahmen, dunkler Grund, Icon; extra = Badge bzw. Schlüssel, attrs = zusätzliche Attribute
@@ -74,7 +74,7 @@
     const linesOf = (parts, player) => Object.entries(parts || {}).filter(([k, v]) => v && (player ? svcLabels : npcLabels)[k]).map(([k, v]) => [(player ? svcLabels : npcLabels)[k], v]);
     const bonNote = (j) => [
       j.guess !== null && j.source === 'spieler' ? `Slab ${j.shopCode || ''} · Note ${j.guess}` : j.guess !== null ? `Note ${j.guess}${j.guess === j.grade ? ' ✓' : ' · richtig ' + j.grade}` : j.source === 'spieler' ? 'gebügelt' : '',
-      j.foilFound ? '+ 1 Folie' : '',
+      j.foilFound ? '+ 1 TCG Sleeve' : '',
     ].filter(Boolean).join(' · ');
     const bons = doneCards.map((j) => ({ card: j.cardInfo, title: j.cardInfo ? j.cardInfo.name : j.card, who: j.customer, at: j.doneAt, lines: linesOf(j.parts, j.source === 'spieler'), total: j.pay, note: bonNote(j) }));
     // Mitglieder-Aufträge im Verlauf als Bons (Kassenzettel und Eingang › Erledigt)
@@ -97,7 +97,7 @@
       { key: 'matte', title: 'Hier wird gearbeitet', text: 'Schritt 2: Hier liegt der aktuelle Auftrag. Der Knopf sagt, was als Nächstes dran ist – putzen, bügeln, benoten, versiegeln. Je sauberer und genauer, desto mehr Lohn.' },
       { key: 'eingang', sheet: 'auftraege', title: 'Eingang', text: (players ? `Deine Auftragsverwaltung. Im Eingang wählst du selbst, was du annimmst: Karten von Mitgliedern zu deinen Festpreisen (Express steht oben und ist orange) oder Laufkundschaft. Tipp auf die Karte zeigt sie groß. Nach dem ersten Annehmen hast du ${orderDays} Tage, mit Express ${expressDays}; wartet ein Auftrag zu lange im Eingang oder wirst du nicht rechtzeitig fertig, geht die Karte samt Geld zurück. ` : `Deine Auftragsverwaltung: Hier nimmst du Laufkundschaft an – ab Stufe ${orderLevel} schicken dir auch Mitglieder ihre Karten, zu deinen Preisen. `) + `Reiter „Angenommen“: bis zu ${maxAccepted} Aufträge gleichzeitig. Der aktive (Aktiv-Marke) liegt auf der Werkbank – „Bearbeiten“ öffnet sie, „Auswählen“ macht einen anderen aktiv, sein Fortschritt bleibt erhalten. „Abbrechen“ ` + (players ? 'gibt eine Mitglieder-Karte zurück in den Eingang (die Frist läuft weiter), ein NPC-Auftrag zählt für heute trotzdem. „Erledigt“: der Verlauf. Die echte Note bleibt geheim: auf den Slab kommt deine.' : 'gibt einen Auftrag auf – er zählt für heute trotzdem.') },
       { key: 'spiess', sheet: 'bons', title: 'Kassenzettel', text: 'Jeder erledigte Auftrag landet als Bon auf dem Spieß. Oben zeigt das Kassendisplay, was du heute verdient hast. Antippen eines Bons klappt die einzelnen Posten auf. Darunter stehen ältere Aufträge von Mitgliedern.' },
-      { key: 'vitrine', sheet: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je seltener und besser benotet, desto schneller wächst deine Reputation. In der Schublade setzt du Häkchen bei den Slabs, die in die Vitrine sollen, und speicherst. Ausgestellte Slabs lassen sich nicht handeln. Tippe in der Vitrine einen Slab an, um ihn zu bewundern.' },
+      { key: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je seltener und besser benotet, desto schneller wächst deine Reputation. Ein leeres Fach antippen wählt einen Slab, eine Karte antippen tauscht sie aus oder nimmt sie raus – und ziehen sortiert um. Ausgestellte Slabs lassen sich nicht handeln.' },
       { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen aus dem Admin-Panel. Neue Preise gelten für neue Aufträge, offene behalten ihren Preis. Günstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
       { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte. Gute Bewertungen bringen Reputation – und neue Kunden.' },
       { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `Shop: Name ändern geht frei, ein neues Kürzel muss ein Admin freigeben – ältere Slabs behalten das alte. Ausbau: jede Stufe schaltet neue Arbeitsschritte frei und bringt mehr Lohn; Mauszeiger über eine Stufe zeigt, was sie bringt. Werkzeuge: Komfort am Tisch, ohne Extra-Lohn – Mauszeiger darüber zeigt die Wirkung.${players ? ' Material: Für jeden Auftrag mit „Benoten + Slab“ verbraucht dein Shop einen leeren Slab – hier kaufst du Nachschub (oder im Handel).' : ''} Ruf: wächst mit +${repRules.base} je Auftrag (bei guter Qualität mehr), ×${repRules.player} bei Mitglieder-Aufträgen, ±${repRules.star} je Stern über oder unter 3 und bis +${Math.round(repRules.cap * 100)} % durch Slabs in der Vitrine. Die Fahnen sind die vier Ruf-Stufen, der gelbe Mast füllt sich bis zu deinem Stand.` },
@@ -138,7 +138,7 @@
 
     <%# ---------- Glasvitrine ---------- %>
     <% if (shop.code) { %>
-      <%- include('partials/grading-desk/vitrine', { items: shown, max: showcaseMax, editHref: hubUrl('vitrine') }) %>
+      <%- include('partials/grading-desk/vitrine', { items: shown, max: showcaseMax, editable: true, cands: showcase.filter((x) => !x.lock) }) %>
     <% } %>
 
     <%# ---------- Ablauf: ① Eingang → ② Werkbank → ③ Bons ---------- %>
@@ -172,6 +172,7 @@
           <h2>Wie heißt dein Shop?</h2>
           <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" placeholder="Günthers Klinik" required></label>
           <label class="field"><span>Kürzel – steht auf jedem Slab</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" placeholder="GKK" required></label>
+          <label class="field"><span>Slogan (optional)</span><input type="text" name="slogan" maxlength="<%= shopSloganMax %>" placeholder="Jede Karte verdient eine zweite Chance"></label>
           <button class="gd-go" type="submit">Shop eröffnen ▶</button>
         </form>
       <% } else if (canTake) { %>
@@ -298,36 +299,6 @@
     </div>
   </dialog>
 
-  <%# Vitrine einräumen: Schublade mit allen eigenen Slabs %>
-  <% if (shop.code) { %>
-  <dialog class="<%= popCls %>" data-gd-sheet="vitrine" aria-labelledby="gd-vitrine-t">
-    <%- sheetHead('vitrine', `Vitrine <span class="gr-dim">${shown.length} / ${showcaseMax}</span>`) %>
-    <div class="gd-sheet-body">
-      <% if (showcase.length) { %>
-        <form method="post" action="/grading/vitrine" class="gd-drawer" data-gd-drawer data-max="<%= showcaseMax %>">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <div class="gd-drawer-grid">
-            <% showcase.forEach((s) => { const rl = (rarityByKey[s.rarity] || { label: '' }).label; %>
-              <label class="gd-drawer-item r-<%= s.rarity %><%= s.lock ? ' is-locked' : '' %>" title="<%= s.card.name %><%= s.lock ? ' – gesperrt' : '' %>">
-                <input type="checkbox" name="doc" value="<%= s.id %>" <%= s.shown ? 'checked' : '' %> <%= s.lock ? 'disabled' : '' %> aria-label="<%= s.card.name %>, Note <%= s.slab.grade %><%= s.lock ? ', gesperrt' : '' %>">
-                <span class="foil-card foil-card-slot"><%- include('partials/foil-mini', { card: s.card, rarityLabel: rl, slab: s.slab, id: s.id }) %></span>
-                <% if (s.lock) { %><%- img('key', 32, 'gd-lock') %><% } %>
-              </label>
-            <% }) %>
-          </div>
-          <div class="gd-sheet-actions">
-            <a class="btn btn-ghost btn-sm" href="/grading/shop/<%= shop.code %>">Shop-Seite</a>
-            <button class="btn btn-primary" type="submit">Speichern</button>
-          </div>
-        </form>
-      <% } else { %>
-        <p class="gd-empty"><%- img('diamond', 72) %> Noch kein Slab</p>
-        <a class="btn btn-primary btn-block" href="/grading/einreichen">Karte graden lassen</a>
-      <% } %>
-    </div>
-  </dialog>
-  <% } %>
-
   <%# Bewertungen %>
   <dialog class="<%= popCls %>" data-gd-sheet="bewertungen" aria-labelledby="gd-bewertungen-t">
     <%- sheetHead('bewertungen', 'Bewertungen') %>
@@ -389,6 +360,7 @@
         <%- tabInput('werkstatt') %>
         <label class="field"><span>Name</span><input type="text" name="name" minlength="3" maxlength="<%= shopNameMax %>" value="<%= shop.name %>" required></label>
         <label class="field"><span>Kürzel</span><input type="text" name="code" minlength="2" maxlength="5" pattern="[A-Za-z0-9]{2,5}" autocomplete="off" value="<%= shop.code %>" required></label>
+        <label class="field"><span>Slogan – steht in der Shop-Ansicht</span><input type="text" name="slogan" maxlength="<%= shopSloganMax %>" value="<%= shop.slogan || '' %>" placeholder="Jede Karte verdient eine zweite Chance"></label>
         <button class="btn btn-sm" type="submit">Speichern</button>
         <% if (shop.codeRequest) { %><p class="small">⏳ <b><%= shop.codeRequest.code %></b> wartet auf Freigabe</p><% } %>
       </form>
@@ -479,22 +451,23 @@
         <p class="small gd-stock-note">Zu <%= euro(slabShop.price) %> das Stück. Auch im <a href="/handel">Handel</a> von anderen Mitgliedern zu haben; die Bank kauft einen leeren Slab für <%= euro(slabShop.sell) %> zurück.</p>
       </section>
       <% } %>
-      <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min)) : 0; const pct = Math.min(100 - 50 / nT, 50 / nT + (ti + prog) * (100 / nT)); const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast']; %>
-      <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, ±<%= repRules.star %> je Stern über oder unter 3, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine">
+      <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.max(0, Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min))) : 0; const pct = Math.min(100 - 50 / nT, 50 / nT + (ti + prog) * (100 / nT)); const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast', 'Weltruhm']; %>
+      <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: Stimmt deine Note, gibt es +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine. Eine Note daneben ändert nichts, weiter daneben kostet <%= repRules.penalty %> je Punkt über 1. Aufträge ohne Benoten zählen nur halb, ±<%= repRules.star %> je Stern über oder unter 3. Ohne Auftrag verfällt der Ruf nach <%= repRules.grace %> Tagen (1 % je Tag, nie unter <%= repRules.floor %>).">
         <h3 class="gd-sheet-sub">Ruf</h3>
         <div class="gd-rep-mast" role="progressbar" aria-label="Ruf: <%= tier.label %>" aria-valuenow="<%= Math.round(r.reputation) %>" aria-valuemin="0" aria-valuemax="<%= repTiers[nT - 1].min %>" style="--rep-pct: <%= pct.toFixed(1) %>%">
           <ol class="gd-rf-list">
             <% repTiers.forEach((t, k) => { %>
               <li class="gd-rf gd-rf-<%= k + 1 %><%= k < ti ? ' is-done' : k === ti ? ' is-now' : '' %>" title="<%= nicks[k] || '' %>">
                 <span class="gd-rf-flag">
-                  <span class="gd-rf-art" style="--art: url(/img/grading/ruf-<%= Math.min(k + 1, 4) %>.svg)" aria-hidden="true"></span>
+                  <span class="gd-rf-art" style="--art: url(/img/grading/ruf-<%= Math.min(k + 1, 5) %>.svg)" aria-hidden="true"></span>
                   <span class="gd-rf-txt"><b><%= t.label %></b></span>
                 </span>
               </li>
             <% }) %>
           </ol>
         </div>
-        <p class="gd-rep-next"><% if (tier.next) { %>Noch <b><%= Math.max(0, Math.ceil(tier.next - r.reputation)) %></b> bis <b><%= repTiers[ti + 1].label %></b><% } else { %><b>Höchste Stufe erreicht</b><% } %></p>
+        <p class="gd-rep-next"><% if (tier.next) { %>Noch <b><%= Math.max(0, Math.ceil(tier.next - r.reputation)) %></b> bis <b><%= repTiers[ti + 1].label %></b><% const nx = tierPerks[ti + 1]; if (nx) { const cur = tierPerks[ti]; const gains = [nx.playerJobs > cur.playerJobs ? '+' + (nx.playerJobs - cur.playerJobs) + ' Aufträge/Tag' : '', nx.showcase > cur.showcase ? '+' + (nx.showcase - cur.showcase) + ' Vitrinenplatz' : '', nx.richness > cur.richness ? 'reichere Kundschaft' : ''].filter(Boolean); if (gains.length) { %> <span class="gd-rep-gain"><%= gains.join(' · ') %></span><% } } } else { %><b>Höchste Stufe erreicht</b><% } %></p>
+        <p class="gd-rep-perk"><%= perks.playerJobs %> Aufträge/Tag · <%= perks.showcase %> Vitrinenplätze</p>
       </section>
       <% } %>
      </div>

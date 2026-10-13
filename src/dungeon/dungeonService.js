@@ -668,7 +668,7 @@ async function setSupplies({ user, coffee, energy }) {
     [me.coffeeDoc, me.energyDoc].filter(Boolean).forEach((id) => locked.reasons.delete(String(id)));
     const freeDoc = async (id, except) => (await TcgCard.find({ user: user._id, card: id }).sort({ createdAt: -1 }).select('_id').session(session).lean()).find((d) => !isLocked(locked, d) && !(except && d._id.equals(except)));
     const coffeeDoc = coffeeId ? await freeDoc(coffeeId) : null;
-    if (coffeeId && !coffeeDoc) throw new UserError('Dieser Kaffee ist nicht frei (Quest, Handel, Folie oder schon im Turm).');
+    if (coffeeId && !coffeeDoc) throw new UserError('Dieser Kaffee ist nicht frei (Quest, Handel, Sleeve oder schon im Turm).');
     const energyDoc = energy ? await freeDoc(LIVE.ENERGY_CARD, coffeeDoc && coffeeId === LIVE.ENERGY_CARD ? coffeeDoc._id : null) : null;
     if (energy && !energyDoc) throw new UserError('Du hast kein freies BfW Energy.');
     await claim([coffeeDoc, energyDoc], user._id, session);

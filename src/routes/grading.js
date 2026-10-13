@@ -64,7 +64,7 @@ router.get('/slab/:nummer', requireLogin, async (req, res) => {
 });
 
 // Fenster des Schreibtischs (#204): jedes Objekt auf dem Tisch öffnet eins; ?reiter=<key> öffnet es beim Laden
-const DESK_SHEETS = ['auftraege', 'bons', 'vitrine', 'bewertungen', 'preise', 'werkstatt', 'buegeln', 'meilensteine'];
+const DESK_SHEETS = ['auftraege', 'bons', 'bewertungen', 'preise', 'werkstatt', 'buegeln', 'meilensteine'];
 const hubUrl = (tab) => (DESK_SHEETS.includes(tab) ? `/grading?reiter=${tab}` : '/grading');
 // Erfolge rund ums Grading (#204) – Fortschritt in der Übersicht des Hubs
 const GRADING_ACHIEVEMENTS = ['ruhige-hand', 'grading-profi', 'gem-mint', 'buegelmeister', 'slab-fabrik', 'express-profi', 'zweite-meinung'];
@@ -170,6 +170,7 @@ router.get('/grading', async (req, res) => {
   res.render('grading', {
     title: 'Grading-Shop',
     shopNameMax: grading.SHOP_NAME_MAX,
+    shopSloganMax: grading.SHOP_SLOGAN_MAX,
     ...state,
     active,
     tab,
@@ -210,9 +211,12 @@ router.get('/grading', async (req, res) => {
     expressDays: grading.settings.expressDays,
     rating: state.shop ? reputation.ratingOf(state.shop) : null,
     repTiers: reputation.TIERS,
-    repRules: { base: reputation.BASE_GAIN, player: reputation.PLAYER_FACTOR, cap: reputation.SHOWCASE_CAP, star: reputation.STAR_STEP },
+    repRules: { base: reputation.BASE_GAIN, player: reputation.PLAYER_FACTOR, cap: reputation.SHOWCASE_CAP, star: reputation.STAR_STEP, penalty: reputation.GRADE_PENALTY, gradeless: reputation.GRADELESS_FACTOR, grace: reputation.DECAY_GRACE_DAYS, floor: reputation.DECAY_FLOOR },
+    // Was die Rufstufe freischaltet: je Stufe { playerJobs, showcase } mit den Admin-Werten, perks = aktuelle Stufe
+    tierPerks: reputation.TIERS.map((t) => grading.perksOf({ reputation: t.min })),
+    perks: grading.perksOf(state.shop),
     showcase,
-    showcaseMax: grading.settings.showcaseMax,
+    showcaseMax: grading.perksOf(state.shop).showcase,
     rarityByKey: catalog.rarityByKey,
     // Eigene Karten mit Knick zum Bügeln (#204) – ab Stufe IRON_LEVEL
     tools,
@@ -320,6 +324,9 @@ router.get('/grading/einreichen', async (req, res) => {
     rateDays: orders.RATE_DAYS,
     reviewTags: orders.REVIEW_TAGS,
     tagMax: orders.TAG_MAX,
+    repTiers: reputation.TIERS,
+    tipSteps: orders.TIP_STEPS,
+    balance: req.user.balance,
     rarityByKey: catalog.rarityByKey,
   });
 });
@@ -357,8 +364,9 @@ router.post('/grading/auftrag/:id/bewerten', (req, res) =>
     res,
     async () => {
       const tags = [].concat(req.body.tags || []).map(str);
-      await orders.rate({ user: req.user, orderId: req.params.id, stars: Number.parseInt(str(req.body.stars), 10), tags });
-      return 'Danke für deine Bewertung!';
+      const tip = Number.parseInt(str(req.body.tip), 10) || 0;
+      await orders.rate({ user: req.user, orderId: req.params.id, stars: Number.parseInt(str(req.body.stars), 10), tags, tip });
+      return tip ? `Danke für deine Bewertung – ${euro(tip)} Trinkgeld sind unterwegs!` : 'Danke für deine Bewertung!';
     },
     '/grading/einreichen'
   )
@@ -398,18 +406,25 @@ router.post('/grading/preis', (req, res) =>
   })
 );
 
-router.post('/grading/vitrine', (req, res) =>
-  handle(
-    req,
-    res,
-    async () => {
-      const raw = req.body.doc;
-      await orders.setShowcase({ user: req.user, docs: (Array.isArray(raw) ? raw : raw ? [raw] : []).map(str) });
+// Vitrine am Schreibtisch bearbeiten: Reihenfolge, Einsetzen, Austauschen, Entfernen – das Skript schickt jede Änderung
+// einzeln (fetch, Antwort als JSON); ohne Skript geht der Formular-Weg wie bei den anderen Aktionen
+router.post('/grading/vitrine', async (req, res) => {
+  const raw = req.body.doc;
+  const docs = (Array.isArray(raw) ? raw : raw ? [raw] : []).map(str);
+  if (req.get('X-Requested-With') !== 'fetch') {
+    return handle(req, res, async () => {
+      await orders.setShowcase({ user: req.user, docs });
       return 'Vitrine gespeichert.';
-    },
-    hubUrl('vitrine')
-  )
-);
+    }, hubUrl('vitrine'));
+  }
+  try {
+    await orders.setShowcase({ user: req.user, docs });
+    res.json({ ok: true });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
 
 router.post('/grading/annehmen', (req, res) =>
   handle(req, res, async () => {
@@ -428,7 +443,7 @@ router.post('/grading/kuendigen', (req, res) =>
 
 router.post('/grading/name', (req, res) =>
   handle(req, res, async () => {
-    const { name, code, requested } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code) });
+    const { name, code, requested } = await grading.setName({ user: req.user, name: str(req.body.name), code: str(req.body.code), slogan: req.body.slogan === undefined ? undefined : str(req.body.slogan) });
     if (requested) return `Dein Shop heißt jetzt „${name}“. Das neue Kürzel ${requested} ist beantragt – ein Admin oder Dev gibt es frei. Bis dahin bleibt ${code}.`;
     return `Dein Shop heißt jetzt „${name}“ – Kürzel ${code}.`;
   })
@@ -537,6 +552,7 @@ router.post('/grading/zuruecksenden', async (req, res, next) => {
       pay: job.pay,
       breakdown: job.breakdown,
       reputation: job.score ? job.score.reputation : 0,
+      graded: job.guess !== null && job.guess !== undefined, // mit Note: Ruf ändert sich nach der Note (0 = ±1 daneben)
       quality: job.score ? job.score.quality : null,
       player: !!job.order,
       services: job.order ? job.order.services || null : null,

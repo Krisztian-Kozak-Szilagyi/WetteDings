@@ -19,19 +19,23 @@ test('#204 B: Vitrine – Seltenheit × Note über 5, höchstens +100 %', () => 
   assert.equal(rep.showcaseBoost([]), 0);
   assert.equal(rep.showcaseBoost([{ rank: 5, grade: 10 }]), 0.3);
   assert.equal(rep.showcaseBoost([{ rank: 0, grade: 5 }]), 0); // Note 5 bringt nichts
-  assert.equal(rep.showcaseBoost(Array(10).fill({ rank: 5, grade: 10 })), 1);
+  assert.equal(rep.showcaseBoost(Array(10).fill({ rank: 5, grade: 10 })), 0.5); // gedeckelt bei +50 %
 });
 
 test('#204 B: Reputation je Auftrag, Sterne und Stufen', () => {
   assert.equal(rep.reputationGain({ quality: 50 }), 10);
   assert.equal(rep.reputationGain({ quality: 50, player: true }), 20);
-  assert.equal(rep.reputationGain({ quality: 100, player: true, boost: 1 }), 60);
+  assert.equal(rep.reputationGain({ quality: 100, player: true, boost: 1 }), 45); // Boost gedeckelt bei +50 %
   assert.equal(rep.reputationGain({ quality: 0 }), 5);
   assert.deepEqual([1, 3, 5].map(rep.starGain), [-10, 0, 10]);
   assert.equal(rep.tierOf(0).label, 'Neuling');
   assert.equal(rep.tierOf(100).label, 'Bekannt');
-  assert.equal(rep.tierOf(1999).next, 2000);
-  assert.equal(rep.tierOf(5000).next, null);
+  assert.equal(rep.tierOf(999).next, 1000);
+  assert.equal(rep.tierOf(1000).label, 'Renommiert');
+  assert.equal(rep.tierOf(5000).label, 'Elite');
+  assert.equal(rep.tierOf(15000).label, 'Legende');
+  assert.equal(rep.tierOf(15000).next, null);
+  assert.equal(rep.tierOf(-30).label, 'Neuling'); // negativer Ruf zählt wie ein Neuling
   const r = rep.ratingOf({ stars: { sum: 9, n: 2 }, quality: { sum: 150, n: 2 }, hits: { exact: 1, n: 4 }, reputation: 120 });
   assert.deepEqual([r.stars, r.quality, r.hitRate, r.tier.label], [4.5, 75, 25, 'Bekannt']);
   assert.equal(rep.ratingOf({}).stars, null);
@@ -235,4 +239,38 @@ test('#204: Versand ohne Sleeve – kleines Risiko für Kratzer, selten Knick (w
   assert.equal(damage.rollDamage(s, knick + 0.001), 'kratzer');
   assert.equal(damage.rollDamage(s, knick + kratzer + 0.001), null); // der Normalfall
   assert.equal(damage.rollDamage(s, 0.5), null);
+});
+
+test('Ruf nach der Note: exakt = Zuwachs, ±1 = unverändert, weiter daneben = Abzug, ohne Note halber Zuwachs', () => {
+  const base = { quality: 100, player: true };
+  const gain = rep.reputationGain(base);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 7, grade: 7 }), gain);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 7, grade: 8 }), 0);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 7, grade: 6 }), 0);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 7, grade: 9 }), -15);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 7, grade: 10 }), -30);
+  assert.equal(rep.gradeRepChange({ ...base, guess: 2, grade: 9 }), -90); // 7 daneben
+  assert.equal(rep.gradeRepChange({ quality: 100 }), Math.round(rep.reputationGain({ quality: 100 }) * 0.5)); // keine Note
+  assert.ok(rep.gradeRepChange({ ...base, guess: 7, grade: 7, boost: 1 }) > gain);
+});
+
+test('Rufstufen schalten Plätze frei: Mitglieder-Aufträge am Tag, Vitrine, Kundschaft', () => {
+  const admin = { playerJobs: 10, showcaseMax: 6 };
+  assert.deepEqual([0, 100, 1000, 5000, 15000].map((r) => rep.perksOf(r, admin).playerJobs), [3, 5, 8, 10, 12]);
+  assert.deepEqual([0, 100, 1000, 5000, 15000].map((r) => rep.perksOf(r, admin).showcase), [3, 4, 5, 6, 6]);
+  assert.equal(rep.perksOf(15000, admin).richness, 2);
+  assert.equal(rep.perksOf(0, { playerJobs: 10, showcaseMax: 2 }).showcase, 2); // Admin-Obergrenze gilt
+  assert.equal(rep.perksOf(5000, { playerJobs: 0, showcaseMax: 6 }).playerJobs, 0); // ausgeschaltet bleibt aus
+  assert.equal(rep.perksOf(-50, admin).tier, 'Neuling');
+});
+
+test('Ruf-Verfall: Karenz 7 Tage, dann 1 % je Tag, nie unter 100', () => {
+  assert.equal(rep.idleDecayDays({ idleDays: 7.9 }), 0);
+  assert.equal(rep.idleDecayDays({ idleDays: 10.2 }), 3);
+  assert.equal(rep.idleDecayDays({ idleDays: 10, appliedDays: 3 }), 0); // schon abgezogen
+  assert.equal(rep.decayedReputation(1000, 1), 990);
+  assert.equal(rep.decayedReputation(1000, 2), 980); // 980,1 gerundet
+  assert.equal(rep.decayedReputation(1000, 0), 1000);
+  assert.equal(rep.decayedReputation(105, 30), 100); // Untergrenze
+  assert.equal(rep.decayedReputation(60, 5), 60); // darunter bleibt es
 });

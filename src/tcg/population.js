@@ -103,8 +103,9 @@ function gradeRarity(cardId, data, grade) {
 
 // Wie sehr ein renommierter Shop einen Slab seltener macht: je höher seine Stufe, desto kleiner der Faktor (0,35 = Legende)
 const SHOP_FACTOR = [
-  { min: 2000, factor: 0.35, label: 'Legende' },
-  { min: 500, factor: 0.55, label: 'Renommiert' },
+  { min: 15000, factor: 0.35, label: 'Legende' },
+  { min: 5000, factor: 0.45, label: 'Elite' },
+  { min: 1000, factor: 0.6, label: 'Renommiert' },
   { min: 100, factor: 0.8, label: 'Bekannt' },
   { min: 0, factor: 1, label: 'Neuling' },
 ];

@@ -6,7 +6,7 @@
   const affordable = Math.max(0, Math.min(maxTickets, Math.floor(currentUser.balance / ticketPrice)));
   const big = lotto.key !== 'taeglich';
   const jackpotOf = (r) => r.pot + (r.prizeCash || 0);
-  const items = (r) => [r.prizePacks ? r.prizePacks + (r.prizePacks === 1 ? ' Pack' : ' Packs') : '', r.prizeFoils ? r.prizeFoils + (r.prizeFoils === 1 ? ' Folie' : ' Folien') : ''].filter(Boolean).join(' · ');
+  const items = (r) => [r.prizePacks ? r.prizePacks + (r.prizePacks === 1 ? ' Pack' : ' Packs') : '', r.prizeFoils ? r.prizeFoils + (r.prizeFoils === 1 ? ' TCG Sleeve' : ' TCG Sleeves') : ''].filter(Boolean).join(' · ');
 %>
 
 <div hidden data-live-root data-live-url="<%= lotto.path %>/stand" data-live-version="<%= liveVersion %>" data-live-signature="<%= round._id %>|<%= lastDrawn ? lastDrawn._id : '-' %>"></div>
@@ -39,7 +39,7 @@
           <% if (round.prizeFoils) { %>
             <div class="lotto-prize">
               <span class="lotto-prize-img"><% for (let i = 0; i < Math.min(3, round.prizeFoils); i++) { %><img src="<%= prizeImages.folie %>" alt="" width="720" height="1008" loading="lazy"><% } %></span>
-              <strong><%= round.prizeFoils %>×</strong><span><%= round.prizeFoils === 1 ? 'Folie' : 'Folien' %></span>
+              <strong><%= round.prizeFoils %>×</strong><span><%= round.prizeFoils === 1 ? 'TCG Sleeve' : 'TCG Sleeves' %></span>
             </div>
           <% } %>
         </div>

@@ -334,7 +334,7 @@
           <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= off ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
           <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } else if (busy) { %><span class="dg-ban-tag"><%= lock.label %></span><% } else if (lock) { %><span class="dg-lock-tag"><%= lock.n %>× <%= lock.label %></span><% } %>
-          <% if (!off && cards.foiled[c.id]) { %><span class="pick-foil-tag" title="Foliertes Exemplar – geschützt vor Schaden">✦ foliert</span><% } %>
+          <% if (!off && cards.foiled[c.id]) { %><span class="pick-foil-tag" title="Exemplar im TCG Sleeve – geschützt vor Schaden">🛡 im Sleeve</span><% } %>
           <button type="button" class="dg-zoom-btn" <%- zoomAttrs(c) %> aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>
@@ -390,7 +390,7 @@
       <% rareLoot.forEach((l) => { %>
         <li class="<%= l.card ? 'r-' + l.card.rarity : 'dg-rare-foil' %>">
           <span class="tcg-dot"></span>
-          <span><strong><%- userLink(l.name) %></strong> erbeutete <%= l.card ? 'die Boss-Karte „' + l.card.name + '“' : '' %><%= l.card && l.foil ? ' und ' : '' %><%= l.foil ? 'einen Sleeve oder Slab' : '' %> <span class="muted">(<%= l.dungeon %>)</span></span>
+          <span><strong><%- userLink(l.name) %></strong> erbeutete <%= l.card ? 'die Boss-Karte „' + l.card.name + '“' : '' %><%= l.card && l.foil ? ' und ' : '' %><%= l.foil ? 'einen TCG Sleeve oder leeren Slab' : '' %> <span class="muted">(<%= l.dungeon %>)</span></span>
           <span class="muted small nowrap"><%= relTime(l.at) %></span>
         </li>
       <% }) %>
@@ -412,7 +412,7 @@
       <% loot.players.forEach((p) => { %>
         <% const items = []; %>
         <% if (p.reward) items.push({ cls: 'is-money', text: euro(p.reward) }); %>
-        <% if (p.foil) items.push({ cls: 'is-foil', text: 'Folie' }); %>
+        <% if (p.foil) items.push({ cls: 'is-foil', text: 'TCG Sleeve oder Slab' }); %>
         <% if (p.bossCard) items.push({ cls: 'is-card', text: loot.bossCard ? loot.bossCard.name : 'Boss-Karte' }); %>
         <% if (!items.length) items.push({ cls: 'is-none', text: 'keine Beute' }); %>
         <% items.forEach((it) => { %>
