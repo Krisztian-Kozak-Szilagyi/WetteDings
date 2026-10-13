@@ -31,7 +31,7 @@ const page = (mode) => async (req, res) => {
     packs,
     itemList: itemList.map((it) => ({ ...it, buy: items.buyPrice(it) })), // Shop-Preis aktuell aus den Admin-Einstellungen
     foilable,
-    hasShop: !!(shop && shop.active), // leere Slabs gibt es nur in der Werkstatt eines Grading-Shops
+    hasShop: !!(shop && shop.active), // leere Slabs im Shop nur mit aktivem Grading-Shop
     itemCategories: CATEGORIES,
     packPrice: settings.getPackPrice(),
     cardsPerPack: catalog.CARDS_PER_PACK,
@@ -71,7 +71,7 @@ router.post('/inventar/verkaufen', (req, res) =>
   })
 );
 
-// Gegenstände vom Bank-Shop kaufen (TCG Sleeve) – leere Slabs gibt es in der Werkstatt (routes/grading.js)
+// Gegenstände vom Bank-Shop kaufen (TCG Sleeve) – leere Slabs auch hier (nur mit Grading-Shop), zusätzlich in der Werkstatt (routes/grading.js)
 router.post('/inventar/kaufen', (req, res) =>
   act(req, res, async () => {
     const count = Number.parseInt(str(req.body.count), 10);

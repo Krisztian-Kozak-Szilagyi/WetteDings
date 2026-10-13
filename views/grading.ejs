@@ -93,16 +93,20 @@
     // Tour (public/js/grading-tour.js): die Erklärungen, die nicht auf dem Tisch stehen – je Objekt (data-tour) eine
     // Station; sheet = Fenster, dessen ?-Knopf denselben Text zeigt. Fehlt ein Objekt, wird die Station übersprungen.
     const tour = [
-      { key: 'schild', title: 'Dein Shop', text: 'Links Name und Kürzel, in der Mitte Stufe und Ruf – der Ruf wächst mit sauberer Arbeit und guten Bewertungen. Rechts: heute verdient und wie viele Aufträge heute noch gehen.' },
-      { key: 'matte', title: 'Hier wird gearbeitet', text: 'Schritt 2: Hier liegt der aktuelle Auftrag. Der Knopf sagt, was als Nächstes dran ist – putzen, bügeln, benoten, versiegeln. Je sauberer und genauer, desto mehr Lohn.' },
-      { key: 'eingang', sheet: 'auftraege', title: 'Eingang', text: (players ? `Deine Auftragsverwaltung. Im Eingang wählst du selbst, was du annimmst: Karten von Mitgliedern zu deinen Festpreisen (Express steht oben und ist orange) oder Laufkundschaft. Tipp auf die Karte zeigt sie groß. Nach dem ersten Annehmen hast du ${orderDays} Tage, mit Express ${expressDays}; wartet ein Auftrag zu lange im Eingang oder wirst du nicht rechtzeitig fertig, geht die Karte samt Geld zurück. ` : `Deine Auftragsverwaltung: Hier nimmst du Laufkundschaft an – ab Stufe ${orderLevel} schicken dir auch Mitglieder ihre Karten, zu deinen Preisen. `) + `Reiter „Angenommen“: bis zu ${maxAccepted} Aufträge gleichzeitig. Der aktive (Aktiv-Marke) liegt auf der Werkbank – „Bearbeiten“ öffnet sie, „Auswählen“ macht einen anderen aktiv, sein Fortschritt bleibt erhalten. „Abbrechen“ ` + (players ? 'gibt eine Mitglieder-Karte zurück in den Eingang (die Frist läuft weiter), ein NPC-Auftrag zählt für heute trotzdem. „Erledigt“: der Verlauf. Die echte Note bleibt geheim: auf den Slab kommt deine.' : 'gibt einen Auftrag auf – er zählt für heute trotzdem.') },
-      { key: 'spiess', sheet: 'bons', title: 'Kassenzettel', text: 'Jeder erledigte Auftrag landet als Bon auf dem Spieß. Oben zeigt das Kassendisplay, was du heute verdient hast. Antippen eines Bons klappt die einzelnen Posten auf. Darunter stehen ältere Aufträge von Mitgliedern.' },
-      { key: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus: je wertvoller die Karte, je höher die Note (ab 7) und je seltener der Slab, desto schneller wächst deine Reputation – bis +50 %. Ein leeres Fach antippen wählt einen Slab, eine Karte antippen tauscht sie aus oder nimmt sie raus – und ziehen sortiert um. Ausgestellte Slabs lassen sich nicht handeln.' },
-      { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen aus dem Admin-Panel. Neue Preise gelten für neue Aufträge, offene behalten ihren Preis. Günstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
-      { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte. Gute Bewertungen bringen Reputation – und neue Kunden.' },
-      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `Shop: Name ändern geht frei, ein neues Kürzel muss ein Admin freigeben – ältere Slabs behalten das alte. Ausbau: jede Stufe schaltet neue Arbeitsschritte frei und bringt mehr Lohn; Mauszeiger über eine Stufe zeigt, was sie bringt. Werkzeuge: Komfort am Tisch, ohne Extra-Lohn – Mauszeiger darüber zeigt die Wirkung.${players ? ' Material: Für jeden Auftrag mit „Benoten + Slab“ verbraucht dein Shop einen leeren Slab – hier kaufst du Nachschub (oder im Handel).' : ''} Ruf: wächst mit +${repRules.base} je Auftrag (bei guter Qualität mehr), ×${repRules.player} bei Mitglieder-Aufträgen, ±${repRules.star} je Stern über oder unter 3 und bis +${Math.round(repRules.cap * 100)} % durch Slabs in der Vitrine. Die Fahnen sind die vier Ruf-Stufen, der gelbe Mast füllt sich bis zu deinem Stand.` },
-      { key: 'meilensteine', sheet: 'meilensteine', title: 'Erfolge', text: 'Meilensteine rund ums Grading, als Medaillen im Regal. Golden = geschafft, dunkel = noch offen mit Fortschrittsbalken. Mauszeiger über eine Medaille zeigt die Aufgabe.' },
-      { key: 'buegeln', sheet: 'buegeln', title: 'Eigene Karten bügeln', text: 'Karten mit Knick aus Quests, Dungeon und Turm. Je glatter, desto höher die Obergrenze der Note (bis 9) – Vorsicht vor Brandflecken. Ein Versuch je Karte.' },
+      { key: 'schild', title: 'Dein Shop', text: 'Links: Name und Kürzel.\nMitte: Stufe und Ruf – er wächst mit sauberer Arbeit und guten Bewertungen.\nRechts: heute verdient und wie viele Aufträge noch gehen.' },
+      { key: 'matte', title: 'Hier wird gearbeitet', text: 'Hier liegt der aktuelle Auftrag. Der Knopf zeigt den nächsten Schritt: putzen, bügeln, benoten, versiegeln.\nJe sauberer und genauer, desto mehr Lohn.' },
+      { key: 'eingang', sheet: 'auftraege', title: 'Eingang', text: (players
+        ? `• Eingang: Du wählst selbst, was du annimmst – Mitglieder-Karten zu deinen Festpreisen (Express: orange, oben) oder Laufkundschaft.\n• Frist: ${orderDays} Tage ab Annahme, Express ${expressDays}. Bist du zu spät, geht die Karte samt Geld zurück.\n`
+        : `• Eingang: Hier nimmst du Laufkundschaft an. Ab Stufe ${orderLevel} schicken dir auch Mitglieder Karten, zu deinen Preisen.\n`)
+        + `• Angenommen: bis zu ${maxAccepted} gleichzeitig. „Auswählen“ legt einen auf die Werkbank, „Bearbeiten“ öffnet sie.\n• Abbrechen: `
+        + (players ? 'Mitglieder-Karten gehen zurück in den Eingang (Frist läuft weiter), Laufkundschaft zählt für heute trotzdem.\n• Erledigt: der Verlauf. Auf den Slab kommt deine Note, die echte bleibt geheim.' : 'gibt den Auftrag auf, er zählt für heute trotzdem.') },
+      { key: 'spiess', sheet: 'bons', title: 'Kassenzettel', text: 'Jeder erledigte Auftrag wird ein Bon auf dem Spieß.\n• Oben: dein Verdienst heute.\n• Bon antippen: zeigt die einzelnen Posten.\n• Darunter: ältere Mitglieder-Aufträge.' },
+      { key: 'vitrine', title: 'Deine Vitrine', text: 'Stell deine besten Slabs aus – das erhöht deinen Ruf um bis zu +50 %.\nMehr Wirkung: wertvollere Karte, Note ab 7, seltenerer Slab.\n• Leeres Fach antippen: Slab wählen.\n• Karte antippen: tauschen oder rausnehmen. Ziehen sortiert um.\nAusgestellte Slabs lassen sich nicht handeln.' },
+      { key: 'preise', sheet: 'preise', title: 'Preisliste', text: players ? 'Deine Festpreise je Baustein, im Rahmen des Admin-Panels.\nNeue Preise gelten nur für neue Aufträge.\nGünstig füllt die Warteschlange, gute Bewertungen rechtfertigen mehr.' : `Ab Stufe ${orderLevel} legst du hier deine Preise für Mitglieder fest.` },
+      { key: 'handy', sheet: 'bewertungen', title: 'Bewertungen', text: 'Kunden geben Sterne und Stichworte.\nGute Bewertungen bringen Ruf und neue Kunden.' },
+      { key: 'werkstatt', sheet: 'werkstatt', title: 'Werkstatt', text: `• Shop: Name frei änderbar, ein neues Kürzel gibt ein Admin frei.\n• Ausbau: Jede Stufe schaltet Arbeitsschritte und mehr Lohn frei.\n• Ruf: +${repRules.base} je Auftrag, ×${repRules.player} bei Mitgliedern, ±${repRules.star} je Stern über/unter 3, bis +${Math.round(repRules.cap * 100)} % durch die Vitrine.\n• Werkzeuge: mehr Komfort am Tisch, kein Extra-Lohn.${players ? '\n• Material: Jeder Auftrag mit „Benoten + Slab“ braucht einen leeren Slab.' : ''}\nMauszeiger auf Stufen und Werkzeuge zeigt Details.` },
+      { key: 'meilensteine', sheet: 'meilensteine', title: 'Erfolge', text: 'Meilensteine rund ums Grading, als Medaillen im Regal.\nGolden = geschafft, dunkel = offen (mit Fortschrittsbalken).\nMauszeiger auf eine Medaille zeigt die Aufgabe.' },
+      { key: 'buegeln', sheet: 'buegeln', title: 'Eigene Karten bügeln', text: 'Karten mit Knick aus Quests, Dungeon und Turm.\nJe glatter, desto höher die Notengrenze (bis 9) – Vorsicht vor Brandflecken.\nEin Versuch je Karte.' },
       { key: 'karton', title: 'Selbst einreichen', text: 'Lass eigene Karten bei einem anderen Shop graden – so kommst du an Slabs für deine Vitrine.' },
     ];
   %>
@@ -399,6 +403,24 @@
       <% } %>
 
       </div>
+      <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.max(0, Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min))) : 0; const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast', 'Weltruhm']; %>
+      <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: Stimmt deine Note, gibt es +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine. Eine Note daneben ändert nichts, weiter daneben kostet <%= repRules.penalty %> je Punkt über 1. Aufträge ohne Benoten zählen nur halb, ein angenommener Auftrag von einem Mitglied, der abläuft, kostet <%= repRules.expiry %>, ±<%= repRules.star %> je Stern über oder unter 3. Ohne Auftrag verfällt der Ruf nach <%= repRules.grace %> Tagen (1 % je Tag, nie unter <%= repRules.floor %>).">
+        <h3 class="gd-sheet-sub">Ruf</h3>
+        <% const nx = tier.next ? tierPerks[ti + 1] : null; const cur = tierPerks[ti]; const gains = nx ? [nx.playerJobs > cur.playerJobs ? '+' + (nx.playerJobs - cur.playerJobs) + ' Aufträge/Tag' : '', nx.showcase > cur.showcase ? '+' + (nx.showcase - cur.showcase) + ' Vitrinenplatz' : '', nx.richness > cur.richness ? 'reichere Kundschaft' : ''].filter(Boolean) : []; %>
+        <ol class="gd-rk" role="progressbar" aria-label="Ruf: <%= tier.label %>" aria-valuenow="<%= Math.round(r.reputation) %>" aria-valuemin="0" aria-valuemax="<%= repTiers[nT - 1].min %>">
+          <% repTiers.forEach((t, k) => { %>
+            <li class="gd-rk-step<%= k < ti ? ' is-done' : k === ti ? ' is-now' : '' %>" title="<%= (nicks[k] || '') + (tierPerks[k] ? ' – ' + tierPerks[k].playerJobs + ' Aufträge/Tag · ' + tierPerks[k].showcase + ' Vitrinenplätze' : '') + (k === ti && tier.next ? ' · noch ' + Math.max(0, Math.ceil(tier.next - r.reputation)) + ' bis ' + repTiers[ti + 1].label + (gains.length ? ' (' + gains.join(', ') + ')' : '') : '') %>">
+              <span class="gd-rk-art" style="--art: url(/img/grading/ruf-<%= Math.min(k + 1, 5) %>.svg)" aria-hidden="true"></span>
+              <span class="gd-rk-txt">
+                <b><%= t.label %></b>
+                <% if (k === ti && tier.next) { %><span class="gd-rk-bar" style="--p: <%= (prog * 100).toFixed(0) %>%" aria-hidden="true"></span><% } %>
+              </span>
+              <span class="gd-rk-end" aria-hidden="true"><%= k < ti ? '✓' : k === ti ? Math.round(r.reputation) + (tier.next ? '/' + tier.next : '') : '' %></span>
+            </li>
+          <% }) %>
+        </ol>
+      </section>
+      <% } %>
       <div class="gd-wk-col">
       <h3 class="gd-sheet-sub">Werkzeuge</h3>
       <ul class="gh-tools">
@@ -426,11 +448,10 @@
       <% if (players) { %>
       <section class="gd-wk-col gd-stock" aria-label="Material">
         <h3 class="gd-sheet-sub">Material</h3>
-        <div class="gd-stock-card">
+        <div class="gd-stock-card" title="Das Gehäuse zum Versiegeln – jede Versiegelung verbraucht einen, auch bei Laufkundschaft. Zu <%= euro(slabShop.price) %> das Stück. Auch im Handel von anderen Mitgliedern zu haben; die Bank kauft einen leeren Slab für <%= euro(slabShop.sell) %> zurück.">
           <img class="gd-stock-img" src="<%= slabShop.image %>" alt="" width="56" height="78" loading="lazy">
           <div class="gd-stock-text">
             <b>Leerer Slab</b>
-            <small>Das Gehäuse zum Versiegeln – jede Versiegelung verbraucht einen, auch bei Laufkundschaft.</small>
           </div>
         </div>
         <dl class="gr-facts">
@@ -448,26 +469,6 @@
           </span>
           <button class="btn btn-primary" type="submit" data-gd-qty-submit <%= currentUser.balance < slabShop.price ? 'disabled' : '' %>>Kaufen · <span data-gd-qty-total><%= euro(slabShop.price) %></span></button>
         </form>
-        <p class="small gd-stock-note">Zu <%= euro(slabShop.price) %> das Stück. Auch im <a href="/handel">Handel</a> von anderen Mitgliedern zu haben; die Bank kauft einen leeren Slab für <%= euro(slabShop.sell) %> zurück.</p>
-      </section>
-      <% } %>
-      <% if (tier && shop.code) { const ti = repTiers.findIndex((t) => t.label === tier.label); const nT = repTiers.length; const prog = tier.next ? Math.max(0, Math.min(1, (r.reputation - tier.min) / (tier.next - tier.min))) : 0; const pct = Math.min(100 - 50 / nT, 50 / nT + (ti + prog) * (100 / nT)); const nicks = ['Bruchbude', 'Gemütliche Werkstatt', 'Kartenfabrik', 'Kartenpalast', 'Weltruhm']; %>
-      <section class="gd-wk-col gd-rep" aria-label="Ruf" title="So steigt dein Ruf: Stimmt deine Note, gibt es +<%= repRules.base %> je Auftrag (bei guter Qualität mehr), ×<%= repRules.player %> bei Mitglieder-Aufträgen, bis +<%= Math.round(repRules.cap * 100) %> % durch Slabs in der Vitrine. Eine Note daneben ändert nichts, weiter daneben kostet <%= repRules.penalty %> je Punkt über 1. Aufträge ohne Benoten zählen nur halb, ein angenommener Auftrag von einem Mitglied, der abläuft, kostet <%= repRules.expiry %>, ±<%= repRules.star %> je Stern über oder unter 3. Ohne Auftrag verfällt der Ruf nach <%= repRules.grace %> Tagen (1 % je Tag, nie unter <%= repRules.floor %>).">
-        <h3 class="gd-sheet-sub">Ruf</h3>
-        <div class="gd-rep-mast" role="progressbar" aria-label="Ruf: <%= tier.label %>" aria-valuenow="<%= Math.round(r.reputation) %>" aria-valuemin="0" aria-valuemax="<%= repTiers[nT - 1].min %>" style="--rep-pct: <%= pct.toFixed(1) %>%">
-          <ol class="gd-rf-list">
-            <% repTiers.forEach((t, k) => { %>
-              <li class="gd-rf gd-rf-<%= k + 1 %><%= k < ti ? ' is-done' : k === ti ? ' is-now' : '' %>" title="<%= nicks[k] || '' %>">
-                <span class="gd-rf-flag">
-                  <span class="gd-rf-art" style="--art: url(/img/grading/ruf-<%= Math.min(k + 1, 5) %>.svg)" aria-hidden="true"></span>
-                  <span class="gd-rf-txt"><b><%= t.label %></b></span>
-                </span>
-              </li>
-            <% }) %>
-          </ol>
-        </div>
-        <p class="gd-rep-next"><% if (tier.next) { %>Noch <b><%= Math.max(0, Math.ceil(tier.next - r.reputation)) %></b> bis <b><%= repTiers[ti + 1].label %></b><% const nx = tierPerks[ti + 1]; if (nx) { const cur = tierPerks[ti]; const gains = [nx.playerJobs > cur.playerJobs ? '+' + (nx.playerJobs - cur.playerJobs) + ' Aufträge/Tag' : '', nx.showcase > cur.showcase ? '+' + (nx.showcase - cur.showcase) + ' Vitrinenplatz' : '', nx.richness > cur.richness ? 'reichere Kundschaft' : ''].filter(Boolean); if (gains.length) { %> <span class="gd-rep-gain"><%= gains.join(' · ') %></span><% } } } else { %><b>Höchste Stufe erreicht</b><% } %></p>
-        <p class="gd-rep-perk"><%= perks.playerJobs %> Aufträge/Tag · <%= perks.showcase %> Vitrinenplätze</p>
       </section>
       <% } %>
      </div>

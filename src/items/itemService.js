@@ -185,14 +185,16 @@ const buyPrice = (t) => (foil.PRICE_FIELD[t.key] ? foil.settings[foil.PRICE_FIEL
 
 /**
  * Gegenstände von der Bank kaufen: zum aktuellen Shop-Preis, nie unter dem Ankaufspreis. via = wo gekauft wird: 'bank'
- * (Bank-Shop im Inventar) oder 'grading' (Werkstatt – nur mit aktivem Grading-Shop); jede Art gibt es nur an ihrem Ort (types.via).
+ * (Bank-Shop im Inventar) oder 'grading' (Werkstatt). Sorten mit types.via 'grading' (leere Slabs) gibt es an beiden Orten,
+ * aber nur für Mitglieder mit aktivem Grading-Shop; alle anderen nur im Bank-Shop.
  */
 async function buyItems({ user, type, count = 1, via = 'bank' }) {
   const t = needType(type);
   const price = buyPrice(t);
   if (!price) throw new UserError(`${t.label} verkauft die Bank nicht.`);
-  if ((t.via || 'bank') !== via) throw new UserError(via === 'bank' ? `${t.label} gibt es nicht im Bank-Shop – du bekommst sie in der Werkstatt deines Grading-Shops.` : `${t.label} gibt es nicht in der Werkstatt.`);
-  if (via === 'grading' && !(await GradingShop.exists({ _id: user._id, active: true }))) throw new UserError('Leere Slabs verkauft die Werkstatt nur an Grading-Shops – sonst bleibt der Handel mit anderen Mitgliedern.');
+  const needsShop = t.via === 'grading';
+  if (via === 'grading' && !needsShop) throw new UserError(`${t.label} gibt es nicht in der Werkstatt.`);
+  if (needsShop && !(await GradingShop.exists({ _id: user._id, active: true }))) throw new UserError('Leere Slabs verkauft die Bank nur an Grading-Shops – sonst bleibt der Handel mit anderen Mitgliedern.');
   if (!Number.isInteger(count) || count < 1 || count > MAX_BUY) throw new UserError(`Du kannst 1 bis ${MAX_BUY} Stück auf einmal kaufen.`);
   return inTransaction(async (session) => {
     const cost = price * count;

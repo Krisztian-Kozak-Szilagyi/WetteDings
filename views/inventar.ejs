@@ -26,7 +26,7 @@
 
 <div class="bag-page">
   <header class="bag-head">
-    <% if (isShop) { %><h1>Shop <%- help('Nachschub für dein Inventar: Packs und Gegenstände. Gekaufte Sachen landen im Inventar.') %></h1><% } else { %><h1>Inventar <%- help('Hier liegt, was du besitzt. Tippe einen Gegenstand an, um ihn zu benutzen, zu verkaufen oder zu handeln. Nachschub gibt es im Shop. Karten in Sleeve oder Slab findest du im Album.') %></h1><% } %>
+    <% if (isShop) { %><h1>Shop <%- help('Nachschub für dein Inventar: Packs und Gegenstände. Gekaufte Sachen landen im Inventar.') %></h1><% } else { %><h1>Inventar <%- help('Hier liegt, was du besitzt.<br>• Gegenstand antippen: benutzen, verkaufen oder handeln<br>• Nachschub: im Shop<br>• Karten in Sleeve oder Slab: im Album') %></h1><% } %>
     <div class="bag-head-r">
       <span class="bag-wallet"><small>Guthaben</small><b><%= euro(balance) %></b></span>
       <a class="btn btn-ghost btn-sm" href="/tcg/album" title="Karten in Sleeve und Slab">🗂️ Album</a>
@@ -81,7 +81,7 @@
           <span class="bag-row-main"><b><%= it.label %></b><%- help(it.text.replace(/</g, '&lt;')) %><small>Ankauf <%= euro(it.sell) %></small></span>
           <span class="bag-row-buy">
             <span class="bag-price"><%= euro(it.buy) %></span>
-            <% if ((it.via || 'bank') === 'bank') { %>
+            <% if ((it.via || 'bank') === 'bank' || hasShop) { %>
               <form method="post" action="/inventar/kaufen" class="bag-buy" data-shop-buy data-price="<%= it.buy %>" data-label="<%= it.label %>" data-balance="<%= balance %>" data-confirm="1× <%= it.label %> für <%= euro(it.buy) %> kaufen?">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="type" value="<%= it.key %>">
@@ -92,10 +92,8 @@
                 </span>
                 <button class="btn btn-primary btn-sm" type="submit" data-shop-submit <%= balance < it.buy ? 'disabled' : '' %>>Kaufen · <span data-shop-total><%= euro(it.buy) %></span></button>
               </form>
-            <% } else if (hasShop) { %>
-              <a class="btn btn-primary btn-sm" href="/grading?reiter=werkstatt" title="Leere Slabs kaufst du in der Werkstatt deines Grading-Shops">Zur Werkstatt</a>
             <% } else { %>
-              <span class="bag-note" title="Leere Slabs verkauft die Bank nur an Grading-Shops – sonst im Handel">nur Grading-Shops · <a href="/handel">Handel</a></span>
+              <span class="bag-note" title="Leere Slabs verkauft die Bank nur an Grading-Shops – sonst im Handel">nur für Grading-Shops · <a href="/handel">Handel</a></span>
             <% } %>
           </span>
         </li>

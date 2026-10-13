@@ -139,10 +139,9 @@ test('Dungeon/Turm: Funde teilen sich in Sleeves und leere Slabs nach dem einges
   assert.deepEqual(splitFoilDrops([], 30), { sleeves: [], slabs: [] });
 });
 
-test('Kaufen: jede Sorte nur an ihrem Ort, ohne Datenbankzugriff abgelehnt', async () => {
+test('Kaufen: Werkstatt nur für Werkstatt-Sorten, ohne Datenbankzugriff abgelehnt', async () => {
   const { buyItems } = require('../src/items/itemService');
   const user = { _id: '000000000000000000000001' };
-  await assert.rejects(buyItems({ user, type: 'slab', via: 'bank' }), /nicht im Bank-Shop/); // Slabs gibt es nur in der Werkstatt
   await assert.rejects(buyItems({ user, type: 'folie', via: 'grading' }), /nicht in der Werkstatt/);
   await assert.rejects(buyItems({ user, type: 'gibtsnicht' }), /gibt es nicht/);
   await assert.rejects(buyItems({ user, type: 'folie', count: 0 }), /1 bis/);
