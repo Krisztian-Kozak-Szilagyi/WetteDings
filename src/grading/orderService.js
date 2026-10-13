@@ -471,7 +471,7 @@ async function rate({ user, orderId, stars, tags = [], tip = 0 }) {
       await Ledger.create([
         { user: user._id, type: 'grading_trinkgeld', amount: -tip, betTitle: what },
         { user: found.shop, type: 'grading_trinkgeld_erhalt', amount: tip, betTitle: `${what} von ${user.username}` },
-      ], { session });
+      ], { session, ordered: true }); // mehrere Dokumente in einer Session: nur mit ordered (Mongoose)
     }
     await GradingShop.updateOne({ _id: found.shop }, { $inc: { 'stars.sum': stars, 'stars.n': 1, reputation: reputation.starGain(stars) } }, { session });
   });
