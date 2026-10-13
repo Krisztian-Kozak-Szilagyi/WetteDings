@@ -5,6 +5,8 @@
 //   Ausrüstung rechts neben dem Avatar: Waffe/Zauber anklicken = angreifen (einmal pro Runde).
 //   Über dem Avatar laufende Effekte (Ring = verbleibende Runden), unter dem Boss-Leben seine Ankündigung.
 //   Spielfeld über der Hand (nur Raid, [data-bf-feld]): permanente Karten mit eigenem Leben; Dios Ziel leuchtet rot.
+//   Permanente Karte anklicken und dann einen Platz im Feld anklicken – oder direkt aufs Feld ziehen. Oben ist vorne
+//   (nah an Dio, wird öfter angegriffen); hinter der gestrichelten Linie erreicht er Karten nur mit der Armbrust.
 //   Karte 0,5 s unter der Maus = große Vorschau.
 // Zum Ausprobieren in der Konsole: bossfight.zustand() zeigt den Zustand.
 // Raid (body data-raid="1", views/raid-kampf.ejs): entschieden wird auf dem Server – jeder Zug geht an /raid/aktion,
@@ -31,6 +33,7 @@
   var gearEls = new Map(); // uid -> Element der Ausrüstung
   var feldEls = new Map(); // uid -> Element einer permanenten Karte auf dem Spielfeld
   var ziel = null; // Druide, der gerade ein Ziel sucht: { uid, el }
+  var platzWahl = null; // permanente Karte, die gerade einen Platz auf dem Spielfeld sucht: { uid }
   var raid = document.body.getAttribute('data-raid') === '1';
   var csrf = document.body.getAttribute('data-csrf') || '';
   var raidEnde = null; // { sieg, reward } vom Server, sobald der Raid vorbei ist
@@ -184,6 +187,20 @@
     img.alt = c.name;
     el.title = c.kampf ? c.name : c.name + ' (kann hier nicht gespielt werden)';
     if (c.kampf) el.classList.add('bf-playable');
+    // permanente Karten lassen sich direkt aufs Spielfeld ziehen
+    if (feldEl && R.istPermanent(c.kampf)) {
+      el.draggable = true;
+      el.addEventListener('dragstart', function (e) {
+        if (!s || laufend || s.vorbei || !R.spielbar(s, inst.uid).ok) return e.preventDefault();
+        hidePreview();
+        e.dataTransfer.setData('text/plain', String(inst.uid));
+        e.dataTransfer.effectAllowed = 'move';
+        var bild = el.querySelector('img');
+        e.dataTransfer.setDragImage(bild, bild.offsetWidth / 2, bild.offsetHeight / 2);
+        platzStart(inst.uid, true);
+      });
+      el.addEventListener('dragend', function () { if (platzWahl) platzEnde(); });
+    }
     el.addEventListener('click', function () { klickHand(inst.uid); });
     el.addEventListener('contextmenu', function (e) {
       if (!ziel) return;
@@ -246,6 +263,9 @@
     var el = document.createElement('div');
     el.className = 'bf-feld-card';
     el.innerHTML = '<img alt="" draggable="false"><span class="bf-feld-hp"><span class="bf-feld-hp-fill"></span><b class="bf-feld-hp-text"></b></span>';
+    el.style.setProperty('--x', f.x == null ? 50 : f.x);
+    el.style.setProperty('--y', f.y == null ? 50 : f.y);
+    el.style.zIndex = 200 - (f.y || 0); // vorne liegende Karten liegen oben
     el.querySelector('img').src = f.card.image;
     el.querySelector('img').alt = f.card.name;
     el.title = f.card.name;
@@ -275,15 +295,19 @@
       feldEls.delete(uid);
       el.remove();
     });
-    var ziel = s.absicht && s.absicht.ziel ? s.absicht.ziel.uid : null;
+    var zielUid = s.absicht && s.absicht.ziel ? s.absicht.ziel.uid : null;
     feld.forEach(function (f) {
       var el = feldEls.get(f.uid) || feldKarte(f);
       feldHp(el, f.hp, f.max);
-      el.classList.toggle('bf-feld-ziel', f.uid === ziel && !s.vorbei);
+      el.classList.toggle('bf-feld-ziel', f.uid === zielUid && !s.vorbei);
     });
     if (feldEl) {
+      // Reichweite von Dios Nahkampf: dahinter trifft er nur mit der Armbrust
+      var weit = s.bd && s.bd.nahReichweite != null ? s.bd.nahReichweite : 1;
+      feldEl.style.setProperty('--reichweite', Math.round(weit * 100));
+      feldEl.toggleAttribute('data-ohne-linie', weit >= 1);
       feldEl.toggleAttribute('data-leer', !feld.length);
-      feldEl.setAttribute('data-plaetze', feld.length + ' / ' + R.feldMax(s));
+      feldEl.setAttribute('data-plaetze', feld.length + (feld.length === 1 ? ' Karte' : ' Karten'));
     }
   }
 
@@ -513,6 +537,8 @@
     // Krit-Lotterie: danach immer ein Zusatztreffer aus dem Münzwurf
     var lot = s.bd && s.bd.lotterie;
     if (lot) muenze += ' · danach Münzwurf: ' + lot.zusatz[0] + '–' + lot.zusatz[1] + ' (Kopf ×' + String(lot.kritFaktor).replace('.', ',') + ')';
+    // Reichweite: Nahkampf erreicht nur Karten bis zur Linie, die Armbrust das ganze Feld
+    if (s.feld && s.feld.length && s.bd && s.bd.feldZiel) muenze += a.fern ? ' · Armbrust: erreicht das ganze Feld' : ' · Nahkampf: nur bis zur Linie';
     var extra = (a.gift ? ' + Gift ' + a.gift.schaden + '×' + a.gift.runden : a.netz ? ' + ' + (raid ? 'Rauch' : 'Netz') + ' (−' + a.netz + ' Energie)' : '') + muenze;
     var zielKarte = R.angriffsZiel(s);
     var wen = zielKarte ? zielKarte.card.name : 'dich';
@@ -587,7 +613,86 @@
     var ok = R.spielbar(s, uid);
     if (!ok.ok) return abspielen([{ t: 'nein', uid: uid, grund: ok.grund }]);
     if (ok.ziel) return zielStart(uid);
+    var inst = s.hand.filter(function (i) { return i.uid === uid; })[0];
+    if (feldEl && inst && R.istPermanent(inst.card.kampf)) {
+      if (platzWahl && platzWahl.uid === uid) return platzEnde();
+      return platzStart(uid);
+    }
     zug(function () { return R.spielen(s, uid); }, { a: 'spielen', uid: uid });
+  }
+
+  // ---------- Platz auf dem Spielfeld wählen ----------
+  var geist = null; // durchsichtige Vorschau der Karte unter der Maus
+  function platzStart(uid, ziehen) {
+    platzEnde();
+    platzWahl = { uid: uid };
+    document.body.classList.add('bf-platzwahl');
+    var hel = handEls.get(uid);
+    if (hel) hel.classList.add('bf-ziel-quelle');
+    if (!ziehen) {
+      var inst = s.hand.filter(function (i) { return i.uid === uid; })[0];
+      geist = document.createElement('div');
+      geist.className = 'bf-feld-card bf-feld-geist';
+      geist.innerHTML = '<img alt="" draggable="false">';
+      geist.querySelector('img').src = inst.card.image;
+      geist.hidden = true;
+      feldEl.appendChild(geist);
+      popup(feldEl, 'Klicke auf einen Platz im Spielfeld – vorne wird öfter angegriffen', 'bf-pop-info');
+    }
+  }
+  function platzEnde() {
+    platzWahl = null;
+    document.body.classList.remove('bf-platzwahl');
+    handEls.forEach(function (el) { el.classList.remove('bf-ziel-quelle'); });
+    if (geist) geist.remove();
+    geist = null;
+  }
+  // Mausposition → Platz (0–100): die Karte liegt ganz im Feld, Mitte der Karte unter der Maus
+  function platzVon(e) {
+    var rc = feldEl.getBoundingClientRect();
+    var probe = feldEl.querySelector('.bf-feld-card');
+    var cw = probe ? probe.offsetWidth : rc.width * 0.1;
+    var ch = probe ? probe.offsetHeight : rc.height * 0.4;
+    var stil = getComputedStyle(feldEl);
+    var pl = parseFloat(stil.paddingLeft) || 0;
+    var pt = parseFloat(stil.paddingTop) || 0;
+    var w = rc.width - pl - (parseFloat(stil.paddingRight) || 0) - cw;
+    var h = rc.height - pt - (parseFloat(stil.paddingBottom) || 0) - ch;
+    var clamp = function (v) { return Math.max(0, Math.min(100, Math.round(v))); };
+    return { x: clamp(((e.clientX - rc.left - pl - cw / 2) / Math.max(1, w)) * 100), y: clamp(((e.clientY - rc.top - pt - ch / 2) / Math.max(1, h)) * 100) };
+  }
+  function legen(uid, pos) {
+    platzEnde();
+    zug(function () { return R.spielen(s, uid, undefined, pos); }, { a: 'spielen', uid: uid, x: pos.x, y: pos.y });
+  }
+  if (feldEl) {
+    feldEl.addEventListener('mousemove', function (e) {
+      if (!platzWahl || !geist) return;
+      var p = platzVon(e);
+      geist.hidden = false;
+      geist.style.setProperty('--x', p.x);
+      geist.style.setProperty('--y', p.y);
+    });
+    feldEl.addEventListener('click', function (e) {
+      if (!platzWahl || laufend) return;
+      legen(platzWahl.uid, platzVon(e));
+    });
+    feldEl.addEventListener('contextmenu', function (e) {
+      if (!platzWahl) return;
+      e.preventDefault();
+      platzEnde();
+    });
+    feldEl.addEventListener('dragover', function (e) {
+      if (!platzWahl) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    feldEl.addEventListener('drop', function (e) {
+      if (!platzWahl) return;
+      e.preventDefault();
+      var uid = Number(e.dataTransfer.getData('text/plain')) || platzWahl.uid;
+      legen(uid, platzVon(e));
+    });
   }
   function klickGear(uid) {
     if (!s || laufend || s.vorbei || ziel) return;
@@ -604,6 +709,10 @@
     var body = new URLSearchParams({ _csrf: csrf, a: aktion.a });
     if (aktion.uid != null) body.set('uid', aktion.uid);
     if (aktion.ziel != null) body.set('ziel', aktion.ziel);
+    if (aktion.x != null) {
+      body.set('x', aktion.x);
+      body.set('y', aktion.y);
+    }
     return fetch('/raid/aktion', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
       .then(function (r) { return r.json(); })
       .then(function (res) {
@@ -666,10 +775,11 @@
   }
   // Esc bricht die Zielwahl ab (statt die Seite zu verlassen – das macht bossfight.js sonst mit Esc)
   window.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && ziel) {
+    if (e.key === 'Escape' && (ziel || platzWahl)) {
       e.stopImmediatePropagation();
       e.preventDefault();
       zielEnde();
+      platzEnde();
     }
   }, true);
 
@@ -677,6 +787,7 @@
     endBtn.addEventListener('click', function () {
       if (!s || laufend || s.vorbei) return;
       zielEnde();
+      platzEnde();
       zug(function () { return R.rundeEnde(s); }, { a: 'ende' });
     });
   }

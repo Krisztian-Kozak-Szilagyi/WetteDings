@@ -590,6 +590,7 @@ router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwert
           netz: num(b[`a_${a.key}_netz`]),
           schwer: b[`a_${a.key}_schwer`] === '1',
           muenze: b[`a_${a.key}_muenze`] === '1',
+          fern: b[`a_${a.key}_fern`] === '1',
         })),
         karten: {
           ...part('karten', ['ang', 'sch', 'hei', 'neben', 'leben']),

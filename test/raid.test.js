@@ -177,10 +177,16 @@ test('Raid: Spielfeld – permanente Karten bleiben liegen, wirken jede Runde, E
   assert.ok(runde.some((e) => e.t === 'feldwirkt' && e.uid === 900));
   const ang = s.feld[0].card.kampf.ang;
   if (ang) assert.equal(hp - s.boss.hp, ang);
-  // Feld voll: keine weitere permanente Karte
-  s.sp = { ...s.sp, feldMax: 1 };
-  s.hand.push({ uid: 902, card: karte(permId), buffs: [] });
-  assert.match(R.spielbar(s, 902).grund, /Spielfeld ist voll/);
+  // kein Limit: beliebig viele permanente Karten, jede an ihrem Platz
+  for (let i = 0; i < 8; i++) {
+    s.hand.push({ uid: 910 + i, card: karte(permId), buffs: [] });
+    s.energie = 10;
+    R.spielen(s, 910 + i, undefined, { x: i * 12, y: 90 });
+  }
+  assert.equal(s.feld.length, 9);
+  assert.deepEqual([s.feld[3].x, s.feld[3].y], [24, 90]);
+  assert.deepEqual([s.feld[0].x, s.feld[0].y], [50, 50], 'ohne Platz: Mitte');
+  s.feld.splice(1);
   // ein Effekt nimmt die Karte vom Feld
   const out = [];
   assert.ok(R.verlassen(s, 900, 'Rauchbombe', out));
@@ -215,4 +221,58 @@ test('Raid: Dio greift Karten auf dem Spielfeld an und zerstört sie', () => {
   assert.equal(s.absicht.ziel, null, 'leeres Feld → Dio zielt wieder auf den Spieler');
   // der Browser sieht das Spielfeld
   assert.ok(Array.isArray(logic.publicState(s).feld));
+});
+
+test('Raid: Platz auf dem Spielfeld – vorne wird öfter angegriffen, weit hinten trifft nur die Armbrust', () => {
+  const o = JSON.parse(JSON.stringify(opts));
+  o.karten.permanent = [ids[0]];
+  const kampf = logic.kampfFor(catalog.cardById[ids[0]], o);
+  const lege = (s, uid, y) => {
+    s.hand.push({ uid, card: { id: ids[0], name: 'K' + uid, image: '', kampf }, buffs: [] });
+    s.energie = 10;
+    R.spielen(s, uid, undefined, { x: 50, y });
+  };
+  const neu = (angriffe) => {
+    const boss = { ...logic.bossDef(o), lotterie: null, feldZiel: 1, angriffe };
+    let n = 0;
+    const { s } = R.neu(logic.deckCards(ids, o), { rng: () => ((n = (n * 9301 + 49297) % 233280) / 233280), spieler: logic.spielerDef(o), boss });
+    s.hand = [];
+    return s;
+  };
+  // Nahkampf (Dolch): Reichweite 50 % – die Karte ganz hinten ist nie Ziel, vorne öfter als in der Mitte
+  const dolch = neu([{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }]);
+  lege(dolch, 801, 0);
+  lege(dolch, 802, 50);
+  lege(dolch, 803, 100);
+  assert.deepEqual(R.erreichbar(dolch, false).map((f) => f.uid), [801, 802]);
+  // viele Ankündigungen hintereinander: wie oft ist welche Karte (oder der Spieler) das Ziel?
+  const zaehle = (s) => {
+    const n = {};
+    for (let i = 0; i < 3000; i++) {
+      R.rundeEnde(s);
+      s.feld.forEach((x) => { x.hp = x.max; });
+      Object.assign(s.spieler, { hp: s.spieler.max });
+      Object.assign(s.boss, { hp: s.boss.max });
+      s.vorbei = null;
+      const z = s.absicht.ziel;
+      n[z ? z.uid : 'spieler'] = (n[z ? z.uid : 'spieler'] || 0) + 1;
+    }
+    return n;
+  };
+  const nd = zaehle(dolch);
+  assert.equal(nd[803], undefined, 'Dolch erreicht hinten nichts');
+  assert.ok(nd[801] > nd[802] * 1.3, `vorne öfter: ${JSON.stringify(nd)}`);
+  // Armbrust (fern): erreicht auch die Karte ganz hinten
+  const armbrust = neu([{ key: 'armbrust', name: 'Armbrust', schaden: [10, 10], gewicht: 1, fern: true }]);
+  lege(armbrust, 801, 0);
+  lege(armbrust, 803, 100);
+  assert.equal(R.erreichbar(armbrust, true).length, 2);
+  const na = zaehle(armbrust);
+  assert.ok(na[803] > 0, 'Armbrust trifft auch hinten');
+  assert.ok(na[801] > na[803] * 2, `vorneFaktor 4: ${JSON.stringify(na)}`);
+  // nur Karten hinten und ein Nahkampf-Angriff → Dio greift den Spieler an
+  const hinten = neu([{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }]);
+  lege(hinten, 803, 90);
+  R.rundeEnde(hinten);
+  assert.equal(hinten.absicht.ziel, null);
 });

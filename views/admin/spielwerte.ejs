@@ -396,14 +396,14 @@
 
         <fieldset class="admin-tax-group">
           <legend>Spieler</legend>
-          <% [['hp', 'Leben'], ['energie', 'Energie pro Runde'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Runde nachziehen'], ['handMax', 'Höchstens Karten auf der Hand'], ['feldMax', 'Plätze auf dem Spielfeld']].forEach(([k, l]) => { %>
+          <% [['hp', 'Leben'], ['energie', 'Energie pro Runde'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Runde nachziehen'], ['handMax', 'Höchstens Karten auf der Hand']].forEach(([k, l]) => { %>
             <label class="field"><span><%= l %></span><input type="number" name="spieler_<%= k %>" min="<%= lim.spieler[k][0] %>" max="<%= lim.spieler[k][1] %>" step="1" value="<%= rs.spieler[k] %>" required><small class="muted">Standard <%= rd.spieler[k] %></small></label>
           <% }) %>
         </fieldset>
 
         <fieldset class="admin-tax-group">
           <legend>Lucky Dio</legend>
-          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%'], ['feldZiel', 'Greift eine Karte auf dem Spielfeld an', '%']].forEach(([k, l, u]) => { %>
+          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%'], ['feldZiel', 'Greift eine Karte auf dem Spielfeld an', '%'], ['vorneFaktor', 'Ganz vorne liegende Karten … mal so oft Ziel wie ganz hinten', '×'], ['nahReichweite', 'Nahkampf reicht bis … der Feldtiefe (Armbrust: überall)', '%']].forEach(([k, l, u]) => { %>
             <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="boss_<%= k %>" min="<%= lim.boss[k][0] %>" max="<%= lim.boss[k][1] %>" step="1" value="<%= rs.boss[k] %>" required><small class="muted">Standard <%= rd.boss[k] %></small></label>
           <% }) %>
         </fieldset>
@@ -412,7 +412,7 @@
           <legend>Dios Angriffe</legend>
           <div class="table-wrap">
             <table class="table admin-tcg-table">
-              <thead><tr><th>Name</th><th>Schaden min–max</th><th>Gewicht</th><th>Gift (Schaden × Runden)</th><th>Rauch (−Energie)</th><th>Schwer</th><th>Münzwurf</th></tr></thead>
+              <thead><tr><th>Name</th><th>Schaden min–max</th><th>Gewicht</th><th>Gift (Schaden × Runden)</th><th>Rauch (−Energie)</th><th>Schwer</th><th>Münzwurf</th><th>Armbrust</th></tr></thead>
               <tbody>
                 <% rs.angriffe.forEach((a) => { %>
                   <tr>
@@ -423,12 +423,13 @@
                     <td><input type="number" name="a_<%= a.key %>_netz" min="0" max="5" step="1" value="<%= a.netz %>" aria-label="<%= a.name %>: weniger Energie" style="width:4em"></td>
                     <td><input type="checkbox" name="a_<%= a.key %>_schwer" value="1" <%= a.schwer ? 'checked' : '' %> aria-label="<%= a.name %>: schwerer Angriff"></td>
                     <td><input type="checkbox" name="a_<%= a.key %>_muenze" value="1" <%= a.muenze ? 'checked' : '' %> aria-label="<%= a.name %>: Münzwurf"></td>
+                    <td><input type="checkbox" name="a_<%= a.key %>_fern" value="1" <%= a.fern ? 'checked' : '' %> aria-label="<%= a.name %>: Armbrust, trifft das ganze Spielfeld"></td>
                   </tr>
                 <% }) %>
               </tbody>
             </table>
           </div>
-          <small class="muted">Gewicht 0 = Angriff kommt nicht vor. Schwer: nie zweimal hintereinander, im Zorn doppelt so oft. Münzwurf: Kopf trifft mit dem Faktor oben, Zahl gibt Dio einen Glücks-Token.</small>
+          <small class="muted">Gewicht 0 = Angriff kommt nicht vor. Schwer: nie zweimal hintereinander, im Zorn doppelt so oft. Münzwurf: Kopf trifft mit dem Faktor oben, Zahl gibt Dio einen Glücks-Token. Armbrust: trifft auch Karten weit hinten auf dem Spielfeld, alle anderen nur bis zur Nahkampf-Reichweite.</small>
         </fieldset>
 
         <fieldset class="admin-tax-group">
@@ -456,7 +457,7 @@
 
         <fieldset class="admin-tax-group">
           <legend>Spielfeld: permanente Karten</legend>
-          <p class="muted small">Angekreuzte Karten bleiben nach dem Ausspielen auf dem Spielfeld liegen und wirken zu Beginn jeder Runde erneut, bis Dio sie zerstört oder ein Effekt sie entfernt. Alle anderen sind Effektkarten: Sie wirken einmal und gehen dann auf den Ablagestapel.</p>
+          <p class="muted small">Angekreuzte Karten legt man frei auf dem Spielfeld ab (ohne Limit); sie bleiben liegen und wirken zu Beginn jeder Runde erneut, bis Dio sie zerstört oder ein Effekt sie entfernt. Je weiter vorne eine Karte liegt, desto eher greift Dio sie an – weit hinten erreicht er sie nur mit der Armbrust. Alle anderen sind Effektkarten: Sie wirken einmal und gehen dann auf den Ablagestapel.</p>
           <label class="field"><span>Leben permanenter Karten</span><input type="number" name="karten_leben" min="<%= lim.karten.leben[0] %>" max="<%= lim.karten.leben[1] %>" step="1" value="<%= rs.karten.leben %>" required><small class="muted">Standard <%= rd.karten.leben %></small></label>
           <% const permSet = new Set(rs.karten.permanent); %>
           <% raid.rarities.forEach((r) => { const list = raid.cards.filter((c) => c.rarity === r.key); if (!list.length) return; const n = list.filter((c) => permSet.has(c.id)).length; %>

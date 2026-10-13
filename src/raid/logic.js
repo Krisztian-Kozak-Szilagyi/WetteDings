@@ -10,14 +10,15 @@ const RARITY_KEYS = catalog.ALL_RARITIES.filter((r) => r.key !== 'test-item').ma
 
 // Angriffe von Lucky Dio (Schlüssel fest, Werte im Admin-Panel). min/max = Schaden, gewicht = wie oft er gewählt wird,
 // schwer = großer Angriff (nie zweimal hintereinander, im Zorn doppelt so oft), gift = Schaden je Runde für giftRunden,
-// netz = so viel weniger Energie in der nächsten Runde, muenze = Münzwurf (Kopf: kopfFaktor-fach, Zahl: Glücks-Token)
+// netz = so viel weniger Energie in der nächsten Runde, muenze = Münzwurf (Kopf: kopfFaktor-fach, Zahl: Glücks-Token),
+// fern = Armbrust: trifft auch Karten weit hinten auf dem Spielfeld (sonst nur bis boss.nahReichweite)
 const ATTACKS = [
-  { key: 'dolch', name: 'Dolchstich', min: 12, max: 16, gewicht: 4, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: false },
-  { key: 'armbrust', name: 'Armbrustschuss', min: 16, max: 20, gewicht: 3, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: false },
-  { key: 'lotterie', name: 'Krit-Lotterie', min: 14, max: 18, gewicht: 3, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: true },
-  { key: 'giftdolch', name: 'Vergifteter Dolch', min: 8, max: 10, gewicht: 2, schwer: false, gift: 4, giftRunden: 3, netz: 0, muenze: false },
-  { key: 'rauchbombe', name: 'Rauchbombe', min: 6, max: 8, gewicht: 1.5, schwer: false, gift: 0, giftRunden: 0, netz: 1, muenze: false },
-  { key: 'allin', name: 'All In', min: 34, max: 40, gewicht: 1.5, schwer: true, gift: 0, giftRunden: 0, netz: 0, muenze: false },
+  { key: 'dolch', name: 'Dolchstich', min: 12, max: 16, gewicht: 4, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: false, fern: false },
+  { key: 'armbrust', name: 'Armbrustschuss', min: 16, max: 20, gewicht: 3, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: false, fern: true },
+  { key: 'lotterie', name: 'Krit-Lotterie', min: 14, max: 18, gewicht: 3, schwer: false, gift: 0, giftRunden: 0, netz: 0, muenze: true, fern: false },
+  { key: 'giftdolch', name: 'Vergifteter Dolch', min: 8, max: 10, gewicht: 2, schwer: false, gift: 4, giftRunden: 3, netz: 0, muenze: false, fern: false },
+  { key: 'rauchbombe', name: 'Rauchbombe', min: 6, max: 8, gewicht: 1.5, schwer: false, gift: 0, giftRunden: 0, netz: 1, muenze: false, fern: false },
+  { key: 'allin', name: 'All In', min: 34, max: 40, gewicht: 1.5, schwer: true, gift: 0, giftRunden: 0, netz: 0, muenze: false, fern: false },
 ];
 
 // Standardwerte (Admin-Panel → Spielwerte → Raid). Prozentwerte als ganze Zahlen (50 = 50 %).
@@ -25,20 +26,21 @@ const ATTACKS = [
 // Verteidiger, BWL → Heiler): dieser Wert zählt voll, die anderen beiden nur mit neben %. ANG = FIA × ang %, SCH = FIS × sch %,
 // HEI = BWL × hei %, jeweils mal Stärke der Seltenheit (gleicht die sehr unterschiedlichen IHK-Werte aus, damit im Raid
 // vor allem das Spiel entscheidet und nicht nur die Sammlung); Kosten = Energie je Seltenheit.
-// Spielfeld: Karten in karten.permanent bleiben nach dem Ausspielen liegen (höchstens spieler.feldMax), wirken jede Runde
-// erneut und haben karten.leben Leben; Dio greift mit boss.feldZiel % Chance eine von ihnen statt des Spielers an.
+// Spielfeld: Karten in karten.permanent bleiben nach dem Ausspielen liegen (ohne Limit, frei platziert), wirken jede Runde
+// erneut und haben karten.leben Leben. Dio greift mit boss.feldZiel % Chance eine von ihnen statt des Spielers an – vorne
+// liegende vorneFaktor-mal so oft wie ganz hinten; Nahkampf erreicht nur Karten bis nahReichweite % der Tiefe, die Armbrust alle.
 // Alle anderen Karten sind Effektkarten (wirken einmal, dann Ablagestapel).
 const DEFAULTS = {
   open: false,
   triesPerDay: 3,
   maxRounds: 30,
-  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8, feldMax: 5 },
+  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8 },
   // Balance (npm run sim:raid, 2026-10-13, mit Dios Krit-Lotterie): kluges Spiel gewinnt mit Gold/Holo ≈ 47 %,
   // Holo/Bockhaber ≈ 67 %, Glitch ≈ 93 %; wer zufällig spielt, gewinnt mit denselben Decks ≈ 11 / 25 / 83 %
   // Krit-Lotterie wie Dios Karte: jeder Angriff krittet mit grundKrit % (+ tokenKrit % je Glücks-Token) und trifft dann
   // kritFaktor-fach; danach Münzwurf (kopfChance): Kopf = kritischer Armbrust-Zusatztreffer, Zahl = Dolch-Zusatztreffer
   // und ein Glücks-Token. Zusatztreffer: zusatzMin–zusatzMax Schaden. Der Münzwurf-Angriff trifft bei Kopf kopfFaktor-fach.
-  boss: { hp: 285, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, grundKrit: 10, kritFaktor: 200, tokenKrit: 1, zusatzMin: 4, zusatzMax: 6, feldZiel: 35 },
+  boss: { hp: 285, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, grundKrit: 10, kritFaktor: 200, tokenKrit: 1, zusatzMin: 4, zusatzMax: 6, feldZiel: 35, vorneFaktor: 4, nahReichweite: 50 },
   angriffe: ATTACKS,
   karten: {
     ang: 40,
@@ -58,8 +60,8 @@ const DEFAULTS = {
 const LIMITS = {
   triesPerDay: [1, 50],
   maxRounds: [5, 200],
-  spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15], feldMax: [1, 10] },
-  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500], feldZiel: [0, 100] },
+  spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15] },
+  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500], feldZiel: [0, 100], vorneFaktor: [1, 20], nahReichweite: [0, 100] },
   angriff: { min: [0, 1000], max: [0, 1000], gewicht: [0, 100], gift: [0, 100], giftRunden: [0, 10], netz: [0, 5] },
   karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], leben: [1, 1000], kosten: [0, 10], staerke: [0, 1000] },
   belohnung: { geld: [0, 100000000], dioChance: [0, 100] },
@@ -95,7 +97,7 @@ function cleanSettings(input) {
   for (const def of ATTACKS) {
     const a = (s.angriffe || []).find((x) => x && x.key === def.key) || {};
     const name = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 40) : def.name;
-    const row = { key: def.key, name, schwer: !!a.schwer, muenze: !!a.muenze };
+    const row = { key: def.key, name, schwer: !!a.schwer, muenze: !!a.muenze, fern: !!a.fern };
     for (const k of Object.keys(LIMITS.angriff)) row[k] = num(`${name} ${k}`, a[k], LIMITS.angriff[k], k !== 'gewicht');
     if (row.min > row.max) errors.push(`${name}: min größer als max`);
     out.angriffe.push(row);
@@ -197,6 +199,8 @@ function bossDef(opts) {
     wutAb: b.wutAb / 100,
     wutFaktor: b.wutFaktor / 100,
     feldZiel: b.feldZiel / 100, // Chance, dass ein Angriff eine Karte auf dem Spielfeld trifft
+    vorneFaktor: b.vorneFaktor, // ganz vorne liegende Karten so viel öfter Ziel als ganz hinten
+    nahReichweite: b.nahReichweite / 100, // so weit (Anteil der Tiefe) reicht Nahkampf, die Armbrust (fern) überall hin
     muenze: { kopfChance: b.kopfChance / 100, kopfFaktor: b.kopfFaktor / 100 },
     // Krit-Lotterie wie Dios Karte (public/js/bossfight-regeln.js: rundeEnde, zusatztreffer)
     lotterie: { kopfChance: b.kopfChance / 100, kritFaktor: b.kritFaktor / 100, grundKrit: b.grundKrit / 100, tokenKrit: b.tokenKrit / 100, zusatz: [b.zusatzMin, b.zusatzMax] },
@@ -211,6 +215,7 @@ function bossDef(opts) {
         ...(a.gift && a.giftRunden ? { gift: { schaden: a.gift, runden: a.giftRunden } } : {}),
         ...(a.netz ? { netz: a.netz } : {}),
         ...(a.muenze ? { muenze: true } : {}),
+        ...(a.fern ? { fern: true } : {}),
       })),
   };
 }
@@ -229,10 +234,10 @@ function mulberry(seed) {
   };
 }
 
-/** Ein Zug auf den Zustand anwenden. action: { a: 'spielen', uid, ziel } | { a: 'einsetzen', uid } | { a: 'ende' } */
+/** Ein Zug auf den Zustand anwenden. action: { a: 'spielen', uid, ziel, x, y } | { a: 'einsetzen', uid } | { a: 'ende' } (x/y: Platz auf dem Spielfeld) */
 function applyAction(s, action) {
   if (!action || typeof action !== 'object') return [{ t: 'nein', grund: 'Unbekannter Zug.' }];
-  if (action.a === 'spielen') return R.spielen(s, Number(action.uid), action.ziel == null ? undefined : Number(action.ziel));
+  if (action.a === 'spielen') return R.spielen(s, Number(action.uid), action.ziel == null ? undefined : Number(action.ziel), action.x == null ? null : { x: action.x, y: action.y });
   if (action.a === 'einsetzen') return R.einsetzen(s, Number(action.uid));
   if (action.a === 'ende') return R.rundeEnde(s);
   return [{ t: 'nein', grund: 'Unbekannter Zug.' }];
@@ -260,7 +265,7 @@ function publicState(s) {
     sp: s.sp,
     spieler: s.spieler,
     boss: s.boss,
-    bd: { key: s.bd.key, name: s.bd.name, hp: s.bd.hp, wutAb: s.bd.wutAb, muenze: s.bd.muenze || null, lotterie: s.bd.lotterie || null },
+    bd: { key: s.bd.key, name: s.bd.name, hp: s.bd.hp, wutAb: s.bd.wutAb, muenze: s.bd.muenze || null, lotterie: s.bd.lotterie || null, feldZiel: s.bd.feldZiel || 0, vorneFaktor: s.bd.vorneFaktor || 1, nahReichweite: s.bd.nahReichweite == null ? 1 : s.bd.nahReichweite },
     hand: s.hand,
     gear: s.gear,
     feld: s.feld,

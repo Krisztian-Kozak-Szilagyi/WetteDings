@@ -7,10 +7,13 @@
 // der Boss kündigt den nächsten Angriff an.
 // Karten-Werte (kampf) stehen in src/tcg/cardData.js; Boss und Spieler-Grundwerte hier unten.
 //
-// Spielfeld (Raid): Helden mit kampf.dauer = 'permanent' wirken beim Ausspielen, bleiben dann auf dem Feld liegen
-// (höchstens sp.feldMax) und wirken zu Beginn jeder weiteren Runde erneut – bis sie zerstört werden (kampf.leben auf 0,
-// der Boss kann sie gezielt angreifen: bd.feldZiel) oder ein Effekt sie vom Feld nimmt (verlassen). Alle anderen Helden
-// sind Effektkarten: sie wirken einmal und gehen danach auf den Ablagestapel.
+// Spielfeld (Raid): Helden mit kampf.dauer = 'permanent' wirken beim Ausspielen, bleiben dann auf dem Feld liegen (ohne
+// Limit, frei platziert: x = links→rechts, y = vorne→hinten, je 0–100) und wirken zu Beginn jeder weiteren Runde erneut –
+// bis sie zerstört werden (kampf.leben auf 0) oder ein Effekt sie vom Feld nimmt (verlassen). Alle anderen Helden sind
+// Effektkarten: sie wirken einmal und gehen danach auf den Ablagestapel.
+// Ziel des Bosses: mit bd.feldZiel Chance eine Karte statt des Spielers – je weiter vorne, desto eher (bd.vorneFaktor:
+// ganz vorne so viel öfter als ganz hinten). Nahkampf erreicht nur Karten bis bd.nahReichweite, Fernkampf (a.fern,
+// Lucky Dios Armbrust) das ganze Feld.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.BossRegeln = factory();
@@ -60,8 +63,8 @@
   var istAusruestung = function (k) { return !!k && (k.typ === 'waffe' || k.typ === 'zauber' || k.typ === 'schild'); };
   var istAngriffsItem = function (k) { return !!k && (k.typ === 'waffe' || k.typ === 'zauber'); };
   var istPermanent = function (k) { return !!k && k.typ === 'held' && k.dauer === 'permanent'; };
-  var FELD_MAX = 5;
-  var feldMax = function (s) { return s.sp.feldMax || FELD_MAX; };
+  // Platz auf dem Spielfeld: ganze Zahlen 0–100, ohne Angabe in der Mitte
+  var platz = function (v) { var n = Math.round(Number(v)); return isFinite(n) ? Math.max(0, Math.min(100, n)) : 50; };
 
   // ---------- Zustand ----------
   /**
@@ -84,7 +87,7 @@
       deck: [],
       hand: [],
       gear: [], // { uid, card, used, hits, bonus }
-      feld: [], // permanente Karten: { uid, card, buffs, hp, max }
+      feld: [], // permanente Karten: { uid, card, buffs, hp, max, x, y } – y: 0 = ganz vorne (beim Boss), 100 = ganz hinten
       ablage: [], // ausgespielte Effektkarten und Karten, die das Feld verlassen haben
       effekte: [], // { art, key, card, name, wert, runden, max }
       gespielt: 0,
@@ -112,7 +115,7 @@
     k.deck = s.deck.slice();
     k.hand = s.hand.map(function (i) { return { uid: i.uid, card: i.card, buffs: i.buffs.slice() }; });
     k.gear = s.gear.map(function (g) { return { uid: g.uid, card: g.card, used: g.used, hits: g.hits, bonus: g.bonus }; });
-    k.feld = (s.feld || []).map(function (f) { return { uid: f.uid, card: f.card, buffs: f.buffs.slice(), hp: f.hp, max: f.max }; });
+    k.feld = (s.feld || []).map(function (f) { return { uid: f.uid, card: f.card, buffs: f.buffs.slice(), hp: f.hp, max: f.max, x: f.x, y: f.y }; });
     k.ablage = (s.ablage || []).slice();
     k.effekte = s.effekte.map(function (e) { var c = {}; for (var x in e) c[x] = e[x]; return c; });
     k.log = { bossSchaden: s.log.bossSchaden, spielerSchaden: s.log.spielerSchaden, geheilt: s.log.geheilt, karten: s.log.karten };
@@ -136,13 +139,30 @@
     }
     var schaden = wuerfel(s, a.schaden[0], a.schaden[1]);
     if (wut) schaden = Math.round(schaden * s.bd.wutFaktor);
-    // Ziel: mit bd.feldZiel Chance eine Karte auf dem Spielfeld statt des Spielers (steht schon in der Ankündigung)
-    var ziel = null;
-    if (s.feld && s.feld.length && s.bd.feldZiel && s.rng() < s.bd.feldZiel) {
-      var f = s.feld[Math.floor(s.rng() * s.feld.length)];
-      ziel = { uid: f.uid, name: f.card.name };
+    return { key: a.key, name: a.name, schaden: schaden, gift: a.gift || null, netz: a.netz || 0, schwer: !!a.schwer, wut: wut, muenze: !!a.muenze, fern: !!a.fern, ziel: feldZiel(s, !!a.fern) };
+  }
+
+  /** Karten, die ein Angriff erreichen kann: Fernkampf alle, Nahkampf nur bis zur Reichweite */
+  function erreichbar(s, fern) {
+    var weit = s.bd.nahReichweite == null ? 1 : s.bd.nahReichweite;
+    return (s.feld || []).filter(function (f) { return fern || f.y <= weit * 100; });
+  }
+  /** Gewicht als Ziel: ganz vorne vorneFaktor-mal so hoch wie ganz hinten */
+  function zielGewicht(s, f) {
+    return 1 + ((s.bd.vorneFaktor || 1) - 1) * (1 - f.y / 100);
+  }
+  // Ziel des angekündigten Angriffs: steht schon in der Ankündigung (null = der Spieler)
+  function feldZiel(s, fern) {
+    if (!s.feld || !s.feld.length || !s.bd.feldZiel) return null;
+    var kandidaten = erreichbar(s, fern);
+    if (!kandidaten.length || s.rng() >= s.bd.feldZiel) return null;
+    var r = s.rng() * summe(kandidaten, function (f) { return zielGewicht(s, f); });
+    var f = kandidaten[kandidaten.length - 1];
+    for (var i = 0; i < kandidaten.length; i++) {
+      r -= zielGewicht(s, kandidaten[i]);
+      if (r < 0) { f = kandidaten[i]; break; }
     }
-    return { key: a.key, name: a.name, schaden: schaden, gift: a.gift || null, netz: a.netz || 0, schwer: !!a.schwer, wut: wut, muenze: !!a.muenze, ziel: ziel };
+    return { uid: f.uid, name: f.card.name };
   }
 
   /** Karte, die der angekündigte Angriff trifft (null = der Spieler; ist sie inzwischen weg, trifft er den Spieler) */
@@ -169,7 +189,6 @@
     var k = inst.card.kampf;
     if (!k || (k.typ !== 'held' && !istAusruestung(k))) return { ok: false, grund: 'Kann im Bosskampf nicht gespielt werden.' };
     if (kosten(s, inst) > s.energie) return { ok: false, grund: 'Zu wenig Energie' };
-    if (istPermanent(k) && (s.feld || []).length >= feldMax(s)) return { ok: false, grund: 'Das Spielfeld ist voll (' + feldMax(s) + ' Karten).' };
     var st = k.effekt && k.effekt.staerken;
     if (st && !ziele(s, uid).length) return { ok: false, grund: 'Keine Karte zum Stärken in der Hand' };
     return { ok: true, ziel: !!st };
@@ -250,8 +269,11 @@
   }
 
   // ---------- Karten spielen ----------
-  /** Karte aus der Hand spielen. zielUid: Zielkarte einer Stärkung (Druiden). Gibt Ereignisse zurück. */
-  function spielen(s, uid, zielUid) {
+  /**
+   * Karte aus der Hand spielen. zielUid: Zielkarte einer Stärkung (Druiden); pos: { x, y } Platz einer permanenten Karte
+   * auf dem Spielfeld (0–100, y = 0 ganz vorne). Gibt Ereignisse zurück.
+   */
+  function spielen(s, uid, zielUid, pos) {
     var ev = [];
     var ok = spielbar(s, uid);
     if (!ok.ok) return [{ t: 'nein', uid: uid, grund: ok.grund }];
@@ -273,7 +295,7 @@
     if (k.typ === 'held') {
       // permanente Karte liegt schon, während sie zum ersten Mal wirkt (so trifft ihr Effekt von ihrem Platz aus)
       if (permanent) {
-        var f = { uid: inst.uid, card: inst.card, buffs: inst.buffs, hp: k.leben || 1, max: k.leben || 1 };
+        var f = { uid: inst.uid, card: inst.card, buffs: inst.buffs, hp: k.leben || 1, max: k.leben || 1, x: platz(pos && pos.x), y: platz(pos && pos.y) };
         s.feld.push(f);
         ev.push({ t: 'feld', f: f });
       }
@@ -517,7 +539,7 @@
     istAusruestung: istAusruestung,
     istAngriffsItem: istAngriffsItem,
     istPermanent: istPermanent,
-    feldMax: feldMax,
+    erreichbar: erreichbar,
     angriffsZiel: angriffsZiel,
     verlassen: verlassen,
   };

@@ -41,7 +41,7 @@
       <p>„<%= deck.deck.name %>“ · <%= deck.deck.check.size %> Karten, davon <strong><%= deck.cards.length %></strong> im Raid spielbar (mindestens <%= minCards %>).</p>
       <ul class="raid-roles"><% Object.entries(roles).forEach(([r, n]) => { %><li><%= n %>× <%= r %></li><% }) %></ul>
       <p class="muted small">Im Raid kämpfen deine Charakterkarten. Jede hat eine Rolle nach ihrem stärksten IHK-Wert: <strong>FIA → Angreifer</strong> (Schaden), <strong>FIS → Verteidiger</strong> (blockt Dios nächsten Angriff), <strong>BWL → Heiler</strong>. Jede Karte kostet Energie, du hast <%= spieler.energie %> pro Runde. Items wie Kaffee spielen nicht mit.</p>
-      <p class="muted small"><strong>Spielfeld:</strong> Permanente Karten bleiben nach dem Ausspielen liegen (höchstens <%= spieler.feldMax %>, je <%= karten.leben %> Leben) und wirken jede Runde erneut, bis Dio sie zerstört. Effektkarten wirken einmal und gehen dann auf den Ablagestapel.<% if (permanentImDeck) { %> In deinem Deck: <strong><%= permanentImDeck %> permanent</strong>.<% } %></p>
+      <p class="muted small"><strong>Spielfeld:</strong> Permanente Karten legst du frei aufs Spielfeld (je <%= karten.leben %> Leben); sie bleiben liegen und wirken jede Runde erneut, bis Dio sie zerstört. Je weiter vorne sie liegen, desto eher greift er sie an – weit hinten erreicht er sie nur mit der Armbrust. Effektkarten wirken einmal und gehen dann auf den Ablagestapel.<% if (permanentImDeck) { %> In deinem Deck: <strong><%= permanentImDeck %> permanent</strong>.<% } %></p>
       <a class="btn btn-ghost btn-sm" href="/deck">Deck bearbeiten</a>
     <% } %>
   </section>
@@ -55,7 +55,7 @@
         <tbody>
           <% angriffe.forEach((a) => { %>
             <tr>
-              <td><%= a.name %><% if (a.schwer) { %><span class="raid-tag">schwer</span><% } %></td>
+              <td><%= a.name %><% if (a.schwer) { %><span class="raid-tag">schwer</span><% } %><% if (a.fern) { %><span class="raid-tag">Fernkampf</span><% } %></td>
               <td class="num"><%= a.min %>–<%= a.max %></td>
               <td class="small"><%= a.muenze ? `Münzwurf: Kopf ×${(boss.kopfFaktor / 100).toLocaleString('de-DE')}, Zahl = Glücks-Token` : a.gift ? `Gift: ${a.gift} Schaden, ${a.giftRunden} Runden` : a.netz ? `Rauch: nächste Runde −${a.netz} Energie` : a.schwer ? 'nie zweimal hintereinander' : '' %></td>
             </tr>
@@ -65,7 +65,7 @@
     </div>
     <p class="small"><strong>Krit-Lotterie</strong> – wie auf seiner Karte: Jeder Angriff trifft mit <%= boss.grundKrit %> % kritisch (×<%= (boss.kritFaktor / 100).toLocaleString('de-DE') %>). Danach fliegt eine Münze: <strong>Kopf</strong> = kritischer Armbrust-Zusatztreffer, <strong>Zahl</strong> = Dolch-Zusatztreffer (<%= boss.zusatzMin %>–<%= boss.zusatzMax %>) und ein Glücks-Token – jeder Token gibt ihm +<%= boss.tokenKrit %> % Krit-Chance.</p>
     <p class="muted small">Planen zählt mehr als die Sammlung: Dio kündigt jeden Angriff eine Runde vorher an.</p>
-    <% if (boss.feldZiel) { %><p class="muted small">Liegen Karten auf deinem Spielfeld, greift er mit <%= boss.feldZiel %> % Chance eine von ihnen an statt dich – die Ankündigung zeigt, wen.</p><% } %>
+    <% if (boss.feldZiel) { %><p class="muted small">Liegen Karten auf deinem Spielfeld, greift er mit <%= boss.feldZiel %> % Chance eine von ihnen an statt dich – die Ankündigung zeigt, wen. Vorne liegende Karten trifft es <%= boss.vorneFaktor %>-mal so oft wie ganz hinten; mit dem Dolch und allem außer der Armbrust reicht er nur <%= boss.nahReichweite %> % weit ins Feld.</p><% } %>
     <p class="muted small">Ab <%= boss.wutAb %> % Leben wird Dio wütend: mehr Schaden, und schwere Angriffe kommen doppelt so oft.</p>
   </section>
 

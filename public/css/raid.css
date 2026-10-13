@@ -67,25 +67,41 @@
   .raid-boss, .raid-boss.is-hit, .raid-boss.is-hit-schwer, .bf-dio-drop .bf-result-titel { animation: none; }
 }
 
-/* Spielfeld: permanente Karten in einer Reihe über der Hand, jede mit eigenem Lebensbalken */
+/* Spielfeld: freie Fläche über der Hand – oben ist vorne (nah an Dio), Karten liegen, wo man sie hinlegt (--x/--y 0–100).
+   Gestrichelte Linie: so weit reicht Dios Nahkampf, dahinter trifft nur die Armbrust. */
 .bf-feld {
-  --feld-h: calc(var(--card-h) * .62);
-  position: absolute; left: 50%; bottom: calc(var(--card-h) + 46px); transform: translateX(-50%);
-  min-width: min(60vw, 420px); min-height: calc(var(--feld-h) + 16px); padding: 8px 14px 14px;
-  display: flex; justify-content: center; align-items: flex-end; gap: 12px;
-  border-radius: 16px; background: linear-gradient(180deg, rgba(42, 17, 69, .15), rgba(42, 17, 69, .5));
+  --feld-h: calc(var(--card-h) * .5);
+  --fw: calc(var(--feld-h) * 63 / 88);
+  position: absolute; left: 50%; bottom: calc(var(--card-h) + 40px); transform: translateX(-50%);
+  width: min(74vw, 980px); height: clamp(150px, 30vh, 320px); padding: 14px 16px 16px; box-sizing: border-box;
+  border-radius: 18px; pointer-events: auto;
+  background: linear-gradient(180deg, rgba(120, 30, 60, .22), rgba(42, 17, 69, .28) 45%, rgba(20, 10, 40, .55));
   box-shadow: inset 0 0 0 1px rgba(232, 169, 72, .22), 0 10px 30px rgba(0, 0, 0, .35);
-  transition: opacity .3s;
+  transition: opacity .3s, box-shadow .2s;
 }
 .bf-feld::before {
-  content: 'Spielfeld · ' attr(data-plaetze); position: absolute; left: 14px; top: -10px; padding: 1px 8px; border-radius: 999px;
+  content: 'Spielfeld · ' attr(data-plaetze) ' · ▲ vorne'; position: absolute; left: 14px; top: -10px; padding: 1px 8px; border-radius: 999px; z-index: 300;
   font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #ffd68a; background: #1d0b33; box-shadow: 0 0 0 1px rgba(232, 169, 72, .4);
 }
-.bf-feld[data-leer] { opacity: .45; }
+/* vorne/hinten und Reichweite */
+.bf-feld::after {
+  content: 'Nahkampf-Reichweite · dahinter nur Armbrust'; position: absolute; left: 16px; right: 16px; pointer-events: none;
+  top: calc(14px + var(--reichweite, 50) * (100% - 30px - var(--feld-h)) / 100 + var(--feld-h) / 2);
+  border-top: 2px dashed rgba(255, 214, 138, .45); padding-top: 2px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; color: rgba(255, 214, 138, .7); text-shadow: 0 1px 2px #000;
+}
+.bf-feld[data-ohne-linie]::after { display: none; }
+.bf-feld[data-leer] { opacity: .55; }
+body.bf-platzwahl .bf-feld { opacity: 1; cursor: crosshair; box-shadow: inset 0 0 0 2px rgba(255, 214, 138, .85), 0 0 30px rgba(232, 169, 72, .35); }
 .bf-feld-card {
-  position: relative; width: calc(var(--feld-h) * 63 / 88); height: var(--feld-h); pointer-events: auto;
+  position: absolute; width: var(--fw); height: var(--feld-h); pointer-events: auto;
+  left: calc(16px + var(--x, 50) * (100% - 32px - var(--fw)) / 100);
+  top: calc(14px + var(--y, 50) * (100% - 30px - var(--feld-h)) / 100);
   transition: transform .5s cubic-bezier(.2, .8, .25, 1), opacity .45s, filter .45s;
 }
+body.bf-platzwahl .bf-feld-card:not(.bf-feld-geist) { pointer-events: none; }
+.bf-feld-geist { opacity: .55; pointer-events: none; z-index: 250 !important; transition: none; }
+.bf-feld-geist[hidden] { display: none; }
 .bf-feld-card img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 8px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .7)); }
 .bf-feld-hp { position: absolute; left: 6%; right: 6%; bottom: -8px; height: 12px; border-radius: 999px; overflow: hidden; background: rgba(8, 6, 12, .85); box-shadow: 0 0 0 1px rgba(255, 255, 255, .18); }
 .bf-feld-hp-fill { position: absolute; inset: 0 auto 0 0; width: 100%; background: linear-gradient(180deg, #5ee08a, #1f9a4c); transition: width .3s ease-out; }
@@ -98,7 +114,7 @@
 .bf-feld-zerstoert { opacity: 0; transform: scale(1.2) rotate(6deg); filter: brightness(2) blur(3px); }
 .bf-feld-weg { opacity: 0; transform: translateY(40px); }
 @keyframes bf-feld-wirkt { 40% { transform: translateY(-10px) scale(1.06); filter: brightness(1.35) drop-shadow(0 0 16px rgba(255, 214, 138, .9)); } }
-@media (max-width: 700px) { .bf-feld { min-width: 0; gap: 6px; padding: 6px 8px 12px; } }
+@media (max-width: 700px) { .bf-feld { width: 92vw; } }
 
 /* ---------- Übersicht (/raid) ---------- */
 /* Banner: Aufbau wie das Dungeon-Banner (.dg-hero in style.css), nur mit Dios Farben */

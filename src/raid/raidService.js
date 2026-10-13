@@ -100,7 +100,7 @@ async function start({ user }) {
 }
 
 /**
- * Ein Zug. action: { a: 'spielen', uid, ziel } | { a: 'einsetzen', uid } | { a: 'ende' }
+ * Ein Zug. action: { a: 'spielen', uid, ziel, x, y } | { a: 'einsetzen', uid } | { a: 'ende' } (x/y: Platz auf dem Spielfeld, 0–100)
  * Gibt { ev, state, ende } zurück; ende = { sieg, reward } sobald der Kampf vorbei ist.
  */
 async function act({ user, action }) {
@@ -125,7 +125,7 @@ async function act({ user, action }) {
 }
 
 /** Nur die bekannten Felder eines Zugs speichern */
-const clean = (a) => ({ a: String(a.a), ...(a.uid != null ? { uid: Number(a.uid) } : {}), ...(a.ziel != null ? { ziel: Number(a.ziel) } : {}) });
+const clean = (a) => ({ a: String(a.a), ...(a.uid != null ? { uid: Number(a.uid) } : {}), ...(a.ziel != null ? { ziel: Number(a.ziel) } : {}), ...(a.x != null ? { x: Number(a.x), y: Number(a.y) } : {}) });
 
 /** Kampf beenden: Status, bei Sieg Spielgeld und mit etwas Glück Lucky Dio */
 async function finish(run, s) {

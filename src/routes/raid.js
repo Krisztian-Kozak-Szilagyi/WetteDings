@@ -80,6 +80,9 @@ router.post('/raid/aktion', async (req, res) => {
     const action = { a: str(req.body.a) };
     if (req.body.uid !== undefined) action.uid = Number.parseInt(str(req.body.uid), 10);
     if (req.body.ziel !== undefined && str(req.body.ziel) !== '') action.ziel = Number.parseInt(str(req.body.ziel), 10);
+    // Platz auf dem Spielfeld (permanente Karten): 0–100, sonst ignoriert
+    const pos = (v) => Math.max(0, Math.min(100, Number.parseInt(str(v), 10)));
+    if (req.body.x !== undefined && Number.isFinite(pos(req.body.x)) && Number.isFinite(pos(req.body.y))) Object.assign(action, { x: pos(req.body.x), y: pos(req.body.y) });
     res.json(await raid.act({ user: req.user, action }));
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
