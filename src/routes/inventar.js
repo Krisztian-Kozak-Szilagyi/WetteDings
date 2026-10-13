@@ -15,7 +15,7 @@ const { euro } = require('../lib/viewHelpers');
 const router = express.Router();
 router.use('/inventar', requireLogin);
 
-router.get('/inventar', async (req, res) => {
+const page = (mode) => async (req, res) => {
   const [packs, itemList, foilable, shop] = await Promise.all([
     tcg.packInventory(req.user._id),
     items.itemInventory(req.user._id),
@@ -26,7 +26,8 @@ router.get('/inventar', async (req, res) => {
   ]);
   res.locals.newPacks = 0;
   res.render('inventar', {
-    title: 'Inventar',
+    mode,
+    title: mode === 'shop' ? 'Shop' : 'Inventar',
     packs,
     itemList: itemList.map((it) => ({ ...it, buy: items.buyPrice(it) })), // Shop-Preis aktuell aus den Admin-Einstellungen
     foilable,
@@ -37,7 +38,9 @@ router.get('/inventar', async (req, res) => {
     packImage: catalog.PACK_IMAGE,
     packType: catalog.DEFAULT_PACK,
   });
-});
+};
+router.get('/inventar', page('inventar'));
+router.get('/inventar/shop', page('shop'));
 
 async function act(req, res, fn) {
   try {
@@ -64,7 +67,7 @@ router.post('/inventar/verkaufen', (req, res) =>
     const count = Number.parseInt(str(req.body.count), 10);
     const { type, count: n, proceeds } = await items.sellItems({ user: req.user, type: str(req.body.type), count: Number.isInteger(count) ? count : 1 });
     return '/inventar'; // Slot oben aktualisiert sich
-    return '/inventar#shop'; // im Shop bleiben – bequem für weitere Käufe
+    return '/inventar/shop'; // im Shop bleiben – bequem für weitere Käufe
   })
 );
 
@@ -74,7 +77,7 @@ router.post('/inventar/kaufen', (req, res) =>
     const count = Number.parseInt(str(req.body.count), 10);
     const { type, count: n, cost } = await items.buyItems({ user: req.user, type: str(req.body.type), count: Number.isInteger(count) ? count : 1, via: 'bank' });
     req.flash('success', `${n}× ${type.label} gekauft für ${euro(cost)}.`);
-    return '/inventar#shop'; // im Shop bleiben – bequem für weitere Käufe
+    return '/inventar/shop'; // im Shop bleiben – bequem für weitere Käufe
   })
 );
 

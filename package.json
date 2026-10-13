@@ -14,6 +14,8 @@
     "dev:handel": "node scripts/dev-handel.js",
     "dev:bewertungen": "node scripts/dev-bewertungen.js",
     "dev:stufe": "node scripts/dev-stufe.js",
+    "dev:ruf": "node scripts/dev-ruf.js",
+    "dev:tests": "node scripts/dev-tests.js",
     "test": "node --test",
     "webp": "node scripts/webp.js",
     "sim:bosskampf": "node scripts/bossfight-sim.js"

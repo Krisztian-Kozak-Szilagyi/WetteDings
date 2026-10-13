@@ -1,25 +1,10 @@
-// Inventar (views/inventar.ejs): Reiter Inventar | Shop, Kategorie-Filter der Slots und Kaufen mit Anzahl (− / +).
+// Inventar und Shop (views/inventar.ejs, Seiten /inventar und /inventar/shop): Kategorie-Filter der Slots und Kaufen mit Anzahl (− / +).
 (function () {
   'use strict';
   var fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
-  // Reiter: #shop in der Adresse öffnet den Shop (nach dem Kaufen), sonst das Inventar
-  var tabs = document.querySelectorAll('[data-bag-tab]');
-  function show(key) {
-    tabs.forEach(function (t) {
-      var on = t.getAttribute('data-bag-tab') === key;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    document.querySelectorAll('[data-bag-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-bag-panel') !== key; });
-    try { history.replaceState(null, '', key === 'shop' ? '#shop' : location.pathname); } catch (err) { /* egal */ }
-  }
-  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.getAttribute('data-bag-tab')); }); });
-  document.addEventListener('click', function (e) {
-    var go = e.target.closest('[data-bag-goto]');
-    if (go) show(go.getAttribute('data-bag-goto'));
-  });
-  if (location.hash === '#shop') show('shop');
+  // Alte Adresse /inventar#shop: der Shop hat jetzt eine eigene Seite
+  if (location.hash === '#shop') { location.replace('/inventar/shop'); return; }
   // Pack öffnen: den Dialog vorher schließen, sonst liegt er über der Öffnungs-Animation
   document.addEventListener('submit', function (e) {
     if (!e.target.matches('[data-tcg-open]')) return;

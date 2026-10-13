@@ -488,7 +488,7 @@ async function registrationLog(query, { player = null, all = false } = {}) {
 
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
-const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Folie', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Sleeve & Slab', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
 const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function settingsRow(c) {
@@ -834,7 +834,7 @@ const CSV = {
     rows: (l) => [[csvDate(l.at), l.player, l.kind, l.text, csvEuro(l.amount)]],
   },
   grading: {
-    head: ['Angenommen', 'Erledigt', 'Spieler', 'Shop', 'Karte', 'Kunde', 'Echte Note', 'Geschätzte Note', 'Sauberkeit (%)', 'Versiegelung', 'Lohn (€)', 'Folie gefunden'],
+    head: ['Angenommen', 'Erledigt', 'Spieler', 'Shop', 'Karte', 'Kunde', 'Echte Note', 'Geschätzte Note', 'Sauberkeit (%)', 'Versiegelung', 'Lohn (€)', 'TCG Sleeve gefunden'],
     rows: (j) => [[csvDate(j.startedAt), j.done ? csvDate(j.at) : '', j.player, j.shop, j.card, j.customer, j.done ? j.grade : '', csvNum(j.guess, 0), csvNum(j.clean, 0), csvNum(j.seal, 0), j.done ? csvEuro(j.pay) : '', yesNo(j.foil)]],
   },
   handel: {
@@ -854,7 +854,7 @@ const CSV = {
     rows: (r) => [[csvDate(r.at), csvDate(r.endsAt), r.player, r.quest, r.difficulty, r.card, r.boosts.join(', '), IHK_STATE[r.state], r.state === 'laeuft' ? '' : csvEuro(r.reward), r.pack || '', csvDate(r.collectedAt)]],
   },
   dungeon: {
-    head: ['Gestartet', 'Ende', 'Dungeon', 'Ergebnis', 'Kämpfe gewonnen', 'Gescheitert an', 'Teilnehmer', 'Bot', 'Anführer', 'Karte', 'Boost', 'Lohn (€)', 'Folie', 'Boss-Karte'],
+    head: ['Gestartet', 'Ende', 'Dungeon', 'Ergebnis', 'Kämpfe gewonnen', 'Gescheitert an', 'Teilnehmer', 'Bot', 'Anführer', 'Karte', 'Boost', 'Lohn (€)', 'Sleeve/Slab', 'Boss-Karte'],
     rows: (r) =>
       r.members.map((m) => [
         csvDate(r.startedAt),

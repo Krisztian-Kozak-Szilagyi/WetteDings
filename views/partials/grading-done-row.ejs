@@ -6,7 +6,7 @@
     <span class="gr-done-meta">
       <% if (j.guess !== null && j.source === 'spieler') { %><span>Slab-Note <%= j.guess %> · Karte eines Mitglieds</span><% } else if (j.guess !== null) { %><span class="<%= j.guess === j.grade ? 'gr-ok' : '' %>">Note <%= j.guess %><%= j.guess === j.grade ? ' ✓' : ' (richtig: ' + j.grade + ')' %></span><% } else if (j.source === 'spieler') { %><span>gebügelt · Karte eines Mitglieds</span><% } %>
       <% if (j.seal !== null) { %><span> · <% if (j.shopCode) { %><b class="gr-shop-code"><%= j.shopCode %></b> <% } %>Versiegelung <%= j.seal %> %</span><% } %>
-      <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 Folie</a><% } %>
+      <% if (j.foilFound) { %><a class="gr-ok" href="/inventar"> · + 1 TCG Sleeve</a><% } %>
     </span>
   </span>
   <b class="gr-pay">+<%= euro(j.pay) %></b>
