@@ -21,6 +21,7 @@ const lineSchema = new Schema(
     grade: { type: Number, default: null }, // Note auf dem Slab (#73, #204: eine Folie allein zeigt keine)
     // Sichtbarer Zustand des Exemplars (#204) – zur Anzeige und für den Ø-Marktpreis (trade/marketPrice)
     slab: { type: new Schema({ code: String, grade: Number }, { _id: false }), default: null },
+    lastGrade: { type: new Schema({ code: String, grade: Number }, { _id: false }), default: null }, // unfoliert, aber früher im Slab: Note des letzten Shops
     damaged: { type: Boolean, default: false }, // Kratzer oder Knick
     creased: { type: Boolean, default: false }, // davon: Knick
     ironed: { type: Boolean, default: false }, // der Knick ist gebügelt

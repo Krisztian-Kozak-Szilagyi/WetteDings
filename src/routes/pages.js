@@ -24,6 +24,7 @@ const grading = require('../grading/gradingService');
 const gradingOrders = require('../grading/orderService');
 const { GradingShop } = require('../models/Grading');
 
+const { viewData } = require('../tcg/albumView');
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
@@ -226,6 +227,10 @@ router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
     isMe,
     ...coll,
     // eigene Karten: "du besitzt …" in der großen Ansicht (eigene Sammlung: die gezeigten Zahlen)
+    ...(await viewData(coll)),
+    seasons: catalog.SEASONS,
+    unreleased: [],
+    testCards: [],
     ownedCounts: mine ? Object.fromEntries(mine.map((o) => [o._id, o.n])) : coll.counts,
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),

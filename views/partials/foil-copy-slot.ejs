@@ -10,8 +10,9 @@
   const favOn = isAlbum && favoriteIds.has(favKey);
   const sellOff = f.lock === 'handel' ? 'Steht schon im Handel.' : f.lock ? 'Gerade gesperrt (' + (f.lock === 'quest' ? 'auf Quest' : f.lock === 'duell' ? 'im Duell' : f.lock === 'dungeon' ? 'im Dungeon' : f.lock === 'vitrine' ? 'in deiner Vitrine' : f.lock) + ').' : '';
   const isNew = isAlbum && locals.highlight === f.id;
+  const popSt = f.slab && locals.popStatsOf ? popStatsOf(c.id, f.slab.grade) : null; // Zertifikatsschild wie in der Vitrine
 %>
-<button type="button" id="f-<%= f.id %>" class="tcg-slot foil-slot r-<%= c.rarity %><%= isNew ? ' is-new' : '' %><%= f.slab ? ' is-slab' : ' is-sleeve' %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn, slab: f.slab, id: f.id, center: f.center, no: locals.no } : { trade: locals.linkFor ? linkFor(favKey) : null, slab: f.slab, id: f.id, center: f.center, no: locals.no }) %>
+<button type="button" id="f-<%= f.id %>" class="tcg-slot foil-slot r-<%= c.rarity %><%= isNew ? ' is-new' : '' %><%= f.slab ? ' is-slab' : ' is-sleeve' %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn, slab: f.slab, id: f.id, center: f.center, no: locals.no } : { trade: locals.linkFor ? linkFor(favKey) : null, slab: f.slab, id: f.id, center: f.center, no: locals.no }) %><% if (f.slab && (isAlbum || locals.popStatsOf)) { %> data-plaque<% } %><% if (isAlbum && f.lock === 'vitrine') { %> data-in-vitrine<% } %><% if (popSt) { %> data-pop-stats="<%= JSON.stringify(popSt) %>"<% } %>
   <% if (isAlbum) { %>data-album-foil data-sell-text="<%= euro(f.value) %>" data-base-text="<%= euro(r.sell || 0) %>"<% if (sellOff) { %> data-sell-off="<%= sellOff %>"<% } %><% } %>
   aria-label="<%= c.name %>, <%= r.label %>, <%= f.slab ? 'Slab ' + f.slab.code + ' Note ' + f.slab.grade : 'im Sleeve' %> seit <%= dayDate(f.foiledAt) %><%= favOn ? ', Favorit' : '' %> – ansehen">
   <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: f.slab, id: f.id, center: f.center }) %></span>

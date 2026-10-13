@@ -220,7 +220,7 @@ async function shopByCode(code) {
  */
 async function submittable(userId) {
   const [docs, locked] = await Promise.all([
-    TcgCard.find({ user: userId }).select('card rarity foiledAt slab damaged creased ironedAt condition.defects.scratches condition.defects.crease').lean(),
+    TcgCard.find({ user: userId }).select('card rarity foiledAt slab lastGrade damaged creased ironedAt condition.defects.scratches condition.defects.crease').lean(),
     lockedDocs(userId),
   ]);
   return docs
@@ -234,6 +234,7 @@ async function submittable(userId) {
       rarity: d.rarity,
       foiledAt: d.foiledAt,
       slab: d.slab ? { code: d.slab.code, grade: d.slab.grade, at: d.slab.at } : null,
+      lastGrade: !d.foiledAt && d.lastGrade && d.lastGrade.grade ? { code: d.lastGrade.code, grade: d.lastGrade.grade } : null, // früher bewertet, Slab ab
       damaged: !!d.damaged,
       creased: !!d.creased,
       ironed: !!d.ironedAt,
@@ -536,6 +537,14 @@ async function setShowcase({ user, docs }) {
   await GradingShop.updateOne({ _id: user._id }, { $set: { showcase: ids } });
 }
 
+/** Einen Slab aus der Vitrine nehmen (Album); die übrigen behalten ihre Reihenfolge */
+async function removeFromShowcase({ user, doc }) {
+  const shop = await GradingShop.findById(user._id).select('showcase').lean();
+  const ids = ((shop && shop.showcase) || []).map(String);
+  if (!ids.includes(String(doc))) throw new UserError('Dieser Slab steht nicht in deiner Vitrine.');
+  await setShowcase({ user, docs: ids.filter((id) => id !== String(doc)) });
+}
+
 /** Eigene Slabs für die Vitrine-Auswahl: [{ id, card, rarity, foiledAt, slab, shown, lock }] */
 async function showcaseChoices(userId) {
   const [docs, shop, locked] = await Promise.all([
@@ -597,5 +606,6 @@ module.exports = {
   closeWithRefund,
   rate,
   setShowcase,
+  removeFromShowcase,
   showcaseChoices,
 };

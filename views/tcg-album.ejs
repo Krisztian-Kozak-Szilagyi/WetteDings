@@ -10,51 +10,10 @@
     </div>
     <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
-  <%# Duplikate: an die Bank verkaufen (Geld) oder zerkleinern (Konfetti für den Kosmetik-Shop) – dieselben Karten %>
-  <div class="album-dupes" title="Von jeder Karte behältst du eine. Geschützte Karten (Schloss) werden nicht angefasst – auch ihre Duplikate nicht.">
-    <span><%= dupCount ? dupCount + (dupCount === 1 ? ' Duplikat' : ' Duplikate') : 'Keine Duplikate' %><% if (dupCount) { %> · <strong><%= euro(dupValue) %></strong><% } %></span>
-    <form method="post" action="/tcg/duplikate-verkaufen" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> für <%= euro(dupValue) %> verkaufen? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn btn-primary btn-sm" type="submit" <%= dupCount ? '' : 'disabled' %>>Verkaufen</button>
-    </form>
-    <form method="post" action="/tcg/duplikate-zerkleinern" data-confirm="<%= dupCount %> doppelte <%= dupCount === 1 ? 'Karte' : 'Karten' %> zu <%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %> zerkleinern? Von jeder Karte bleibt eine übrig, geschützte Karten bleiben komplett.">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <button class="btn btn-ghost btn-sm" type="submit" <%= dupCount && dupKonfetti ? '' : 'disabled' %>>Zerkleinern<% if (dupKonfetti) { %> · +<%= dupKonfetti.toLocaleString('de-DE') %> <%= konfettiName() %><% } %></button>
-    </form>
-    <a class="album-konfetti" href="/kosmetik" title="Zum Kosmetik-Shop"><%= konfetti.toLocaleString('de-DE') %> <%= konfettiName() %></a>
-  </div>
 </div>
 
 <div class="album-body" id="sammlung">
-  <%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
-  <%# Test-Karten stehen nicht in ihrer Season, sondern (nur für Admins) im Abschnitt "Test" ganz unten.
-      Noch nicht erhältliche Karten kommen als "?" ans Ende ihrer Season und zählen nicht mit. %>
-  <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key && c.rarity !== 'test-item'), soon: unreleased.filter((c) => c.season === s.key) })).filter((s) => s.list.length || s.soon.length); %>
-  <% const seasonOpts = (slabCopies.length ? [{ key: 'slabs', label: 'Slabs' }] : []).concat(seasonList.map((s) => ({ key: s.key, label: s.label })), testCards.length ? [{ key: 'test', label: 'Test' }] : []); %>
-  <div class="album-filter-row"><%- include('partials/tcg-filter', { seasonOpts }) %></div>
-  <% if (!cardCount) { %>
-    <p class="muted">Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!</p>
-  <% } %>
-  <%# Slabs: ganz oben als einzelne Karten. Karten im Sleeve stehen unten in den Seasons neben ihren Varianten ohne Sleeve. %>
-  <%- include('partials/slab-shelf') %>
-  <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
-    <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
-      <div class="album-season-head">
-        <h2 id="season-<%= s.key %>"><%= s.label %></h2>
-        <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
-      </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list.concat(s.soon), slabsAbove: true }) %>
-    </section>
-  <% }) %>
-  <% if (testCards.length) { %>
-    <section class="album-season" data-album-season-section="test" aria-labelledby="season-test">
-      <div class="album-season-head">
-        <h2 id="season-test">Test</h2>
-        <span class="tcg-progress-num"><%= testCards.filter((c) => counts[c.id]).length %> / <%= testCards.length %></span>
-      </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: testCards, slabsAbove: true }) %>
-    </section>
-  <% } %>
+  <%- include('partials/collection-view', { mode: 'album', dupes: true, emptyText: 'Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!' }) %>
 </div>
 
 <!-- Karte vergrößern -->
@@ -71,6 +30,11 @@
       <span class="tcg-modal-rarity"><span class="tcg-dot" data-tcg-modal-dot></span><span data-tcg-modal-rarity></span></span>
       <h2 data-tcg-modal-name></h2>
       <p class="tcg-modal-status" data-tcg-modal-count></p>
+      <%# Exemplare dieser Karte nach Wertung, befüllt aus der Kachel (public/js/tcg.js, partials/album-copies) %>
+      <div class="tcg-copylist" data-tcg-copylist hidden>
+        <h3>Deine Exemplare</h3>
+        <div class="tcg-copyrows" data-tcg-copyrows></div>
+      </div>
       <%# Meldung der letzten Aktion (Favorit, Schützen, Verkaufen) – nach dem Neuladen hier statt oben auf der Seite (#131) %>
       <p class="tcg-modal-note" data-tcg-modal-note role="status" hidden></p>
       <div class="tcg-modal-actions" data-tcg-owned-actions>
