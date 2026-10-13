@@ -171,7 +171,7 @@ const ledgerLabels = {
   item_kauf: 'Gegenstand gekauft',
   ihk_lohn: 'IHK-Quest geschafft',
   dungeon_lohn: 'Dungeon-Beute',
-  raid_lohn: 'Raid: Lucky Dio besiegt',
+  raid_lohn: 'The Gambit of Shadows: Lucky Dio besiegt',
   erfolg: 'Erfolg freigeschaltet',
   esports_gruendung: 'eSports: Team gegründet',
   esports_austritt: 'eSports: Austritt',

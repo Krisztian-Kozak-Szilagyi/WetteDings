@@ -1,4 +1,4 @@
-// Raid gegen Lucky Dio (/raid): Übersicht, Kampf beginnen, Kampf im Vollbild (/raid/kampf) mit Zügen über /raid/aktion.
+// Raid „The Gambit of Shadows“ gegen Lucky Dio (/raid): Übersicht, Kampf beginnen, Kampf im Vollbild (/raid/kampf) mit Zügen über /raid/aktion.
 // Entschieden wird auf dem Server (src/raid/raidService.js) – der Browser zeichnet nur.
 const express = require('express');
 const { requireLogin } = require('../middleware');
@@ -29,7 +29,7 @@ router.get('/raid', async (req, res) => {
   // Rollen im Deck (Angreifer, Verteidiger, Heiler) – hilft beim Planen
   const roles = deck.cards.reduce((m, c) => ({ ...m, [c.kampf.rolle || 'Spezial']: (m[c.kampf.rolle || 'Spezial'] || 0) + 1 }), {});
   res.render('raid', {
-    title: 'Raid: Lucky Dio',
+    title: 'The Gambit of Shadows',
     tries,
     deck,
     roles,
@@ -41,6 +41,8 @@ router.get('/raid', async (req, res) => {
     angriffe: s.angriffe.filter((a) => a.gewicht > 0),
     belohnung: s.belohnung,
     spieler: s.spieler,
+    karten: s.karten,
+    permanentImDeck: deck.cards.filter((c) => c.kampf.dauer === 'permanent').length,
     maxRounds: s.maxRounds,
     minCards: raid.MIN_CARDS,
   });
@@ -61,7 +63,7 @@ router.post('/raid/start', async (req, res) => {
 router.get('/raid/kampf', async (req, res) => {
   const cur = await raid.current(req.user._id);
   if (!cur) return res.redirect('/raid');
-  res.render('raid-kampf', { title: 'Raid: Lucky Dio', bossHp: cur.s.boss.max, spielerHp: cur.s.spieler.max });
+  res.render('raid-kampf', { title: 'The Gambit of Shadows', bossHp: cur.s.boss.max, spielerHp: cur.s.spieler.max });
 });
 
 // Zustand des laufenden Kampfs; beim allerersten Laden zusätzlich die Startereignisse (Karten ziehen, erste Ankündigung)

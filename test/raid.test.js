@@ -149,3 +149,70 @@ test('Raid: der Browser sieht weder Zufall noch die Reihenfolge des Nachziehstap
   assert.ok(pub.absicht && pub.hand.length);
   assert.doesNotThrow(() => JSON.stringify(pub));
 });
+
+test('Raid: Spielfeld – permanente Karten bleiben liegen, wirken jede Runde, Effektkarten gehen auf die Ablage', () => {
+  const o = JSON.parse(JSON.stringify(opts));
+  const permId = ids[0];
+  o.karten.permanent = [permId];
+  assert.deepEqual(logic.cleanSettings(o).karten.permanent, [permId]);
+  assert.deepEqual(logic.cleanSettings({ ...o, karten: { ...o.karten, permanent: ['gibt-es-nicht', 'casino-kaffee-6-glitch'] } }).karten.permanent, [], 'nur Charakterkarten');
+  assert.equal(logic.kampfFor(catalog.cardById[permId], o).dauer, 'permanent');
+  assert.equal(logic.kampfFor(catalog.cardById[ids[2]], o).dauer, 'effekt');
+  // Boss ohne Feld-Angriffe und ohne Krit-Lotterie, damit nur das Spielfeld zählt
+  const boss = { ...logic.bossDef(o), lotterie: null, feldZiel: 0, angriffe: [{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }] };
+  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energie: 10 }, boss });
+  s.hand = [];
+  const karte = (id) => ({ id, name: id, image: '', kampf: logic.kampfFor(catalog.cardById[id], o) });
+  s.hand.push({ uid: 900, card: karte(permId), buffs: [] }, { uid: 901, card: karte(ids[2]), buffs: [] });
+  const ev = R.spielen(s, 900);
+  assert.ok(ev.some((e) => e.t === 'feld'));
+  assert.equal(s.feld.length, 1);
+  assert.equal(s.feld[0].hp, o.karten.leben);
+  R.spielen(s, 901);
+  assert.equal(s.feld.length, 1, 'Effektkarte bleibt nicht liegen');
+  assert.equal(s.ablage.length, 1);
+  // nächste Runde: die permanente Karte wirkt erneut
+  const hp = s.boss.hp;
+  const runde = R.rundeEnde(s);
+  assert.ok(runde.some((e) => e.t === 'feldwirkt' && e.uid === 900));
+  const ang = s.feld[0].card.kampf.ang;
+  if (ang) assert.equal(hp - s.boss.hp, ang);
+  // Feld voll: keine weitere permanente Karte
+  s.sp = { ...s.sp, feldMax: 1 };
+  s.hand.push({ uid: 902, card: karte(permId), buffs: [] });
+  assert.match(R.spielbar(s, 902).grund, /Spielfeld ist voll/);
+  // ein Effekt nimmt die Karte vom Feld
+  const out = [];
+  assert.ok(R.verlassen(s, 900, 'Rauchbombe', out));
+  assert.equal(s.feld.length, 0);
+  assert.equal(out[0].t, 'verlassen');
+  assert.equal(R.verlassen(s, 900, 'x', []), null);
+});
+
+test('Raid: Dio greift Karten auf dem Spielfeld an und zerstört sie', () => {
+  const o = JSON.parse(JSON.stringify(opts));
+  o.karten.permanent = [ids[0]];
+  o.karten.leben = 15;
+  const boss = { ...logic.bossDef(o), lotterie: null, feldZiel: 1, angriffe: [{ key: 'dolch', name: 'Dolch', schaden: [10, 10], gewicht: 1 }] };
+  const { s } = R.neu(logic.deckCards(ids, o), { rng: () => 0.3, spieler: { ...logic.spielerDef(o), energie: 10 }, boss });
+  s.hand = [{ uid: 900, card: { id: ids[0], name: 'Wache', image: '', kampf: logic.kampfFor(catalog.cardById[ids[0]], o) }, buffs: [] }];
+  R.spielen(s, 900);
+  // die Ankündigung wurde vor dem Legen gewürfelt – neu ankündigen lassen (Ziel: die Karte)
+  R.rundeEnde(s);
+  assert.equal(s.absicht.ziel.uid, 900, 'feldZiel 100 % → die Karte ist das Ziel');
+  assert.equal(R.angriffsZiel(s).uid, 900);
+  const hpSpieler = s.spieler.hp;
+  s.effekte = s.effekte.filter((e) => e.art !== 'block'); // eigener Block der Karte zählt hier nicht
+  const ev = R.rundeEnde(s);
+  assert.ok(ev.some((e) => e.t === 'feldschaden' && e.uid === 900));
+  assert.equal(s.spieler.hp, hpSpieler, 'der Spieler bleibt verschont');
+  // nach dem zweiten Treffer (15 Leben, 10 Schaden je Angriff) ist sie zerstört
+  s.effekte = s.effekte.filter((e) => e.art !== 'block');
+  const ev2 = R.rundeEnde(s);
+  assert.ok(ev2.some((e) => e.t === 'verlassen' && e.grund === 'zerstoert'));
+  assert.equal(s.feld.length, 0);
+  assert.ok(s.ablage.some((i) => i.uid === 900));
+  assert.equal(s.absicht.ziel, null, 'leeres Feld → Dio zielt wieder auf den Spieler');
+  // der Browser sieht das Spielfeld
+  assert.ok(Array.isArray(logic.publicState(s).feld));
+});

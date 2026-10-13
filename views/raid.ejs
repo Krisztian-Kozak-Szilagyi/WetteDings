@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
 <link rel="stylesheet" href="/css/raid.css?v=<%= assetVersion %>">
 <%
-  // Raid gegen Lucky Dio: Übersicht vor dem Kampf (src/routes/raid.js). Gekämpft wird auf /raid/kampf.
+  // Raid „The Gambit of Shadows“ gegen Lucky Dio: Übersicht vor dem Kampf (src/routes/raid.js). Gekämpft wird auf /raid/kampf.
   const RESULT = { sieg: 'Sieg', niederlage: 'Niederlage', aufgegeben: 'Aufgegeben' };
   const canStart = !running && tries.left > 0 && deck.playable;
 %>
@@ -13,8 +13,8 @@
     <div class="dg-hero-shade"></div>
     <div class="dg-hero-text">
       <span class="kicker">Raid<%= running ? ' · läuft' : '' %></span>
-      <h1>Lucky Dio</h1>
-      <p class="dg-hero-sub">Der Glücksspieler mit Handarmbrust und Dolch hat sich in der Stadt verschanzt. Besiege ihn mit deinem Deck im rundenbasierten Kampf – nur dann hast du die Chance, seine Karte zu erbeuten.</p>
+      <h1>The Gambit of Shadows</h1>
+      <p class="dg-hero-sub">Vor dem BFW hat sich ein Portal in eine andere Dimension geöffnet. Durchschreitet den Schatten und versucht euer Glück.</p>
       <div class="raid-hero-actions">
         <% if (running) { %>
           <a class="btn btn-primary" href="/raid/kampf">Kampf fortsetzen (Runde <%= running.runde %>)</a>
@@ -41,6 +41,7 @@
       <p>„<%= deck.deck.name %>“ · <%= deck.deck.check.size %> Karten, davon <strong><%= deck.cards.length %></strong> im Raid spielbar (mindestens <%= minCards %>).</p>
       <ul class="raid-roles"><% Object.entries(roles).forEach(([r, n]) => { %><li><%= n %>× <%= r %></li><% }) %></ul>
       <p class="muted small">Im Raid kämpfen deine Charakterkarten. Jede hat eine Rolle nach ihrem stärksten IHK-Wert: <strong>FIA → Angreifer</strong> (Schaden), <strong>FIS → Verteidiger</strong> (blockt Dios nächsten Angriff), <strong>BWL → Heiler</strong>. Jede Karte kostet Energie, du hast <%= spieler.energie %> pro Runde. Items wie Kaffee spielen nicht mit.</p>
+      <p class="muted small"><strong>Spielfeld:</strong> Permanente Karten bleiben nach dem Ausspielen liegen (höchstens <%= spieler.feldMax %>, je <%= karten.leben %> Leben) und wirken jede Runde erneut, bis Dio sie zerstört. Effektkarten wirken einmal und gehen dann auf den Ablagestapel.<% if (permanentImDeck) { %> In deinem Deck: <strong><%= permanentImDeck %> permanent</strong>.<% } %></p>
       <a class="btn btn-ghost btn-sm" href="/deck">Deck bearbeiten</a>
     <% } %>
   </section>
@@ -64,6 +65,7 @@
     </div>
     <p class="small"><strong>Krit-Lotterie</strong> – wie auf seiner Karte: Jeder Angriff trifft mit <%= boss.grundKrit %> % kritisch (×<%= (boss.kritFaktor / 100).toLocaleString('de-DE') %>). Danach fliegt eine Münze: <strong>Kopf</strong> = kritischer Armbrust-Zusatztreffer, <strong>Zahl</strong> = Dolch-Zusatztreffer (<%= boss.zusatzMin %>–<%= boss.zusatzMax %>) und ein Glücks-Token – jeder Token gibt ihm +<%= boss.tokenKrit %> % Krit-Chance.</p>
     <p class="muted small">Planen zählt mehr als die Sammlung: Dio kündigt jeden Angriff eine Runde vorher an.</p>
+    <% if (boss.feldZiel) { %><p class="muted small">Liegen Karten auf deinem Spielfeld, greift er mit <%= boss.feldZiel %> % Chance eine von ihnen an statt dich – die Ankündigung zeigt, wen.</p><% } %>
     <p class="muted small">Ab <%= boss.wutAb %> % Leben wird Dio wütend: mehr Schaden, und schwere Angriffe kommen doppelt so oft.</p>
   </section>
 

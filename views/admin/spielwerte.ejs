@@ -379,7 +379,7 @@
 <% } %>
   <% if (sub === 'raid') { const rs = raid.settings; const rd = raid.defaults; const lim = raid.limits; %>
   <section class="stats-block" id="raid">
-    <%- blockHead('Raid: Lucky Dio', 'Rundenbasierter Kampf mit dem eigenen Deck gegen Lucky Dio – der einzige Weg an seine Karte. Entschieden wird auf dem Server; jeder Kampf behält die Werte, mit denen er begonnen hat. Änderungen gelten ab dem nächsten Kampf. Zum Ausprobieren neuer Werte: <code>npm run sim:raid</code> (zeigt Siegquoten je Deck-Stufe und Spielweise).') %>
+    <%- blockHead('Raid: The Gambit of Shadows', 'Rundenbasierter Kampf mit dem eigenen Deck gegen Lucky Dio – der einzige Weg an seine Karte. Entschieden wird auf dem Server; jeder Kampf behält die Werte, mit denen er begonnen hat. Änderungen gelten ab dem nächsten Kampf. Zum Ausprobieren neuer Werte: <code>npm run sim:raid</code> (zeigt Siegquoten je Deck-Stufe und Spielweise).') %>
     <div class="card">
       <form method="post" data-reauth action="/admin/raid" class="form panel-form" data-confirm="Raid-Einstellungen wirklich ändern?">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -396,14 +396,14 @@
 
         <fieldset class="admin-tax-group">
           <legend>Spieler</legend>
-          <% [['hp', 'Leben'], ['energie', 'Energie pro Runde'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Runde nachziehen'], ['handMax', 'Höchstens Karten auf der Hand']].forEach(([k, l]) => { %>
+          <% [['hp', 'Leben'], ['energie', 'Energie pro Runde'], ['startHand', 'Karten zu Beginn'], ['ziehen', 'Karten je Runde nachziehen'], ['handMax', 'Höchstens Karten auf der Hand'], ['feldMax', 'Plätze auf dem Spielfeld']].forEach(([k, l]) => { %>
             <label class="field"><span><%= l %></span><input type="number" name="spieler_<%= k %>" min="<%= lim.spieler[k][0] %>" max="<%= lim.spieler[k][1] %>" step="1" value="<%= rs.spieler[k] %>" required><small class="muted">Standard <%= rd.spieler[k] %></small></label>
           <% }) %>
         </fieldset>
 
         <fieldset class="admin-tax-group">
           <legend>Lucky Dio</legend>
-          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%']].forEach(([k, l, u]) => { %>
+          <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%'], ['feldZiel', 'Greift eine Karte auf dem Spielfeld an', '%']].forEach(([k, l, u]) => { %>
             <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="boss_<%= k %>" min="<%= lim.boss[k][0] %>" max="<%= lim.boss[k][1] %>" step="1" value="<%= rs.boss[k] %>" required><small class="muted">Standard <%= rd.boss[k] %></small></label>
           <% }) %>
         </fieldset>
@@ -452,6 +452,23 @@
             </table>
           </div>
           <small class="muted">Jede Charakterkarte hat eine Rolle nach ihrem stärksten IHK-Wert (FIA → Angreifer, FIS → Verteidiger, BWL → Heiler): dieser Wert zählt voll, die anderen mit „Nebenwerte“. Die Stärke je Seltenheit gleicht die sehr unterschiedlichen IHK-Werte aus (Glitch ≈ 4× Crumpled), damit vor allem das Spiel entscheidet.</small>
+        </fieldset>
+
+        <fieldset class="admin-tax-group">
+          <legend>Spielfeld: permanente Karten</legend>
+          <p class="muted small">Angekreuzte Karten bleiben nach dem Ausspielen auf dem Spielfeld liegen und wirken zu Beginn jeder Runde erneut, bis Dio sie zerstört oder ein Effekt sie entfernt. Alle anderen sind Effektkarten: Sie wirken einmal und gehen dann auf den Ablagestapel.</p>
+          <label class="field"><span>Leben permanenter Karten</span><input type="number" name="karten_leben" min="<%= lim.karten.leben[0] %>" max="<%= lim.karten.leben[1] %>" step="1" value="<%= rs.karten.leben %>" required><small class="muted">Standard <%= rd.karten.leben %></small></label>
+          <% const permSet = new Set(rs.karten.permanent); %>
+          <% raid.rarities.forEach((r) => { const list = raid.cards.filter((c) => c.rarity === r.key); if (!list.length) return; const n = list.filter((c) => permSet.has(c.id)).length; %>
+            <details class="raid-perm-group r-<%= r.key %>"<%= n ? ' open' : '' %>>
+              <summary><span class="tcg-dot"></span> <%= r.label %> <span class="muted small">(<%= n %> von <%= list.length %> permanent)</span></summary>
+              <div class="raid-perm-list">
+                <% list.forEach((c) => { %>
+                  <label class="check"><input type="checkbox" name="permanent" value="<%= c.id %>" <%= permSet.has(c.id) ? 'checked' : '' %>> <span><%= c.name %></span></label>
+                <% }) %>
+              </div>
+            </details>
+          <% }) %>
         </fieldset>
 
         <fieldset class="admin-tax-group">

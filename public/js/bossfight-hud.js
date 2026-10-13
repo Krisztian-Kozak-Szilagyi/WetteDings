@@ -4,6 +4,7 @@
 //   Hand unten: Klick = spielen; Druiden fragen danach nach einer Zielkarte (Esc/Rechtsklick = abbrechen).
 //   Ausrüstung rechts neben dem Avatar: Waffe/Zauber anklicken = angreifen (einmal pro Runde).
 //   Über dem Avatar laufende Effekte (Ring = verbleibende Runden), unter dem Boss-Leben seine Ankündigung.
+//   Spielfeld über der Hand (nur Raid, [data-bf-feld]): permanente Karten mit eigenem Leben; Dios Ziel leuchtet rot.
 //   Karte 0,5 s unter der Maus = große Vorschau.
 // Zum Ausprobieren in der Konsole: bossfight.zustand() zeigt den Zustand.
 // Raid (body data-raid="1", views/raid-kampf.ejs): entschieden wird auf dem Server – jeder Zug geht an /raid/aktion,
@@ -19,6 +20,7 @@
   var energieEl = document.querySelector('[data-bf-energy]');
   var effekteEl = document.querySelector('[data-bf-effects]');
   var absichtEl = document.querySelector('[data-bf-intent]');
+  var feldEl = document.querySelector('[data-bf-feld]');
   if (!R || !hand || !deckEl || !gearEl) return;
   var deckCount = deckEl.querySelector('[data-bf-deck-count]');
   var avatar = document.querySelector('.bf-avatar');
@@ -27,6 +29,7 @@
   var laufend = false; // Ereignisse werden gerade abgespielt – solange keine Eingaben
   var handEls = new Map(); // uid -> Element in der Hand
   var gearEls = new Map(); // uid -> Element der Ausrüstung
+  var feldEls = new Map(); // uid -> Element einer permanenten Karte auf dem Spielfeld
   var ziel = null; // Druide, der gerade ein Ziel sucht: { uid, el }
   var raid = document.body.getAttribute('data-raid') === '1';
   var csrf = document.body.getAttribute('data-csrf') || '';
@@ -134,7 +137,8 @@
     if (!k) return 'Kann im Bosskampf nicht gespielt werden.';
     var teile = [];
     if (inst && s) teile.push('Kosten: ' + R.kosten(s, inst) + ' Energie');
-    if (k.typ === 'held') teile.push('wirkt sofort');
+    if (R.istPermanent(k)) teile.push('permanent: bleibt auf dem Spielfeld (' + (k.leben || 1) + ' Leben) und wirkt jede Runde erneut');
+    else if (k.typ === 'held') teile.push(k.dauer === 'effekt' ? 'Effektkarte: wirkt einmal, dann Ablagestapel' : 'wirkt sofort');
     else if (k.typ === 'schild') teile.push('Schild, bleibt liegen');
     else teile.push('bleibt liegen, einmal pro Runde einsetzbar');
     if (inst && inst.buffs && inst.buffs.length) teile.push('gestärkt: ' + buffText(inst));
@@ -237,6 +241,52 @@
     setTimeout(function () { el.remove(); }, 500);
   }
 
+  // ---------- Spielfeld: permanente Karten mit Lebensbalken ----------
+  function feldKarte(f) {
+    var el = document.createElement('div');
+    el.className = 'bf-feld-card';
+    el.innerHTML = '<img alt="" draggable="false"><span class="bf-feld-hp"><span class="bf-feld-hp-fill"></span><b class="bf-feld-hp-text"></b></span>';
+    el.querySelector('img').src = f.card.image;
+    el.querySelector('img').alt = f.card.name;
+    el.title = f.card.name;
+    previewOn(el, f.card, null);
+    feldEls.set(f.uid, el);
+    (feldEl || gearEl).appendChild(el);
+    return el;
+  }
+  function feldHp(el, hp, max) {
+    el.dataset.max = max;
+    el.querySelector('.bf-feld-hp-fill').style.width = Math.max(0, (hp / max) * 100) + '%';
+    el.querySelector('.bf-feld-hp-text').textContent = hp + ' / ' + max;
+    el.title = el.querySelector('img').alt + ' – ' + hp + ' / ' + max + ' Leben';
+  }
+  function anstossen(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function zeichnenFeld() {
+    if (!s) return;
+    var feld = s.feld || [];
+    var da = new Set(feld.map(function (f) { return f.uid; }));
+    feldEls.forEach(function (el, uid) {
+      if (da.has(uid)) return;
+      feldEls.delete(uid);
+      el.remove();
+    });
+    var ziel = s.absicht && s.absicht.ziel ? s.absicht.ziel.uid : null;
+    feld.forEach(function (f) {
+      var el = feldEls.get(f.uid) || feldKarte(f);
+      feldHp(el, f.hp, f.max);
+      el.classList.toggle('bf-feld-ziel', f.uid === ziel && !s.vorbei);
+    });
+    if (feldEl) {
+      feldEl.toggleAttribute('data-leer', !feld.length);
+      feldEl.setAttribute('data-plaetze', feld.length + ' / ' + R.feldMax(s));
+    }
+  }
+
   // Held-Karte leuchtet kurz neben der Ausrüstung auf und verschwindet
   function aufblitzen(c, von) {
     var flash = document.createElement('div');
@@ -291,9 +341,40 @@
         handEls.delete(e.inst.uid);
         if (hel) hel.remove();
         layout();
-        if (e.inst.card.kampf.typ === 'held') letzteQuelle.set(e.inst.uid, aufblitzen(e.inst.card, von));
+        if (e.permanent) letzteQuelle.set(e.inst.uid, von); // gleitet gleich aufs Spielfeld ('feld')
+        else if (e.inst.card.kampf.typ === 'held') letzteQuelle.set(e.inst.uid, aufblitzen(e.inst.card, von));
         else letzteQuelle.set(e.inst.uid, von);
-        return warte(e.inst.card.kampf.typ === 'held' ? 350 : 0);
+        return warte(e.inst.card.kampf.typ === 'held' && !e.permanent ? 350 : 0);
+      }
+      case 'feld': {
+        var fel = feldEls.get(e.f.uid) || feldKarte(e.f);
+        feldHp(fel, e.f.hp, e.f.max);
+        gleiten(fel, letzteQuelle.get(e.f.uid));
+        letzteQuelle.set(e.f.uid, fel);
+        if (feldEl) feldEl.removeAttribute('data-leer');
+        return warte(380);
+      }
+      case 'feldwirkt':
+        anstossen(feldEls.get(e.uid), 'bf-feld-wirkt');
+        return warte(260);
+      case 'feldschaden': {
+        var tel = feldEls.get(e.uid);
+        if (tel) {
+          feldHp(tel, e.hp, Number(tel.dataset.max) || e.hp);
+          anstossen(tel, 'bf-feld-treffer');
+          popup(tel, '−' + e.wert + (e.text ? ' ' + e.text : ''), 'bf-pop-player');
+        }
+        return warte(300);
+      }
+      case 'verlassen': {
+        var vel = feldEls.get(e.uid);
+        feldEls.delete(e.uid);
+        if (vel) {
+          popup(vel, e.grund === 'zerstoert' ? e.card.name + ' zerstört' : e.card.name + ' verlässt das Feld', 'bf-pop-info');
+          vel.classList.add(e.grund === 'zerstoert' ? 'bf-feld-zerstoert' : 'bf-feld-weg');
+          setTimeout(function () { vel.remove(); }, 600);
+        }
+        return warte(450);
       }
       case 'ausgeruestet': {
         e.weg.forEach(function (g) { gearWeg(g, 'bf-gear-out'); });
@@ -306,7 +387,7 @@
         zeichnenGear();
         return null;
       case 'boss': {
-        var quelle = (e.uid && (gearEls.get(e.uid) || letzteQuelle.get(e.uid))) || effekteEl || gearEl;
+        var quelle = (e.uid && (gearEls.get(e.uid) || feldEls.get(e.uid) || letzteQuelle.get(e.uid))) || effekteEl || gearEl;
         if (!(quelle instanceof Element)) quelle = gearEl;
         return fx(e.fx, quelle).then(function (p) {
           bossBar.set(e.hp);
@@ -336,13 +417,16 @@
       }
       case 'bossangriff': {
         document.body.classList.add('bf-boss-attack');
-        var angriff = e.aus || !window.bossfightFx || !avatar
+        // trifft er eine Karte auf dem Spielfeld, fliegt der Angriff dorthin statt zum Avatar
+        var getroffen = (e.ziel && feldEls.get(e.ziel)) || avatar;
+        var angriff = e.aus || !window.bossfightFx || !getroffen
           ? warte(250)
-          : Promise.race([window.bossfightFx.bossAngriff(avatar, e.schild), warte(800)]);
+          : Promise.race([window.bossfightFx.bossAngriff(getroffen, e.schild), warte(800)]);
         return angriff.then(function () {
           document.body.classList.remove('bf-boss-attack');
-          if (e.aus) popup(spielerBar.el, e.absicht.name + ': ausgesetzt', 'bf-pop-info');
-          else if (e.details.length) popup(spielerBar.el, e.absicht.name + ' ' + e.roh + ' → ' + e.wert + ' (' + e.details.join(', ') + ')', 'bf-pop-info');
+          var bei = (e.ziel && feldEls.get(e.ziel)) || spielerBar.el;
+          if (e.aus) popup(bei, e.absicht.name + ': ausgesetzt', 'bf-pop-info');
+          else if (e.details.length) popup(bei, e.absicht.name + ' ' + e.roh + ' → ' + e.wert + ' (' + e.details.join(', ') + ')', 'bf-pop-info');
           return warte(200);
         });
       }
@@ -356,10 +440,11 @@
         return warte(200);
       case 'absicht':
         zeichnenAbsicht();
+        zeichnenFeld();
         return null;
       case 'zusatz':
         // Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf nach seinem Angriff
-        popup(spielerBar.el, (e.seite === 'kopf' ? 'Kopf! Armbrust-Krit ' : 'Zahl · Dolch ') + e.wert + (e.seite === 'zahl' ? ' · Glücks-Token ' + e.tokens : ''), e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
+        popup((e.ziel && feldEls.get(e.ziel)) || spielerBar.el, (e.seite === 'kopf' ? 'Kopf! Armbrust-Krit ' : 'Zahl · Dolch ') + e.wert + (e.seite === 'zahl' ? ' · Glücks-Token ' + e.tokens : ''), e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
         return warte(450);
       case 'muenze':
         // Münzwurf-Angriff: Kopf trifft mehrfach, Zahl gibt dem Boss einen Glücks-Token (stärkt seine Angriffe)
@@ -400,6 +485,7 @@
       el.classList.toggle('bf-zu-teuer', !!inst.card.kampf && R.kosten(s, inst) > s.energie);
     });
     zeichnenGear();
+    zeichnenFeld();
     zeichnenEffekte();
     zeichnenAbsicht();
     layout();
@@ -428,7 +514,9 @@
     var lot = s.bd && s.bd.lotterie;
     if (lot) muenze += ' · danach Münzwurf: ' + lot.zusatz[0] + '–' + lot.zusatz[1] + ' (Kopf ×' + String(lot.kritFaktor).replace('.', ',') + ')';
     var extra = (a.gift ? ' + Gift ' + a.gift.schaden + '×' + a.gift.runden : a.netz ? ' + ' + (raid ? 'Rauch' : 'Netz') + ' (−' + a.netz + ' Energie)' : '') + muenze;
-    var trifft = v.aus ? 'ausgesetzt' : v.wert !== a.schaden ? 'trifft dich mit ' + v.wert : '';
+    var zielKarte = R.angriffsZiel(s);
+    var wen = zielKarte ? zielKarte.card.name : 'dich';
+    var trifft = v.aus ? 'ausgesetzt' : v.wert !== a.schaden || zielKarte ? 'trifft ' + wen + ' mit ' + v.wert : '';
     absichtEl.innerHTML = '';
     var b = document.createElement('b');
     b.textContent = a.name + ' ' + a.schaden;

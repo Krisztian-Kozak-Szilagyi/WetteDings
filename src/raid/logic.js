@@ -1,4 +1,4 @@
-// Raid gegen Lucky Dio – reine Logik ohne Datenbank: Einstellungen, Kampfwerte der Karten, Dio als Boss und das
+// Raid „The Gambit of Shadows“ gegen Lucky Dio – reine Logik ohne Datenbank: Einstellungen, Kampfwerte der Karten, Dio als Boss und das
 // Nachspielen eines Kampfs. Gekämpft wird mit den Bosskampf-Regeln (public/js/bossfight-regeln.js), die auch im
 // Browser laufen. Der Server hält jeden Kampf als Startwert + Liste der Züge und spielt ihn bei jedem Zug nach –
 // so entscheidet nur der Server, und niemand kann den Zufall vorausberechnen (src/raid/raidService.js).
@@ -25,23 +25,28 @@ const ATTACKS = [
 // Verteidiger, BWL → Heiler): dieser Wert zählt voll, die anderen beiden nur mit neben %. ANG = FIA × ang %, SCH = FIS × sch %,
 // HEI = BWL × hei %, jeweils mal Stärke der Seltenheit (gleicht die sehr unterschiedlichen IHK-Werte aus, damit im Raid
 // vor allem das Spiel entscheidet und nicht nur die Sammlung); Kosten = Energie je Seltenheit.
+// Spielfeld: Karten in karten.permanent bleiben nach dem Ausspielen liegen (höchstens spieler.feldMax), wirken jede Runde
+// erneut und haben karten.leben Leben; Dio greift mit boss.feldZiel % Chance eine von ihnen statt des Spielers an.
+// Alle anderen Karten sind Effektkarten (wirken einmal, dann Ablagestapel).
 const DEFAULTS = {
   open: false,
   triesPerDay: 3,
   maxRounds: 30,
-  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8 },
+  spieler: { hp: 200, energie: 3, startHand: 5, ziehen: 2, handMax: 8, feldMax: 5 },
   // Balance (npm run sim:raid, 2026-10-13, mit Dios Krit-Lotterie): kluges Spiel gewinnt mit Gold/Holo ≈ 47 %,
   // Holo/Bockhaber ≈ 67 %, Glitch ≈ 93 %; wer zufällig spielt, gewinnt mit denselben Decks ≈ 11 / 25 / 83 %
   // Krit-Lotterie wie Dios Karte: jeder Angriff krittet mit grundKrit % (+ tokenKrit % je Glücks-Token) und trifft dann
   // kritFaktor-fach; danach Münzwurf (kopfChance): Kopf = kritischer Armbrust-Zusatztreffer, Zahl = Dolch-Zusatztreffer
   // und ein Glücks-Token. Zusatztreffer: zusatzMin–zusatzMax Schaden. Der Münzwurf-Angriff trifft bei Kopf kopfFaktor-fach.
-  boss: { hp: 285, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, grundKrit: 10, kritFaktor: 200, tokenKrit: 1, zusatzMin: 4, zusatzMax: 6 },
+  boss: { hp: 285, wutAb: 50, wutFaktor: 125, kopfChance: 50, kopfFaktor: 200, grundKrit: 10, kritFaktor: 200, tokenKrit: 1, zusatzMin: 4, zusatzMax: 6, feldZiel: 35 },
   angriffe: ATTACKS,
   karten: {
     ang: 40,
     sch: 40,
     hei: 20,
     neben: 20,
+    leben: 40,
+    permanent: [], // Karten-IDs der permanenten Karten (Admin-Panel)
     kosten: { crumpled: 2, bfwler: 2, gold: 2, holo: 2, bockhaber: 2, glitch: 2, icon: 2, sith: 2, boss: 2, footman: 2, arcane: 2 },
     // ≈ Zielstärke ÷ Ø Hauptwert der Seltenheit: Crumpled 70 %, BFWler 77 %, Gold 84 %, Holo 90 %, Bockhaber 95 %, Glitch 100 %, Boss 110 %
     staerke: { crumpled: 256, bfwler: 209, gold: 190, holo: 178, bockhaber: 164, glitch: 100, icon: 110, sith: 110, boss: 106, footman: 209, arcane: 100 },
@@ -53,12 +58,15 @@ const DEFAULTS = {
 const LIMITS = {
   triesPerDay: [1, 50],
   maxRounds: [5, 200],
-  spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15] },
-  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500] },
+  spieler: { hp: [10, 1000], energie: [1, 10], startHand: [1, 10], ziehen: [0, 10], handMax: [3, 15], feldMax: [1, 10] },
+  boss: { hp: [50, 100000], wutAb: [0, 100], wutFaktor: [100, 500], kopfChance: [0, 100], kopfFaktor: [100, 1000], grundKrit: [0, 100], kritFaktor: [100, 1000], tokenKrit: [0, 20], zusatzMin: [0, 500], zusatzMax: [0, 500], feldZiel: [0, 100] },
   angriff: { min: [0, 1000], max: [0, 1000], gewicht: [0, 100], gift: [0, 100], giftRunden: [0, 10], netz: [0, 5] },
-  karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], kosten: [0, 10], staerke: [0, 1000] },
+  karten: { ang: [0, 500], sch: [0, 500], hei: [0, 500], neben: [0, 100], leben: [1, 1000], kosten: [0, 10], staerke: [0, 1000] },
   belohnung: { geld: [0, 100000000], dioChance: [0, 100] },
 };
+
+// Karten, die permanent sein können: Charaktere mit IHK-Werten (Items spielen im Raid nicht mit)
+const PERMANENT_OK = (card) => !!card && !!card.isCharacter && !!card.stats;
 
 const inRange = (v, [min, max], int = true) => Number.isFinite(v) && (!int || Number.isInteger(v)) && v >= min && v <= max;
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -78,7 +86,7 @@ function cleanSettings(input) {
     spieler: {},
     boss: {},
     angriffe: [],
-    karten: { kosten: {}, staerke: {} },
+    karten: { kosten: {}, staerke: {}, permanent: [] },
     belohnung: {},
   };
   for (const k of Object.keys(LIMITS.spieler)) out.spieler[k] = num(`Spieler ${k}`, s.spieler && s.spieler[k], LIMITS.spieler[k]);
@@ -94,6 +102,10 @@ function cleanSettings(input) {
   }
   if (!out.angriffe.some((a) => a.gewicht > 0)) errors.push('Mindestens ein Angriff braucht ein Gewicht über 0');
   for (const k of ['ang', 'sch', 'hei', 'neben']) out.karten[k] = num(`Karten ${k} %`, s.karten && s.karten[k], LIMITS.karten[k]);
+  out.karten.leben = num('Leben permanenter Karten', s.karten && s.karten.leben, LIMITS.karten.leben);
+  // permanente Karten: nur bekannte, im Raid spielbare Karten, jede einmal
+  const perm = s.karten && Array.isArray(s.karten.permanent) ? s.karten.permanent : [];
+  out.karten.permanent = [...new Set(perm.filter((id) => typeof id === 'string' && PERMANENT_OK(catalog.cardById[id])))].sort();
   for (const r of RARITY_KEYS) {
     out.karten.kosten[r] = num(`Kosten ${r}`, s.karten && s.karten.kosten && s.karten.kosten[r], LIMITS.karten.kosten);
     out.karten.staerke[r] = num(`Stärke ${r}`, s.karten && s.karten.staerke && s.karten.staerke[r], LIMITS.karten.staerke);
@@ -118,7 +130,8 @@ function mergeSettings(doc) {
     for (const k of ['triesPerDay', 'maxRounds']) if (doc[k] !== undefined) merged[k] = doc[k];
     for (const part of ['spieler', 'boss', 'belohnung']) Object.assign(merged[part], doc[part] || {});
     if (doc.karten) {
-      for (const k of ['ang', 'sch', 'hei', 'neben']) if (doc.karten[k] !== undefined) merged.karten[k] = doc.karten[k];
+      for (const k of ['ang', 'sch', 'hei', 'neben', 'leben']) if (doc.karten[k] !== undefined) merged.karten[k] = doc.karten[k];
+      if (Array.isArray(doc.karten.permanent)) merged.karten.permanent = doc.karten.permanent;
       Object.assign(merged.karten.kosten, doc.karten.kosten || {});
       Object.assign(merged.karten.staerke, doc.karten.staerke || {});
     }
@@ -157,6 +170,9 @@ function kampfFor(card, opts) {
     sch: v('fis', k.sch),
     hei: v('bwl', k.hei),
     rolle: ROLE_LABEL[role],
+    // Spielfeld: permanent = bleibt liegen bis zur Zerstörung, sonst Effektkarte
+    dauer: (k.permanent || []).includes(card.id) ? 'permanent' : 'effekt',
+    leben: k.leben,
     effekt: null,
     fx: FX[card.rarity] || 'hieb',
   };
@@ -180,6 +196,7 @@ function bossDef(opts) {
     hp: b.hp,
     wutAb: b.wutAb / 100,
     wutFaktor: b.wutFaktor / 100,
+    feldZiel: b.feldZiel / 100, // Chance, dass ein Angriff eine Karte auf dem Spielfeld trifft
     muenze: { kopfChance: b.kopfChance / 100, kopfFaktor: b.kopfFaktor / 100 },
     // Krit-Lotterie wie Dios Karte (public/js/bossfight-regeln.js: rundeEnde, zusatztreffer)
     lotterie: { kopfChance: b.kopfChance / 100, kritFaktor: b.kritFaktor / 100, grundKrit: b.grundKrit / 100, tokenKrit: b.tokenKrit / 100, zusatz: [b.zusatzMin, b.zusatzMax] },
@@ -246,6 +263,8 @@ function publicState(s) {
     bd: { key: s.bd.key, name: s.bd.name, hp: s.bd.hp, wutAb: s.bd.wutAb, muenze: s.bd.muenze || null, lotterie: s.bd.lotterie || null },
     hand: s.hand,
     gear: s.gear,
+    feld: s.feld,
+    ablage: s.ablage.length,
     effekte: s.effekte,
     gespielt: s.gespielt,
     absicht: s.absicht,
@@ -255,4 +274,4 @@ function publicState(s) {
   };
 }
 
-module.exports = { ROLE_LABEL, roleOf, ATTACKS, RARITY_KEYS, DEFAULTS, LIMITS, cleanSettings, mergeSettings, kampfFor, deckCards, bossDef, spielerDef, mulberry, applyAction, accepted, replay, publicState };
+module.exports = { ROLE_LABEL, roleOf, PERMANENT_OK, ATTACKS, RARITY_KEYS, DEFAULTS, LIMITS, cleanSettings, mergeSettings, kampfFor, deckCards, bossDef, spielerDef, mulberry, applyAction, accepted, replay, publicState };

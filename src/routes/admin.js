@@ -267,7 +267,14 @@ router.get('/admin', requireStaff, async (req, res) => {
           }
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
-    raid: { settings: raidService.settings, defaults: raidLogic.DEFAULTS, limits: raidLogic.LIMITS, rarities: raidLogic.RARITY_KEYS.map((k) => tcgCatalog.rarityByKey[k]) },
+    raid: {
+      settings: raidService.settings,
+      defaults: raidLogic.DEFAULTS,
+      limits: raidLogic.LIMITS,
+      rarities: raidLogic.RARITY_KEYS.map((k) => tcgCatalog.rarityByKey[k]),
+      // Karten, die auf dem Spielfeld liegen bleiben können (Charaktere), nach Seltenheit sortiert
+      cards: tcgCatalog.CARDS.filter(raidLogic.PERMANENT_OK).sort((a, b) => raidLogic.RARITY_KEYS.indexOf(a.rarity) - raidLogic.RARITY_KEYS.indexOf(b.rarity) || a.name.localeCompare(b.name, 'de')),
+    },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
@@ -555,7 +562,7 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
 });
 
 // ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
-// ---------- Raid gegen Lucky Dio: Regeln, Spieler, Boss, Angriffe, Kampfwerte der Karten, Beute ----------
+// ---------- Raid „The Gambit of Shadows“ gegen Lucky Dio: Regeln, Spieler, Boss, Angriffe, Kampfwerte, Spielfeld, Beute ----------
 router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const b = req.body;
   // Zahlen wie im Formular: ganze Zahlen, beim Gewicht auch Kommazahlen (z. B. 1,5)
@@ -585,7 +592,8 @@ router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwert
           muenze: b[`a_${a.key}_muenze`] === '1',
         })),
         karten: {
-          ...part('karten', ['ang', 'sch', 'hei', 'neben']),
+          ...part('karten', ['ang', 'sch', 'hei', 'neben', 'leben']),
+          permanent: [].concat(b.permanent || []), // angekreuzte Karten bleiben auf dem Spielfeld liegen
           kosten: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`kosten_${r}`])])),
           staerke: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`staerke_${r}`])])),
         },

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
   <link rel="stylesheet" href="/css/raid.css?v=<%= assetVersion %>">
 </head>
-<%# Raid gegen Lucky Dio – Vollbild wie der Bosskampf (views/bossfight.ejs): die Stadt bei Nacht als Hintergrund, Dio als Figur
+<%# Raid „The Gambit of Shadows“ gegen Lucky Dio – Vollbild wie der Bosskampf (views/bossfight.ejs): die Stadt bei Nacht als Hintergrund, Dio als Figur
     (public/js/raid-boss.js), darüber dieselbe Oberfläche (public/js/bossfight-hud.js im Raid-Modus: Züge gehen an den Server).
     Esc = zurück zur Raid-Seite %>
 <body class="bf-body raid-body" data-raid="1" data-csrf="<%= csrfToken %>">
@@ -41,6 +41,8 @@
       </div>
     </section>
     <section class="bf-gear" data-bf-gear aria-label="Ausrüstung"></section>
+    <%# Spielfeld: permanente Karten bleiben hier liegen, bis sie zerstört werden (public/js/bossfight-regeln.js) %>
+    <section class="bf-feld" data-bf-feld data-leer aria-label="Spielfeld"></section>
 
     <section class="bf-turn">
       <span class="bf-round" data-bf-round>Runde 1</span>
