@@ -39,6 +39,11 @@
   let target = null; // { label, run } – was E gerade tun würde
   let shelfUid = null; // offenes Regal-Fenster
   let pcTab = 'moebel';
+  let licenseList = [];
+  let serviceList = [];
+  let packs = [];
+  let more = { licenses: {}, services: {} };
+  const licensePrices = () => Object.fromEntries(licenseList.map((l) => [l.id, l.price]));
 
   const doAct = (type, extra) => Object.assign({ type }, extra);
 
@@ -56,7 +61,7 @@
 
   /** Lokal prüfen + zeichnen, dann speichern */
   function act(action) {
-    const r = L.apply(state, catalog, goods, Object.assign({ price: unitPrice }, action));
+    const r = L.apply(state, catalog, goods, Object.assign({ price: unitPrice }, action), more);
     if (r.error) { toast(r.error); return false; }
     state = r.state;
     refresh();
@@ -125,17 +130,17 @@
     ['ware', 'Ware bestellen'],
     ['preise', 'Preise'],
     ['bestand', 'Bestand'],
+    ['lizenzen', 'Lizenzen'],
     ['verkauf', 'Verkäufe / Tag'],
     ['bewertungen', 'Bewertungen'],
     ['belege', 'Belege'],
     '–',
     ['ruf', 'Ruf'],
-    ['lizenzen', 'Lizenzen'],
     ['kleidung', 'Kleidung'],
     ['propaganda', 'Propaganda drucken'],
     ['level', 'Level'],
   ];
-  const LATER = ['ruf', 'lizenzen', 'kleidung', 'propaganda', 'level'];
+  const LATER = ['ruf', 'kleidung', 'propaganda', 'level'];
 
   function openPc() {
     const dlg = $('[data-shop-pc]');
@@ -162,6 +167,7 @@
     else if (pcTab === 'ware') pcWare(body);
     else if (pcTab === 'preise') pcPreise(body);
     else if (pcTab === 'bestand') pcBestand(body);
+    else if (pcTab === 'lizenzen') pcLizenzen(body);
     else if (pcTab === 'verkauf') pcVerkauf(body);
     else if (pcTab === 'bewertungen') pcBewertungen(body);
     else if (pcTab === 'belege') pcBelege(body);
@@ -210,14 +216,23 @@
   }
 
   function pcWare(body) {
+    ['ware', 'material'].forEach((kind) => {
+      body.appendChild(el('div', 'sd-group', kind === 'ware' ? 'Ware zum Verkaufen' : 'Material für Aufträge (in den Arbeitstisch einräumen)'));
+      pcWareTable(body, goodsList.filter((g) => (g.kind || 'ware') === kind));
+    });
+    body.appendChild(el('p', 'sd-later', 'Bestelltes landet als Karton auf dem Gehweg vor dem Eingang.'));
+  }
+
+  function pcWareTable(body, rows) {
     const { t, tb } = table([['Ware'], ['Karton', 1], ['Einkauf/Stück', 1], ['Karton-Preis', 1], ['']]);
-    goodsList.forEach((g) => {
+    rows.forEach((g) => {
       const tr = el('tr');
       const name = el('td');
       const sw = el('span', 'sd-swatch');
       sw.style.background = hex(g.color);
       name.append(sw, g.name);
-      name.appendChild(el('span', 'sub', 'Marktpreis ' + fmt(g.market)));
+      const lic = g.license && !state.licenses.includes(g.license) ? more.licenses[g.license] : null;
+      name.appendChild(el('span', 'sub', lic ? 'braucht die ' + lic.name : g.kind === 'material' ? 'wird bei Aufträgen verbraucht' : 'Marktpreis ' + fmt(g.market)));
       tr.appendChild(name);
       tr.appendChild(el('td', 'num', g.perBox + ' Stück'));
       tr.appendChild(el('td', 'num', fmt(g.buy)));
@@ -226,14 +241,37 @@
       const td = el('td', 'num');
       const b = el('button', 'sd-btn', '1 Karton');
       b.type = 'button';
-      b.disabled = boxCost > state.coins;
+      b.disabled = boxCost > state.coins || !!lic;
       b.addEventListener('click', () => { if (act(doAct('orderWare', { id: g.id, n: 1 }))) renderPc(); });
       td.appendChild(b);
       tr.appendChild(td);
       tb.appendChild(tr);
     });
     body.appendChild(t);
-    body.appendChild(el('p', 'sd-later', 'Bestelltes landet als Karton auf dem Gehweg vor dem Eingang.'));
+  }
+
+  function pcLizenzen(body) {
+    const { t, tb } = table([['Lizenz'], ['Preis', 1], ['']]);
+    licenseList.forEach((l) => {
+      const tr = el('tr');
+      const name = el('td', '', l.name);
+      name.appendChild(el('span', 'sub', l.text));
+      tr.appendChild(name);
+      tr.appendChild(el('td', 'num', fmt(l.price)));
+      const td = el('td', 'num');
+      if (state.licenses.includes(l.id)) td.appendChild(el('span', 'sd-later', 'Gekauft'));
+      else {
+        const b = el('button', 'sd-btn', 'Kaufen');
+        b.type = 'button';
+        b.disabled = l.price > state.coins;
+        b.addEventListener('click', () => { if (act(doAct('buyLicense', { id: l.id }))) renderPc(); });
+        td.appendChild(b);
+      }
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+    body.appendChild(el('p', 'sd-later', 'Ohne Lizenz: Boosterpacks, Kartenhüllen, Toploader, Getränke, Material.'));
   }
 
   function priceInput(id) {
@@ -257,8 +295,9 @@
   }
 
   function pcPreise(body) {
+    body.appendChild(el('div', 'sd-group', 'Ware'));
     const { t, tb } = table([['Ware'], ['Einkauf', 1], ['Marktpreis', 1], ['Dein Preis', 1]]);
-    goodsList.forEach((g) => {
+    goodsList.filter((g) => (g.kind || 'ware') === 'ware').forEach((g) => {
       const tr = el('tr');
       tr.appendChild(el('td', '', g.name));
       tr.appendChild(el('td', 'num', fmt(g.buy)));
@@ -269,6 +308,28 @@
       tb.appendChild(tr);
     });
     body.appendChild(t);
+    body.appendChild(el('div', 'sd-group', 'Dienstleistungen (Kunden-Aufträge)'));
+    const sv = table([['Dienst'], ['Arbeitstisch'], ['Marktpreis', 1], ['Dein Preis', 1]]);
+    serviceList.forEach((x) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', x.name));
+      tr.appendChild(el('td', '', (catalog[x.station] || {}).name || ''));
+      tr.appendChild(el('td', 'num', fmt(x.market)));
+      const td = el('td', 'num');
+      const inp = el('input');
+      inp.type = 'number';
+      inp.min = '0';
+      inp.step = '0.01';
+      inp.value = L.servicePrice(state, more, x.id);
+      inp.addEventListener('change', () => {
+        const v = Number(String(inp.value).replace(',', '.'));
+        if (act(doAct('setServicePrice', { service: x.id, price: v }))) inp.value = L.servicePrice(state, more, x.id);
+      });
+      td.appendChild(inp);
+      tr.appendChild(td);
+      sv.tb.appendChild(tr);
+    });
+    body.appendChild(sv.t);
   }
 
   function pcBestand(body) {
@@ -551,10 +612,13 @@
       reserved[k] = Math.max(0, (reserved[k] || 0) - b.qty);
     });
   }
+  const isWare = (id) => !!goods[id] && (goods[id].kind || 'ware') === 'ware';
+  /** Verkäufliche Ware im ganzen Laden (Material an den Arbeitstischen zählt nicht) */
   function shopStock() {
-    return state.items.reduce((a, it) => a + L.used(it), 0);
+    return state.items.reduce((a, it) => a + Object.keys(it.stock || {}).filter(isWare).reduce((n, w) => n + it.stock[w], 0), 0);
   }
-  const holders = () => state.items.filter((it) => catalog[it.id].holds);
+  // Möbel, an denen Kunden sich Ware ansehen (nicht die Arbeitstische mit Material)
+  const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare));
   const counter = () => state.items.find((it) => it.id === L.PC_ID);
 
   function openDay() {
@@ -587,7 +651,11 @@
   }
 
   function spawn() {
-    const c = C.newCustomer(day.rng, goodsList, 1);
+    const c = C.newCustomer(day.rng, goodsList, { tier: 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
+    // Bringt er eine Karte? Nur mit passenden Tischen und höchstens 2 Aufträge (auch die, die noch an der Kasse stehen)
+    const pendingJobs = state.jobs.length + day.customers.filter((o) => o.services && !o.jid && !o.gone && o.phase !== 'leave').length;
+    c.services = C.serviceWish(day.rng, new Set(state.items.map((it) => it.id)), pendingJobs, packs, serviceList);
+    if (c.services) c.wish = null;
     const sx = Math.floor(day.rng() * state.units * L.UNIT_W);
     Object.assign(c, {
       id: day.nextId++, x: sx + 0.5, y: L.UNIT_D + L.SIDEWALK - 0.4, path: [], phase: 'enter', wait: 0,
@@ -599,7 +667,7 @@
     const all = holders();
     const withWish = all.filter((it) => c.wish && freeStock(it, c.wish) > 0);
     const rest = all.filter((it) => !withWish.includes(it)).sort(() => day.rng() - 0.5);
-    c.visit = withWish.slice(0, 2).concat(rest).slice(0, 3).map((it) => it.uid);
+    c.visit = c.services ? [] : withWish.slice(0, 2).concat(rest).slice(0, 3).map((it) => it.uid);
     day.customers.push(c);
   }
 
@@ -616,6 +684,7 @@
   }
 
   function nextLeg(c) {
+    if (c.services) { c.phase = 'queue'; c.wait = 0; queueUp(c); say(c, 'Ich hab eine Karte für euch!', 2.5); return; }
     while (c.visit.length) {
       const it = state.items.find((i) => i.uid === c.visit[0]);
       if (it && goTo(c, C.approach(state, catalog, it, blockSet))) { c.phase = 'look'; c.lookAt = it.uid; return; }
@@ -683,7 +752,72 @@
       .sort((a, b) => b.wait - a.wait)[0] || null;
   }
 
+  /** Auftrag annehmen (Preis prüfen, Server würfelt die Karte), Kunde setzt sich und wartet */
+  function acceptJob(c) {
+    const price = c.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
+    const market = c.services.reduce((a, id) => a + ((more.services[id] || {}).market || 0), 0);
+    const j = C.judge(price, market, c.tol);
+    if (!j.buy) {
+      say(c, 'Viel zu teuer!', 2.5);
+      leave(c, null);
+      return;
+    }
+    c.priceStars = j.stars;
+    c.phase = 'taking';
+    const body = new URLSearchParams({ _csrf: root.dataset.csrf, aktion: JSON.stringify({ type: 'takeJob', services: c.services, cid: c.id }) });
+    fetch('/api/shop-demo', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.state) state = res.state;
+        if (res.error || !res.jid) {
+          toast(res.error || 'Auftrag nicht angenommen.');
+          refresh();
+          leave(c, null);
+          return;
+        }
+        c.jid = res.jid;
+        const job = state.jobs.find((x) => x.jid === c.jid);
+        c.services = job.services; // evtl. mit Bügeln
+        const tables = new Set(job.services.map((id) => more.services[id].station));
+        c.patience = C.SERVICE_PATIENCE * tables.size;
+        c.phase = 'wait';
+        c.wait = 0;
+        say(c, 'Danke! Ich warte dort.', 2.5);
+        goTo(c, waitSpot(c));
+        refresh();
+      })
+      .catch(() => { toast('Keine Verbindung.'); leave(c, null); });
+  }
+
+  /** Wo ein Kunde mit Auftrag wartet: neben einem freien Stuhl, sonst irgendwo frei im Laden */
+  function waitSpot(c) {
+    const taken = new Set(day.customers.filter((o) => o !== c && o.phase === 'wait' && o.seat).map((o) => o.seat));
+    for (const it of state.items.filter((i) => i.id === 'chair' || i.id === 'beanbag')) {
+      const spots = Array.from(C.approach(state, catalog, it, blockSet)).filter((k) => !taken.has(k));
+      if (spots.length) { c.seat = spots[0]; return new Set([spots[0]]); }
+    }
+    const spots = queueSpots().slice().reverse().filter((k) => !taken.has(k));
+    c.seat = spots[0] || null;
+    return new Set(spots.slice(0, 1));
+  }
+
+  function jobOf(c) {
+    return c.jid ? state.jobs.find((x) => x.jid === c.jid) : null;
+  }
+
+  function serveJob(c) {
+    const job = jobOf(c);
+    if (!job) { leave(c, null); return; }
+    const stars = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
+    const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
+    act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: 'job' + stars }));
+    say(c, '+' + fmt(total) + ' Kanacoin', 2);
+    leave(c, null, 'paid');
+  }
+
   function serve(c) {
+    if (c.services && !c.jid) { acceptJob(c); return; }
+    if (c.jid) { serveJob(c); return; }
     const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
     const rev = C.review(c.result, shopStock(), day.rng);
     release(c);
@@ -722,7 +856,19 @@
       if (c.wait >= C.PATIENCE) {
         release(c);
         say(c, 'Zu lange gewartet!', 2.5);
-        leave(c, C.angryReview());
+        if (c.jid && jobOf(c)) { act(doAct('jobCancel', Object.assign({ jid: c.jid }, C.angryReview()))); leave(c, null, 'paid'); }
+        else leave(c, C.angryReview());
+      }
+      return;
+    }
+    if (c.phase === 'wait') {
+      c.wait += sec;
+      const job = jobOf(c);
+      if (job && !L.nextService(job)) { c.phase = 'queue'; c.wait = 0; say(c, 'Ist meine Karte fertig?', 2.5); queueUp(c); return; }
+      if (!job || c.wait >= c.patience) {
+        say(c, 'Das dauert mir zu lange!', 2.5);
+        if (job) act(doAct('jobCancel', { jid: job.jid, stars: 2, why: 'jobwait' }));
+        leave(c, null, 'paid'); // jobCancel zählt den Besuch schon
       }
       return;
     }
@@ -744,8 +890,9 @@
       g.fillStyle(0xe8c09a, 1);
       g.fillCircle(p.x, p.y - 37, 8);
       if (c.basket.length && c.phase !== 'leave') { g.fillStyle(0xf0d48a, 1); g.fillRect(p.x + 6, p.y - 20, 8, 7); }
-      if (c.phase === 'queue' && !c.path.length) {
-        const left = Math.max(0, 1 - c.wait / C.PATIENCE);
+      if (c.services && c.phase !== 'leave') { g.fillStyle(0xffffff, 1); g.fillRect(p.x + 6, p.y - 24, 6, 9); g.lineStyle(1, 0x5aa0e0, 1); g.strokeRect(p.x + 6, p.y - 24, 6, 9); }
+      if ((c.phase === 'queue' || c.phase === 'wait') && !c.path.length) {
+        const left = Math.max(0, 1 - c.wait / (c.phase === 'wait' ? c.patience : C.PATIENCE));
         g.fillStyle(0x000000, 0.6);
         g.fillRect(p.x - 12, p.y - 52, 24, 4);
         g.fillStyle(left > 0.5 ? 0x4fd17a : left > 0.25 ? 0xe0b040 : 0xe0525a, 1);
@@ -806,6 +953,11 @@
     body.appendChild(el('div', 'sd-group', 'Tag ' + last.day + ': verkauft'));
     const sold = Object.keys(last.sold || {});
     body.appendChild(el('p', 'sd-later', sold.length ? sold.map((w) => last.sold[w] + '× ' + goods[w].name).join(', ') : 'Nichts.'));
+    const done = Object.keys(last.services || {});
+    if (done.length) {
+      body.appendChild(el('div', 'sd-group', 'Aufträge erledigt'));
+      body.appendChild(el('p', 'sd-later', done.map((id) => last.services[id] + '× ' + ((more.services[id] || {}).name || id)).join(', ')));
+    }
     const miss = Object.keys(last.misses || {});
     if (miss.length) {
       body.appendChild(el('div', 'sd-group', 'Gesucht, aber nicht gefunden'));
@@ -839,7 +991,7 @@
     src.receipts.slice().reverse().forEach((r, i) => {
       const tr = el('tr');
       tr.appendChild(el('td', '', String(src.receipts.length - i)));
-      tr.appendChild(el('td', '', r.lines.map((l) => l.qty + '× ' + goods[l.ware].name + ' à ' + fmt(l.price)).join(', ')));
+      tr.appendChild(el('td', '', r.lines.map((l) => (l.service ? (more.services[l.service] || {}).name || l.service : l.qty + '× ' + goods[l.ware].name) + ' à ' + fmt(l.price)).join(', ')));
       tr.appendChild(el('td', 'num', fmt(r.total)));
       tb.appendChild(tr);
     });
@@ -927,6 +1079,51 @@
     return distRect(it.x, it.y, s.w, s.d);
   }
 
+  /** Auftrag, der jetzt an diesem Möbel dran ist */
+  function jobAt(it) {
+    return state.jobs.find((j) => {
+      const n = L.nextService(j);
+      return n && more.services[n] && more.services[n].station === it.id;
+    }) || null;
+  }
+
+  function benchTarget(near) {
+    for (const o of near) {
+      const job = jobAt(o.it);
+      if (!job) continue;
+      const n = L.nextService(job);
+      const label = n === 'foil' ? 'E: Karte von Kunde ' + job.jid + ' in TCG Sleeve stecken' : 'E: ' + more.services[n].name + ' – Karte von Kunde ' + job.jid;
+      return { label: label, run: () => (n === 'foil' ? act(doAct('foil', { jid: job.jid })) : openBench(job, o.it.id)) };
+    }
+    return null;
+  }
+
+  function openBench(job, station) {
+    const needsSlab = job.services.includes('slab') && !job.done.includes('slab') && station === 'card_grading_table';
+    if (needsSlab && !L.supplier(state, 'mat_slab')) { toast('Kein leerer Slab – erst am PC bestellen und in den Tisch einräumen.'); return; }
+    const dlg = $('[data-shop-bench]');
+    $('[data-shop-bench-frame]').src = '/shop-demo/werkbank?auftrag=' + encodeURIComponent(job.jid) + '&tisch=' + encodeURIComponent(station);
+    dlg.showModal();
+  }
+
+  /** Neuer Stand vom Server (nach dem Arbeitstisch) */
+  function reload() {
+    return fetch('/api/shop-demo', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((data) => { if (data.state) { state = data.state; refresh(); } });
+  }
+
+  window.addEventListener('message', (e) => {
+    if (e.origin !== window.location.origin || !e.data || e.data.type !== 'shop-werkbank') return;
+    const dlg = $('[data-shop-bench]');
+    if (dlg.open) dlg.close();
+    reload();
+  });
+  $('[data-shop-bench]').addEventListener('close', () => {
+    $('[data-shop-bench-frame]').src = 'about:blank';
+    reload();
+  });
+
   /** Was würde E jetzt tun? */
   function findTarget() {
     const h = hand();
@@ -940,6 +1137,8 @@
       t = { label: 'E: Kunde kassieren', run: () => serve(waiting) };
     } else if (atDoor && !h) {
       t = { label: 'E: Laden öffnen (Tag ' + state.day + ')', run: openDay };
+    } else if (!h && benchTarget(near)) {
+      t = benchTarget(near);
     } else if (h && h.kind === 'moebel') {
       t = { label: 'E: ' + catalog[h.id].name + ' aufbauen', run: () => { mode = { kind: 'build', id: h.id, rot: 0 }; selected = null; refresh(); } };
     } else if (h) {
@@ -1180,6 +1379,10 @@
       goodsList = data.goods;
       groups = data.groups;
       unitPrice = data.unitPrice;
+      licenseList = data.licenses || [];
+      serviceList = data.services || [];
+      packs = data.packs || [];
+      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])) };
       catalog = Object.fromEntries(list.map((d) => [d.id, d]));
       goods = Object.fromEntries(goodsList.map((g) => [g.id, g]));
       refreshHud();

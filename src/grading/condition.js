@@ -34,6 +34,13 @@ const CENTERING = [
   { max: 80, cap: 6 },
 ];
 // Ein Knick setzt die Obergrenze auf … (wie bei echtem Grading) – gebügelt höher, siehe ironCap
+// Zentrierungs-Bereiche fürs Benoten: { from, to, cap } in % der breiteren Seite, beide Grenzen eingeschlossen
+// (Werkbank und Shop-Demo zeigen sie als Skala: 50/50–55/45 → 10, 56/44–60/40 → 9, …)
+const ratioLabel = (v) => `${v}/${100 - v}`;
+const CENTERING_SCALE = CENTERING.map((cc, i) => {
+  const from = i === 0 ? 50 : CENTERING[i - 1].max + 1;
+  return { from, to: cc.max, fromLabel: ratioLabel(from), toLabel: ratioLabel(cc.max), cap: cc.cap };
+});
 const CREASE_CAP = 4;
 
 // Wie oft welche Mängel vorkommen. scratches/edges: Gewichte für 0, 1, 2 … Stück; corner/crease: Wahrscheinlichkeit;
@@ -218,4 +225,4 @@ function gradeStats(grades) {
   return { count: list.length, best, bestCount: dist[best], avg: list.reduce((s, g) => s + g, 0) / list.length, dist };
 }
 
-module.exports = { visibleMarks, CONDITION_VERSION, PROFILES, CENTERING, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap, addDamage, conditionV3, CREASE_SEGMENTS, IRON_MAX_CAP, ironCap, creaseLine, applyIron };
+module.exports = { visibleMarks, CONDITION_VERSION, PROFILES, CENTERING, CENTERING_SCALE, CREASE_CAP, centeringCap, rnd, chance, pick, weighted, rollDefects, gradeFor, rollCondition, GRADE_NAMES, gradeWord, gradeStats, centerShift, gradeCap, addDamage, conditionV3, CREASE_SEGMENTS, IRON_MAX_CAP, ironCap, creaseLine, applyIron };

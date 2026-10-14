@@ -10,14 +10,10 @@ const damage = require('../grading/damage');
 const items = require('../items/itemService');
 const population = require('../tcg/population');
 const catalog = require('../tcg/catalog');
-const { centerShift, centeringCap, CENTERING, creaseLine } = require('../grading/condition');
+const { centerShift, centeringCap, CENTERING_SCALE, creaseLine } = require('../grading/condition');
 
-// Zentrierungs-Bereiche fürs Benoten: { from, to, cap } in % der breiteren Seite, beide Grenzen eingeschlossen
-const ratio = (v) => `${v}/${100 - v}`;
-const centeringScale = CENTERING.map((c, i) => {
-  const from = i === 0 ? 50 : CENTERING[i - 1].max + 1;
-  return { from, to: c.max, fromLabel: ratio(from), toLabel: ratio(c.max), cap: c.cap };
-});
+// Zentrierungs-Bereiche fürs Benoten (condition.js)
+const centeringScale = CENTERING_SCALE;
 const { str, UserError, parseEuro } = require('../lib/util');
 const { euro } = require('../lib/viewHelpers');
 

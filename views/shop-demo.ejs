@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen (Tür = Laden öffnen, Kasse = kassieren) · Q Karton abstellen · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
+  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen (Tür = öffnen, Kasse = kassieren/Auftrag annehmen, Arbeitstisch = Karte bearbeiten) · Q Karton abstellen · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
   <div class="sd-toast" data-shop-toast hidden></div>
 
   <dialog class="sd-win sd-pc" data-shop-pc>
@@ -60,6 +60,14 @@
       <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
     </div>
     <div class="sd-shelf-body" data-shop-shelf-body></div>
+  </dialog>
+
+  <dialog class="sd-win sd-bench" data-shop-bench>
+    <div class="sd-win-head">
+      <strong>Arbeitstisch</strong>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <iframe class="sd-bench-frame" data-shop-bench-frame title="Arbeitstisch" src="about:blank"></iframe>
   </dialog>
 
   <dialog class="sd-dialog" data-shop-dialog>

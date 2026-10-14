@@ -1,11 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const L = require('../src/shop/layout');
-const { CATALOG, GOODS, UNIT_PRICE } = require('../src/shop/catalog');
+const { CATALOG, GOODS, LICENSES, SERVICES, UNIT_PRICE } = require('../src/shop/catalog');
 
 const cat = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
-const apply = (s, a) => L.apply(s, cat, goods, a);
+const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
+const apply = (s, a) => L.apply(s, cat, goods, a, more);
 const run = (state, ...actions) => actions.reduce((s, a) => {
   const r = apply(s, a);
   assert.ok(!r.error, r.error);
@@ -58,6 +59,9 @@ test('Kollision, Eingang, Wand, Theke', () => {
 
 test('Ware bestellen, tragen, gemischt einräumen, Platz begrenzt', () => {
   let s = build(L.fresh(), 'shelf_small', 0, 0, 0); // 6 Plätze
+  assert.match(apply(s, { type: 'orderWare', id: 'board_game_box', n: 1 }).error, /Brettspiel-Lizenz/);
+  s = run(s, { type: 'buyLicense', id: 'brettspiele' });
+  assert.match(apply(s, { type: 'buyLicense', id: 'brettspiele' }).error, /schon/);
   const before = s.coins;
   s = run(s, { type: 'orderWare', id: 'board_game_box', n: 2 });
   assert.strictEqual(s.coins, before - 2 * goods.board_game_box.perBox * goods.board_game_box.buy);
