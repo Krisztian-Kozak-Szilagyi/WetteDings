@@ -239,7 +239,7 @@
       name.append(sw, g.name);
       const lic = g.license && !state.licenses.includes(g.license) ? more.licenses[g.license] : null;
       const fits = Array.from(new Set(list.filter((d) => (d.holds || []).includes(g.id)).map((d) => d.name))).join(', ');
-      name.appendChild(el('span', 'sub', (lic ? 'braucht die ' + lic.name : g.kind === 'material' ? 'wird bei Aufträgen verbraucht' : 'Marktpreis ' + fmt(g.market)) + (fits ? ' · passt in: ' + fits : '')));
+      name.appendChild(el('span', 'sub', (lic ? 'braucht die ' + lic.name : g.kind === 'material' ? 'wird bei Aufträgen verbraucht' : 'Marktpreis ' + marketLabel(g.id)) + (fits ? ' · passt in: ' + fits : '')));
       tr.appendChild(name);
       tr.appendChild(el('td', 'num', g.perBox + ' Stück'));
       tr.appendChild(el('td', 'num', fmt(g.buy)));
@@ -305,17 +305,46 @@
     body.appendChild(el('p', 'sd-later', 'Ohne Lizenz: Boosterpacks, Kartenhüllen, Toploader, Getränke, Material.'));
   }
 
-  function priceInput(id) {
+  /**
+   * Preisfeld mit Knöpfen (Krisztian, 2026-10-14): „+5 %“ immer vom Marktpreis aus (100 → 105 → 110),
+   * „Runden“ (unter 20 auf 0,50, sonst auf 5), „= Markt“. get/market/set: aktueller Preis, Marktpreis, speichern
+   */
+  function priceControl(get, market, set) {
+    const box = el('span', 'sd-price');
     const inp = el('input');
     inp.type = 'number';
     inp.min = '0';
     inp.step = '0.01';
-    inp.value = L.price(state, goods, id);
-    inp.addEventListener('change', () => {
-      const v = Number(String(inp.value).replace(',', '.'));
-      if (act(doAct('setPrice', { ware: id, price: v }))) inp.value = L.price(state, goods, id);
-    });
-    return inp;
+    inp.value = get();
+    const save = (v) => { if (set(Math.round(v * 100) / 100)) inp.value = get(); };
+    inp.addEventListener('change', () => save(Number(String(inp.value).replace(',', '.'))));
+    const btn = (label, title, fn) => {
+      const b = el('button', 'sd-price-btn', label);
+      b.type = 'button';
+      b.title = title;
+      b.addEventListener('click', fn);
+      return b;
+    };
+    box.append(
+      inp,
+      btn('+5 %', 'Marktpreis + 5 % (noch einmal: +10 %, …)', () => save(L.priceStepUp(get(), market()))),
+      btn('≈', 'Runden (unter 20 auf 0,50, sonst auf 5)', () => save(L.roundPrice(get()))),
+      btn('=', 'Zurück auf den Marktpreis', () => save(market()))
+    );
+    return box;
+  }
+
+  function priceInput(id) {
+    return priceControl(() => L.price(state, goods, id), () => L.marketPrice(state, goods, id), (v) => act(doAct('setPrice', { ware: id, price: v })));
+  }
+
+  /** Marktpreis mit Pfeil, wenn er sich beim letzten Mal bewegt hat */
+  function marketLabel(id) {
+    const m = (state.marketMoves || []).find((x) => x.id === id);
+    const txt = fmt(L.marketPrice(state, goods, id));
+    if (!m) return txt;
+    const pct = Math.round((m.to / m.from - 1) * 100);
+    return txt + (pct > 0 ? ' ↑' + pct : ' ↓' + Math.abs(pct)) + ' %';
   }
 
   /** Stückzahl im Laden: in Regalen / in Kartons */
@@ -332,7 +361,10 @@
       const tr = el('tr');
       tr.appendChild(el('td', '', g.name));
       tr.appendChild(el('td', 'num', fmt(g.buy)));
-      tr.appendChild(el('td', 'num', fmt(g.market)));
+      const mk = el('td', 'num', marketLabel(g.id));
+      const mv = (state.marketMoves || []).find((x) => x.id === g.id);
+      if (mv) mk.classList.add(mv.to > mv.from ? 'is-up' : 'is-down');
+      tr.appendChild(mk);
       const td = el('td', 'num');
       td.appendChild(priceInput(g.id));
       tr.appendChild(td);
@@ -347,16 +379,7 @@
       tr.appendChild(el('td', '', (catalog[x.station] || {}).name || ''));
       tr.appendChild(el('td', 'num', fmt(x.market)));
       const td = el('td', 'num');
-      const inp = el('input');
-      inp.type = 'number';
-      inp.min = '0';
-      inp.step = '0.01';
-      inp.value = L.servicePrice(state, more, x.id);
-      inp.addEventListener('change', () => {
-        const v = Number(String(inp.value).replace(',', '.'));
-        if (act(doAct('setServicePrice', { service: x.id, price: v }))) inp.value = L.servicePrice(state, more, x.id);
-      });
-      td.appendChild(inp);
+      td.appendChild(priceControl(() => L.servicePrice(state, more, x.id), () => x.market, (v) => act(doAct('setServicePrice', { service: x.id, price: v }))));
       tr.appendChild(td);
       sv.tb.appendChild(tr);
     });
@@ -909,7 +932,7 @@
     c.seen.forEach((uid) => {
       const it = state.items.find((i) => i.uid === uid);
       if (!it || !it.stock) return;
-      Object.keys(it.stock).forEach((w) => offers.push({ uid: uid, ware: w, qty: freeStock(it, w), price: L.price(state, goods, w) }));
+      Object.keys(it.stock).forEach((w) => offers.push({ uid: uid, ware: w, qty: freeStock(it, w), price: L.price(state, goods, w), market: L.marketPrice(state, goods, w) }));
     });
     const r = C.shop(c, offers, goods, day.rng);
     c.result = r;
@@ -1621,7 +1644,19 @@
     drawItem(g, c, col, 0.55, col);
   }
 
+  /** Nach Ladenschluss: neue Marktpreise melden (einmal je Tag) */
+  let seenMarketDay = null;
+  function noteMarket() {
+    if (!state || seenMarketDay === null) { seenMarketDay = state ? state.marketDay : null; return; }
+    if (state.marketDay === seenMarketDay) return;
+    seenMarketDay = state.marketDay;
+    const moves = state.marketMoves || [];
+    if (!moves.length) return;
+    setTimeout(() => note('Neue Marktpreise: ' + moves.map((m) => goods[m.id].name + ' ' + (m.to > m.from ? '↑' : '↓') + Math.abs(Math.round((m.to / m.from - 1) * 100)) + ' %').join(', ') + ' – am PC neu auspreisen.'), 6200);
+  }
+
   function refresh() {
+    noteMarket();
     refreshHud();
     refreshClock();
     drawAll();

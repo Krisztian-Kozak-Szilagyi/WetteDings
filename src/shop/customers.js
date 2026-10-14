@@ -159,7 +159,7 @@
 
     const tryBuy = (ware) => {
       const o = avail.filter((x) => x.ware === ware).sort((a, b) => a.price - b.price || b.qty - a.qty)[0];
-      const j = judge(o.price, goods[ware].market, customer.tol);
+      const j = judge(o.price, o.market || goods[ware].market, customer.tol); // o.market = aktueller Marktpreis
       if (!j.buy) { tooExpensive.push(ware); return; }
       basket.push({ uid: o.uid, ware: ware, qty: quantity(goods[ware], o.qty, rng, customer.big), price: o.price });
       stars = Math.min(stars, j.stars);

@@ -3,9 +3,11 @@
 // Die Minispiele sind Nachbauten des Grading-Tisches der Seite (public/js/grading.js) mit denselben Werten:
 //   clean – Flecken mit dem Schwamm wegreiben (vorne und hinten, R = Karte umdrehen), Sauberkeit in % wie cleanliness()
 //   iron  – Bügeleisen über den Knick ziehen: Stücke werden glatt, zu lange auf einer Stelle = Brandfleck
-// Weitere Schritte (grade, slab) kommen als Einträge in STEPS dazu; bis dahin öffnet der Laden dafür den alten Tisch.
-// Ergebnisse gehen an dieselben Adressen wie dort (/shop-demo/werkbank/buegeln, …/fertig).
-// Aufruf: ShopWerkbank.open(game, { job, csrf, onDone, onCancel }) – job = jobData von GET /api/shop-demo/werkbank
+//   grade – Karte prüfen: kippen (Drehen, D) lässt Kratzer aufblitzen, Messen (M) zwei Linien an die Bildkanten →
+//           Zentrierung, UV-Lampe (U) zeigt Ecken-/Kantenmacken; dann Note 1–10 (Server sagt die echte)
+//   slab  – Zeiger pendelt, Leertaste/Klick stoppt ihn: je näher an der Mitte, desto sauberer versiegelt
+// Ergebnisse gehen an dieselben Adressen wie am Tisch der Seite (/shop-demo/werkbank/buegeln, …/benoten, …/fertig).
+// Aufruf: ShopWerkbank.open(game, { job, station, csrf, onDone, onCancel }) – job = jobData von GET /api/shop-demo/werkbank
 // WICHTIG: Phaser übernimmt bei Szenen als Objekt nur init/preload/create/update – eigene Methoden gehören in "extend"
 // (test/shop-scenes.test.js spielt die Szene ohne Browser durch).
 (function () {
@@ -14,6 +16,11 @@
   const CARD_RATIO = 1008 / 720;
   const CORNER = 0.055; // Eckenradius der Karte (Anteil der Breite, wie die Kartenbilder)
   const WEB_CARD_W = 290; // Kartenbreite am Tisch der Seite – Reib-Strecken werden darauf umgerechnet
+  const CARD_MM = 63; // Kartenbreite in mm (Messen)
+  // Vorderseite wie am Tisch der Seite: Bild 94 % × 95,72 % im Rand in Seltenheitsfarbe, seitlich verschoben (Zentrierung)
+  const IMG_W = 0.94;
+  const IMG_H = 0.9572;
+  const RARITY_COLOR = { crumpled: 0xb8a07e, bfwler: 0x8fa3c7, gold: 0xe3b341, holo: 0xa8d8ff, bockhaber: 0xb48cf2, glitch: 0x4ade80, icon: 0xf3f5fe, boss: 0xd9a441, sith: 0x7a1915 };
 
   // wie public/js/grading.js
   const BRUSH = 16;
@@ -24,13 +31,17 @@
   const FLAT_RATE = 1.5;
   const HEAT_RATE = 0.9;
   const COOL_RATE = 0.6;
+  const UV_R = 64;
+  const METER_MS = 850;
+  const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
 
-  /** Nur diese Schritte laufen hier – der Rest am alten Tisch */
-  const STEPS = ['clean', 'iron'];
-  const LABEL = { clean: 'Putzen', iron: 'Bügeln' };
+  const STEPS = ['clean', 'iron', 'grade', 'slab'];
+  const LABEL = { clean: 'Putzen', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln' };
   const HINT = {
     clean: 'Mit gedrückter Maus schrubben · R = Karte umdrehen',
     iron: 'Mit gedrückter Maus langsam über den Knick fahren – nicht stehen bleiben',
+    grade: 'D kippen (Kratzer blitzen auf) · M messen · U UV-Lampe · dann Note wählen',
+    slab: 'Leertaste oder Klick: Zeiger in der Mitte stoppen',
   };
 
   // ---------- Ton (leise, optional) ----------
@@ -58,7 +69,7 @@
   }
 
   /** Bild mit abgerundeten Ecken als neue Textur (Rückseiten haben schwarze statt durchsichtige Ecken) */
-  function roundedTexture(scene, key) {
+  function roundedTexture(scene, key, cornerPart) {
     const out = key + '-rund';
     if (scene.textures.exists(out)) return out;
     if (!scene.textures.exists(key)) return null;
@@ -68,7 +79,7 @@
     const tex = scene.textures.createCanvas(out, w, h);
     if (!tex) return key;
     const ctx = tex.getContext();
-    const r = w * CORNER;
+    const r = w * (cornerPart || CORNER);
     ctx.beginPath();
     ctx.moveTo(r, 0);
     ctx.arcTo(w, 0, w, h, r);
@@ -93,12 +104,23 @@
     return out;
   }
 
+  const fmtMm = (v) => v.toFixed(1).replace('.', ',') + ' mm';
+
+  /** Kleiner Knopf (Text mit Hintergrund) – gibt das Text-Objekt zurück */
+  function button(scene, x, y, label, fn, opts) {
+    const o = opts || {};
+    const t = scene.add.text(x, y, label, {
+      fontSize: o.size || '14px', color: o.color || '#ffffff', backgroundColor: o.bg || '#2a2f3c', padding: { x: o.px || 10, y: o.py || 6 },
+    }).setOrigin(o.ox === undefined ? 0.5 : o.ox, o.oy === undefined ? 0.5 : o.oy).setInteractive({ useHandCursor: true });
+    t.on('pointerdown', (p, lx, ly, ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); fn(); });
+    return t;
+  }
+
   const BenchScene = {
     key: KEY,
     init(data) { this.opts = data; },
     preload() {
       const job = this.opts.job;
-      // Schlüssel = Bildadresse (nicht die Auftragsnummer – die beginnt nach „Neu starten“ wieder bei 1)
       // schon vorab geladen (Laden: prefetchBenches)? dann nichts laden
       [job.card && job.card.image, job.back].forEach((url) => { if (url && !this.textures.exists('wb:' + url)) this.load.image('wb:' + url, url); });
     },
@@ -110,9 +132,11 @@
       this.busy = false;
       this.flipping = false;
       this.foam = [];
-      this.cameras.main.fadeIn(140, 0, 0, 0);
       this.sparks = [];
       this.t = 0;
+      this.tilt = { x: 0, y: 0 };
+      this.mode = 'rotate';
+      this.cameras.main.fadeIn(140, 0, 0, 0);
 
       // ---------- Tischplatte ----------
       const g = this.add.graphics();
@@ -123,17 +147,16 @@
         const y = rnd.between(0, H);
         g.lineBetween(0, y, W, y + rnd.between(-20, 20));
       }
-      // Schneidematte
-      const cardH = Math.min(H * 0.78, (W - 40) * CARD_RATIO * 0.6);
+      const cardH = Math.min(H * 0.74, (W - 40) * CARD_RATIO * 0.6);
       const cardW = cardH / CARD_RATIO;
       const mw = cardW * 2.1;
-      const mh = cardH * 1.18;
+      const mh = cardH * 1.2;
       g.fillStyle(0x1f4f45, 1).fillRoundedRect(W / 2 - mw / 2, H / 2 - mh / 2, mw, mh, 14);
       g.lineStyle(1, 0x2f6a5c, 0.7);
       for (let x = W / 2 - mw / 2 + 20; x < W / 2 + mw / 2; x += 24) g.lineBetween(x, H / 2 - mh / 2, x, H / 2 + mh / 2);
       for (let y = H / 2 - mh / 2 + 20; y < H / 2 + mh / 2; y += 24) g.lineBetween(W / 2 - mw / 2, y, W / 2 + mw / 2, y);
 
-      // ---------- Karte: alles in einem Container (dreht sich beim Umdrehen als Ganzes) ----------
+      // ---------- Karte: alles in einem Container (Umdrehen/Kippen bewegen sie als Ganzes) ----------
       const cx = W / 2;
       const cy = H / 2;
       const scale = cardW / WEB_CARD_W;
@@ -141,15 +164,29 @@
       this.cardC = this.add.container(cx, cy);
       const shadow = this.add.graphics();
       shadow.fillStyle(0x000000, 0.35).fillRoundedRect(-cardW / 2 + 6, -cardH / 2 + 10, cardW, cardH, cardW * CORNER);
+      // Vorderseite: Rand in Seltenheitsfarbe, Bild darin – seitlich verschoben um center.x (wie --cx am Tisch der Seite)
+      const shift = job.center ? Number(job.center.x) || 0 : 0;
+      this.imgEdge = { l: 0.03 * (1 + shift), r: 1 - 0.03 * (1 - shift) };
+      this.front = this.add.container(0, 0);
+      const border = this.add.graphics();
+      border.fillStyle(RARITY_COLOR[job.card && job.card.rarity] || 0x1a1a1a, 1).fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, cardW * CORNER);
+      this.front.add(border);
       const frontKey = job.card && job.card.image ? roundedTexture(this, 'wb:' + job.card.image) : null;
+      const iw = cardW * IMG_W;
+      const ih = cardH * IMG_H;
+      const ix = -cardW / 2 + this.imgEdge.l * cardW + iw / 2;
+      const iy = -cardH / 2 + cardH * 0.0214 + ih / 2;
+      this.front.add(frontKey ? this.add.image(ix, iy, frontKey).setDisplaySize(iw, ih) : this.add.rectangle(ix, iy, iw, ih, 0xdddddd));
       const backKey = job.back ? roundedTexture(this, 'wb:' + job.back) : null;
-      this.front = frontKey ? this.add.image(0, 0, frontKey).setDisplaySize(cardW, cardH) : this.add.rectangle(0, 0, cardW, cardH, 0xdddddd);
       this.back = backKey ? this.add.image(0, 0, backKey).setDisplaySize(cardW, cardH) : this.add.rectangle(0, 0, cardW, cardH, 0x2a2440);
       this.back.setVisible(false);
-      this.marks = this.add.graphics(); // Flecken, Knick (Container-Koordinaten)
-      this.cardC.add([shadow, this.front, this.back, this.marks]);
+      this.marks = this.add.graphics(); // Flecken, Knick, Mängel (Container-Koordinaten)
+      this.glare = this.add.graphics(); // Lichtreflex beim Kippen
+      this.slabG = this.add.graphics(); // Slab nach dem Versiegeln
+      this.cardC.add([shadow, this.front, this.back, this.marks, this.glare, this.slabG]);
       this.facingFront = true;
-      this.fx = this.add.graphics(); // Schaum, Funken, Schwamm, Bügeleisen (Bildschirm-Koordinaten)
+      this.uvShade = this.add.graphics(); // dunkelt beim UV-Licht alles außer dem Kegel ab
+      this.fx = this.add.graphics(); // Schaum, Funken, Werkzeug, Messlinien (Bildschirm-Koordinaten)
 
       // ---------- Flecken (wie grading.js: hp 1 → 0, need in Pixeln Reibweg) ----------
       this.spots = (job.spots || []).map((s, i) => ({
@@ -158,20 +195,27 @@
       }));
       // ---------- Knick: 10 Stücke entlang der Linie (y in %, Winkel) ----------
       this.segs = [];
-      if (job.crease && !job.iron) {
+      if (job.crease) {
         const a = (job.crease.angle * Math.PI) / 180;
         for (let i = 0; i < IRON_SEGMENTS; i++) {
           const fx = (i + 0.5) / IRON_SEGMENTS;
           const fy = job.crease.y / 100 + (Math.tan(a) * (fx - 0.5) * cardW) / cardH;
-          this.segs.push({ x: fx, y: fy, flat: 0, heat: 0, burnt: false });
+          const done = !!job.iron;
+          this.segs.push({ x: fx, y: fy, flat: done ? 1 : 0, heat: 0, burnt: false });
         }
       }
-      this.steps = (job.steps || []).filter((s) => STEPS.includes(s) && (s !== 'iron' || this.segs.length));
+      this.defects = job.defects || {};
+      this.guess = job.guess || null;
+      this.grade = job.grade || null;
+      this.guides = { l: 0.09, r: 0.91 }; // Messlinien (nicht an der Bildkante – messen muss man selbst)
+      this.steps = (job.steps || []).filter((s) => STEPS.includes(s) && (s !== 'iron' || (this.segs.length && !job.iron)) && (s !== 'grade' || !job.guess));
       this.stepIndex = 0;
 
       // ---------- Anzeige (wenig Text) ----------
+      this.ui = []; // Knöpfe des aktuellen Schritts
       this.stepText = this.add.text(W / 2, 18, '', { fontSize: '15px', color: '#fff3c8', backgroundColor: '#00000066', padding: { x: 10, y: 5 } }).setOrigin(0.5, 0);
       this.hint = this.add.text(W / 2, H - 16, '', { fontSize: '13px', color: '#e8dcc0', backgroundColor: '#00000066', padding: { x: 8, y: 4 } }).setOrigin(0.5, 1);
+      this.info = this.add.text(W / 2, cy + cardH / 2 + 18, '', { fontSize: '14px', color: '#ffffff', backgroundColor: '#000000aa', padding: { x: 8, y: 4 }, align: 'center' }).setOrigin(0.5, 0).setVisible(false);
       this.add.text(14, 14, 'Esc = aufstehen', { fontSize: '12px', color: '#d8c8a8' });
       this.btn = this.add.text(W - 20, H - 20, '', { fontSize: '16px', color: '#ffffff', backgroundColor: '#2f9a5a', padding: { x: 14, y: 8 } })
         .setOrigin(1, 1).setInteractive({ useHandCursor: true });
@@ -179,19 +223,16 @@
 
       // ---------- Eingabe ----------
       this.pointer = null;
-      this.input.on('pointerdown', (p) => { this.pointer = { x: p.x, y: p.y }; this.hover = this.pointer; });
-      this.input.on('pointermove', (p) => {
-        if (!p.isDown) { this.hover = { x: p.x, y: p.y }; return; }
-        const last = this.pointer || { x: p.x, y: p.y };
-        const dist = Math.hypot(p.x - last.x, p.y - last.y);
-        this.pointer = { x: p.x, y: p.y };
-        this.hover = this.pointer;
-        if (this.step() === 'clean' && !this.flipping) this.rub(p.x, p.y, dist);
-      });
-      this.input.on('pointerup', () => { this.pointer = null; });
+      this.input.on('pointerdown', (p) => this.down(p));
+      this.input.on('pointermove', (p) => this.move(p));
+      this.input.on('pointerup', () => this.up());
       this.input.keyboard.on('keydown-ESC', () => this.close(false));
       this.input.keyboard.on('keydown-R', () => this.flip()); // wie Möbel drehen im Laden
       this.input.keyboard.on('keydown-F', () => this.flip());
+      this.input.keyboard.on('keydown-D', () => this.setMode('rotate'));
+      this.input.keyboard.on('keydown-M', () => this.setMode('measure'));
+      this.input.keyboard.on('keydown-U', () => this.setMode('uv'));
+      this.input.keyboard.on('keydown-SPACE', () => { if (this.step() === 'slab') this.seal(); });
 
       if (!this.steps.length) { this.send(); return; }
       this.showStep();
@@ -200,12 +241,138 @@
     extend: {
       step() { return this.steps[this.stepIndex]; },
 
+      clearUi() {
+        this.ui.forEach((o) => o.destroy());
+        this.ui = [];
+      },
+
       showStep() {
         const s = this.step();
+        this.clearUi();
+        this.info.setVisible(false);
         this.stepText.setText(this.steps.map((x, i) => (i < this.stepIndex ? '✓ ' : i === this.stepIndex ? '● ' : '○ ') + LABEL[x]).join('    '));
         this.hint.setText(HINT[s] || '');
+        this.btn.setVisible(s === 'clean' || s === 'iron');
         this.btn.setText(s === 'clean' ? 'Fertig geputzt' : 'Fertig gebügelt');
-        if (s === 'iron' && !this.facingFront) this.flip(true); // gebügelt wird vorne
+        if ((s === 'iron' || s === 'grade' || s === 'slab') && !this.facingFront) this.flip(true); // vorne
+        if (s === 'grade') this.buildGrade();
+        if (s === 'slab') this.buildSlab();
+      },
+
+      // ---------- Benoten ----------
+      buildGrade() {
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const c = this.card;
+        // Werkzeuge links neben der Karte
+        const lx = c.x - 70;
+        [['rotate', '✋ Drehen (D)'], ['measure', '📏 Messen (M)'], ['uv', '🔦 UV (U)']].forEach(([m, label], i) => {
+          const b = button(this, lx, c.cy - 50 + i * 44, label, () => this.setMode(m), { ox: 1 });
+          b.modeKey = m;
+          this.ui.push(b);
+        });
+        // Noten 1–10 unten
+        const bw = Math.min(46, (W - 60) / 10);
+        for (let n = 1; n <= 10; n++) {
+          const b = button(this, W / 2 + (n - 5.5) * (bw + 4), H - 62, String(n), () => this.pickGrade(n), { size: '16px', px: 0, py: 8 });
+          b.setFixedSize(bw, 0).setAlign('center');
+          b.grade = n;
+          this.ui.push(b);
+        }
+        this.okBtn = button(this, W - 20, H - 20, 'Note abgeben', () => this.submitGrade(), { bg: '#2f9a5a', size: '16px', ox: 1, oy: 1, px: 14, py: 8 });
+        this.okBtn.setAlpha(0.4);
+        this.ui.push(this.okBtn);
+        this.chosen = null;
+        this.setMode('rotate');
+      },
+
+      setMode(m) {
+        if (this.step() !== 'grade' || this.guess) return;
+        this.mode = m;
+        this.tilt = m === 'rotate' ? this.tilt : { x: 0, y: 0 };
+        this.ui.forEach((b) => { if (b.modeKey) b.setBackgroundColor(b.modeKey === m ? '#5a4a8a' : '#2a2f3c'); });
+        this.measureText();
+      },
+
+      pickGrade(n) {
+        if (this.guess || this.busy) return;
+        this.chosen = n;
+        this.ui.forEach((b) => { if (b.grade) b.setBackgroundColor(b.grade === n ? '#5a4a8a' : '#2a2f3c'); });
+        this.okBtn.setAlpha(1);
+      },
+
+      submitGrade() {
+        if (!this.chosen || this.guess || this.busy) return;
+        this.busy = true;
+        post('/shop-demo/werkbank/benoten', this.opts.csrf, { job: this.opts.job.id, tisch: this.opts.station || '', grade: String(this.chosen) })
+          .then((res) => {
+            this.busy = false;
+            this.guess = res.guess;
+            this.grade = res.grade;
+            this.mode = 'rotate';
+            this.tilt = { x: 0, y: 0 };
+            const diff = Math.abs(res.guess - res.grade);
+            tone(diff === 0 ? 1300 : diff === 1 ? 900 : 300, 220, 'triangle', 0.04);
+            this.ui.forEach((b) => {
+              if (!b.grade) return;
+              b.setBackgroundColor(b.grade === res.grade ? '#2f9a5a' : b.grade === res.guess ? '#8a3a3a' : '#2a2f3c');
+            });
+            this.info.setText((diff === 0 ? 'Genau richtig! ' : diff === 1 ? 'Knapp daneben. ' : 'Daneben. ') + 'Note ' + res.grade + ' – ' + (GRADE_NAMES[res.grade] || '')).setVisible(true);
+            this.okBtn.setText('Weiter');
+            this.okBtn.removeAllListeners('pointerdown');
+            this.okBtn.on('pointerdown', () => this.next());
+          })
+          .catch((err) => { this.busy = false; this.hint.setText(err.message); });
+      },
+
+      /** Rand in mm und Obergrenze aus den Messlinien */
+      measureText() {
+        if (this.step() !== 'grade' || this.mode !== 'measure') { if (!this.guess) this.info.setVisible(false); return; }
+        const l = this.guides.l * CARD_MM;
+        const r = (1 - this.guides.r) * CARD_MM;
+        const big = Math.max(l, r) / Math.max(0.001, l + r) * 100;
+        const scaleRow = (this.opts.job.centerScale || []).find((s) => big >= s.from - 0.5 && big <= s.to + 0.5);
+        const ratio = Math.round(big) + '/' + (100 - Math.round(big));
+        this.info.setText('Links ' + fmtMm(l) + ' · Rechts ' + fmtMm(r) + ' · ' + ratio + (scaleRow ? ' → höchstens ' + scaleRow.cap : '')).setVisible(true);
+      },
+
+      // ---------- Versiegeln ----------
+      buildSlab() {
+        const W = this.scale.width;
+        const H = this.scale.height;
+        this.meter = { x: W / 2 - 160, y: H - 70, w: 320, on: true, t0: this.t, pos: 0 };
+        this.ui.push(button(this, W - 20, H - 20, 'Versiegeln (Leertaste)', () => this.seal(), { bg: '#2f9a5a', size: '16px', ox: 1, oy: 1, px: 14, py: 8 }));
+      },
+
+      seal() {
+        const m = this.meter;
+        if (!m || !m.on || this.busy) return;
+        m.on = false;
+        const q = Math.max(0, Math.round(100 - Math.abs(m.pos - 50) * 4));
+        this.sealQ = q;
+        tone(q >= 90 ? 1500 : q >= 60 ? 1000 : 400, 200, 'triangle', 0.04);
+        this.info.setText(q >= 90 ? 'Perfekt versiegelt! (' + q + ' %)' : q >= 60 ? 'Sauber versiegelt. (' + q + ' %)' : q > 0 ? 'Eine kleine Luftblase … (' + q + ' %)' : 'Schief eingeschweißt! (0 %)').setVisible(true);
+        this.drawSlab();
+        this.clearUi();
+        this.time.delayedCall(900, () => this.next());
+      },
+
+      /** Slab um die Karte mit Etikett (Kürzel, Name, Notenwort, Note) */
+      drawSlab() {
+        const s = this.slabG;
+        const c = this.card;
+        const job = this.opts.job;
+        s.clear();
+        const pad = c.w * 0.06;
+        const top = c.h * 0.2;
+        s.fillStyle(0xdfeaf5, 0.22).fillRoundedRect(-c.w / 2 - pad, -c.h / 2 - top, c.w + pad * 2, c.h + top + pad, 10);
+        s.lineStyle(3, 0xeaf2fa, 0.9).strokeRoundedRect(-c.w / 2 - pad, -c.h / 2 - top, c.w + pad * 2, c.h + top + pad, 10);
+        s.fillStyle(0xf5f0e6, 1).fillRect(-c.w / 2, -c.h / 2 - top + pad * 0.6, c.w, top - pad * 1.2);
+        const g = this.guess || 0;
+        const ly = -c.h / 2 - top / 2;
+        const t1 = this.add.text(-c.w / 2 + 8, ly, ((job.shop && job.shop.code) || 'SD') + ' GRADING\n' + (job.card ? job.card.name : ''), { fontSize: Math.round(11 * c.scale) + 'px', color: '#2a2a2a' }).setOrigin(0, 0.5);
+        const t2 = this.add.text(c.w / 2 - 8, ly, (GRADE_NAMES[g] || '') + '\n' + (g || '–'), { fontSize: Math.round(13 * c.scale) + 'px', color: '#7a1915', align: 'right', fontStyle: 'bold' }).setOrigin(1, 0.5);
+        this.cardC.add([t1, t2]);
       },
 
       /** Karte umdrehen – mit Animation: zusammenklappen, Seite wechseln, aufklappen */
@@ -244,6 +411,51 @@
         return x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h;
       },
 
+      // ---------- Maus ----------
+      down(p) {
+        this.pointer = { x: p.x, y: p.y };
+        this.hover = this.pointer;
+        if (this.step() === 'grade' && this.mode === 'measure' && !this.guess) {
+          // nächste Messlinie greifen (mit Versatz, kein Springen)
+          const c = this.card;
+          const fx = (p.x - c.x) / c.w;
+          const k = Math.abs(fx - this.guides.l) <= Math.abs(fx - this.guides.r) ? 'l' : 'r';
+          this.grab = Math.abs(fx - this.guides[k]) < 0.08 ? { k, off: this.guides[k] - fx } : null;
+        }
+        if (this.step() === 'slab' && this.meter && this.meter.on && !this.onCard(p.x, p.y)) this.seal();
+      },
+
+      move(p) {
+        const last = this.pointer || { x: p.x, y: p.y };
+        this.hover = { x: p.x, y: p.y };
+        if (!p.isDown) return;
+        const dist = Math.hypot(p.x - last.x, p.y - last.y);
+        this.pointer = { x: p.x, y: p.y };
+        const s = this.step();
+        if (s === 'clean' && !this.flipping) this.rub(p.x, p.y, dist);
+        if (s === 'grade' && !this.guess) {
+          if (this.mode === 'rotate') {
+            // kippen: bis 35°, Kratzer blitzen ab 12° auf (wie am Tisch der Seite)
+            this.tilt.y = Phaser.Math.Clamp(this.tilt.y + (p.x - last.x) * 0.35, -35, 35);
+            this.tilt.x = Phaser.Math.Clamp(this.tilt.x + (p.y - last.y) * 0.35, -35, 35);
+          } else if (this.mode === 'measure' && this.grab) {
+            const c = this.card;
+            let v = Phaser.Math.Clamp((p.x - c.x) / c.w + this.grab.off, 0, 1);
+            const edge = this.grab.k === 'l' ? this.imgEdge.l : this.imgEdge.r;
+            if (Math.abs(v - edge) < 0.004) v = edge; // leichter Magnet an der Bildkante
+            if (this.grab.k === 'l') v = Math.min(v, this.guides.r - 0.2);
+            else v = Math.max(v, this.guides.l + 0.2);
+            this.guides[this.grab.k] = v;
+            this.measureText();
+          }
+        }
+      },
+
+      up() {
+        this.pointer = null;
+        this.grab = null;
+      },
+
       rub(x, y, dist) {
         let hit = false;
         this.spots.forEach((s) => {
@@ -256,7 +468,6 @@
           if (!s.hp) this.sparkle(p.x, p.y);
         });
         if (this.onCard(x, y) && dist > 0) {
-          // Schaum beim Schrubben – mehr, wenn er auf Schmutz trifft
           const n = hit ? 3 : 1;
           for (let i = 0; i < n; i++) {
             this.foam.push({ x: x + (Math.random() - 0.5) * 26 * this.card.scale, y: y + (Math.random() - 0.5) * 18 * this.card.scale, r: 2 + Math.random() * 5, t: 0.6 + Math.random() * 0.4 });
@@ -282,6 +493,7 @@
         const p = this.step() === 'iron' && this.pointer && this.facingFront && !this.flipping ? this.pointer : null;
         const R = IRON_R * this.card.scale;
         this.hottest = 0;
+        if (this.step() !== 'iron') return;
         this.segs.forEach((s) => {
           const sp = this.toScreen(s.x, s.y);
           const segLen = (this.card.w / IRON_SEGMENTS) / 2;
@@ -307,13 +519,14 @@
           const r = this.ironResult();
           post('/shop-demo/werkbank/buegeln', this.opts.csrf, { job: this.opts.job.id, tisch: this.opts.station || '', smooth: String(r.smooth), burns: String(r.burns) })
             .then((res) => {
+              if (res.defects) this.defects = res.defects;
               this.hint.setText('Zu ' + res.smooth + ' % glatt' + (res.burns ? ' · ' + res.burns + ' Brandfleck' + (res.burns === 1 ? '' : 'e') : ''));
               this.time.delayedCall(1100, () => { this.busy = false; this.next(); });
             })
             .catch((err) => { this.busy = false; this.hint.setText(err.message); });
           return;
         }
-        this.next();
+        if (s === 'clean') this.next();
       },
 
       next() {
@@ -325,8 +538,12 @@
       send() {
         this.busy = true;
         this.btn.setVisible(false);
+        this.clearUi();
         this.hint.setText('Fertig!');
-        post('/shop-demo/werkbank/fertig', this.opts.csrf, { job: this.opts.job.id, tisch: this.opts.station || '', clean: String(this.cleanliness()), seal: '' })
+        post('/shop-demo/werkbank/fertig', this.opts.csrf, {
+          job: this.opts.job.id, tisch: this.opts.station || '',
+          clean: String(this.cleanliness()), seal: this.sealQ === undefined ? '' : String(this.sealQ),
+        })
           .then((res) => this.time.delayedCall(500, () => this.close(true, res)))
           .catch((err) => { this.busy = false; this.btn.setVisible(true); this.hint.setText(err.message); });
       },
@@ -345,7 +562,7 @@
         cam.fadeOut(150, 0, 0, 0);
       },
 
-      /** Flecken und Knick in Container-Koordinaten zeichnen */
+      /** Flecken, Knick und Mängel in Container-Koordinaten zeichnen */
       drawMarks() {
         const m = this.marks;
         const c = this.card;
@@ -354,13 +571,15 @@
         this.spots.forEach((s) => {
           if (s.hp <= 0 || (s.side === 'f') !== this.facingFront) return;
           const p = local(this.toScreen(s.x, s.y));
-          const a = 0.12 + 0.7 * Math.pow(s.hp, 0.8); // Reste bleiben lange sichtbar, werden aber deutlich blasser
+          const a = 0.12 + 0.7 * Math.pow(s.hp, 0.8);
           const r = s.r * c.w * (0.55 + 0.45 * s.hp) * (s.kind === 'fleck' ? 1 + 0.6 * s.hp * (1 - s.hp) : 1);
           const col = SPOT_COLOR[s.kind] || 0x6b4423;
           s.blobs.forEach((b) => { m.fillStyle(col, a * (b.dx || b.dy ? 0.55 : 0.8)); m.fillCircle(p.x + b.dx * r, p.y + b.dy * r, r * b.rr); });
           if (s.kind === 'finger') { m.lineStyle(1.2, 0x7a6a50, 0.55 * a); for (let k = 0.3; k < 1; k += 0.18) m.strokeEllipse(p.x, p.y, r * k * 1.6, r * k * 2); }
         });
-        if (this.facingFront && this.segs.length) {
+        if (!this.facingFront) return;
+        // Knick
+        if (this.segs.length && (this.step() === 'iron' || !this.defects.ironed || this.segs.some((s) => s.flat < 1))) {
           const segLen = c.w / IRON_SEGMENTS;
           const first = this.segs[0];
           const last = this.segs[this.segs.length - 1];
@@ -375,6 +594,38 @@
             if (s.burnt) { m.fillStyle(0x1a1008, 0.9); m.fillCircle(p.x, p.y, 4 * c.scale); }
           });
         }
+        if (this.step() !== 'grade' && this.step() !== 'slab') return;
+        const d = this.defects;
+        const revealed = !!this.guess;
+        const tilt = Math.sqrt(this.tilt.x * this.tilt.x + this.tilt.y * this.tilt.y);
+        const scr = revealed ? 1 : Phaser.Math.Clamp((tilt - 12) / 18, 0, 1);
+        // Kratzer: blitzen beim Kippen auf (nach dem Benoten rot)
+        (d.scratches || []).forEach((s) => {
+          if (!scr) return;
+          const p = local(this.toScreen(s.x / 100, s.y / 100));
+          const a = (s.angle * Math.PI) / 180;
+          const len = (s.len / 100) * c.w;
+          m.lineStyle(2, revealed ? 0xef4444 : 0xffffff, scr);
+          m.lineBetween(p.x, p.y, p.x + Math.cos(a) * len, p.y + Math.sin(a) * len);
+        });
+        // Ecken- und Kantenmacken: leicht hell, unter der UV-Lampe grün
+        const uv = this.mode === 'uv' && this.hover && !revealed ? this.hover : null;
+        const R = UV_R * c.scale;
+        const dent = (fx, fy, rw, rh) => {
+          const sp = this.toScreen(fx, fy);
+          const lit = uv && Math.hypot(uv.x - sp.x, uv.y - sp.y) <= R + Math.max(rw, rh);
+          const p = local(sp);
+          m.fillStyle(revealed ? 0xef4444 : lit ? 0x4dff8a : 0xffffff, revealed || lit ? 0.9 : 0.35);
+          m.fillEllipse(p.x, p.y, rw, rh);
+        };
+        (d.corners || []).forEach((k) => dent(k === 1 || k === 2 ? 1 : 0, k >= 2 ? 1 : 0, c.w * 0.05, c.w * 0.05));
+        (d.edges || []).forEach((n) => {
+          const pos = n.pos / 100;
+          if (n.side === 0) dent(pos, 0, c.w * 0.05, c.h * 0.012);
+          else if (n.side === 2) dent(pos, 1, c.w * 0.05, c.h * 0.012);
+          else if (n.side === 1) dent(1, pos, c.w * 0.018, c.h * 0.036);
+          else dent(0, pos, c.w * 0.018, c.h * 0.036);
+        });
       },
     },
 
@@ -383,11 +634,55 @@
       const dt = Math.min(0.05, delta / 1000);
       this.t += dt;
       this.ironTick(dt);
+      // Kippen: Karte wirkt schmaler/kürzer, Lichtreflex wandert; ohne Ziehen federt sie zurück
+      if (!this.pointer && !this.flipping) { this.tilt.x *= 0.9; this.tilt.y *= 0.9; }
+      if (!this.flipping) {
+        this.cardC.scaleX = Math.cos((this.tilt.y * Math.PI) / 180);
+        this.cardC.scaleY = Math.cos((this.tilt.x * Math.PI) / 180);
+      }
       this.drawMarks();
-      const f = this.fx;
       const c = this.card;
+      const gl = this.glare;
+      gl.clear();
+      const tilt = Math.sqrt(this.tilt.x * this.tilt.x + this.tilt.y * this.tilt.y);
+      if (tilt > 2) {
+        gl.fillStyle(0xffffff, Math.min(0.25, tilt / 120));
+        gl.fillEllipse((this.tilt.y / 35) * c.w * 0.45, (this.tilt.x / 35) * c.h * 0.45, c.w * 0.7, c.h * 0.35);
+      }
+      const f = this.fx;
       f.clear();
-      // Schaum: steigt leicht auf und vergeht
+      // UV-Lampe: alles dunkel außer dem Lichtkegel
+      const us = this.uvShade;
+      us.clear();
+      if (this.step() === 'grade' && this.mode === 'uv' && !this.guess && this.hover) {
+        const R = UV_R * c.scale;
+        us.fillStyle(0x0a0420, 0.55).fillRect(0, 0, this.scale.width, this.scale.height);
+        f.fillStyle(0x8a5cff, 0.25).fillCircle(this.hover.x, this.hover.y, R);
+        f.lineStyle(2, 0xb48cf2, 0.7).strokeCircle(this.hover.x, this.hover.y, R);
+      }
+      // Messlinien
+      if (this.step() === 'grade' && this.mode === 'measure' && !this.guess) {
+        ['l', 'r'].forEach((k) => {
+          const x = c.x + this.guides[k] * c.w;
+          const snapped = Math.abs(this.guides[k] - (k === 'l' ? this.imgEdge.l : this.imgEdge.r)) < 1e-6;
+          f.lineStyle(2, snapped ? 0x4fd17a : 0xffd84a, 0.95);
+          f.lineBetween(x, c.y - 14, x, c.y + c.h + 14);
+          f.fillStyle(snapped ? 0x4fd17a : 0xffd84a, 1).fillTriangle(x - 7, c.y + c.h + 26, x + 7, c.y + c.h + 26, x, c.y + c.h + 14);
+        });
+      }
+      // Versiegeln: pendelnder Zeiger
+      const mt = this.meter;
+      if (this.step() === 'slab' && mt) {
+        if (mt.on) {
+          const p = (((this.t - mt.t0) * 1000) / METER_MS) % 2;
+          mt.pos = (p < 1 ? p : 2 - p) * 100;
+        }
+        f.fillStyle(0x1c1f2b, 0.9).fillRoundedRect(mt.x - 6, mt.y - 14, mt.w + 12, 28, 8);
+        f.fillStyle(0x3a3f52, 1).fillRect(mt.x, mt.y - 6, mt.w, 12);
+        f.fillStyle(0x4fd17a, 1).fillRect(mt.x + mt.w * 0.45, mt.y - 6, mt.w * 0.1, 12);
+        f.fillStyle(0xffffff, 1).fillRect(mt.x + (mt.pos / 100) * mt.w - 2, mt.y - 12, 4, 24);
+      }
+      // Schaum und Funken
       this.foam = this.foam.filter((b) => (b.t -= dt) > 0);
       this.foam.forEach((b) => {
         b.y -= dt * 6;
@@ -395,7 +690,6 @@
         f.fillCircle(b.x, b.y, b.r);
         f.lineStyle(1, 0xd8e8f0, Math.min(0.6, b.t)).strokeCircle(b.x, b.y, b.r);
       });
-      // Funken, wenn ein Fleck ganz weg ist
       this.sparks = this.sparks.filter((s) => (s.t -= dt) > 0);
       this.sparks.forEach((s) => {
         s.x += s.vx * dt;
