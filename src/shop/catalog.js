@@ -87,13 +87,44 @@ const WARE = {
   energy_drink_can: [12, 0x50d0a0],
   coffee: [12, 0x8a5a3a],
 };
+// Lizenzen (Krisztian, 2026-10-14): Grundsortiment ohne Lizenz, der Rest in Paketen
+const LICENSES = [
+  { id: 'sammler', name: 'Sammler-Lizenz', price: 2500, text: 'Booster-Boxen, Einzelkarten und bewertete Karten im Slab' },
+  { id: 'brettspiele', name: 'Brettspiel-Lizenz', price: 1500, text: 'Brettspiele' },
+];
+const LICENSE_OF = { booster_box: 'sammler', single_card: 'sammler', graded_slab: 'sammler', board_game_box: 'brettspiele' };
+
 const GOODS = Object.entries(WARE)
   .filter(([id]) => byId[id])
   .map(([id, [perBox, color]]) => {
     const market = byId[id].placeholder_price.amount;
-    // tier = ab welcher Stufe Kunden danach fragen (vorbereitet, alles Stufe 1)
-    return { id, name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100, tier: 1 };
-  });
+    // tier = ab welcher Stufe Kunden danach fragen (vorbereitet, alles Stufe 1); license = nötige Lizenz zum Bestellen
+    return { id, kind: 'ware', name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100, tier: 1, license: LICENSE_OF[id] || null };
+  })
+  // Material für Aufträge (Preise wie im Bank-Shop der Seite: TCG Sleeve 15, Leerer Slab 40) – nicht für Kunden im Regal
+  .concat([
+    { id: 'mat_sleeve', kind: 'material', name: 'TCG Sleeve', perBox: 10, color: 0xc0a0f0, market: 15, buy: 15, tier: 1, license: null },
+    { id: 'mat_slab', kind: 'material', name: 'Leerer Slab', perBox: 5, color: 0xd8e8f0, market: 40, buy: 40, tier: 1, license: null },
+  ]);
+
+// Dienstleistungen: Marktpreis = Lohn im Grading-Shop der Seite (Krisztian, 2026-10-14), station = Möbel dafür,
+// material = wird dabei verbraucht. Reinigen + Bügeln am Kartenreinigungstisch, Benoten + Versiegeln am Kartenbewertungstisch,
+// TCG Sleeve an der Booster-Öffnungstheke.
+const SERVICES = [
+  { id: 'clean', name: 'Reinigen', market: 25, station: 'card_cleaning_table' },
+  { id: 'iron', name: 'Knick bügeln', market: 20, station: 'card_cleaning_table' },
+  { id: 'grade', name: 'Benoten', market: 30, station: 'card_grading_table' },
+  { id: 'slab', name: 'Versiegeln (Slab)', market: 60, station: 'card_grading_table', material: 'mat_slab' },
+  { id: 'foil', name: 'In TCG Sleeve', market: 15, station: 'pack_opening_counter', material: 'mat_sleeve' },
+];
+// Was Kunden bestellen (Gewicht): Bügeln kommt von selbst dazu, wenn die Karte einen Knick hat und gereinigt wird.
+// Slab und Sleeve schließen sich aus (die Karte steckt entweder im Slab oder im Sleeve).
+const SERVICE_PACKS = [
+  { services: ['clean'], weight: 3 },
+  { services: ['clean', 'foil'], weight: 2 },
+  { services: ['grade', 'slab'], weight: 2 },
+  { services: ['clean', 'grade', 'slab'], weight: 2 },
+];
 
 // Was in welches Möbel passt (Platz = Stückzahl, jedes Stück braucht einen Platz; gemischt erlaubt)
 const SHELF_GOODS = ['board_game_box', 'booster_box', 'sleeve_pack', 'toploader', 'booster_pack'];
@@ -104,14 +135,18 @@ const HOLDS = {
   drink_refrigerator: ['energy_drink_can', 'coffee'],
   card_display_case: ['single_card', 'graded_slab'],
   booster_display: ['booster_pack'],
+  card_grading_table: ['mat_slab'],
+  pack_opening_counter: ['mat_sleeve'],
 };
+// Plätze, wo die Kapazität im Text nicht passt (Material-Vorrat an den Arbeitstischen)
+const SLOTS = { card_grading_table: 10, pack_opening_counter: 20 };
 CATALOG.forEach((d) => {
   const holds = HOLDS[d.id];
   if (!holds) return;
   d.holds = holds;
-  d.slots = parseInt(String(d.capacity).match(/\d+/), 10) || 6;
+  d.slots = SLOTS[d.id] || parseInt(String(d.capacity).match(/\d+/), 10) || 6;
 });
 
 const UNIT_PRICE = (byId.empty_neighbor_unit && byId.empty_neighbor_unit.placeholder_price.amount) || 5000;
 
-module.exports = { CATALOG, GROUPS, GOODS, UNIT_PRICE };
+module.exports = { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE };

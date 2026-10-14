@@ -976,7 +976,7 @@
     gradeOk.addEventListener('click', function () {
       if (!chosen) return;
       gradeOk.disabled = true;
-      fetch('/grading/benoten', {
+      fetch(job.gradeUrl || '/grading/benoten', { // Shop-Demo: eigene Adresse
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ _csrf: csrf, job: job.id, grade: String(chosen) }),
@@ -1245,6 +1245,8 @@
       .then(function (res) {
         if (res.error) throw new Error(res.error);
         try { sessionStorage.removeItem(SAVE_KEY); } catch (err) { /* egal */ }
+        // Shop-Demo: der Tisch läuft im Fenster über dem Laden – Ergebnis an den Laden, der schließt das Fenster
+        if (job.demo) return wait.then(function () { window.parent.postMessage({ type: 'shop-werkbank', result: res }, window.location.origin); });
         return wait.then(function () { showSummary(res); });
       })
       .catch(function (err) {

@@ -114,3 +114,9 @@ html, body.sd-body {
   padding: 8px 14px; border-radius: 8px; background: rgba(28, 31, 43, .96); border: 1px solid #d9a441; font-size: 13px;
 }
 @media (max-width: 700px) { .sd-clock { top: 54px; font-size: 12px; } .sd-note { top: 96px; } }
+
+/* Arbeitstisch-Fenster (Grading-Tisch der Seite im iframe, views/shop-werkbank.ejs) */
+.sd-bench { width: min(1180px, calc(100vw - 24px)); height: calc(100vh - 40px); max-height: none; }
+.sd-bench[open] { display: flex; flex-direction: column; }
+.sd-bench-frame { flex: 1; width: 100%; border: 0; background: #14161f; }
+.sd-werkbank-body { margin: 0; padding: 12px 16px; min-height: 100vh; box-sizing: border-box; }
