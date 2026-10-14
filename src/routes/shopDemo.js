@@ -150,45 +150,65 @@ async function benchFor(userId, jid, station) {
   return { state, job, steps };
 }
 
+/**
+ * Arbeitstisch öffnen: prüft Auftrag/Tisch, merkt sich den Tisch am Auftrag und liefert die Daten für den Tisch
+ * → { jobData } oder { error }. Genutzt von der Seite im Fenster (GET /shop-demo/werkbank) und vom Phaser-Tisch
+ * im Laden (GET /api/shop-demo/werkbank, public/js/shop-werkbank-phaser.js)
+ */
+async function openBench(userId, jid, station) {
+  const b = await benchFor(userId, jid, station);
+  if (b.error) return b;
+  const { job, steps } = b;
+  if (steps.includes('slab') && !layout.supplier(b.state, 'mat_slab')) return { error: 'Kein leerer Slab am Kartenbewertungstisch – erst Slabs bestellen und einräumen.' };
+  b.state.jobs.find((j) => j.jid === job.jid).bench = station;
+  await save(userId, b.state);
+  const cleaned = job.done.includes('clean');
+  const card = cardInfo(job.card);
+  return {
+    jobData: {
+      demo: true,
+      id: String(job.jid),
+      steps,
+      card,
+      back: card && card.season ? '/img/tcg-backs/' + card.season + '.webp' : null,
+      customer: 'Kunde ' + job.jid,
+      shop: { name: 'Shop-Demo', code: 'SD' },
+      cert: String(parseInt(job.seed, 16) * 977 + job.jid).padStart(8, '0').slice(-8),
+      spots: cleaned ? [] : job.spots,
+      defects: job.defects,
+      center: centerShift(job.defects && job.defects.centering, job.seed),
+      centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
+      centerScale: CENTERING_SCALE.map(({ from, to, cap }) => ({ from, to, cap })),
+      minMs: 0,
+      crease: job.defects && job.defects.crease ? creaseLine(job.seed) : null,
+      iron: job.results.iron !== undefined ? { smooth: job.results.iron } : null,
+      ironUrl: '/shop-demo/werkbank/buegeln',
+      gradeUrl: '/shop-demo/werkbank/benoten',
+      startedAt: Date.now(),
+      guess: job.results.guess || null,
+      grade: job.results.guess ? job.results.grade : null,
+      player: false,
+      services: null,
+      tools: [],
+    },
+  };
+}
+
 router.get('/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
   try {
-    const b = await benchFor(req.user._id, Number(req.query.auftrag), str(req.query.tisch));
+    const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch));
     if (b.error) return res.status(400).type('text/plain').send(b.error);
-    const { job, steps } = b;
-    if (steps.includes('slab') && !layout.supplier(b.state, 'mat_slab')) return res.status(400).type('text/plain').send('Kein leerer Slab am Kartenbewertungstisch – erst Slabs bestellen und einräumen.');
-    b.state.jobs.find((j) => j.jid === job.jid).bench = str(req.query.tisch);
-    await save(req.user._id, b.state);
-    const cleaned = job.done.includes('clean');
-    res.render('shop-werkbank', {
-      title: 'Arbeitstisch',
-      pay: grading.PAY,
-      centeringScale: CENTERING_SCALE,
-      jobData: {
-        demo: true,
-        id: String(job.jid),
-        steps,
-        card: cardInfo(job.card),
-        customer: 'Kunde ' + job.jid,
-        shop: { name: 'Shop-Demo', code: 'SD' },
-        cert: String(parseInt(job.seed, 16) * 977 + job.jid).padStart(8, '0').slice(-8),
-        spots: cleaned ? [] : job.spots,
-        defects: job.defects,
-        center: centerShift(job.defects && job.defects.centering, job.seed),
-        centerCap: job.defects && job.defects.centering ? centeringCap(job.defects.centering) : 10,
-        centerScale: CENTERING_SCALE.map(({ from, to, cap }) => ({ from, to, cap })),
-        minMs: 0,
-        crease: job.defects && job.defects.crease ? creaseLine(job.seed) : null,
-        iron: job.results.iron !== undefined ? { smooth: job.results.iron } : null,
-        ironUrl: '/shop-demo/werkbank/buegeln',
-        gradeUrl: '/shop-demo/werkbank/benoten',
-        startedAt: Date.now(),
-        guess: job.results.guess || null,
-        grade: job.results.guess ? job.results.grade : null,
-        player: false,
-        services: null,
-        tools: [],
-      },
-    });
+    res.render('shop-werkbank', { title: 'Arbeitstisch', pay: grading.PAY, centeringScale: CENTERING_SCALE, jobData: b.jobData });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
+  try {
+    const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch));
+    if (b.error) return res.status(400).json({ error: b.error });
+    res.json({ jobData: b.jobData });
   } catch (err) {
     next(err);
   }
