@@ -26,7 +26,8 @@ function loadScene(file, globalName) {
   });
   const handlers = {};
   Object.assign(scene, {
-    scale: { width: 1200, height: 800 }, textures: { exists: () => false }, add: obj(), load: obj(), tweens: obj(),
+    scale: { width: 1200, height: 800 }, textures: { exists: () => false }, add: obj(), load: obj(),
+    tweens: { add: (c) => { if (c.onComplete) c.onComplete(); return obj(); } }, // Animationen sofort fertig
     time: { delayedCall: (ms, fn) => fn() }, scene: { stop() { scene.stopped = true; } },
     input: { on: (e, fn) => { handlers[e] = fn; }, keyboard: { on: (e, fn) => { handlers[e] = fn; }, once: (e, fn) => { handlers[e] = fn; } } },
   });
@@ -42,8 +43,8 @@ test('Arbeitstisch: putzen, umdrehen, bügeln, Esc', () => {
   handlers.pointerdown({ x: 600, y: 400 });
   for (let i = 0; i < 300; i++) handlers.pointermove({ x: 600 + (i % 2 ? 40 : -40), y: 400, isDown: true });
   assert.strictEqual(scene.cleanliness(), 50, 'vorne sauber, hinten nicht');
-  handlers['keydown-F']();
-  assert.strictEqual(scene.facingFront, false);
+  handlers['keydown-R']();
+  assert.strictEqual(scene.facingFront, false, 'R dreht die Karte um');
   scene.finishStep();
   assert.strictEqual(scene.step(), 'iron');
   assert.strictEqual(scene.facingFront, true, 'zum Bügeln wieder vorne');
