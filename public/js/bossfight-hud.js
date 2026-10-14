@@ -806,7 +806,7 @@
     var p = document.createElement('div');
     p.className = 'bf-result-text';
     var euro = function (c) { return (c / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }); };
-    p.textContent = e.sieg ? (r.geld ? euro(r.geld) + ' Beute' : 'Sieg') + (r.dio ? ' – und er hat seine Karte fallen lassen: Lucky Dio ist jetzt in deinem Album!' : ' – seine Karte hat er diesmal behalten.') : 'Versuch es mit einem anderen Deck oder einem besseren Plan noch einmal.';
+    p.textContent = e.sieg ? (r.geld ? euro(r.geld) + ' Beute' : 'Sieg') + (r.dio ? ' – und er hat seine Karte fallen lassen: Dio Schattenpfeil ist jetzt in deinem Album!' : ' – seine Karte hat er diesmal behalten.') : 'Versuch es mit einem anderen Deck oder einem besseren Plan noch einmal.';
     resultEl.appendChild(p);
     var a = document.createElement('a');
     a.className = 'bf-result-link';

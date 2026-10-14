@@ -104,24 +104,31 @@ function nameSvg(frame, name) {
   return `<text x="${n.x}" y="${(n.y + size * 0.34).toFixed(1)}" text-anchor="middle" font-size="${size}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(name)}</text>`;
 }
 
-// title = Name der Fähigkeit (fett, über dem Text); der Text passt sich dem restlichen Platz an
-function abilitySvg(frame, text, title) {
-  if (!text && !title) return '';
+// title = Name der Fähigkeit (fett, über dem Text); der Text passt sich dem restlichen Platz an.
+// typen = Klassen der Karte (z. B. ['Schurke']): stehen als „[Schurke]“ ganz oben im Textfeld – spätere Effekte beziehen sich darauf.
+function abilitySvg(frame, text, title, typen = []) {
+  if (!text && !title && !typen.length) return '';
   const b = frame.text;
   const c = frame.colors;
+  const klasse = typen.map((t) => `[${t}]`).join(' ');
+  const klasseSize = klasse ? b.size + 1 : 0;
+  const klasseLh = klasseSize * 1.3;
   const titleSize = title ? b.size + 3 : 0;
   const titleLh = titleSize * 1.25;
-  const { size, lines } = text ? fitText(text, { ...b, h: b.h - titleLh }) : { size: b.size, lines: [] };
+  const { size, lines } = text ? fitText(text, { ...b, h: b.h - titleLh - klasseLh }) : { size: b.size, lines: [] };
   const lh = size * b.lineHeight;
-  // Block (Titel + Text) senkrecht mittig; die Grundlinie liegt etwa 0,8 Schriftgrößen unter der Zeilenoberkante
-  const blockTop = b.y + (b.h - titleLh - lines.length * lh) / 2;
-  const top = blockTop + titleLh + size * 0.8 + (lh - size) / 2;
+  // Block (Klasse + Titel + Text) senkrecht mittig; die Grundlinie liegt etwa 0,8 Schriftgrößen unter der Zeilenoberkante
+  const blockTop = b.y + (b.h - klasseLh - titleLh - lines.length * lh) / 2;
+  const top = blockTop + klasseLh + titleLh + size * 0.8 + (lh - size) / 2;
   const cx = b.x + b.w / 2;
+  const kopf = klasse
+    ? `<text x="${cx}" y="${(blockTop + klasseSize * 0.95).toFixed(1)}" text-anchor="middle" font-size="${klasseSize}" font-weight="700" letter-spacing="2" fill="${c.label}" stroke-width="3" ${textAttrs(c)}>${esc(klasse)}</text>`
+    : '';
   const head = title
-    ? `<text x="${cx}" y="${(blockTop + titleSize * 0.95).toFixed(1)}" text-anchor="middle" font-size="${titleSize}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(title)}</text>`
+    ? `<text x="${cx}" y="${(blockTop + klasseLh + titleSize * 0.95).toFixed(1)}" text-anchor="middle" font-size="${titleSize}" font-weight="700" letter-spacing="1" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${esc(title)}</text>`
     : '';
   const tspans = lines.map((l, i) => `<tspan x="${cx}" y="${(top + i * lh).toFixed(1)}">${esc(l)}</tspan>`).join('');
-  return head + (lines.length ? `<text text-anchor="middle" font-size="${size}" font-style="italic" fill="${c.text}" stroke-width="2" ${textAttrs(c)}>${tspans}</text>` : '');
+  return kopf + head + (lines.length ? `<text text-anchor="middle" font-size="${size}" font-style="italic" fill="${c.text}" stroke-width="2" ${textAttrs(c)}>${tspans}</text>` : '');
 }
 
 /**
@@ -142,7 +149,7 @@ function render(card, values = {}) {
     (frame.name ? nameSvg(frame, card.name) : '') +
     (frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
-    abilitySvg(frame, card.ability, card.abilityName) +
+    abilitySvg(frame, card.ability, card.abilityName, card.typen || []) +
     '</svg>'
   );
 }

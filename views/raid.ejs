@@ -78,9 +78,9 @@
 
   <section class="card">
     <h2>Beute</h2>
-    <p>Jeder Sieg bringt <strong><%= euro(belohnung.geld) %></strong>. Mit <strong><%= String(belohnung.dioChance).replace('.', ',') %> %</strong> Chance lässt Dio dazu seine Karte fallen – <strong>Lucky Dio</strong> gibt es nur hier.</p>
+    <p>Jeder Sieg bringt <strong><%= euro(belohnung.geld) %></strong>. Mit <strong><%= String(belohnung.dioChance).replace('.', ',') %> %</strong> Chance lässt Dio dazu seine Karte fallen – <strong><%= dio ? dio.name : 'Dios Karte' %></strong> gibt es nur hier.</p>
     <% if (winners.length) { %>
-      <h3 class="small">Lucky Dio erbeutet haben</h3>
+      <h3 class="small"><%= dio ? dio.name : 'Dios Karte' %> erbeutet haben</h3>
       <ul class="small"><% winners.forEach((w) => { %><li><%- userLink(w.username) %> · <%= date(w.endedAt) %></li><% }) %></ul>
     <% } else { %>
       <p class="muted small">Noch hat niemand Dios Karte erbeutet.</p>
@@ -103,7 +103,7 @@
               <td><span class="raid-result is-<%= h.status %>"><%= RESULT[h.status] %></span></td>
               <td class="num"><%= h.runde %></td>
               <td class="num"><%= h.bossHp %>/<%= h.bossMax %></td>
-              <td><%= h.reward && h.reward.geld ? euro(h.reward.geld) : '–' %><%= h.reward && h.reward.dio ? ' + Lucky Dio!' : '' %></td>
+              <td><%= h.reward && h.reward.geld ? euro(h.reward.geld) : '–' %><%= h.reward && h.reward.dio ? ' + Dios Karte!' : '' %></td>
             </tr>
           <% }) %>
         </tbody>

@@ -45,22 +45,6 @@ module.exports = {
   },
 };
 
-// Violetter Boss-Rahmen (Lucky Dio): Fenster wie gilded, Namensschild leer – der Name kommt per Code.
-// Farben passend zum Bild: tiefes Violett, bernsteinfarbenes Gold
-module.exports.violet = {
-  ...module.exports.gilded,
-  name: { x: 240, y: 73, w: 360, size: 36, minSize: 22 },
-  colors: {
-    value: '#ffd68a',
-    label: '#d6a8ff',
-    text: '#f1e6ff',
-    outline: '#13071f',
-    plate: '#2a1145',
-    plateBorder: '#e8a948',
-    up: '#8fe8a8',
-    down: '#ff9b9b',
-  },
-};
 
 // Helden-Karten für den Bosskampf (720 × 1008): leerer Namensbalken (Name per Code), Kampfwerte statt FIA/FIS/BWL –
 // ANG = Schaden am Boss, SCH = Block gegen den nächsten Boss-Angriff, HEI = Heilung. Die Plakette zeigt die
@@ -106,6 +90,35 @@ module.exports.nekro = heldFrame({
   text: { x: 95, y: 772, w: 530, h: 150, size: 26, minSize: 15, lineHeight: 1.32 },
   colors: { value: '#d8fff6', label: '#7fe3d2', text: '#e3f2ef', outline: '#05100e', plate: '#16211f', plateBorder: '#5fe0d0' },
 });
+// Violetter Rahmen der Karten fürs neue Kartenspiel (Dio Schattenpfeil): Angriff, Abwehr, Lebenspunkte statt FIA/FIS/BWL,
+// die Plakette oben rechts zeigt die Kosten (Energie) statt Speed. Werte aus card.kampf (ang, sch = Abwehr, leben).
+// Farben passend zum Bild: tiefes Violett, bernsteinfarbenes Gold. Rahmenbild: Fenster wie gilded.
+module.exports.violet = {
+  ...module.exports.gilded,
+  dash: true,
+  values: (card) => {
+    const k = card.kampf || {};
+    return { speed: k.kosten || 0, ang: k.ang || 0, abw: k.sch || 0, lp: k.leben || 0 };
+  },
+  stats: [
+    { key: 'ang', label: 'ANG', x: 111, y: 432 },
+    { key: 'abw', label: 'ABW', x: 111, y: 563 },
+    { key: 'lp', label: 'LP', x: 111, y: 691 },
+  ],
+  name: { x: 240, y: 73, w: 360, size: 36, minSize: 22 },
+  text: { x: 92, y: 790, w: 520, h: 144, size: 26, minSize: 15, lineHeight: 1.32 },
+  colors: {
+    value: '#ffd68a',
+    label: '#d6a8ff',
+    text: '#f1e6ff',
+    outline: '#13071f',
+    plate: '#2a1145',
+    plateBorder: '#e8a948',
+    up: '#8fe8a8',
+    down: '#ff9b9b',
+  },
+};
+
 module.exports.eis = heldFrame({
   stats: heldStats(115, [406, 514, 625]),
   name: { x: 301, y: 71, w: 400, size: 38, minSize: 24 },

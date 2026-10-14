@@ -46,7 +46,7 @@ const STUFEN = [
 ];
 
 function deckFuer(stufe, rng) {
-  const pool = catalog.CARDS.filter((c) => c.isCharacter && stufe.rar.includes(c.rarity) && c.id !== 'lucky-dio-boss').flatMap((c) => [c.id, c.id]);
+  const pool = catalog.CARDS.filter((c) => c.isCharacter && stufe.rar.includes(c.rarity) && c.id !== 'dio-schattenpfeil-boss').flatMap((c) => [c.id, c.id]);
   for (let j = pool.length - 1; j > 0; j--) {
     const r = Math.floor(rng() * (j + 1));
     [pool[j], pool[r]] = [pool[r], pool[j]];

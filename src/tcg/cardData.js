@@ -9,6 +9,7 @@
 //   stats:   [Speed, FIA, FIS, BWL]
 //   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
+//   typen:   Klassen der Karte (z. B. ['Schurke']) – stehen als „[Schurke]“ oben im Textfeld; Effekte können sich darauf beziehen
 //   kampf:   Kampfwerte für den kommenden Kampfmodus (eigener Block, getrennt von den IHK-Werten in stats).
 //            Die Felder legen wir mit den Spielregeln fest.
 // Test-Karten für den Bosskampf (Seltenheit test-item, Admins bekommen sie beim Start – src/migrate.js).
@@ -101,15 +102,16 @@ module.exports = {
     abilityName: 'Forkbomb',
     ability: 'Alle gegnerischen Karten werden 30 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
   },
-  // Boss-Karte, nur als Beute aus dem Raid gegen Lucky Dio erhältlich. Rahmen: violet (src/tcg/frames.js)
-  'lucky-dio-boss': {
+  // Boss-Karte fürs neue Kartenspiel, nur als Beute aus dem Raid „The Gambit of Shadows“ erhältlich. Rahmen: violet
+  // (Angriff, Abwehr, Lebenspunkte, Kosten). Keine IHK-Werte – spielt nicht in IHK, Dungeon oder Turm.
+  // Mit Lebenspunkten bleibt sie nach dem Ausspielen auf dem Spielfeld liegen (permanent). Effekt folgt.
+  'dio-schattenpfeil-boss': {
     season: 'season-1',
     frame: 'violet',
-    name: 'Lucky Dio',
-    stats: [99, 99, 90, 95],
-    // Krit-Lotterie (src/ihk/abilities.js, Ablauf in ihkService.simulate): Schurke und Glücksspieler (Handarmbrust, Dolch).
-    // Werte: DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN. Vorbote eines Fantasy-Settings (Beta).
-    abilityName: 'Krit-Lotterie',
-    ability: 'Nach jedem Angriff fliegt eine Münze für einen Zusatztreffer. Kopf: kritischer Kettentreffer mit der Armbrust. Zahl: Dolchtreffer und ein Glücks-Token (+1 % Krit-Chance). Booster: Glücksmünze.',
+    name: 'Dio Schattenpfeil',
+    stats: [0, 0, 0, 0],
+    typen: ['Schurke'],
+    ability: 'Effekt folgt',
+    kampf: { typ: 'held', kosten: 5, ang: 60, sch: 20, hei: 0, leben: 60, dauer: 'permanent', typen: ['Schurke'], effekt: null, fx: 'nekro' },
   },
 };

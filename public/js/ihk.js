@@ -345,44 +345,17 @@
     void el.offsetWidth;
     el.classList.add(cls);
   }
-  // Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf – Kopf = Armbrust-Krit, Zahl = Dolch und ein Glücks-Token
   function floater(tk) {
     var el = document.createElement('span');
-    var coin = !tk.ability && tk.coin;
-    el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '') + (coin ? ' is-coin coin-' + coin : '');
-    var head = coin === 'kopf' ? 'KOPF! ARMBRUST-KRIT ' : coin === 'zahl' ? 'ZAHL · DOLCH +' : tk.crit ? 'KRIT! ' : '+';
-    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : head) + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
+    el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
+    el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
     if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
-    el.style.left = (coin ? 30 + Math.random() * 40 : 15 + Math.random() * 60) + '%';
+    el.style.left = (15 + Math.random() * 60) + '%';
     floaters.appendChild(el);
-    setTimeout(function () { el.remove(); }, coin ? 1400 : 1200);
-    if (coin === 'zahl') dioTokens(tk.tokens);
+    setTimeout(function () { el.remove(); }, 1200);
     bump(player, 'is-hit');
     bump(enemy, 'is-shake');
   }
-  // Zähler der Glücks-Tokens an Dios Karte (je Token +TOKEN_STEP % Krit-Chance)
-  var hasLottery = data.ticks.some(function (t) { return t.coin && !t.ability; });
-  var TOKEN_STEP = data.tokenStep || 1;
-  var dioBadge = null;
-  function dioTokens(n) {
-    if (!hasLottery || !player) return;
-    if (!dioBadge) {
-      dioBadge = document.createElement('div');
-      dioBadge.className = 'dio-badge';
-      player.appendChild(dioBadge);
-    }
-    dioBadge.textContent = n + ' Glücks-Token' + (n === 1 ? '' : 's') + ' · +' + n * TOKEN_STEP + ' % Krit';
-  }
-  // Glücksmünze (Lucky Dio als Booster): zur Halbzeit dreht sich eine Münze, dann Kopf oder Zahl
-  var coinTick = data.ticks.filter(function (t) { return t.coin && t.ability; })[0];
-  function playCoin() {
-    if (!coinTick || !player) return;
-    var c = document.createElement('div');
-    c.className = 'dio-coin is-' + coinTick.coin;
-    c.innerHTML = '<span class="dio-coin-face"></span><span class="dio-coin-label">' + (coinTick.coin === 'kopf' ? 'Kopf! +15 % Krit' : 'Zahl – Pech gehabt') + '</span>';
-    add(player, c, 2600);
-  }
-
   // ---------- Fähigkeits-Effekte (gezeichnet, keine Emojis) ----------
   var SVGNS = 'http://www.w3.org/2000/svg';
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
@@ -528,14 +501,11 @@
     });
     data.ticks.forEach(function (t) { if (t.ability && t.st) showStats(t.st); });
     boostSlots.forEach(function (b) { if (b.querySelector('img')) bump(b, 'fx-flash'); });
-    playCoin();
   }
   function finish() {
     if (done) return;
     done = true;
-    var tokens = null;
-    while (i < ticks.length) { if (ticks[i].tokens) tokens = ticks[i].tokens; total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
-    if (tokens !== null) dioTokens(tokens);
+    while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
     if (hasAbility && (data.success ? last >= half : true)) activate();
     showStats(lastStats(), true);
     render(endT);

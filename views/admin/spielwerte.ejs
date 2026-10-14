@@ -478,7 +478,7 @@
         <fieldset class="admin-tax-group">
           <legend>Beute bei Sieg</legend>
           <label class="field"><span>Spielgeld (€)</span><input type="text" inputmode="decimal" name="belohnung_geld" value="<%= (rs.belohnung.geld / 100).toFixed(2).replace('.', ',') %>" required><small class="muted">Standard <%= euro(rd.belohnung.geld) %></small></label>
-          <label class="field"><span>Chance auf Lucky Dio (%)</span><input type="text" inputmode="decimal" name="belohnung_dioChance" value="<%= String(rs.belohnung.dioChance).replace('.', ',') %>" required><small class="muted">Standard <%= rd.belohnung.dioChance %> % – Lucky Dio gibt es nur hier</small></label>
+          <label class="field"><span>Chance auf Dios Karte „Dio Schattenpfeil“ (%)</span><input type="text" inputmode="decimal" name="belohnung_dioChance" value="<%= String(rs.belohnung.dioChance).replace('.', ',') %>" required><small class="muted">Standard <%= rd.belohnung.dioChance %> % – die Karte gibt es nur hier</small></label>
         </fieldset>
 
         <button class="btn btn-primary" type="submit">Speichern</button>

@@ -85,11 +85,8 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 // Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
 const FORKBOMB_STEP = 2;
 
-// Krit-Lotterie (Lucky Dio): so viele Spiel-Sekunden nach dem Angriff folgt der Zusatztreffer aus dem Münzwurf
-const COIN_GAP = 0.3;
-
 function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0, critBonus: 0, lottery: null, coin: null, rand };
+  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -97,10 +94,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   const totals = keys.map(() => 0);
   const open = () => totals.some((x) => x < required);
   const ticks = [];
-  // Eigenschaften der Karte selbst (passive, z. B. Krit-Lotterie) gelten von Anfang an, alle anderen zur Halbzeit
-  const passive = effects.filter((e) => e.passive);
-  const later = effects.filter((e) => !e.passive);
-  let applied = later.length === 0;
+  let applied = effects.length === 0;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
   const slow = []; // Forkbomb: [von, bis, Prozent] – in diesen Spiel-Sekunden läuft die Deadline langsamer
   // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen)
@@ -116,18 +110,14 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     lastShown = now.join();
     return { ...tick, st: now };
   };
-  if (passive.length) {
-    passive.forEach((e) => e.apply(s));
-    ticks.push(withShown({ t: 0, p: 0, ability: true }));
-  }
   while (open()) {
     let next = t + interval();
     if (!applied && next > half) {
       // Halbzeit: Fähigkeiten aktivieren
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
-      later.forEach((e) => e.apply(s));
+      effects.forEach((e) => e.apply(s));
       applied = true;
-      ticks.push(withShown({ t: half, p: 0, ability: true, ...(s.coin ? { coin: s.coin } : {}) })); // coin: Glücksmünze (Lucky Dio als Booster)
+      ticks.push(withShown({ t: half, p: 0, ability: true }));
       if (s.extraTicks || s.extraTime) {
         // Bloodlust: ganze Runden; Reality Check: Sekunden
         freeze = s.extraTicks * interval() + s.extraTime;
@@ -142,13 +132,10 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     }
     if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
     const fake = s.fakeNext;
-    // Krit-Lotterie (Lucky Dio): jeder Glücks-Token gibt l.step mehr Krit-Chance auf den normalen Angriff
-    const l = s.lottery;
-    const crit = rand() < CRIT_CHANCE + s.critBonus + (l ? l.tokens * l.step : 0);
-    const mult = crit ? 2 : 1;
+    const crit = rand() < CRIT_CHANCE;
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
-    const factor = ((0.8 + 0.4 * rand()) * mult) / (s.doom ? s.doom.factor : 1);
+    const factor = ((0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1);
     const ps = keys.map((k) => Math.max(1, Math.round((fake ? 99 : s.stats[k]) * factor)));
     s.fakeNext = false;
     if (s.tempSpeed && --s.tempSpeed.ticks <= 0) {
@@ -160,19 +147,6 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       totals[i] += p;
     });
     ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
-    // Nach dem Angriff fliegt die Münze (Chance auf Kopf: l.heads) und bringt einen Zusatztreffer:
-    // Kopf = kritischer Kettentreffer mit der Armbrust (×2 · l.chain), Zahl = Dolchtreffer (×1) und ein Glücks-Token
-    const coinAt = next + COIN_GAP;
-    if (l && open() && used(coinAt) <= WORK_TIME + 1e-9) {
-      const coin = rand() < l.heads ? 'kopf' : 'zahl';
-      const f2 = ((0.8 + 0.4 * rand()) * (coin === 'kopf' ? 2 * l.chain : 1)) / (s.doom ? s.doom.factor : 1);
-      const pc = keys.map((k) => Math.max(1, Math.round(s.stats[k] * f2)));
-      pc.forEach((p, i) => {
-        totals[i] += p;
-      });
-      if (coin === 'zahl') l.tokens += 1;
-      ticks.push(withShown({ t: Math.round(coinAt * 10) / 10, p: pc[0], ...(hybrid ? { p2: pc[1] } : {}), coin, ...(coin === 'kopf' ? { crit: true } : { tokens: l.tokens }) }));
-    }
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag

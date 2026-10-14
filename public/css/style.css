@@ -5936,55 +5936,6 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 .pick-freq-btn { flex: none; }
 .pick-freq-btn[aria-pressed="true"] { color: var(--color-accent-300); box-shadow: inset 0 0 0 1px var(--color-accent-300); }
 .ihk-pick-tools { flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-/* Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf – Kopf (Armbrust-Krit) golden, Zahl (Dolch) silbern-violett */
-.ihk-floater.is-coin, .dg-pop.is-coin { font-family: Georgia, "Times New Roman", serif; font-variant: small-caps; font-weight: 700; }
-.ihk-floater.is-coin.coin-kopf, .dg-pop.is-coin.coin-kopf { color: #ffd68a; text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 14px rgba(232, 169, 72, .75); }
-.ihk-floater.is-coin.coin-zahl, .dg-pop.is-coin.coin-zahl { color: #e4d4ff; text-shadow: 0 0 2px #13071f, 0 2px 4px #13071f, 0 0 10px rgba(168, 85, 247, .55); }
-@keyframes dio-fade { from { opacity: 0; } }
-
-/* Zähler der Glücks-Tokens bleibt klein auf der Karte stehen – über dem Textfeld, damit Name und Werte frei bleiben */
-.dio-badge {
-  position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); z-index: 2; pointer-events: none;
-  display: flex; gap: 6px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
-  font: 700 11px/1.3 Georgia, "Times New Roman", serif; font-variant: small-caps; letter-spacing: .04em;
-  color: #f1e6ff; background: rgba(42, 17, 69, .92); border: 1px solid #e8a948;
-}
-.dio-badge b { color: #ffd68a; font-size: 12px; }
-
-/* Glücksmünze (Lucky Dio als Booster): Münze dreht sich (scaleX), dann Kopf oder Zahl */
-.dio-coin { position: absolute; inset: 0; z-index: 3; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-.dio-coin-face {
-  width: 44px; height: 44px; border-radius: 50%; border: 2px solid #8a6a3a;
-  background: radial-gradient(circle at 35% 30%, #fff4cf, #e9c766 45%, #a07d2c);
-  box-shadow: inset 0 0 0 4px rgba(138, 106, 58, .35), 0 4px 8px rgba(0, 0, 0, .5);
-  animation: dio-coin-flip .9s ease-out both; will-change: transform;
-}
-.dio-coin-label {
-  padding: 2px 10px; border-radius: 999px; font: 700 13px/1.4 Georgia, "Times New Roman", serif; font-variant: small-caps;
-  color: #ffd68a; background: #2a1145; border: 1px solid #e8a948; opacity: 0; animation: dio-label-in .25s ease-out .9s forwards;
-}
-.dio-coin.is-zahl .dio-coin-label { color: #cbd5e1; border-color: #64748b; }
-.dio-coin { animation: dio-fade .2s ease-out, dio-fade-out .4s ease-in 2.2s forwards; }
-@keyframes dio-coin-flip {
-  0% { transform: translateY(20px) scaleX(1); }
-  15% { transform: translateY(-14px) scaleX(-1); }
-  30% { transform: translateY(-24px) scaleX(1); }
-  45% { transform: translateY(-24px) scaleX(-1); }
-  60% { transform: translateY(-14px) scaleX(1); }
-  75% { transform: translateY(0) scaleX(-1); }
-  100% { transform: none; }
-}
-@keyframes dio-label-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes dio-fade-out { to { opacity: 0; } }
-
-/* Dungeon: Glücksmünze (Lucky Dio als Booster) in der Einblendung */
-.dg-pop.is-coin { color: #ffd68a; font: 700 18px/1.3 Georgia, "Times New Roman", serif; font-variant: small-caps; }
-
-@media (prefers-reduced-motion: reduce) {
-  .dio-coin, .dio-coin-face, .dio-coin-label { animation: none !important; }
-  .dio-coin-label { opacity: 1; }
-}
-
 /* Pop-up vom Entwickler-Team (#132): wie das Geschenk-Fenster, Text mit Zeilenumbrüchen, bei langen Texten scrollbar */
 .dev-pop-text {
   margin: 4px auto 10px; max-width: 46ch; max-height: min(50vh, 420px); overflow-y: auto; text-align: left;

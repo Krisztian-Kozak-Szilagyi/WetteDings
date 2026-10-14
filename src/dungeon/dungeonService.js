@@ -271,7 +271,7 @@ function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECO
     const r = simulate(mem.card.stats, stat, required, rand, effects);
     if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text }));
     limit = Math.max(limit, WORK_TIME + r.freeze + (r.extend || 0));
-    r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.coin ? { coin: x.coin } : {}), ...(x.tokens ? { tokens: x.tokens } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
+    r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
   });
   events.sort((a, b) => a.t - b.t || a.m - b.m);
   const ticks = [];

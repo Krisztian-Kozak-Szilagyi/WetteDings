@@ -120,7 +120,9 @@ test('Alle Test-Karten haben gültige Kampfwerte', () => {
   for (const [id, d] of karten) {
     const k = d.kampf;
     assert.ok(['held', 'waffe', 'zauber', 'schild'].includes(k.typ), id);
-    if (k.typ === 'held') assert.ok(k.kosten >= 0 && k.kosten <= R.SPIELER.energie, `${id}: Kosten`);
+    // Test-Karten für den Bosskampf (feste Energie je Runde); Raid-Karten wie Dio Schattenpfeil bis zur Raid-Höchstenergie (10)
+    const maxKosten = id.endsWith('-test-item') ? R.SPIELER.energie : 10;
+    if (k.typ === 'held') assert.ok(k.kosten >= 0 && k.kosten <= maxKosten, `${id}: Kosten`);
     assert.ok(d.ability && !/undefined|NaN/.test(d.ability), `${id}: Kartentext`);
   }
 });

@@ -88,6 +88,19 @@ async function migrate() {
   }
   await TcgOpening.updateMany({ 'cards.card': from }, { $set: { 'cards.$[c].card': to } }, { arrayFilters: [{ 'c.card': from }] });
 
+  // Lucky Dio wurde neu gemacht: aus der Boss-Karte „Lucky Dio“ (Raid-Beute) wird „Dio Schattenpfeil“ – vergebene
+  // Exemplare, Decks, Angebote, Pack-Verlauf und „schon besessen“ ziehen mit
+  const dioFrom = 'lucky-dio-boss';
+  const dioTo = 'dio-schattenpfeil-boss';
+  const dio = await TcgCard.updateMany({ card: dioFrom }, { $set: { card: dioTo } });
+  if (dio.modifiedCount) console.log(`Migration: ${dio.modifiedCount}× Lucky Dio durch Dio Schattenpfeil ersetzt.`);
+  await require('./models/Deck').updateMany({ 'cards.card': dioFrom }, { $set: { 'cards.$[c].card': dioTo } }, { arrayFilters: [{ 'c.card': dioFrom }] });
+  for (const side of ['give', 'want']) {
+    await Trade.updateMany({ [`${side}.card`]: dioFrom }, { $set: { [`${side}.$[l].card`]: dioTo } }, { arrayFilters: [{ 'l.card': dioFrom }] });
+  }
+  await TcgOpening.updateMany({ 'cards.card': dioFrom }, { $set: { 'cards.$[c].card': dioTo } }, { arrayFilters: [{ 'c.card': dioFrom }] });
+  await User.updateMany({ tcgSeen: dioFrom }, { $set: { 'tcgSeen.$': dioTo } });
+
   // "Schon besessen" (tcgSeen) für Altbestand nachtragen: aktuelle Karten, alle geöffneten Packs und
   // alle über den Handel erhaltenen Karten. Läuft nur für Konten, die das Feld noch nicht haben.
   const todo = await User.find({ tcgSeen: { $exists: false } }).select('_id').lean();

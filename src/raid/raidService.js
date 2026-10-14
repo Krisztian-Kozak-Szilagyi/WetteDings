@@ -17,7 +17,7 @@ const { UserError } = require('../lib/util');
 const { logSettingsChange } = require('../stats/settingsLog');
 const logic = require('./logic');
 
-const DIO = 'lucky-dio-boss';
+const DIO = 'dio-schattenpfeil-boss'; // Beute: Dios Karte „Dio Schattenpfeil“
 const MIN_CARDS = 30; // das Raid-Deck besteht aus 30 Karten – alle müssen im Raid spielbar sein
 const HISTORY = 10;
 
@@ -127,7 +127,7 @@ async function act({ user, action }) {
 /** Nur die bekannten Felder eines Zugs speichern */
 const clean = (a) => ({ a: String(a.a), ...(a.uid != null ? { uid: Number(a.uid) } : {}), ...(a.ziel != null ? { ziel: Number(a.ziel) } : {}), ...(a.x != null ? { x: Number(a.x), y: Number(a.y) } : {}) });
 
-/** Kampf beenden: Status, bei Sieg Spielgeld und mit etwas Glück Lucky Dio */
+/** Kampf beenden: Status, bei Sieg Spielgeld und mit etwas Glück Dios Karte (Dio Schattenpfeil) */
 async function finish(run, s) {
   const sieg = s.vorbei === 'sieg';
   const reward = { geld: sieg ? settings.belohnung.geld : 0, dio: sieg && crypto.randomInt(10000) < settings.belohnung.dioChance * 100 };
@@ -157,7 +157,7 @@ async function abandon({ user }) {
 /** Letzte Kämpfe des Mitglieds */
 const history = (userId) => RaidRun.find({ user: userId, status: { $ne: 'laeuft' } }).sort({ createdAt: -1 }).limit(HISTORY).lean();
 
-/** Wer hat Lucky Dio schon erbeutet (für die Raid-Seite) */
+/** Wer hat Dios Karte schon erbeutet (für die Raid-Seite) */
 const dioWinners = () => RaidRun.find({ 'reward.dio': true }).sort({ endedAt: -1 }).limit(10).select('username endedAt').lean();
 
 /** Nur Testumgebung (npm run dev): die heutigen Kämpfe zählen nicht mehr als Versuch – volle Versuche zum Ausprobieren */

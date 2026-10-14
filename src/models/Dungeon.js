@@ -39,8 +39,7 @@ partySchema.index({ 'invites.user': 1 });
 partySchema.index({ slot: 1 });
 
 // st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate
-// coin/tokens: Krit-Lotterie (Lucky Dio) – Zusatztreffer aus dem Münzwurf und Glücks-Tokens für die Anzeige
-const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, coin: String, tokens: Number, ability: Boolean, destroy: Boolean, boost: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
+const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, boost: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
 
 // Ein Dungeon-Durchlauf (drei Spieler, Bots füllen auf). Alle Kämpfe werden beim Start ausgewürfelt und
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.

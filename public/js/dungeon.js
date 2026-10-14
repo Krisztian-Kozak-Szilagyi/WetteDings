@@ -533,13 +533,6 @@
     logList.prepend(li);
   }
 
-  // Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf – Kopf = Armbrust-Krit, Zahl = Dolch und ein Glücks-Token
-  function coinText(x) {
-    if (x.coin === 'kopf') return 'Kopf! Armbrust-Krit ';
-    if (x.coin === 'zahl') return 'Zahl · Dolch · ' + x.tokens + ' Glück ';
-    return x.crit ? 'Krit! ' : '';
-  }
-
   function pop(m, text, cls) {
     if (first) return;
     const el = slotEls[m] && slotEls[m].querySelector('[data-dg-pops]');
@@ -657,12 +650,10 @@
             }
           });
           cast(x.m);
-          // Glücksmünze (Lucky Dio als Booster) zur Halbzeit
-          if (x.coin) pop(x.m, x.coin === 'kopf' ? 'Glücksmünze: Kopf! +15 % Krit' : 'Glücksmünze: Zahl – Pech', 'is-coin');
         } else if (x.destroy) {
           pop(x.m, 'Zerstört!', 'is-crit');
         } else {
-          pop(x.m, coinText(x) + '+' + x.p, (x.crit ? 'is-crit' : '') + (x.coin ? ' is-coin coin-' + x.coin : ''));
+          pop(x.m, '+' + x.p, x.crit ? 'is-crit' : '');
         }
       }
       const done = f.ticks.slice(0, s.ticks).reduce((sum, x) => sum + (x.p || 0), 0);

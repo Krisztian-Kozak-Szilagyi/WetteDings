@@ -11,14 +11,6 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
-// Lucky Dio (Schurke und Glücksspieler mit Handarmbrust und Dolch): Krit-Lotterie.
-// DIO_HEADS = Chance auf Kopf in Prozent, DIO_TOKEN = so viel Krit-Chance in Prozent je Glücks-Token,
-// DIO_CHAIN = Stärke des kritischen Armbrust-Kettentreffers bei Kopf (1 = normaler Krit ×2),
-// DIO_COIN = Glücksmünze als Booster: Krit-Chance in Prozent bei Kopf
-const DIO_HEADS = 50;
-const DIO_TOKEN = 1;
-const DIO_CHAIN = 1;
-const DIO_COIN = 15;
 // Hundekarten (Spells): Hugo und Lilly
 const DOGS = new Set(['hugo', 'lilly']);
 const isDog = (card) => DOGS.has(who(card));
@@ -102,15 +94,6 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
-  // Lucky Dio (Boss-Karte, Beute aus dem Raid): Krit-Lotterie – Eigenschaft der Karte, wirkt von Anfang an (passive).
-  // Als Hauptkarte fliegt nach jedem Angriff eine Münze und bringt einen Zusatztreffer (Ablauf: ihkService.simulate):
-  // Kopf = kritischer Kettentreffer mit der Armbrust, Zahl = Dolchtreffer und ein Glücks-Token (+DIO_TOKEN % Krit-Chance).
-  // Als Booster: Glücksmünze zur Halbzeit – Kopf: +DIO_COIN % Krit-Chance, Zahl: nichts.
-  if (m === 'lucky-dio-boss') {
-    add({ key: 'krit-lotterie', label: 'Krit-Lotterie', text: `Nach jedem Angriff fliegt eine Münze: Kopf = kritischer Kettentreffer mit der Armbrust, Zahl = Dolchtreffer und ein Glücks-Token (+${DIO_TOKEN} % Krit-Chance).`, fx: 'fx-energy', target: 'player', passive: true, apply: (s) => { s.lottery = { heads: DIO_HEADS / 100, step: DIO_TOKEN / 100, chain: DIO_CHAIN, tokens: 0 }; } });
-  } else if (b === 'lucky-dio-boss') {
-    add({ key: 'gluecksmuenze', label: 'Glücksmünze', text: `Lucky Dio wirft eine Münze – Kopf: +${DIO_COIN} % Krit-Chance, Zahl: Pech gehabt.`, fx: 'fx-energy', target: 'player', apply: (s) => { s.coin = s.rand() < 0.5 ? 'kopf' : 'zahl'; if (s.coin === 'kopf') s.critBonus += DIO_COIN / 100; } });
-  }
   return out;
 }
 
@@ -128,7 +111,7 @@ function resolveAll(main, boosts) {
 }
 
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
-const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili', 'lucky-dio-boss']);
+const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili']);
 
 // Oliver the Sigrist "kann nicht im Spiel eingesetzt werden".
 // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt (er würde jede Quest
@@ -141,4 +124,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { DIO_HEADS, DIO_TOKEN, DIO_CHAIN, DIO_COIN, resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
