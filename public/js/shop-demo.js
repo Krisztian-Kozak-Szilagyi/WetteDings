@@ -721,11 +721,19 @@
     }
   }
 
-  function spawn() {
+  const pendingJobs = () => state.jobs.length + day.customers.filter((o) => o.services && !o.jid && !o.gone && o.phase !== 'leave').length;
+
+  /** force (nur Test-Knöpfe): 'kunde' = sicher ohne Karte, 'auftrag' = sicher mit Karte (sonst Zufall wie im Spiel) */
+  function spawn(force) {
     const c = C.newCustomer(day.rng, goodsList, { tier: 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
     // Bringt er eine Karte? Nur mit passenden Tischen und höchstens 2 Aufträge (auch die, die noch an der Kasse stehen)
-    const pendingJobs = state.jobs.length + day.customers.filter((o) => o.services && !o.jid && !o.gone && o.phase !== 'leave').length;
-    c.services = C.serviceWish(day.rng, new Set(state.items.map((it) => it.id)), pendingJobs, packs, serviceList);
+    const stations = new Set(state.items.map((it) => it.id));
+    c.services = force === 'kunde' ? null : C.serviceWish(force === 'auftrag' ? () => 0 : day.rng, stations, pendingJobs(), packs, serviceList);
+    if (force === 'auftrag' && c.services) {
+      // Test: Paket zufällig unter denen, für die die Tische stehen (serviceWish nimmt mit rng = 0 immer das erste)
+      const ok = packs.filter((p) => p.services.every((id) => more.services[id] && stations.has(more.services[id].station)));
+      c.services = ok[Math.floor(day.rng() * ok.length)].services.slice();
+    }
     if (c.services) c.wish = null;
     const sx = Math.floor(day.rng() * state.units * L.UNIT_W);
     Object.assign(c, {
@@ -1472,6 +1480,20 @@
     ask('Kanacoin festlegen (Demo-Geld):', true, Math.floor(state.coins)).then((v) => {
       if (v === null || v === '') return;
       act(doAct('setCoins', { amount: Math.floor(Number(v)) }));
+    });
+  });
+
+  // ---------- TEST-KNÖPFE (nur Shop-Demo – im fertigen Spiel entfernen: Markup data-shop-dev, CSS .sd-dev, dieser Block) ----------
+  document.querySelectorAll('[data-shop-dev]').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (!state.open || !day.rng) { toast('Erst den Laden an der Tür öffnen.'); return; }
+      if (b.dataset.shopDev === 'auftrag') {
+        const stations = new Set(state.items.map((it) => it.id));
+        const any = packs.some((p) => p.services.every((id) => more.services[id] && stations.has(more.services[id].station)));
+        if (!any) { toast('Dafür fehlt ein Arbeitstisch (Reinigung, Bewertung oder Öffnungstheke).'); return; }
+        if (pendingJobs() >= L.MAX_JOBS) { toast('Es laufen schon ' + L.MAX_JOBS + ' Aufträge.'); return; }
+      }
+      spawn(b.dataset.shopDev);
     });
   });
 

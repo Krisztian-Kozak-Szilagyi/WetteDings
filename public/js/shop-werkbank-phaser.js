@@ -135,6 +135,8 @@
       this.showStep();
     },
 
+    // Phaser übernimmt bei Szenen als Objekt nur init/preload/create/update – alle eigenen Methoden müssen in "extend"
+    extend: {
     step() { return this.steps[this.stepIndex]; },
 
     showStep() {
@@ -143,14 +145,18 @@
       this.hint.setText(HINT[s] || '');
       this.btn.setText(s === 'clean' ? 'Fertig geputzt' : 'Fertig gebügelt');
       this.flipBtn.setVisible(s === 'clean');
-      if (s === 'iron' && !this.facingFront) this.flip();
+      if (s === 'iron') this.setFacing(true); // gebügelt wird vorne
     },
 
     flip() {
       if (this.step() !== 'clean' || this.busy) return;
-      this.facingFront = !this.facingFront;
-      this.front.setVisible(this.facingFront);
-      this.back.setVisible(!this.facingFront);
+      this.setFacing(!this.facingFront);
+    },
+
+    setFacing(front) {
+      this.facingFront = front;
+      this.front.setVisible(front);
+      this.back.setVisible(!front);
     },
 
     /** Kartenkoordinaten (0…1) → Bildschirm; die Rückseite ist gespiegelt */
@@ -237,6 +243,8 @@
       this.scene.stop();
       if (done && o.onDone) o.onDone(res);
       if (!done && o.onCancel) o.onCancel();
+    },
+
     },
 
     update(time, delta) {
