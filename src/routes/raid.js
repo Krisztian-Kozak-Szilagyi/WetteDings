@@ -1,4 +1,4 @@
-// Raid „The Gambit of Shadows“ gegen Lucky Dio (/raid): Übersicht, Kampf beginnen, Kampf im Vollbild (/raid/kampf) mit Zügen über /raid/aktion.
+// Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten (/raid): Übersicht, Kampf beginnen, Kampf im Vollbild (/raid/kampf) mit Zügen über /raid/aktion.
 // Entschieden wird auf dem Server (src/raid/raidService.js) – der Browser zeichnet nur.
 const express = require('express');
 const { requireLogin } = require('../middleware');
@@ -72,7 +72,7 @@ router.post('/raid/debug/versuche', async (req, res) => {
   res.redirect('/raid');
 });
 
-// Kampf im Vollbild (wie der Bosskampf, aber mit Lucky Dio und Zügen über den Server)
+// Kampf im Vollbild (wie der Bosskampf, aber mit Dio Meister der Schatten und Zügen über den Server)
 router.get('/raid/kampf', async (req, res) => {
   const cur = await raid.current(req.user._id);
   if (!cur) return res.redirect('/raid');
@@ -83,7 +83,7 @@ router.get('/raid/kampf', async (req, res) => {
 router.get('/raid/zustand', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const cur = await raid.current(req.user._id);
-  if (!cur) return res.status(404).json({ error: 'Du kämpfst gerade nicht gegen Lucky Dio.' });
+  if (!cur) return res.status(404).json({ error: 'Du kämpfst gerade nicht gegen Dio Meister der Schatten.' });
   const fresh = !cur.run.actions.length;
   res.json({ state: logic.publicState(cur.s), ev: fresh ? logic.replay(cur.run.seed, cur.run.snap, []).ev : null });
 });
@@ -106,7 +106,7 @@ router.post('/raid/aktion', async (req, res) => {
 router.post('/raid/aufgeben', async (req, res) => {
   try {
     await raid.abandon({ user: req.user });
-    req.flash('info', 'Du hast den Kampf aufgegeben – Lucky Dio lacht und verschwindet im Rauch.');
+    req.flash('info', 'Du hast den Kampf aufgegeben – Dio Meister der Schatten lacht und verschwindet im Rauch.');
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     req.flash('error', err.message);

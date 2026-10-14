@@ -50,7 +50,7 @@ const LEDGER_GROUPS = [
   { key: 'bonus', label: 'Tagesbonus', types: ['bonus'], hint: 'für Mitglieder unter der Bonus-Grenze' },
   { key: 'ihk', label: 'IHK-Löhne', types: ['ihk_lohn'], hint: 'geschaffte Quests' },
   { key: 'dungeon', label: 'Dungeon', types: ['dungeon_lohn'], hint: 'Lohn für gewonnene Kämpfe' },
-  { key: 'raid', label: 'Raid', types: ['raid_lohn'], hint: 'Lohn für Siege gegen Lucky Dio' },
+  { key: 'raid', label: 'Raid', types: ['raid_lohn'], hint: 'Lohn für Siege gegen Dio Meister der Schatten' },
   { key: 'erfolg', label: 'Erfolge', types: ['erfolg'], hint: 'Belohnung für freigeschaltete Erfolge' },
   { key: 'grading', label: 'Grading-Shop', types: ['grading_lohn', 'grading_ausbau'], hint: 'Löhne für Aufträge − Ausbau des Shops' },
   { key: 'tcg', label: 'TCG (Bank)', types: ['tcg_pack', 'tcg_verkauf', 'item_verkauf', 'item_kauf', 'black_market', 'bazaar_kauf'], hint: 'Verkäufe an die Bank (Karten, Gegenstände) − Packs, Gegenstände und Black Market' },

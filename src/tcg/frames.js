@@ -90,7 +90,7 @@ module.exports.nekro = heldFrame({
   text: { x: 95, y: 772, w: 530, h: 150, size: 26, minSize: 15, lineHeight: 1.32 },
   colors: { value: '#d8fff6', label: '#7fe3d2', text: '#e3f2ef', outline: '#05100e', plate: '#16211f', plateBorder: '#5fe0d0' },
 });
-// Violetter Rahmen der Karten fürs neue Kartenspiel (Dio Schattenpfeil): Angriff, Abwehr, Lebenspunkte statt FIA/FIS/BWL,
+// Violetter Rahmen der Karten fürs neue Kartenspiel (Dio Meister der Schatten): Angriff, Abwehr, Lebenspunkte statt FIA/FIS/BWL,
 // die Plakette oben rechts zeigt die Kosten (Energie) statt Speed. Werte aus card.kampf (ang, sch = Abwehr, leben).
 // Farben passend zum Bild: tiefes Violett, bernsteinfarbenes Gold. Rahmenbild: Fenster wie gilded.
 module.exports.violet = {

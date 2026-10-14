@@ -10,19 +10,19 @@
   <link rel="stylesheet" href="/css/bossfight.css?v=<%= assetVersion %>">
   <link rel="stylesheet" href="/css/raid.css?v=<%= assetVersion %>">
 </head>
-<%# Raid „The Gambit of Shadows“ gegen Lucky Dio – Vollbild wie der Bosskampf (views/bossfight.ejs): die Schattenfestung als Hintergrund, Dio als Figur
+<%# Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten – Vollbild wie der Bosskampf (views/bossfight.ejs): die Schattenfestung als Hintergrund, Dio als Figur
     (public/js/raid-boss.js), darüber dieselbe Oberfläche (public/js/bossfight-hud.js im Raid-Modus: Züge gehen an den Server).
     Esc = zurück zur Raid-Seite %>
 <body class="bf-body raid-body" data-raid="1" data-csrf="<%= csrfToken %>">
   <div class="bf-stage raid-stage">
     <div class="raid-boss" data-raid-boss>
-      <img src="/img/raid/lucky-dio.webp?v=<%= assetVersion %>" alt="Lucky Dio mit Handarmbrust und Dolch" width="720" height="1008" draggable="false">
+      <img src="/img/raid/dio-meister-der-schatten.webp?v=<%= assetVersion %>" alt="Dio Meister der Schatten mit Handarmbrust und Dolch" width="720" height="1008" draggable="false">
     </div>
   </div>
 
   <div class="bf-hud">
     <section class="bf-boss" aria-label="Boss">
-      <div class="bf-boss-name">Lucky Dio</div>
+      <div class="bf-boss-name">Dio Meister der Schatten</div>
       <div class="bf-hp bf-hp-boss" data-bf-hp="boss" data-max="<%= bossHp %>">
         <span class="bf-hp-lag"></span><span class="bf-hp-fill"></span>
         <span class="bf-hp-text"></span>

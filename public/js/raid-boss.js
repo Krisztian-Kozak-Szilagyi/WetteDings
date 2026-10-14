@@ -1,4 +1,4 @@
-// Lucky Dio als Boss-Figur im Raid (views/raid-kampf.ejs) – ersetzt die gezeichnete Spinne des Bosskampfs. Bietet dieselbe
+// Dio Meister der Schatten als Boss-Figur im Raid (views/raid-kampf.ejs) – ersetzt die gezeichnete Spinne des Bosskampfs. Bietet dieselbe
 // Schnittstelle (window.bossfightBoss), über die die Effekte (public/js/bossfight-fx.js) treffen: Trefferpunkt, Treffer-
 // Reaktion (Aufblitzen in der Farbe des Effekts, Zucken) und kurzes Anhalten. Esc führt zurück zur Raid-Seite.
 (function () {

@@ -562,7 +562,7 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
 });
 
 // ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
-// ---------- Raid „The Gambit of Shadows“ gegen Lucky Dio: Regeln, Spieler, Boss, Angriffe, Kampfwerte, Spielfeld, Beute ----------
+// ---------- Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten: Regeln, Spieler, Boss, Angriffe, Kampfwerte, Spielfeld, Beute ----------
 router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const b = req.body;
   // Zahlen wie im Formular: ganze Zahlen, beim Gewicht auch Kommazahlen (z. B. 1,5)

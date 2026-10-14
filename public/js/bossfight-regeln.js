@@ -15,7 +15,7 @@
 // ohne energieStart (Bosskampf) jede Runde sp.energie.
 // Ziel des Bosses: mit bd.feldZiel Chance eine Karte statt des Spielers – je weiter vorne, desto eher (bd.vorneFaktor:
 // ganz vorne so viel öfter als ganz hinten). Nahkampf erreicht nur Karten bis bd.nahReichweite, Fernkampf (a.fern,
-// Lucky Dios Armbrust) das ganze Feld.
+// Dios Armbrust) das ganze Feld.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.BossRegeln = factory();
@@ -86,7 +86,7 @@
       energie: sp.energieStart != null ? sp.energieStart : sp.energie,
       maxEnergie: sp.energieStart != null ? sp.energieStart : sp.energie, // so viel Energie gibt es diese Runde
       spieler: { hp: sp.hp, max: sp.hp },
-      boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Krit-Lotterie, Lucky Dio) – je Token mehr Krit-Chance
+      boss: { hp: bd.hp, max: bd.hp, tokens: 0 }, // tokens: Glücks-Tokens (Krit-Lotterie, Dio Meister der Schatten) – je Token mehr Krit-Chance
       deck: [],
       hand: [],
       gear: [], // { uid, card, used, hits, bonus }
@@ -434,7 +434,7 @@
       else s.boss.tokens = (s.boss.tokens || 0) + 1;
       ev.push({ t: 'muenze', seite: kopf ? 'kopf' : 'zahl', tokens: s.boss.tokens });
     }
-    // Krit-Lotterie (s.bd.lotterie, wie Lucky Dios Karte): jeder Angriff kann kritisch treffen – Grundchance plus
+    // Krit-Lotterie (s.bd.lotterie, wie Dios Karte): jeder Angriff kann kritisch treffen – Grundchance plus
     // tokenKrit je Glücks-Token; die Ankündigung zeigt den normalen Schaden, ob er krittet, entscheidet sich erst jetzt
     var l = s.bd.lotterie;
     if (a && l && !aussetzen && s.rng() < l.grundKrit + (s.boss.tokens || 0) * l.tokenKrit) {
@@ -468,7 +468,7 @@
   }
 
   /**
-   * Krit-Lotterie (Lucky Dio): nach dem Angriff fliegt eine Münze und bringt einen Zusatztreffer – Kopf: kritischer
+   * Krit-Lotterie (Dio Meister der Schatten): nach dem Angriff fliegt eine Münze und bringt einen Zusatztreffer – Kopf: kritischer
    * Kettentreffer mit der Armbrust (kritFaktor-fach), Zahl: Dolchtreffer und ein Glücks-Token (mehr Krit-Chance).
    * Abgewehrt wird wie beim Angriff: Schwächung und Schilde wirken, Block nur, soweit der Angriff ihn übrig gelassen hat.
    * Er trifft dasselbe Ziel wie der Angriff (zielKarte; ist sie schon zerstört, den Spieler).

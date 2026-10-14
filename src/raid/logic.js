@@ -1,4 +1,4 @@
-// Raid „The Gambit of Shadows“ gegen Lucky Dio – reine Logik ohne Datenbank: Einstellungen, Kampfwerte der Karten, Dio als Boss und das
+// Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten – reine Logik ohne Datenbank: Einstellungen, Kampfwerte der Karten, Dio als Boss und das
 // Nachspielen eines Kampfs. Gekämpft wird mit den Bosskampf-Regeln (public/js/bossfight-regeln.js), die auch im
 // Browser laufen. Der Server hält jeden Kampf als Startwert + Liste der Züge und spielt ihn bei jedem Zug nach –
 // so entscheidet nur der Server, und niemand kann den Zufall vorausberechnen (src/raid/raidService.js).
@@ -8,7 +8,7 @@ const catalog = require('../tcg/catalog');
 // Seltenheiten, für die Kosten und Stärke einstellbar sind (Test-Items haben eigene Kampfwerte)
 const RARITY_KEYS = catalog.ALL_RARITIES.filter((r) => r.key !== 'test-item').map((r) => r.key);
 
-// Angriffe von Lucky Dio (Schlüssel fest, Werte im Admin-Panel). min/max = Schaden, gewicht = wie oft er gewählt wird,
+// Angriffe von Dio Meister der Schatten (Schlüssel fest, Werte im Admin-Panel). min/max = Schaden, gewicht = wie oft er gewählt wird,
 // schwer = großer Angriff (nie zweimal hintereinander, im Zorn doppelt so oft), gift = Schaden je Runde für giftRunden,
 // netz = so viel weniger Energie in der nächsten Runde, muenze = Münzwurf (Kopf: kopfFaktor-fach, Zahl: Glücks-Token),
 // fern = Armbrust: trifft auch Karten weit hinten auf dem Spielfeld (sonst nur bis boss.nahReichweite)
@@ -201,12 +201,12 @@ function deckCards(ids, opts) {
     .filter((c) => c.kampf);
 }
 
-/** Lucky Dio als Boss für die Regeln */
+/** Dio Meister der Schatten als Boss für die Regeln */
 function bossDef(opts) {
   const b = opts.boss;
   return {
-    key: 'lucky-dio',
-    name: 'Lucky Dio',
+    key: 'dio',
+    name: 'Dio Meister der Schatten',
     hp: b.hp,
     wutAb: b.wutAb / 100,
     wutFaktor: b.wutFaktor / 100,

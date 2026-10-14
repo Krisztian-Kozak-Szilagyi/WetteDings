@@ -379,7 +379,7 @@
 <% } %>
   <% if (sub === 'raid') { const rs = raid.settings; const rd = raid.defaults; const lim = raid.limits; %>
   <section class="stats-block" id="raid">
-    <%- blockHead('Raid: The Gambit of Shadows', 'Rundenbasierter Kampf mit dem eigenen Deck gegen Lucky Dio – der einzige Weg an seine Karte. Entschieden wird auf dem Server; jeder Kampf behält die Werte, mit denen er begonnen hat. Änderungen gelten ab dem nächsten Kampf. Zum Ausprobieren neuer Werte: <code>npm run sim:raid</code> (zeigt Siegquoten je Deck-Stufe und Spielweise).') %>
+    <%- blockHead('Raid: The Gambit of Shadows', 'Rundenbasierter Kampf mit dem eigenen Deck gegen Dio Meister der Schatten – der einzige Weg an seine Karte. Entschieden wird auf dem Server; jeder Kampf behält die Werte, mit denen er begonnen hat. Änderungen gelten ab dem nächsten Kampf. Zum Ausprobieren neuer Werte: <code>npm run sim:raid</code> (zeigt Siegquoten je Deck-Stufe und Spielweise).') %>
     <div class="card">
       <form method="post" data-reauth action="/admin/raid" class="form panel-form" data-confirm="Raid-Einstellungen wirklich ändern?">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -402,7 +402,7 @@
         </fieldset>
 
         <fieldset class="admin-tax-group">
-          <legend>Lucky Dio</legend>
+          <legend>Dio Meister der Schatten</legend>
           <% [['hp', 'Leben', ''], ['wutAb', 'Wütend ab … % Leben', '%'], ['wutFaktor', 'Schaden im Zorn', '%'], ['grundKrit', 'Krit-Lotterie: Krit-Chance seiner Angriffe', '%'], ['kritFaktor', 'Krit-Lotterie: Schaden bei Krit', '%'], ['tokenKrit', 'Krit-Lotterie: mehr Krit-Chance je Glücks-Token', '%'], ['kopfChance', 'Münzwurf: Chance auf Kopf', '%'], ['zusatzMin', 'Zusatztreffer: Schaden min', ''], ['zusatzMax', 'Zusatztreffer: Schaden max', ''], ['kopfFaktor', 'Münzwurf-Angriff: Schaden bei Kopf', '%'], ['feldZiel', 'Greift eine Karte auf dem Spielfeld an', '%'], ['vorneFaktor', 'Ganz vorne liegende Karten … mal so oft Ziel wie ganz hinten', '×'], ['nahReichweite', 'Nahkampf reicht bis … der Feldtiefe (Armbrust: überall)', '%']].forEach(([k, l, u]) => { %>
             <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="boss_<%= k %>" min="<%= lim.boss[k][0] %>" max="<%= lim.boss[k][1] %>" step="1" value="<%= rs.boss[k] %>" required><small class="muted">Standard <%= rd.boss[k] %></small></label>
           <% }) %>
@@ -478,7 +478,7 @@
         <fieldset class="admin-tax-group">
           <legend>Beute bei Sieg</legend>
           <label class="field"><span>Spielgeld (€)</span><input type="text" inputmode="decimal" name="belohnung_geld" value="<%= (rs.belohnung.geld / 100).toFixed(2).replace('.', ',') %>" required><small class="muted">Standard <%= euro(rd.belohnung.geld) %></small></label>
-          <label class="field"><span>Chance auf Dios Karte „Dio Schattenpfeil“ (%)</span><input type="text" inputmode="decimal" name="belohnung_dioChance" value="<%= String(rs.belohnung.dioChance).replace('.', ',') %>" required><small class="muted">Standard <%= rd.belohnung.dioChance %> % – die Karte gibt es nur hier</small></label>
+          <label class="field"><span>Chance auf Dios Karte „Dio Meister der Schatten“ (%)</span><input type="text" inputmode="decimal" name="belohnung_dioChance" value="<%= String(rs.belohnung.dioChance).replace('.', ',') %>" required><small class="muted">Standard <%= rd.belohnung.dioChance %> % – die Karte gibt es nur hier</small></label>
         </fieldset>
 
         <button class="btn btn-primary" type="submit">Speichern</button>

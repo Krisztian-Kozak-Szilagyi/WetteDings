@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
 <link rel="stylesheet" href="/css/raid.css?v=<%= assetVersion %>">
 <%
-  // Raid „The Gambit of Shadows“ gegen Lucky Dio: Übersicht vor dem Kampf (src/routes/raid.js). Gekämpft wird auf /raid/kampf.
+  // Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten: Übersicht vor dem Kampf (src/routes/raid.js). Gekämpft wird auf /raid/kampf.
   const RESULT = { sieg: 'Sieg', niederlage: 'Niederlage', aufgegeben: 'Aufgegeben' };
   const canStart = !running && tries.left > 0 && deck.playable;
 %>
@@ -54,7 +54,7 @@
   </section>
 
   <section class="card">
-    <h2>Lucky Dio</h2>
+    <h2>Dio Meister der Schatten</h2>
     <p><strong><%= boss.hp %> Leben</strong> · du hast <%= spieler.hp %> Leben · höchstens <%= maxRounds %> Runden, dann entkommt er.</p>
     <div class="table-wrap">
       <table class="table raid-attacks">
@@ -91,7 +91,7 @@
 <section class="card">
   <h2>Deine letzten Kämpfe</h2>
   <% if (!history.length) { %>
-    <p class="muted">Noch keine Kämpfe gegen Lucky Dio.</p>
+    <p class="muted">Noch keine Kämpfe gegen Dio Meister der Schatten.</p>
   <% } else { %>
     <div class="table-wrap">
       <table class="table">

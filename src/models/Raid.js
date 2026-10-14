@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 
-// Raid gegen Lucky Dio (src/raid). Ein Kampf wird nicht als Zustand gespeichert, sondern als geheimer Startwert und die
+// Raid gegen Dio Meister der Schatten (src/raid). Ein Kampf wird nicht als Zustand gespeichert, sondern als geheimer Startwert und die
 // Liste der Züge – der Server spielt ihn bei jedem Zug nach (src/raid/logic.replay). snap hält beim Start fest, mit
 // welchen Werten gekämpft wird, damit Änderungen im Admin-Panel laufende Kämpfe nicht verändern.
 const runSchema = new Schema(

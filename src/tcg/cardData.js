@@ -105,10 +105,10 @@ module.exports = {
   // Boss-Karte fürs neue Kartenspiel, nur als Beute aus dem Raid „The Gambit of Shadows“ erhältlich. Rahmen: violet
   // (Angriff, Abwehr, Lebenspunkte, Kosten). Keine IHK-Werte – spielt nicht in IHK, Dungeon oder Turm.
   // Mit Lebenspunkten bleibt sie nach dem Ausspielen auf dem Spielfeld liegen (permanent). Effekt folgt.
-  'dio-schattenpfeil-boss': {
+  'dio-meister-der-schatten-boss': {
     season: 'season-1',
     frame: 'violet',
-    name: 'Dio Schattenpfeil',
+    name: 'Dio Meister der Schatten',
     stats: [0, 0, 0, 0],
     typen: ['Schurke'],
     ability: 'Effekt folgt',

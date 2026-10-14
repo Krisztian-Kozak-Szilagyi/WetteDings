@@ -525,7 +525,7 @@
         zeichnenFeld();
         return null;
       case 'zusatz':
-        // Krit-Lotterie (Lucky Dio): Zusatztreffer aus dem Münzwurf nach seinem Angriff
+        // Krit-Lotterie (Dio Meister der Schatten): Zusatztreffer aus dem Münzwurf nach seinem Angriff
         popup((e.ziel && feldEls.get(e.ziel)) || spielerBar.el, (e.seite === 'kopf' ? 'Kopf! Armbrust-Krit ' : 'Zahl · Dolch ') + e.wert + (e.seite === 'zahl' ? ' · Glücks-Token ' + e.tokens : ''), e.seite === 'kopf' ? 'bf-pop-schwer' : 'bf-pop-info');
         return warte(450);
       case 'muenze':
@@ -801,12 +801,12 @@
     resultEl.innerHTML = '';
     var h = document.createElement('div');
     h.className = 'bf-result-titel';
-    h.textContent = e.sieg ? 'Lucky Dio besiegt!' : e.flucht ? 'Lucky Dio ist entkommen' : 'Niederlage';
+    h.textContent = e.sieg ? 'Dio Meister der Schatten besiegt!' : e.flucht ? 'Dio Meister der Schatten ist entkommen' : 'Niederlage';
     resultEl.appendChild(h);
     var p = document.createElement('div');
     p.className = 'bf-result-text';
     var euro = function (c) { return (c / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }); };
-    p.textContent = e.sieg ? (r.geld ? euro(r.geld) + ' Beute' : 'Sieg') + (r.dio ? ' – und er hat seine Karte fallen lassen: Dio Schattenpfeil ist jetzt in deinem Album!' : ' – seine Karte hat er diesmal behalten.') : 'Versuch es mit einem anderen Deck oder einem besseren Plan noch einmal.';
+    p.textContent = e.sieg ? (r.geld ? euro(r.geld) + ' Beute' : 'Sieg') + (r.dio ? ' – und er hat seine Karte fallen lassen: Dio Meister der Schatten ist jetzt in deinem Album!' : ' – seine Karte hat er diesmal behalten.') : 'Versuch es mit einem anderen Deck oder einem besseren Plan noch einmal.';
     resultEl.appendChild(p);
     var a = document.createElement('a');
     a.className = 'bf-result-link';

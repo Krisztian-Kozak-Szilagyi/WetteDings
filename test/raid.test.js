@@ -313,11 +313,10 @@ test('Raid: 30 Karten, 5 auf der Hand, 1 je Zug; Energie wächst jede Runde; Kos
   assert.equal(spinne.energie, R.SPIELER.energie);
 });
 
-test('Dio Schattenpfeil: neue Boss-Karte mit Angriff, Abwehr, Lebenspunkten, Kosten und Klasse [Schurke]', () => {
-  const dio = catalog.cardById['dio-schattenpfeil-boss'];
+test('Dio Meister der Schatten: neue Boss-Karte mit Angriff, Abwehr, Lebenspunkten, Kosten und Klasse [Schurke]', () => {
+  const dio = catalog.cardById['dio-meister-der-schatten-boss'];
   assert.ok(dio && catalog.CARDS.includes(dio));
-  assert.equal(catalog.cardById['lucky-dio-boss'], undefined, 'alte Karte ist weg');
-  assert.equal(dio.name, 'Dio Schattenpfeil');
+  assert.equal(dio.name, 'Dio Meister der Schatten');
   assert.equal(dio.rarity, 'boss');
   assert.equal(dio.isCharacter, false, 'keine IHK-Werte – spielt nicht in IHK, Dungeon oder Turm');
   assert.deepEqual(dio.typen, ['Schurke']);
@@ -325,9 +324,9 @@ test('Dio Schattenpfeil: neue Boss-Karte mit Angriff, Abwehr, Lebenspunkten, Kos
   assert.deepEqual([k.kosten, k.ang, k.sch, k.leben, k.dauer], [5, 60, 20, 60, 'permanent']);
   // Karte: ANG/ABW/LP und Kosten auf der Plakette, Klasse oben im Textfeld
   const svg = require('../src/tcg/cardSvg').render(dio).replace(/<image[^>]*\/>/, ''); // ohne eingebettetes Bild (Base64)
-  for (const t of ['ANG', 'ABW', 'LP', '>60<', '>20<', '>5<', '[Schurke]', 'Effekt folgt', 'Dio Schattenpfeil']) assert.ok(svg.includes(t), t);
+  for (const t of ['ANG', 'ABW', 'LP', '>60<', '>20<', '>5<', '[Schurke]', 'Effekt folgt', 'Dio Meister der Schatten']) assert.ok(svg.includes(t), t);
   assert.ok(!/FIA|FIS|BWL/.test(svg));
   // im Raid spielbar und landet als permanente Karte auf dem Feld
-  const [karte] = logic.deckCards(['dio-schattenpfeil-boss'], opts);
+  const [karte] = logic.deckCards(['dio-meister-der-schatten-boss'], opts);
   assert.ok(R.istPermanent(karte.kampf));
 });

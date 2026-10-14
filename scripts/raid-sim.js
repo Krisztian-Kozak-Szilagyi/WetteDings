@@ -1,4 +1,4 @@
-// Raid-Simulation für die Balance: spielt viele Kämpfe gegen Lucky Dio mit den echten Regeln und den Raid-Einstellungen
+// Raid-Simulation für die Balance: spielt viele Kämpfe gegen Dio Meister der Schatten mit den echten Regeln und den Raid-Einstellungen
 // (src/raid/logic.js). Decks aus den vorhandenen Charakterkarten, je Stufe einer typischen Sammlung (je Karte bis 2 Exemplare),
 // gespielt mit den Spielweisen aus scripts/bossfight-sim.js (zufall, gierig, klug).
 //
@@ -46,7 +46,7 @@ const STUFEN = [
 ];
 
 function deckFuer(stufe, rng) {
-  const pool = catalog.CARDS.filter((c) => c.isCharacter && stufe.rar.includes(c.rarity) && c.id !== 'dio-schattenpfeil-boss').flatMap((c) => [c.id, c.id]);
+  const pool = catalog.CARDS.filter((c) => c.isCharacter && stufe.rar.includes(c.rarity) && c.id !== 'dio-meister-der-schatten-boss').flatMap((c) => [c.id, c.id]);
   for (let j = pool.length - 1; j > 0; j--) {
     const r = Math.floor(rng() * (j + 1));
     [pool[j], pool[r]] = [pool[r], pool[j]];
@@ -66,7 +66,7 @@ function kampf(stufe, spielweise, rng) {
 }
 
 if (require.main === module) {
-  console.log(`Raid gegen Lucky Dio – ${N} Kämpfe je Deck und Spielweise (Boss ${opts.boss.hp} Leben, Spieler ${opts.spieler.hp})\n`);
+  console.log(`Raid gegen Dio Meister der Schatten – ${N} Kämpfe je Deck und Spielweise (Boss ${opts.boss.hp} Leben, Spieler ${opts.spieler.hp})\n`);
   console.log('Deck'.padEnd(30) + 'Spielweise'.padEnd(12) + 'Siege'.padStart(7) + 'Ø Runden'.padStart(10) + 'Ø Boss-Rest'.padStart(13));
   for (const stufe of STUFEN) {
     for (const sw of ['zufall', 'gierig', 'klug']) {
