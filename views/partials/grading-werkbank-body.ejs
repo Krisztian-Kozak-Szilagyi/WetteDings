@@ -8,13 +8,13 @@
     <b><%= jobData.card ? jobData.card.name : 'Karte' %></b>
     <% if (jobData.card) { %><span class="gr-ticket-rar r-<%= jobData.card.rarity %>"><span class="tcg-dot"></span><%= jobData.card.rarityLabel %><% if (jobData.card.bonus) { %> · +<%= jobData.card.bonus %> % Lohn<% } %></span><% } %>
     <span class="gr-ticket-for">für <%= jobData.customer %></span>
-    <% if (jobData.services) { %><%- include('partials/grading-services', { sv: jobData.services }) %><% } %>
+    <% if (jobData.services) { %><%- include('grading-services', { sv: jobData.services }) %><% } %>
   </div>
   <button type="button" class="btn btn-ghost btn-sm gr-sound" data-gr-sound aria-pressed="false">🔇 Ton aus</button>
 </div>
 
 <section class="gr-bench" data-grading="<%= JSON.stringify(jobData) %>">
-  <%- include('partials/grading-stage', { steps: jobData.steps }) %>
+  <%- include('grading-stage', { steps: jobData.steps }) %>
 
   <ol class="gr-steps" data-gr-steps>
     <% if (jobData.steps.includes('clean')) { %><li data-step="clean">Reinigen</li><% } %>
@@ -35,7 +35,7 @@
   <% } %>
 
   <% if (jobData.steps.includes('iron')) { %>
-  <%- include('partials/grading-iron-panel', { pay, own: !!jobData.demo }) %>
+  <%- include('grading-iron-panel', { pay, own: !!jobData.demo }) %>
   <% } %>
 
   <% if (jobData.steps.includes('grade')) { %>
