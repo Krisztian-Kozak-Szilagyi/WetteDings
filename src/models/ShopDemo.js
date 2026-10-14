@@ -22,6 +22,10 @@ const shopDemoSchema = new Schema(
     servicePrices: { type: Schema.Types.Mixed, default: {} },
     jobs: { type: [Schema.Types.Mixed], default: [] },
     nextJid: { type: Number, default: 1 },
+    // Sauberkeit: Flecken auf dem Boden, gekaufte Werkzeuge (Wischmopp)
+    dirt: { type: [Schema.Types.Mixed], default: [] },
+    nextDid: { type: Number, default: 1 },
+    tools: { type: [String], default: [] },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

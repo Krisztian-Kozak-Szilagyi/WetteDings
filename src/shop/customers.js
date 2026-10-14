@@ -39,6 +39,12 @@
   const BIG_CHANCE = 0.05;
   const SERVICE_CHANCE = 0.1;
   const SERVICE_PATIENCE = 90; // je Arbeitstisch, den der Auftrag braucht
+  // Sauberkeit (Krisztian, 2026-10-14): 10 % der Kunden hinterlassen einen Fleck; ab 3 Flecken, die älter als 30 s
+  // sind (ein frischer Fleck soll nicht sofort zählen), gibt es höchstens 3★
+  const DIRT_CHANCE = 0.1;
+  const DIRT_LIMIT = 3;
+  const DIRT_GRACE_MS = 30000;
+  const DIRT_MAX_STARS = 3;
 
   /** Fester Zufall aus einer Zahl (für Tests und Wiederholbarkeit) */
   function rngFrom(seed) {
@@ -225,6 +231,17 @@
     return null;
   }
 
+  /** Flecken, die ein Kunde beim Gehen bemerkt (älter als DIRT_GRACE_MS) */
+  function dirtCount(dirt, now) {
+    return (dirt || []).filter((d) => now - (d.at || 0) >= DIRT_GRACE_MS).length;
+  }
+
+  /** Bewertung an die Sauberkeit anpassen: zu schmutzig → höchstens 3★ (Text „schmutzig“) */
+  function dirtCap(rev, dirt, now) {
+    if (!rev || dirtCount(dirt, now) < DIRT_LIMIT || rev.stars <= DIRT_MAX_STARS) return rev;
+    return { stars: DIRT_MAX_STARS, why: 'dirty' };
+  }
+
   /** Möbel, auf dem etwas steht (Booster-Display auf der Theke → die Theke), sonst das Möbel selbst */
   function baseOf(state, cat, it) {
     if (cat[it.id].layer !== 'theke') return it;
@@ -232,12 +249,14 @@
     return state.items.find((o) => cat[o.id].counter && L.cells(cat[o.id], o).includes(key)) || it;
   }
 
-  /** Freie Zellen VOR einem Möbel (Krisztian, 2026-10-14: Kunden nehmen nur von vorne; bei Sachen auf der Theke: vor der Theke) */
+  /**
+   * Freie Zellen VOR einem Möbel (Krisztian, 2026-10-14: Kunden nehmen nur von vorne). Sachen auf der Theke
+   * (Booster-Display) haben ihre eigene Vorderseite – zeigt sie in die Theke hinein, kommt man nicht heran.
+   */
   function approach(state, cat, it, blockSet) {
     const blocks = blockSet || L.blocked(state, cat);
-    const base = baseOf(state, cat, it);
     const out = new Set();
-    L.frontCells(cat[base.id], base).forEach((c) => {
+    L.frontCells(cat[it.id], it).forEach((c) => {
       if (c.y < L.UNIT_D && walkableCell(state, blocks, c.x, c.y)) out.add(c.x + ',' + c.y);
     });
     return out;
@@ -278,6 +297,6 @@
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
     MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
     rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
-    walkableCell, path, approach, baseOf, queueLine,
+    walkableCell, path, approach, baseOf, queueLine, DIRT_CHANCE, DIRT_LIMIT, DIRT_GRACE_MS, dirtCount, dirtCap,
   };
 });
