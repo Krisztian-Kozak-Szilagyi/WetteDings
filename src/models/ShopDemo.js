@@ -26,6 +26,10 @@ const shopDemoSchema = new Schema(
     dirt: { type: [Schema.Types.Mixed], default: [] },
     nextDid: { type: Number, default: 1 },
     tools: { type: [String], default: [] },
+    // bewegliche Marktpreise (src/shop/layout.js moveMarket)
+    market: { type: Schema.Types.Mixed, default: {} },
+    marketMoves: { type: [Schema.Types.Mixed], default: [] },
+    marketDay: { type: Number, default: 0 },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

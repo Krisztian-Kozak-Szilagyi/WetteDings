@@ -181,3 +181,10 @@ html, body.sd-body {
 .sd-wheel-slot.is-held { border-color: #8a90a4; }
 .sd-wheel-slot.is-pick { border-color: #d9a441; background: #3a3220; color: #fff3c8; }
 .sd-wheel-slot.is-locked { opacity: .45; }
+
+/* Preisfeld mit Knöpfen (+5 % vom Markt, Runden, = Markt) und Markt-Pfeile */
+.sd-price { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.sd-price-btn { padding: 3px 6px; border: 1px solid #3a3f52; border-radius: 5px; background: #262a3b; font-size: 11px; }
+.sd-price-btn:hover { border-color: #d9a441; }
+.sd-table td.is-up { color: #7ee2a0; }
+.sd-table td.is-down { color: #ff9a9a; }

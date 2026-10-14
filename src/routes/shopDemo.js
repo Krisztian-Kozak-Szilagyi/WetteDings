@@ -29,7 +29,7 @@ const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
   const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock }) => {
     const it = { uid, id, x, y, rot };
@@ -39,7 +39,7 @@ function plain(doc) {
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
   return layout.ensureCounter(
-    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools }),
+    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay }),
     catalog
   );
 }
@@ -132,6 +132,8 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
     const state = await load(req.user._id);
     const r = layout.apply(state, catalog, goods, action, more);
     if (r.error) return res.status(400).json({ error: r.error, state });
+    // nach Ladenschluss bewegen sich die Marktpreise (Zufall nur hier auf dem Server)
+    if (type === 'closeDay') r.state = layout.moveMarket(r.state, goods, Math.random);
     await save(req.user._id, r.state);
     res.json({ state: r.state, ...(type === 'takeJob' ? { jid: r.state.jobs[r.state.jobs.length - 1].jid } : {}) });
   } catch (err) {
