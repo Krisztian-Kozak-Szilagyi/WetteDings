@@ -225,24 +225,52 @@
     return null;
   }
 
-  /** Freie Zellen direkt neben einem Möbel (bei Sachen auf der Theke: neben der Theke) */
+  /** Möbel, auf dem etwas steht (Booster-Display auf der Theke → die Theke), sonst das Möbel selbst */
+  function baseOf(state, cat, it) {
+    if (cat[it.id].layer !== 'theke') return it;
+    const key = it.x + ',' + it.y;
+    return state.items.find((o) => cat[o.id].counter && L.cells(cat[o.id], o).includes(key)) || it;
+  }
+
+  /** Freie Zellen VOR einem Möbel (Krisztian, 2026-10-14: Kunden nehmen nur von vorne; bei Sachen auf der Theke: vor der Theke) */
   function approach(state, cat, it, blockSet) {
     const blocks = blockSet || L.blocked(state, cat);
-    let base = it;
-    if (cat[it.id].layer === 'theke') {
-      const key = it.x + ',' + it.y;
-      base = state.items.find((o) => cat[o.id].counter && L.cells(cat[o.id], o).includes(key)) || it;
-    }
-    const own = new Set(L.cells(cat[base.id], base));
+    const base = baseOf(state, cat, it);
     const out = new Set();
-    own.forEach((k) => {
-      const [x, y] = k.split(',').map(Number);
-      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (ny < L.UNIT_D && !own.has(nx + ',' + ny) && walkableCell(state, blocks, nx, ny)) out.add(nx + ',' + ny);
-      });
+    L.frontCells(cat[base.id], base).forEach((c) => {
+      if (c.y < L.UNIT_D && walkableCell(state, blocks, c.x, c.y)) out.add(c.x + ',' + c.y);
     });
+    return out;
+  }
+
+  /**
+   * Warteschlange vor der Kasse: erst die Mitte vor der Theke, dann gerade nach vorne weg, danach freie Zellen daneben.
+   * → ["x,y", …], Platz 0 = wer als Nächster dran ist
+   */
+  function queueLine(state, cat, counterItem, blockSet, max) {
+    const blocks = blockSet || L.blocked(state, cat);
+    const limit = max || 10;
+    const front = L.frontCells(cat[counterItem.id], counterItem).filter((c) => c.y < L.UNIT_D && walkableCell(state, blocks, c.x, c.y));
+    if (!front.length) return [];
+    const [dx, dy] = L.FRONT[L.rot4(counterItem.rot)];
+    const start = front[Math.floor((front.length - 1) / 2)];
+    const out = [];
+    const seen = new Set();
+    for (let k = 0; out.length < limit; k++) {
+      const x = start.x + dx * k;
+      const y = start.y + dy * k;
+      if (y >= L.UNIT_D || !walkableCell(state, blocks, x, y)) break;
+      out.push(x + ',' + y);
+      seen.add(x + ',' + y);
+    }
+    // reicht die Gerade nicht: freie Nachbarzellen der bisherigen Plätze
+    for (let i = 0; i < out.length && out.length < limit; i++) {
+      const [x, y] = out[i].split(',').map(Number);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([ax, ay]) => {
+        const k = x + ax + ',' + (y + ay);
+        if (out.length < limit && !seen.has(k) && y + ay < L.UNIT_D && walkableCell(state, blocks, x + ax, y + ay)) { seen.add(k); out.push(k); }
+      });
+    }
     return out;
   }
 
@@ -250,6 +278,6 @@
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
     MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
     rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
-    walkableCell, path, approach,
+    walkableCell, path, approach, baseOf, queueLine,
   };
 });

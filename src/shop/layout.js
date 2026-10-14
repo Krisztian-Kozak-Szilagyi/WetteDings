@@ -5,7 +5,8 @@
 // die Nachbar-Einheiten kann man kaufen. Vorne in der ersten Einheit liegt der Eingang (DOOR, bleibt frei),
 // davor der Gehweg (y = UNIT_D … UNIT_D+2), wo bestellte Kartons abgestellt werden.
 // Zustand: { coins, units, nextUid, nextBid, items, boxes, carry, prices }
-//   items: [{ uid, id, x, y, rot, wall, stock }] – rot 0/1 (gedreht = w/d getauscht), wall 'n'/'w' nur bei Wand-Sachen,
+//   items: [{ uid, id, x, y, rot, wall, stock }] – rot 0–3 = Blickrichtung der Vorderseite (FRONT: 0 → +y, 1 → +x, 2 → −y,
+//          3 → −x; ungerade = w/d getauscht), Kunden nehmen nur von vorne; wall 'n'/'w' nur bei Wand-Sachen,
 //          stock { wareId: Stück } bei Regalen & Co. (gemischt, jedes Stück braucht einen Platz)
 //   boxes: [{ bid, kind: 'ware'|'moebel', id, qty, x, y }] – Kartons; carry = bid des Kartons in der Hand (oder null)
 //   prices: { wareId: Verkaufspreis } – fehlt einer, gilt der Marktpreis
@@ -91,9 +92,27 @@
     return state;
   }
 
-  /** Grundfläche in Zellen, gedreht = Breite/Tiefe getauscht */
+  const FRONT = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+  const rot4 = (r) => (((Math.floor(Number(r)) || 0) % 4) + 4) % 4;
+
+  /** Grundfläche in Zellen, quer gedreht (1, 3) = Breite/Tiefe getauscht */
   function size(def, rot) {
-    return rot ? { w: def.d, d: def.w } : { w: def.w, d: def.d };
+    return rot4(rot) % 2 ? { w: def.d, d: def.w } : { w: def.w, d: def.d };
+  }
+
+  /** Zellen direkt vor der Vorderseite eines Möbels (von dort nehmen Kunden Ware, dort steht man an der Kasse) */
+  function frontCells(def, it) {
+    const s = size(def, it.rot);
+    const r = rot4(it.rot);
+    const out = [];
+    const n = r % 2 ? s.d : s.w;
+    for (let i = 0; i < n; i++) {
+      if (r === 0) out.push({ x: it.x + i, y: it.y + s.d });
+      else if (r === 1) out.push({ x: it.x + s.w, y: it.y + i });
+      else if (r === 2) out.push({ x: it.x + i, y: it.y - 1 });
+      else out.push({ x: it.x - 1, y: it.y + i });
+    }
+    return out;
   }
 
   function cells(def, it) {
@@ -204,7 +223,7 @@
   }
 
   function clean(cand, def) {
-    const out = { id: cand.id, x: cand.x | 0, y: cand.y | 0, rot: cand.rot ? 1 : 0 };
+    const out = { id: cand.id, x: cand.x | 0, y: cand.y | 0, rot: rot4(cand.rot) };
     if (def.layer === 'wand') {
       out.rot = 0;
       out.wall = cand.wall;
@@ -536,6 +555,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });
