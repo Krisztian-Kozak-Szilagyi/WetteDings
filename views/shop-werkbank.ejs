@@ -9,9 +9,11 @@
   <link rel="stylesheet" href="/css/shop-demo.css?v=<%= assetVersion %>">
 </head>
 <%# Shop-Demo: Arbeitstisch des Grading-Shops ohne Seitenmenü, läuft im Fenster über dem Laden (public/js/shop-demo.js).
+    Spiel-Layout (Krisztian, 2026-10-14): Karte groß links, Schritte rechts, passt ohne Scrollen; Erklärungen hinter „?“.
     Ergebnis geht per postMessage an den Laden (public/js/grading.js, jobData.demo). %>
 <body class="sd-werkbank-body">
   <%- include('partials/grading-werkbank-body') %>
   <script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+  <script src="/js/shop-werkbank.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>
