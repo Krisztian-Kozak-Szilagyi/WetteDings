@@ -1374,7 +1374,18 @@
     if (!window.ShopWerkbank || !gameRef) { oldTable(); return; }
     const start = (jobData) => {
       if (!window.ShopWerkbank.handles(jobData.steps)) { oldTable(); return; }
-      window.ShopWerkbank.open(gameRef, { job: jobData, station: station, csrf: root.dataset.csrf, onDone: reload, onCancel: reload });
+      window.ShopWerkbank.open(gameRef, {
+        job: jobData, station: station, csrf: root.dataset.csrf,
+        // fertig: der Server schickt den neuen Stand mit; Esc: nichts geändert, nichts nachladen
+        onDone: (res) => {
+          if (!res || !res.state) { reload(); return; }
+          state = res.state;
+          benchCache.clear();
+          refresh();
+          prefetchBenches();
+        },
+        onCancel: () => { if (scene) findTarget(); },
+      });
     };
     const key = job.jid + '|' + station;
     const ready = benchCache.get(key);

@@ -271,7 +271,8 @@ router.post('/shop-demo/werkbank/fertig', requireAdmin, (req, res, next) =>
     if (r.error) return { error: r.error };
     const done = r.state.jobs.find((j) => j.jid === job.jid);
     delete done.bench;
-    return { state: r.state, json: { demo: true, jid: job.jid, steps, results: done.results, next: layout.nextService(done) } };
+    // neuer Stand gleich mit – der Laden muss danach nichts mehr nachladen (Schließen des Tisches ohne Ruckeln)
+    return { state: r.state, json: { demo: true, jid: job.jid, steps, results: done.results, next: layout.nextService(done), state: r.state } };
   }).catch(next)
 );
 

@@ -29,6 +29,7 @@ function loadScene(file, globalName) {
     scale: { width: 1200, height: 800 }, textures: { exists: () => false }, add: obj(), load: obj(),
     tweens: { add: (c) => { if (c.onComplete) c.onComplete(); return obj(); } }, // Animationen sofort fertig
     time: { delayedCall: (ms, fn) => fn() }, scene: { stop() { scene.stopped = true; } },
+    cameras: { main: { fadeIn() {}, fadeOut() {}, once: (e, fn) => fn() } }, // Abblenden sofort fertig
     input: { on: (e, fn) => { handlers[e] = fn; }, keyboard: { on: (e, fn) => { handlers[e] = fn; }, once: (e, fn) => { handlers[e] = fn; } } },
   });
   return { scene, handlers, clicks };
