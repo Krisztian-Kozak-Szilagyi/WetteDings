@@ -97,7 +97,8 @@
   }
 
   let gameRef = null;
-  const kasseOpen = () => !!(window.ShopKasse && gameRef && window.ShopKasse.isOpen(gameRef));
+  // Minispiel-Szenen über dem Laden (Kasse, Arbeitstisch): solange eine offen ist, ruht die Steuerung im Laden
+  const kasseOpen = () => !!(gameRef && ((window.ShopKasse && window.ShopKasse.isOpen(gameRef)) || (window.ShopWerkbank && window.ShopWerkbank.isOpen(gameRef))));
   const dialogOpen = () => !!document.querySelector('dialog[open]') || kasseOpen();
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -1205,9 +1206,21 @@
   function openBench(job, station) {
     const needsSlab = job.services.includes('slab') && !job.done.includes('slab') && station === 'card_grading_table';
     if (needsSlab && !L.supplier(state, 'mat_slab')) { toast('Kein leerer Slab – erst am PC bestellen und in den Tisch einräumen.'); return; }
-    const dlg = $('[data-shop-bench]');
-    $('[data-shop-bench-frame]').src = '/shop-demo/werkbank?auftrag=' + encodeURIComponent(job.jid) + '&tisch=' + encodeURIComponent(station);
-    dlg.showModal();
+    const q = '?auftrag=' + encodeURIComponent(job.jid) + '&tisch=' + encodeURIComponent(station);
+    const oldTable = () => {
+      $('[data-shop-bench-frame]').src = '/shop-demo/werkbank' + q;
+      $('[data-shop-bench]').showModal();
+    };
+    // Phaser-Tisch im Spiel (public/js/shop-werkbank-phaser.js), solange er die Schritte kann – sonst der Tisch der Seite
+    if (!window.ShopWerkbank || !gameRef) { oldTable(); return; }
+    fetch('/api/shop-demo/werkbank' + q, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.error) { toast(res.error); return; }
+        if (!window.ShopWerkbank.handles(res.jobData.steps)) { oldTable(); return; }
+        window.ShopWerkbank.open(gameRef, { job: res.jobData, csrf: root.dataset.csrf, onDone: reload, onCancel: reload });
+      })
+      .catch(() => toast('Keine Verbindung.'));
   }
 
   /** Neuer Stand vom Server (nach dem Arbeitstisch) */
@@ -1505,6 +1518,8 @@
         backgroundColor: '#14161f',
         scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
         banner: false,
+        // Bilder per <img> laden statt per XHR/Blob – die CSP der Seite erlaubt keine blob:-Bilder
+        loader: { imageLoadType: 'HTMLImageElement' },
         scene: GameScene,
       });
     })
