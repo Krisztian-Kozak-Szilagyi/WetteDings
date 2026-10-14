@@ -14,6 +14,7 @@
 //   reports (Tagesberichte, neueste zuletzt) – die Kunden selbst laufen im Browser (src/shop/customers.js)
 //   licenses: [lizenzId] – gekaufte Lizenzen · servicePrices: { dienstId: Preis } · jobs: Kunden-Aufträge (Karte
 //   reinigen/benoten/versiegeln/in Sleeve) mit { jid, services, done: [dienstId], results, card, defects, spots, seed }
+//   dirt: [{ did, x, y, at }] – Flecken auf dem Boden (at = Zeitpunkt in ms, s. ShopCustomers.dirtCap) · tools: [werkzeugId]
 // more = { licenses: { id: def }, services: { id: def } } (src/shop/catalog.js LICENSES/SERVICES)
 // Kataloge kommen von außen: cat = { möbelId: def }, goods = { wareId: def } (src/shop/catalog.js).
 (function (root, factory) {
@@ -31,6 +32,9 @@
   const DOOR = [{ x: 3, y: UNIT_D - 1 }, { x: 4, y: UNIT_D - 1 }];
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
+  const MAX_DIRT = 40;
+  // Werkzeuge (Krisztian, 2026-10-14): am PC kaufen, im Werkzeug-Rad (Tab) wählen. Preis = Platzhalter
+  const TOOLS = [{ id: 'mop', name: 'Wischmopp', price: 50, text: 'Flecken vom Boden wischen (Werkzeug-Rad: Tab oder 2)' }];
   const MAX_JOBS = 2; // so viele Aufträge gleichzeitig (Krisztian, 2026-10-14)
   const SERVICE_ORDER = ['clean', 'iron', 'grade', 'slab', 'foil'];
   const KEEP_REVIEWS = 60;
@@ -48,6 +52,7 @@
     job4: 'Karte gut gemacht, kleine Mängel.',
     job3: 'Mit meiner Karte bin ich nicht ganz zufrieden.',
     jobwait: 'Meine Karte hat ewig gedauert.',
+    dirty: 'Ziemlich schmutzig hier.',
   };
 
   const cents = (n) => Math.round(n * 100) / 100;
@@ -60,7 +65,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1,
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [],
     };
   }
 
@@ -76,6 +81,8 @@
     out.reviews = (out.reviews || []).slice(-KEEP_REVIEWS);
     out.reports = (out.reports || []).slice(-KEEP_REPORTS);
     out.licenses = (out.licenses || []).slice();
+    out.dirt = (out.dirt || []).map((d) => Object.assign({}, d));
+    out.tools = (out.tools || []).slice();
     out.servicePrices = Object.assign({}, out.servicePrices || {});
     out.jobs = (out.jobs || []).map((j) => Object.assign({}, j, { done: (j.done || []).slice(), results: Object.assign({}, j.results) }));
     if (!out.boxes.some((b) => b.bid === out.carry)) out.carry = null;
@@ -444,6 +451,32 @@
         s.today = freshDay();
         return { state: s };
       }
+      case 'buyTool': {
+        const tool = TOOLS.find((t) => t.id === a.id);
+        if (!tool) return fail('Unbekanntes Werkzeug.');
+        if (s.tools.includes(tool.id)) return fail('Das hast du schon.');
+        if (s.coins < tool.price) return fail('Nicht genug Kanacoin.');
+        s.coins = cents(s.coins - tool.price);
+        s.tools.push(tool.id);
+        return { state: s };
+      }
+      // Kunde hinterlässt einen Fleck (der Browser würfelt, wo und ob)
+      case 'dirt': {
+        const x = Number(a.x);
+        const y = Number(a.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= s.units * UNIT_W || y >= UNIT_D) return fail('Ungültiger Fleck.');
+        if (s.dirt.length >= MAX_DIRT) return { state: s };
+        const at = Number(a.at);
+        s.dirt.push({ did: s.nextDid++, x: cents(x), y: cents(y), at: Number.isFinite(at) ? at : 0 });
+        return { state: s };
+      }
+      case 'mop': {
+        if (!s.tools.includes('mop')) return fail('Dafür brauchst du einen Wischmopp.');
+        const d = s.dirt.find((x) => x.did === a.did);
+        if (!d) return fail('Der Fleck ist schon weg.');
+        s.dirt = s.dirt.filter((x) => x !== d);
+        return { state: s };
+      }
       case 'buyLicense': {
         const lic = more.licenses[a.id];
         if (!lic) return fail('Unbekannte Lizenz.');
@@ -555,6 +588,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });
