@@ -113,7 +113,7 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       price: Number(a.price),
       x: Number(a.x),
       y: Number(a.y),
-      rot: a.rot ? 1 : 0,
+      rot: layout.rot4(a.rot), // 0–3 = Blickrichtung der Vorderseite
       wall: a.wall === 'n' || a.wall === 'w' ? a.wall : undefined,
       amount: Number(a.amount),
       lines: Array.isArray(a.lines)

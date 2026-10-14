@@ -96,7 +96,9 @@
     });
   }
 
-  const dialogOpen = () => !!document.querySelector('dialog[open]');
+  let gameRef = null;
+  const kasseOpen = () => !!(window.ShopKasse && gameRef && window.ShopKasse.isOpen(gameRef));
+  const dialogOpen = () => !!document.querySelector('dialog[open]') || kasseOpen();
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -120,7 +122,7 @@
     $('[data-shop-panel-name]').textContent = d.name;
     $('[data-shop-panel-info]').textContent = d.utility + (d.capacity ? ' · ' + d.capacity : '');
     $('[data-shop-panel-refund]').textContent = '(+' + fmt(d.price) + ')';
-    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer !== 'boden' || d.w === d.d;
+    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer === 'wand' || d.layer === 'theke';
     panel.hidden = !!mode;
   }
 
@@ -232,7 +234,8 @@
       sw.style.background = hex(g.color);
       name.append(sw, g.name);
       const lic = g.license && !state.licenses.includes(g.license) ? more.licenses[g.license] : null;
-      name.appendChild(el('span', 'sub', lic ? 'braucht die ' + lic.name : g.kind === 'material' ? 'wird bei Aufträgen verbraucht' : 'Marktpreis ' + fmt(g.market)));
+      const fits = Array.from(new Set(list.filter((d) => (d.holds || []).includes(g.id)).map((d) => d.name))).join(', ');
+      name.appendChild(el('span', 'sub', (lic ? 'braucht die ' + lic.name : g.kind === 'material' ? 'wird bei Aufträgen verbraucht' : 'Marktpreis ' + fmt(g.market)) + (fits ? ' · passt in: ' + fits : '')));
       tr.appendChild(name);
       tr.appendChild(el('td', 'num', g.perBox + ' Stück'));
       tr.appendChild(el('td', 'num', fmt(g.buy)));
@@ -448,25 +451,45 @@
   }
 
   /** Inhalt eines Regals als farbige Streifen auf der Vorderseite (später: Bilder der Ware) */
-  function drawStock(g, it, s, d, z0) {
-    if (!d.slots || !it.stock) return;
+  /**
+   * Vorderseite (rot 0–3, Krisztian 2026-10-14): heller Rahmen + Ware als Farbstreifen. Zeigt sie zum Betrachter
+   * (0 = linke Seitenfläche, 1 = rechte), liegt beides auf dieser Fläche, sonst als Streifen oben an der vorderen Kante.
+   * Ein kleiner Pfeil oben zeigt immer die Blickrichtung.
+   */
+  function drawFront(g, it, s, d, z0) {
     const m = 0.06;
-    const x0 = it.x + m, x1 = it.x + s.w - m, y1 = it.y + s.d - m, y0 = it.y + m;
-    const front = s.w >= s.d; // Ware auf der längeren sichtbaren Seite
-    const len = front ? x1 - x0 : y1 - y0;
-    let t = 0;
-    const za = z0 + d.height * 0.2;
-    const zb = z0 + d.height * 0.8;
-    Object.keys(it.stock).forEach((id) => {
-      const part = (it.stock[id] / d.slots) * len;
-      const a = t;
-      const b = t + part;
-      t = b;
-      const pts = front
-        ? [iso(x0 + a, y1, za), iso(x0 + b, y1, za), iso(x0 + b, y1, zb), iso(x0 + a, y1, zb)]
-        : [iso(x1, y1 - a, za), iso(x1, y1 - b, za), iso(x1, y1 - b, zb), iso(x1, y1 - a, zb)];
-      poly(g, pts, goods[id] ? goods[id].color : 0xffffff, 0.95, 0x000000);
-    });
+    const x0 = it.x + m, x1 = it.x + s.w - m, y0 = it.y + m, y1 = it.y + s.d - m;
+    const r = L.rot4(it.rot);
+    const h = d.height;
+    // Punkt auf der Vorderseite: t = 0…1 entlang der Seite, z = Höhe
+    const along = r === 0 ? (t, z) => iso(x0 + t * (x1 - x0), y1, z) : r === 1 ? (t, z) => iso(x1, y1 - t * (y1 - y0), z) : null;
+    const top = z0 + h;
+    if (along) poly(g, [along(0.04, z0 + h * 0.1), along(0.96, z0 + h * 0.1), along(0.96, z0 + h * 0.9), along(0.04, z0 + h * 0.9)], 0xffffff, 0.18);
+    if (d.slots && it.stock) {
+      let t = 0.06;
+      Object.keys(it.stock).forEach((id) => {
+        const part = (it.stock[id] / d.slots) * 0.88;
+        const a = t;
+        const b = t + part;
+        t = b;
+        const col = goods[id] ? goods[id].color : 0xffffff;
+        if (along) poly(g, [along(a, z0 + h * 0.2), along(b, z0 + h * 0.2), along(b, z0 + h * 0.8), along(a, z0 + h * 0.8)], col, 0.95, 0x000000);
+        else {
+          // hinten liegende Vorderseite: Streifen oben entlang der vorderen Kante
+          const e = r === 2 ? (u, v) => iso(x0 + u * (x1 - x0), y0 + v, top) : (u, v) => iso(x0 + v, y0 + u * (y1 - y0), top);
+          poly(g, [e(a, 0), e(b, 0), e(b, 0.18), e(a, 0.18)], col, 0.95, 0x000000);
+        }
+      });
+    }
+    // Pfeil zur Vorderseite
+    const [fx, fy] = L.FRONT[r];
+    const cx = it.x + s.w / 2;
+    const cy = it.y + s.d / 2;
+    const tip = iso(cx + fx * (s.w / 2 - 0.12), cy + fy * (s.d / 2 - 0.12), top);
+    const back = iso(cx + fx * (s.w / 2 - 0.42), cy + fy * (s.d / 2 - 0.42), top);
+    const side = iso(cx + fy * 0.14 + fx * (s.w / 2 - 0.42), cy - fx * 0.14 + fy * (s.d / 2 - 0.42), top);
+    const side2 = iso(cx - fy * 0.14 + fx * (s.w / 2 - 0.42), cy + fx * 0.14 + fy * (s.d / 2 - 0.42), top);
+    if (back) poly(g, [tip, side, side2], 0xffffff, 0.75);
   }
 
   /** Bild an der Wand: Rechteck auf der Wandfläche */
@@ -502,8 +525,13 @@
     }
     if (d.layer === 'flach') depth = -8000 + it.x + it.y;
     const hull = box(g, it.x, it.y, s.w, s.d, d.height, z0, color, alpha, outline);
-    if (alpha === 1) drawStock(g, it, s, d, z0);
-    return { hull: hull, depth: depth, top: iso(it.x + s.w / 2, it.y + s.d / 2, z0 + d.height) };
+    if (d.layer === 'boden' || d.slots) drawFront(g, it, s, d, z0); // auch beim Aufstellen: der Pfeil zeigt, wo vorne ist
+    const base = d.layer === 'theke' ? counterUnder(it) || it : it;
+    const bs = L.size(catalog[base.id], base.rot);
+    return {
+      hull: hull, depth: depth, top: iso(it.x + s.w / 2, it.y + s.d / 2, z0 + d.height),
+      box: { x0: base.x, y0: base.y, x1: base.x + bs.w, y1: base.y + bs.d, bias: d.layer === 'theke' ? 1 : 0 },
+    };
   }
 
   function drawCarton(g, x, y, z, kindColor, alpha) {
@@ -512,6 +540,44 @@
   }
 
   const cartonColor = (b) => (b.kind === 'moebel' ? groups[catalog[b.id].group].color : goods[b.id].color);
+
+  /** A steht vor B, wenn A ganz rechts-vorne (x) oder ganz links-vorne (y) von B liegt */
+  const inFront = (a, b) => a.x0 >= b.x1 - 1e-6 || a.y0 >= b.y1 - 1e-6;
+  const mid = (b) => b.x0 + b.x1 + b.y0 + b.y1;
+
+  /** Sortiert Möbel, Kartons, Wände und Figuren jedes Bild neu (bei Platzhalter-Mengen reicht n²) */
+  function sortDepth() {
+    const list = (scene.sortables || []).slice();
+    const r = 0.18;
+    list.push({ g: scene.hero, box: { x0: player.x - r, y0: player.y - r, x1: player.x + r, y1: player.y + r, bias: 2 } });
+    day.customers.forEach((c) => { if (c.g) list.push({ g: c.g, box: { x0: c.x - r, y0: c.y - r, x1: c.x + r, y1: c.y + r, bias: 2 } }); });
+    const n = list.length;
+    const after = list.map(() => []);
+    const indeg = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = list[i].box;
+        const b = list[j].box;
+        const ab = inFront(a, b);
+        const ba = inFront(b, a);
+        if (ab && !ba) { after[j].push(i); indeg[i]++; } else if (ba && !ab) { after[i].push(j); indeg[j]++; }
+      }
+    }
+    const key = (i) => mid(list[i].box) * 10 + list[i].box.bias;
+    const ready = [];
+    for (let i = 0; i < n; i++) if (!indeg[i]) ready.push(i);
+    let d = 0;
+    const placed = new Array(n).fill(false);
+    while (ready.length) {
+      ready.sort((a, b) => key(a) - key(b));
+      const i = ready.shift();
+      placed[i] = true;
+      list[i].g.setDepth(1000 + d++);
+      after[i].forEach((j) => { if (--indeg[j] === 0) ready.push(j); });
+    }
+    // Ring (sollte nicht vorkommen): Rest nach Mitte
+    list.map((o, i) => i).filter((i) => !placed[i]).sort((a, b) => key(a) - key(b)).forEach((i) => list[i].g.setDepth(1000 + d++));
+  }
 
   const GameScene = {
     key: 'shop',
@@ -547,6 +613,7 @@
       if (this.input.mouse) this.input.mouse.disableContextMenu();
       const setHover = (p) => { hover = { x: (p.worldX / TW + p.worldY / TH) / 2, y: (p.worldY / TH - p.worldX / TW) / 2 }; };
       this.input.on('pointerdown', (p) => {
+        if (kasseOpen()) return;
         setHover(p);
         if (p.rightButtonDown()) { if (mode) { mode = null; refresh(); } return; }
         if (mode) { drag = { place: true }; return; }
@@ -561,6 +628,7 @@
         drawGhost();
       });
       this.input.on('pointerup', () => {
+        if (kasseOpen()) { drag = null; return; }
         const d = drag;
         drag = null;
         if (!d) return;
@@ -583,6 +651,7 @@
       tickDay(sec);
       drawCustomers();
       drawHero();
+      sortDepth();
       this.clockT = (this.clockT || 0) + sec;
       if (this.clockT > 0.5) { this.clockT = 0; refreshClock(); }
       const cam = this.cameras.main;
@@ -628,6 +697,7 @@
     day.rng = C.rngFrom((Date.now() ^ (state.day * 7919)) >>> 0);
     day.queue = C.arrivals(C.customersPerDay(C.rating(state.reviews)), day.rng);
     day.customers = [];
+    day.line = [];
     day.closing = false;
     Object.keys(reserved).forEach((k) => delete reserved[k]);
   }
@@ -713,32 +783,41 @@
   }
 
   /** Warteplätze an der Kasse: freie Zellen neben der Theke, dann dahinter */
+  /** Plätze in der Schlange: gerade vor der Kassentheke (ShopCustomers.queueLine) */
   function queueSpots() {
     const pc = counter();
-    if (!pc) return [];
-    const first = Array.from(C.approach(state, catalog, pc, blockSet));
-    const spots = first.slice();
-    const seen = new Set(first);
-    for (let i = 0; i < spots.length && spots.length < 12; i++) {
-      const [x, y] = spots[i].split(',').map(Number);
-      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-        const k = x + dx + ',' + (y + dy);
-        if (!seen.has(k) && y + dy < L.UNIT_D && C.walkableCell(state, blockSet, x + dx, y + dy)) { seen.add(k); spots.push(k); }
-      });
-    }
-    return spots;
+    return pc ? C.queueLine(state, catalog, pc, blockSet, 12) : [];
+  }
+
+  /** Wer steht an (in Ankunfts-Reihenfolge) – rückt nach, wenn vorne jemand fertig ist */
+  function reflowLine() {
+    day.line = (day.line || []).filter((o) => o.phase === 'queue' && !o.gone);
+    const spots = queueSpots();
+    day.line.forEach((o, i) => {
+      const spot = spots[Math.min(i, spots.length - 1)];
+      if (!spot) return;
+      if (o.spot !== spot) { o.spot = spot; goTo(o, new Set([spot])); }
+    });
   }
 
   function queueUp(c) {
-    const waiting = day.customers.filter((o) => o.phase === 'queue' && o !== c);
-    const spots = queueSpots();
-    const spot = spots[Math.min(waiting.length, spots.length - 1)];
-    if (!spot) { release(c); leave(c, null); return; }
-    goTo(c, new Set([spot]));
+    if (!queueSpots().length) { release(c); leave(c, null); return; }
+    day.line = day.line || [];
+    if (!day.line.includes(c)) day.line.push(c);
+    c.spot = null;
+    reflowLine();
+  }
+
+  function dequeue(c) {
+    if (!day.line || !day.line.includes(c)) return;
+    day.line = day.line.filter((o) => o !== c);
+    c.spot = null;
+    reflowLine();
   }
 
   function leave(c, rev, kind) {
     c.phase = 'leave';
+    dequeue(c);
     const miss = c.result && c.result.missWish ? c.wish : '';
     if (kind !== 'paid') act(doAct('leave', Object.assign({ miss: miss }, rev || {})));
     const exits = new Set();
@@ -747,9 +826,8 @@
   }
 
   function firstInLine() {
-    return day.customers
-      .filter((c) => c.phase === 'queue' && !c.path.length)
-      .sort((a, b) => b.wait - a.wait)[0] || null;
+    const c = (day.line || [])[0];
+    return c && c.phase === 'queue' && !c.path.length && !c.serving ? c : null;
   }
 
   /** Auftrag annehmen (Preis prüfen, Server würfelt die Karte), Kunde setzt sich und wartet */
@@ -764,6 +842,7 @@
     }
     c.priceStars = j.stars;
     c.phase = 'taking';
+    dequeue(c);
     const body = new URLSearchParams({ _csrf: root.dataset.csrf, aktion: JSON.stringify({ type: 'takeJob', services: c.services, cid: c.id }) });
     fetch('/api/shop-demo', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
       .then((r) => r.json())
@@ -796,35 +875,60 @@
       const spots = Array.from(C.approach(state, catalog, it, blockSet)).filter((k) => !taken.has(k));
       if (spots.length) { c.seat = spots[0]; return new Set([spots[0]]); }
     }
-    const spots = queueSpots().slice().reverse().filter((k) => !taken.has(k));
-    c.seat = spots[0] || null;
-    return new Set(spots.slice(0, 1));
+    const line = new Set(queueSpots());
+    const free = [];
+    for (let y = 0; y < L.UNIT_D - 1; y++) {
+      for (let x = 0; x < state.units * L.UNIT_W; x++) {
+        const k = x + ',' + y;
+        if (!line.has(k) && !taken.has(k) && C.walkableCell(state, blockSet, x, y)) free.push(k);
+      }
+    }
+    c.seat = free[0] || null;
+    return new Set(free.slice(0, 1));
   }
 
   function jobOf(c) {
     return c.jid ? state.jobs.find((x) => x.jid === c.jid) : null;
   }
 
+  /** Kassen-Minispiel öffnen (public/js/shop-kasse.js); done() bucht, Abbrechen lässt den Kunden weiter warten */
+  function scanThen(c, title, lines, done) {
+    if (!window.ShopKasse || !gameRef) { done(); return; }
+    c.serving = true;
+    window.ShopKasse.open(gameRef, {
+      title: title,
+      lines: lines,
+      onDone: () => { c.serving = false; done(); },
+      onCancel: () => { c.serving = false; },
+    });
+  }
+
   function serveJob(c) {
     const job = jobOf(c);
     if (!job) { leave(c, null); return; }
-    const stars = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
-    const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
-    act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: 'job' + stars }));
-    say(c, '+' + fmt(total) + ' Kanacoin', 2);
-    leave(c, null, 'paid');
+    const lines = job.services.map((id) => ({ name: (more.services[id] || {}).name || id, qty: 1, price: L.servicePrice(state, more, id), color: 0xffffff }));
+    scanThen(c, 'Auftrag Kunde ' + job.jid, lines, () => {
+      const stars = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
+      const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
+      act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: 'job' + stars }));
+      say(c, '+' + fmt(total) + ' Kanacoin', 2);
+      leave(c, null, 'paid');
+    });
   }
 
   function serve(c) {
     if (c.services && !c.jid) { acceptJob(c); return; }
     if (c.jid) { serveJob(c); return; }
-    const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
-    const rev = C.review(c.result, shopStock(), day.rng);
-    release(c);
-    const total = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
-    act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '' }, rev || {})));
-    say(c, '+' + fmt(total) + ' Kanacoin', 2);
-    leave(c, null, 'paid');
+    const scan = c.basket.map((b) => ({ name: goods[b.ware].name, qty: b.qty, price: L.price(state, goods, b.ware), color: goods[b.ware].color }));
+    scanThen(c, 'Kunde', scan, () => {
+      const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
+      const rev = C.review(c.result, shopStock(), day.rng);
+      release(c);
+      const total = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
+      act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '' }, rev || {})));
+      say(c, '+' + fmt(total) + ' Kanacoin', 2);
+      leave(c, null, 'paid');
+    });
   }
 
   function tickCustomer(c, sec) {
@@ -852,6 +956,7 @@
       return;
     }
     if (c.phase === 'queue') {
+      if (c.serving) return;
       c.wait += sec;
       if (c.wait >= C.PATIENCE) {
         release(c);
@@ -1059,7 +1164,6 @@
       g.fillStyle(cartonColor(h), 1);
       g.fillRect(p.x - 12, p.y - 24, 24, 4);
     }
-    g.setDepth((player.x + player.y) * 10 + 0.5);
     scene.prompt.setPosition(p.x, p.y - 56);
     scene.prompt.setText(target && !mode ? target.label : '');
     scene.prompt.setVisible(!!(target && !mode));
@@ -1193,26 +1297,27 @@
         const wc = owned ? 0xc9bfae : 0x4a4d58;
         poly(w, [iso(x, 0), iso(x + 1, 0), iso(x + 1, 0, WALL_H), iso(x, 0, WALL_H)], wc, 1, shade(wc, -0.2));
       }
-      if (!owned) {
-        const sx = u * L.UNIT_W;
-        for (let y = 0; y < L.UNIT_D; y++) {
-          poly(w, [iso(sx, y), iso(sx, y + 1), iso(sx, y + 1, 54), iso(sx, y, 54)], next ? 0x6d717e : 0x55585f, 0.92, 0x3b3e46);
-        }
-      }
     }
     for (let y = 0; y < L.UNIT_D; y++) {
       poly(w, [iso(0, y), iso(0, y + 1), iso(0, y + 1, WALL_H), iso(0, y, WALL_H)], 0xb3a998, 1, 0x948a7a);
     }
-    // Vorderwand nur als Linie (sonst verdeckt sie den Laden), Lücke an der Tür
+  }
+
+  /** Vorder- und rechte Seitenwand nur niedrig (wie abgeschnitten), damit nichts dahinter verschwindet */
+  const LOW_WALL = 16;
+  function drawLowWalls() {
     const front = state.units * L.UNIT_W;
     const d0 = L.DOOR[0].x;
     const d1 = L.DOOR[L.DOOR.length - 1].x + 1;
-    g.lineStyle(4, 0xc9bfae, 0.9);
-    [[0, d0], [d1, front]].forEach(([a, b]) => {
-      const p = iso(a, L.UNIT_D);
-      const q = iso(b, L.UNIT_D);
-      g.lineBetween(p.x, p.y, q.x, q.y);
-    });
+    const add = (x, y, w, d) => {
+      const g = scene.add.graphics();
+      box(g, x, y, w, d, LOW_WALL, 0, 0xc9bfae, 1, 0x948a7a, 0);
+      scene.items.push(g);
+      scene.sortables.push({ g: g, box: { x0: x, y0: y, x1: x + w, y1: y + d, bias: 0 } });
+    };
+    // Vorderwand außen an y = UNIT_D, Lücke an der Tür; Seitenwand außen an x = Ende des Ladens
+    [[0, d0], [d1, front]].forEach(([a, b]) => { if (b > a) add(a, L.UNIT_D, b - a, 0.12); });
+    add(front, 0, 0.12, L.UNIT_D + 0.12);
   }
 
   function drawAll() {
@@ -1226,6 +1331,8 @@
     scene.labels = [];
     scene.extra = [];
     scene.hulls = [];
+    scene.sortables = [];
+    drawLowWalls();
 
     if (state.units < L.MAX_UNITS) {
       const c = iso(state.units * L.UNIT_W + L.UNIT_W / 2, L.UNIT_D / 2);
@@ -1242,6 +1349,8 @@
       const r = drawItem(g, it, color, moving ? 0.25 : 1, it.uid === selected ? 0xffffff : shade(color, -0.55));
       g.setDepth(r.depth);
       scene.items.push(g);
+      const layer = catalog[it.id].layer;
+      if (r.box && (layer === 'boden' || layer === 'theke')) scene.sortables.push({ g: g, box: r.box });
       if (!moving) scene.hulls.push({ uid: it.uid, hull: r.hull, depth: r.depth });
       return { it, r };
     });
@@ -1253,6 +1362,7 @@
       drawCarton(g, b.x, b.y, 0, cartonColor(b), 1);
       g.setDepth((b.x + b.y) * 10);
       scene.items.push(g);
+      scene.sortables.push({ g: g, box: { x0: b.x - 0.2, y0: b.y - 0.2, x1: b.x + 0.2, y1: b.y + 0.2, bias: 0 } });
       if (showNames) {
         const p = iso(b.x, b.y, 18);
         const t = scene.add.text(p.x, p.y, b.kind === 'moebel' ? catalog[b.id].name : '×' + b.qty, { fontSize: '9px', color: '#ffe9c0', backgroundColor: '#00000088', padding: { x: 2, y: 0 } });
@@ -1293,6 +1403,7 @@
     refreshHud();
     refreshClock();
     drawAll();
+    if (state && state.open && day.rng) reflowLine();
     if (scene) findTarget();
     if ($('[data-shop-pc]').open) renderPc();
     if ($('[data-shop-shelf]').open) renderShelf();
@@ -1307,12 +1418,12 @@
   function rotate() {
     if (mode) {
       const d = catalog[mode.id];
-      if (d.layer === 'boden' || d.layer === 'flach') { mode.rot = mode.rot ? 0 : 1; drawGhost(); }
+      if (d.layer === 'boden' || d.layer === 'flach') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
       return;
     }
     const it = selected && state.items.find((i) => i.uid === selected);
     if (!it) return;
-    act(doAct('move', { uid: it.uid, x: it.x, y: it.y, rot: it.rot ? 0 : 1, wall: it.wall }));
+    act(doAct('move', { uid: it.uid, x: it.x, y: it.y, rot: (it.rot + 1) % 4, wall: it.wall }));
   }
 
   function startMove(uid) {
@@ -1388,7 +1499,7 @@
       refreshHud();
       // Ein offener Tag kann nach dem Neuladen nicht weiterlaufen (die Kunden leben nur im Browser)
       if (state.open && act(doAct('closeDay', { aborted: true }))) note('Der letzte Tag wurde beim Neuladen abgebrochen.');
-      new Phaser.Game({
+      gameRef = new Phaser.Game({
         type: Phaser.AUTO,
         parent: document.querySelector('[data-shop-stage]'),
         backgroundColor: '#14161f',
