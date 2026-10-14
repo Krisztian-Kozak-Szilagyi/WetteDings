@@ -66,7 +66,7 @@ test('Wege: nur durch die Tür, um Möbel herum, Platz neben dem Regal', () => {
   assert.ok(L.DOOR.some((d) => d.x === p[fromStreet].x), 'betritt den Laden durch die Tür');
   assert.ok(!p.some((c) => c.y === 3 && c.x >= 2 && c.x <= 4), 'nicht durchs Regal');
   const near = C.approach(s, cat, s.items[0]);
-  assert.ok(near.has('2,2') && near.has('3,4') && !near.has('3,3'));
+  assert.ok(near.has('2,4') && near.has('3,4') && near.has('4,4') && !near.has('2,2'), 'nur vor der Vorderseite');
   // Gehweg links neben der Tür → nicht durch die Wand
   const q = C.path(s, cat, { x: 0, y: 8 }, new Set(['0,7']));
   assert.ok(q.some((c) => L.DOOR.some((d) => d.x === c.x && d.y === c.y)));
@@ -94,4 +94,22 @@ test('Ein Tag: öffnen, kassieren, gehen, schließen → Bericht', () => {
   // Mehr verlangt als da ist → nur das Vorhandene
   s = run(s, { type: 'openDay' }, { type: 'checkout', lines: [{ uid: 1, ware: 'board_game_box', qty: 9 }] });
   assert.strictEqual(s.today.revenue, 60);
+});
+
+test('Vorderseite in 4 Richtungen, Warteschlange gerade vor der Kasse', () => {
+  const shelf = cat.shelf_medium; // 2×1
+  const cells = (rot) => L.frontCells(shelf, { x: 3, y: 3, rot }).map((c) => c.x + ',' + c.y);
+  assert.deepStrictEqual(cells(0), ['3,4', '4,4']);
+  assert.deepStrictEqual(cells(1), ['4,3', '4,4'], 'quer: 1×2, vorne +x');
+  assert.deepStrictEqual(cells(2), ['3,2', '4,2']);
+  assert.deepStrictEqual(cells(3), ['2,3', '2,4']);
+  assert.deepStrictEqual(L.frontCells(cat.chair, { x: 1, y: 1, rot: 3 }), [{ x: 0, y: 1 }], '1×1 drehbar');
+  const s = L.fresh();
+  s.items.push({ uid: 1, id: 'cashier_counter', x: 2, y: 2, rot: 0 }); // vorne Richtung +y
+  const q = C.queueLine(s, cat, s.items[0], null, 4);
+  assert.deepStrictEqual(q, ['2,3', '2,4', '2,5', '2,6'], 'gerade nach vorne, nicht hinter die Theke');
+  s.items.push({ uid: 2, id: 'plant', x: 2, y: 5, rot: 0 });
+  const q2 = C.queueLine(s, cat, s.items[0], null, 4);
+  assert.deepStrictEqual(q2.slice(0, 2), ['2,3', '2,4']);
+  assert.ok(!q2.includes('2,5') && !q2.some((k) => k.endsWith(',1')), 'Hindernis: daneben weiter, nie hinter der Theke');
 });
