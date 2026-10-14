@@ -9,6 +9,7 @@
 //   stats:   [Speed, FIA, FIS, BWL]
 //   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
+//   typen:   Klassen der Karte (z. B. ['Schurke']) – stehen als „[Schurke]“ oben im Textfeld; Effekte können sich darauf beziehen
 //   kampf:   Kampfwerte für den kommenden Kampfmodus (eigener Block, getrennt von den IHK-Werten in stats).
 //            Die Felder legen wir mit den Spielregeln fest.
 // Test-Karten für den Bosskampf (Seltenheit test-item, Admins bekommen sie beim Start – src/migrate.js).
@@ -100,5 +101,17 @@ module.exports = {
     // Effekt auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.
     abilityName: 'Forkbomb',
     ability: 'Alle gegnerischen Karten werden 30 % langsamer, jede Runde lässt der Effekt um 2 % nach.',
+  },
+  // Boss-Karte fürs neue Kartenspiel, nur als Beute aus dem Raid „The Gambit of Shadows“ erhältlich. Rahmen: violet
+  // (Angriff, Abwehr, Lebenspunkte, Kosten). Keine IHK-Werte – spielt nicht in IHK, Dungeon oder Turm.
+  // Mit Lebenspunkten bleibt sie nach dem Ausspielen auf dem Spielfeld liegen (permanent). Effekt folgt.
+  'dio-meister-der-schatten-boss': {
+    season: 'season-1',
+    frame: 'violet',
+    name: 'Dio Meister der Schatten',
+    stats: [0, 0, 0, 0],
+    typen: ['Schurke'],
+    ability: 'Effekt folgt',
+    kampf: { typ: 'held', kosten: 5, ang: 60, sch: 20, hei: 0, leben: 60, dauer: 'permanent', typen: ['Schurke'], effekt: null, fx: 'nekro' },
   },
 };

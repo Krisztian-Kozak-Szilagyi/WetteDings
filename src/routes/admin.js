@@ -19,6 +19,8 @@ const cardBans = require('../tcg/cardBans');
 const { canBoost } = require('../ihk/abilities');
 const ihk = require('../ihk/ihkService');
 const dungeonService = require('../dungeon/dungeonService');
+const raidService = require('../raid/raidService');
+const raidLogic = require('../raid/logic');
 const towerTexts = require('../dungeon/tower');
 const bonusService = require('../services/bonusService');
 const inviteService = require('../services/inviteService');
@@ -58,7 +60,7 @@ const PANEL_SECTIONS = [
   { key: 'moderation', label: 'Moderation', icon: 'shield', description: 'Streitfälle, Meldungen, Bans, Mehrfach-Konten und Auffälligkeiten.' },
   { key: 'vergaben', label: 'Vergaben', icon: 'gift', description: 'Packs, Karten und Gegenstände vergeben oder Karten entfernen.' },
   { key: 'popups', label: 'Pop-ups', icon: 'message', description: 'Nachrichten, die allen Mitgliedern als Fenster erscheinen, bis sie gelesen sind.' },
-  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Kosmetik, Lotterie, IHK und Dungeon.' },
+  { key: 'spielwerte', label: 'Spielwerte', icon: 'sliders', adminOnly: true, description: 'Preise, Chancen, Steuern, Bonus, Grading, Folie, Kosmetik, Lotterie, IHK, Dungeon und Raid.' },
   { key: 'team', label: 'Team', icon: 'users', description: 'Einladungscodes und -links, Devs und Mods, Passwort zurücksetzen.' },
   { key: 'protokolle', label: 'Protokolle', icon: 'list', description: 'Alles, was im Spiel passiert ist – für alle oder einen Spieler, mit Export.' },
 ];
@@ -87,6 +89,7 @@ const SUBTABS = {
     { key: 'ihk', label: 'IHK' },
     { key: 'dungeon', label: 'Dungeon' },
     { key: 'esports', label: 'eSports' },
+    { key: 'raid', label: 'Raid' },
   ],
 };
 
@@ -264,6 +267,14 @@ router.get('/admin', requireStaff, async (req, res) => {
           }
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
+    raid: {
+      settings: raidService.settings,
+      defaults: raidLogic.DEFAULTS,
+      limits: raidLogic.LIMITS,
+      rarities: raidLogic.RARITY_KEYS.map((k) => tcgCatalog.rarityByKey[k]),
+      // Karten, die auf dem Spielfeld liegen bleiben können (Charaktere), nach Seltenheit sortiert
+      cards: tcgCatalog.CARDS.filter(raidLogic.PERMANENT_OK).sort((a, b) => raidLogic.RARITY_KEYS.indexOf(a.rarity) - raidLogic.RARITY_KEYS.indexOf(b.rarity) || a.name.localeCompare(b.name, 'de')),
+    },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
@@ -551,6 +562,55 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
 });
 
 // ---------- Dungeon: Termine, Ziel-Punkte, Lohn, Beute, Bot-Karten ----------
+// ---------- Raid „The Gambit of Shadows“ gegen Dio Meister der Schatten: Regeln, Spieler, Boss, Angriffe, Kampfwerte, Spielfeld, Beute ----------
+router.post('/admin/raid', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const b = req.body;
+  // Zahlen wie im Formular: ganze Zahlen, beim Gewicht auch Kommazahlen (z. B. 1,5)
+  const num = (v) => Number.parseInt(typeof v === 'string' ? v.trim() : '', 10);
+  const dec = (v) => Number(String(typeof v === 'string' ? v : 'x').trim().replace(',', '.') || 'x');
+  const euroCents = (v) => (/^\s*0+([.,]0*)?\s*$/.test(String(v || 'x')) ? 0 : centsOrNull(v));
+  const part = (prefix, keys) => Object.fromEntries(keys.map((k) => [k, num(b[`${prefix}_${k}`])]));
+  try {
+    await raidService.saveSettings({
+      admin: req.user,
+      values: {
+        open: b.open === '1',
+        triesPerDay: num(b.triesPerDay),
+        maxRounds: num(b.maxRounds),
+        spieler: part('spieler', Object.keys(raidLogic.LIMITS.spieler)),
+        boss: part('boss', Object.keys(raidLogic.LIMITS.boss)),
+        angriffe: raidLogic.ATTACKS.map((a) => ({
+          key: a.key,
+          name: typeof b[`a_${a.key}_name`] === 'string' ? b[`a_${a.key}_name`] : a.name,
+          min: num(b[`a_${a.key}_min`]),
+          max: num(b[`a_${a.key}_max`]),
+          gewicht: dec(b[`a_${a.key}_gewicht`]),
+          gift: num(b[`a_${a.key}_gift`]),
+          giftRunden: num(b[`a_${a.key}_giftRunden`]),
+          netz: num(b[`a_${a.key}_netz`]),
+          schwer: b[`a_${a.key}_schwer`] === '1',
+          muenze: b[`a_${a.key}_muenze`] === '1',
+          fern: b[`a_${a.key}_fern`] === '1',
+        })),
+        karten: {
+          ...part('karten', ['ang', 'sch', 'hei', 'neben', 'leben']),
+          permanent: [].concat(b.permanent || []), // angekreuzte Karten bleiben auf dem Spielfeld liegen
+          // eigene Kosten einzelner Karten (Feld leer = Kosten der Seltenheit)
+          kostenKarte: Object.fromEntries(Object.entries(b).filter(([k, v]) => k.startsWith('kk_') && String(v).trim() !== '').map(([k, v]) => [k.slice(3), num(v)])),
+          kosten: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`kosten_${r}`])])),
+          staerke: Object.fromEntries(raidLogic.RARITY_KEYS.map((r) => [r, num(b[`staerke_${r}`])])),
+        },
+        belohnung: { geld: euroCents(b.belohnung_geld), dioChance: dec(b.belohnung_dioChance) },
+      },
+    });
+    req.flash('success', 'Raid-Einstellungen gespeichert – sie gelten ab dem nächsten Kampf.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'raid'));
+});
+
 router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
   const num = (v) => Number.parseInt(typeof v === 'string' ? v : '', 10);
   const pct = (v) => Number(String(typeof v === 'string' ? v : 'x').replace(',', '.') || 'x');

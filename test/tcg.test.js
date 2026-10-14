@@ -52,7 +52,7 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 91); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
+  assert.equal(catalog.CARDS.length, 92); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins; mit Dio Meister der Schatten (Boss)
   assert.equal(catalog.TEST_CARDS.length, 23);
   assert.equal(catalog.cardsByRarity['test-item'].length, 0);
   assert.ok(catalog.cardById[catalog.TEST_CARDS[0].id]); // vergebene Exemplare funktionieren weiter

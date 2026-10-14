@@ -1,0 +1,154 @@
+/* Raid gegen Dio Meister der Schatten – Kampf (views/raid-kampf.ejs, zusätzlich zu bossfight.css) und Übersicht (views/raid.ejs).
+   Farben wie Dios Karte: tiefes Violett, bernsteinfarbenes Gold */
+
+/* ---------- Kampf ---------- */
+/* Hintergrund: die Schattenfestung hinter dem Portal (Dio steht als eigene Figur vor dem Tor); dasselbe Bild wie das Banner */
+.raid-stage {
+  width: max(100vw, calc(100vh * 1672 / 941));
+  height: max(100vh, calc(100vw * 941 / 1672));
+  background: url('/img/raid/gambit-of-shadows.webp') center / cover no-repeat;
+}
+.raid-stage::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(10, 4, 20, .6) 85%), linear-gradient(transparent 55%, rgba(10, 4, 20, .7));
+}
+/* Dio steht in der Mitte über der Stadt und schwankt leicht */
+.raid-boss {
+  --hit: #ffd68a;
+  position: fixed; left: 50%; top: 9vh; z-index: 1;
+  height: min(60vh, 640px); aspect-ratio: 720 / 1008; transform: translateX(-50%);
+  animation: raid-sway 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 24px rgba(168, 85, 247, .45)) drop-shadow(0 18px 30px rgba(0, 0, 0, .7));
+  pointer-events: none;
+}
+.raid-boss img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 18px; user-select: none;
+  -webkit-mask-image: radial-gradient(ellipse 72% 78% at 50% 45%, #000 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 72% 78% at 50% 45%, #000 60%, transparent 100%);
+}
+.raid-boss.is-still { animation-play-state: paused; }
+.raid-boss.is-hit { animation: raid-hit .45s ease-out, raid-sway 4.5s ease-in-out infinite; }
+.raid-boss.is-hit-schwer { animation: raid-hit-schwer .6s ease-out, raid-sway 4.5s ease-in-out infinite; }
+@keyframes raid-sway { 0%, 100% { transform: translateX(-50%) translateY(0) rotate(-.6deg); } 50% { transform: translateX(-50%) translateY(-8px) rotate(.6deg); } }
+@keyframes raid-hit { 20% { transform: translateX(calc(-50% + 8px)); filter: drop-shadow(0 0 30px var(--hit)) brightness(1.4); } }
+@keyframes raid-hit-schwer {
+  15% { transform: translateX(calc(-50% - 14px)) rotate(-2deg); filter: drop-shadow(0 0 44px var(--hit)) brightness(1.7); }
+  35% { transform: translateX(calc(-50% + 10px)) rotate(1.5deg); }
+}
+.raid-body .bf-boss-name { color: #ffd68a; text-shadow: 0 0 12px rgba(232, 169, 72, .6); }
+.raid-body .bf-hp-boss .bf-hp-fill { background: linear-gradient(90deg, #6b21a8, #a855f7 60%, #e8a948); }
+
+/* Münzwurf: Kopf golden, groß */
+.bf-pop-schwer { color: #ffd68a; font-size: 26px; font-weight: 800; text-shadow: 0 0 2px #13071f, 0 2px 6px #13071f, 0 0 18px rgba(232, 169, 72, .8); }
+
+/* Ergebnis im Raid: Titel, Beute, Link zurück */
+.raid-body .bf-result { display: grid; place-content: center; gap: 14px; text-align: center; padding: 24px; }
+.raid-body .bf-result[hidden] { display: none; }
+.bf-result-titel { font-size: clamp(34px, 7vw, 72px); font-weight: 800; color: #ffd68a; text-shadow: 0 0 24px rgba(232, 169, 72, .6); }
+.bf-result-text { max-width: 42ch; margin: 0 auto; font-size: clamp(16px, 2.4vw, 20px); color: #f1e6ff; }
+.bf-result-link {
+  justify-self: center; padding: 10px 22px; border-radius: 999px; font-size: 16px; font-weight: 700; text-decoration: none;
+  color: #2a1145; background: linear-gradient(135deg, #fff4cf, #e9c766 50%, #c79a3c); box-shadow: 0 6px 20px rgba(232, 169, 72, .45);
+}
+.bf-dio-drop .bf-result { background: radial-gradient(circle at 50% 45%, rgba(168, 85, 247, .45), rgba(8, 6, 12, .75) 70%); }
+.bf-dio-drop .bf-result-titel { animation: raid-jackpot 1.2s ease-in-out infinite alternate; }
+@keyframes raid-jackpot { to { text-shadow: 0 0 40px rgba(255, 214, 138, .95), 0 0 80px rgba(168, 85, 247, .7); } }
+
+/* Aufgeben oben links */
+.raid-quit { position: fixed; left: max(14px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); z-index: 5; }
+.raid-quit-btn {
+  padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(232, 169, 72, .5); cursor: pointer;
+  font: 600 13px/1 Inter, system-ui, sans-serif; color: #f1e6ff; background: rgba(42, 17, 69, .75);
+}
+.raid-quit-btn.is-armed { color: #fff; background: #b91c1c; border-color: #fca5a5; }
+.bf-over .raid-quit { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .raid-boss, .raid-boss.is-hit, .raid-boss.is-hit-schwer, .bf-dio-drop .bf-result-titel { animation: none; }
+}
+
+/* Spielfeld: freie Fläche über der Hand – oben ist vorne (nah an Dio), Karten liegen, wo man sie hinlegt (--x/--y 0–100).
+   Gestrichelte Linie: so weit reicht Dios Nahkampf, dahinter trifft nur die Armbrust. */
+.bf-feld {
+  --feld-h: calc(var(--card-h) * .5);
+  --fw: calc(var(--feld-h) * 63 / 88);
+  position: absolute; left: 50%; bottom: calc(var(--card-h) + 40px); transform: translateX(-50%);
+  width: min(74vw, 980px); height: clamp(150px, 30vh, 320px); padding: 14px 16px 16px; box-sizing: border-box;
+  border-radius: 18px; pointer-events: auto;
+  background: linear-gradient(180deg, rgba(120, 30, 60, .22), rgba(42, 17, 69, .28) 45%, rgba(20, 10, 40, .55));
+  box-shadow: inset 0 0 0 1px rgba(232, 169, 72, .22), 0 10px 30px rgba(0, 0, 0, .35);
+  transition: opacity .3s, box-shadow .2s;
+}
+.bf-feld::before {
+  content: 'Spielfeld · ' attr(data-plaetze) ' · ▲ vorne'; position: absolute; left: 14px; top: -10px; padding: 1px 8px; border-radius: 999px; z-index: 300;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #ffd68a; background: #1d0b33; box-shadow: 0 0 0 1px rgba(232, 169, 72, .4);
+}
+/* vorne/hinten und Reichweite */
+.bf-feld::after {
+  content: 'Nahkampf-Reichweite · dahinter nur Armbrust'; position: absolute; left: 16px; right: 16px; pointer-events: none;
+  top: calc(14px + var(--reichweite, 50) * (100% - 30px - var(--feld-h)) / 100 + var(--feld-h) / 2);
+  border-top: 2px dashed rgba(255, 214, 138, .45); padding-top: 2px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; color: rgba(255, 214, 138, .7); text-shadow: 0 1px 2px #000;
+}
+.bf-feld[data-ohne-linie]::after { display: none; }
+.bf-feld[data-leer] { opacity: .55; }
+body.bf-platzwahl .bf-feld { opacity: 1; cursor: crosshair; box-shadow: inset 0 0 0 2px rgba(255, 214, 138, .85), 0 0 30px rgba(232, 169, 72, .35); }
+.bf-feld-card {
+  position: absolute; width: var(--fw); height: var(--feld-h); pointer-events: auto;
+  left: calc(16px + var(--x, 50) * (100% - 32px - var(--fw)) / 100);
+  top: calc(14px + var(--y, 50) * (100% - 30px - var(--feld-h)) / 100);
+  transition: transform .5s cubic-bezier(.2, .8, .25, 1), opacity .45s, filter .45s;
+}
+body.bf-platzwahl .bf-feld-card:not(.bf-feld-geist) { pointer-events: none; }
+.bf-feld-geist { opacity: .55; pointer-events: none; z-index: 250 !important; transition: none; }
+.bf-feld-geist[hidden] { display: none; }
+.bf-feld-card img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 8px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .7)); }
+.bf-feld-hp { position: absolute; left: 6%; right: 6%; bottom: -8px; height: 12px; border-radius: 999px; overflow: hidden; background: rgba(8, 6, 12, .85); box-shadow: 0 0 0 1px rgba(255, 255, 255, .18); }
+.bf-feld-hp-fill { position: absolute; inset: 0 auto 0 0; width: 100%; background: linear-gradient(180deg, #5ee08a, #1f9a4c); transition: width .3s ease-out; }
+.bf-feld-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 9px; font-weight: 800; text-shadow: 0 1px 2px #000; }
+/* Dios angekündigtes Ziel */
+.bf-feld-card.bf-feld-ziel img { filter: drop-shadow(0 0 14px rgba(248, 113, 113, .95)) drop-shadow(0 6px 14px rgba(0, 0, 0, .7)); }
+.bf-feld-card.bf-feld-ziel::after { content: '🎯'; position: absolute; top: -12px; right: -8px; font-size: 18px; filter: drop-shadow(0 2px 3px #000); }
+.bf-feld-card.bf-feld-wirkt { animation: bf-feld-wirkt .5s ease-out; }
+.bf-feld-card.bf-feld-treffer { animation: bf-shake .3s; }
+.bf-feld-zerstoert { opacity: 0; transform: scale(1.2) rotate(6deg); filter: brightness(2) blur(3px); }
+.bf-feld-weg { opacity: 0; transform: translateY(40px); }
+@keyframes bf-feld-wirkt { 40% { transform: translateY(-10px) scale(1.06); filter: brightness(1.35) drop-shadow(0 0 16px rgba(255, 214, 138, .9)); } }
+@media (max-width: 700px) { .bf-feld { width: 92vw; } }
+
+/* Exil: Stapel links neben dem Deck – was das Feld verlassen hat, liegt hier offen */
+.bf-exil {
+  position: absolute; right: calc(26px + var(--card-w) + 22px); bottom: 22px;
+  width: calc(var(--card-w) * .8); height: calc(var(--card-h) * .8); border-radius: 10px;
+  background: rgba(13, 5, 26, .55); box-shadow: inset 0 0 0 2px rgba(168, 85, 247, .45), 0 6px 16px rgba(0, 0, 0, .5);
+}
+.bf-exil img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 10px; filter: grayscale(.6) brightness(.7) drop-shadow(0 6px 14px rgba(0, 0, 0, .7)); }
+.bf-exil-name { position: absolute; left: 0; right: 0; bottom: -20px; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #c9a6ff; text-shadow: 0 1px 3px #000; }
+.bf-exil[data-leer] .bf-exil-name::after { content: ' (leer)'; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.bf-exil.bf-exil-neu { animation: bf-exil-neu .45s ease-out; }
+@keyframes bf-exil-neu { 40% { transform: scale(1.08); box-shadow: inset 0 0 0 2px #c9a6ff, 0 0 24px rgba(168, 85, 247, .8); } }
+@media (max-width: 700px) { .bf-exil { right: calc(14px + var(--card-w) + 14px); bottom: 14px; } }
+
+/* ---------- Übersicht (/raid) ---------- */
+/* Banner: Aufbau wie das Dungeon-Banner (.dg-hero in style.css), nur mit Dios Farben; Bildausschnitt aufs Tor */
+.raid-hero .dg-hero-img { object-position: 50% 45%; }
+.raid-hero-wrap { margin-bottom: 18px; }
+.raid-hero { box-shadow: inset 0 0 0 1px rgba(232, 169, 72, .35), var(--shadow-md); }
+.raid-hero .dg-hero-shade { background: linear-gradient(180deg, rgba(13, 5, 26, .1) 0%, rgba(13, 5, 26, .5) 50%, rgba(13, 5, 26, .93) 100%); }
+.raid-hero h1 { color: #ffd68a; text-shadow: 0 0 18px rgba(232, 169, 72, .45); }
+.raid-hero .dg-hero-sub { color: #e4d4ff; }
+.raid-hero .kicker { background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .05) 60%, rgba(168, 85, 247, .14)); }
+.raid-debug { border: 1px dashed rgba(255, 214, 138, .7); color: #ffd68a; background: rgba(13, 5, 26, .55); }
+.raid-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; }
+.raid-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.raid-grid .card h2 { margin-top: 0; }
+.raid-problem { color: var(--nein, #f87171); font-weight: 600; }
+.raid-roles { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
+.raid-roles li { padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--color-accent-700) 35%, transparent); font-size: 13px; }
+.raid-attacks td:first-child { font-weight: 600; }
+.raid-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; background: #2a1145; color: #ffd68a; border: 1px solid #e8a948; }
+.raid-result.is-sieg { color: var(--ja, #4ade80); font-weight: 700; }
+.raid-result.is-niederlage, .raid-result.is-aufgegeben { color: var(--nein, #f87171); font-weight: 700; }
+@media (max-width: 640px) {
+  .raid-hero { min-height: 360px; }
+}

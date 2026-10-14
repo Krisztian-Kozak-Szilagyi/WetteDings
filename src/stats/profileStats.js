@@ -27,7 +27,7 @@ function summarize({ ledger, stakes, coin, wealth, packsOpened }) {
       hint: 'Pack-Käufe, Bank-Verkäufe, Black Market; Ergebnis inkl. heutigem Wert der Karten und Packs',
     },
     { key: 'handel', label: 'Handel', turnover: abs('handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'), result: L('handel_kauf', 'handel_verkauf', 'handel_tausch_zahlung', 'handel_tausch_erhalt'), hint: 'Geld aus Käufen, Verkäufen und Aufpreisen beim Tausch' },
-    { key: 'jobs', label: 'IHK, Dungeon & Grading', turnover: null, result: L('ihk_lohn', 'dungeon_lohn', 'grading_lohn', 'grading_ausbau', 'grading_einnahme', 'grading_auftrag', 'grading_erstattung'), hint: 'Löhne und Einnahmen aus Spieler-Aufträgen, abzüglich Grading-Ausbau und eingereichter Karten' },
+    { key: 'jobs', label: 'IHK, Dungeon & Grading', turnover: null, result: L('ihk_lohn', 'dungeon_lohn', 'raid_lohn', 'grading_lohn', 'grading_ausbau', 'grading_einnahme', 'grading_auftrag', 'grading_erstattung'), hint: 'Löhne und Einnahmen aus Spieler-Aufträgen, abzüglich Grading-Ausbau und eingereichter Karten' },
     { key: 'boni', label: 'Boni & Provisionen', turnover: null, result: L('bonus', 'erfolg', 'provision', 'provision_schiri'), hint: 'Tagesbonus, Erfolge und Provisionen' },
   ];
   const start = L('startguthaben');

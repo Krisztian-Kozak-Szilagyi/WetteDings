@@ -136,7 +136,7 @@ function loadCards(dir = IMAGE_DIR) {
       if (data && data.kampf) card.kampf = data.kampf;
       // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
       if (data && data.unreleased) card.unreleased = true;
-      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
+      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', typen: data.typen || [], artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
       return card;
@@ -169,7 +169,7 @@ function cardImage(card, values = {}) {
   } catch {
     // Datei fehlt – ohne Bildversion
   }
-  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, card.kampf || null, mtime])).digest('hex').slice(0, 10);
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, card.typen || [], card.kampf || null, mtime])).digest('hex').slice(0, 10);
   const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }

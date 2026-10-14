@@ -12,7 +12,7 @@ const actionToken = require('./actionToken');
 const network = require('./network');
 
 // Bereiche, deren Formulare als Spiel-Aktion zählen (erster Pfadteil)
-const GAME_AREAS = new Set(['tcg', 'inventar', 'handel', 'ihk', 'dungeon', 'grading', 'broker', 'wetten', 'duell', 'lotterie']);
+const GAME_AREAS = new Set(['tcg', 'inventar', 'handel', 'ihk', 'dungeon', 'grading', 'broker', 'wetten', 'duell', 'lotterie', 'raid']);
 // Hintergrund-Abfragen der Seiten zählen nicht (Chat, "gesehen"-Meldungen)
 const IGNORE = /^\/dungeon\/(chat|beute-gesehen)\b/;
 // Skript-Werkzeuge und Headless-Browser im User-Agent
