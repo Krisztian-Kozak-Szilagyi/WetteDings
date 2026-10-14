@@ -22,14 +22,14 @@ const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'] };
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
   const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock }) => {
     const it = { uid, id, x, y, rot };
@@ -39,7 +39,7 @@ function plain(doc) {
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
   return layout.ensureCounter(
-    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid }),
+    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools }),
     catalog
   );
 }
@@ -106,6 +106,8 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       uid: Number(a.uid),
       bid: Number(a.bid),
       jid: Number(a.jid),
+      did: Number(a.did),
+      at: Number(a.at),
       cid: Number(a.cid),
       n: Number(a.n),
       ware: typeof a.ware === 'string' ? a.ware : '',
@@ -155,13 +157,17 @@ async function benchFor(userId, jid, station) {
  * → { jobData } oder { error }. Genutzt von der Seite im Fenster (GET /shop-demo/werkbank) und vom Phaser-Tisch
  * im Laden (GET /api/shop-demo/werkbank, public/js/shop-werkbank-phaser.js)
  */
-async function openBench(userId, jid, station) {
+async function openBench(userId, jid, station, remember) {
   const b = await benchFor(userId, jid, station);
   if (b.error) return b;
   const { job, steps } = b;
   if (steps.includes('slab') && !layout.supplier(b.state, 'mat_slab')) return { error: 'Kein leerer Slab am Kartenbewertungstisch – erst Slabs bestellen und einräumen.' };
-  b.state.jobs.find((j) => j.jid === job.jid).bench = station;
-  await save(userId, b.state);
+  // Der Tisch der Seite (Fenster) schickt den Tisch beim Fertig-Melden nicht mit – nur dafür merken (kostet einen
+  // Schreibzugriff); der Phaser-Tisch schickt "tisch" mit, sein Öffnen bleibt ein reiner Lesezugriff (schneller)
+  if (remember) {
+    b.state.jobs.find((j) => j.jid === job.jid).bench = station;
+    await save(userId, b.state);
+  }
   const cleaned = job.done.includes('clean');
   const card = cardInfo(job.card);
   return {
@@ -196,7 +202,7 @@ async function openBench(userId, jid, station) {
 
 router.get('/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
   try {
-    const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch));
+    const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch), true);
     if (b.error) return res.status(400).type('text/plain').send(b.error);
     res.render('shop-werkbank', { title: 'Arbeitstisch', pay: grading.PAY, centeringScale: CENTERING_SCALE, jobData: b.jobData });
   } catch (err) {
@@ -219,7 +225,11 @@ async function benchStep(req, res, fn) {
   const jid = Number(str(req.body.job));
   const state = await load(req.user._id);
   const job = state.jobs.find((j) => j.jid === jid);
-  if (!job || !job.bench) return res.status(400).json({ error: 'Diesen Auftrag gibt es nicht mehr.' });
+  if (!job) return res.status(400).json({ error: 'Diesen Auftrag gibt es nicht mehr.' });
+  // Tisch: vom Phaser-Tisch mitgeschickt, sonst der gemerkte (Tisch der Seite im Fenster)
+  const sent = str(req.body.tisch);
+  job.bench = Object.keys(BENCH_STEPS).find((k) => k === sent) || job.bench;
+  if (!job.bench) return res.status(400).json({ error: 'Kein Arbeitstisch.' });
   const out = fn(job, state);
   if (out.error) return res.status(400).json(out);
   await save(req.user._id, out.state || state);

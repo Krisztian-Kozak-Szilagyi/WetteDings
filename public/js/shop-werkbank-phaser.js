@@ -99,8 +99,8 @@
     preload() {
       const job = this.opts.job;
       // Schlüssel = Bildadresse (nicht die Auftragsnummer – die beginnt nach „Neu starten“ wieder bei 1)
-      if (job.card && job.card.image) this.load.image('wb:' + job.card.image, job.card.image);
-      if (job.back) this.load.image('wb:' + job.back, job.back);
+      // schon vorab geladen (Laden: prefetchBenches)? dann nichts laden
+      [job.card && job.card.image, job.back].forEach((url) => { if (url && !this.textures.exists('wb:' + url)) this.load.image('wb:' + url, url); });
     },
     create() {
       const job = this.opts.job;
@@ -304,7 +304,7 @@
         if (s === 'iron') {
           this.busy = true;
           const r = this.ironResult();
-          post('/shop-demo/werkbank/buegeln', this.opts.csrf, { job: this.opts.job.id, smooth: String(r.smooth), burns: String(r.burns) })
+          post('/shop-demo/werkbank/buegeln', this.opts.csrf, { job: this.opts.job.id, tisch: this.opts.station || '', smooth: String(r.smooth), burns: String(r.burns) })
             .then((res) => {
               this.hint.setText('Zu ' + res.smooth + ' % glatt' + (res.burns ? ' · ' + res.burns + ' Brandfleck' + (res.burns === 1 ? '' : 'e') : ''));
               this.time.delayedCall(1100, () => { this.busy = false; this.next(); });
@@ -325,7 +325,7 @@
         this.busy = true;
         this.btn.setVisible(false);
         this.hint.setText('Fertig!');
-        post('/shop-demo/werkbank/fertig', this.opts.csrf, { job: this.opts.job.id, clean: String(this.cleanliness()), seal: '' })
+        post('/shop-demo/werkbank/fertig', this.opts.csrf, { job: this.opts.job.id, tisch: this.opts.station || '', clean: String(this.cleanliness()), seal: '' })
           .then((res) => this.time.delayedCall(500, () => this.close(true, res)))
           .catch((err) => { this.busy = false; this.btn.setVisible(true); this.hint.setText(err.message); });
       },

@@ -114,8 +114,9 @@
     $('[data-shop-coins-value]').textContent = fmt(state.coins);
     const h = hand();
     const handEl = $('[data-shop-hand]');
-    handEl.hidden = !h;
+    handEl.hidden = !h && held === 'hand';
     if (h) handEl.textContent = 'In der Hand: Karton ' + boxName(h) + (h.kind === 'moebel' ? ' · E aufbauen' : '');
+    else if (held === 'mop') handEl.textContent = 'In der Hand: Wischmopp · Tab/1 = Hände';
     const panel = $('[data-shop-panel]');
     const it = selected && state.items.find((i) => i.uid === selected);
     if (!it) { selected = null; panel.hidden = true; return; }
@@ -123,7 +124,7 @@
     $('[data-shop-panel-name]').textContent = d.name;
     $('[data-shop-panel-info]').textContent = d.utility + (d.capacity ? ' · ' + d.capacity : '');
     $('[data-shop-panel-refund]').textContent = '(+' + fmt(d.price) + ')';
-    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer === 'wand' || d.layer === 'theke';
+    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer === 'wand';
     panel.hidden = !!mode;
   }
 
@@ -134,6 +135,7 @@
     ['preise', 'Preise'],
     ['bestand', 'Bestand'],
     ['lizenzen', 'Lizenzen'],
+    ['werkzeug', 'Werkzeug'],
     ['verkauf', 'Verkäufe / Tag'],
     ['bewertungen', 'Bewertungen'],
     ['belege', 'Belege'],
@@ -171,6 +173,7 @@
     else if (pcTab === 'preise') pcPreise(body);
     else if (pcTab === 'bestand') pcBestand(body);
     else if (pcTab === 'lizenzen') pcLizenzen(body);
+    else if (pcTab === 'werkzeug') pcWerkzeug(body);
     else if (pcTab === 'verkauf') pcVerkauf(body);
     else if (pcTab === 'bewertungen') pcBewertungen(body);
     else if (pcTab === 'belege') pcBelege(body);
@@ -252,6 +255,30 @@
       tb.appendChild(tr);
     });
     body.appendChild(t);
+  }
+
+  function pcWerkzeug(body) {
+    const { t, tb } = table([['Werkzeug'], ['Preis', 1], ['']]);
+    L.TOOLS.forEach((w) => {
+      const tr = el('tr');
+      const name = el('td', '', w.name);
+      name.appendChild(el('span', 'sub', w.text));
+      tr.appendChild(name);
+      tr.appendChild(el('td', 'num', fmt(w.price)));
+      const td = el('td', 'num');
+      if (state.tools.includes(w.id)) td.appendChild(el('span', 'sd-later', 'Gekauft'));
+      else {
+        const b = el('button', 'sd-btn', 'Kaufen');
+        b.type = 'button';
+        b.disabled = w.price > state.coins;
+        b.addEventListener('click', () => { if (act(doAct('buyTool', { id: w.id }))) renderPc(); });
+        td.appendChild(b);
+      }
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+    body.appendChild(el('p', 'sd-later', 'Werkzeug wählen: Tab gedrückt halten (Werkzeug-Rad) oder 1 = Hände, 2 = Wischmopp.'));
   }
 
   function pcLizenzen(body) {
@@ -588,6 +615,7 @@
       this.floor = this.add.graphics().setDepth(-10000);
       this.walls = this.add.graphics().setDepth(-9000);
       this.ghost = this.add.graphics().setDepth(20000);
+      this.dirt = this.add.graphics().setDepth(-8500);
       this.hero = this.add.graphics();
       this.prompt = this.add.text(0, 0, '', { fontSize: '12px', color: '#fff3c8', backgroundColor: '#1c1f2bdd', padding: { x: 6, y: 3 } })
         .setOrigin(0.5, 1).setDepth(30000).setResolution(2);
@@ -601,11 +629,19 @@
       this.cameras.main.setZoom(window.innerWidth < 900 ? 1 : 1.4);
 
       // false: Tasten in Eingabefeldern (Preise, Dialog) nicht schlucken
-      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,ESC,DELETE', false);
+      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,ESC,DELETE,ONE,TWO', false);
+      // Tab: Werkzeug-Rad, solange gedrückt. Nur im Laden abfangen (sonst springt der Fokus) – in Fenstern bleibt Tab normal
+      const tab = this.input.keyboard.addKey('TAB', false);
+      window.addEventListener('keydown', (e) => { if (e.key === 'Tab' && !dialogOpen()) e.preventDefault(); });
+      tab.on('down', () => { if (!dialogOpen() && !mode) openWheel(); });
+      tab.on('up', closeWheel);
+      keys.ONE.on('down', () => { if (!dialogOpen()) selectTool('hand'); });
+      keys.TWO.on('down', () => { if (!dialogOpen()) selectTool('mop'); });
       this.keys = keys;
       const free = () => !dialogOpen();
       keys.R.on('down', () => { if (free()) rotate(); });
       keys.E.on('down', () => { if (free() && !mode && target) target.run(); });
+      this.eKey = keys.E;
       keys.Q.on('down', () => { if (free() && !mode && hand()) dropHere(); });
       keys.ESC.on('down', () => { if (!free()) return; if (mode) { mode = null; refresh(); } else select(null); });
       keys.DELETE.on('down', () => { if (free() && selected && !mode) giveBack(); });
@@ -649,6 +685,7 @@
     update: function (time, dt) {
       const sec = Math.min(dt, 50) / 1000;
       walk(this.keys, sec);
+      tickMop(sec, this.eKey && this.eKey.isDown);
       tickDay(sec);
       drawCustomers();
       drawHero();
@@ -661,6 +698,99 @@
       cam.scrollY += (p.y - 40 - cam.height / 2 - cam.scrollY) * 0.12;
     },
   };
+
+  // ---------- Werkzeug in der Hand (Krisztian, 2026-10-14: GTA-artiges Rad) ----------
+  // Mit Wischmopp in der Hand wischt E Flecken (gedrückt halten), mit leeren Händen benutzt E alles andere.
+  const WHEEL = [{ id: 'hand', name: 'Hände' }, { id: 'mop', name: 'Wischmopp' }]; // neue Werkzeuge: hier und in L.TOOLS
+  const MOP_SECONDS = 1.5;
+  let held = 'hand';
+  let mopping = null; // { did, t }
+
+  function selectTool(id) {
+    if (id !== 'hand' && !state.tools.includes(id)) { toast('Den ' + ((L.TOOLS.find((t) => t.id === id) || {}).name || 'Gegenstand') + ' gibt es am PC (Werkzeug).'); return; }
+    if (id !== 'hand' && hand()) { toast('Erst den Karton abstellen (Q).'); return; }
+    held = id;
+    mopping = null;
+    refreshHud();
+    if (scene) findTarget();
+  }
+
+  const wheelEl = () => $('[data-shop-wheel]');
+  let wheelPick = null;
+  function openWheel() {
+    const w = wheelEl();
+    if (!w || !w.hidden) return;
+    w.textContent = '';
+    WHEEL.forEach((t, i) => {
+      const a = -Math.PI / 2 + (i / WHEEL.length) * Math.PI * 2;
+      const b = el('div', 'sd-wheel-slot' + (t.id === held ? ' is-held' : '') + (t.id !== 'hand' && !state.tools.includes(t.id) ? ' is-locked' : ''), t.name);
+      b.style.left = 50 + Math.cos(a) * 34 + '%';
+      b.style.top = 50 + Math.sin(a) * 34 + '%';
+      b.dataset.tool = t.id;
+      w.appendChild(b);
+    });
+    wheelPick = held;
+    w.hidden = false;
+    markWheel();
+  }
+  function markWheel() {
+    wheelEl().querySelectorAll('.sd-wheel-slot').forEach((b) => b.classList.toggle('is-pick', b.dataset.tool === wheelPick));
+  }
+  window.addEventListener('mousemove', (e) => {
+    const w = wheelEl();
+    if (!w || w.hidden) return;
+    const dx = e.clientX - window.innerWidth / 2;
+    const dy = e.clientY - window.innerHeight / 2;
+    if (Math.hypot(dx, dy) < 30) return;
+    let a = Math.atan2(dy, dx) + Math.PI / 2;
+    if (a < 0) a += Math.PI * 2;
+    wheelPick = WHEEL[Math.round(a / ((Math.PI * 2) / WHEEL.length)) % WHEEL.length].id;
+    markWheel();
+  });
+  function closeWheel() {
+    const w = wheelEl();
+    if (!w || w.hidden) return;
+    w.hidden = true;
+    if (wheelPick && wheelPick !== held) selectTool(wheelPick);
+  }
+
+  /** Nächster Fleck in Reichweite (für den Wischmopp) */
+  function nearDirt() {
+    return (state.dirt || [])
+      .map((d) => ({ d, dist: Math.hypot(d.x - player.x, d.y - player.y) }))
+      .filter((o) => o.dist <= 0.9)
+      .sort((a, b) => a.dist - b.dist)[0] || null;
+  }
+
+  function tickMop(sec, eDown) {
+    if (!mopping) return;
+    const still = (state.dirt || []).some((d) => d.did === mopping.did);
+    if (!eDown || !still || held !== 'mop') { mopping = null; return; }
+    mopping.t += sec;
+    if (mopping.t >= MOP_SECONDS) {
+      const did = mopping.did;
+      mopping = null;
+      act(doAct('mop', { did: did }));
+    }
+  }
+
+  /** Flecken auf dem Boden (unter Möbeln und Figuren) */
+  function drawDirt() {
+    const g = scene.dirt;
+    g.clear();
+    (state.dirt || []).forEach((d, i) => {
+      const p = iso(d.x, d.y);
+      const k = (d.did * 37) % 5;
+      g.fillStyle(0x4a3220, 0.55);
+      g.fillEllipse(p.x, p.y, 26 + k * 2, 12 + k);
+      g.fillStyle(0x3a2616, 0.5);
+      g.fillEllipse(p.x + 6 - k, p.y + 2, 12, 6);
+      g.fillEllipse(p.x - 8 + k, p.y - 2, 9, 5);
+    });
+  }
+
+  /** Bewertung an die Sauberkeit des Ladens anpassen (ShopCustomers.dirtCap) */
+  const capDirt = (rev) => C.dirtCap(rev, state.dirt, Date.now());
 
   // ---------- Öffnungstag & Kunden ----------
   // Der Tag läuft nur im Browser: Kunden kommen zu festen Zeitpunkten, laufen auf Rasterwegen (ShopCustomers.path)
@@ -739,6 +869,7 @@
     Object.assign(c, {
       id: day.nextId++, x: sx + 0.5, y: L.UNIT_D + L.SIDEWALK - 0.4, path: [], phase: 'enter', wait: 0,
       color: COLORS[Math.floor(day.rng() * COLORS.length)], seen: [], visit: [], bubble: '', bubbleT: 0, basket: [],
+      dirty: day.rng() < C.DIRT_CHANCE, // hinterlässt irgendwo im Laden einen Fleck
     });
     const door = L.DOOR[Math.floor(day.rng() * L.DOOR.length)];
     goTo(c, new Set([door.x + ',' + door.y]));
@@ -788,7 +919,7 @@
     else if (r.tooExpensive.length && !r.basket.length) say(c, 'Viel zu teuer!', 2.5);
     else if (r.stars < 5 && r.basket.length) say(c, 'Hmm, teuer …', 2);
     if (r.basket.length) { c.phase = 'queue'; c.wait = 0; queueUp(c); }
-    else leave(c, C.review(r, shopStock(), day.rng));
+    else leave(c, capDirt(C.review(r, shopStock(), day.rng)));
   }
 
   /** Warteplätze an der Kasse: freie Zellen neben der Theke, dann dahinter */
@@ -864,6 +995,7 @@
           return;
         }
         c.jid = res.jid;
+        setTimeout(prefetchBenches, 0);
         const job = state.jobs.find((x) => x.jid === c.jid);
         c.services = job.services; // evtl. mit Bügeln
         const tables = new Set(job.services.map((id) => more.services[id].station));
@@ -917,9 +1049,11 @@
     if (!job) { leave(c, null); return; }
     const lines = job.services.map((id) => ({ name: (more.services[id] || {}).name || id, qty: 1, price: L.servicePrice(state, more, id), color: 0xffffff }));
     scanThen(c, 'Auftrag Kunde ' + job.jid, lines, () => {
-      const stars = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
+      const stars0 = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
+      const capped = capDirt({ stars: stars0, why: 'job' + stars0 });
+      const stars = capped.stars;
       const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
-      act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: 'job' + stars }));
+      act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: capped.why === 'dirty' ? 'dirty' : 'job' + stars }));
       say(c, '+' + fmt(total) + ' Kanacoin', 2);
       leave(c, null, 'paid');
     });
@@ -931,7 +1065,7 @@
     const scan = c.basket.map((b) => ({ name: goods[b.ware].name, qty: b.qty, price: L.price(state, goods, b.ware), color: goods[b.ware].color }));
     scanThen(c, 'Kunde', scan, () => {
       const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
-      const rev = C.review(c.result, shopStock(), day.rng);
+      const rev = capDirt(C.review(c.result, shopStock(), day.rng));
       release(c);
       const total = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
       act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '' }, rev || {})));
@@ -952,6 +1086,10 @@
       const stepLen = CUSTOMER_SPEED * sec;
       if (d <= stepLen) { c.x = tx; c.y = ty; c.path.shift(); } else { c.x += (dx / d) * stepLen; c.y += (dy / d) * stepLen; }
       return;
+    }
+    if (c.dirty && c.y < L.UNIT_D - 0.5 && c.phase !== 'enter') {
+      c.dirty = false;
+      act(doAct('dirt', { x: Math.round((c.x + (day.rng() - 0.5) * 0.4) * 100) / 100, y: Math.round((c.y + (day.rng() - 0.5) * 0.4) * 100) / 100, at: Date.now() }));
     }
     if (c.phase === 'enter') { nextLeg(c); return; }
     if (c.phase === 'look') {
@@ -1164,6 +1302,19 @@
     g.lineStyle(1.5, 0x0e1a33, 1);
     g.strokeRoundedRect(p.x - 9, p.y - 34, 18, 30, 7);
     g.strokeCircle(p.x, p.y - 42, 9);
+    if (held === 'mop') {
+      const wob = mopping ? Math.sin(mopping.t * 18) * 5 : 0;
+      g.lineStyle(3, 0x8a6a3a, 1);
+      g.lineBetween(p.x + 10, p.y - 30, p.x + 16 + wob, p.y + 2);
+      g.fillStyle(0xd8d0c0, 1);
+      g.fillEllipse(p.x + 17 + wob, p.y + 3, 16, 6);
+      if (mopping) {
+        g.lineStyle(4, 0x4fd17a, 1);
+        g.beginPath();
+        g.arc(p.x, p.y - 62, 9, -Math.PI / 2, -Math.PI / 2 + (mopping.t / MOP_SECONDS) * Math.PI * 2);
+        g.strokePath();
+      }
+    }
     const h = hand();
     if (h) {
       g.fillStyle(0xa07a4a, 1);
@@ -1221,21 +1372,54 @@
     };
     // Phaser-Tisch im Spiel (public/js/shop-werkbank-phaser.js), solange er die Schritte kann – sonst der Tisch der Seite
     if (!window.ShopWerkbank || !gameRef) { oldTable(); return; }
-    fetch('/api/shop-demo/werkbank' + q, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.error) { toast(res.error); return; }
-        if (!window.ShopWerkbank.handles(res.jobData.steps)) { oldTable(); return; }
-        window.ShopWerkbank.open(gameRef, { job: res.jobData, csrf: root.dataset.csrf, onDone: reload, onCancel: reload });
-      })
-      .catch(() => toast('Keine Verbindung.'));
+    const start = (jobData) => {
+      if (!window.ShopWerkbank.handles(jobData.steps)) { oldTable(); return; }
+      window.ShopWerkbank.open(gameRef, { job: jobData, station: station, csrf: root.dataset.csrf, onDone: reload, onCancel: reload });
+    };
+    const key = job.jid + '|' + station;
+    const ready = benchCache.get(key);
+    if (ready) { benchCache.delete(key); start(ready); return; }
+    fetchBench(job.jid, station).then((res) => (res.error ? toast(res.error) : start(res.jobData))).catch(() => toast('Keine Verbindung.'));
+  }
+
+  // Vorab laden (Krisztian, 2026-10-14: der Tisch ging zu langsam auf): sobald klar ist, welcher Tisch als Nächstes
+  // dran ist, Tischdaten holen und Kartenbilder schon in Phaser legen – E öffnet dann ohne Wartezeit
+  const benchCache = new Map();
+  function fetchBench(jid, station) {
+    return fetch('/api/shop-demo/werkbank?auftrag=' + encodeURIComponent(jid) + '&tisch=' + encodeURIComponent(station), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((r) => r.json());
+  }
+  function preloadImage(url) {
+    if (!url || !gameRef || gameRef.textures.exists('wb:' + url)) return;
+    const img = new Image();
+    img.onload = () => { if (!gameRef.textures.exists('wb:' + url)) gameRef.textures.addImage('wb:' + url, img); };
+    img.src = url;
+  }
+  function prefetchBenches() {
+    if (!window.ShopWerkbank || !state) return;
+    state.jobs.forEach((job) => {
+      const n = L.nextService(job);
+      const station = n && more.services[n] ? more.services[n].station : null;
+      if (!station || station === 'pack_opening_counter') return;
+      const key = job.jid + '|' + station;
+      if (benchCache.has(key)) return;
+      benchCache.set(key, null); // läuft schon
+      fetchBench(job.jid, station)
+        .then((res) => {
+          if (res.error || !res.jobData || !window.ShopWerkbank.handles(res.jobData.steps)) { benchCache.delete(key); return; }
+          benchCache.set(key, res.jobData);
+          preloadImage(res.jobData.card && res.jobData.card.image);
+          preloadImage(res.jobData.back);
+        })
+        .catch(() => benchCache.delete(key));
+    });
   }
 
   /** Neuer Stand vom Server (nach dem Arbeitstisch) */
   function reload() {
     return fetch('/api/shop-demo', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then((r) => r.json())
-      .then((data) => { if (data.state) { state = data.state; refresh(); } });
+      .then((data) => { if (data.state) { state = data.state; benchCache.clear(); refresh(); prefetchBenches(); } });
   }
 
   window.addEventListener('message', (e) => {
@@ -1258,6 +1442,11 @@
     let t = null;
     const waiting = pc && state.open ? firstInLine() : null;
     const atDoor = !state.open && L.DOOR.some((d) => Math.hypot(d.x + 0.5 - player.x, d.y + 1 - player.y) < 1.3);
+    if (held === 'mop') {
+      const d = nearDirt();
+      target = d ? { label: mopping ? 'Wischen …' : 'E halten: Fleck wegwischen', run: () => { mopping = { did: d.d.did, t: 0 }; } } : null;
+      return;
+    }
     if (waiting) {
       t = { label: 'E: Kunde kassieren', run: () => serve(waiting) };
     } else if (atDoor && !h) {
@@ -1354,6 +1543,7 @@
     scene.hulls = [];
     scene.sortables = [];
     drawLowWalls();
+    drawDirt();
 
     if (state.units < L.MAX_UNITS) {
       const c = iso(state.units * L.UNIT_W + L.UNIT_W / 2, L.UNIT_D / 2);
@@ -1439,7 +1629,7 @@
   function rotate() {
     if (mode) {
       const d = catalog[mode.id];
-      if (d.layer === 'boden' || d.layer === 'flach') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
+      if (d.layer !== 'wand') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
       return;
     }
     const it = selected && state.items.find((i) => i.uid === selected);
