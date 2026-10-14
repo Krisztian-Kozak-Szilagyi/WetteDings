@@ -3,7 +3,7 @@
 // Die Minispiele sind Nachbauten des Grading-Tisches der Seite (public/js/grading.js) mit denselben Werten:
 //   clean – Flecken mit dem Schwamm wegreiben (vorne und hinten, R = Karte umdrehen), Sauberkeit in % wie cleanliness()
 //   iron  – Bügeleisen über den Knick ziehen: Stücke werden glatt, zu lange auf einer Stelle = Brandfleck
-//   grade – Karte prüfen: kippen (Drehen, D) lässt Kratzer aufblitzen, Messen (M) zwei Linien an die Bildkanten →
+//   grade – Karte prüfen: Licht (D) über die Karte ziehen – Kratzer blitzen im Lichtfleck auf, Messen (M) zwei Linien an die Bildkanten →
 //           Zentrierung, UV-Lampe (U) zeigt Ecken-/Kantenmacken; dann Note 1–10 (Server sagt die echte)
 //   slab  – Zeiger pendelt, Leertaste/Klick stoppt ihn: je näher an der Mitte, desto sauberer versiegelt
 // Ergebnisse gehen an dieselben Adressen wie am Tisch der Seite (/shop-demo/werkbank/buegeln, …/benoten, …/fertig).
@@ -40,7 +40,7 @@
   const HINT = {
     clean: 'Mit gedrückter Maus schrubben · R = Karte umdrehen',
     iron: 'Mit gedrückter Maus langsam über den Knick fahren – nicht stehen bleiben',
-    grade: 'D kippen (Kratzer blitzen auf) · M messen · U UV-Lampe · dann Note wählen',
+    grade: 'D Licht über die Karte ziehen (Kratzer blitzen auf) · M messen · U UV-Lampe · dann Note wählen',
     slab: 'Leertaste oder Klick: Zeiger in der Mitte stoppen',
   };
 
@@ -134,7 +134,7 @@
       this.foam = [];
       this.sparks = [];
       this.t = 0;
-      this.tilt = { x: 0, y: 0 };
+      this.light = null; // Lichtfleck (Kartenanteile 0…1) beim Prüfen auf Kratzer
       this.mode = 'rotate';
       this.cameras.main.fadeIn(140, 0, 0, 0);
 
@@ -184,6 +184,12 @@
       this.glare = this.add.graphics(); // Lichtreflex beim Kippen
       this.slabG = this.add.graphics(); // Slab nach dem Versiegeln
       this.cardC.add([shadow, this.front, this.back, this.marks, this.glare, this.slabG]);
+      if (this.make) {
+        // Lichtfleck nur auf der Karte
+        const mask = this.make.graphics({ add: false });
+        mask.fillStyle(0xffffff, 1).fillRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, cardW * CORNER);
+        this.glare.setMask(mask.createGeometryMask());
+      }
       this.facingFront = true;
       this.uvShade = this.add.graphics(); // dunkelt beim UV-Licht alles außer dem Kegel ab
       this.fx = this.add.graphics(); // Schaum, Funken, Werkzeug, Messlinien (Bildschirm-Koordinaten)
@@ -266,7 +272,7 @@
         const c = this.card;
         // Werkzeuge links neben der Karte
         const lx = c.x - 70;
-        [['rotate', '✋ Drehen (D)'], ['measure', '📏 Messen (M)'], ['uv', '🔦 UV (U)']].forEach(([m, label], i) => {
+        [['rotate', '💡 Licht (D)'], ['measure', '📏 Messen (M)'], ['uv', '🔦 UV (U)']].forEach(([m, label], i) => {
           const b = button(this, lx, c.cy - 50 + i * 44, label, () => this.setMode(m), { ox: 1 });
           b.modeKey = m;
           this.ui.push(b);
@@ -289,7 +295,6 @@
       setMode(m) {
         if (this.step() !== 'grade' || this.guess) return;
         this.mode = m;
-        this.tilt = m === 'rotate' ? this.tilt : { x: 0, y: 0 };
         this.ui.forEach((b) => { if (b.modeKey) b.setBackgroundColor(b.modeKey === m ? '#5a4a8a' : '#2a2f3c'); });
         this.measureText();
       },
@@ -310,7 +315,6 @@
             this.guess = res.guess;
             this.grade = res.grade;
             this.mode = 'rotate';
-            this.tilt = { x: 0, y: 0 };
             const diff = Math.abs(res.guess - res.grade);
             tone(diff === 0 ? 1300 : diff === 1 ? 900 : 300, 220, 'triangle', 0.04);
             this.ui.forEach((b) => {
@@ -435,9 +439,9 @@
         if (s === 'clean' && !this.flipping) this.rub(p.x, p.y, dist);
         if (s === 'grade' && !this.guess) {
           if (this.mode === 'rotate') {
-            // kippen: bis 35°, Kratzer blitzen ab 12° auf (wie am Tisch der Seite)
-            this.tilt.y = Phaser.Math.Clamp(this.tilt.y + (p.x - last.x) * 0.35, -35, 35);
-            this.tilt.x = Phaser.Math.Clamp(this.tilt.x + (p.y - last.y) * 0.35, -35, 35);
+            // Licht über die Karte ziehen (Krisztian, 2026-10-14: Kippen per Stauchen sah falsch aus)
+            const c = this.card;
+            this.light = { fx: Phaser.Math.Clamp((p.x - c.x) / c.w, 0, 1), fy: Phaser.Math.Clamp((p.y - c.y) / c.h, 0, 1) };
           } else if (this.mode === 'measure' && this.grab) {
             const c = this.card;
             let v = Phaser.Math.Clamp((p.x - c.x) / c.w + this.grab.off, 0, 1);
@@ -597,16 +601,27 @@
         if (this.step() !== 'grade' && this.step() !== 'slab') return;
         const d = this.defects;
         const revealed = !!this.guess;
-        const tilt = Math.sqrt(this.tilt.x * this.tilt.x + this.tilt.y * this.tilt.y);
-        const scr = revealed ? 1 : Phaser.Math.Clamp((tilt - 12) / 18, 0, 1);
-        // Kratzer: blitzen beim Kippen auf (nach dem Benoten rot)
-        (d.scratches || []).forEach((s) => {
-          if (!scr) return;
-          const p = local(this.toScreen(s.x / 100, s.y / 100));
-          const a = (s.angle * Math.PI) / 180;
-          const len = (s.len / 100) * c.w;
-          m.lineStyle(2, revealed ? 0xef4444 : 0xffffff, scr);
-          m.lineBetween(p.x, p.y, p.x + Math.cos(a) * len, p.y + Math.sin(a) * len);
+        // Kratzer: blitzen auf, wo der Lichtfleck darüber liegt (nach dem Benoten rot); immer innerhalb der Karte
+        const LR = 0.24; // Radius des Lichtflecks (Anteil der Kartenbreite)
+        (d.scratches || []).forEach((sc) => {
+          const a = (sc.angle * Math.PI) / 180;
+          const x0 = Phaser.Math.Clamp(sc.x / 100, 0.03, 0.97);
+          const y0 = Phaser.Math.Clamp(sc.y / 100, 0.03, 0.97);
+          const endX = (k) => x0 + Math.cos(a) * (sc.len / 100) * k;
+          const endY = (k) => y0 + (Math.sin(a) * (sc.len / 100) * k * c.w) / c.h;
+          let t = 1;
+          while (t > 0 && (endX(t) < 0.03 || endX(t) > 0.97 || endY(t) < 0.03 || endY(t) > 0.97)) t -= 0.05;
+          if (t <= 0) return;
+          let vis = revealed ? 1 : 0;
+          if (!revealed && this.light && this.mode === 'rotate') {
+            const dist = Math.hypot(((x0 + endX(t)) / 2 - this.light.fx) * c.w, ((y0 + endY(t)) / 2 - this.light.fy) * c.h) / (LR * c.w);
+            vis = Phaser.Math.Clamp(1.4 - dist * 1.4, 0, 1);
+          }
+          if (!vis) return;
+          const p = local(this.toScreen(x0, y0));
+          const q = local(this.toScreen(endX(t), endY(t)));
+          m.lineStyle(2, revealed ? 0xef4444 : 0xffffff, vis);
+          m.lineBetween(p.x, p.y, q.x, q.y);
         });
         // Ecken- und Kantenmacken: leicht hell, unter der UV-Lampe grün
         const uv = this.mode === 'uv' && this.hover && !revealed ? this.hover : null;
@@ -618,13 +633,14 @@
           m.fillStyle(revealed ? 0xef4444 : lit ? 0x4dff8a : 0xffffff, revealed || lit ? 0.9 : 0.35);
           m.fillEllipse(p.x, p.y, rw, rh);
         };
-        (d.corners || []).forEach((k) => dent(k === 1 || k === 2 ? 1 : 0, k >= 2 ? 1 : 0, c.w * 0.05, c.w * 0.05));
+        // Ecken/Kanten: knapp innerhalb des Kartenrands (nicht darüber hinaus)
+        (d.corners || []).forEach((k) => dent(k === 1 || k === 2 ? 0.96 : 0.04, k >= 2 ? 0.972 : 0.028, c.w * 0.05, c.w * 0.05));
         (d.edges || []).forEach((n) => {
-          const pos = n.pos / 100;
-          if (n.side === 0) dent(pos, 0, c.w * 0.05, c.h * 0.012);
-          else if (n.side === 2) dent(pos, 1, c.w * 0.05, c.h * 0.012);
-          else if (n.side === 1) dent(1, pos, c.w * 0.018, c.h * 0.036);
-          else dent(0, pos, c.w * 0.018, c.h * 0.036);
+          const pos = Phaser.Math.Clamp(n.pos / 100, 0.06, 0.94);
+          if (n.side === 0) dent(pos, 0.01, c.w * 0.05, c.h * 0.012);
+          else if (n.side === 2) dent(pos, 0.99, c.w * 0.05, c.h * 0.012);
+          else if (n.side === 1) dent(0.986, pos, c.w * 0.018, c.h * 0.036);
+          else dent(0.014, pos, c.w * 0.018, c.h * 0.036);
         });
       },
     },
@@ -634,20 +650,18 @@
       const dt = Math.min(0.05, delta / 1000);
       this.t += dt;
       this.ironTick(dt);
-      // Kippen: Karte wirkt schmaler/kürzer, Lichtreflex wandert; ohne Ziehen federt sie zurück
-      if (!this.pointer && !this.flipping) { this.tilt.x *= 0.9; this.tilt.y *= 0.9; }
-      if (!this.flipping) {
-        this.cardC.scaleX = Math.cos((this.tilt.y * Math.PI) / 180);
-        this.cardC.scaleY = Math.cos((this.tilt.x * Math.PI) / 180);
-      }
       this.drawMarks();
       const c = this.card;
       const gl = this.glare;
       gl.clear();
-      const tilt = Math.sqrt(this.tilt.x * this.tilt.x + this.tilt.y * this.tilt.y);
-      if (tilt > 2) {
-        gl.fillStyle(0xffffff, Math.min(0.25, tilt / 120));
-        gl.fillEllipse((this.tilt.y / 35) * c.w * 0.45, (this.tilt.x / 35) * c.h * 0.45, c.w * 0.7, c.h * 0.35);
+      // Lichtfleck beim Prüfen: weicher heller Kreis, nur auf der Karte (Maske in create)
+      if (this.step() === 'grade' && this.mode === 'rotate' && this.light && !this.guess) {
+        const lx = (this.light.fx - 0.5) * c.w;
+        const ly = (this.light.fy - 0.5) * c.h;
+        for (let k = 6; k >= 1; k--) {
+          gl.fillStyle(0xffffff, 0.05);
+          gl.fillCircle(lx, ly, c.w * 0.24 * (k / 6));
+        }
       }
       const f = this.fx;
       f.clear();
@@ -656,8 +670,9 @@
       us.clear();
       if (this.step() === 'grade' && this.mode === 'uv' && !this.guess && this.hover) {
         const R = UV_R * c.scale;
-        us.fillStyle(0x0a0420, 0.55).fillRect(0, 0, this.scale.width, this.scale.height);
-        f.fillStyle(0x8a5cff, 0.25).fillCircle(this.hover.x, this.hover.y, R);
+        // dunkel nur AUSSERHALB des Kegels: dicker Ring statt Fläche (im Kegel bleibt die Karte klar)
+        us.lineStyle(4000, 0x0a0420, 0.5).strokeCircle(this.hover.x, this.hover.y, R + 2000);
+        f.fillStyle(0x8a5cff, 0.08).fillCircle(this.hover.x, this.hover.y, R);
         f.lineStyle(2, 0xb48cf2, 0.7).strokeCircle(this.hover.x, this.hover.y, R);
       }
       // Messlinien
