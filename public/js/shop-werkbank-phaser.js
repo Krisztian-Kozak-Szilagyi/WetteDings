@@ -110,6 +110,7 @@
       this.busy = false;
       this.flipping = false;
       this.foam = [];
+      this.cameras.main.fadeIn(140, 0, 0, 0);
       this.sparks = [];
       this.t = 0;
 
@@ -330,13 +331,18 @@
           .catch((err) => { this.busy = false; this.btn.setVisible(true); this.hint.setText(err.message); });
       },
 
+      /** Aufstehen: kurz abblenden, dann zurück in den Laden (erst danach baut der Laden sein Bild neu auf) */
       close(done, res) {
         if (this.closed) return;
         this.closed = true;
         const o = this.opts;
-        this.scene.stop();
-        if (done && o.onDone) o.onDone(res);
-        if (!done && o.onCancel) o.onCancel();
+        const cam = this.cameras.main;
+        cam.once('camerafadeoutcomplete', () => {
+          this.scene.stop();
+          if (done && o.onDone) o.onDone(res);
+          if (!done && o.onCancel) o.onCancel();
+        });
+        cam.fadeOut(150, 0, 0, 0);
       },
 
       /** Flecken und Knick in Container-Koordinaten zeichnen */
