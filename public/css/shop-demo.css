@@ -156,3 +156,13 @@ html, body.sd-body {
   .sd-werkbank-body .gr-bench { display: flex; flex-direction: column; }
   .sd-werkbank-body .gr-stage { height: 60vh; }
 }
+
+/* TEST-KNÖPFE – nur Demo, im fertigen Spiel entfernen (gestreift, damit sie nie wie ein Spiel-Element aussehen) */
+.sd-dev {
+  position: fixed; left: 12px; bottom: 54px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  border: 1px dashed #e0b040; border-radius: 8px;
+  background: repeating-linear-gradient(-45deg, rgba(60, 46, 10, .92) 0 8px, rgba(40, 30, 8, .92) 8px 16px);
+}
+.sd-dev-tag { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #e0b040; }
+.sd-dev button { padding: 5px 9px; border: 1px solid #8a6a20; border-radius: 6px; background: #2a2110; font-size: 12px; color: #f5e2b0; }
+.sd-dev button:hover { border-color: #e0b040; }
