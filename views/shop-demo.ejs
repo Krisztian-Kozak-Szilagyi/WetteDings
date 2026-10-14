@@ -23,6 +23,12 @@
   </div>
   <div class="sd-clock" data-shop-clock></div>
   <div class="sd-note" data-shop-note hidden></div>
+  <%# TEST-KNÖPFE – nur für die Demo, im fertigen Spiel entfernen (public/js/shop-demo.js „TEST-KNÖPFE“, CSS .sd-dev) %>
+  <div class="sd-dev" aria-label="Test">
+    <span class="sd-dev-tag">TEST</span>
+    <button type="button" data-shop-dev="kunde">+ Kunde</button>
+    <button type="button" data-shop-dev="auftrag">+ Kunde mit Karte</button>
+  </div>
   <div class="sd-hud sd-hud-right">
     <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen</label>
     <button type="button" class="sd-reset" data-shop-reset>Neu starten</button>
