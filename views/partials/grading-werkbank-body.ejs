@@ -10,6 +10,7 @@
     <span class="gr-ticket-for">für <%= jobData.customer %></span>
     <% if (jobData.services) { %><%- include('grading-services', { sv: jobData.services }) %><% } %>
   </div>
+  <% if (jobData.demo) { %><button type="button" class="btn btn-ghost btn-sm sd-help" data-sd-help aria-pressed="false" title="Erklärungen ein-/ausblenden">?</button><% } %>
   <button type="button" class="btn btn-ghost btn-sm gr-sound" data-gr-sound aria-pressed="false">🔇 Ton aus</button>
 </div>
 
