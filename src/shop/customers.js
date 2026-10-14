@@ -6,8 +6,12 @@
 //   Jeder Kunde hat dazu eine eigene Toleranz von ±5 Prozentpunkten (TOL_SPREAD), damit es keine harte Kante gibt.
 // - Findet er nichts: selten 2★; ist der Laden (fast) leer: 1★. Zu lange an der Kasse: geht verärgert, 2★.
 // - Mehr Sterne = mehr Kunden; es zählen nur die letzten REVIEW_WINDOW Bewertungen, ein neuer Laden startet mit 3★.
-// - Wünsche: Kunden suchen gezielt eine Ware aus dem Pool ihrer Stufe (wishPool) – später nur, was der Spieler schon
-//   haben kann (tier). Finden sie sie nicht, fragen sie danach (Hinweis für den Spieler, landet im Tagesbericht).
+// - Wünsche: Kunden suchen gezielt eine Ware (wishPool) – nur, was der Spieler schon haben kann: ohne Lizenz, mit
+//   gekaufter Lizenz oder mit einer Lizenz, die er sich leisten könnte. Finden sie sie nicht, fragen sie danach
+//   (Hinweis für den Spieler, landet im Tagesbericht).
+// - Großeinkäufer (2026-10-14): 5 % der Kunden nehmen 3–6× so viel.
+// - Aufträge (2026-10-14): 10 % bringen eine Karte (reinigen, benoten + Slab, Sleeve …), höchstens 2 gleichzeitig,
+//   nur wenn die Tische dafür stehen. Sie warten SERVICE_PATIENCE Sekunden je Arbeitstisch.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./layout'));
   else root.ShopCustomers = factory(root.ShopLayout);
@@ -32,6 +36,9 @@
   const NOTHING_REVIEW = 0.15;
   const EMPTY_SHOP = 5; // so wenig Ware im ganzen Laden = „leer“
   const PATIENCE = 30; // Sekunden an der Kasse
+  const BIG_CHANCE = 0.05;
+  const SERVICE_CHANCE = 0.1;
+  const SERVICE_PATIENCE = 90; // je Arbeitstisch, den der Auftrag braucht
 
   /** Fester Zufall aus einer Zahl (für Tests und Wiederholbarkeit) */
   function rngFrom(seed) {
@@ -79,20 +86,57 @@
     return { buy: false, stars: 0 };
   }
 
-  /** Waren, die sich Kunden auf dieser Stufe wünschen dürfen */
-  function wishPool(goodsList, tier) {
-    return goodsList.filter((g) => (g.tier || 1) <= (tier || 1));
+  /**
+   * Waren, die sich Kunden wünschen dürfen: nur verkäufliche Ware der Stufe, und nur ohne Lizenz, mit gekaufter
+   * Lizenz oder mit einer, die sich der Spieler gerade leisten könnte. ctx = { tier, licenses: [id], coins, prices: { id: Preis } }
+   */
+  function wishPool(goodsList, ctx) {
+    const c = ctx || {};
+    const owned = c.licenses || [];
+    const prices = c.prices || {};
+    return goodsList.filter((g) => (g.kind || 'ware') === 'ware' && (g.tier || 1) <= (c.tier || 1) &&
+      (!g.license || owned.includes(g.license) || (prices[g.license] !== undefined && prices[g.license] <= (c.coins || 0))));
   }
 
-  function newCustomer(rng, goodsList, tier) {
-    const pool = wishPool(goodsList, tier);
+  function newCustomer(rng, goodsList, ctx) {
+    const pool = wishPool(goodsList, ctx);
     const wish = pool.length && rng() < WISH_CHANCE ? pool[Math.floor(rng() * pool.length)].id : null;
-    return { tol: (rng() * 2 - 1) * TOL_SPREAD, wish: wish };
+    return { tol: (rng() * 2 - 1) * TOL_SPREAD, wish: wish, big: rng() < BIG_CHANCE };
   }
 
-  function quantity(g, avail, rng) {
+  function quantity(g, avail, rng, big) {
     const max = g.perBox >= 10 ? 3 : 1;
-    return Math.max(1, Math.min(avail, 1 + Math.floor(rng() * max)));
+    const n = (1 + Math.floor(rng() * max)) * (big ? 3 + Math.floor(rng() * 4) : 1);
+    return Math.max(1, Math.min(avail, n));
+  }
+
+  /**
+   * Bringt der Kunde eine Karte mit? → [dienstId] oder null. stations = Set der Möbel-IDs im Laden,
+   * openJobs = laufende Aufträge, packs/services aus src/shop/catalog.js
+   */
+  function serviceWish(rng, stations, openJobs, packs, services) {
+    if (openJobs >= 2 || rng() >= SERVICE_CHANCE) return null;
+    const byId = Object.fromEntries(services.map((x) => [x.id, x]));
+    const ok = packs.filter((p) => p.services.every((id) => byId[id] && stations.has(byId[id].station)));
+    if (!ok.length) return null;
+    let r = rng() * ok.reduce((a, p) => a + p.weight, 0);
+    const pack = ok.find((p) => (r -= p.weight) < 0) || ok[ok.length - 1];
+    return pack.services.slice();
+  }
+
+  /** Wie zufrieden mit der Arbeit an der Karte? results = { clean %, iron %, guess, grade, seal % } → 3–5★ */
+  function workStars(services, results) {
+    const r = results || {};
+    const pct = (v) => (v >= 90 ? 5 : v >= 70 ? 4 : 3);
+    let stars = 5;
+    if (services.includes('clean')) stars = Math.min(stars, r.clean >= 95 ? 5 : r.clean >= 80 ? 4 : 3);
+    if (services.includes('iron')) stars = Math.min(stars, pct(r.iron || 0));
+    if (services.includes('grade')) {
+      const diff = Math.abs((r.guess || 0) - (r.grade || 0));
+      stars = Math.min(stars, diff === 0 ? 5 : diff === 1 ? 4 : 3);
+    }
+    if (services.includes('slab')) stars = Math.min(stars, pct(r.seal || 0));
+    return stars;
   }
 
   /**
@@ -100,7 +144,7 @@
    * → { basket: [{ uid, ware, qty, price }], stars (schlechteste Laune, 5 wenn nichts), missWish, tooExpensive: [ware] }
    */
   function shop(customer, offers, goods, rng) {
-    const avail = offers.filter((o) => o.qty > 0 && goods[o.ware]);
+    const avail = offers.filter((o) => o.qty > 0 && goods[o.ware] && (goods[o.ware].kind || 'ware') === 'ware');
     const wares = Array.from(new Set(avail.map((o) => o.ware)));
     const basket = [];
     const tooExpensive = [];
@@ -111,7 +155,7 @@
       const o = avail.filter((x) => x.ware === ware).sort((a, b) => a.price - b.price || b.qty - a.qty)[0];
       const j = judge(o.price, goods[ware].market, customer.tol);
       if (!j.buy) { tooExpensive.push(ware); return; }
-      basket.push({ uid: o.uid, ware: ware, qty: quantity(goods[ware], o.qty, rng), price: o.price });
+      basket.push({ uid: o.uid, ware: ware, qty: quantity(goods[ware], o.qty, rng, customer.big), price: o.price });
       stars = Math.min(stars, j.stars);
     };
 
@@ -204,7 +248,7 @@
 
   return {
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
-    MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE,
+    MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
     rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
     walkableCell, path, approach,
   };

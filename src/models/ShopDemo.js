@@ -17,6 +17,11 @@ const shopDemoSchema = new Schema(
     today: { type: Schema.Types.Mixed, default: null },
     reviews: [{ _id: false, day: Number, stars: Number, text: String }],
     reports: { type: [Schema.Types.Mixed], default: [] },
+    // Lizenzen, Preise für Dienste, Kunden-Aufträge (Karte, Mängel, erledigte Schritte – src/shop/layout.js)
+    licenses: { type: [String], default: [] },
+    servicePrices: { type: Schema.Types.Mixed, default: {} },
+    jobs: { type: [Schema.Types.Mixed], default: [] },
+    nextJid: { type: Number, default: 1 },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

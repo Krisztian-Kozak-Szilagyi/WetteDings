@@ -11,6 +11,9 @@
 //   prices: { wareId: Verkaufspreis } – fehlt einer, gilt der Marktpreis
 //   day (laufender Tag), open (Laden geöffnet), today (Zahlen des laufenden Tages), reviews (letzte Bewertungen),
 //   reports (Tagesberichte, neueste zuletzt) – die Kunden selbst laufen im Browser (src/shop/customers.js)
+//   licenses: [lizenzId] – gekaufte Lizenzen · servicePrices: { dienstId: Preis } · jobs: Kunden-Aufträge (Karte
+//   reinigen/benoten/versiegeln/in Sleeve) mit { jid, services, done: [dienstId], results, card, defects, spots, seed }
+// more = { licenses: { id: def }, services: { id: def } } (src/shop/catalog.js LICENSES/SERVICES)
 // Kataloge kommen von außen: cat = { möbelId: def }, goods = { wareId: def } (src/shop/catalog.js).
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -27,6 +30,8 @@
   const DOOR = [{ x: 3, y: UNIT_D - 1 }, { x: 4, y: UNIT_D - 1 }];
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
+  const MAX_JOBS = 2; // so viele Aufträge gleichzeitig (Krisztian, 2026-10-14)
+  const SERVICE_ORDER = ['clean', 'iron', 'grade', 'slab', 'foil'];
   const KEEP_REVIEWS = 60;
   const KEEP_REPORTS = 14;
   const KEEP_RECEIPTS = 60;
@@ -38,6 +43,10 @@
     nothing: 'Nichts Passendes gefunden.',
     empty: 'Der Laden ist ja fast leer!',
     waited: 'Ewig an der Kasse gewartet.',
+    job5: 'Top Arbeit an meiner Karte!',
+    job4: 'Karte gut gemacht, kleine Mängel.',
+    job3: 'Mit meiner Karte bin ich nicht ganz zufrieden.',
+    jobwait: 'Meine Karte hat ewig gedauert.',
   };
 
   const cents = (n) => Math.round(n * 100) / 100;
@@ -50,6 +59,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1,
     };
   }
 
@@ -64,6 +74,9 @@
     out.today = Object.assign(freshDay(), out.today || {});
     out.reviews = (out.reviews || []).slice(-KEEP_REVIEWS);
     out.reports = (out.reports || []).slice(-KEEP_REPORTS);
+    out.licenses = (out.licenses || []).slice();
+    out.servicePrices = Object.assign({}, out.servicePrices || {});
+    out.jobs = (out.jobs || []).map((j) => Object.assign({}, j, { done: (j.done || []).slice(), results: Object.assign({}, j.results) }));
     if (!out.boxes.some((b) => b.bid === out.carry)) out.carry = null;
     return out;
   }
@@ -133,6 +146,28 @@
     return typeof p === 'number' ? p : goods[id] ? goods[id].market : 0;
   }
 
+  function servicePrice(state, more, id) {
+    const p = state.servicePrices[id];
+    const def = more && more.services && more.services[id];
+    return typeof p === 'number' ? p : def ? def.market : 0;
+  }
+
+  /** Nächster offener Dienst eines Auftrags (in fester Reihenfolge) oder null, wenn alles erledigt ist */
+  function nextService(job) {
+    return SERVICE_ORDER.find((id) => job.services.includes(id) && !job.done.includes(id)) || null;
+  }
+
+  /** Aus welchem Möbel ein Material genommen wird (erstes mit Vorrat) */
+  function supplier(state, ware) {
+    return state.items.find((it) => it.stock && it.stock[ware] > 0) || null;
+  }
+
+  function takeOne(it, ware) {
+    it.stock = Object.assign({}, it.stock);
+    it.stock[ware] -= 1;
+    if (!it.stock[ware]) delete it.stock[ware];
+  }
+
   /** Darf das Teil so stehen? → { ok, reason } (ignore = uid, die beim Verschieben nicht mitzählt) */
   function check(state, cat, cand, ignore) {
     const def = cat[cand.id];
@@ -197,7 +232,8 @@
    * build {x, y, rot, wall} (Möbel aus dem Karton in der Hand) · move {uid, x, y, rot, wall} · remove {uid} ·
    * setPrice {ware, price} · buyUnit {price} · setCoins {amount} · reset
    */
-  function apply(state, cat, goods, a) {
+  function apply(state, cat, goods, a, more) {
+    more = more || { licenses: {}, services: {} };
     const s = normalize(JSON.parse(JSON.stringify(state)));
     const fail = (error) => ({ error });
     const find = (uid) => s.items.find((it) => it.uid === uid);
@@ -214,6 +250,10 @@
         const g = goods[a.id];
         const n = Number(a.n) || 1;
         if (!g) return fail('Unbekannte Ware.');
+        if (g.license && !s.licenses.includes(g.license)) {
+          const lic = more.licenses[g.license];
+          return fail('Dafür brauchst du die ' + (lic ? lic.name : 'passende Lizenz') + '.');
+        }
         if (!Number.isInteger(n) || n < 1 || n > 10) return fail('Ungültige Menge.');
         if (s.boxes.length + n > MAX_BOXES) return fail('Zu viele Kartons – erst etwas einräumen.');
         const cost = cents(g.buy * g.perBox * n);
@@ -336,7 +376,7 @@
           const lines = [];
           (Array.isArray(a.lines) ? a.lines : []).slice(0, 10).forEach((l) => {
             let want = Math.max(0, Math.min(50, Math.floor(Number(l.qty)) || 0));
-            if (!goods[l.ware] || !want) return;
+            if (!goods[l.ware] || goods[l.ware].kind === 'material' || !want) return;
             const p = price(s, goods, l.ware);
             // zuerst aus dem Regal, aus dem der Kunde genommen hat, sonst aus einem anderen
             const from = s.items.filter((it) => it.stock && it.stock[l.ware]).sort((x, y) => (y.uid === l.uid) - (x.uid === l.uid));
@@ -376,12 +416,95 @@
         const t = s.today;
         s.reports = s.reports.concat({
           day: s.day, revenue: t.revenue, sold: t.sold, visitors: t.visitors, buyers: t.buyers, misses: t.misses,
-          receipts: t.receipts, stars: t.reviews ? Math.round((t.starSum / t.reviews) * 10) / 10 : null, reviews: t.reviews,
+          receipts: t.receipts, stars: t.reviews ? Math.round((t.starSum / t.reviews) * 10) / 10 : null, reviews: t.reviews, services: t.services || {},
           aborted: !!a.aborted,
         }).slice(-KEEP_REPORTS);
         s.open = false;
+        s.jobs = []; // wer bis Ladenschluss nicht bedient wurde, ist gegangen
         s.day += 1;
         s.today = freshDay();
+        return { state: s };
+      }
+      case 'buyLicense': {
+        const lic = more.licenses[a.id];
+        if (!lic) return fail('Unbekannte Lizenz.');
+        if (s.licenses.includes(lic.id)) return fail('Die hast du schon.');
+        if (s.coins < lic.price) return fail('Nicht genug Kanacoin.');
+        s.coins = cents(s.coins - lic.price);
+        s.licenses.push(lic.id);
+        return { state: s };
+      }
+      case 'setServicePrice': {
+        const p = Number(a.price);
+        if (!more.services[a.service]) return fail('Unbekannter Dienst.');
+        if (!Number.isFinite(p) || p < 0 || p > MAX_PRICE) return fail('Ungültiger Preis.');
+        s.servicePrices[a.service] = cents(p);
+        return { state: s };
+      }
+      // Auftrag annehmen – nur der Server ruft das auf (er würfelt Karte und Zustand: a.job)
+      case 'takeJob': {
+        if (!s.open) return fail('Der Laden ist zu.');
+        if (s.jobs.length >= MAX_JOBS) return fail('Erst die offenen Aufträge erledigen.');
+        const j = a.job || {};
+        const services = SERVICE_ORDER.filter((id) => (j.services || []).includes(id) && more.services[id]);
+        if (!services.length) return fail('Kein Auftrag.');
+        const missing = services.find((id) => !s.items.some((it) => it.id === more.services[id].station));
+        if (missing) return fail('Dafür fehlt dir noch: ' + (cat[more.services[missing].station] || {}).name + '.');
+        s.jobs.push({ jid: s.nextJid++, services, done: [], results: {}, card: j.card, defects: j.defects, spots: j.spots, seed: j.seed, cid: Number(a.cid) || 0 });
+        return { state: s };
+      }
+      // Ergebnis eines Arbeitstisches – nur der Server (Werkbank) ruft das auf
+      case 'benchDone': {
+        const job = s.jobs.find((x) => x.jid === a.jid);
+        if (!job) return fail('Den Auftrag gibt es nicht mehr.');
+        const steps = (a.steps || []).filter((id) => job.services.includes(id) && !job.done.includes(id));
+        if (!steps.length) return fail('Hier ist nichts mehr zu tun.');
+        if (steps.includes('slab')) {
+          const from = supplier(s, 'mat_slab');
+          if (!from) return fail('Kein leerer Slab mehr am Kartenbewertungstisch.');
+          takeOne(from, 'mat_slab');
+        }
+        job.done = job.done.concat(steps);
+        Object.assign(job.results, a.results || {});
+        if (a.defects) job.defects = a.defects;
+        return { state: s };
+      }
+      case 'foil': {
+        const job = s.jobs.find((x) => x.jid === a.jid);
+        if (!job || nextService(job) !== 'foil') return fail('Hier ist nichts zu tun.');
+        const from = supplier(s, 'mat_sleeve');
+        if (!from) return fail('Kein TCG Sleeve mehr an der Booster-Öffnungstheke.');
+        takeOne(from, 'mat_sleeve');
+        job.done = job.done.concat('foil');
+        job.results.foil = true;
+        return { state: s };
+      }
+      case 'serviceCheckout':
+      case 'jobCancel': {
+        const job = s.jobs.find((x) => x.jid === a.jid);
+        if (!job) return fail('Den Auftrag gibt es nicht mehr.');
+        if (!s.open) return fail('Der Laden ist zu.');
+        const t = s.today;
+        t.visitors += 1;
+        if (a.type === 'serviceCheckout') {
+          if (nextService(job)) return fail('Der Auftrag ist noch nicht fertig.');
+          const lines = job.services.map((id) => ({ service: id, qty: 1, price: servicePrice(s, more, id) }));
+          const total = cents(lines.reduce((sum, l) => sum + l.price, 0));
+          s.coins = cents(s.coins + total);
+          t.revenue = cents(t.revenue + total);
+          t.buyers += 1;
+          t.services = Object.assign({}, t.services);
+          job.services.forEach((id) => { t.services[id] = (t.services[id] || 0) + 1; });
+          t.receipts = t.receipts.concat({ lines: lines, total: total }).slice(-KEEP_RECEIPTS);
+        }
+        s.jobs = s.jobs.filter((x) => x !== job);
+        const stars = Number(a.stars);
+        const text = Object.prototype.hasOwnProperty.call(REVIEW_TEXTS, a.why) ? REVIEW_TEXTS[a.why] : null;
+        if (Number.isInteger(stars) && stars >= 1 && stars <= 5 && text) {
+          s.reviews = s.reviews.concat({ day: s.day, stars: stars, text: text }).slice(-KEEP_REVIEWS);
+          t.reviews += 1;
+          t.starSum += stars;
+        }
         return { state: s };
       }
       case 'setPrice': {
@@ -413,6 +536,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    REVIEW_TEXTS, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

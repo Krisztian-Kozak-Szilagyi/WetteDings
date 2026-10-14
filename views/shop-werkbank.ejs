@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title><%= title %> · <%= appName %></title>
+  <link rel="icon" href="/favicon.svg?v=<%= assetVersion %>" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
+  <link rel="stylesheet" href="/css/shop-demo.css?v=<%= assetVersion %>">
+</head>
+<%# Shop-Demo: Arbeitstisch des Grading-Shops ohne Seitenmenü, läuft im Fenster über dem Laden (public/js/shop-demo.js).
+    Ergebnis geht per postMessage an den Laden (public/js/grading.js, jobData.demo). %>
+<body class="sd-werkbank-body">
+  <%- include('partials/grading-werkbank-body') %>
+  <script src="/js/grading.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>
