@@ -14,6 +14,7 @@
 //   reports (Tagesberichte, neueste zuletzt) – die Kunden selbst laufen im Browser (src/shop/customers.js)
 //   licenses: [lizenzId] – gekaufte Lizenzen · servicePrices: { dienstId: Preis } · jobs: Kunden-Aufträge (Karte
 //   reinigen/benoten/versiegeln/in Sleeve) mit { jid, services, done: [dienstId], results, card, defects, spots, seed }
+//   market: { wareId: Marktpreis } – fehlt einer, gilt der Grundpreis; marketMoves: letzte Änderung [{ id, from, to }], marketDay
 //   dirt: [{ did, x, y, at }] – Flecken auf dem Boden (at = Zeitpunkt in ms, s. ShopCustomers.dirtCap) · tools: [werkzeugId]
 // more = { licenses: { id: def }, services: { id: def } } (src/shop/catalog.js LICENSES/SERVICES)
 // Kataloge kommen von außen: cat = { möbelId: def }, goods = { wareId: def } (src/shop/catalog.js).
@@ -33,6 +34,9 @@
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
   const MAX_DIRT = 40;
+  // Marktpreise (Krisztian, 2026-10-14): nach Ladenschluss mit 50 % Chance: 2 Waren teurer, 2 billiger (je 5–15 %),
+  // immer zwischen 70 % und 150 % des Grundpreises – der Einkauf bleibt beim Grundpreis × 50 %, also nie Verlust
+  const MARKET = { chance: 0.5, up: 2, down: 2, min: 0.05, max: 0.15, floor: 0.7, ceil: 1.5 };
   // Werkzeuge (Krisztian, 2026-10-14): am PC kaufen, im Werkzeug-Rad (Tab) wählen. Preis = Platzhalter
   const TOOLS = [{ id: 'mop', name: 'Wischmopp', price: 50, text: 'Flecken vom Boden wischen (Werkzeug-Rad: Tab oder 2)' }];
   const MAX_JOBS = 2; // so viele Aufträge gleichzeitig (Krisztian, 2026-10-14)
@@ -65,7 +69,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [],
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0,
     };
   }
 
@@ -82,6 +86,8 @@
     out.reports = (out.reports || []).slice(-KEEP_REPORTS);
     out.licenses = (out.licenses || []).slice();
     out.dirt = (out.dirt || []).map((d) => Object.assign({}, d));
+    out.market = Object.assign({}, out.market || {});
+    out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
     out.tools = (out.tools || []).slice();
     out.servicePrices = Object.assign({}, out.servicePrices || {});
     out.jobs = (out.jobs || []).map((j) => Object.assign({}, j, { done: (j.done || []).slice(), results: Object.assign({}, j.results) }));
@@ -167,9 +173,47 @@
     return Object.values(it.stock || {}).reduce((a, n) => a + n, 0);
   }
 
+  /** Aktueller Marktpreis (bewegt sich, s. moveMarket) */
+  function marketPrice(state, goods, id) {
+    const m = state.market && state.market[id];
+    return typeof m === 'number' ? m : goods[id] ? goods[id].market : 0;
+  }
+
+  /** Verkaufspreis: eigener Preis, sonst der aktuelle Marktpreis */
   function price(state, goods, id) {
     const p = state.prices[id];
-    return typeof p === 'number' ? p : goods[id] ? goods[id].market : 0;
+    return typeof p === 'number' ? p : marketPrice(state, goods, id);
+  }
+
+  /** Runden (Krisztian): unter 20 auf 0,50, sonst auf die nächste 5 (103 → 105, 106 → 105, 102 → 100) */
+  function roundPrice(p) {
+    return p < 20 ? Math.round(p * 2) / 2 : Math.round(p / 5) * 5;
+  }
+
+  /** Knopf „+5 %“: immer vom Marktpreis aus – 100 → 105 → 110 … */
+  function priceStepUp(current, market) {
+    const k = Math.round((current / market - 1) / 0.05);
+    return cents(market * (1 + (k + 1) * 0.05));
+  }
+
+  /** Neue Marktpreise nach Ladenschluss (rng = () => 0…1) → neuer Zustand, marketMoves = was sich geändert hat */
+  function moveMarket(state, goods, rng) {
+    const s = normalize(JSON.parse(JSON.stringify(state)));
+    s.marketMoves = [];
+    s.marketDay = s.day;
+    if (rng() >= MARKET.chance) return s;
+    const ids = Object.keys(goods).filter((id) => (goods[id].kind || 'ware') === 'ware');
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    ids.slice(0, MARKET.up + MARKET.down).forEach((id, i) => {
+      const base = goods[id].market;
+      const from = marketPrice(s, goods, id);
+      const pct = MARKET.min + rng() * (MARKET.max - MARKET.min);
+      const to = cents(Math.min(base * MARKET.ceil, Math.max(base * MARKET.floor, from * (i < MARKET.up ? 1 + pct : 1 - pct))));
+      if (to === from) return;
+      s.market[id] = to;
+      s.marketMoves.push({ id, from, to });
+    });
+    return s;
   }
 
   function servicePrice(state, more, id) {
@@ -588,6 +632,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

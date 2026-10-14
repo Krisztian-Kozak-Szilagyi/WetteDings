@@ -7,12 +7,13 @@ const path = require('path');
 const vm = require('vm');
 
 /** Lädt eine Datei aus public/js wie im Browser und baut die Szene so zusammen wie Phaser */
-function loadScene(file, globalName) {
+function loadScene(file, globalName, fetchMock) {
   const P = {
     Math: { RandomDataGenerator: function () { return { between: (a) => a, pick: (x) => x[0] }; }, Between: () => 0 },
     Display: { Color: { GetColor: () => 0 } },
   };
-  const ctx = { window: { Phaser: P }, Phaser: P, URLSearchParams, Math, Number, String, Array, Object, Set, JSON };
+  P.Math.Clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const ctx = { window: { Phaser: P }, Phaser: P, URLSearchParams, Math, Number, String, Array, Object, Set, JSON, Promise, fetch: fetchMock };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', file), 'utf8'), ctx);
   let cfg;
   ctx.window[globalName].open({ scene: { getScene: () => null, add: (k, c) => { cfg = c; }, start() {}, bringToTop() {}, isActive: () => true } }, {});
@@ -65,4 +66,47 @@ test('Kasse: alles scannen, dann kassieren', () => {
   assert.strictEqual(clicks.length, pieces + 1, 'nach dem Scannen erscheint „Kassieren“');
   clicks[clicks.length - 1]();
   assert.strictEqual(total, 42);
+});
+
+test('Arbeitstisch: messen, benoten, versiegeln, fertig', async () => {
+  const posts = [];
+  const answers = { benoten: { guess: 7, grade: 8 }, fertig: { demo: true, state: { ok: 1 } } };
+  const fetchMock = (url, o) => {
+    posts.push([url, String(o.body)]);
+    const key = Object.keys(answers).find((k) => url.endsWith(k));
+    return Promise.resolve({ json: () => answers[key] });
+  };
+  const { scene, handlers } = loadScene('shop-werkbank-phaser.js', 'ShopWerkbank', fetchMock);
+  let done = null;
+  scene.init({
+    job: { id: '4', steps: ['grade', 'slab'], center: { x: 0.2 }, centerScale: [{ from: 50, to: 55, cap: 10 }, { from: 56, to: 60, cap: 9 }],
+      defects: { scratches: [{ x: 40, y: 40, len: 20, angle: 10 }], corners: [1], edges: [{ side: 0, pos: 30 }], centering: { lr: 56 } } },
+    station: 'card_grading_table', csrf: 't', onDone: (r) => { done = r; },
+  });
+  scene.create();
+  assert.strictEqual(scene.step(), 'grade');
+  scene.update(0, 16);
+  // Messen: linke Linie an die Bildkante ziehen (Magnet)
+  handlers['keydown-M']();
+  assert.strictEqual(scene.mode, 'measure');
+  const c = scene.card;
+  handlers.pointerdown({ x: c.x + scene.guides.l * c.w, y: c.cy });
+  handlers.pointermove({ x: c.x + scene.imgEdge.l * c.w + 0.5, y: c.cy, isDown: true });
+  assert.strictEqual(scene.guides.l, scene.imgEdge.l, 'rastet an der Bildkante ein');
+  handlers.pointerup();
+  scene.pickGrade(7);
+  scene.submitGrade();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepStrictEqual([scene.guess, scene.grade], [7, 8]);
+  assert.ok(posts[0][0].endsWith('/benoten') && posts[0][1].includes('tisch=card_grading_table'));
+  scene.next();
+  assert.strictEqual(scene.step(), 'slab');
+  scene.t = 0.425; // Zeiger genau in der Mitte (850 ms für eine Strecke)
+  scene.meter.t0 = 0;
+  scene.update(0, 0);
+  scene.seal();
+  assert.ok(scene.sealQ >= 90, 'mittig gestoppt = sauber versiegelt');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(posts[1][0].endsWith('/fertig') && posts[1][1].includes('seal=' + scene.sealQ));
+  assert.deepStrictEqual(done, answers.fertig);
 });
