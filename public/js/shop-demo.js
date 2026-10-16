@@ -134,6 +134,7 @@
   // ---------- PC ----------
   const PC_TABS = [
     ['moebel', 'Möbel bestellen'],
+    ['bauen', 'Bauen'],
     ['ware', 'Ware bestellen'],
     ['preise', 'Preise'],
     ['bestand', 'Bestand'],
@@ -172,6 +173,7 @@
     const keep = body.scrollTop;
     body.textContent = '';
     if (pcTab === 'moebel') pcMoebel(body);
+    else if (pcTab === 'bauen') pcBauen(body);
     else if (pcTab === 'ware') pcWare(body);
     else if (pcTab === 'preise') pcPreise(body);
     else if (pcTab === 'bestand') pcBestand(body);
@@ -194,7 +196,6 @@
   }
 
   function pcMoebel(body) {
-    pcBauen(body);
     let last = '';
     let tb = null;
     list.filter((d) => !d.secret).forEach((d) => {
@@ -278,16 +279,43 @@
       });
       row.appendChild(b);
     });
-    row.appendChild(document.createTextNode('Wand ' + fmt(L.ROOM.wall) + ' je Feld · Tür ' + fmt(L.ROOM.door) + ' · Schrank ' + fmt(L.ROOM.cabinet)));
-    body.appendChild(row);
-    (state.rooms || []).forEach((r) => {
-      const p = el('p', 'sd-later', (r.kind === 'lager' ? 'Lager' : 'Geheimraum') + ' ' + r.w + '×' + r.d + ' ');
-      const b = el('button', 'sd-btn', 'Abreißen (+' + fmt(L.roomCost(state, r)) + ')');
-      b.type = 'button';
-      b.addEventListener('click', () => { if (act(doAct('removeRoom', { rid: r.rid }))) renderPc(); });
-      p.appendChild(b);
-      body.appendChild(p);
+    const del = el('button', 'sd-btn', 'Abreißen');
+    del.type = 'button';
+    del.disabled = !(state.rooms || []).length;
+    del.addEventListener('click', () => {
+      $('[data-shop-pc]').close();
+      selected = null;
+      mode = { kind: 'demolish' };
+      toast('Abreißen: Raum mit der Maus anklicken (Esc = abbrechen).');
+      refresh();
     });
+    row.appendChild(del);
+    body.appendChild(row);
+    body.appendChild(el('p', 'sd-later', 'Wand ' + fmt(L.ROOM.wall) + ' je Feld · Tür ' + fmt(L.ROOM.door) + ' · Schrank ' + fmt(L.ROOM.cabinet) + ' (beim Geheimraum statt Tür)'));
+    if (!(state.rooms || []).length) return;
+    // Räume: Name (zum Umbenennen), Größe, beim Lager die Luftentfeuchter
+    const { t, tb } = table([['Name'], ['Art'], ['Größe'], ['Luftentfeuchter']]);
+    state.rooms.forEach((r) => {
+      const tr = el('tr');
+      const tdn = el('td');
+      const inp = el('input');
+      inp.type = 'text';
+      inp.maxLength = L.ROOM.nameMax;
+      inp.value = r.name || '';
+      inp.className = 'sd-name-input';
+      inp.addEventListener('change', () => { if (!act(doAct('renameRoom', { rid: r.rid, name: inp.value }))) inp.value = r.name || ''; });
+      tdn.appendChild(inp);
+      tr.appendChild(tdn);
+      tr.appendChild(el('td', '', r.kind === 'lager' ? 'Lager' : 'Geheimraum'));
+      tr.appendChild(el('td', '', r.w + '×' + r.d));
+      if (r.kind === 'lager') {
+        const st = L.dampStatus(state, r);
+        const td = el('td', st.have >= st.need ? '' : 'is-down', st.have + ' / ' + st.need + (st.have >= st.need ? '' : ' – Karten verderben nachts'));
+        tr.appendChild(td);
+      } else tr.appendChild(el('td', '', '–'));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
   }
 
   function pcWerkzeug(body) {
@@ -608,6 +636,7 @@
       }
     }
     if (d.layer === 'flach') depth = -8000 + it.x + it.y;
+    if (d.layer === 'wandnah') return drawNearWall(g, it, d, color, alpha, outline);
     const hull = box(g, it.x, it.y, s.w, s.d, d.height, z0, color, alpha, outline);
     if (d.layer === 'boden' || d.slots) drawFront(g, it, s, d, z0); // auch beim Aufstellen: der Pfeil zeigt, wo vorne ist
     const base = d.layer === 'theke' ? counterUnder(it) || it : it;
@@ -616,6 +645,20 @@
       hull: hull, depth: depth, top: iso(it.x + s.w / 2, it.y + s.d / 2, z0 + d.height),
       box: { x0: base.x, y0: base.y, x1: base.x + bs.w, y1: base.y + bs.d, bias: d.layer === 'theke' ? 1 : 0 },
     };
+  }
+
+  /** Gerät an der Wand: kleiner Kasten in Brusthöhe, an die nächste Wand der Zelle gerückt */
+  function drawNearWall(g, it, d, color, alpha, outline) {
+    const ws = walls;
+    const x = it.x;
+    const y = it.y;
+    let bx;
+    if (y === 0 || ws.has('h:' + x + ',' + y)) bx = { x: x + 0.25, y: y + 0.04, w: 0.5, d: 0.22 };
+    else if (x === 0 || ws.has('v:' + x + ',' + y)) bx = { x: x + 0.04, y: y + 0.25, w: 0.22, d: 0.5 };
+    else if (ws.has('h:' + x + ',' + (y + 1))) bx = { x: x + 0.25, y: y + 0.74, w: 0.5, d: 0.22 };
+    else bx = { x: x + 0.74, y: y + 0.25, w: 0.22, d: 0.5 };
+    const hull = box(g, bx.x, bx.y, bx.w, bx.d, d.height, 26, color, alpha, outline, 0);
+    return { hull: hull, depth: (bx.x + bx.y) * 10, top: iso(bx.x + bx.w / 2, bx.y + bx.d / 2, 26 + d.height), box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 1 } };
   }
 
   function drawCarton(g, x, y, z, kindColor, alpha) {
@@ -710,6 +753,7 @@
         setHover(p);
         if (p.rightButtonDown()) { if (mode) { mode = null; refresh(); } return; }
         if (mode && mode.kind === 'room') { roomDown(); return; }
+        if (mode && mode.kind === 'demolish') { demolishAt(); return; }
         if (mode) { drag = { place: true }; return; }
         drag = { x: p.x, y: p.y, uid: pick(p.worldX, p.worldY), moved: false };
       });
@@ -1265,6 +1309,11 @@
     body.appendChild(el('div', 'sd-group', 'Tag ' + last.day + ': verkauft'));
     const sold = Object.keys(last.sold || {});
     body.appendChild(el('p', 'sd-later', sold.length ? sold.map((w) => last.sold[w] + '× ' + goods[w].name).join(', ') : 'Nichts.'));
+    const wet = Object.keys(last.spoiled || {});
+    if (wet.length) {
+      body.appendChild(el('div', 'sd-group', 'Feuchtigkeit im Lager – verdorben'));
+      body.appendChild(el('p', 'sd-later', wet.map((w) => last.spoiled[w] + '× ' + goods[w].name).join(', ')));
+    }
     const done = Object.keys(last.services || {});
     if (done.length) {
       body.appendChild(el('div', 'sd-group', 'Aufträge erledigt'));
@@ -1314,6 +1363,12 @@
   let blockSet = new Set();
   let custBlock = new Set(); // für Kunden zusätzlich alle Raum-Zellen
   let walls = new Set(); // Wände der Räume (Zellkanten, L.wallSet)
+
+  /** Zellen, die die Figur gerade berührt (der Geheimschrank darf dort nicht hin) */
+  function bodyCells() {
+    const r = 0.18;
+    return Array.from(new Set([[-r, -r], [r, -r], [-r, r], [r, r]].map(([ox, oy]) => Math.floor(player.x + ox) + ',' + Math.floor(player.y + oy))));
+  }
 
   /** Läuft die Figur von (fx, fy) nach (tx, ty) durch eine Raumwand? (Ecken des Körpers einzeln prüfen) */
   function throughWall(fx, fy, tx, ty) {
@@ -1555,7 +1610,7 @@
         .sort((a, b) => a.dist - b.dist)[0];
       const first = near.find((o) => o.it.id === 'cashier_counter' || catalog[o.it.id].holds);
       const cab = near.find((o) => catalog[o.it.id].secret);
-      if (cab && (!box || cab.dist <= box.dist)) t = { label: 'E: Schrank schieben', run: () => act(doAct('slideCabinet', { uid: cab.it.uid })) };
+      if (cab && (!box || cab.dist <= box.dist)) t = { label: 'E: Schrank schieben', run: () => act(doAct('slideCabinet', { uid: cab.it.uid, avoid: bodyCells() })) };
       else if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => act(doAct('pick', { bid: box.b.bid })) };
       else if (first && first.it.id === 'cashier_counter') t = { label: 'E: PC benutzen', run: openPc };
       else if (first) t = { label: 'E: ' + catalog[first.it.id].name + ' ansehen', run: () => openShelf(first.it.uid) };
@@ -1609,15 +1664,27 @@
       const col = r.kind === 'lager' ? 0x6a707c : 0x5a2434;
       for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.d; y++) poly(g, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], col, 0.55);
     });
-    walls.forEach((key) => {
-      const [t, rest] = key.split(':');
+    // Wand hinten (Nord/West des Raums) hoch, vorne (Süd/Ost) niedrig – sonst verdeckt sie Raum und Figur
+    L.wallPieces(state).forEach((p) => {
+      const [t, rest] = p.key.split(':');
       const [a, b] = rest.split(',').map(Number);
+      const h = p.near ? LOW_WALL : ROOM_WALL_H;
+      const T = 0.12;
+      // etwas über die Enden hinaus, damit die Ecken geschlossen sind
+      const bx = t === 'h' ? { x: a - T / 2, y: b - T / 2, w: 1 + T, d: T } : { x: a - T / 2, y: b - T / 2, w: T, d: 1 + T };
       const wg = scene.add.graphics();
-      const bx = t === 'h' ? { x: a, y: b - 0.06, w: 1, d: 0.12 } : { x: a - 0.06, y: b, w: 0.12, d: 1 };
-      box(wg, bx.x, bx.y, bx.w, bx.d, ROOM_WALL_H, 0, 0xb8ad9a, 1, 0x8a7f6c, 0);
+      box(wg, bx.x, bx.y, bx.w, bx.d, h, 0, p.near ? 0xc9bfae : 0xb8ad9a, 1, 0x8a7f6c, 0);
       scene.items.push(wg);
       scene.sortables.push({ g: wg, box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 0 } });
     });
+    // Raumnamen auf dem Boden
+    if (showNames) {
+      (state.rooms || []).forEach((r) => {
+        const c = iso(r.x + r.w / 2, r.y + r.d / 2);
+        const t = scene.add.text(c.x, c.y, r.name || '', { fontSize: '11px', color: '#f0e6d0', backgroundColor: '#00000066', padding: { x: 4, y: 1 } });
+        scene.labels.push(t.setOrigin(0.5).setDepth(-7900).setResolution(2));
+      });
+    }
   }
 
   /** Vorder- und rechte Seitenwand nur niedrig (wie abgeschnitten), damit nichts dahinter verschwindet */
@@ -1672,7 +1739,7 @@
       g.setDepth(r.depth);
       scene.items.push(g);
       const layer = catalog[it.id].layer;
-      if (r.box && (layer === 'boden' || layer === 'theke')) scene.sortables.push({ g: g, box: r.box });
+      if (r.box && (layer === 'boden' || layer === 'theke' || layer === 'wandnah')) scene.sortables.push({ g: g, box: r.box });
       if (!moving) scene.hulls.push({ uid: it.uid, hull: r.hull, depth: r.depth });
       return { it, r };
     });
@@ -1745,6 +1812,22 @@
     if (e.side === 'w') return [iso(r.x, r.y + e.i, z), iso(r.x, r.y + e.i + 1, z)];
     return [iso(r.x + r.w, r.y + e.i, z), iso(r.x + r.w, r.y + e.i + 1, z)];
   }
+  function hoverRoom() {
+    return hover ? L.roomAt(state, Math.floor(hover.x), Math.floor(hover.y)) : null;
+  }
+  function drawDemolishGhost(g) {
+    const r = hoverRoom();
+    if (!r) return;
+    for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.d; y++) poly(g, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], 0xe0525a, 0.35);
+  }
+  function demolishAt() {
+    const r = hoverRoom();
+    if (!r) return;
+    ask('„' + (r.name || 'Raum') + '“ wirklich abreißen? (+' + fmt(L.roomCost(state, r)) + ' Kanacoin zurück)').then((ok) => {
+      if (ok && act(doAct('removeRoom', { rid: r.rid }))) { mode = null; refresh(); }
+    });
+  }
+
   function drawRoomGhost(g) {
     const r = roomRect();
     if (!r) return;
@@ -1774,6 +1857,7 @@
     g.clear();
     if (scene.roomLabel) scene.roomLabel.setVisible(false);
     if (mode && mode.kind === 'room') { drawRoomGhost(g); return; }
+    if (mode && mode.kind === 'demolish') { drawDemolishGhost(g); return; }
     const c = candidate();
     if (!c) return;
     const ok = L.check(state, catalog, c, mode.kind === 'move' ? mode.uid : undefined).ok;
@@ -1794,6 +1878,9 @@
     if (!state || seenMarketDay === null) { seenMarketDay = state ? state.marketDay : null; return; }
     if (state.marketDay === seenMarketDay) return;
     seenMarketDay = state.marketDay;
+    const last = state.reports[state.reports.length - 1];
+    const wet = last && last.spoiled ? Object.keys(last.spoiled) : [];
+    if (wet.length) setTimeout(() => note('Feuchtigkeit im Lager: ' + wet.map((w) => last.spoiled[w] + '× ' + goods[w].name).join(', ') + ' verdorben – Luftentfeuchter aufstellen.'), 6200);
     const moves = state.marketMoves || [];
     if (!moves.length) return;
     setTimeout(() => note('Neue Marktpreise: ' + moves.map((m) => goods[m.id].name + ' ' + (m.to > m.from ? '↑' : '↓') + Math.abs(Math.round((m.to / m.from - 1) * 100)) + ' %').join(', ') + ' – am PC neu auspreisen.'), 6200);
@@ -1817,7 +1904,7 @@
   }
 
   function rotate() {
-    if (mode && mode.kind === 'room') return; // Raum bauen: nichts zu drehen
+    if (mode && (mode.kind === 'room' || mode.kind === 'demolish')) return; // Bauen/Abreißen: nichts zu drehen
     if (mode) {
       const d = catalog[mode.id];
       if (d.layer !== 'wand') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }

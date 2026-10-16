@@ -75,3 +75,38 @@ test('Geheimraum: Schrank vor der Tür, E schiebt ihn, darin lagern, nicht frei 
   // Kunden-Zellen: der Raum gehört nicht dazu
   assert.ok(L.roomCells(s).has('6,1') && !L.roomCells(s).has('6,3'));
 });
+
+test('Raumnamen, Schrank klemmt niemanden ein', () => {
+  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 2, d: 2, door: { side: 'e', i: 0 } });
+  assert.strictEqual(s.rooms[0].name, 'Lager 1');
+  s = run(s, { type: 'renameRoom', rid: s.rooms[0].rid, name: '  Hinterzimmer <b>Nord</b> ' });
+  assert.strictEqual(s.rooms[0].name, 'Hinterzimmer bNordb', 'nur Buchstaben, Zahlen, Leerzeichen, .-_');
+  assert.ok(apply(s, { type: 'renameRoom', rid: s.rooms[0].rid, name: '<<>>' }).error);
+  s = run(s, { type: 'buildRoom', kind: 'geheim', x: 5, y: 0, w: 3, d: 3, door: { side: 's', i: 1 } });
+  const cab = s.items.find((it) => it.id === 'geheimschrank');
+  // Figur steht rechts neben dem Schrank → er rutscht nach links
+  s = run(s, { type: 'slideCabinet', uid: cab.uid, avoid: ['7,3'] });
+  assert.strictEqual(s.items.find((it) => it.uid === cab.uid).x, 5);
+  // Figur steht jetzt im Eingang (vor der Tür) → zuschieben geht nicht
+  assert.match(apply(s, { type: 'slideCabinet', uid: cab.uid, avoid: ['6,3'] }).error, /im Weg/);
+});
+
+test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Feuchtigkeit lässt Papier verderben', () => {
+  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 2, y: 2, w: 4, d: 5, door: { side: 'n', i: 0 } }); // 20 Felder → 2 Geräte
+  assert.deepStrictEqual(L.dampStatus(s, s.rooms[0]), { need: 2, have: 0 });
+  s = build(s, 'dehumidifier', 2, 2, 0);
+  s = run(s, { type: 'orderMoebel', id: 'dehumidifier_wall' }, { type: 'pick', bid: s.nextBid });
+  assert.match(apply(s, { type: 'build', x: 3, y: 4 }).error, /Wand/, 'mitten im Raum keine Wand');
+  s = run(s, { type: 'build', x: 5, y: 4 }); // rechte Raumwand
+  assert.deepStrictEqual(L.dampStatus(s, s.rooms[0]), { need: 2, have: 2 });
+  assert.ok(!L.blocked(s, cat).has('5,4'), 'Wand-Gerät braucht keinen Platz am Boden');
+  // ohne Geräte: Papier verdirbt, Getränke nicht
+  let wet = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 4, d: 4, door: { side: 's', i: 1 } });
+  wet.items.push({ uid: 50, id: 'lager_regal_gross', x: 0, y: 0, rot: 0, stock: { booster_pack: 40, coffee: 20 } });
+  const r = L.spoilStorage(wet, cat, goods, () => 0.5);
+  assert.deepStrictEqual(r.spoiled, { booster_pack: 2 }, '5 % von 40 = 2, Kaffee nicht');
+  assert.strictEqual(r.state.items.find((it) => it.uid === 50).stock.booster_pack, 38);
+  // mit Gerät: nichts
+  wet.items.push({ uid: 51, id: 'dehumidifier', x: 3, y: 3, rot: 0 });
+  assert.deepStrictEqual(L.spoilStorage(wet, cat, goods, () => 0.5).spoiled, {});
+});
