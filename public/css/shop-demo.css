@@ -188,3 +188,6 @@ html, body.sd-body {
 .sd-price-btn:hover { border-color: #d9a441; }
 .sd-table td.is-up { color: #7ee2a0; }
 .sd-table td.is-down { color: #ff9a9a; }
+
+/* Raumname im Bauen-Reiter */
+.sd-name-input { width: 160px; padding: 4px 6px; border: 1px solid #3a3f52; border-radius: 5px; background: #14161f; color: inherit; font: inherit; }

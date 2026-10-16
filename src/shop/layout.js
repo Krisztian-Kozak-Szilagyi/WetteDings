@@ -37,7 +37,10 @@
 
   const MAX_DIRT = 40;
   // Räume (Krisztian, 2026-10-16): Wand je Zellkante 20, Tür 50, Geheimschrank 300 (ersetzt beim Geheimraum die Tür)
-  const ROOM = { minW: 2, minD: 2, wall: 20, door: 50, cabinet: 300, kinds: ['lager', 'geheim'] };
+  const ROOM = { minW: 2, minD: 2, wall: 20, door: 50, cabinet: 300, kinds: ['lager', 'geheim'], nameMax: 24 };
+  // Feuchtigkeit (Krisztian, 2026-10-16): je angefangene 16 Felder Lager ein Luftentfeuchter; fehlt er, verdirbt nachts
+  // ein Teil der Papier-Ware (5 % × Anteil der fehlenden Geräte, mindestens 1 Stück, wenn etwas da ist)
+  const DAMP = { cellsPer: 16, rate: 0.05, devices: ['dehumidifier', 'dehumidifier_wall'] };
   const CABINET_ID = 'geheimschrank';
   // Marktpreise (Krisztian, 2026-10-14): nach Ladenschluss mit 50 % Chance: 2 Waren teurer, 2 billiger (je 5–15 %),
   // immer zwischen 70 % und 150 % des Grundpreises – der Einkauf bleibt beim Grundpreis × 50 %, also nie Verlust
@@ -302,6 +305,64 @@
     if (side === 'w') return { x: r.x - 1, y: r.y + i, rot: 3 };
     return { x: r.x + r.w, y: r.y + i, rot: 1 };
   }
+  /** Hat die Zelle eine Wand an einer ihrer Seiten (Raumwand oder hintere Ladenwand)? */
+  function hasWallNext(state, x, y) {
+    if (x === 0 || y === 0) return true;
+    const ws = wallSet(state);
+    return ['h:' + x + ',' + y, 'h:' + x + ',' + (y + 1), 'v:' + x + ',' + y, 'v:' + (x + 1) + ',' + y].some((k) => ws.has(k));
+  }
+
+  /** Wandstücke zum Zeichnen: { key, side, near } – near = zum Betrachter (Süd/Ost), wird niedrig gezeichnet */
+  function wallPieces(state) {
+    const out = new Map();
+    const walls = wallSet(state);
+    (state.rooms || []).forEach((r) => {
+      roomEdges(r).forEach((e) => {
+        if (!walls.has(e.key)) return;
+        const near = e.side === 's' || e.side === 'e';
+        const prev = out.get(e.key);
+        if (!prev || (prev.near && !near)) out.set(e.key, { key: e.key, side: e.side, near });
+      });
+    });
+    return Array.from(out.values());
+  }
+
+  /** Luftentfeuchter im Lager: { need, have } */
+  function dampStatus(state, r) {
+    const need = Math.ceil((r.w * r.d) / DAMP.cellsPer);
+    const have = state.items.filter((it) => DAMP.devices.includes(it.id) && inRect(r, it.x, it.y)).length;
+    return { need, have };
+  }
+
+  /**
+   * Nachts verdirbt Papier-Ware in Lagern ohne genug Luftentfeuchter → { state, spoiled: { wareId: Stück } }
+   * (rng = () => 0…1; nur der Server würfelt)
+   */
+  function spoilStorage(state, cat, goods, rng) {
+    const s = normalize(JSON.parse(JSON.stringify(state)));
+    const spoiled = {};
+    s.rooms.filter((r) => r.kind === 'lager').forEach((r) => {
+      const st = dampStatus(s, r);
+      if (st.have >= st.need) return;
+      const rate = DAMP.rate * (st.need - st.have) / st.need;
+      const units = [];
+      s.items.filter((it) => it.stock && inRect(r, it.x, it.y)).forEach((it) => {
+        Object.keys(it.stock).forEach((w) => { if (goods[w] && goods[w].paper) for (let k = 0; k < it.stock[w]; k++) units.push([it, w]); });
+      });
+      if (!units.length) return;
+      let lose = Math.max(1, Math.round(units.length * rate));
+      while (lose-- > 0 && units.length) {
+        const [it, w] = units.splice(Math.floor(rng() * units.length), 1)[0];
+        it.stock = Object.assign({}, it.stock);
+        it.stock[w] -= 1;
+        if (!it.stock[w]) delete it.stock[w];
+        spoiled[w] = (spoiled[w] || 0) + 1;
+      }
+    });
+    if (Object.keys(spoiled).length && s.reports.length) s.reports[s.reports.length - 1].spoiled = spoiled;
+    return { state: s, spoiled };
+  }
+
   function roomCost(state, r) {
     const walls = roomEdges(r).filter((e) => !outerEdge(state, e.key)).length;
     return walls * ROOM.wall + (r.kind === 'geheim' ? ROOM.cabinet : ROOM.door);
@@ -330,6 +391,12 @@
     const mine = cells(def, cand);
     if (!mine.every((k) => inside(state, k))) return { ok: false, reason: 'Außerhalb deines Ladens.' };
 
+    if (def.layer === 'wandnah') {
+      if (!hasWallNext(state, cand.x, cand.y)) return { ok: false, reason: 'Das gehört an eine Wand.' };
+      if (same('wandnah').some((it) => it.x === cand.x && it.y === cand.y)) return { ok: false, reason: 'Da hängt schon etwas.' };
+      return { ok: true };
+    }
+
     if (def.layer === 'theke') {
       const base = same('boden').find((it) => cat[it.id].counter && cells(cat[it.id], it).includes(mine[0]));
       if (mine.length !== 1 || !base) return { ok: false, reason: 'Das gehört auf eine Theke.' };
@@ -344,7 +411,7 @@
     if (rooms.some((r) => r !== rooms[0])) return { ok: false, reason: 'Das stünde auf einer Wand.' };
     const room = rooms[0];
     if (def.lagerOnly && (!room || room.kind !== 'lager')) return { ok: false, reason: 'Lagerregale gehören ins Lager.' };
-    if (room && room.kind === 'lager' && !def.lagerOnly && def.layer === 'boden') return { ok: false, reason: 'Im Lager stehen nur Lagerregale.' };
+    if (room && room.kind === 'lager' && !def.lagerOnly && !def.lagerOk && def.layer === 'boden') return { ok: false, reason: 'Im Lager stehen nur Lagerregale.' };
     return { ok: true };
   }
 
@@ -598,8 +665,17 @@
         if (s.coins < cost) return fail('Nicht genug Kanacoin.');
         s.coins = cents(s.coins - cost);
         r.rid = s.nextRid++;
+        r.name = (kind === 'lager' ? 'Lager ' : 'Geheimraum ') + (s.rooms.filter((o) => o.kind === kind).length + 1);
         s.rooms.push(r);
         if (cab) s.items.push({ uid: s.nextUid++, id: CABINET_ID, x: cab.x, y: cab.y, rot: cab.rot, rid: r.rid, home: { x: cab.x, y: cab.y } });
+        return { state: s };
+      }
+      case 'renameRoom': {
+        const r = s.rooms.find((o) => o.rid === a.rid);
+        if (!r) return fail('Den Raum gibt es nicht mehr.');
+        const name = String(a.name || '').replace(/[^\p{L}\p{N} ._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, ROOM.nameMax);
+        if (!name) return fail('Gib dem Raum einen Namen.');
+        r.name = name;
         return { state: s };
       }
       case 'removeRoom': {
@@ -622,9 +698,11 @@
         if (!r || !it.home) return fail('Der Schrank gehört zu keinem Raum.');
         const atHome = it.x === it.home.x && it.y === it.home.y;
         const taken = blocked(Object.assign({}, s, { items: s.items.filter((o) => o !== it) }), cat);
+        // Zellen, auf denen jemand steht (der Browser schickt die Figur mit) – der Schrank klemmt niemanden ein
+        (Array.isArray(a.avoid) ? a.avoid.slice(0, 8) : []).forEach((k) => { if (typeof k === 'string') taken.add(k); });
         const free = (x, y) => inside_(s, x + ',' + y) && !roomAt(s, x, y) && !isDoor(x + ',' + y) && !taken.has(x + ',' + y);
         if (!atHome) {
-          if (!free(it.home.x, it.home.y)) return fail('Der Platz vor der Tür ist belegt.');
+          if (!free(it.home.x, it.home.y)) return fail('Da steht etwas oder jemand im Weg.');
           it.x = it.home.x;
           it.y = it.home.y;
           return { state: s };
@@ -773,6 +851,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    DAMP, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

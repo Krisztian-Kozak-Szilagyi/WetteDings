@@ -22,7 +22,7 @@ const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'slideCabinet', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'] };
@@ -110,6 +110,8 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       jid: Number(a.jid),
       did: Number(a.did),
       rid: Number(a.rid),
+      name: typeof a.name === 'string' ? a.name.slice(0, 60) : '',
+      avoid: Array.isArray(a.avoid) ? a.avoid.filter((k) => typeof k === 'string' && /^\d{1,3},\d{1,3}$/.test(k)).slice(0, 8) : [],
       kind: typeof a.kind === 'string' ? a.kind : '',
       w: Number(a.w),
       d: Number(a.d),
@@ -140,7 +142,8 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
     const r = layout.apply(state, catalog, goods, action, more);
     if (r.error) return res.status(400).json({ error: r.error, state });
     // nach Ladenschluss bewegen sich die Marktpreise (Zufall nur hier auf dem Server)
-    if (type === 'closeDay') r.state = layout.moveMarket(r.state, goods, Math.random);
+    // … und im Lager ohne Luftentfeuchter verdirbt Papier-Ware (steht dann im Tagesbericht)
+    if (type === 'closeDay') r.state = layout.spoilStorage(layout.moveMarket(r.state, goods, Math.random), catalog, goods, Math.random).state;
     await save(req.user._id, r.state);
     res.json({ state: r.state, ...(type === 'takeJob' ? { jid: r.state.jobs[r.state.jobs.length - 1].jid } : {}) });
   } catch (err) {
