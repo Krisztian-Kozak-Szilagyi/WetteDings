@@ -307,9 +307,22 @@
   }
   /** Hat die Zelle eine Wand an einer ihrer Seiten (Raumwand oder hintere Ladenwand)? */
   function hasWallNext(state, x, y) {
-    if (x === 0 || y === 0) return true;
-    const ws = wallSet(state);
-    return ['h:' + x + ',' + y, 'h:' + x + ',' + (y + 1), 'v:' + x + ',' + y, 'v:' + (x + 1) + ',' + y].some((k) => ws.has(k));
+    return [0, 1, 2, 3].some((side) => wallOnSide(state, x, y, side));
+  }
+
+  // Wandgeräte (Krisztian, 2026-10-16): rot = an welcher Seite der Zelle es hängt – 0 Nord, 1 West, 2 Süd, 3 Ost
+  // (in Ecken mit R wählbar). Höhe der Halterung: höhere Möbel passen nicht darunter.
+  const MOUNT_Z = 26;
+  function wallOnSide(state, x, y, side, ws) {
+    const walls = ws || wallSet(state);
+    if (side === 0) return y === 0 || walls.has('h:' + x + ',' + y);
+    if (side === 1) return x === 0 || walls.has('v:' + x + ',' + y);
+    if (side === 2) return walls.has('h:' + x + ',' + (y + 1));
+    return walls.has('v:' + (x + 1) + ',' + y);
+  }
+  /** Zellen mit Wandgerät (darunter passt kein hohes Möbel) */
+  function mountCells(state, cat) {
+    return new Set(state.items.filter((it) => cat[it.id] && cat[it.id].layer === 'wandnah').map((it) => it.x + ',' + it.y));
   }
 
   /** Wandstücke zum Zeichnen: { key, side, near } – near = zum Betrachter (Süd/Ost), wird niedrig gezeichnet */
@@ -392,8 +405,9 @@
     if (!mine.every((k) => inside(state, k))) return { ok: false, reason: 'Außerhalb deines Ladens.' };
 
     if (def.layer === 'wandnah') {
-      if (!hasWallNext(state, cand.x, cand.y)) return { ok: false, reason: 'Das gehört an eine Wand.' };
+      if (!wallOnSide(state, cand.x, cand.y, rot4(cand.rot))) return { ok: false, reason: hasWallNext(state, cand.x, cand.y) ? 'Auf dieser Seite ist keine Wand (R = andere Seite).' : 'Das gehört an eine Wand.' };
       if (same('wandnah').some((it) => it.x === cand.x && it.y === cand.y)) return { ok: false, reason: 'Da hängt schon etwas.' };
+      if (same('boden').some((it) => cat[it.id].height > MOUNT_Z && cells(cat[it.id], it).includes(cand.x + ',' + cand.y))) return { ok: false, reason: 'Davor steht ein hohes Möbel.' };
       return { ok: true };
     }
 
@@ -406,6 +420,7 @@
 
     if (mine.some(isDoor)) return { ok: false, reason: 'Der Eingang muss frei bleiben.' };
     if (same(def.layer).some((it) => overlap(cells(cat[it.id], it), mine))) return { ok: false, reason: 'Da steht schon etwas.' };
+    if (def.layer === 'boden' && def.height > MOUNT_Z && same('wandnah').some((it) => mine.includes(it.x + ',' + it.y))) return { ok: false, reason: 'Da hängt ein Gerät an der Wand – das Möbel ist zu hoch.' };
     // Räume: ein Teil steht ganz drinnen oder ganz draußen; im Lager nur Lagerregale, Lagerregale nur im Lager
     const rooms = mine.map((k) => { const [x, y] = k.split(',').map(Number); return roomAt(state, x, y); });
     if (rooms.some((r) => r !== rooms[0])) return { ok: false, reason: 'Das stünde auf einer Wand.' };
@@ -700,7 +715,8 @@
         const taken = blocked(Object.assign({}, s, { items: s.items.filter((o) => o !== it) }), cat);
         // Zellen, auf denen jemand steht (der Browser schickt die Figur mit) – der Schrank klemmt niemanden ein
         (Array.isArray(a.avoid) ? a.avoid.slice(0, 8) : []).forEach((k) => { if (typeof k === 'string') taken.add(k); });
-        const free = (x, y) => inside_(s, x + ',' + y) && !roomAt(s, x, y) && !isDoor(x + ',' + y) && !taken.has(x + ',' + y);
+        const mounts = mountCells(s, cat);
+        const free = (x, y) => inside_(s, x + ',' + y) && !roomAt(s, x, y) && !isDoor(x + ',' + y) && !taken.has(x + ',' + y) && !mounts.has(x + ',' + y);
         if (!atHome) {
           if (!free(it.home.x, it.home.y)) return fail('Da steht etwas oder jemand im Weg.');
           it.x = it.home.x;
@@ -851,6 +867,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    DAMP, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

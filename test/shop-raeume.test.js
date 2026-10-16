@@ -97,7 +97,8 @@ test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Fe
   s = build(s, 'dehumidifier', 2, 2, 0);
   s = run(s, { type: 'orderMoebel', id: 'dehumidifier_wall' }, { type: 'pick', bid: s.nextBid });
   assert.match(apply(s, { type: 'build', x: 3, y: 4 }).error, /Wand/, 'mitten im Raum keine Wand');
-  s = run(s, { type: 'build', x: 5, y: 4 }); // rechte Raumwand
+  assert.match(apply(s, { type: 'build', x: 5, y: 4, rot: 0 }).error, /keine Wand/, 'Nordseite hat hier keine Wand');
+  s = run(s, { type: 'build', x: 5, y: 4, rot: 3 }); // an der rechten (östlichen) Raumwand
   assert.deepStrictEqual(L.dampStatus(s, s.rooms[0]), { need: 2, have: 2 });
   assert.ok(!L.blocked(s, cat).has('5,4'), 'Wand-Gerät braucht keinen Platz am Boden');
   // ohne Geräte: Papier verdirbt, Getränke nicht
@@ -109,4 +110,19 @@ test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Fe
   // mit Gerät: nichts
   wet.items.push({ uid: 51, id: 'dehumidifier', x: 3, y: 3, rot: 0 });
   assert.deepStrictEqual(L.spoilStorage(wet, cat, goods, () => 0.5).spoiled, {});
+});
+
+test('Wandgerät in der Ecke: Seite wählbar; hohe Möbel und der Schrank kommen nicht darunter', () => {
+  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 3, d: 3, door: { side: 's', i: 1 } });
+  // Zelle (2,0): Nord = hintere Ladenwand, Ost = Raumwand – beides geht
+  assert.ok(L.wallOnSide(s, 2, 0, 0) && L.wallOnSide(s, 2, 0, 3) && !L.wallOnSide(s, 2, 0, 2));
+  s = run(s, { type: 'orderMoebel', id: 'dehumidifier_wall' }, { type: 'pick', bid: 1 }, { type: 'build', x: 2, y: 0, rot: 3 });
+  s = run(s, { type: 'orderMoebel', id: 'lager_regal_klein' }, { type: 'pick', bid: 2 });
+  assert.match(apply(s, { type: 'build', x: 1, y: 0, rot: 0 }).error, /Gerät/, 'Lagerregal (hoch) nicht unter das Gerät');
+  // Geheimschrank darf nicht unter ein Wandgerät rutschen
+  let g = run(L.fresh(), { type: 'buildRoom', kind: 'geheim', x: 5, y: 2, w: 3, d: 3, door: { side: 'w', i: 1 } });
+  const cab = g.items.find((it) => it.id === 'geheimschrank'); // steht bei (4,3)
+  g.items.push({ uid: 99, id: 'dehumidifier_wall', x: 4, y: 4, rot: 3 });
+  g = run(g, { type: 'slideCabinet', uid: cab.uid });
+  assert.strictEqual(g.items.find((it) => it.uid === cab.uid).y, 2, 'rutscht zur anderen Seite');
 });
