@@ -10,7 +10,7 @@ const express = require('express');
 const { requireAdmin } = require('../middleware');
 const ShopDemo = require('../models/ShopDemo');
 const layout = require('../shop/layout');
-const { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE } = require('../shop/catalog');
+const { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS } = require('../shop/catalog');
 const grading = require('../grading/gradingService');
 const { centerShift, centeringCap, CENTERING_SCALE, creaseLine, applyIron, ironCap, gradeFor } = require('../grading/condition');
 const tcg = require('../tcg/catalog');
@@ -19,17 +19,17 @@ const { str } = require('../lib/util');
 const router = express.Router();
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
-const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
+const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
-const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'] };
+const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'], pack_opening_counter: ['foil'] };
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
   const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, rid, home }) => {
     const it = { uid, id, x, y, rot };
@@ -41,7 +41,7 @@ function plain(doc) {
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
   return layout.ensureCounter(
-    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid }),
+    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit }),
     catalog
   );
 }
@@ -84,7 +84,8 @@ router.get('/api/shop-demo', requireAdmin, async (req, res, next) => {
   try {
     res.json({
       state: await load(req.user._id), catalog: CATALOG, goods: GOODS, groups: GROUPS, unitPrice: UNIT_PRICE,
-      licenses: LICENSES, services: SERVICES, packs: SERVICE_PACKS,
+      licenses: LICENSES, services: SERVICES, packs: SERVICE_PACKS, clothes: CLOTHES, clothesSlots: CLOTHES_SLOTS,
+      ruf: { levels: layout.RUF.levels, unlock: layout.UNLOCK, perCoins: layout.RUF.perCoins, stars: layout.RUF.stars },
     });
   } catch (err) {
     next(err);
@@ -174,6 +175,7 @@ async function openBench(userId, jid, station, remember) {
   if (b.error) return b;
   const { job, steps } = b;
   if (steps.includes('slab') && !layout.supplier(b.state, 'mat_slab')) return { error: 'Kein leerer Slab am Kartenbewertungstisch – erst Slabs bestellen und einräumen.' };
+  if (steps.includes('foil') && !layout.supplier(b.state, 'mat_sleeve')) return { error: 'Kein TCG Sleeve an der Booster-Öffnungstheke – erst Sleeves bestellen und einräumen.' };
   // Der Tisch der Seite (Fenster) schickt den Tisch beim Fertig-Melden nicht mit – nur dafür merken (kostet einen
   // Schreibzugriff); der Phaser-Tisch schickt "tisch" mit, sein Öffnen bleibt ein reiner Lesezugriff (schneller)
   if (remember) {
@@ -278,6 +280,7 @@ router.post('/shop-demo/werkbank/fertig', requireAdmin, (req, res, next) =>
     if (steps.includes('clean')) results.clean = pct(str(req.body.clean));
     if (steps.includes('iron') && job.results.iron === undefined) results.iron = 0; // Bügeln übersprungen
     if (steps.includes('slab')) results.seal = pct(str(req.body.seal));
+    if (steps.includes('foil')) results.foil = pct(str(req.body.foil));
     if (steps.includes('grade') && !job.results.guess) return { error: 'Erst benoten.' };
     const r = layout.apply(state, catalog, goods, { type: 'benchDone', jid: job.jid, steps, results, defects: job.defects }, more);
     if (r.error) return { error: r.error };

@@ -6,6 +6,7 @@
 //   grade – Karte prüfen: Licht (D) über die Karte ziehen – Kratzer blitzen im Lichtfleck auf, Messen (M) zwei Linien an die Bildkanten →
 //           Zentrierung, UV-Lampe (U) zeigt Ecken-/Kantenmacken; dann Note 1–10 (Server sagt die echte)
 //   slab  – Zeiger pendelt, Leertaste/Klick stoppt ihn: je näher an der Mitte, desto sauberer versiegelt
+//   foil  – Karte gerade in den TCG Sleeve schieben (schief = sie hakt), dann die zwei oberen Ecken umklappen
 // Ergebnisse gehen an dieselben Adressen wie am Tisch der Seite (/shop-demo/werkbank/buegeln, …/benoten, …/fertig).
 // Aufruf: ShopWerkbank.open(game, { job, station, csrf, onDone, onCancel }) – job = jobData von GET /api/shop-demo/werkbank
 // WICHTIG: Phaser übernimmt bei Szenen als Objekt nur init/preload/create/update – eigene Methoden gehören in "extend"
@@ -35,14 +36,16 @@
   const METER_MS = 850;
   const GRADE_NAMES = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NEAR MINT', 6: 'EX-MT', 5: 'EXCELLENT', 4: 'VG-EX', 3: 'VERY GOOD', 2: 'GOOD', 1: 'POOR' };
 
-  const STEPS = ['clean', 'iron', 'grade', 'slab'];
-  const LABEL = { clean: 'Putzen', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln' };
+  const STEPS = ['clean', 'iron', 'grade', 'slab', 'foil'];
+  const LABEL = { clean: 'Putzen', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln', foil: 'Sleeve' };
   const HINT = {
     clean: 'Mit gedrückter Maus schrubben · R = Karte umdrehen',
     iron: 'Mit gedrückter Maus langsam über den Knick fahren – nicht stehen bleiben',
     grade: 'D Licht über die Karte ziehen (Kratzer blitzen auf) · M messen · U UV-Lampe · dann Note wählen',
     slab: 'Leertaste oder Klick: Zeiger in der Mitte stoppen',
+    foil: 'Karte nach unten in den Sleeve ziehen – gerade halten',
   };
+  const FOIL_TOL = 0.07; // so weit (Anteil der Kartenbreite) darf die Karte seitlich daneben sein, sonst hakt sie
 
   // ---------- Ton (leise, optional) ----------
   let audio = null;
@@ -231,7 +234,7 @@
       this.pointer = null;
       this.input.on('pointerdown', (p) => this.down(p));
       this.input.on('pointermove', (p) => this.move(p));
-      this.input.on('pointerup', () => this.up());
+      this.input.on('pointerup', (p) => this.up(p));
       this.input.keyboard.on('keydown-ESC', () => this.close(false));
       this.input.keyboard.on('keydown-R', () => this.flip()); // wie Möbel drehen im Laden
       this.input.keyboard.on('keydown-F', () => this.flip());
@@ -263,6 +266,7 @@
         if ((s === 'iron' || s === 'grade' || s === 'slab') && !this.facingFront) this.flip(true); // vorne
         if (s === 'grade') this.buildGrade();
         if (s === 'slab') this.buildSlab();
+        if (s === 'foil') this.buildFoil();
       },
 
       // ---------- Benoten ----------
@@ -338,6 +342,108 @@
         const scaleRow = (this.opts.job.centerScale || []).find((s) => big >= s.from - 0.5 && big <= s.to + 0.5);
         const ratio = Math.round(big) + '/' + (100 - Math.round(big));
         this.info.setText('Links ' + fmtMm(l) + ' · Rechts ' + fmtMm(r) + ' · ' + ratio + (scaleRow ? ' → höchstens ' + scaleRow.cap : '')).setVisible(true);
+      },
+
+      // ---------- Folieren ----------
+      buildFoil() {
+        const c = this.card;
+        const side = Math.random() < 0.5 ? -1 : 1;
+        this.foil = { phase: 'slide', dx: side * c.w * (0.1 + Math.random() * 0.12), dy: -c.h * 0.62, corners: {}, slideQ: null };
+        this.cardC.setPosition(c.cx + this.foil.dx, c.cy + this.foil.dy);
+        if (!this.foilG) this.foilG = this.add.graphics();
+      },
+
+      /** Ecken des Sleeves (Bildschirm) */
+      sleeveRect() {
+        const c = this.card;
+        const sw = c.w * 1.06;
+        const sh = c.h * 1.04;
+        return { x: c.cx - sw / 2, y: c.cy - sh / 2, w: sw, h: sh, f: c.w * 0.14 };
+      },
+
+      foilDown(p) {
+        const fo = this.foil;
+        const c = this.card;
+        if (fo.phase === 'slide') {
+          const x0 = c.cx + fo.dx - c.w / 2;
+          const y0 = c.cy + fo.dy - c.h / 2;
+          if (p.x >= x0 && p.x <= x0 + c.w && p.y >= y0 && p.y <= y0 + c.h) fo.grab = true;
+          return;
+        }
+        if (fo.phase === 'fold') {
+          const r = this.sleeveRect();
+          const hit = [['l', r.x, r.y], ['r', r.x + r.w, r.y]].find(([k, x, y]) => !(k in fo.corners) && Math.hypot(p.x - x, p.y - y) < r.f * 1.3);
+          if (hit) fo.drag = { k: hit[0], x: p.x, y: p.y };
+        }
+      },
+
+      foilMove(p, last) {
+        const fo = this.foil;
+        const c = this.card;
+        if (fo.phase !== 'slide' || !fo.grab) return;
+        fo.dx = Phaser.Math.Clamp(fo.dx + (p.x - last.x), -c.w * 0.4, c.w * 0.4);
+        fo.dy = Phaser.Math.Clamp(fo.dy + (p.y - last.y), -c.h * 0.75, 0);
+        // schief am Sleeve-Rand: hakt, kommt nicht tiefer
+        if (fo.dy > -c.h * 0.12 && Math.abs(fo.dx) > c.w * FOIL_TOL) {
+          fo.dy = -c.h * 0.12;
+          this.hint.setText('Hakt – gerade halten!');
+        }
+        if (fo.dy >= -1) {
+          fo.dy = 0;
+          fo.grab = false;
+          fo.phase = 'fold';
+          fo.slideQ = Math.max(0, Math.round(100 - (Math.abs(fo.dx) / (c.w * FOIL_TOL)) * 100));
+          tone(900, 120, 'triangle', 0.03);
+          this.hint.setText('Jetzt die zwei oberen Ecken des Sleeves nach innen umklappen (ziehen)');
+        }
+        this.cardC.setPosition(c.cx + fo.dx, c.cy + fo.dy);
+      },
+
+      foilUp(p) {
+        const fo = this.foil;
+        if (!fo || !fo.drag) { if (fo) fo.grab = false; return; }
+        const d = fo.drag;
+        fo.drag = null;
+        const vx = p.x - d.x;
+        const vy = p.y - d.y;
+        const len = Math.hypot(vx, vy);
+        if (len < this.card.w * 0.06) return;
+        // ideal: nach unten innen (links: ↘, rechts: ↙)
+        const ideal = d.k === 'l' ? Math.atan2(1, 1) : Math.atan2(1, -1);
+        let err = Math.abs(Math.atan2(vy, vx) - ideal) * (180 / Math.PI);
+        if (err > 180) err = 360 - err;
+        fo.corners[d.k] = Math.max(0, Math.round(100 - err * 2.2));
+        tone(1200, 90, 'triangle', 0.03);
+        if ('l' in fo.corners && 'r' in fo.corners) {
+          fo.phase = 'done';
+          this.foilQ = Math.round((fo.slideQ + fo.corners.l + fo.corners.r) / 3);
+          this.info.setText(this.foilQ >= 90 ? 'Sauber eingesleevt! (' + this.foilQ + ' %)' : this.foilQ >= 70 ? 'Gut eingesleevt. (' + this.foilQ + ' %)' : 'Etwas schief … (' + this.foilQ + ' %)').setVisible(true);
+          this.time.delayedCall(800, () => this.next());
+        }
+      },
+
+      drawFoil() {
+        const g = this.foilG;
+        if (!g) return;
+        g.clear();
+        if (this.step() !== 'foil' || !this.foil) return;
+        const r = this.sleeveRect();
+        const fo = this.foil;
+        g.fillStyle(0xdff0ff, 0.16).fillRect(r.x, r.y, r.w, r.h);
+        g.lineStyle(2, 0xeaf6ff, 0.85);
+        g.lineBetween(r.x, r.y, r.x, r.y + r.h);
+        g.lineBetween(r.x, r.y + r.h, r.x + r.w, r.y + r.h);
+        g.lineBetween(r.x + r.w, r.y + r.h, r.x + r.w, r.y);
+        g.lineStyle(1, 0xeaf6ff, 0.4).lineBetween(r.x, r.y, r.x + r.w, r.y); // offene Oberkante
+        [['l', r.x, 1], ['r', r.x + r.w, -1]].forEach(([k, x, dir]) => {
+          if (k in fo.corners) {
+            g.fillStyle(0xcfe6ff, 0.55).fillTriangle(x, r.y, x + dir * r.f, r.y, x, r.y + r.f);
+            g.lineStyle(1.5, 0xffffff, 0.9).strokeTriangle(x, r.y, x + dir * r.f, r.y, x, r.y + r.f);
+          } else if (fo.phase === 'fold') {
+            const pulse = 0.5 + 0.5 * Math.sin(this.t * 6);
+            g.lineStyle(2, 0xffd84a, 0.5 + 0.5 * pulse).strokeTriangle(x, r.y, x + dir * r.f, r.y, x, r.y + r.f);
+          }
+        });
       },
 
       // ---------- Versiegeln ----------
@@ -427,6 +533,7 @@
           this.grab = Math.abs(fx - this.guides[k]) < 0.08 ? { k, off: this.guides[k] - fx } : null;
         }
         if (this.step() === 'slab' && this.meter && this.meter.on && !this.onCard(p.x, p.y)) this.seal();
+        if (this.step() === 'foil' && this.foil) this.foilDown(p);
       },
 
       move(p) {
@@ -436,6 +543,7 @@
         const dist = Math.hypot(p.x - last.x, p.y - last.y);
         this.pointer = { x: p.x, y: p.y };
         const s = this.step();
+        if (s === 'foil' && this.foil) this.foilMove(p, last);
         if (s === 'clean' && !this.flipping) this.rub(p.x, p.y, dist);
         if (s === 'grade' && !this.guess) {
           if (this.mode === 'rotate') {
@@ -455,7 +563,8 @@
         }
       },
 
-      up() {
+      up(p) {
+        if (this.step() === 'foil' && this.foil && p) this.foilUp(p);
         this.pointer = null;
         this.grab = null;
       },
@@ -547,6 +656,7 @@
         post('/shop-demo/werkbank/fertig', this.opts.csrf, {
           job: this.opts.job.id, tisch: this.opts.station || '',
           clean: String(this.cleanliness()), seal: this.sealQ === undefined ? '' : String(this.sealQ),
+          foil: this.foilQ === undefined ? '' : String(this.foilQ),
         })
           .then((res) => this.time.delayedCall(500, () => this.close(true, res)))
           .catch((err) => { this.busy = false; this.btn.setVisible(true); this.hint.setText(err.message); });
@@ -651,6 +761,7 @@
       this.t += dt;
       this.ironTick(dt);
       this.drawMarks();
+      this.drawFoil();
       const c = this.card;
       const gl = this.glare;
       gl.clear();

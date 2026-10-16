@@ -100,7 +100,7 @@
     const c = ctx || {};
     const owned = c.licenses || [];
     const prices = c.prices || {};
-    return goodsList.filter((g) => (g.kind || 'ware') === 'ware' && (g.tier || 1) <= (c.tier || 1) &&
+    return goodsList.filter((g) => (g.kind || 'ware') === 'ware' && (g.tier || 1) <= (c.tier || 1) && (g.level || 1) <= (c.level || 99) &&
       (!g.license || owned.includes(g.license) || (prices[g.license] !== undefined && prices[g.license] <= (c.coins || 0))));
   }
 
@@ -142,6 +142,7 @@
       stars = Math.min(stars, diff === 0 ? 5 : diff === 1 ? 4 : 3);
     }
     if (services.includes('slab')) stars = Math.min(stars, pct(r.seal || 0));
+    if (services.includes('foil') && typeof r.foil === 'number') stars = Math.min(stars, pct(r.foil));
     return stars;
   }
 
