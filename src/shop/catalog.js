@@ -71,6 +71,16 @@ const CATALOG = Object.entries(LOOK)
       capacity: src.capacity,
     };
   })
+  // Eigene Teile, die nicht in items.json stehen (Krisztian, 2026-10-16: Lager + Geheimraum; Preise = Platzhalter)
+  .concat([
+    { id: 'lager_regal_klein', name: 'Lagerregal (klein)', group: 'technik', w: 2, d: 1, height: 74, layer: 'boden', counter: false, price: 150,
+      utility: 'Vorrat im Lager – nur im Lager aufstellbar, Kunden kommen nicht heran.', capacity: '40 Stück', lagerOnly: true },
+    { id: 'lager_regal_gross', name: 'Lagerregal (groß)', group: 'technik', w: 3, d: 1, height: 74, layer: 'boden', counter: false, price: 250,
+      utility: 'Vorrat im Lager – nur im Lager aufstellbar, Kunden kommen nicht heran.', capacity: '80 Stück', lagerOnly: true },
+    { id: 'geheimschrank', name: 'Schrank (Geheimtür)', group: 'technik', w: 1, d: 1, height: 74, layer: 'boden', counter: false, price: 300,
+      utility: 'Verdeckt den Eingang zum Geheimraum – E schiebt ihn zur Seite. Darin lässt sich auch etwas lagern.', capacity: '20 Stück',
+      secret: true }, // kommt mit dem Geheimraum, nicht einzeln bestellbar
+  ])
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
 
 // Ware zum Verkaufen: Marktpreis = Platzhalter-Preis aus items.json, Einkauf = BUY_FACTOR davon.
@@ -139,7 +149,12 @@ const HOLDS = {
   pack_opening_counter: ['mat_sleeve'],
 };
 // Plätze, wo die Kapazität im Text nicht passt (Material-Vorrat an den Arbeitstischen)
-const SLOTS = { card_grading_table: 10, pack_opening_counter: 20 };
+const SLOTS = { card_grading_table: 10, pack_opening_counter: 20, lager_regal_klein: 40, lager_regal_gross: 80, geheimschrank: 20 };
+// Lagerregale und der Schrank nehmen alles (Ware und Material)
+const ALL_GOODS = GOODS.map((g) => g.id);
+HOLDS.lager_regal_klein = ALL_GOODS;
+HOLDS.lager_regal_gross = ALL_GOODS;
+HOLDS.geheimschrank = ALL_GOODS;
 CATALOG.forEach((d) => {
   const holds = HOLDS[d.id];
   if (!holds) return;

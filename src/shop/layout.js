@@ -15,6 +15,8 @@
 //   licenses: [lizenzId] – gekaufte Lizenzen · servicePrices: { dienstId: Preis } · jobs: Kunden-Aufträge (Karte
 //   reinigen/benoten/versiegeln/in Sleeve) mit { jid, services, done: [dienstId], results, card, defects, spots, seed }
 //   market: { wareId: Marktpreis } – fehlt einer, gilt der Grundpreis; marketMoves: letzte Änderung [{ id, from, to }], marketDay
+//   rooms: [{ rid, kind: 'lager'|'geheim', x, y, w, d, door: { side: 'n'|'s'|'w'|'e', i } }] – Räume mit Wänden auf den
+//          Zellkanten; Lager: nur Lagerregale, Geheimraum: der Eingang wird vom Schrank (Teil 'geheimschrank') verdeckt
 //   dirt: [{ did, x, y, at }] – Flecken auf dem Boden (at = Zeitpunkt in ms, s. ShopCustomers.dirtCap) · tools: [werkzeugId]
 // more = { licenses: { id: def }, services: { id: def } } (src/shop/catalog.js LICENSES/SERVICES)
 // Kataloge kommen von außen: cat = { möbelId: def }, goods = { wareId: def } (src/shop/catalog.js).
@@ -34,6 +36,9 @@
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
   const MAX_DIRT = 40;
+  // Räume (Krisztian, 2026-10-16): Wand je Zellkante 20, Tür 50, Geheimschrank 300 (ersetzt beim Geheimraum die Tür)
+  const ROOM = { minW: 2, minD: 2, wall: 20, door: 50, cabinet: 300, kinds: ['lager', 'geheim'] };
+  const CABINET_ID = 'geheimschrank';
   // Marktpreise (Krisztian, 2026-10-14): nach Ladenschluss mit 50 % Chance: 2 Waren teurer, 2 billiger (je 5–15 %),
   // immer zwischen 70 % und 150 % des Grundpreises – der Einkauf bleibt beim Grundpreis × 50 %, also nie Verlust
   const MARKET = { chance: 0.5, up: 2, down: 2, min: 0.05, max: 0.15, floor: 0.7, ceil: 1.5 };
@@ -69,7 +74,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0,
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1,
     };
   }
 
@@ -87,6 +92,7 @@
     out.licenses = (out.licenses || []).slice();
     out.dirt = (out.dirt || []).map((d) => Object.assign({}, d));
     out.market = Object.assign({}, out.market || {});
+    out.rooms = (out.rooms || []).map((r) => Object.assign({}, r, { door: r.door ? Object.assign({}, r.door) : null }));
     out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
     out.tools = (out.tools || []).slice();
     out.servicePrices = Object.assign({}, out.servicePrices || {});
@@ -147,6 +153,8 @@
     const [x, y] = key.split(',').map(Number);
     return x >= 0 && y >= 0 && x < state.units * UNIT_W && y < UNIT_D;
   }
+
+  const inside_ = (state, key) => inside(state, key);
 
   function overlap(a, b) {
     return a.some((k) => b.includes(k));
@@ -238,6 +246,67 @@
     if (!it.stock[ware]) delete it.stock[ware];
   }
 
+  // ---------- Räume ----------
+  const inRect = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.d;
+  function roomAt(state, x, y) {
+    return (state.rooms || []).find((r) => inRect(r, x, y)) || null;
+  }
+  /** Alle Zellen in Räumen (Kunden gehen dort nicht hin) */
+  function roomCells(state) {
+    const set = new Set();
+    (state.rooms || []).forEach((r) => { for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.d; y++) set.add(x + ',' + y); });
+    return set;
+  }
+  /** Kanten des Rands: { side, i, key } – key 'h:x,y' = waagrechte Kante über Zelle (x, y), 'v:x,y' = senkrechte links davon */
+  function roomEdges(r) {
+    const out = [];
+    for (let i = 0; i < r.w; i++) {
+      out.push({ side: 'n', i, key: 'h:' + (r.x + i) + ',' + r.y });
+      out.push({ side: 's', i, key: 'h:' + (r.x + i) + ',' + (r.y + r.d) });
+    }
+    for (let i = 0; i < r.d; i++) {
+      out.push({ side: 'w', i, key: 'v:' + r.x + ',' + (r.y + i) });
+      out.push({ side: 'e', i, key: 'v:' + (r.x + r.w) + ',' + (r.y + i) });
+    }
+    return out;
+  }
+  /** Liegt die Kante auf dem Außenrand des Ladens (dort ist schon Wand bzw. Vorderfront)? */
+  function outerEdge(state, key) {
+    const [t, rest] = key.split(':');
+    const [a, b] = rest.split(',').map(Number);
+    return t === 'h' ? b === 0 || b === UNIT_D : a === 0 || a === state.units * UNIT_W;
+  }
+  /** Wände (ohne Türen, ohne Außenrand) als Menge von Kanten */
+  function wallSet(state) {
+    const set = new Set();
+    (state.rooms || []).forEach((r) => {
+      roomEdges(r).forEach((e) => {
+        if (outerEdge(state, e.key)) return;
+        if (r.door && r.door.side === e.side && r.door.i === e.i) return;
+        set.add(e.key);
+      });
+    });
+    return set;
+  }
+  /** Wand zwischen zwei Nachbarzellen? */
+  function wallBetween(walls, ax, ay, bx, by) {
+    if (ax === bx && Math.abs(ay - by) === 1) return walls.has('h:' + ax + ',' + Math.max(ay, by));
+    if (ay === by && Math.abs(ax - bx) === 1) return walls.has('v:' + Math.max(ax, bx) + ',' + ay);
+    return false;
+  }
+  /** Zelle vor der Tür (außen) – dort steht beim Geheimraum der Schrank */
+  function outsideOfDoor(r) {
+    const { side, i } = r.door;
+    if (side === 'n') return { x: r.x + i, y: r.y - 1, rot: 2 };
+    if (side === 's') return { x: r.x + i, y: r.y + r.d, rot: 0 };
+    if (side === 'w') return { x: r.x - 1, y: r.y + i, rot: 3 };
+    return { x: r.x + r.w, y: r.y + i, rot: 1 };
+  }
+  function roomCost(state, r) {
+    const walls = roomEdges(r).filter((e) => !outerEdge(state, e.key)).length;
+    return walls * ROOM.wall + (r.kind === 'geheim' ? ROOM.cabinet : ROOM.door);
+  }
+
   /** Darf das Teil so stehen? → { ok, reason } (ignore = uid, die beim Verschieben nicht mitzählt) */
   function check(state, cat, cand, ignore) {
     const def = cat[cand.id];
@@ -270,6 +339,12 @@
 
     if (mine.some(isDoor)) return { ok: false, reason: 'Der Eingang muss frei bleiben.' };
     if (same(def.layer).some((it) => overlap(cells(cat[it.id], it), mine))) return { ok: false, reason: 'Da steht schon etwas.' };
+    // Räume: ein Teil steht ganz drinnen oder ganz draußen; im Lager nur Lagerregale, Lagerregale nur im Lager
+    const rooms = mine.map((k) => { const [x, y] = k.split(',').map(Number); return roomAt(state, x, y); });
+    if (rooms.some((r) => r !== rooms[0])) return { ok: false, reason: 'Das stünde auf einer Wand.' };
+    const room = rooms[0];
+    if (def.lagerOnly && (!room || room.kind !== 'lager')) return { ok: false, reason: 'Lagerregale gehören ins Lager.' };
+    if (room && room.kind === 'lager' && !def.lagerOnly && def.layer === 'boden') return { ok: false, reason: 'Im Lager stehen nur Lagerregale.' };
     return { ok: true };
   }
 
@@ -409,6 +484,7 @@
       case 'move': {
         const it = find(a.uid);
         if (!it) return fail('Das Teil gibt es nicht mehr.');
+        if (it.id === CABINET_ID) return fail('Der Schrank gehört zum Geheimraum – E schiebt ihn.');
         const def = cat[it.id];
         const cand = clean(Object.assign({}, a, { id: it.id }), def);
         const c = check(s, cat, cand, it.uid);
@@ -424,6 +500,7 @@
       case 'remove': {
         const it = find(a.uid);
         if (!it) return fail('Das Teil gibt es nicht mehr.');
+        if (it.id === CABINET_ID) return fail('Der Schrank gehört zum Geheimraum (am PC: Bauen → abreißen).');
         const gone = [it].concat(cat[it.id] && cat[it.id].counter ? onTop(s, cat, it) : []);
         if (gone.some((g) => used(g) > 0)) return fail('Erst die Ware herausnehmen.');
         if (it.id === PC_ID && s.items.filter((x) => x.id === PC_ID).length === 1) return fail('Die Kasse mit dem PC brauchst du – verschieben geht.');
@@ -493,6 +570,70 @@
         s.jobs = []; // wer bis Ladenschluss nicht bedient wurde, ist gegangen
         s.day += 1;
         s.today = freshDay();
+        return { state: s };
+      }
+      // Raum bauen: Rechteck + Tür auf dem Rand (Geheimraum: davor kommt der Schrank)
+      case 'buildRoom': {
+        const kind = ROOM.kinds.find((k) => k === a.kind);
+        const r = { x: Number(a.x), y: Number(a.y), w: Number(a.w), d: Number(a.d), kind };
+        if (!kind || ![r.x, r.y, r.w, r.d].every(Number.isInteger)) return fail('Ungültiger Raum.');
+        if (r.w < ROOM.minW || r.d < ROOM.minD) return fail('Ein Raum braucht mindestens ' + ROOM.minW + '×' + ROOM.minD + ' Felder.');
+        if (r.x < 0 || r.y < 0 || r.x + r.w > s.units * UNIT_W || r.y + r.d > UNIT_D) return fail('Der Raum muss in deinen Laden passen.');
+        if (s.rooms.some((o) => o.x < r.x + r.w && r.x < o.x + o.w && o.y < r.y + r.d && r.y < o.y + o.d)) return fail('Da ist schon ein Raum.');
+        if (DOOR.some((c) => inRect(r, c.x, c.y))) return fail('Der Eingang muss frei bleiben.');
+        const inside = s.items.filter((it) => cat[it.id] && cat[it.id].layer !== 'wand' && cells(cat[it.id], it).some((k) => { const [x, y] = k.split(',').map(Number); return inRect(r, x, y); }));
+        if (inside.length) return fail('Der Platz muss leer sein (' + cat[inside[0].id].name + ').');
+        const door = a.door || {};
+        const edge = roomEdges(r).find((e) => e.side === door.side && e.i === Number(door.i));
+        if (!edge) return fail('Wähle eine Stelle für die Tür.');
+        if (outerEdge(s, edge.key)) return fail('Die Tür kann nicht in die Außenwand.');
+        r.door = { side: edge.side, i: edge.i };
+        let cab = null;
+        if (kind === 'geheim') {
+          cab = outsideOfDoor(r);
+          const key = cab.x + ',' + cab.y;
+          if (!inside_(s, key) || roomAt(s, cab.x, cab.y) || isDoor(key) || blocked(s, cat).has(key)) return fail('Vor der Tür muss Platz für den Schrank sein.');
+        }
+        const cost = roomCost(s, r);
+        if (s.coins < cost) return fail('Nicht genug Kanacoin.');
+        s.coins = cents(s.coins - cost);
+        r.rid = s.nextRid++;
+        s.rooms.push(r);
+        if (cab) s.items.push({ uid: s.nextUid++, id: CABINET_ID, x: cab.x, y: cab.y, rot: cab.rot, rid: r.rid, home: { x: cab.x, y: cab.y } });
+        return { state: s };
+      }
+      case 'removeRoom': {
+        const r = s.rooms.find((o) => o.rid === a.rid);
+        if (!r) return fail('Den Raum gibt es nicht mehr.');
+        const cab = s.items.find((it) => it.id === CABINET_ID && it.rid === r.rid);
+        if (cab && used(cab) > 0) return fail('Erst den Schrank ausräumen.');
+        const inside = s.items.filter((it) => it !== cab && cat[it.id] && cat[it.id].layer !== 'wand' && cells(cat[it.id], it).some((k) => { const [x, y] = k.split(',').map(Number); return inRect(r, x, y); }));
+        if (inside.length) return fail('Erst den Raum leer räumen.');
+        s.coins = cents(s.coins + roomCost(s, r));
+        s.rooms = s.rooms.filter((o) => o !== r);
+        s.items = s.items.filter((it) => it !== cab);
+        return { state: s };
+      }
+      // Geheimschrank zur Seite schieben (öffnet den Eingang) bzw. zurück
+      case 'slideCabinet': {
+        const it = find(a.uid);
+        if (!it || it.id !== CABINET_ID) return fail('Das ist kein Geheimschrank.');
+        const r = s.rooms.find((o) => o.rid === it.rid);
+        if (!r || !it.home) return fail('Der Schrank gehört zu keinem Raum.');
+        const atHome = it.x === it.home.x && it.y === it.home.y;
+        const taken = blocked(Object.assign({}, s, { items: s.items.filter((o) => o !== it) }), cat);
+        const free = (x, y) => inside_(s, x + ',' + y) && !roomAt(s, x, y) && !isDoor(x + ',' + y) && !taken.has(x + ',' + y);
+        if (!atHome) {
+          if (!free(it.home.x, it.home.y)) return fail('Der Platz vor der Tür ist belegt.');
+          it.x = it.home.x;
+          it.y = it.home.y;
+          return { state: s };
+        }
+        const along = r.door.side === 'n' || r.door.side === 's' ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]];
+        const to = along.map(([dx, dy]) => ({ x: it.x + dx, y: it.y + dy })).find((p) => free(p.x, p.y));
+        if (!to) return fail('Neben dem Schrank ist kein Platz zum Schieben.');
+        it.x = to.x;
+        it.y = to.y;
         return { state: s };
       }
       case 'buyTool': {
@@ -632,6 +773,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });
