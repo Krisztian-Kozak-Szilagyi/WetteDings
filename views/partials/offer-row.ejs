@@ -28,7 +28,7 @@
     return {
       list, cents, c, r, top, single,
       name: list.length ? lineLabel(list) : cents > 0 ? 'Geld' : 'nichts',
-      state: !list.length ? '–' : single ? (c.isItem ? 'Gegenstand' : (stateLabel(top) || 'Normal').replace('foliert', 'Sleeve')) : list.some((l) => l.foiledAt || l.damaged) ? 'gemischt' : 'Normal',
+      state: !list.length ? '–' : single ? (c.isItem ? 'Gegenstand' : (stateLabel(top) || 'Normal').replace('foliert', 'Sleeve')) : list.some((l) => l.foiledAt || l.damaged || l.lastGrade) ? 'gemischt' : 'Normal',
       rare: !list.length ? '–' : c.isItem && single ? 'Gegenstand' : !single ? 'bis ' + r.label : !sp ? r.label : sp.kind === 'slab' ? r.label + ' · ' + sp.label : r.label + ' · ' + sp.pct + ' % besitzen',
       own: !list.length || mine ? '–' : single ? (c.isItem ? '–' : lacking ? 'Fehlt dir' : 'Im Besitz' + ((ownCounts[c.id] || 0) > 1 ? ' ×' + ownCounts[c.id] : '')) : lacking ? lacking + ' fehlen dir' : 'Alle im Besitz',
       isNew: !mine && lacking > 0,

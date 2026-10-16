@@ -123,10 +123,11 @@
                     <span class="tcg-art">
                       <img src="<%= c.card.image %>" alt="" loading="lazy" width="720" height="1008">
                       <% if (c.creased) { %><span class="tcg-crease-tag"><%= c.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+                      <% if (c.lastGrade) { %><span class="tcg-grade-tag"><%= c.lastGrade.code %> <b><%= c.lastGrade.grade %></b></span><% } %>
                       <% if (c.marks) { %><button type="button" class="hb-loupe"<%- copyViewAttrs(c.card, r.label, c.marks, { note: 'Exemplar' }) %> aria-label="<%= c.card.name %> genau ansehen" title="Genau ansehen">🔍</button><% } %>
                     </span>
                   <% } %>
-                  <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.creased ? (c.ironed ? ' · gebügelt' : ' · Knick') : c.damaged ? ' · Spuren' : '' %></span>
+                  <span class="tcg-slot-label"><span class="tcg-dot"></span><%= c.card.name %><%= c.slab ? ' · Slab ' + c.slab.code + ' ' + c.slab.grade : c.foiledAt ? ' · Sleeve geht an den Shop' : c.creased ? (c.ironed ? ' · gebügelt' : ' · Knick') : c.damaged ? ' · Spuren' : '' %><%= !c.slab && c.lastGrade ? ' · zuletzt ' + c.lastGrade.code + ' ' + c.lastGrade.grade : '' %></span>
                 </label>
               <% }) %>
             </div>

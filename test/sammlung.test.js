@@ -36,8 +36,8 @@ test('Fremde Sammlung: Klick vergrößert die Karte, der Tausch steht erst in de
   assert.ok(html.includes('data-trade-href="/handel/tausch?an=Bob&amp;will=f%3Acopy1"'));
 });
 
-test('Eigene Sammlung: nur ansehen, kein Tausch', async () => {
+test('Eigene Sammlung: groß ansehen, aber kein Tausch', async () => {
   const html = await render(null);
   assert.ok(!html.includes('data-trade-href'));
-  assert.ok(!html.includes('data-zoom-card'));
+  assert.match(html, /data-zoom-card/); // wie fremde Sammlungen: Großansicht mit den Exemplaren, nur ohne „Angebot machen“
 });

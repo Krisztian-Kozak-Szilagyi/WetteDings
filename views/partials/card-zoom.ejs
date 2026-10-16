@@ -13,6 +13,11 @@
       <h2 data-zoom-name></h2>
       <p><span class="tcg-badge" data-zoom-rarity></span></p>
       <p class="muted" data-zoom-meta></p>
+      <%# Sammlung im Album-Look: Exemplare nach Wertung (befüllt aus der Kachel, public/js/handel.js) %>
+      <div class="tcg-copylist" data-zoom-copylist hidden>
+        <h3>Exemplare</h3>
+        <div class="tcg-copyrows" data-zoom-copyrows></div>
+      </div>
       <%# nur in fremden Sammlungen sichtbar: Karte mit data-trade-href %>
       <a class="btn btn-primary btn-block" data-zoom-trade hidden>Angebot machen</a>
       <% if (locals.favForm) { %>

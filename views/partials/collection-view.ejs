@@ -1,0 +1,56 @@
+<%#
+  Sammlung im Album-Look (eigenes Album und Sammlung eines Mitglieds): Reiter je Season und für die Slabs, Suche/Filter,
+  „Nur Karten im Besitz“, darunter Slab-Regal und je Season ein Raster mit einer Kachel je Karte (partials/tcg-grid).
+  mode: 'album' (eigenes Album, Standard) oder 'view' (Sammlung eines Mitglieds, mit linkFor = „Angebot machen“),
+  dupes: true zeigt die Duplikate-Leiste (nur Album), emptyText = Hinweis ohne Karten.
+  Erwartet die Daten der Sammlung (tcg/collection) plus cards, seasons, unreleased, testCards, slabCopies, rarityByKey, rarities.
+%>
+<% const gridMode = locals.mode === 'view' ? 'view' : 'album'; %>
+<%# Eine Sektion je Season, die neueste oben. Die Nummer (#01 …) zählt je Season. %>
+<%# Test-Karten stehen nicht in ihrer Season, sondern (nur für Admins) im Abschnitt "Test" ganz unten.
+    Noch nicht erhältliche Karten kommen als "?" ans Ende ihrer Season und zählen nicht mit. %>
+<%# Im Raster stehen die höchsten Wertungen oben: erst die beste Note der Karte (Slab oder zuletzt bewertet), dann die Seltenheit; Karten ohne Note in der Reihenfolge der Season %>
+<% const bestGrade = (c) => Math.max(0, ...(foiledCopies[c.id] || []).map((f) => (f.slab ? f.slab.grade : 0)), ...(markedCopies[c.id] || []).map((m) => (m.lastGrade ? m.lastGrade.grade : 0)));
+   const byQuality = (a, b) => bestGrade(b) - bestGrade(a) || (rarityByKey[b.rarity].rank || 0) - (rarityByKey[a.rarity].rank || 0); %>
+<% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key && c.rarity !== 'test-item').sort(byQuality), soon: unreleased.filter((c) => c.season === s.key) })).filter((s) => s.list.length || s.soon.length); %>
+<%# Reiter statt langer Seite: immer nur eine Season (die neueste zuerst) oder das Slab-Regal; „Alle“ zeigt alles %>
+<% const tabs = seasonList.map((s) => ({ key: s.key, label: s.label })).concat(testCards.length ? [{ key: 'test', label: 'Test' }] : []);
+   const firstTab = tabs.length ? tabs[0].key : 'all'; %>
+<div class="album-filter-row">
+  <% if (slabCopies.length || tabs.length > 1) { %>
+    <div class="hb-tabs album-tabs" role="tablist" aria-label="Sammlungs-Bereich">
+      <% if (slabCopies.length) { %><button type="button" class="hb-tab" role="tab" aria-selected="false" data-album-season="slabs">Slabs <span class="hb-tab-count"><%= slabCopies.length %></span></button><% } %>
+      <% tabs.forEach((t, i) => { %><button type="button" class="hb-tab<%= i === 0 ? ' active' : '' %>" role="tab" aria-selected="<%= i === 0 %>" data-album-season="<%= t.key %>"><%= t.label %></button><% }) %>
+      <button type="button" class="hb-tab" role="tab" aria-selected="false" data-album-season="all">Alle</button>
+    </div>
+  <% } %>
+  <% if (locals.dupes) { %><%- include('album-dupes') %><% } %>
+</div>
+<div class="album-tools">
+  <%- include('tcg-filter') %>
+  <%# Nur besessene Karten zeigen (public/js/tcg.js, merkt sich die Wahl) %>
+  <label class="check album-owned"><input type="checkbox" data-album-owned><span>Nur Karten im Besitz zeigen</span></label>
+</div>
+<% if (!cardCount) { %>
+  <p class="muted"><%- locals.emptyText || 'Noch keine Karten.' %></p>
+<% } %>
+<%# Slabs: eigener Reiter mit Filter nach Note. Karten im Sleeve stehen in den Seasons neben ihren Varianten. %>
+<%- include('slab-shelf', { shelfMode: gridMode, shelfTitle: locals.shelfTitle || 'Meine Slabs', favoriteIds: locals.favoriteIds || new Set() }) %>
+<% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
+  <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>"<%- s.key === firstTab ? '' : ' hidden' %>>
+    <div class="album-season-head">
+      <h2 id="season-<%= s.key %>"><%= s.label %></h2>
+      <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
+    </div>
+    <%- include('tcg-grid', { mode: gridMode, cards: s.list.concat(s.soon), lockedByCard: gridMode === 'view' ? {} : locals.lockedByCard }) %>
+  </section>
+<% }) %>
+<% if (testCards.length) { %>
+  <section class="album-season" data-album-season-section="test" aria-labelledby="season-test"<%- firstTab === 'test' ? '' : ' hidden' %>>
+    <div class="album-season-head">
+      <h2 id="season-test">Test</h2>
+      <span class="tcg-progress-num"><%= testCards.filter((c) => counts[c.id]).length %> / <%= testCards.length %></span>
+    </div>
+    <%- include('tcg-grid', { mode: gridMode, cards: testCards, lockedByCard: gridMode === 'view' ? {} : locals.lockedByCard }) %>
+  </section>
+<% } %>

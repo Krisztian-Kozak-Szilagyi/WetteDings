@@ -307,8 +307,9 @@ async function unfoilCard({ user, copyId }) {
     // Folierte Karten spielen mit (#204): unterwegs bleibt die Folie dran – sonst wäre die Karte beim Abschluss ungeschützt
     if (reason && !isStateLock(reason)) throw new UserError(`Die Karte ist gerade unterwegs (${lockLabel(reason)}). Den Sleeve kannst du danach abziehen.`);
     await claim([doc], user._id, session);
-    // Slab aufbrechen (#204): Kürzel, Note und Wertsteigerung sind weg – die Karte kann neu eingereicht werden
-    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null, slab: null } }, { session });
+    // Slab aufbrechen (#204): Etikett und Wertsteigerung sind weg – die Karte kann neu eingereicht werden; die letzte Bewertung
+    // (Kürzel, Note) merkt sich das Exemplar in lastGrade
+    await TcgCard.updateOne({ _id: doc._id, user: user._id }, { $set: { foiledAt: null, slab: null, ...(doc.slab ? { lastGrade: { code: doc.slab.code, grade: doc.slab.grade, at: doc.slab.at, cert: doc.slab.cert } } : {}) } }, { session });
     // nur ein Sleeve kommt zurück – ein aufgebrochener Slab ist kaputt (Beschaffung: Shop, Dungeon)
     if (!doc.slab) await addItems({ userIds: [user._id], type: 'folie', source: 'folieren', session, meta: { card: doc.card, back: true } });
     return { card: catalog.cardById[doc.card] || null, sleeve: !doc.slab };

@@ -77,17 +77,18 @@
         </label>
       <% }) %>
       <%# Beschädigte Exemplare (#204): einzeln wählbar; die Lupe zeigt Kratzer und Knick (public/js/foil-view.js) %>
-      <% marked.forEach((m) => { const c = m.card; const r = pickRar(c); const on = preset.copies.has(m.id); const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : 'Gebrauchsspuren'; %>
+      <% marked.forEach((m) => { const c = m.card; const r = pickRar(c); const on = preset.copies.has(m.id); const was = m.lastGrade ? 'zuletzt ' + (m.lastGrade.code || 'BfW') + ' ' + m.lastGrade.grade : ''; const what = [m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : (m.marks && (m.marks.c || (m.marks.s || []).length) ? 'Gebrauchsspuren' : ''), was].filter(Boolean).join(', ') || 'Exemplar'; %>
         <label class="tcg-slot hb-card hb-foil hb-copy r-<%= c.rarity %>" data-hb-slot data-rarity="<%= c.rarity %>" data-rank="<%= r.rank %>" data-name="<%= c.name.toLowerCase() %> <%= r.label.toLowerCase() %> exemplar" data-label="<%= c.name %> (<%= what %>)" data-image="<%= c.image %>" data-value="<%= m.value %>">
           <input type="checkbox" name="<%= side %>" value="f:<%= m.id %>" <%= on ? 'checked' : '' %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar (<%= what %>)">
           <span class="tcg-art hb-art">
             <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
             <% if (m.creased) { %><span class="tcg-crease-tag"><%= m.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+            <% if (m.lastGrade) { %><span class="tcg-grade-tag"><%= m.lastGrade.code || 'BfW' %> <b><%= m.lastGrade.grade %></b></span><% } %>
             <button type="button" class="hb-loupe"<%- copyViewAttrs(c, r.label, m.marks, { note: 'Exemplar · ' + what }) %> aria-label="<%= c.name %> genau ansehen" title="Genau ansehen">🔍</button>
           </span>
           <span class="hb-card-name"><%= c.name %></span>
           <span class="hb-card-chips"><span class="hb-chip"><span class="tcg-dot"></span><%= r.label %></span><%- chip(what, 'is-state') %><% if (m.lock) { %><%- chip('gesperrt', 'is-lock') %><% } %></span>
-          <%- kv(m.value, [{ card: c.id, damaged: true }], salesText(m.id)) %>
+          <%- kv(m.value, [{ card: c.id, damaged: !!m.marks && !m.lastGrade, lastGrade: m.lastGrade }], salesText(m.id)) %>
         </label>
       <% }) %>
     </div>
