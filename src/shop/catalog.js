@@ -77,11 +77,20 @@ const CATALOG = Object.entries(LOOK)
       utility: 'Vorrat im Lager – nur im Lager aufstellbar, Kunden kommen nicht heran.', capacity: '40 Stück', lagerOnly: true },
     { id: 'lager_regal_gross', name: 'Lagerregal (groß)', group: 'technik', w: 3, d: 1, height: 74, layer: 'boden', counter: false, price: 250,
       utility: 'Vorrat im Lager – nur im Lager aufstellbar, Kunden kommen nicht heran.', capacity: '80 Stück', lagerOnly: true },
+    // Luftentfeuchter an der Wand (Krisztian, 2026-10-16): teurer, braucht keinen Platz am Boden – nur neben einer Wand
+    { id: 'dehumidifier_wall', name: 'Luftentfeuchter (Wand)', group: 'technik', w: 1, d: 1, height: 18, layer: 'wandnah', counter: false, price: 350,
+      utility: 'Schützt Karten im Lager vor Feuchtigkeit (1 Gerät je 16 Felder). Hängt an der Wand, braucht keinen Platz.', capacity: null, lagerOk: true },
     { id: 'geheimschrank', name: 'Schrank (Geheimtür)', group: 'technik', w: 1, d: 1, height: 74, layer: 'boden', counter: false, price: 300,
       utility: 'Verdeckt den Eingang zum Geheimraum – E schiebt ihn zur Seite. Darin lässt sich auch etwas lagern.', capacity: '20 Stück',
       secret: true }, // kommt mit dem Geheimraum, nicht einzeln bestellbar
   ])
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
+// Luftentfeuchter am Boden: darf ins Lager, deutscher Text
+CATALOG.forEach((d) => {
+  if (d.id !== 'dehumidifier') return;
+  d.lagerOk = true;
+  d.utility = 'Schützt Karten im Lager vor Feuchtigkeit (1 Gerät je 16 Felder).';
+});
 
 // Ware zum Verkaufen: Marktpreis = Platzhalter-Preis aus items.json, Einkauf = BUY_FACTOR davon.
 // [Karton-Inhalt (Stück), Farbe] – Karton-Größen sind Platzhalter (Krisztian, 2026-10-13: erst der Rahmen)
@@ -102,6 +111,7 @@ const LICENSES = [
   { id: 'sammler', name: 'Sammler-Lizenz', price: 2500, text: 'Booster-Boxen, Einzelkarten und bewertete Karten im Slab' },
   { id: 'brettspiele', name: 'Brettspiel-Lizenz', price: 1500, text: 'Brettspiele' },
 ];
+const PAPER = ['single_card', 'booster_pack', 'booster_box', 'board_game_box'];
 const LICENSE_OF = { booster_box: 'sammler', single_card: 'sammler', graded_slab: 'sammler', board_game_box: 'brettspiele' };
 
 const GOODS = Object.entries(WARE)
@@ -109,7 +119,8 @@ const GOODS = Object.entries(WARE)
   .map(([id, [perBox, color]]) => {
     const market = byId[id].placeholder_price.amount;
     // tier = ab welcher Stufe Kunden danach fragen (vorbereitet, alles Stufe 1); license = nötige Lizenz zum Bestellen
-    return { id, kind: 'ware', name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100, tier: 1, license: LICENSE_OF[id] || null };
+    // paper = verdirbt im Lager ohne Luftentfeuchter (Krisztian, 2026-10-16)
+    return { id, kind: 'ware', name: byId[id].name_de, perBox, color, market, buy: Math.round(market * BUY_FACTOR * 100) / 100, tier: 1, license: LICENSE_OF[id] || null, paper: PAPER.includes(id) };
   })
   // Material für Aufträge (Preise wie im Bank-Shop der Seite: TCG Sleeve 15, Leerer Slab 40) – nicht für Kunden im Regal
   .concat([
