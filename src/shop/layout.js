@@ -36,6 +36,12 @@
   const SIDEWALK = 2; // Gehweg-Tiefe in Zellen
 
   const MAX_DIRT = 40;
+  // Ruf & Stufen (Krisztian, 2026-10-16): Ruf aus Umsatz (je 10 Kanacoin +1) und Bewertungen (5★ +5 … 1★ −5).
+  // Die Stufe fällt nie zurück; der Ruf kann bis zur Schwelle der erreichten Stufe sinken, nicht darunter.
+  // Schwellen und Freischaltungen = Platzhalter (erste Stufe nach etwa einem guten Tag)
+  const RUF = { perCoins: 10, stars: { 5: 5, 4: 2, 3: 0, 2: -2, 1: -5 }, levels: [0, 150, 500, 1200, 2500] };
+  // Freischaltungen außerhalb des Katalogs: Räume und die Nachbarfläche
+  const UNLOCK = { lager: 2, geheim: 4, unit: 5 };
   // Räume (Krisztian, 2026-10-16): Wand je Zellkante 20, Tür 50, Geheimschrank 300 (ersetzt beim Geheimraum die Tür)
   const ROOM = { minW: 2, minD: 2, wall: 20, door: 50, cabinet: 300, kinds: ['lager', 'geheim'], nameMax: 24 };
   // Feuchtigkeit (Krisztian, 2026-10-16): je angefangene 16 Felder Lager ein Luftentfeuchter; fehlt er, verdirbt nachts
@@ -77,7 +83,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1,
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {},
     };
   }
 
@@ -95,6 +101,8 @@
     out.licenses = (out.licenses || []).slice();
     out.dirt = (out.dirt || []).map((d) => Object.assign({}, d));
     out.market = Object.assign({}, out.market || {});
+    out.wardrobe = (out.wardrobe || []).slice();
+    out.outfit = Object.assign({}, out.outfit || {});
     out.rooms = (out.rooms || []).map((r) => Object.assign({}, r, { door: r.door ? Object.assign({}, r.door) : null }));
     out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
     out.tools = (out.tools || []).slice();
@@ -248,6 +256,26 @@
     it.stock[ware] -= 1;
     if (!it.stock[ware]) delete it.stock[ware];
   }
+
+  // ---------- Ruf ----------
+  function levelFor(ruf) {
+    let lv = 1;
+    RUF.levels.forEach((min, i) => { if (ruf >= min) lv = i + 1; });
+    return lv;
+  }
+  /** Ruf ändern: Stufe steigt mit, fällt aber nie; Ruf nicht unter die Schwelle der erreichten Stufe */
+  function addRuf(s, pts) {
+    if (!pts) return;
+    const floor = RUF.levels[(s.level || 1) - 1] || 0;
+    s.ruf = Math.max(floor, Math.round(((s.ruf || 0) + pts) * 100) / 100);
+    s.level = Math.max(s.level || 1, levelFor(s.ruf));
+  }
+  const rufForStars = (stars) => RUF.stars[stars] || 0;
+  /** Nächste Schwelle (oder null auf der höchsten Stufe) */
+  function nextLevelAt(s) {
+    return RUF.levels[s.level] === undefined ? null : RUF.levels[s.level];
+  }
+  const needLevel = (s, lv) => (lv || 1) > (s.level || 1);
 
   // ---------- Räume ----------
   const inRect = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.d;
@@ -477,6 +505,7 @@
         const g = goods[a.id];
         const n = Number(a.n) || 1;
         if (!g) return fail('Unbekannte Ware.');
+        if (needLevel(s, g.level)) return fail('Ab Ruf-Stufe ' + g.level + '.');
         if (g.license && !s.licenses.includes(g.license)) {
           const lic = more.licenses[g.license];
           return fail('Dafür brauchst du die ' + (lic ? lic.name : 'passende Lizenz') + '.');
@@ -492,6 +521,8 @@
       case 'orderMoebel': {
         const def = cat[a.id];
         if (!def) return fail('Unbekanntes Teil.');
+        if (def.secret) return fail('Das gibt es nur mit dem Geheimraum.');
+        if (needLevel(s, def.level)) return fail('Ab Ruf-Stufe ' + def.level + '.');
         if (s.boxes.length >= MAX_BOXES) return fail('Zu viele Kartons – erst etwas aufbauen.');
         if (s.coins < def.price) return fail('Nicht genug Kanacoin.');
         s.coins = cents(s.coins - def.price);
@@ -628,6 +659,7 @@
             t.buyers += 1;
             lines.forEach((l) => { t.sold[l.ware] = (t.sold[l.ware] || 0) + l.qty; });
             t.receipts = t.receipts.concat({ lines: lines, total: total }).slice(-KEEP_RECEIPTS);
+            addRuf(s, Math.floor(total / RUF.perCoins));
           }
         }
         if (a.miss && goods[a.miss]) t.misses[a.miss] = (t.misses[a.miss] || 0) + 1;
@@ -637,6 +669,7 @@
           s.reviews = s.reviews.concat({ day: s.day, stars: stars, text: text }).slice(-KEEP_REVIEWS);
           t.reviews += 1;
           t.starSum += stars;
+          addRuf(s, rufForStars(stars));
         }
         return { state: s };
       }
@@ -659,6 +692,7 @@
         const kind = ROOM.kinds.find((k) => k === a.kind);
         const r = { x: Number(a.x), y: Number(a.y), w: Number(a.w), d: Number(a.d), kind };
         if (!kind || ![r.x, r.y, r.w, r.d].every(Number.isInteger)) return fail('Ungültiger Raum.');
+        if (needLevel(s, UNLOCK[kind])) return fail('Ab Ruf-Stufe ' + UNLOCK[kind] + '.');
         if (r.w < ROOM.minW || r.d < ROOM.minD) return fail('Ein Raum braucht mindestens ' + ROOM.minW + '×' + ROOM.minD + ' Felder.');
         if (r.x < 0 || r.y < 0 || r.x + r.w > s.units * UNIT_W || r.y + r.d > UNIT_D) return fail('Der Raum muss in deinen Laden passen.');
         if (s.rooms.some((o) => o.x < r.x + r.w && r.x < o.x + o.w && o.y < r.y + r.d && r.y < o.y + o.d)) return fail('Da ist schon ein Raum.');
@@ -730,6 +764,28 @@
         it.y = to.y;
         return { state: s };
       }
+      case 'buyClothes': {
+        const c = (more.clothes || []).find((x) => x.id === a.id);
+        if (!c) return fail('Unbekanntes Kleidungsstück.');
+        if (s.wardrobe.includes(c.id)) return fail('Das hast du schon.');
+        if (s.coins < c.price) return fail('Nicht genug Kanacoin.');
+        s.coins = cents(s.coins - c.price);
+        s.wardrobe.push(c.id);
+        s.outfit[c.slot] = c.id; // gleich anziehen
+        return { state: s };
+      }
+      case 'wear': {
+        const c = (more.clothes || []).find((x) => x.id === a.id);
+        if (!c || !s.wardrobe.includes(c.id)) return fail('Das hast du nicht.');
+        if (s.outfit[c.slot] === c.id) delete s.outfit[c.slot]; // nochmal = ausziehen
+        else s.outfit[c.slot] = c.id;
+        return { state: s };
+      }
+      // TEST-KNOPF (nur Demo, im fertigen Spiel entfernen): Ruf dazugeben
+      case 'devRuf': {
+        addRuf(s, Math.max(-1000, Math.min(5000, Number(a.amount) || 0)));
+        return { state: s };
+      }
       case 'buyTool': {
         const tool = TOOLS.find((t) => t.id === a.id);
         if (!tool) return fail('Unbekanntes Werkzeug.');
@@ -760,6 +816,7 @@
         const lic = more.licenses[a.id];
         if (!lic) return fail('Unbekannte Lizenz.');
         if (s.licenses.includes(lic.id)) return fail('Die hast du schon.');
+        if (needLevel(s, lic.level)) return fail('Ab Ruf-Stufe ' + lic.level + '.');
         if (s.coins < lic.price) return fail('Nicht genug Kanacoin.');
         s.coins = cents(s.coins - lic.price);
         s.licenses.push(lic.id);
@@ -795,6 +852,11 @@
           if (!from) return fail('Kein leerer Slab mehr am Kartenbewertungstisch.');
           takeOne(from, 'mat_slab');
         }
+        if (steps.includes('foil')) {
+          const from = supplier(s, 'mat_sleeve');
+          if (!from) return fail('Kein TCG Sleeve mehr an der Booster-Öffnungstheke.');
+          takeOne(from, 'mat_sleeve');
+        }
         job.done = job.done.concat(steps);
         Object.assign(job.results, a.results || {});
         if (a.defects) job.defects = a.defects;
@@ -827,6 +889,7 @@
           t.services = Object.assign({}, t.services);
           job.services.forEach((id) => { t.services[id] = (t.services[id] || 0) + 1; });
           t.receipts = t.receipts.concat({ lines: lines, total: total }).slice(-KEEP_RECEIPTS);
+          addRuf(s, Math.floor(total / RUF.perCoins));
         }
         s.jobs = s.jobs.filter((x) => x !== job);
         const stars = Number(a.stars);
@@ -835,6 +898,7 @@
           s.reviews = s.reviews.concat({ day: s.day, stars: stars, text: text }).slice(-KEEP_REVIEWS);
           t.reviews += 1;
           t.starSum += stars;
+          addRuf(s, rufForStars(stars));
         }
         return { state: s };
       }
@@ -847,6 +911,7 @@
       }
       case 'buyUnit': {
         if (s.units >= MAX_UNITS) return fail('Mehr Platz gibt es nicht.');
+        if (needLevel(s, UNLOCK.unit)) return fail('Ab Ruf-Stufe ' + UNLOCK.unit + '.');
         if (s.coins < a.price) return fail('Nicht genug Kanacoin.');
         s.coins = cents(s.coins - a.price);
         s.units += 1;
@@ -867,6 +932,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

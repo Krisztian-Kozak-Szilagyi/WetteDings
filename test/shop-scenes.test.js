@@ -110,3 +110,35 @@ test('Arbeitstisch: messen, benoten, versiegeln, fertig', async () => {
   assert.ok(posts[1][0].endsWith('/fertig') && posts[1][1].includes('seal=' + scene.sealQ));
   assert.deepStrictEqual(done, answers.fertig);
 });
+
+test('Arbeitstisch: Karte in den Sleeve schieben (schief hakt), Ecken umklappen, fertig', async () => {
+  const posts = [];
+  const fetchMock = (url, o) => { posts.push([url, String(o.body)]); return Promise.resolve({ json: () => ({ demo: true }) }); };
+  const { scene, handlers } = loadScene('shop-werkbank-phaser.js', 'ShopWerkbank', fetchMock);
+  scene.init({ job: { id: '7', steps: ['foil'] }, station: 'pack_opening_counter', csrf: 't', onDone: () => {} });
+  scene.create();
+  assert.strictEqual(scene.step(), 'foil');
+  const c = scene.card;
+  const fo = scene.foil;
+  // schief nach unten ziehen: hakt am Rand
+  fo.dx = c.w * 0.2;
+  handlers.pointerdown({ x: c.cx + fo.dx, y: c.cy + fo.dy });
+  handlers.pointermove({ x: c.cx + fo.dx, y: c.cy + fo.dy + c.h, isDown: true });
+  assert.strictEqual(fo.phase, 'slide', 'schief = hakt');
+  // gerade rücken und ganz hinein
+  handlers.pointermove({ x: c.cx + 0.01 * c.w, y: c.cy + fo.dy + c.h, isDown: true });
+  handlers.pointermove({ x: c.cx + 0.01 * c.w, y: c.cy + c.h * 2, isDown: true });
+  assert.strictEqual(fo.phase, 'fold');
+  assert.ok(fo.slideQ > 80);
+  handlers.pointerup({ x: 0, y: 0 });
+  // Ecken: links nach rechts unten, rechts nach links unten
+  const r = scene.sleeveRect();
+  handlers.pointerdown({ x: r.x + 2, y: r.y + 2 });
+  handlers.pointerup({ x: r.x + 2 + c.w * 0.1, y: r.y + 2 + c.w * 0.1 });
+  handlers.pointerdown({ x: r.x + r.w - 2, y: r.y + 2 });
+  handlers.pointerup({ x: r.x + r.w - 2 - c.w * 0.1, y: r.y + 2 + c.w * 0.1 });
+  assert.strictEqual(fo.phase, 'done');
+  assert.ok(scene.foilQ > 85);
+  await new Promise((res) => setTimeout(res, 0));
+  assert.ok(posts.some(([u, b]) => u.endsWith('/fertig') && b.includes('foil=' + scene.foilQ) && b.includes('tisch=pack_opening_counter')));
+});
