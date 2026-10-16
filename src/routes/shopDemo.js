@@ -22,24 +22,26 @@ const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'slideCabinet', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'] };
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
-  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock }) => {
+  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, rid, home }) => {
     const it = { uid, id, x, y, rot };
+    if (rid) it.rid = rid;
+    if (home) it.home = { x: home.x, y: home.y };
     if (wall) it.wall = wall;
     if (stock && Object.keys(stock).length) it.stock = stock;
     return it;
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
   return layout.ensureCounter(
-    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay }),
+    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid }),
     catalog
   );
 }
@@ -107,6 +109,11 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       bid: Number(a.bid),
       jid: Number(a.jid),
       did: Number(a.did),
+      rid: Number(a.rid),
+      kind: typeof a.kind === 'string' ? a.kind : '',
+      w: Number(a.w),
+      d: Number(a.d),
+      door: a.door && typeof a.door === 'object' ? { side: typeof a.door.side === 'string' ? a.door.side : '', i: Number(a.door.i) } : null,
       at: Number(a.at),
       cid: Number(a.cid),
       n: Number(a.n),

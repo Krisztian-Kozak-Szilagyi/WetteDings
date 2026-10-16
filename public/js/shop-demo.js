@@ -124,7 +124,10 @@
     $('[data-shop-panel-name]').textContent = d.name;
     $('[data-shop-panel-info]').textContent = d.utility + (d.capacity ? ' · ' + d.capacity : '');
     $('[data-shop-panel-refund]').textContent = '(+' + fmt(d.price) + ')';
-    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer === 'wand';
+    panel.querySelector('[data-shop-do="rotate"]').hidden = d.layer === 'wand' || !!d.secret;
+    panel.querySelector('[data-shop-do="move"]').hidden = !!d.secret;
+    panel.querySelector('[data-shop-do="remove"]').hidden = !!d.secret;
+    panel.querySelector('[data-shop-do="inhalt"]').hidden = !d.holds;
     panel.hidden = !!mode;
   }
 
@@ -191,9 +194,10 @@
   }
 
   function pcMoebel(body) {
+    pcBauen(body);
     let last = '';
     let tb = null;
-    list.forEach((d) => {
+    list.filter((d) => !d.secret).forEach((d) => {
       if (d.group !== last) {
         last = d.group;
         body.appendChild(el('div', 'sd-group', groups[d.group].name));
@@ -255,6 +259,35 @@
       tb.appendChild(tr);
     });
     body.appendChild(t);
+  }
+
+  /** Räume bauen (Krisztian, 2026-10-16): Lager / Geheimraum – Rechteck ziehen, dann Tür wählen */
+  function pcBauen(body) {
+    body.appendChild(el('div', 'sd-group', 'Bauen'));
+    const row = el('p', 'sd-later');
+    [['lager', 'Lager bauen'], ['geheim', 'Geheimraum bauen']].forEach(([kind, label]) => {
+      const b = el('button', 'sd-btn', label);
+      b.type = 'button';
+      b.style.marginRight = '6px';
+      b.addEventListener('click', () => {
+        $('[data-shop-pc]').close();
+        selected = null;
+        mode = { kind: 'room', room: kind, stage: 'rect', a: null, b: null };
+        toast(kind === 'lager' ? 'Lager: Fläche mit der Maus aufziehen, dann eine Wand für die Tür anklicken (Esc = abbrechen).' : 'Geheimraum: Fläche aufziehen, dann die Wand anklicken, vor die der Schrank kommt (Esc = abbrechen).');
+        refresh();
+      });
+      row.appendChild(b);
+    });
+    row.appendChild(document.createTextNode('Wand ' + fmt(L.ROOM.wall) + ' je Feld · Tür ' + fmt(L.ROOM.door) + ' · Schrank ' + fmt(L.ROOM.cabinet)));
+    body.appendChild(row);
+    (state.rooms || []).forEach((r) => {
+      const p = el('p', 'sd-later', (r.kind === 'lager' ? 'Lager' : 'Geheimraum') + ' ' + r.w + '×' + r.d + ' ');
+      const b = el('button', 'sd-btn', 'Abreißen (+' + fmt(L.roomCost(state, r)) + ')');
+      b.type = 'button';
+      b.addEventListener('click', () => { if (act(doAct('removeRoom', { rid: r.rid }))) renderPc(); });
+      p.appendChild(b);
+      body.appendChild(p);
+    });
   }
 
   function pcWerkzeug(body) {
@@ -676,6 +709,7 @@
         if (kasseOpen()) return;
         setHover(p);
         if (p.rightButtonDown()) { if (mode) { mode = null; refresh(); } return; }
+        if (mode && mode.kind === 'room') { roomDown(); return; }
         if (mode) { drag = { place: true }; return; }
         drag = { x: p.x, y: p.y, uid: pick(p.worldX, p.worldY), moved: false };
       });
@@ -685,10 +719,12 @@
           drag.moved = true;
           startMove(drag.uid);
         }
+        if (mode && mode.kind === 'room' && mode.stage === 'rect' && mode.a && p.isDown) mode.b = cellOf(hover);
         drawGhost();
       });
       this.input.on('pointerup', () => {
         if (kasseOpen()) { drag = null; return; }
+        if (mode && mode.kind === 'room') { roomUp(); return; }
         const d = drag;
         drag = null;
         if (!d) return;
@@ -841,7 +877,8 @@
     return state.items.reduce((a, it) => a + Object.keys(it.stock || {}).filter(isWare).reduce((n, w) => n + it.stock[w], 0), 0);
   }
   // Möbel, an denen Kunden sich Ware ansehen (nicht die Arbeitstische mit Material)
-  const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare));
+  // Regale, an die Kunden kommen: nicht in Räumen (Lager, Geheimraum), nicht der Geheimschrank
+  const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare) && !catalog[it.id].secret && !L.roomAt(state, it.x, it.y));
   const counter = () => state.items.find((it) => it.id === L.PC_ID);
 
   function openDay() {
@@ -906,7 +943,7 @@
 
   function goTo(c, goals) {
     const start = { x: Math.floor(c.x), y: Math.floor(c.y) };
-    const p = goals.size ? C.path(state, catalog, start, goals, blockSet) : null;
+    const p = goals.size ? C.path(state, catalog, start, goals, custBlock) : null;
     c.path = p || [];
     return !!p;
   }
@@ -920,7 +957,7 @@
     if (c.services) { c.phase = 'queue'; c.wait = 0; queueUp(c); say(c, 'Ich hab eine Karte für euch!', 2.5); return; }
     while (c.visit.length) {
       const it = state.items.find((i) => i.uid === c.visit[0]);
-      if (it && goTo(c, C.approach(state, catalog, it, blockSet))) { c.phase = 'look'; c.lookAt = it.uid; return; }
+      if (it && goTo(c, C.approach(state, catalog, it, custBlock))) { c.phase = 'look'; c.lookAt = it.uid; return; }
       c.visit.shift();
     }
     decide(c);
@@ -949,7 +986,7 @@
   /** Plätze in der Schlange: gerade vor der Kassentheke (ShopCustomers.queueLine) */
   function queueSpots() {
     const pc = counter();
-    return pc ? C.queueLine(state, catalog, pc, blockSet, 12) : [];
+    return pc ? C.queueLine(state, catalog, pc, custBlock, 12) : [];
   }
 
   /** Wer steht an (in Ankunfts-Reihenfolge) – rückt nach, wenn vorne jemand fertig ist */
@@ -1036,7 +1073,7 @@
   function waitSpot(c) {
     const taken = new Set(day.customers.filter((o) => o !== c && o.phase === 'wait' && o.seat).map((o) => o.seat));
     for (const it of state.items.filter((i) => i.id === 'chair' || i.id === 'beanbag')) {
-      const spots = Array.from(C.approach(state, catalog, it, blockSet)).filter((k) => !taken.has(k));
+      const spots = Array.from(C.approach(state, catalog, it, custBlock)).filter((k) => !taken.has(k));
       if (spots.length) { c.seat = spots[0]; return new Set([spots[0]]); }
     }
     const line = new Set(queueSpots());
@@ -1044,7 +1081,7 @@
     for (let y = 0; y < L.UNIT_D - 1; y++) {
       for (let x = 0; x < state.units * L.UNIT_W; x++) {
         const k = x + ',' + y;
-        if (!line.has(k) && !taken.has(k) && C.walkableCell(state, blockSet, x, y)) free.push(k);
+        if (!line.has(k) && !taken.has(k) && C.walkableCell(state, custBlock, x, y)) free.push(k);
       }
     }
     c.seat = free[0] || null;
@@ -1275,6 +1312,22 @@
 
   // ---------- Figur ----------
   let blockSet = new Set();
+  let custBlock = new Set(); // für Kunden zusätzlich alle Raum-Zellen
+  let walls = new Set(); // Wände der Räume (Zellkanten, L.wallSet)
+
+  /** Läuft die Figur von (fx, fy) nach (tx, ty) durch eine Raumwand? (Ecken des Körpers einzeln prüfen) */
+  function throughWall(fx, fy, tx, ty) {
+    const r = 0.18;
+    return [[-r, -r], [r, -r], [-r, r], [r, r]].some(([ox, oy]) => {
+      const ax = Math.floor(fx + ox);
+      const ay = Math.floor(fy + oy);
+      const bx = Math.floor(tx + ox);
+      const by = Math.floor(ty + oy);
+      if (ax === bx && ay === by) return false;
+      if (Math.abs(ax - bx) + Math.abs(ay - by) > 1) return L.wallBetween(walls, ax, ay, bx, ay) || L.wallBetween(walls, bx, ay, bx, by);
+      return L.wallBetween(walls, ax, ay, bx, by);
+    });
+  }
 
   /** Darf die Figur bei (x, y) stehen? (Rand mit kleinem Körper-Radius, Tür als einziger Durchgang zum Gehweg) */
   function canStand(x, y, fromY) {
@@ -1306,8 +1359,8 @@
       gx = (gx / len) * SPEED * sec;
       gy = (gy / len) * SPEED * sec;
       const fromY = player.y;
-      if (canStand(player.x + gx, player.y, fromY)) player.x += gx;
-      if (canStand(player.x, player.y + gy, fromY)) player.y += gy;
+      if (canStand(player.x + gx, player.y, fromY) && !throughWall(player.x, player.y, player.x + gx, player.y)) player.x += gx;
+      if (canStand(player.x, player.y + gy, fromY) && !throughWall(player.x, player.y, player.x, player.y + gy)) player.y += gy;
     }
     findTarget();
   }
@@ -1501,7 +1554,9 @@
         .filter((o) => o.dist <= 0.75)
         .sort((a, b) => a.dist - b.dist)[0];
       const first = near.find((o) => o.it.id === 'cashier_counter' || catalog[o.it.id].holds);
-      if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => act(doAct('pick', { bid: box.b.bid })) };
+      const cab = near.find((o) => catalog[o.it.id].secret);
+      if (cab && (!box || cab.dist <= box.dist)) t = { label: 'E: Schrank schieben', run: () => act(doAct('slideCabinet', { uid: cab.it.uid })) };
+      else if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => act(doAct('pick', { bid: box.b.bid })) };
       else if (first && first.it.id === 'cashier_counter') t = { label: 'E: PC benutzen', run: openPc };
       else if (first) t = { label: 'E: ' + catalog[first.it.id].name + ' ansehen', run: () => openShelf(first.it.uid) };
     }
@@ -1547,6 +1602,24 @@
     }
   }
 
+  const ROOM_WALL_H = 44;
+  function drawRooms() {
+    const g = scene.floor;
+    (state.rooms || []).forEach((r) => {
+      const col = r.kind === 'lager' ? 0x6a707c : 0x5a2434;
+      for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.d; y++) poly(g, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], col, 0.55);
+    });
+    walls.forEach((key) => {
+      const [t, rest] = key.split(':');
+      const [a, b] = rest.split(',').map(Number);
+      const wg = scene.add.graphics();
+      const bx = t === 'h' ? { x: a, y: b - 0.06, w: 1, d: 0.12 } : { x: a - 0.06, y: b, w: 0.12, d: 1 };
+      box(wg, bx.x, bx.y, bx.w, bx.d, ROOM_WALL_H, 0, 0xb8ad9a, 1, 0x8a7f6c, 0);
+      scene.items.push(wg);
+      scene.sortables.push({ g: wg, box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 0 } });
+    });
+  }
+
   /** Vorder- und rechte Seitenwand nur niedrig (wie abgeschnitten), damit nichts dahinter verschwindet */
   const LOW_WALL = 16;
   function drawLowWalls() {
@@ -1567,6 +1640,9 @@
   function drawAll() {
     if (!scene) return;
     blockSet = L.blocked(state, catalog);
+    walls = L.wallSet(state);
+    custBlock = new Set(blockSet);
+    L.roomCells(state).forEach((k) => custBlock.add(k));
     drawFloor();
     scene.items.forEach((o) => o.destroy());
     scene.labels.forEach((o) => o.destroy());
@@ -1577,6 +1653,7 @@
     scene.hulls = [];
     scene.sortables = [];
     drawLowWalls();
+    drawRooms();
     drawDirt();
 
     if (state.units < L.MAX_UNITS) {
@@ -1626,10 +1703,77 @@
     drawGhost();
   }
 
+  // ---------- Raum bauen: Rechteck aufziehen, dann Tür-Kante wählen ----------
+  const cellOf = (h) => ({ x: Math.floor(h.x), y: Math.floor(h.y) });
+  function roomRect() {
+    if (!mode || !mode.a || !mode.b) return null;
+    const x = Math.min(mode.a.x, mode.b.x);
+    const y = Math.min(mode.a.y, mode.b.y);
+    return { kind: mode.room, x, y, w: Math.abs(mode.a.x - mode.b.x) + 1, d: Math.abs(mode.a.y - mode.b.y) + 1 };
+  }
+  function roomDown() {
+    if (!hover) return;
+    if (mode.stage === 'rect') { mode.a = cellOf(hover); mode.b = mode.a; return; }
+    const r = roomRect();
+    const e = nearestEdge(r);
+    if (!e) return;
+    if (act(doAct('buildRoom', { kind: r.kind, x: r.x, y: r.y, w: r.w, d: r.d, door: { side: e.side, i: e.i } }))) { mode = null; refresh(); }
+  }
+  function roomUp() {
+    if (mode.stage !== 'rect' || !mode.a) return;
+    const r = roomRect();
+    if (r.w < L.ROOM.minW || r.d < L.ROOM.minD) { toast('Mindestens ' + L.ROOM.minW + '×' + L.ROOM.minD + ' Felder.'); mode.a = null; mode.b = null; return; }
+    mode.stage = 'door';
+  }
+  /** Kante des Rechtecks, die der Maus am nächsten ist (Außenwände des Ladens gehen nicht) */
+  function nearestEdge(r) {
+    if (!r || !hover) return null;
+    const mid = (e) => {
+      if (e.side === 'n') return { x: r.x + e.i + 0.5, y: r.y };
+      if (e.side === 's') return { x: r.x + e.i + 0.5, y: r.y + r.d };
+      if (e.side === 'w') return { x: r.x, y: r.y + e.i + 0.5 };
+      return { x: r.x + r.w, y: r.y + e.i + 0.5 };
+    };
+    return L.roomEdges(r).filter((e) => !L.outerEdge(state, e.key))
+      .map((e) => Object.assign({ m: mid(e) }, e))
+      .sort((a, b) => Math.hypot(a.m.x - hover.x, a.m.y - hover.y) - Math.hypot(b.m.x - hover.x, b.m.y - hover.y))[0] || null;
+  }
+  /** Kante als Linie am Boden (für Wände, Tür-Markierung) */
+  function edgePts(e, r, z) {
+    if (e.side === 'n') return [iso(r.x + e.i, r.y, z), iso(r.x + e.i + 1, r.y, z)];
+    if (e.side === 's') return [iso(r.x + e.i, r.y + r.d, z), iso(r.x + e.i + 1, r.y + r.d, z)];
+    if (e.side === 'w') return [iso(r.x, r.y + e.i, z), iso(r.x, r.y + e.i + 1, z)];
+    return [iso(r.x + r.w, r.y + e.i, z), iso(r.x + r.w, r.y + e.i + 1, z)];
+  }
+  function drawRoomGhost(g) {
+    const r = roomRect();
+    if (!r) return;
+    const cost = L.roomCost(state, r);
+    const col = r.w >= L.ROOM.minW && r.d >= L.ROOM.minD && state.coins >= cost ? 0x4fd17a : 0xe0525a;
+    for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.d; y++) poly(g, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], col, 0.25);
+    L.roomEdges(r).forEach((e) => {
+      if (L.outerEdge(state, e.key)) return;
+      const [p, q] = edgePts(e, r, 0);
+      g.lineStyle(3, col, 0.9).lineBetween(p.x, p.y, q.x, q.y);
+    });
+    if (mode.stage === 'door') {
+      const e = nearestEdge(r);
+      if (e) {
+        const [p, q] = edgePts(e, r, 0);
+        g.lineStyle(6, 0xffd84a, 1).lineBetween(p.x, p.y, q.x, q.y);
+      }
+    }
+    const c = iso(r.x + r.w / 2, r.y + r.d / 2);
+    if (!scene.roomLabel) scene.roomLabel = scene.add.text(0, 0, '', { fontSize: '12px', color: '#fff', backgroundColor: '#000000aa', padding: { x: 6, y: 3 } }).setOrigin(0.5).setDepth(21000).setResolution(2);
+    scene.roomLabel.setText((r.kind === 'lager' ? 'Lager ' : 'Geheimraum ') + r.w + '×' + r.d + ' · ' + fmt(cost) + ' Kanacoin' + (mode.stage === 'door' ? '\n' + (r.kind === 'lager' ? 'Wand für die Tür anklicken' : 'Wand für den Schrank anklicken') : '')).setPosition(c.x, c.y).setVisible(true);
+  }
+
   function drawGhost() {
     if (!scene) return;
     const g = scene.ghost;
     g.clear();
+    if (scene.roomLabel) scene.roomLabel.setVisible(false);
+    if (mode && mode.kind === 'room') { drawRoomGhost(g); return; }
     const c = candidate();
     if (!c) return;
     const ok = L.check(state, catalog, c, mode.kind === 'move' ? mode.uid : undefined).ok;
@@ -1673,6 +1817,7 @@
   }
 
   function rotate() {
+    if (mode && mode.kind === 'room') return; // Raum bauen: nichts zu drehen
     if (mode) {
       const d = catalog[mode.id];
       if (d.layer !== 'wand') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
@@ -1708,6 +1853,7 @@
       const what = b.dataset.shopDo;
       if (what === 'rotate') rotate();
       else if (what === 'move') startMove(selected);
+      else if (what === 'inhalt') openShelf(selected);
       else giveBack();
     });
   });
