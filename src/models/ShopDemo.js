@@ -33,6 +33,11 @@ const shopDemoSchema = new Schema(
     // Räume (Lager, Geheimraum) – src/shop/layout.js
     rooms: { type: [Schema.Types.Mixed], default: [] },
     nextRid: { type: Number, default: 1 },
+    // Ruf & Stufe, Kleidung (src/shop/layout.js)
+    ruf: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    wardrobe: { type: [String], default: [] },
+    outfit: { type: Schema.Types.Mixed, default: {} },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

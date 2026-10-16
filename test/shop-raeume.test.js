@@ -3,6 +3,8 @@ const assert = require('node:assert');
 const L = require('../src/shop/layout');
 const { CATALOG, GOODS } = require('../src/shop/catalog');
 
+// Läden in diesen Tests sind schon auf der höchsten Ruf-Stufe (Freischaltungen: test/shop-ruf.test.js)
+const hoch = () => Object.assign(L.fresh(), { level: 5, ruf: 2500 });
 const cat = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const apply = (s, a) => L.apply(s, cat, goods, a);
@@ -17,7 +19,7 @@ const build = (s, id, x, y, rot) => {
 };
 
 test('Lager: Wände kosten je Kante, Tür, nur Lagerregale, Wand blockiert', () => {
-  let s = L.fresh();
+  let s = hoch();
   // 3×3 in der Ecke hinten links: zwei Seiten sind Außenwand (6 Kanten), 6 neue Wände + Tür
   const r = { x: 0, y: 0, w: 3, d: 3, kind: 'lager' };
   assert.strictEqual(L.roomCost(s, r), 6 * 20 + 50);
@@ -44,7 +46,7 @@ test('Lager: Wände kosten je Kante, Tür, nur Lagerregale, Wand blockiert', () 
 });
 
 test('Raum-Regeln: Mindestgröße, kein Überlappen, Platz muss leer sein, Eingang frei', () => {
-  let s = build(L.fresh(), 'plant', 5, 5, 0);
+  let s = build(hoch(), 'plant', 5, 5, 0);
   assert.match(apply(s, { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 1, d: 3, door: { side: 'e', i: 0 } }).error, /mindestens/);
   assert.match(apply(s, { type: 'buildRoom', kind: 'lager', x: 4, y: 4, w: 2, d: 2, door: { side: 'n', i: 0 } }).error, /leer/);
   assert.match(apply(s, { type: 'buildRoom', kind: 'lager', x: 3, y: 6, w: 2, d: 2, door: { side: 'n', i: 0 } }).error, /Eingang/);
@@ -53,7 +55,7 @@ test('Raum-Regeln: Mindestgröße, kein Überlappen, Platz muss leer sein, Einga
 });
 
 test('Geheimraum: Schrank vor der Tür, E schiebt ihn, darin lagern, nicht frei bewegbar', () => {
-  let s = L.fresh();
+  let s = hoch();
   s = run(s, { type: 'buildRoom', kind: 'geheim', x: 5, y: 0, w: 3, d: 3, door: { side: 's', i: 1 } });
   const cab = s.items.find((it) => it.id === 'geheimschrank');
   assert.deepStrictEqual([cab.x, cab.y, cab.rot], [6, 3, 0], 'vor der Tür, Front nach außen');
@@ -77,7 +79,7 @@ test('Geheimraum: Schrank vor der Tür, E schiebt ihn, darin lagern, nicht frei 
 });
 
 test('Raumnamen, Schrank klemmt niemanden ein', () => {
-  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 2, d: 2, door: { side: 'e', i: 0 } });
+  let s = run(hoch(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 2, d: 2, door: { side: 'e', i: 0 } });
   assert.strictEqual(s.rooms[0].name, 'Lager 1');
   s = run(s, { type: 'renameRoom', rid: s.rooms[0].rid, name: '  Hinterzimmer <b>Nord</b> ' });
   assert.strictEqual(s.rooms[0].name, 'Hinterzimmer bNordb', 'nur Buchstaben, Zahlen, Leerzeichen, .-_');
@@ -92,7 +94,7 @@ test('Raumnamen, Schrank klemmt niemanden ein', () => {
 });
 
 test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Feuchtigkeit lässt Papier verderben', () => {
-  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 2, y: 2, w: 4, d: 5, door: { side: 'n', i: 0 } }); // 20 Felder → 2 Geräte
+  let s = run(hoch(), { type: 'buildRoom', kind: 'lager', x: 2, y: 2, w: 4, d: 5, door: { side: 'n', i: 0 } }); // 20 Felder → 2 Geräte
   assert.deepStrictEqual(L.dampStatus(s, s.rooms[0]), { need: 2, have: 0 });
   s = build(s, 'dehumidifier', 2, 2, 0);
   s = run(s, { type: 'orderMoebel', id: 'dehumidifier_wall' }, { type: 'pick', bid: s.nextBid });
@@ -102,7 +104,7 @@ test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Fe
   assert.deepStrictEqual(L.dampStatus(s, s.rooms[0]), { need: 2, have: 2 });
   assert.ok(!L.blocked(s, cat).has('5,4'), 'Wand-Gerät braucht keinen Platz am Boden');
   // ohne Geräte: Papier verdirbt, Getränke nicht
-  let wet = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 4, d: 4, door: { side: 's', i: 1 } });
+  let wet = run(hoch(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 4, d: 4, door: { side: 's', i: 1 } });
   wet.items.push({ uid: 50, id: 'lager_regal_gross', x: 0, y: 0, rot: 0, stock: { booster_pack: 40, coffee: 20 } });
   const r = L.spoilStorage(wet, cat, goods, () => 0.5);
   assert.deepStrictEqual(r.spoiled, { booster_pack: 2 }, '5 % von 40 = 2, Kaffee nicht');
@@ -113,14 +115,14 @@ test('Luftentfeuchter: Boden im Lager erlaubt, Wand-Gerät nur an einer Wand; Fe
 });
 
 test('Wandgerät in der Ecke: Seite wählbar; hohe Möbel und der Schrank kommen nicht darunter', () => {
-  let s = run(L.fresh(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 3, d: 3, door: { side: 's', i: 1 } });
+  let s = run(hoch(), { type: 'buildRoom', kind: 'lager', x: 0, y: 0, w: 3, d: 3, door: { side: 's', i: 1 } });
   // Zelle (2,0): Nord = hintere Ladenwand, Ost = Raumwand – beides geht
   assert.ok(L.wallOnSide(s, 2, 0, 0) && L.wallOnSide(s, 2, 0, 3) && !L.wallOnSide(s, 2, 0, 2));
   s = run(s, { type: 'orderMoebel', id: 'dehumidifier_wall' }, { type: 'pick', bid: 1 }, { type: 'build', x: 2, y: 0, rot: 3 });
   s = run(s, { type: 'orderMoebel', id: 'lager_regal_klein' }, { type: 'pick', bid: 2 });
   assert.match(apply(s, { type: 'build', x: 1, y: 0, rot: 0 }).error, /Gerät/, 'Lagerregal (hoch) nicht unter das Gerät');
   // Geheimschrank darf nicht unter ein Wandgerät rutschen
-  let g = run(L.fresh(), { type: 'buildRoom', kind: 'geheim', x: 5, y: 2, w: 3, d: 3, door: { side: 'w', i: 1 } });
+  let g = run(hoch(), { type: 'buildRoom', kind: 'geheim', x: 5, y: 2, w: 3, d: 3, door: { side: 'w', i: 1 } });
   const cab = g.items.find((it) => it.id === 'geheimschrank'); // steht bei (4,3)
   g.items.push({ uid: 99, id: 'dehumidifier_wall', x: 4, y: 4, rot: 3 });
   g = run(g, { type: 'slideCabinet', uid: cab.uid });

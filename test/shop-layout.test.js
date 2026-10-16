@@ -3,6 +3,8 @@ const assert = require('node:assert');
 const L = require('../src/shop/layout');
 const { CATALOG, GOODS, LICENSES, SERVICES, UNIT_PRICE } = require('../src/shop/catalog');
 
+// Läden in diesen Tests sind schon auf der höchsten Ruf-Stufe (Freischaltungen: test/shop-ruf.test.js)
+const hoch = () => Object.assign(L.fresh(), { level: 5, ruf: 2500 });
 const cat = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])) };
@@ -32,7 +34,7 @@ test('Katalog: Möbel und Ware aus den Platzhalter-Daten', () => {
 });
 
 test('Möbel kommen im Karton auf den Gehweg und werden aufgebaut', () => {
-  let s = run(L.fresh(), { type: 'orderMoebel', id: 'shelf_big' });
+  let s = run(hoch(), { type: 'orderMoebel', id: 'shelf_big' });
   assert.strictEqual(s.coins, L.START_COINS - cat.shelf_big.price);
   assert.strictEqual(s.items.length, 0);
   assert.ok(s.boxes[0].y >= L.UNIT_D, 'auf dem Gehweg');
@@ -47,18 +49,18 @@ test('Möbel kommen im Karton auf den Gehweg und werden aufgebaut', () => {
 });
 
 test('Kollision, Eingang, Wand, Theke', () => {
-  let s = build(L.fresh(), 'shelf_medium', 0, 0, 0);
+  let s = build(hoch(), 'shelf_medium', 0, 0, 0);
   s = run(s, { type: 'orderMoebel', id: 'chair' }, { type: 'pick', bid: s.nextBid });
   assert.match(apply(s, { type: 'build', x: 1, y: 0 }).error, /schon/);
   assert.match(apply(s, { type: 'build', x: 3, y: 7 }).error, /Eingang/);
-  s = build(L.fresh(), 'poster', 2, 5, 0, 'n');
+  s = build(hoch(), 'poster', 2, 5, 0, 'n');
   assert.strictEqual(s.items[0].y, 0);
   s = run(s, { type: 'orderMoebel', id: 'booster_display' }, { type: 'pick', bid: s.nextBid });
   assert.match(apply(s, { type: 'build', x: 5, y: 5 }).error, /Theke/);
 });
 
 test('Ware bestellen, tragen, gemischt einräumen, Platz begrenzt', () => {
-  let s = build(L.fresh(), 'shelf_small', 0, 0, 0); // 6 Plätze
+  let s = build(hoch(), 'shelf_small', 0, 0, 0); // 6 Plätze
   assert.match(apply(s, { type: 'orderWare', id: 'board_game_box', n: 1 }).error, /Brettspiel-Lizenz/);
   s = run(s, { type: 'buyLicense', id: 'brettspiele' });
   assert.match(apply(s, { type: 'buyLicense', id: 'brettspiele' }).error, /schon/);
@@ -84,7 +86,7 @@ test('Ware bestellen, tragen, gemischt einräumen, Platz begrenzt', () => {
 });
 
 test('Ware herausnehmen, Abstellen nur auf freiem Boden', () => {
-  let s = build(L.fresh(), 'shelf_small', 0, 0, 0);
+  let s = build(hoch(), 'shelf_small', 0, 0, 0);
   s = run(s, { type: 'orderWare', id: 'toploader', n: 1 });
   s = run(s, { type: 'pick', bid: s.boxes[0].bid }, { type: 'stock', uid: 1 });
   assert.match(apply(s, { type: 'drop', x: 0.5, y: 0.5 }).error, /nicht stehen/);
@@ -96,7 +98,7 @@ test('Ware herausnehmen, Abstellen nur auf freiem Boden', () => {
 });
 
 test('Preise, Nachbar-Einheit, Kanacoin, Zurücksetzen', () => {
-  let s = run(L.fresh(), { type: 'setPrice', ware: 'booster_pack', price: 12.5 });
+  let s = run(hoch(), { type: 'setPrice', ware: 'booster_pack', price: 12.5 });
   assert.strictEqual(L.price(s, goods, 'booster_pack'), 12.5);
   assert.strictEqual(L.price(s, goods, 'coffee'), goods.coffee.market);
   assert.ok(apply(s, { type: 'setPrice', ware: 'booster_pack', price: -1 }).error);
@@ -108,7 +110,7 @@ test('Preise, Nachbar-Einheit, Kanacoin, Zurücksetzen', () => {
   assert.strictEqual(r.coins, L.START_COINS);
   assert.match(apply(r, { type: 'remove', uid: r.items[0].uid }).error, /Kasse/);
   // Kasse wird auch neben vorhandenen Möbeln untergebracht
-  const busy = build(L.fresh(), 'shelf_big', 1, 5, 0);
+  const busy = build(hoch(), 'shelf_big', 1, 5, 0);
   assert.ok(L.ensureCounter(busy, cat).items.some((i) => i.id === 'cashier_counter'));
   assert.deepStrictEqual(L.normalize({ coins: 5, units: 1, nextUid: 1, items: [] }).boxes, [], 'alter Stand ohne Kartons');
 });

@@ -43,6 +43,10 @@
   let serviceList = [];
   let packs = [];
   let more = { licenses: {}, services: {} };
+  let clothesList = [];
+  let clothesSlots = [];
+  let rufCfg = { levels: [0], unlock: {} };
+  const lockedFor = (lv) => (lv || 1) > (state.level || 1); // ab dieser Ruf-Stufe frei
   const licensePrices = () => Object.fromEntries(licenseList.map((l) => [l.id, l.price]));
 
   const doAct = (type, extra) => Object.assign({ type }, extra);
@@ -149,7 +153,7 @@
     ['propaganda', 'Propaganda drucken'],
     ['level', 'Level'],
   ];
-  const LATER = ['ruf', 'kleidung', 'propaganda', 'level'];
+  const LATER = ['propaganda', 'level'];
 
   function openPc() {
     const dlg = $('[data-shop-pc]');
@@ -179,6 +183,8 @@
     else if (pcTab === 'bestand') pcBestand(body);
     else if (pcTab === 'lizenzen') pcLizenzen(body);
     else if (pcTab === 'werkzeug') pcWerkzeug(body);
+    else if (pcTab === 'ruf') pcRuf(body);
+    else if (pcTab === 'kleidung') pcKleidung(body);
     else if (pcTab === 'verkauf') pcVerkauf(body);
     else if (pcTab === 'bewertungen') pcBewertungen(body);
     else if (pcTab === 'belege') pcBelege(body);
@@ -218,7 +224,8 @@
       const td = el('td', 'num');
       const b = el('button', 'sd-btn', 'Bestellen');
       b.type = 'button';
-      b.disabled = d.price > state.coins;
+      b.disabled = d.price > state.coins || lockedFor(d.level);
+      if (lockedFor(d.level)) b.textContent = 'ab Stufe ' + d.level;
       b.addEventListener('click', () => { if (act(doAct('orderMoebel', { id: d.id }))) renderPc(); });
       td.appendChild(b);
       tr.appendChild(td);
@@ -253,7 +260,8 @@
       const td = el('td', 'num');
       const b = el('button', 'sd-btn', '1 Karton');
       b.type = 'button';
-      b.disabled = boxCost > state.coins || !!lic;
+      b.disabled = boxCost > state.coins || !!lic || lockedFor(g.level);
+      if (lockedFor(g.level)) b.textContent = 'ab Stufe ' + g.level;
       b.addEventListener('click', () => { if (act(doAct('orderWare', { id: g.id, n: 1 }))) renderPc(); });
       td.appendChild(b);
       tr.appendChild(td);
@@ -267,9 +275,11 @@
     body.appendChild(el('div', 'sd-group', 'Bauen'));
     const row = el('p', 'sd-later');
     [['lager', 'Lager bauen'], ['geheim', 'Geheimraum bauen']].forEach(([kind, label]) => {
-      const b = el('button', 'sd-btn', label);
+      const need = rufCfg.unlock[kind] || 1;
+      const b = el('button', 'sd-btn', lockedFor(need) ? label + ' (ab Stufe ' + need + ')' : label);
       b.type = 'button';
       b.style.marginRight = '6px';
+      b.disabled = lockedFor(need);
       b.addEventListener('click', () => {
         $('[data-shop-pc]').close();
         selected = null;
@@ -318,6 +328,59 @@
     body.appendChild(t);
   }
 
+  /** Ruf-Stufe: Stand, nächste Schwelle, was wo frei wird (Platzhalter-Tabelle, Krisztian 2026-10-16) */
+  function pcRuf(body) {
+    const lv = state.level || 1;
+    const next = rufCfg.levels[lv];
+    body.appendChild(el('p', '', 'Ruf-Stufe ' + lv + ' · ' + fmt(state.ruf || 0) + ' Ruf' + (next !== undefined ? ' – Stufe ' + (lv + 1) + ' ab ' + fmt(next) : ' – höchste Stufe')));
+    body.appendChild(el('p', 'sd-later', 'Ruf gibt es für Umsatz (je ' + rufCfg.perCoins + ' Kanacoin +1) und Bewertungen (5★ +' + rufCfg.stars[5] + ', 4★ +' + rufCfg.stars[4] + ', 2★ ' + rufCfg.stars[2] + ', 1★ ' + rufCfg.stars[1] + '). Eine erreichte Stufe geht nie verloren.'));
+    const unlocks = {};
+    const addU = (lvl, txt) => { (unlocks[lvl] = unlocks[lvl] || []).push(txt); };
+    list.filter((d) => (d.level || 1) > 1).forEach((d) => addU(d.level, d.name));
+    goodsList.filter((g) => (g.level || 1) > 1).forEach((g) => addU(g.level, g.name));
+    licenseList.filter((l) => (l.level || 1) > 1).forEach((l) => addU(l.level, l.name));
+    if (rufCfg.unlock.lager) addU(rufCfg.unlock.lager, 'Lager bauen');
+    if (rufCfg.unlock.geheim) addU(rufCfg.unlock.geheim, 'Geheimraum bauen');
+    if (rufCfg.unlock.unit) addU(rufCfg.unlock.unit, 'Nachbarfläche kaufen');
+    const { t, tb } = table([['Stufe'], ['ab Ruf', 1], ['Wird frei']]);
+    rufCfg.levels.forEach((min, i) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', i + 1 <= lv ? 'is-up' : '', 'Stufe ' + (i + 1) + (i + 1 <= lv ? ' ✓' : '')));
+      tr.appendChild(el('td', 'num', fmt(min)));
+      tr.appendChild(el('td', '', i === 0 ? 'Grundausstattung' : (unlocks[i + 1] || []).join(', ') || '–'));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+  }
+
+  /** Kleidung: kaufen = anziehen; nochmal klicken = ausziehen (Verdacht in der Stadt: später) */
+  function pcKleidung(body) {
+    clothesSlots.forEach((slot) => {
+      body.appendChild(el('div', 'sd-group', slot.name));
+      const { t, tb } = table([['Kleidung'], ['Preis', 1], ['']]);
+      clothesList.filter((c) => c.slot === slot.id).forEach((c) => {
+        const tr = el('tr');
+        const name = el('td');
+        const sw = el('span', 'sd-swatch');
+        sw.style.background = hex(c.color);
+        name.append(sw, c.name);
+        tr.appendChild(name);
+        tr.appendChild(el('td', 'num', fmt(c.price)));
+        const td = el('td', 'num');
+        const owned = state.wardrobe.includes(c.id);
+        const worn = state.outfit[c.slot] === c.id;
+        const b = el('button', 'sd-btn', !owned ? 'Kaufen' : worn ? 'Ausziehen' : 'Anziehen');
+        b.type = 'button';
+        b.disabled = !owned && c.price > state.coins;
+        b.addEventListener('click', () => { if (act(doAct(owned ? 'wear' : 'buyClothes', { id: c.id }))) renderPc(); });
+        td.appendChild(b);
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      });
+      body.appendChild(t);
+    });
+  }
+
   function pcWerkzeug(body) {
     const { t, tb } = table([['Werkzeug'], ['Preis', 1], ['']]);
     L.TOOLS.forEach((w) => {
@@ -355,7 +418,8 @@
       else {
         const b = el('button', 'sd-btn', 'Kaufen');
         b.type = 'button';
-        b.disabled = l.price > state.coins;
+        b.disabled = l.price > state.coins || lockedFor(l.level);
+        if (lockedFor(l.level)) b.textContent = 'ab Stufe ' + l.level;
         b.addEventListener('click', () => { if (act(doAct('buyLicense', { id: l.id }))) renderPc(); });
         td.appendChild(b);
       }
@@ -966,7 +1030,7 @@
 
   /** force (nur Test-Knöpfe): 'kunde' = sicher ohne Karte, 'auftrag' = sicher mit Karte (sonst Zufall wie im Spiel) */
   function spawn(force) {
-    const c = C.newCustomer(day.rng, goodsList, { tier: 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
+    const c = C.newCustomer(day.rng, goodsList, { tier: 1, level: state.level || 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
     // Bringt er eine Karte? Nur mit passenden Tischen und höchstens 2 Aufträge (auch die, die noch an der Kasse stehen)
     const stations = new Set(state.items.map((it) => it.id));
     c.services = force === 'kunde' ? null : C.serviceWish(force === 'auftrag' ? () => 0 : day.rng, stations, pendingJobs(), packs, serviceList);
@@ -1273,6 +1337,7 @@
     });
   }
 
+  let seenLevel = null;
   function refreshClock() {
     const elc = $('[data-shop-clock]');
     if (!elc) return;
@@ -1282,6 +1347,9 @@
       const frac = day.t / C.DAY_SECONDS;
       elc.textContent = 'Tag ' + state.day + ' · ' + (frac >= 1 ? 'Ladenschluss' : C.clock(frac) + ' · geöffnet') + ' · ' + stars;
     } else elc.textContent = 'Tag ' + state.day + ' · geschlossen · ' + stars;
+    elc.textContent += ' · Stufe ' + (state.level || 1);
+    if (seenLevel !== null && (state.level || 1) > seenLevel) note('Ruf-Stufe ' + state.level + ' erreicht! Am PC (Reiter Ruf) siehst du, was neu frei ist.');
+    seenLevel = state.level || 1;
   }
 
   let noteTimer = 0;
@@ -1446,13 +1514,27 @@
     const p = iso(player.x, player.y);
     g.fillStyle(0x000000, 0.3);
     g.fillEllipse(p.x, p.y, 26, 12);
-    g.fillStyle(0x2f6fd0, 1);
-    g.fillRoundedRect(p.x - 9, p.y - 34, 18, 30, 7);
+    // Kleidung (PC → Kleidung): Oberteil, Hose, Kopf
+    const wear = (slot) => clothesList.find((c) => c.id === (state.outfit || {})[slot]) || null;
+    const top = wear('oberteil');
+    const legs = wear('hose');
+    const head = wear('kopf');
+    g.fillStyle(legs ? legs.color : 0x2a3550, 1);
+    g.fillRect(p.x - 8, p.y - 14, 7, 12);
+    g.fillRect(p.x + 1, p.y - 14, 7, 12);
+    g.fillStyle(top ? top.color : 0x2f6fd0, 1);
+    g.fillRoundedRect(p.x - 9, p.y - 34, 18, 22, 7);
     g.fillStyle(0xf0c8a0, 1);
     g.fillCircle(p.x, p.y - 42, 9);
     g.lineStyle(1.5, 0x0e1a33, 1);
-    g.strokeRoundedRect(p.x - 9, p.y - 34, 18, 30, 7);
+    g.strokeRoundedRect(p.x - 9, p.y - 34, 18, 22, 7);
     g.strokeCircle(p.x, p.y - 42, 9);
+    if (head) {
+      g.fillStyle(head.color, 1);
+      if (head.shape === 'kappe') { g.fillEllipse(p.x, p.y - 47, 20, 10); g.fillRect(p.x, p.y - 47, 13, 3); }
+      else if (head.shape === 'muetze') { g.fillEllipse(p.x, p.y - 48, 20, 13); g.fillCircle(p.x, p.y - 56, 3); }
+      else { g.fillRoundedRect(p.x - 11, p.y - 53, 22, 20, 8); g.fillStyle(0xf0c8a0, 1); g.fillCircle(p.x, p.y - 41, 7); }
+    }
     if (held === 'mop') {
       const wob = mopping ? Math.sin(mopping.t * 18) * 5 : 0;
       g.lineStyle(3, 0x8a6a3a, 1);
@@ -1508,12 +1590,13 @@
       if (!job) continue;
       const n = L.nextService(job);
       const label = n === 'foil' ? 'E: Karte von Kunde ' + job.jid + ' in TCG Sleeve stecken' : 'E: ' + more.services[n].name + ' – Karte von Kunde ' + job.jid;
-      return { label: label, run: () => (n === 'foil' ? act(doAct('foil', { jid: job.jid })) : openBench(job, o.it.id)) };
+      return { label: label, run: () => openBench(job, o.it.id) };
     }
     return null;
   }
 
   function openBench(job, station) {
+    if (job.services.includes('foil') && station === 'pack_opening_counter' && !L.supplier(state, 'mat_sleeve')) { toast('Kein TCG Sleeve – erst am PC bestellen und in die Öffnungstheke einräumen.'); return; }
     const needsSlab = job.services.includes('slab') && !job.done.includes('slab') && station === 'card_grading_table';
     if (needsSlab && !L.supplier(state, 'mat_slab')) { toast('Kein leerer Slab – erst am PC bestellen und in den Tisch einräumen.'); return; }
     const q = '?auftrag=' + encodeURIComponent(job.jid) + '&tisch=' + encodeURIComponent(station);
@@ -1562,7 +1645,7 @@
     state.jobs.forEach((job) => {
       const n = L.nextService(job);
       const station = n && more.services[n] ? more.services[n].station : null;
-      if (!station || station === 'pack_opening_counter') return;
+      if (!station) return;
       const key = job.jid + '|' + station;
       if (benchCache.has(key)) return;
       benchCache.set(key, null); // läuft schon
@@ -1762,7 +1845,7 @@
 
     if (state.units < L.MAX_UNITS) {
       const c = iso(state.units * L.UNIT_W + L.UNIT_W / 2, L.UNIT_D / 2);
-      const t = scene.add.text(c.x, c.y, 'Zu verkaufen\n' + fmt(unitPrice) + ' Kanacoin\n(klicken)', {
+      const t = scene.add.text(c.x, c.y, 'Zu verkaufen\n' + fmt(unitPrice) + ' Kanacoin\n' + (lockedFor(rufCfg.unlock.unit) ? '(ab Ruf-Stufe ' + rufCfg.unlock.unit + ')' : '(klicken)'), {
         fontSize: '14px', color: state.coins >= unitPrice ? '#f0d48a' : '#8a8f9c', align: 'center', backgroundColor: '#1c1f2bcc', padding: { x: 8, y: 6 },
       });
       scene.extra.push(t.setOrigin(0.5).setDepth(-6000));
@@ -2000,6 +2083,7 @@
   // ---------- TEST-KNÖPFE (nur Shop-Demo – im fertigen Spiel entfernen: Markup data-shop-dev, CSS .sd-dev, dieser Block) ----------
   document.querySelectorAll('[data-shop-dev]').forEach((b) => {
     b.addEventListener('click', () => {
+      if (b.dataset.shopDev === 'ruf') { act(doAct('devRuf', { amount: 100 })); return; }
       if (!state.open || !day.rng) { toast('Erst den Laden an der Tür öffnen.'); return; }
       if (b.dataset.shopDev === 'auftrag') {
         const stations = new Set(state.items.map((it) => it.id));
@@ -2042,7 +2126,10 @@
       licenseList = data.licenses || [];
       serviceList = data.services || [];
       packs = data.packs || [];
-      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])) };
+      clothesList = data.clothes || [];
+      clothesSlots = data.clothesSlots || [];
+      rufCfg = data.ruf || { levels: [0], unlock: {} };
+      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])), clothes: clothesList };
       catalog = Object.fromEntries(list.map((d) => [d.id, d]));
       goods = Object.fromEntries(goodsList.map((g) => [g.id, g]));
       refreshHud();
