@@ -513,6 +513,13 @@
       const pos = Math.floor((onN ? hover.x : hover.y) - d.w / 2 + 0.5);
       return onN ? { id: d.id, x: pos, y: 0, wall: 'n', rot: 0 } : { id: d.id, x: 0, y: pos, wall: 'w', rot: 0 };
     }
+    if (d.layer === 'wandnah') {
+      // Seite mit Wand: die gewählte (R), sonst die erste passende
+      const x = Math.floor(hover.x);
+      const y = Math.floor(hover.y);
+      const rot = L.wallOnSide(state, x, y, mode.rot, walls) ? mode.rot : [0, 1, 2, 3].find((r) => L.wallOnSide(state, x, y, r, walls));
+      return { id: d.id, x, y, rot: rot === undefined ? mode.rot : rot };
+    }
     const s = L.size(d, mode.rot);
     return { id: d.id, x: Math.floor(hover.x - s.w / 2 + 0.5), y: Math.floor(hover.y - s.d / 2 + 0.5), rot: mode.rot };
   }
@@ -649,16 +656,15 @@
 
   /** Gerät an der Wand: kleiner Kasten in Brusthöhe, an die nächste Wand der Zelle gerückt */
   function drawNearWall(g, it, d, color, alpha, outline) {
-    const ws = walls;
     const x = it.x;
     const y = it.y;
-    let bx;
-    if (y === 0 || ws.has('h:' + x + ',' + y)) bx = { x: x + 0.25, y: y + 0.04, w: 0.5, d: 0.22 };
-    else if (x === 0 || ws.has('v:' + x + ',' + y)) bx = { x: x + 0.04, y: y + 0.25, w: 0.22, d: 0.5 };
-    else if (ws.has('h:' + x + ',' + (y + 1))) bx = { x: x + 0.25, y: y + 0.74, w: 0.5, d: 0.22 };
-    else bx = { x: x + 0.74, y: y + 0.25, w: 0.22, d: 0.5 };
-    const hull = box(g, bx.x, bx.y, bx.w, bx.d, d.height, 26, color, alpha, outline, 0);
-    return { hull: hull, depth: (bx.x + bx.y) * 10, top: iso(bx.x + bx.w / 2, bx.y + bx.d / 2, 26 + d.height), box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 1 } };
+    const side = L.rot4(it.rot);
+    const bx = side === 0 ? { x: x + 0.25, y: y + 0.07, w: 0.5, d: 0.22 }
+      : side === 1 ? { x: x + 0.07, y: y + 0.25, w: 0.22, d: 0.5 }
+        : side === 2 ? { x: x + 0.25, y: y + 0.71, w: 0.5, d: 0.22 }
+          : { x: x + 0.71, y: y + 0.25, w: 0.22, d: 0.5 };
+    const hull = box(g, bx.x, bx.y, bx.w, bx.d, d.height, L.MOUNT_Z, color, alpha, outline, 0);
+    return { hull: hull, depth: (bx.x + bx.y) * 10, top: iso(bx.x + bx.w / 2, bx.y + bx.d / 2, L.MOUNT_Z + d.height), box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 1 } };
   }
 
   function drawCarton(g, x, y, z, kindColor, alpha) {
@@ -675,9 +681,9 @@
   /** Sortiert Möbel, Kartons, Wände und Figuren jedes Bild neu (bei Platzhalter-Mengen reicht n²) */
   function sortDepth() {
     const list = (scene.sortables || []).slice();
-    const r = 0.18;
-    list.push({ g: scene.hero, box: { x0: player.x - r, y0: player.y - r, x1: player.x + r, y1: player.y + r, bias: 2 } });
-    day.customers.forEach((c) => { if (c.g) list.push({ g: c.g, box: { x0: c.x - r, y0: c.y - r, x1: c.x + r, y1: c.y + r, bias: 2 } }); });
+    // Figuren zählen als Punkt (wo sie stehen), Wände als Linie auf der Zellkante – so ist vorne/hinten immer eindeutig
+    list.push({ g: scene.hero, box: { x0: player.x, y0: player.y, x1: player.x, y1: player.y, bias: 2 } });
+    day.customers.forEach((c) => { if (c.g) list.push({ g: c.g, box: { x0: c.x, y0: c.y, x1: c.x, y1: c.y, bias: 2 } }); });
     const n = list.length;
     const after = list.map(() => []);
     const indeg = new Array(n).fill(0);
@@ -793,6 +799,7 @@
       drawCustomers();
       drawHero();
       sortDepth();
+      fadeWalls();
       this.clockT = (this.clockT || 0) + sec;
       if (this.clockT > 0.5) { this.clockT = 0; refreshClock(); }
       const cam = this.cameras.main;
@@ -1370,18 +1377,31 @@
     return Array.from(new Set([[-r, -r], [r, -r], [-r, r], [r, r]].map(([ox, oy]) => Math.floor(player.x + ox) + ',' + Math.floor(player.y + oy))));
   }
 
-  /** Läuft die Figur von (fx, fy) nach (tx, ty) durch eine Raumwand? (Ecken des Körpers einzeln prüfen) */
+  /** Abstand eines Punkts zu einem Wandstück (Kante 'h:x,y' bzw. 'v:x,y') */
+  function wallDist(key, px, py) {
+    const [t, rest] = key.split(':');
+    const [a, b] = rest.split(',').map(Number);
+    const cx = t === 'h' ? Math.max(a, Math.min(a + 1, px)) : a;
+    const cy = t === 'h' ? b : Math.max(b, Math.min(b + 1, py));
+    return Math.hypot(px - cx, py - cy);
+  }
+  /**
+   * Läuft die Figur in eine Raumwand? Körper = Kreis (Radius 0,2): blockiert nur, wenn er einer Wand näher als der
+   * Radius kommt UND sich ihr dabei nähert – wegbewegen geht immer (so kann man nie festklemmen)
+   */
   function throughWall(fx, fy, tx, ty) {
-    const r = 0.18;
-    return [[-r, -r], [r, -r], [-r, r], [r, r]].some(([ox, oy]) => {
-      const ax = Math.floor(fx + ox);
-      const ay = Math.floor(fy + oy);
-      const bx = Math.floor(tx + ox);
-      const by = Math.floor(ty + oy);
-      if (ax === bx && ay === by) return false;
-      if (Math.abs(ax - bx) + Math.abs(ay - by) > 1) return L.wallBetween(walls, ax, ay, bx, ay) || L.wallBetween(walls, bx, ay, bx, by);
-      return L.wallBetween(walls, ax, ay, bx, by);
-    });
+    const R = 0.2;
+    for (const key of walls) {
+      const dTo = wallDist(key, tx, ty);
+      if (dTo >= R) continue;
+      if (dTo < wallDist(key, fx, fy)) return true;
+    }
+    // die Kante selbst überqueren (sehr schnelle Schritte)
+    const ax = Math.floor(fx);
+    const ay = Math.floor(fy);
+    const bx = Math.floor(tx);
+    const by = Math.floor(ty);
+    return (ax !== bx || ay !== by) && Math.abs(ax - bx) + Math.abs(ay - by) === 1 && L.wallBetween(walls, ax, ay, bx, by);
   }
 
   /** Darf die Figur bei (x, y) stehen? (Rand mit kleinem Körper-Radius, Tür als einziger Durchgang zum Gehweg) */
@@ -1657,7 +1677,21 @@
     }
   }
 
-  const ROOM_WALL_H = 44;
+  const ROOM_WALL_H = 56;
+
+  /** Wandstücke vor der Figur (näher am Betrachter, auf dem Bildschirm in der Nähe) durchsichtig machen */
+  function fadeWalls() {
+    if (!scene || !scene.sortables) return;
+    const p = { x0: player.x, y0: player.y, x1: player.x, y1: player.y };
+    const ps = iso(player.x, player.y, 24);
+    scene.sortables.forEach((o) => {
+      if (!o.wall) return;
+      const front = inFront(o.box, p) && !inFront(p, o.box);
+      const near = Math.abs(o.mid.x - ps.x) < 70 && o.mid.y - ps.y > -20 && o.mid.y - ps.y < 90;
+      const target = front && near ? 0.28 : 1;
+      o.g.alpha += (target - o.g.alpha) * 0.25;
+    });
+  }
   function drawRooms() {
     const g = scene.floor;
     (state.rooms || []).forEach((r) => {
@@ -1668,14 +1702,17 @@
     L.wallPieces(state).forEach((p) => {
       const [t, rest] = p.key.split(':');
       const [a, b] = rest.split(',').map(Number);
-      const h = p.near ? LOW_WALL : ROOM_WALL_H;
+      // Krisztian (2026-10-16): Wände nicht niedriger machen (später eine ganze Stadt) – voll hoch, und wer davor steht,
+      // sieht durch: steht die Figur dahinter, wird das Wandstück durchsichtig (fadeWalls)
       const T = 0.12;
-      // etwas über die Enden hinaus, damit die Ecken geschlossen sind
       const bx = t === 'h' ? { x: a - T / 2, y: b - T / 2, w: 1 + T, d: T } : { x: a - T / 2, y: b - T / 2, w: T, d: 1 + T };
       const wg = scene.add.graphics();
-      box(wg, bx.x, bx.y, bx.w, bx.d, h, 0, p.near ? 0xc9bfae : 0xb8ad9a, 1, 0x8a7f6c, 0);
+      box(wg, bx.x, bx.y, bx.w, bx.d, ROOM_WALL_H, 0, p.near ? 0xc9bfae : 0xb8ad9a, 1, 0x8a7f6c, 0);
       scene.items.push(wg);
-      scene.sortables.push({ g: wg, box: { x0: bx.x, y0: bx.y, x1: bx.x + bx.w, y1: bx.y + bx.d, bias: 0 } });
+      // Sortier-Box = genau die Kante (nicht die gezeichnete Dicke)
+      const line = t === 'h' ? { x0: a, y0: b, x1: a + 1, y1: b } : { x0: a, y0: b, x1: a, y1: b + 1 };
+      const entry = { g: wg, box: Object.assign(line, { bias: 0 }), wall: true, mid: iso(t === 'h' ? a + 0.5 : a, t === 'h' ? b : b + 0.5, ROOM_WALL_H / 2) };
+      scene.sortables.push(entry);
     });
     // Raumnamen auf dem Boden
     if (showNames) {
@@ -1907,7 +1944,15 @@
     if (mode && (mode.kind === 'room' || mode.kind === 'demolish')) return; // Bauen/Abreißen: nichts zu drehen
     if (mode) {
       const d = catalog[mode.id];
-      if (d.layer !== 'wand') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
+      if (d.layer === 'wandnah' && hover) {
+        // nächste Seite der Zelle, an der eine Wand ist
+        const c = candidate();
+        for (let k = 1; k <= 4; k++) {
+          const r = (c.rot + k) % 4;
+          if (L.wallOnSide(state, c.x, c.y, r, walls)) { mode.rot = r; break; }
+        }
+        drawGhost();
+      } else if (d.layer !== 'wand') { mode.rot = (mode.rot + 1) % 4; drawGhost(); }
       return;
     }
     const it = selected && state.items.find((i) => i.uid === selected);
