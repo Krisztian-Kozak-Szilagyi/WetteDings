@@ -30,6 +30,9 @@ const shopDemoSchema = new Schema(
     market: { type: Schema.Types.Mixed, default: {} },
     marketMoves: { type: [Schema.Types.Mixed], default: [] },
     marketDay: { type: Number, default: 0 },
+    // Räume (Lager, Geheimraum) – src/shop/layout.js
+    rooms: { type: [Schema.Types.Mixed], default: [] },
+    nextRid: { type: Number, default: 1 },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {
@@ -41,6 +44,8 @@ const shopDemoSchema = new Schema(
         rot: Number,
         wall: String,
         stock: Schema.Types.Mixed,
+        rid: Number, // Geheimschrank: zu welchem Raum
+        home: Schema.Types.Mixed, // Geheimschrank: Platz vor der Tür
       },
     ],
   },
