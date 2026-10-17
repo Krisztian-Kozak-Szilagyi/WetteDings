@@ -38,6 +38,9 @@ const shopDemoSchema = new Schema(
     level: { type: Number, default: 1 },
     wardrobe: { type: [String], default: [] },
     outfit: { type: Schema.Types.Mixed, default: {} },
+    // Plakate: gedruckt (Typ → Stück), aufgehängt (Ort → Typ)
+    posters: { type: Schema.Types.Mixed, default: {} },
+    hung: { type: Schema.Types.Mixed, default: {} },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

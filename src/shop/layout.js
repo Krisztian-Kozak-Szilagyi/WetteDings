@@ -76,14 +76,14 @@
   const cents = (n) => Math.round(n * 100) / 100;
 
   function freshDay() {
-    return { revenue: 0, sold: {}, visitors: 0, buyers: 0, misses: {}, receipts: [], reviews: 0, starSum: 0 };
+    return { revenue: 0, sold: {}, visitors: 0, buyers: 0, misses: {}, receipts: [], reviews: 0, starSum: 0, cash: 0, card: 0, lost: 0 };
   }
 
   function fresh() {
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {},
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {}, posters: {}, hung: {},
     };
   }
 
@@ -102,6 +102,8 @@
     out.dirt = (out.dirt || []).map((d) => Object.assign({}, d));
     out.market = Object.assign({}, out.market || {});
     out.wardrobe = (out.wardrobe || []).slice();
+    out.posters = Object.assign({}, out.posters || {});
+    out.hung = Object.assign({}, out.hung || {});
     out.outfit = Object.assign({}, out.outfit || {});
     out.rooms = (out.rooms || []).map((r) => Object.assign({}, r, { door: r.door ? Object.assign({}, r.door) : null }));
     out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
@@ -255,6 +257,21 @@
     it.stock = Object.assign({}, it.stock);
     it.stock[ware] -= 1;
     if (!it.stock[ware]) delete it.stock[ware];
+  }
+
+  // ---------- Plakate ----------
+  /** Wirkung der aufgehängten Plakate → { customers: zusätzliche Kunden pro Tag, boost: { wareId: Wunsch-Gewicht }, secret: Anzahl } */
+  function posterEffect(state, more) {
+    const P = (more && more.poster) || { customers: 2, wishBoost: 2 };
+    const types = Object.fromEntries(((more && more.posterTypes) || []).map((t) => [t.id, t]));
+    const out = { customers: 0, boost: {}, secret: 0 };
+    Object.values(state.hung || {}).forEach((key) => {
+      const [id, secret] = String(key).split(':');
+      out.customers += P.customers;
+      if (secret) out.secret += 1;
+      ((types[id] && types[id].goods) || []).forEach((g) => { out.boost[g] = (out.boost[g] || 0) + P.wishBoost; });
+    });
+    return out;
   }
 
   // ---------- Ruf ----------
@@ -653,9 +670,16 @@
             if (got) lines.push({ ware: l.ware, qty: got, price: p });
           });
           if (lines.length) {
-            const total = cents(lines.reduce((sum, l) => sum + l.qty * l.price, 0));
-            s.coins = cents(s.coins + total);
-            t.revenue = cents(t.revenue + total);
+            const full = cents(lines.reduce((sum, l) => sum + l.qty * l.price, 0));
+            // Feilschen: höchstens 30 % Nachlass; Verlust = Falschgeld/zu viel Wechselgeld, höchstens der Betrag selbst
+            const deal = Number(a.deal);
+            const total = Number.isFinite(deal) && deal > 0 && deal < full ? cents(Math.max(deal, full * 0.7)) : full;
+            const lost = Math.max(0, Math.min(total, Number(a.lost) || 0));
+            s.coins = cents(s.coins + total - lost);
+            t.revenue = cents(t.revenue + total - lost);
+            t.lost = cents((t.lost || 0) + lost);
+            if (a.method === 'cash') t.cash = cents((t.cash || 0) + total);
+            else t.card = cents((t.card || 0) + total);
             t.buyers += 1;
             lines.forEach((l) => { t.sold[l.ware] = (t.sold[l.ware] || 0) + l.qty; });
             t.receipts = t.receipts.concat({ lines: lines, total: total }).slice(-KEEP_RECEIPTS);
@@ -679,6 +703,7 @@
         s.reports = s.reports.concat({
           day: s.day, revenue: t.revenue, sold: t.sold, visitors: t.visitors, buyers: t.buyers, misses: t.misses,
           receipts: t.receipts, stars: t.reviews ? Math.round((t.starSum / t.reviews) * 10) / 10 : null, reviews: t.reviews, services: t.services || {},
+          cash: t.cash || 0, card: t.card || 0, lost: t.lost || 0,
           aborted: !!a.aborted,
         }).slice(-KEEP_REPORTS);
         s.open = false;
@@ -762,6 +787,27 @@
         if (!to) return fail('Neben dem Schrank ist kein Platz zum Schieben.');
         it.x = to.x;
         it.y = to.y;
+        return { state: s };
+      }
+      case 'printPoster': {
+        const type = (more.posterTypes || []).find((x) => x.id === a.id);
+        const price = (more.poster && more.poster.price) || 10;
+        if (!type) return fail('Unbekanntes Plakat.');
+        const n = Math.max(1, Math.min(10, Number(a.n) || 1));
+        if (s.coins < price * n) return fail('Nicht genug Kanacoin.');
+        s.coins = cents(s.coins - price * n);
+        const key = type.id + (a.secret ? ':geheim' : '');
+        s.posters[key] = (s.posters[key] || 0) + n;
+        return { state: s };
+      }
+      case 'hangPoster': {
+        const spot = (more.posterSpots || []).find((x) => x.id === a.spot);
+        const key = typeof a.key === 'string' ? a.key : '';
+        if (!spot) return fail('Unbekannter Ort.');
+        if (!s.posters[key]) return fail('Davon hast du kein Plakat.');
+        s.posters[key] -= 1;
+        if (!s.posters[key]) delete s.posters[key];
+        s.hung[spot.id] = key; // ersetzt ein altes Plakat an diesem Ort
         return { state: s };
       }
       case 'buyClothes': {
@@ -883,8 +929,12 @@
           if (nextService(job)) return fail('Der Auftrag ist noch nicht fertig.');
           const lines = job.services.map((id) => ({ service: id, qty: 1, price: servicePrice(s, more, id) }));
           const total = cents(lines.reduce((sum, l) => sum + l.price, 0));
-          s.coins = cents(s.coins + total);
-          t.revenue = cents(t.revenue + total);
+          const lost = Math.max(0, Math.min(total, Number(a.lost) || 0));
+          s.coins = cents(s.coins + total - lost);
+          t.revenue = cents(t.revenue + total - lost);
+          t.lost = cents((t.lost || 0) + lost);
+          if (a.method === 'cash') t.cash = cents((t.cash || 0) + total);
+          else t.card = cents((t.card || 0) + total);
           t.buyers += 1;
           t.services = Object.assign({}, t.services);
           job.services.forEach((id) => { t.services[id] = (t.services[id] || 0) + 1; });
@@ -932,6 +982,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    posterEffect, RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });
