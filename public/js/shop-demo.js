@@ -44,6 +44,8 @@
   let packs = [];
   let more = { licenses: {}, services: {} };
   let clothesList = [];
+  let posterTypes = [];
+  let posterSpots = [];
   let clothesSlots = [];
   let rufCfg = { levels: [0], unlock: {} };
   const lockedFor = (lv) => (lv || 1) > (state.level || 1); // ab dieser Ruf-Stufe frei
@@ -153,7 +155,7 @@
     ['propaganda', 'Propaganda drucken'],
     ['level', 'Level'],
   ];
-  const LATER = ['propaganda', 'level'];
+  const LATER = ['level'];
 
   function openPc() {
     const dlg = $('[data-shop-pc]');
@@ -185,6 +187,7 @@
     else if (pcTab === 'werkzeug') pcWerkzeug(body);
     else if (pcTab === 'ruf') pcRuf(body);
     else if (pcTab === 'kleidung') pcKleidung(body);
+    else if (pcTab === 'propaganda') pcPropaganda(body);
     else if (pcTab === 'verkauf') pcVerkauf(body);
     else if (pcTab === 'bewertungen') pcBewertungen(body);
     else if (pcTab === 'belege') pcBelege(body);
@@ -379,6 +382,61 @@
       });
       body.appendChild(t);
     });
+  }
+
+  /**
+   * Propaganda-Plakate (Krisztian, 2026-10-17): drucken, an Orten aufhängen – sie bleiben dort. Jedes bringt mehr Kunden,
+   * gezielte erhöhen die Nachfrage nach ihrer Warengruppe. Geheimes Zeichen: vorbereitet (Schwarzmarkt/Verdacht mit der Stadt).
+   * Die Orte sind Platzhalter bis zur Stadtkarte.
+   */
+  function pcPropaganda(body) {
+    const P = more.poster || { price: 10, customers: 2, wishBoost: 2 };
+    body.appendChild(el('div', 'sd-group', 'Drucken (' + fmt(P.price) + ' je Plakat)'));
+    const secretBox = el('label', 'sd-check');
+    const secret = el('input');
+    secret.type = 'checkbox';
+    secretBox.append(secret, ' mit geheimem Zeichen (für den Schwarzmarkt – wirkt später in der Stadt)');
+    const print = table([['Plakat'], ['Gezielt auf'], ['Auf Lager', 1], ['']]);
+    posterTypes.forEach((pt) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', pt.name));
+      tr.appendChild(el('td', '', pt.goods.length ? pt.goods.map((g) => (goods[g] || {}).name).filter(Boolean).join(', ') : 'alle Kunden'));
+      tr.appendChild(el('td', 'num', String((state.posters[pt.id] || 0) + (state.posters[pt.id + ':geheim'] || 0))));
+      const td = el('td', 'num');
+      const b = el('button', 'sd-btn', 'Drucken');
+      b.type = 'button';
+      b.disabled = P.price > state.coins;
+      b.addEventListener('click', () => { if (act(doAct('printPoster', { id: pt.id, n: 1, secret: secret.checked }))) renderPc(); });
+      td.appendChild(b);
+      tr.appendChild(td);
+      print.tb.appendChild(tr);
+    });
+    body.appendChild(print.t);
+    body.appendChild(secretBox);
+    const eff = L.posterEffect(state, more);
+    body.appendChild(el('div', 'sd-group', 'Aufhängen – Plakate bleiben dort (jetzt: +' + eff.customers + ' Kunden pro Tag)'));
+    const keys = Object.keys(state.posters).filter((k) => state.posters[k] > 0);
+    const label = (key) => { const [id, s] = String(key).split(':'); const pt = posterTypes.find((x) => x.id === id); return (pt ? pt.name : id) + (s ? ' (geheim)' : ''); };
+    const spots = table([['Ort'], ['Hängt dort'], ['']]);
+    posterSpots.forEach((sp) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', sp.name));
+      tr.appendChild(el('td', '', state.hung[sp.id] ? label(state.hung[sp.id]) : '–'));
+      const td = el('td', 'num');
+      if (keys.length) {
+        const sel = el('select');
+        sel.className = 'sd-name-input';
+        keys.forEach((k) => { const o = el('option', '', label(k) + ' (' + state.posters[k] + ')'); o.value = k; sel.appendChild(o); });
+        const b = el('button', 'sd-btn', state.hung[sp.id] ? 'Ersetzen' : 'Aufhängen');
+        b.type = 'button';
+        b.addEventListener('click', () => { if (act(doAct('hangPoster', { spot: sp.id, key: sel.value }))) renderPc(); });
+        td.append(sel, ' ', b);
+      } else td.appendChild(el('span', 'sd-later', 'erst drucken'));
+      tr.appendChild(td);
+      spots.tb.appendChild(tr);
+    });
+    body.appendChild(spots.t);
+    body.appendChild(el('p', 'sd-later', 'Die Orte sind Platzhalter – mit der Stadtkarte hängst du sie selbst auf (dann zählt auch, wo).'));
   }
 
   function pcWerkzeug(body) {
@@ -1001,7 +1059,7 @@
     if (!act(doAct('openDay'))) return;
     day.t = 0;
     day.rng = C.rngFrom((Date.now() ^ (state.day * 7919)) >>> 0);
-    day.queue = C.arrivals(C.customersPerDay(C.rating(state.reviews)), day.rng);
+    day.queue = C.arrivals(C.customersPerDay(C.rating(state.reviews), L.posterEffect(state, more).customers), day.rng);
     day.customers = [];
     day.line = [];
     day.closing = false;
@@ -1030,7 +1088,7 @@
 
   /** force (nur Test-Knöpfe): 'kunde' = sicher ohne Karte, 'auftrag' = sicher mit Karte (sonst Zufall wie im Spiel) */
   function spawn(force) {
-    const c = C.newCustomer(day.rng, goodsList, { tier: 1, level: state.level || 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
+    const c = C.newCustomer(day.rng, goodsList, { boost: L.posterEffect(state, more).boost, tier: 1, level: state.level || 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
     // Bringt er eine Karte? Nur mit passenden Tischen und höchstens 2 Aufträge (auch die, die noch an der Kasse stehen)
     const stations = new Set(state.items.map((it) => it.id));
     c.services = force === 'kunde' ? null : C.serviceWish(force === 'auftrag' ? () => 0 : day.rng, stations, pendingJobs(), packs, serviceList);
@@ -1208,13 +1266,25 @@
   }
 
   /** Kassen-Minispiel öffnen (public/js/shop-kasse.js); done() bucht, Abbrechen lässt den Kunden weiter warten */
-  function scanThen(c, title, lines, done) {
-    if (!window.ShopKasse || !gameRef) { done(); return; }
+  /**
+   * Kassen-Minispiel (public/js/shop-kasse.js): Feilschen (nur bei Waren, selten, großer Einkauf), Scannen, Bezahlen
+   * (Karte/bar, Falschgeld nur bei Kunden mit Illegalem). done(res) mit { deal, method, lost, short, walk }
+   */
+  function scanThen(c, title, lines, done, opts) {
+    const o = opts || {};
+    const total = lines.reduce((a, l) => a + l.qty * l.price, 0);
+    if (!window.ShopKasse || !gameRef) { done({ method: 'card', lost: 0 }); return; }
     c.serving = true;
     window.ShopKasse.open(gameRef, {
       title: title,
       lines: lines,
-      onDone: () => { c.serving = false; done(); },
+      total: total,
+      haggle: o.haggle ? C.haggle(total, day.rng) : null,
+      answer: (h, counter, t) => C.haggleAnswer(h, counter, t, day.rng),
+      pay: { method: C.payMethod(day.rng) },
+      customer: { illegal: !!c.illegal },
+      rng: day.rng,
+      onDone: (res) => { c.serving = false; done(res || {}); },
       onCancel: () => { c.serving = false; },
     });
   }
@@ -1223,12 +1293,12 @@
     const job = jobOf(c);
     if (!job) { leave(c, null); return; }
     const lines = job.services.map((id) => ({ name: (more.services[id] || {}).name || id, qty: 1, price: L.servicePrice(state, more, id), color: 0xffffff }));
-    scanThen(c, 'Auftrag Kunde ' + job.jid, lines, () => {
-      const stars0 = Math.min(c.priceStars || 5, C.workStars(job.services, job.results));
+    scanThen(c, 'Auftrag Kunde ' + job.jid, lines, (res) => {
+      const stars0 = Math.min(c.priceStars || 5, C.workStars(job.services, job.results), res.short ? 3 : 5);
       const capped = capDirt({ stars: stars0, why: 'job' + stars0 });
       const stars = capped.stars;
       const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
-      act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: capped.why === 'dirty' ? 'dirty' : 'job' + stars }));
+      act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: capped.why === 'dirty' ? 'dirty' : 'job' + stars, method: res.method, lost: res.lost }));
       say(c, '+' + fmt(total) + ' Kanacoin', 2);
       leave(c, null, 'paid');
     });
@@ -1238,15 +1308,20 @@
     if (c.services && !c.jid) { acceptJob(c); return; }
     if (c.jid) { serveJob(c); return; }
     const scan = c.basket.map((b) => ({ name: goods[b.ware].name, qty: b.qty, price: L.price(state, goods, b.ware), color: goods[b.ware].color }));
-    scanThen(c, 'Kunde', scan, () => {
-      const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
-      const rev = capDirt(C.review(c.result, shopStock(), day.rng));
+    c.illegal = c.basket.some((b) => goods[b.ware] && goods[b.ware].illegal); // Falschgeld versuchen nur diese (vorbereitet)
+    scanThen(c, 'Kunde', scan, (res) => {
       release(c);
-      const total = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
-      act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '' }, rev || {})));
-      say(c, '+' + fmt(total) + ' Kanacoin', 2);
+      // Feilschen abgelehnt und der Kunde geht: kein Kauf, keine schlechte Bewertung (Krisztian, 2026-10-17)
+      if (res.walk) { leave(c, { miss: c.result.missWish ? c.wish : '' }); return; }
+      const lines = c.basket.map((b) => ({ uid: b.uid, ware: b.ware, qty: b.qty }));
+      let rev = capDirt(C.review(c.result, shopStock(), day.rng));
+      if (res.short && rev && rev.stars > 3) rev = { stars: 3, why: '3' }; // zu wenig Wechselgeld
+      const full = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
+      const paid = res.deal || full;
+      act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '', method: res.method, deal: res.deal || undefined, lost: res.lost || 0 }, rev || {})));
+      say(c, '+' + fmt(paid - (res.lost || 0)) + ' Kanacoin', 2);
       leave(c, null, 'paid');
-    });
+    }, { haggle: true });
   }
 
   function tickCustomer(c, sec) {
@@ -1384,6 +1459,10 @@
     body.appendChild(el('div', 'sd-group', 'Tag ' + last.day + ': verkauft'));
     const sold = Object.keys(last.sold || {});
     body.appendChild(el('p', 'sd-later', sold.length ? sold.map((w) => last.sold[w] + '× ' + goods[w].name).join(', ') : 'Nichts.'));
+    if (last.cash || last.card) {
+      body.appendChild(el('div', 'sd-group', 'Bezahlt'));
+      body.appendChild(el('p', 'sd-later', 'Bar ' + fmt(last.cash || 0) + ' · Karte ' + fmt(last.card || 0) + (last.lost ? ' · Verlust (Falschgeld/Wechselgeld) ' + fmt(last.lost) : '')));
+    }
     const wet = Object.keys(last.spoiled || {});
     if (wet.length) {
       body.appendChild(el('div', 'sd-group', 'Feuchtigkeit im Lager – verdorben'));
@@ -2129,7 +2208,12 @@
       clothesList = data.clothes || [];
       clothesSlots = data.clothesSlots || [];
       rufCfg = data.ruf || { levels: [0], unlock: {} };
-      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])), clothes: clothesList };
+      posterTypes = data.posterTypes || [];
+      posterSpots = data.posterSpots || [];
+      more.poster = data.poster;
+      more.posterTypes = posterTypes;
+      more.posterSpots = posterSpots;
+      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])), clothes: clothesList, poster: data.poster, posterTypes: data.posterTypes || [], posterSpots: data.posterSpots || [] };
       catalog = Object.fromEntries(list.map((d) => [d.id, d]));
       goods = Object.fromEntries(goodsList.map((g) => [g.id, g]));
       refreshHud();

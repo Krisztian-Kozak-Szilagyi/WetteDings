@@ -31,8 +31,9 @@ function loadScene(file, globalName, fetchMock) {
     tweens: { add: (c) => { if (c.onComplete) c.onComplete(); return obj(); } }, // Animationen sofort fertig
     time: { delayedCall: (ms, fn) => fn() }, scene: { stop() { scene.stopped = true; } },
     cameras: { main: { fadeIn() {}, fadeOut() {}, once: (e, fn) => fn() } }, // Abblenden sofort fertig
-    input: { on: (e, fn) => { handlers[e] = fn; }, keyboard: { on: (e, fn) => { handlers[e] = fn; }, once: (e, fn) => { handlers[e] = fn; } } },
+    input: { on: (e, fn) => { handlers[e] = fn; }, keyboard: { on: (e, fn) => { handlers[e] = fn; }, once: (e, fn) => { handlers[e] = fn; }, off: (e) => { delete handlers[e]; } } },
   });
+  ctx.window.ShopCustomers = require('../src/shop/customers');
   return { scene, handlers, clicks };
 }
 
@@ -56,16 +57,31 @@ test('Arbeitstisch: putzen, umdrehen, bügeln, Esc', () => {
   assert.ok(scene.stopped && cancelled);
 });
 
-test('Kasse: alles scannen, dann kassieren', () => {
-  const { scene, clicks } = loadScene('shop-kasse.js', 'ShopKasse');
-  let total = null;
-  scene.init({ title: 'Kunde', lines: [{ name: 'Boosterpack', qty: 3, price: 10, color: 1 }, { name: 'Kaffee', qty: 1, price: 12, color: 2 }], onDone: (r) => { total = r.total; } });
+test('Kasse: alles scannen, mit Karte zahlen (Betrag eintippen)', () => {
+  const { scene, clicks, handlers } = loadScene('shop-kasse.js', 'ShopKasse');
+  let res = null;
+  scene.init({ title: 'Kunde', lines: [{ name: 'Boosterpack', qty: 3, price: 10, color: 1 }, { name: 'Kaffee', qty: 1, price: 12, color: 2 }], pay: { method: 'card' }, onDone: (r) => { res = r; } });
   scene.create();
   const pieces = clicks.length;
   clicks.slice(0, pieces).forEach((fn) => fn());
-  assert.strictEqual(clicks.length, pieces + 1, 'nach dem Scannen erscheint „Kassieren“');
-  clicks[clicks.length - 1]();
-  assert.strictEqual(total, 42);
+  handlers.keydown({ key: '4' });
+  handlers.keydown({ key: '1' });
+  handlers.keydown({ key: 'Enter' });
+  assert.strictEqual(res, null, 'falscher Betrag: nochmal');
+  handlers.keydown({ key: '4' });
+  handlers.keydown({ key: '2' });
+  handlers.keydown({ key: 'Enter' });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), { deal: null, method: 'card', lost: 0, short: false, walk: false }); // Objekt aus der vm-Sandbox
+});
+
+test('Kasse: Feilschen – ablehnen, Kunde geht', () => {
+  const { scene, clicks } = loadScene('shop-kasse.js', 'ShopKasse');
+  let res = null;
+  scene.init({ title: 'Kunde', lines: [{ name: 'Box', qty: 2, price: 100, color: 1 }], haggle: { offer: 160, max: 180 },
+    answer: (h, counter) => (counter === null ? { walk: true } : { deal: counter }), pay: { method: 'card' }, onDone: (r) => { res = r; } });
+  scene.create();
+  clicks[clicks.length - 1](); // „Ablehnen“
+  assert.deepStrictEqual(res && res.walk, true);
 });
 
 test('Arbeitstisch: messen, benoten, versiegeln, fertig', async () => {
