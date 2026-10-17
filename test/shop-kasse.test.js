@@ -64,7 +64,7 @@ test('Plakate: drucken, an Orten aufhängen (bleiben), mehr Kunden, gezielte Wü
   assert.match(apply(s, { type: 'hangPoster', spot: 'bahnhof', key: 'gamer' }).error, /kein Plakat/);
   const eff = L.posterEffect(s, more);
   assert.deepStrictEqual(eff, { customers: 4, boost: { board_game_box: 2 }, secret: 1 });
-  assert.strictEqual(C.customersPerDay(3, eff.customers), C.customersPerDay(3) + 4);
+  assert.strictEqual(C.expectedCustomers({ rating: 3, day: 3, extra: eff.customers }), C.expectedCustomers({ rating: 3, day: 3 }) + 4);
   // Wunsch-Gewicht: mit Plakat wird das Brettspiel öfter gewünscht
   const ctx = { level: 5, licenses: ['brettspiele', 'sammler'], coins: 0, prices: {} };
   const count = (boost) => { let n = 0; const r = C.rngFrom(3); for (let i = 0; i < 2000; i++) if (C.newCustomer(r, GOODS, Object.assign({ boost }, ctx)).wish === 'board_game_box') n++; return n; };

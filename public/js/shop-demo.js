@@ -413,30 +413,6 @@
     });
     body.appendChild(print.t);
     body.appendChild(secretBox);
-    const eff = L.posterEffect(state, more);
-    body.appendChild(el('div', 'sd-group', 'Aufhängen – Plakate bleiben dort (jetzt: +' + eff.customers + ' Kunden pro Tag)'));
-    const keys = Object.keys(state.posters).filter((k) => state.posters[k] > 0);
-    const label = (key) => { const [id, s] = String(key).split(':'); const pt = posterTypes.find((x) => x.id === id); return (pt ? pt.name : id) + (s ? ' (geheim)' : ''); };
-    const spots = table([['Ort'], ['Hängt dort'], ['']]);
-    posterSpots.forEach((sp) => {
-      const tr = el('tr');
-      tr.appendChild(el('td', '', sp.name));
-      tr.appendChild(el('td', '', state.hung[sp.id] ? label(state.hung[sp.id]) : '–'));
-      const td = el('td', 'num');
-      if (keys.length) {
-        const sel = el('select');
-        sel.className = 'sd-name-input';
-        keys.forEach((k) => { const o = el('option', '', label(k) + ' (' + state.posters[k] + ')'); o.value = k; sel.appendChild(o); });
-        const b = el('button', 'sd-btn', state.hung[sp.id] ? 'Ersetzen' : 'Aufhängen');
-        b.type = 'button';
-        b.addEventListener('click', () => { if (act(doAct('hangPoster', { spot: sp.id, key: sel.value }))) renderPc(); });
-        td.append(sel, ' ', b);
-      } else td.appendChild(el('span', 'sd-later', 'erst drucken'));
-      tr.appendChild(td);
-      spots.tb.appendChild(tr);
-    });
-    body.appendChild(spots.t);
-    body.appendChild(el('p', 'sd-later', 'Die Orte sind Platzhalter – mit der Stadtkarte hängst du sie selbst auf (dann zählt auch, wo).'));
   }
 
   function pcWerkzeug(body) {
@@ -1054,12 +1030,15 @@
   const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare) && !catalog[it.id].secret && !L.roomAt(state, it.x, it.y));
   const counter = () => state.items.find((it) => it.id === L.PC_ID);
 
+  /** Nachfrage-Daten für heute (Bekanntheit, Sterne, Wochentag, Plakate) */
+  const demandCtx = () => ({ level: state.level || 1, rating: C.rating(state.reviews), day: state.day, extra: L.posterEffect(state, more).customers });
+
   function openDay() {
     if (state.open) return;
     if (!act(doAct('openDay'))) return;
     day.t = 0;
     day.rng = C.rngFrom((Date.now() ^ (state.day * 7919)) >>> 0);
-    day.queue = C.arrivals(C.customersPerDay(C.rating(state.reviews), L.posterEffect(state, more).customers), day.rng);
+    day.queue = C.arrivals(C.customersToday(demandCtx(), day.rng), day.rng);
     day.customers = [];
     day.line = [];
     day.closing = false;
@@ -1420,8 +1399,8 @@
     const stars = '★ ' + r.toLocaleString('de-DE', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
     if (state.open && day.rng) {
       const frac = day.t / C.DAY_SECONDS;
-      elc.textContent = 'Tag ' + state.day + ' · ' + (frac >= 1 ? 'Ladenschluss' : C.clock(frac) + ' · geöffnet') + ' · ' + stars;
-    } else elc.textContent = 'Tag ' + state.day + ' · geschlossen · ' + stars;
+      elc.textContent = 'Tag ' + state.day + ' (' + C.weekday(state.day).name + ') · ' + (frac >= 1 ? 'Ladenschluss' : C.clock(frac) + ' · geöffnet') + ' · ' + stars;
+    } else elc.textContent = 'Tag ' + state.day + ' (' + C.weekday(state.day).name + ') · geschlossen · ' + stars;
     elc.textContent += ' · Stufe ' + (state.level || 1);
     if (seenLevel !== null && (state.level || 1) > seenLevel) note('Ruf-Stufe ' + state.level + ' erreicht! Am PC (Reiter Ruf) siehst du, was neu frei ist.');
     seenLevel = state.level || 1;
@@ -1484,7 +1463,7 @@
     const r = C.rating(state.reviews);
     const n = state.reviews.slice(-C.REVIEW_WINDOW).length;
     body.appendChild(el('p', '', 'Durchschnitt: ' + stars(Math.round(r * 10) / 10) + (n ? ' aus den letzten ' + n + ' Bewertungen' : ' (neuer Laden)') +
-      ' · erwartet ca. ' + C.customersPerDay(r) + ' Kunden pro Tag'));
+      ' · erwartet heute (' + C.weekday(state.day).name + ') ca. ' + C.expectedCustomers(demandCtx()) + ' Kunden'));
     const list2 = state.reviews.slice().reverse();
     if (!list2.length) return;
     const { t, tb } = table([['Tag'], ['Sterne'], ['Kommentar']]);
