@@ -191,3 +191,21 @@ html, body.sd-body {
 
 /* Raumname im Bauen-Reiter */
 .sd-name-input { width: 160px; padding: 4px 6px; border: 1px solid #3a3f52; border-radius: 5px; background: #14161f; color: inherit; font: inherit; }
+
+/* Hauptmenü / Pause (Esc) – public/js/shop-demo.js „Menü“ */
+.sd-menu { width: min(420px, calc(100vw - 32px)); }
+.sd-menu::backdrop { background: rgba(8, 9, 14, .78); }
+.sd-menu-body { display: flex; flex-direction: column; gap: 8px; padding: 22px; }
+.sd-menu-title { margin: 0 0 4px; font-size: 22px; text-align: center; }
+.sd-menu-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.sd-menu-head .sd-menu-title { margin: 0; font-size: 18px; text-align: left; }
+.sd-menu-sub { margin: 0 0 10px; text-align: center; color: #8a90a4; font-size: 13px; }
+.sd-menu-btn { display: block; width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid #3a3f52; background: #262a39; color: #e6e1d6; font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
+.sd-menu-btn:hover:not(:disabled) { background: #30354a; }
+.sd-menu-btn.is-main { background: #c9a44c; border-color: #c9a44c; color: #1c1f2b; font-weight: 600; }
+.sd-menu-btn:disabled { opacity: .45; cursor: default; }
+.sd-menu-row { display: grid; grid-template-columns: 1fr 160px 48px; align-items: center; gap: 10px; font-size: 14px; }
+.sd-menu-val { text-align: right; color: #8a90a4; font-size: 13px; }
+.sd-menu-msg { color: #e88; margin: 4px 0 0; }
+.sd-pc-btns { display: flex; gap: 8px; margin-top: 12px; }
+.sd-no-dev .sd-dev { display: none; }
