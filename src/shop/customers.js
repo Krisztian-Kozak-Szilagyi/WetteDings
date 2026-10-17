@@ -31,7 +31,6 @@
   const WISH_CHANCE = 0.7;
   const IMPULSE_CHANCE = 0.25;
   const BUYER_REVIEWS = 0.8;
-  const NOTHING_REVIEW = 0.15;
   const EMPTY_SHOP = 5; // so wenig Ware im ganzen Laden = „leer“
   const PATIENCE = 30; // Sekunden an der Kasse
   const BIG_CHANCE = 0.05;
@@ -273,7 +272,7 @@
   function review(result, shopStock, rng) {
     if (result.basket.length) return rng() < BUYER_REVIEWS ? { stars: result.stars, why: String(result.stars) } : null;
     if (shopStock <= EMPTY_SHOP) return { stars: 1, why: 'empty' };
-    return rng() < NOTHING_REVIEW ? { stars: 2, why: 'nothing' } : null;
+    return null; // Krisztian (2026-10-17): nicht bestrafen, nur weil der Kunde nichts Passendes findet
   }
 
   function angryReview() {

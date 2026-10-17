@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { requireAdmin } = require('../middleware');
 const ShopDemo = require('../models/ShopDemo');
+const ShopDemoSlot = require('../models/ShopDemoSlot');
 const layout = require('../shop/layout');
 const { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS, POSTER, POSTER_TYPES, POSTER_SPOTS } = require('../shop/catalog');
 const grading = require('../grading/gradingService');
@@ -22,7 +23,7 @@ const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'storePoster', 'takePoster', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'], pack_opening_counter: ['foil'] };
@@ -31,12 +32,13 @@ function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
   const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
-  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, rid, home }) => {
+  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, posters, rid, home }) => {
     const it = { uid, id, x, y, rot };
     if (rid) it.rid = rid;
     if (home) it.home = { x: home.x, y: home.y };
     if (wall) it.wall = wall;
     if (stock && Object.keys(stock).length) it.stock = stock;
+    if (posters && Object.keys(posters).length) it.posters = posters;
     return it;
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
@@ -296,5 +298,65 @@ router.post('/shop-demo/werkbank/fertig', requireAdmin, (req, res, next) =>
     return { state: r.state, json: { demo: true, jid: job.jid, steps, results: done.results, next: layout.nextService(done), state: r.state } };
   }).catch(next)
 );
+
+// ---------- Spielstände (Hauptmenü): 3 Plätze. Der laufende liegt in ShopDemo, die anderen in ShopDemoSlot ----------
+const SLOTS = 3;
+const slotId = (u, n) => String(u) + ':' + n;
+const summary = (s) => ({ day: s.day, level: s.level || 1, coins: s.coins });
+async function activeSlot(u) {
+  const a = await ShopDemoSlot.findOne({ user: u, active: true }).lean();
+  return a ? a.slot : 1;
+}
+
+router.get('/api/shop-demo/spielstaende', requireAdmin, async (req, res, next) => {
+  try {
+    const u = req.user._id;
+    const [active, docs, live] = await Promise.all([activeSlot(u), ShopDemoSlot.find({ user: u }).lean(), ShopDemo.findById(u).lean()]);
+    const slots = [];
+    for (let n = 1; n <= SLOTS; n++) {
+      if (n === active) {
+        slots.push({ slot: n, summary: summary(plain(live)), savedAt: live ? live.updatedAt : null });
+        continue;
+      }
+      const d = docs.find((x) => x.slot === n);
+      slots.push({ slot: n, summary: d && d.data ? d.summary : null, savedAt: d && d.data ? d.savedAt : null });
+    }
+    res.json({ active, slots });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// laden = anderen Platz holen (der laufende wird auf seinen Platz gelegt) · neu = frischer Laden auf diesem Platz
+router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) => {
+  try {
+    const u = req.user._id;
+    const aktion = ['laden', 'neu'].find((k) => k === req.body.aktion);
+    const n = Number(req.body.slot);
+    if (!aktion || !Number.isInteger(n) || n < 1 || n > SLOTS) return res.status(400).json({ error: 'Unbekannter Spielstand.' });
+    const active = await activeSlot(u);
+    if (aktion === 'laden' && n === active) return res.json({ ok: true });
+    const target = n === active ? null : await ShopDemoSlot.findById(slotId(u, n)).lean();
+    if (aktion === 'laden' && !(target && target.data)) return res.status(400).json({ error: 'Der Platz ist leer.' });
+    if (n !== active) {
+      const live = await load(u);
+      await ShopDemoSlot.replaceOne(
+        { _id: slotId(u, active) },
+        { _id: slotId(u, active), user: u, slot: active, active: false, data: live, summary: summary(live), savedAt: new Date() },
+        { upsert: true }
+      );
+    }
+    if (aktion === 'laden') await save(u, plain(target.data));
+    else await ShopDemo.deleteOne({ _id: u });
+    await ShopDemoSlot.replaceOne(
+      { _id: slotId(u, n) },
+      { _id: slotId(u, n), user: u, slot: n, active: true, data: null, summary: null, savedAt: new Date() },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
