@@ -27,8 +27,6 @@
 
   const REVIEW_WINDOW = 30;
   const START_RATING = 3;
-  const MIN_CUSTOMERS = 8;
-  const MAX_CUSTOMERS = 30;
 
   const WISH_CHANCE = 0.7;
   const IMPULSE_CHANCE = 0.25;
@@ -68,10 +66,40 @@
     return last.reduce((a, r) => a + r.stars, 0) / last.length;
   }
 
-  /** Kunden pro Tag aus den Sternen, dazu Plakate (extra = zusätzliche Kunden) */
-  function customersPerDay(r, extra) {
-    const c = Math.max(1, Math.min(5, r));
-    return Math.round(MIN_CUSTOMERS + ((c - 1) / 4) * (MAX_CUSTOMERS - MIN_CUSTOMERS)) + (extra || 0);
+  // ---------- Nachfrage: wie viele Kunden heute kommen (Krisztian, 2026-10-17: keine feste Zahl) ----------
+  // Bekanntheit (Ruf-Stufe) × Stimmung (Sterne) × Wochentag × Tagesschwankung × Ereignis, dazu die Plakate.
+  // Alle Zahlen = Platzhalter. Kein Deckel: wer nichts findet, kauft einfach nichts.
+  const DEMAND = {
+    base: [14, 18, 22, 26, 30], // nach Ruf-Stufe 1–5 (darüber: letzter Wert)
+    stars: [0.6, 0.8, 1, 1.15, 1.3], // nach Sternen 1–5, dazwischen linear
+    week: [
+      { name: 'Mo', f: 0.8 }, { name: 'Di', f: 0.9 }, { name: 'Mi', f: 1 }, { name: 'Do', f: 1 },
+      { name: 'Fr', f: 1.15 }, { name: 'Sa', f: 1.35 }, { name: 'So', f: 1.2 },
+    ],
+    spread: 0.2, // ±20 % von Tag zu Tag
+    peak: 0.47, // Tagesanteil um 12 Uhr: da kommen die meisten
+  };
+  /** Wochentag zu Tag n (Tag 1 = Montag) */
+  function weekday(n) {
+    return DEMAND.week[(Math.max(1, Math.floor(n) || 1) - 1) % 7];
+  }
+  function starFactor(r) {
+    const c = Math.max(1, Math.min(5, r)) - 1;
+    const i = Math.min(3, Math.floor(c));
+    return DEMAND.stars[i] + (c - i) * (DEMAND.stars[i + 1] - DEMAND.stars[i]);
+  }
+  /** Erwartete Kunden (ohne Zufall): ctx = { level, rating, day, extra (Plakate), event (Faktor, später) } */
+  function expectedCustomers(ctx) {
+    const b = DEMAND.base[Math.min(DEMAND.base.length, Math.max(1, ctx.level || 1)) - 1];
+    const f = starFactor(ctx.rating == null ? START_RATING : ctx.rating) * weekday(ctx.day).f * (ctx.event || 1);
+    return Math.max(1, Math.round(b * f)) + (ctx.extra || 0);
+  }
+  /** Kunden heute: wie erwartet, aber mit Tagesschwankung */
+  function customersToday(ctx, rng) {
+    const b = DEMAND.base[Math.min(DEMAND.base.length, Math.max(1, ctx.level || 1)) - 1];
+    const f = starFactor(ctx.rating == null ? START_RATING : ctx.rating) * weekday(ctx.day).f * (ctx.event || 1);
+    const swing = 1 + (rng() * 2 - 1) * DEMAND.spread;
+    return Math.max(1, Math.round(b * f * swing)) + (ctx.extra || 0);
   }
 
   // ---------- Bezahlen ----------
@@ -120,10 +148,15 @@
     return rng() < HAGGLE.walkAway ? { walk: true } : { full: true, deal: total };
   }
 
-  /** Ankunftszeiten als Anteil des Tages (0…LAST_ARRIVAL), sortiert */
+  /** Ankunftszeiten als Anteil des Tages (0…LAST_ARRIVAL), sortiert – mittags die meisten, morgens/abends weniger */
   function arrivals(n, rng) {
+    const w = (x) => 0.35 + Math.exp(-Math.pow((x - DEMAND.peak) / 0.2, 2)); // höchstens 1,35
     const out = [];
-    for (let i = 0; i < n; i++) out.push(rng() * LAST_ARRIVAL);
+    for (let i = 0; i < n; i++) {
+      let x = rng() * LAST_ARRIVAL;
+      for (let k = 0; k < 20 && rng() * 1.35 > w(x); k++) x = rng() * LAST_ARRIVAL;
+      out.push(x);
+    }
     return out.sort((a, b) => a - b);
   }
 
@@ -351,8 +384,8 @@
 
   return {
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
-    MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
-    PAY, HAGGLE, payMethod, cashGiven, fakeBill, changeResult, haggle, haggleAnswer, rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
+    EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
+    PAY, HAGGLE, payMethod, cashGiven, fakeBill, changeResult, haggle, haggleAnswer, rngFrom, rating, DEMAND, weekday, expectedCustomers, customersToday, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
     walkableCell, path, approach, baseOf, queueLine, DIRT_CHANCE, DIRT_LIMIT, DIRT_GRACE_MS, dirtCount, dirtCap,
   };
 });

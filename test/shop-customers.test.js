@@ -25,9 +25,20 @@ test('Preis-Urteil: bis +15 % 5★, bis +35 % 4★/3★, darüber nicht', () => 
 
 test('Sterne → Kunden pro Tag, neuer Laden 3★, nur die letzten 30 zählen', () => {
   assert.strictEqual(C.rating([]), 3);
-  assert.strictEqual(C.customersPerDay(1), C.MIN_CUSTOMERS);
-  assert.strictEqual(C.customersPerDay(5), C.MAX_CUSTOMERS);
-  assert.ok(C.customersPerDay(4) > C.customersPerDay(3));
+  const e = (o) => C.expectedCustomers(Object.assign({ level: 1, rating: 3, day: 3 }, o));
+  assert.strictEqual(e({}), 14, 'Stufe 1, 3 Sterne, Mittwoch');
+  assert.ok(e({ rating: 5 }) > e({ rating: 4 }) && e({ rating: 4 }) > e({}) && e({}) > e({ rating: 1 }));
+  assert.ok(e({ level: 3 }) > e({}), 'bekannter Laden');
+  assert.ok(e({ day: 6 }) > e({ day: 1 }), 'Samstag mehr als Montag');
+  assert.strictEqual(C.weekday(8).name, 'Mo');
+  assert.strictEqual(e({ extra: 4 }), e({}) + 4, 'Plakate');
+  const r = C.rngFrom(9);
+  const days = Array.from({ length: 200 }, () => C.customersToday({ level: 1, rating: 3, day: 3 }, r));
+  assert.ok(Math.min(...days) >= 11 && Math.max(...days) <= 17 && new Set(days).size > 3, 'schwankt ±20 %');
+  const times = C.arrivals(600, C.rngFrom(4));
+  const mid = times.filter((x) => x > 0.35 && x < 0.6).length;
+  const early = times.filter((x) => x < 0.25).length;
+  assert.ok(mid > early * 1.5, 'mittags mehr los');
   const old = Array(50).fill({ stars: 1 });
   const fresh = Array(30).fill({ stars: 5 });
   assert.strictEqual(C.rating(old.concat(fresh)), 5);
