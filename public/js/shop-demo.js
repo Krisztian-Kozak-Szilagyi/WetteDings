@@ -153,6 +153,7 @@
     ['ruf', 'Ruf'],
     ['kleidung', 'Kleidung'],
     ['propaganda', 'Propaganda drucken'],
+    ['turnier', 'Turniere'],
     ['level', 'Level'],
   ];
   const LATER = ['level'];
@@ -188,6 +189,7 @@
     else if (pcTab === 'ruf') pcRuf(body);
     else if (pcTab === 'kleidung') pcKleidung(body);
     else if (pcTab === 'propaganda') pcPropaganda(body);
+    else if (pcTab === 'turnier') pcTurnier(body);
     else if (pcTab === 'verkauf') pcVerkauf(body);
     else if (pcTab === 'bewertungen') pcBewertungen(body);
     else if (pcTab === 'belege') pcBelege(body);
@@ -405,7 +407,7 @@
       const td = el('td', 'num');
       const b = el('button', 'sd-btn', 'Drucken');
       b.type = 'button';
-      b.disabled = P.price > state.coins;
+      b.disabled = P.price > state.coins || L.invUsed(state) >= L.INVENTORY.slots;
       b.addEventListener('click', () => { if (act(doAct('printPoster', { id: pt.id, n: 1, secret: secret.checked }))) renderPc(); });
       td.appendChild(b);
       tr.appendChild(td);
@@ -413,6 +415,35 @@
     });
     body.appendChild(print.t);
     body.appendChild(secretBox);
+    body.appendChild(el('p', 'sd-later', 'Gedruckte Plakate trägst du im Inventar (Taste I, ' + L.invUsed(state) + ' / ' + L.INVENTORY.slots +
+      ' Plätze) – lagern kannst du sie im Safe, aufhängen später in der Stadt.'));
+  }
+
+  function pcTurnier(body) {
+    const tables = L.gameTables(state, catalog);
+    body.appendChild(el('p', '', 'Turniere laufen am Spieltisch (Möbel bestellen) – mit ' + L.TABLE.chairs + ' Stühlen direkt daneben, sonst ist niemand zum Mitspielen da.'));
+    if (!tables.length) body.appendChild(el('p', 'sd-later', 'Noch kein Spieltisch im Laden.'));
+    else {
+      const { t, tb } = table([['Spieltisch'], ['Stühle daneben', 1], ['']]);
+      tables.forEach((x, i) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', '', 'Tisch ' + (i + 1)));
+        tr.appendChild(el('td', 'num', Math.min(x.chairs, L.TABLE.chairs) + ' / ' + L.TABLE.chairs));
+        const miss = L.TABLE.chairs - x.chairs;
+        tr.appendChild(el('td', 'num', x.ready ? 'bereit' : 'noch ' + miss + (miss === 1 ? ' Stuhl' : ' Stühle')));
+        tb.appendChild(tr);
+      });
+      body.appendChild(t);
+    }
+    const btns = el('div', 'sd-pc-btns');
+    ['Turnier starten', 'Turnier bewerben'].forEach((txt) => {
+      const b = el('button', 'sd-btn', txt);
+      b.type = 'button';
+      b.disabled = true;
+      btns.appendChild(b);
+    });
+    body.appendChild(btns);
+    body.appendChild(el('p', 'sd-later', 'Starten und Bewerben kommen, sobald die Turnier-Regeln stehen (Startgeld, Mitspieler, Preise).'));
   }
 
   function pcWerkzeug(body) {
@@ -599,7 +630,66 @@
       });
       body.appendChild(t);
     }
-    body.appendChild(el('p', 'sd-shelf-fits', 'Passt hinein: ' + d.holds.map((id) => goods[id] && goods[id].name).filter(Boolean).join(', ')));
+    body.appendChild(el('p', 'sd-shelf-fits', 'Passt hinein: ' + d.holds.map((id) => goods[id] && goods[id].name).filter(Boolean).concat(d.holdsPosters ? ['Plakate'] : []).join(', ')));
+    if (d.holdsPosters) shelfPosters(body, it, d);
+  }
+
+  // ---------- Inventar (Taste I) ----------
+  const posterLabel = (key) => {
+    const [id, s] = String(key).split(':');
+    const pt = posterTypes.find((x) => x.id === id);
+    return 'Plakat ' + (pt ? pt.name : id) + (s ? ' (geheim)' : '');
+  };
+  /** Safe-Fenster: Plakate hinein / heraus (immer der ganze Stapel, soweit Platz ist) */
+  function shelfPosters(body, it, d) {
+    const inSafe = it.posters || {};
+    const keys = Array.from(new Set(Object.keys(inSafe).concat(Object.keys(state.posters).filter((k) => state.posters[k] > 0))));
+    if (!keys.length) return;
+    body.appendChild(el('div', 'sd-group', 'Plakate'));
+    const { t, tb } = table([['Plakat'], ['Hier', 1], ['Inventar', 1], ['']]);
+    keys.forEach((k) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', posterLabel(k)));
+      tr.appendChild(el('td', 'num', String(inSafe[k] || 0)));
+      tr.appendChild(el('td', 'num', String(state.posters[k] || 0)));
+      const td = el('td', 'num');
+      const nIn = Math.min(state.posters[k] || 0, d.slots - L.used(it));
+      const nOut = Math.min(inSafe[k] || 0, L.INVENTORY.slots - L.invUsed(state));
+      [['Hineinlegen', 'storePoster', nIn], ['Herausnehmen', 'takePoster', nOut]].forEach(([txt, type, n]) => {
+        const b = el('button', 'sd-btn', txt);
+        b.type = 'button';
+        b.disabled = n <= 0;
+        b.addEventListener('click', () => { act(doAct(type, { uid: it.uid, key: k, n })); renderShelf(); });
+        td.append(b, ' ');
+      });
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+  }
+
+  function openInventory() {
+    renderInventory();
+    const dlg = $('[data-shop-inv]');
+    if (!dlg.open) dlg.showModal();
+  }
+  function renderInventory() {
+    $('[data-shop-inv-used]').textContent = L.invUsed(state) + ' / ' + L.INVENTORY.slots + ' Plätze belegt';
+    const body = $('[data-shop-inv-body]');
+    body.textContent = '';
+    const keys = Object.keys(state.posters).filter((k) => state.posters[k] > 0);
+    if (!keys.length) {
+      body.appendChild(el('p', 'sd-later', 'Leer. Gedruckte Plakate (PC → Propaganda) landen hier – aufhängen kannst du sie später in der Stadt.'));
+      return;
+    }
+    const { t, tb } = table([['Gegenstand'], ['Stück', 1]]);
+    keys.forEach((k) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', '', posterLabel(k)));
+      tr.appendChild(el('td', 'num', String(state.posters[k])));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
   }
 
   // ---------- Kandidat unter der Maus (Aufbauen/Verschieben) ----------
@@ -832,7 +922,7 @@
       this.cameras.main.setZoom(window.innerWidth < 900 ? 1 : 1.4);
 
       // false: Tasten in Eingabefeldern (Preise, Dialog) nicht schlucken
-      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,ESC,DELETE,ONE,TWO', false);
+      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,I,ESC,DELETE,ONE,TWO', false);
       // Tab: Werkzeug-Rad, solange gedrückt. Nur im Laden abfangen (sonst springt der Fokus) – in Fenstern bleibt Tab normal
       const tab = this.input.keyboard.addKey('TAB', false);
       window.addEventListener('keydown', (e) => { if (e.key === 'Tab' && !dialogOpen()) e.preventDefault(); });
@@ -846,7 +936,13 @@
       keys.E.on('down', () => { if (free() && !mode && target) target.run(); });
       this.eKey = keys.E;
       keys.Q.on('down', () => { if (free() && !mode && hand()) dropHere(); });
-      keys.ESC.on('down', () => { if (!free()) return; if (mode) { mode = null; refresh(); } else select(null); });
+      keys.I.on('down', () => { if (free() && !mode) openInventory(); });
+      // Esc: erst Bau-Modus / Auswahl abbrechen, sonst Pause-Menü (nach dem Tastendruck, sonst schließt es Esc gleich wieder)
+      keys.ESC.on('down', () => {
+        if (!free()) return;
+        if (mode) { mode = null; refresh(); } else if (selected) select(null);
+        else setTimeout(() => { if (!dialogOpen()) openMenu(true); }, 0);
+      });
       keys.DELETE.on('down', () => { if (free() && selected && !mode) giveBack(); });
 
       let drag = null;
@@ -890,6 +986,7 @@
       drawAll();
     },
     update: function (time, dt) {
+      if (menuOpen()) return; // Pause
       const sec = Math.min(dt, 50) / 1000;
       walk(this.keys, sec);
       tickMop(sec, this.eKey && this.eKey.isDown);
@@ -1460,12 +1557,8 @@
   }
 
   function pcBewertungen(body) {
-    const r = C.rating(state.reviews);
-    const n = state.reviews.slice(-C.REVIEW_WINDOW).length;
-    body.appendChild(el('p', '', 'Durchschnitt: ' + stars(Math.round(r * 10) / 10) + (n ? ' aus den letzten ' + n + ' Bewertungen' : ' (neuer Laden)') +
-      ' · erwartet heute (' + C.weekday(state.day).name + ') ca. ' + C.expectedCustomers(demandCtx()) + ' Kunden'));
     const list2 = state.reviews.slice().reverse();
-    if (!list2.length) return;
+    if (!list2.length) { body.appendChild(el('p', 'sd-later', 'Noch keine Bewertungen.')); return; }
     const { t, tb } = table([['Tag'], ['Sterne'], ['Kommentar']]);
     list2.forEach((v) => {
       const tr = el('tr');
@@ -2173,6 +2266,143 @@
   });
 
   // ---------- Start ----------
+  // ---------- Menü (Hauptmenü beim Start, Pause mit Esc) ----------
+  // Solange es offen ist, steht das Spiel (update() läuft nicht). Einstellungen wirken sofort und bleiben im Browser.
+  const SETTINGS_KEY = 'sd-settings';
+  const settings = { master: 80, music: 60, sfx: 80, test: true };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) { /* ohne Speicher: Standard */ }
+  const settingsFns = [];
+  // für spätere Töne: window.ShopSettings.get().sfx (0–100), .on(fn) = bei jeder Änderung sofort
+  window.ShopSettings = { get: () => Object.assign({}, settings), on: (fn) => settingsFns.push(fn) };
+  function applySettings() {
+    document.body.classList.toggle('sd-no-dev', !settings.test);
+  }
+  function setSetting(k, v) {
+    settings[k] = v;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* egal */ }
+    applySettings();
+    settingsFns.forEach((fn) => fn(Object.assign({}, settings)));
+  }
+  const KEYS = [
+    ['W A S D', 'laufen'], ['E', 'benutzen'], ['Q', 'Karton abstellen'], ['R', 'drehen'], ['Tab (halten)', 'Werkzeug-Rad'],
+    ['1 / 2', 'Hände / Wischmopp'], ['I', 'Inventar'], ['Esc', 'Pause / Menü'], ['Entf', 'Möbel zurückgeben'], ['Mausrad', 'Zoom'],
+  ];
+  let menuScreen = 'haupt';
+  let menuPause = false;
+  let menuMsg = '';
+  let slotInfo = null;
+  const menuOpen = () => !!document.querySelector('[data-shop-menu][open]');
+  function openMenu(pause) {
+    menuPause = !!pause;
+    menuScreen = 'haupt';
+    menuMsg = '';
+    renderMenu();
+    const dlg = $('[data-shop-menu]');
+    if (!dlg.open) dlg.showModal();
+    fetch('/api/shop-demo/spielstaende', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((j) => { if (j.slots) { slotInfo = j; renderMenu(); } })
+      .catch(() => {});
+  }
+  function closeMenu() {
+    const dlg = $('[data-shop-menu]');
+    if (dlg.open) dlg.close();
+  }
+  function menuBtn(parent, label, fn, opts) {
+    const b = el('button', 'sd-menu-btn' + (opts && opts.main ? ' is-main' : ''), label);
+    b.type = 'button';
+    b.disabled = !!(opts && opts.disabled);
+    b.addEventListener('click', fn);
+    parent.appendChild(b);
+    return b;
+  }
+  const slotText = (s) => (s.summary ? 'Tag ' + s.summary.day + ' · Stufe ' + s.summary.level + ' · ' + fmt(s.summary.coins) + ' Kanacoin' : 'leer');
+  function switchSlot(aktion, slot) {
+    const body = new URLSearchParams({ _csrf: root.dataset.csrf, aktion, slot: String(slot) });
+    fetch('/api/shop-demo/spielstand', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.error) { menuMsg = j.error; renderMenu(); return; }
+        try { sessionStorage.setItem('sd-skip-menu', '1'); } catch (e) { /* dann eben wieder das Menü */ }
+        location.reload();
+      })
+      .catch(() => { menuMsg = 'Keine Verbindung.'; renderMenu(); });
+  }
+  function renderMenu() {
+    const body = $('[data-shop-menu-body]');
+    body.textContent = '';
+    const back = () => { menuScreen = 'haupt'; menuMsg = ''; renderMenu(); };
+    if (menuScreen === 'haupt') {
+      body.appendChild(el('h2', 'sd-menu-title', menuPause ? 'Pause' : 'Grading Shop'));
+      if (!menuPause) body.appendChild(el('p', 'sd-menu-sub', 'Demo · Platzhalter-Grafik'));
+      const cur = slotInfo && slotInfo.slots.find((s) => s.slot === slotInfo.active);
+      menuBtn(body, 'Weiter' + (cur && cur.summary ? ' (Platz ' + cur.slot + ', Tag ' + cur.summary.day + ')' : ''), closeMenu, { main: true });
+      menuBtn(body, 'Neues Spiel', () => { menuScreen = 'neu'; renderMenu(); });
+      menuBtn(body, 'Laden', () => { menuScreen = 'laden'; renderMenu(); });
+      menuBtn(body, 'Einstellungen', () => { menuScreen = 'einst'; renderMenu(); });
+      const site = el('a', 'sd-menu-btn', 'Zurück zur Seite');
+      site.href = '/';
+      body.appendChild(site);
+      return;
+    }
+    const head = el('div', 'sd-menu-head');
+    const bk = el('button', 'sd-btn', '← Zurück');
+    bk.type = 'button';
+    bk.addEventListener('click', back);
+    head.append(bk, el('h2', 'sd-menu-title', { neu: 'Neues Spiel', laden: 'Laden', einst: 'Einstellungen' }[menuScreen]));
+    body.appendChild(head);
+    if (menuScreen === 'einst') { menuSettings(body); return; }
+    if (!slotInfo) { body.appendChild(el('p', 'sd-later', 'Lädt …')); return; }
+    slotInfo.slots.forEach((s) => {
+      const cur = s.slot === slotInfo.active;
+      const label = 'Platz ' + s.slot + (cur ? ' (läuft gerade)' : '') + ' – ' + slotText(s);
+      if (menuScreen === 'laden') menuBtn(body, label, () => { if (cur) closeMenu(); else switchSlot('laden', s.slot); }, { disabled: !s.summary });
+      else {
+        menuBtn(body, label, () => {
+          if (!s.summary) { switchSlot('neu', s.slot); return; }
+          ask('Platz ' + s.slot + ' überschreiben? Der Spielstand dort ist dann weg.').then((ok) => { if (ok) switchSlot('neu', s.slot); });
+        });
+      }
+    });
+    body.appendChild(el('p', 'sd-later', menuScreen === 'neu' ? 'Dein jetziger Spielstand bleibt auf seinem Platz gespeichert.' : 'Gespeichert wird von selbst. Ein offener Tag wird beim Wechseln abgebrochen.'));
+    if (menuMsg) body.appendChild(el('p', 'sd-menu-msg', menuMsg));
+  }
+  function menuSettings(body) {
+    [['master', 'Gesamtlautstärke'], ['music', 'Musik'], ['sfx', 'Geräusche']].forEach(([k, name]) => {
+      const row = el('label', 'sd-menu-row');
+      const r = el('input');
+      r.type = 'range';
+      r.min = '0';
+      r.max = '100';
+      r.value = String(settings[k]);
+      const v = el('span', 'sd-menu-val', settings[k] + ' %');
+      r.addEventListener('input', () => { setSetting(k, Number(r.value)); v.textContent = r.value + ' %'; });
+      row.append(el('span', '', name), r, v);
+      body.appendChild(row);
+    });
+    body.appendChild(el('p', 'sd-later', 'Noch gibt es keine Töne – die Regler wirken, sobald welche dazukommen (auch mitten im Spiel über Esc).'));
+    const box = el('label', 'sd-check');
+    const c = el('input');
+    c.type = 'checkbox';
+    c.checked = !!settings.test;
+    c.addEventListener('change', () => setSetting('test', c.checked));
+    box.append(c, ' TEST-Knöpfe zeigen');
+    body.appendChild(box);
+    body.appendChild(el('div', 'sd-group', 'Tasten'));
+    const { t, tb } = table([['Taste'], ['Was']]);
+    KEYS.forEach(([k, w]) => {
+      const tr = el('tr');
+      tr.append(el('td', '', k), el('td', '', w));
+      tb.appendChild(tr);
+    });
+    body.appendChild(t);
+  }
+  applySettings();
+  // Hauptmenü beim Öffnen – außer direkt nach einem Spielstand-Wechsel
+  let skipMenu = false;
+  try { skipMenu = !!sessionStorage.getItem('sd-skip-menu'); sessionStorage.removeItem('sd-skip-menu'); } catch (e) { /* egal */ }
+  if (!skipMenu) openMenu(false);
+
   fetch('/api/shop-demo', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
     .then((r) => r.json())
     .then((data) => {

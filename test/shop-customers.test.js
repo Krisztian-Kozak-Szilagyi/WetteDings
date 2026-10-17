@@ -64,7 +64,7 @@ test('Bewertungen beim Gehen', () => {
   assert.deepStrictEqual(C.review({ basket: [{}], stars: 4 }, 50, fixed(0.1)), { stars: 4, why: '4' });
   assert.deepStrictEqual(C.review({ basket: [] }, 2, fixed(0.99)), { stars: 1, why: 'empty' });
   assert.strictEqual(C.review({ basket: [] }, 50, fixed(0.99)), null, 'meist keine Bewertung');
-  assert.deepStrictEqual(C.review({ basket: [] }, 50, fixed(0.01)), { stars: 2, why: 'nothing' });
+  assert.strictEqual(C.review({ basket: [] }, 50, fixed(0.01)), null, 'nichts gefunden: keine Strafe');
   assert.ok(L.REVIEW_TEXTS[C.angryReview().why]);
 });
 

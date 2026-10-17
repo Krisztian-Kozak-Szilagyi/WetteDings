@@ -191,7 +191,8 @@
   }
 
   function used(it) {
-    return Object.values(it.stock || {}).reduce((a, n) => a + n, 0);
+    const sum = (o) => Object.values(o || {}).reduce((a, n) => a + n, 0);
+    return sum(it.stock) + sum(it.posters); // Plakate im Safe belegen auch Plätze
   }
 
   /** Aktueller Marktpreis (bewegt sich, s. moveMarket) */
@@ -257,6 +258,35 @@
     it.stock = Object.assign({}, it.stock);
     it.stock[ware] -= 1;
     if (!it.stock[ware]) delete it.stock[ware];
+  }
+
+  // ---------- Inventar (Taste I) ----------
+  // Was die Figur bei sich trägt – jetzt: gedruckte Plakate (state.posters), aufgehängt werden sie später in der Stadt.
+  // Platzhalter: 20 Plätze, ein Plakat = ein Platz. Lagern geht im Safe (holdsPosters).
+  const INVENTORY = { slots: 20 };
+  function invUsed(state) {
+    return Object.values(state.posters || {}).reduce((a, n) => a + n, 0);
+  }
+  const POSTER_KEY = /^[a-z]{1,20}(:geheim)?$/;
+
+  // ---------- Spieltisch (Turniere) ----------
+  // Krisztian (2026-10-17): Turniere am Spieltisch, dafür braucht er 2 Stühle direkt daneben (allein spielt keiner)
+  const TABLE = { id: 'playmat_table', chairs: 2 };
+  /** Spieltische mit den Stühlen direkt daneben → [{ uid, chairs, ready }] */
+  function gameTables(state, cat) {
+    const chairs = new Set(state.items.filter((c) => c.id === 'chair').map((c) => c.x + ',' + c.y));
+    return state.items.filter((it) => it.id === TABLE.id && cat[it.id]).map((it) => {
+      const own = new Set(cells(cat[it.id], it));
+      const near = new Set();
+      own.forEach((k) => {
+        const [x, y] = k.split(',').map(Number);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+          const n = x + dx + ',' + (y + dy);
+          if (!own.has(n) && chairs.has(n)) near.add(n);
+        });
+      });
+      return { uid: it.uid, chairs: near.size, ready: near.size >= TABLE.chairs };
+    });
   }
 
   // ---------- Plakate ----------
@@ -794,6 +824,7 @@
         const price = (more.poster && more.poster.price) || 10;
         if (!type) return fail('Unbekanntes Plakat.');
         const n = Math.max(1, Math.min(10, Number(a.n) || 1));
+        if (invUsed(s) + n > INVENTORY.slots) return fail('Inventar voll.');
         if (s.coins < price * n) return fail('Nicht genug Kanacoin.');
         s.coins = cents(s.coins - price * n);
         const key = type.id + (a.secret ? ':geheim' : '');
@@ -808,6 +839,28 @@
         s.posters[key] -= 1;
         if (!s.posters[key]) delete s.posters[key];
         s.hung[spot.id] = key; // ersetzt ein altes Plakat an diesem Ort
+        return { state: s };
+      }
+      case 'storePoster':
+      case 'takePoster': {
+        // Plakate zwischen Inventar und Safe bewegen
+        const it = find(a.uid);
+        const d = it && cat[it.id];
+        const key = typeof a.key === 'string' && POSTER_KEY.test(a.key) ? a.key : '';
+        if (!d || !d.holdsPosters) return fail('Hier passen keine Plakate hinein.');
+        if (!key) return fail('Unbekanntes Plakat.');
+        const n = Math.max(1, Math.min(100, Math.floor(Number(a.n)) || 1));
+        it.posters = Object.assign({}, it.posters);
+        const store = a.type === 'storePoster';
+        const from = store ? s.posters : it.posters;
+        const to = store ? it.posters : s.posters;
+        if ((from[key] || 0) < n) return fail('So viele Plakate sind nicht da.');
+        if (store && used(it) + n > d.slots) return fail('Kein Platz mehr.');
+        if (!store && invUsed(s) + n > INVENTORY.slots) return fail('Inventar voll.');
+        from[key] -= n;
+        if (!from[key]) delete from[key];
+        to[key] = (to[key] || 0) + n;
+        if (!Object.keys(it.posters).length) delete it.posters;
         return { state: s };
       }
       case 'buyClothes': {
@@ -982,6 +1035,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    posterEffect, RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    posterEffect, INVENTORY, invUsed, TABLE, gameTables, RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });

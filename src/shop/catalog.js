@@ -86,7 +86,9 @@ const CATALOG = Object.entries(LOOK)
   ])
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
 // Safe: Inhalt ist vor Razzien sicher (Razzien kommen mit der Stadt)
-CATALOG.forEach((d) => { if (d.id === 'safe') { d.raidSafe = true; d.utility = 'Wertsachen (Einzelkarten, Slabs, Booster-Boxen) – später sicher vor Razzien.'; } });
+CATALOG.forEach((d) => { if (d.id === 'safe') { d.raidSafe = true; d.holdsPosters = true; d.utility = 'Wertsachen (Einzelkarten, Slabs, Booster-Boxen) und Plakate – später sicher vor Razzien.'; } });
+// Spieltisch: Turniere mit 2 Stühlen direkt daneben (Krisztian, 2026-10-17; Regeln kommen noch)
+CATALOG.forEach((d) => { if (d.id === 'playmat_table') d.utility = 'Für Turniere – braucht 2 Stühle direkt daneben (PC → Turniere).'; });
 // Trophäen-Vitrine (Krisztian, 2026-10-17): Trophäen aus Matches, jede bringt täglich Ruf, solange sie drin steht – vorbereitet
 CATALOG.forEach((d) => { if (d.id === 'trophy_cabinet') d.utility = 'Trophäen aus Matches ausstellen – jede bringt täglich Ruf (kommt mit den Matches).'; });
 // Ruf-Stufe, ab der ein Möbel bestellbar ist (Krisztian, 2026-10-16, Platzhalter): 2 Lager-Sachen, 3 CD/DVD-Ständer

@@ -46,7 +46,7 @@
     </div>
   </div>
 
-  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · R drehen · Tab Werkzeug-Rad · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
+  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · R drehen · Tab Werkzeug-Rad · I Inventar · Esc Menü · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
   <div class="sd-toast" data-shop-toast hidden></div>
   <%# Werkzeug-Rad (Tab gedrückt halten): public/js/shop-demo.js „Werkzeug in der Hand“ %>
   <div class="sd-wheel" data-shop-wheel hidden></div>
@@ -78,6 +78,20 @@
       <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
     </div>
     <iframe class="sd-bench-frame" data-shop-bench-frame title="Arbeitstisch" src="about:blank"></iframe>
+  </dialog>
+
+  <dialog class="sd-win sd-shelf" data-shop-inv>
+    <div class="sd-win-head">
+      <strong>Inventar</strong>
+      <span class="sd-shelf-used" data-shop-inv-used></span>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <div class="sd-shelf-body" data-shop-inv-body></div>
+  </dialog>
+
+  <%# Hauptmenü beim Start und Pause (Esc): public/js/shop-demo.js „Menü“, Spielstände: /api/shop-demo/spielstaende %>
+  <dialog class="sd-win sd-menu" data-shop-menu>
+    <div class="sd-menu-body" data-shop-menu-body></div>
   </dialog>
 
   <dialog class="sd-dialog" data-shop-dialog>
