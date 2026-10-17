@@ -41,6 +41,10 @@
   const SERVICE_PATIENCE = 90; // je Arbeitstisch, den der Auftrag braucht
   // Sauberkeit (Krisztian, 2026-10-14): 10 % der Kunden hinterlassen einen Fleck; ab 3 Flecken, die älter als 30 s
   // sind (ein frischer Fleck soll nicht sofort zählen), gibt es höchstens 3★
+  // Bezahlen (Krisztian, 2026-10-17): halb Karte, halb bar. Falschgeld nur bei Kunden, die Illegales kaufen (10 %).
+  // Feilschen: selten und nur bei großen Einkäufen; nie eine schlechtere Bewertung deswegen
+  const PAY = { cardShare: 0.5, fakeChance: 0.1, bills: [100, 50, 20, 10, 5], change: [50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.01] };
+  const HAGGLE = { minTotal: 150, chance: 0.2, minOff: 0.1, maxOff: 0.25, walkAway: 0.5 };
   const DIRT_CHANCE = 0.1;
   const DIRT_LIMIT = 3;
   const DIRT_GRACE_MS = 30000;
@@ -64,9 +68,56 @@
     return last.reduce((a, r) => a + r.stars, 0) / last.length;
   }
 
-  function customersPerDay(r) {
+  /** Kunden pro Tag aus den Sternen, dazu Plakate (extra = zusätzliche Kunden) */
+  function customersPerDay(r, extra) {
     const c = Math.max(1, Math.min(5, r));
-    return Math.round(MIN_CUSTOMERS + ((c - 1) / 4) * (MAX_CUSTOMERS - MIN_CUSTOMERS));
+    return Math.round(MIN_CUSTOMERS + ((c - 1) / 4) * (MAX_CUSTOMERS - MIN_CUSTOMERS)) + (extra || 0);
+  }
+
+  // ---------- Bezahlen ----------
+  const c2 = (n) => Math.round(n * 100) / 100;
+  /** Karte oder bar? */
+  function payMethod(rng) {
+    return rng() < PAY.cardShare ? 'card' : 'cash';
+  }
+  /** Was der Kunde bar hinlegt: ein, zwei Scheine, mindestens die Summe (wie im echten Leben, mal passend, mal groß) */
+  function cashGiven(total, rng) {
+    const big = PAY.bills.filter((b) => b >= total);
+    if (big.length && rng() < 0.6) return [big[big.length - 1 - Math.floor(rng() * Math.min(2, big.length))]];
+    const out = [];
+    let sum = 0;
+    while (sum < total) {
+      const b = PAY.bills.find((x) => x <= total - sum + 0.0001) || PAY.bills[PAY.bills.length - 1];
+      out.push(b);
+      sum += b;
+    }
+    if (rng() < 0.5 && sum - total < 5) out.push(5);
+    return out;
+  }
+  /** Falschgeld: nur wer Illegales kauft, versucht es (10 %) – Index des falschen Scheins oder -1 */
+  function fakeBill(customer, given, rng) {
+    if (!customer || !customer.illegal || !given.length) return -1;
+    return rng() < PAY.fakeChance ? Math.floor(rng() * given.length) : -1;
+  }
+  /** Wechselgeld auswerten: { due, gave, short, over } (short = zu wenig herausgegeben, over = zu viel) */
+  function changeResult(total, given, change) {
+    const due = c2(given.reduce((a, b) => a + b, 0) - total);
+    const gave = c2(change.reduce((a, b) => a + b, 0));
+    return { due, gave, short: c2(Math.max(0, due - gave)), over: c2(Math.max(0, gave - due)) };
+  }
+
+  // ---------- Feilschen ----------
+  /** Will der Kunde feilschen? → { offer, max } (max = was er insgeheim höchstens zahlt) oder null */
+  function haggle(total, rng) {
+    if (total < HAGGLE.minTotal || rng() >= HAGGLE.chance) return null;
+    const off = HAGGLE.minOff + rng() * (HAGGLE.maxOff - HAGGLE.minOff);
+    const offer = c2(total * (1 - off));
+    return { offer, max: c2(offer + rng() * (total - offer)) };
+  }
+  /** Antwort auf ein Gegenangebot (oder null = abgelehnt): { deal: Preis } oder { walk: true } / { full: true } */
+  function haggleAnswer(h, counter, total, rng) {
+    if (counter !== null && counter <= h.max) return { deal: c2(counter) };
+    return rng() < HAGGLE.walkAway ? { walk: true } : { full: true, deal: total };
   }
 
   /** Ankunftszeiten als Anteil des Tages (0…LAST_ARRIVAL), sortiert */
@@ -106,7 +157,11 @@
 
   function newCustomer(rng, goodsList, ctx) {
     const pool = wishPool(goodsList, ctx);
-    const wish = pool.length && rng() < WISH_CHANCE ? pool[Math.floor(rng() * pool.length)].id : null;
+    // Plakate (ctx.boost = { wareId: Gewicht }) machen ihre Waren als Wunsch wahrscheinlicher
+    const weights = pool.map((g) => 1 + ((ctx && ctx.boost && ctx.boost[g.id]) || 0));
+    let pick = rng() * weights.reduce((a, b) => a + b, 0);
+    const idx = Math.max(0, weights.findIndex((w) => (pick -= w) < 0));
+    const wish = pool.length && rng() < WISH_CHANCE ? pool[idx].id : null;
     return { tol: (rng() * 2 - 1) * TOL_SPREAD, wish: wish, big: rng() < BIG_CHANCE };
   }
 
@@ -297,7 +352,7 @@
   return {
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
     MIN_CUSTOMERS, MAX_CUSTOMERS, EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
-    rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
+    PAY, HAGGLE, payMethod, cashGiven, fakeBill, changeResult, haggle, haggleAnswer, rngFrom, rating, customersPerDay, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
     walkableCell, path, approach, baseOf, queueLine, DIRT_CHANCE, DIRT_LIMIT, DIRT_GRACE_MS, dirtCount, dirtCap,
   };
 });

@@ -85,6 +85,10 @@ const CATALOG = Object.entries(LOOK)
       secret: true }, // kommt mit dem Geheimraum, nicht einzeln bestellbar
   ])
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
+// Safe: Inhalt ist vor Razzien sicher (Razzien kommen mit der Stadt)
+CATALOG.forEach((d) => { if (d.id === 'safe') { d.raidSafe = true; d.utility = 'Wertsachen (Einzelkarten, Slabs, Booster-Boxen) – später sicher vor Razzien.'; } });
+// Trophäen-Vitrine (Krisztian, 2026-10-17): Trophäen aus Matches, jede bringt täglich Ruf, solange sie drin steht – vorbereitet
+CATALOG.forEach((d) => { if (d.id === 'trophy_cabinet') d.utility = 'Trophäen aus Matches ausstellen – jede bringt täglich Ruf (kommt mit den Matches).'; });
 // Ruf-Stufe, ab der ein Möbel bestellbar ist (Krisztian, 2026-10-16, Platzhalter): 2 Lager-Sachen, 3 CD/DVD-Ständer
 const LEVEL_OF = { lager_regal_klein: 2, lager_regal_gross: 2, dehumidifier: 2, dehumidifier_wall: 2, cd_dvd_holder: 3 };
 CATALOG.forEach((d) => { d.level = LEVEL_OF[d.id] || 1; });
@@ -163,11 +167,13 @@ const HOLDS = {
   card_display_case: ['single_card', 'graded_slab'],
   booster_display: ['booster_pack'],
   cd_dvd_holder: ['retro_cd', 'retro_dvd'],
+  // Safe (Krisztian, 2026-10-17): Wertsachen – später vor Razzien sicher (raidSafe), Bargeld bringt später der Manager hinein
+  safe: ['single_card', 'graded_slab', 'booster_box'],
   card_grading_table: ['mat_slab'],
   pack_opening_counter: ['mat_sleeve'],
 };
 // Plätze, wo die Kapazität im Text nicht passt (Material-Vorrat an den Arbeitstischen)
-const SLOTS = { card_grading_table: 10, pack_opening_counter: 20, lager_regal_klein: 40, lager_regal_gross: 80, geheimschrank: 20 };
+const SLOTS = { safe: 20, card_grading_table: 10, pack_opening_counter: 20, lager_regal_klein: 40, lager_regal_gross: 80, geheimschrank: 20 };
 // Lagerregale und der Schrank nehmen alles (Ware und Material)
 const ALL_GOODS = GOODS.map((g) => g.id);
 HOLDS.lager_regal_klein = ALL_GOODS;
@@ -197,4 +203,22 @@ const CLOTHES = [
   { id: 'anzughose', slot: 'hose', name: 'Anzughose (schwarz)', color: 0x1e2028, price: 90, suspicion: null },
 ];
 
-module.exports = { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS };
+// Propaganda-Plakate (Krisztian, 2026-10-17): drucken, an Orten in der Stadt aufhängen – sie bleiben dort. Jedes bringt mehr
+// Kunden, ein gezieltes Plakat zusätzlich mehr Nachfrage nach seiner Warengruppe. secret = geheimes Zeichen für den
+// Schwarzmarkt (vorbereitet: Wirkung + Verdacht kommen mit der Stadt). Orte = Platzhalter bis zur Stadtkarte. Zahlen = Platzhalter
+const POSTER = { price: 10, customers: 2, wishBoost: 2 };
+const POSTER_TYPES = [
+  { id: 'allgemein', name: 'Allgemein', goods: [] },
+  { id: 'sammler', name: 'Sammler', goods: ['booster_pack', 'booster_box', 'single_card', 'graded_slab'] },
+  { id: 'brettspiel', name: 'Brettspiele', goods: ['board_game_box'] },
+  { id: 'gamer', name: 'Gamer', goods: ['energy_drink_can', 'coffee', 'retro_cd', 'retro_dvd'] },
+];
+const POSTER_SPOTS = [
+  { id: 'bushaltestelle', name: 'Bushaltestelle' },
+  { id: 'uni', name: 'Uni-Mensa' },
+  { id: 'park', name: 'Stadtpark' },
+  { id: 'bahnhof', name: 'Bahnhof' },
+  { id: 'spielhalle', name: 'Spielhalle' },
+];
+
+module.exports = { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS, POSTER, POSTER_TYPES, POSTER_SPOTS };
