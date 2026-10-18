@@ -15,19 +15,9 @@
   const MAX_PIECES = 24;
   const DENOMS = [50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.01];
 
-  let audio = null;
+  // Piep über window.ShopSound (public/js/shop-sound.js, Lautstärke aus dem Menü)
   function beep(freq, ms) {
-    try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const o = audio.createOscillator();
-      const g = audio.createGain();
-      o.type = 'square';
-      o.frequency.value = freq || 1400;
-      g.gain.value = 0.04;
-      o.connect(g).connect(audio.destination);
-      o.start();
-      o.stop(audio.currentTime + (ms || 70) / 1000);
-    } catch (e) { /* ohne Ton */ }
+    if (window.ShopSound) window.ShopSound.tone(freq || 1400, ms || 70, 'square', 0.04, { flat: true });
   }
 
   const STEPS = {

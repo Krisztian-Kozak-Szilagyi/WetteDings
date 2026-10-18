@@ -48,20 +48,8 @@
   const FOIL_TOL = 0.07; // so weit (Anteil der Kartenbreite) darf die Karte seitlich daneben sein, sonst hakt sie
 
   // ---------- Ton (leise, optional) ----------
-  let audio = null;
   function tone(freq, ms, type, vol) {
-    try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const o = audio.createOscillator();
-      const g = audio.createGain();
-      o.type = type || 'triangle';
-      o.frequency.value = freq;
-      g.gain.value = vol || 0.03;
-      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + ms / 1000);
-      o.connect(g).connect(audio.destination);
-      o.start();
-      o.stop(audio.currentTime + ms / 1000);
-    } catch (e) { /* ohne Ton */ }
+    if (window.ShopSound) window.ShopSound.tone(freq, ms, type, vol || 0.03); // public/js/shop-sound.js
   }
 
   function post(url, csrf, fields) {
