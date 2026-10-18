@@ -305,6 +305,7 @@ router.post('/shop-demo/werkbank/fertig', requireAdmin, (req, res, next) =>
 const SLOTS = 3;
 const slotId = (u, n) => String(u) + ':' + n;
 const summary = (s) => ({ day: s.day, level: s.level || 1, coins: s.coins });
+// 0 = kein laufendes Spiel (der laufende Spielstand wurde gelöscht → erst Neues Spiel oder Laden)
 async function activeSlot(u) {
   const a = await ShopDemoSlot.findOne({ user: u, active: true }).lean();
   return a ? a.slot : 1;
@@ -330,7 +331,7 @@ router.get('/api/shop-demo/spielstaende', requireAdmin, async (req, res, next) =
 });
 
 // laden = anderen Platz holen (der laufende wird auf seinen Platz gelegt) · neu = frischer Laden auf diesem Platz
-// loeschen = Platz leeren; der laufende fängt dabei neu an (irgendein Spielstand läuft immer)
+// loeschen = Platz leeren; war es der laufende, läuft danach keiner (Platz 0) – zurück ins Hauptmenü (Krisztian, 2026-10-18)
 router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) => {
   try {
     const u = req.user._id;
@@ -339,14 +340,17 @@ router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) =>
     if (!aktion || !Number.isInteger(n) || n < 1 || n > SLOTS) return res.status(400).json({ error: 'Unbekannter Spielstand.' });
     const active = await activeSlot(u);
     if (aktion === 'loeschen') {
-      if (n === active) await ShopDemo.deleteOne({ _id: u });
-      else await ShopDemoSlot.deleteOne({ _id: slotId(u, n) });
+      await ShopDemoSlot.deleteOne({ _id: slotId(u, n) });
+      if (n === active) {
+        await ShopDemo.deleteOne({ _id: u });
+        await ShopDemoSlot.replaceOne({ _id: slotId(u, 0) }, { _id: slotId(u, 0), user: u, slot: 0, active: true, data: null, summary: null }, { upsert: true });
+      }
       return res.json({ ok: true, reload: n === active });
     }
     if (aktion === 'laden' && n === active) return res.json({ ok: true });
     const target = n === active ? null : await ShopDemoSlot.findById(slotId(u, n)).lean();
     if (aktion === 'laden' && !(target && target.data)) return res.status(400).json({ error: 'Der Platz ist leer.' });
-    if (n !== active) {
+    if (n !== active && active > 0) {
       const live = await load(u);
       await ShopDemoSlot.replaceOne(
         { _id: slotId(u, active) },
@@ -356,6 +360,7 @@ router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) =>
     }
     if (aktion === 'laden') await save(u, plain(target.data));
     else await ShopDemo.deleteOne({ _id: u });
+    await ShopDemoSlot.deleteOne({ _id: slotId(u, 0) });
     await ShopDemoSlot.replaceOne(
       { _id: slotId(u, n) },
       { _id: slotId(u, n), user: u, slot: n, active: true, data: null, summary: null, savedAt: new Date() },
