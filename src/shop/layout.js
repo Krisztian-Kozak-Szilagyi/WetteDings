@@ -83,7 +83,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {}, posters: {}, hung: {},
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {}, posters: {}, hung: {}, bag: {}, board: [], nextPid: 1, boardDay: 0,
     };
   }
 
@@ -104,6 +104,10 @@
     out.wardrobe = (out.wardrobe || []).slice();
     out.posters = Object.assign({}, out.posters || {});
     out.hung = Object.assign({}, out.hung || {});
+    out.bag = Object.fromEntries(Object.entries(out.bag || {}).map(([k, v]) => [k, Object.assign({}, v)]));
+    out.board = (out.board || []).map((b) => Object.assign({}, b));
+    out.nextPid = out.nextPid || 1;
+    out.boardDay = out.boardDay || 0;
     out.outfit = Object.assign({}, out.outfit || {});
     out.rooms = (out.rooms || []).map((r) => Object.assign({}, r, { door: r.door ? Object.assign({}, r.door) : null }));
     out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
@@ -265,7 +269,49 @@
   // Platzhalter: 20 Plätze, ein Plakat = ein Platz. Lagern geht im Safe (holdsPosters).
   const INVENTORY = { slots: 20 };
   function invUsed(state) {
-    return Object.values(state.posters || {}).reduce((a, n) => a + n, 0);
+    const posters = Object.values(state.posters || {}).reduce((a, n) => a + n, 0);
+    return posters + Object.values(state.bag || {}).reduce((a, b) => a + (b.n || 0), 0);
+  }
+  // Tasche (state.bag): Dinge mit Namen – Dungeon-Karten ('dungeon:dk1'), Karten vom Schwarzen Brett ('card:<id>')
+  function bagAdd(s, key, name, extra) {
+    const cur = s.bag[key] || Object.assign({ n: 0, name: name }, extra || {});
+    s.bag[key] = Object.assign({}, cur, { n: cur.n + 1 });
+  }
+  function bagTake(s, key) {
+    if (!s.bag[key] || !(s.bag[key].n > 0)) return false;
+    s.bag[key] = Object.assign({}, s.bag[key], { n: s.bag[key].n - 1 });
+    if (!s.bag[key].n) delete s.bag[key];
+    return true;
+  }
+
+  // ---------- Schwarzes Brett: Aushänge der NPCs (nur seltene Karten) ----------
+  const BOARD_ID = 'bulletin_board';
+  const hasBoard = (s) => s.items.some((it) => it.id === BOARD_ID);
+  /**
+   * Abgelaufene Aushänge weg, neue dazu (bis je 2–3 Gesuche/Angebote). cards = [{ id, name, label, rank, value, weight }],
+   * cfg = BOARD (catalog.js), rng = Zufall – nur auf dem Server. Ohne Brett im Laden passiert nichts.
+   */
+  function refreshBoard(state, cards, cfg, rng) {
+    const s = normalize(JSON.parse(JSON.stringify(state)));
+    s.boardDay = s.day;
+    if (!hasBoard(s) || !cards.length) return s;
+    s.board = s.board.filter((b) => b.until >= s.day);
+    const total = cards.reduce((a, c) => a + c.weight, 0);
+    const pickCard = () => {
+      let r = rng() * total;
+      return cards.find((c) => (r -= c.weight) < 0) || cards[cards.length - 1];
+    };
+    const span = (a) => a[0] + rng() * (a[1] - a[0]);
+    ['biete', 'suche'].forEach((kind) => {
+      const want = cfg.perKind[0] + Math.floor(rng() * (cfg.perKind[1] - cfg.perKind[0] + 1));
+      while (s.board.filter((b) => b.kind === kind).length < want) {
+        const c = pickCard();
+        const price = Math.max(1, Math.round(c.value * span(kind === 'biete' ? cfg.offer : cfg.wanted)));
+        s.board.push({ pid: s.nextPid++, kind, card: c.id, name: c.name, label: c.label, price,
+          npc: cfg.npcs[Math.floor(rng() * cfg.npcs.length)], until: s.day + Math.round(span(cfg.days)) });
+      }
+    });
+    return s;
   }
   const POSTER_KEY = /^[a-z]{1,20}(:geheim)?$/;
 
@@ -569,6 +615,7 @@
         const def = cat[a.id];
         if (!def) return fail('Unbekanntes Teil.');
         if (def.secret) return fail('Das gibt es nur mit dem Geheimraum.');
+        if (def.findOnly) return fail('Den kann man nicht kaufen – nur finden.');
         if (needLevel(s, def.level)) return fail('Ab Ruf-Stufe ' + def.level + '.');
         if (s.boxes.length >= MAX_BOXES) return fail('Zu viele Kartons – erst etwas aufbauen.');
         if (s.coins < def.price) return fail('Nicht genug Kanacoin.');
@@ -661,6 +708,7 @@
         const it = find(a.uid);
         if (!it) return fail('Das Teil gibt es nicht mehr.');
         if (it.id === CABINET_ID) return fail('Der Schrank gehört zum Geheimraum (am PC: Bauen → abreißen).');
+        if (cat[it.id] && cat[it.id].findOnly) return fail('Den gibt es nirgends zu kaufen – den behältst du lieber (verschieben geht).');
         const gone = [it].concat(cat[it.id] && cat[it.id].counter ? onTop(s, cat, it) : []);
         if (gone.some((g) => used(g) > 0)) return fail('Erst die Ware herausnehmen.');
         if (it.id === PC_ID && s.items.filter((x) => x.id === PC_ID).length === 1) return fail('Die Kasse mit dem PC brauchst du – verschieben geht.');
@@ -859,6 +907,60 @@
         s.today.guest = (s.today.guest || 0) + 1;
         return { state: s };
       }
+      case 'devFind': {
+        // TEST: Spielautomat (Karton auf dem Gehweg) oder eine Dungeon-Karte „finden“ – im fertigen Spiel: Bosse, versteckte Orte
+        if (a.id === 'arcade') {
+          if (!cat.arcade_machine) return fail('Kein Spielautomat im Katalog.');
+          if (s.boxes.length >= MAX_BOXES) return fail('Zu viele Kartons – erst etwas aufbauen.');
+          newBox('moebel', 'arcade_machine', 1);
+          return { state: s };
+        }
+        const dk = (more.dungeonCards || []).find((x) => x.id === a.id);
+        if (!dk) return fail('Unbekannte Dungeon-Karte.');
+        if (invUsed(s) >= INVENTORY.slots) return fail('Inventar voll.');
+        bagAdd(s, 'dungeon:' + dk.id, dk.name, { tier: dk.tier });
+        return { state: s };
+      }
+      case 'insertCard': {
+        const it = find(a.uid);
+        if (!it || it.id !== 'arcade_machine') return fail('Das ist kein Spielautomat.');
+        if (it.card) return fail('Da steckt schon eine Karte.');
+        const key = typeof a.key === 'string' && /^dungeon:[a-z0-9]{1,10}$/.test(a.key) ? a.key : '';
+        const name = key && s.bag[key] && s.bag[key].name;
+        if (!key || !bagTake(s, key)) return fail('Die Karte hast du nicht.');
+        it.card = key;
+        it.cardName = name;
+        return { state: s };
+      }
+      case 'ejectCard': {
+        const it = find(a.uid);
+        if (!it || it.id !== 'arcade_machine' || !it.card) return fail('Da steckt keine Karte.');
+        if (invUsed(s) >= INVENTORY.slots) return fail('Inventar voll.');
+        bagAdd(s, it.card, it.cardName || it.card);
+        delete it.card;
+        delete it.cardName;
+        return { state: s };
+      }
+      case 'boardBuy':
+      case 'boardSell': {
+        if (!hasBoard(s)) return fail('Dafür brauchst du das Schwarze Brett.');
+        const b = s.board.find((x) => x.pid === a.pid);
+        const buy = a.type === 'boardBuy';
+        if (!b || b.kind !== (buy ? 'biete' : 'suche')) return fail('Den Aushang gibt es nicht mehr.');
+        const key = 'card:' + b.card;
+        if (buy) {
+          if (s.coins < b.price) return fail('Nicht genug Kanacoin.');
+          if (invUsed(s) >= INVENTORY.slots) return fail('Inventar voll.');
+          s.coins = cents(s.coins - b.price);
+          bagAdd(s, key, b.name, { label: b.label });
+        } else {
+          if (!bagTake(s, key)) return fail('Die Karte hast du nicht.');
+          s.coins = cents(s.coins + b.price);
+          s.today.revenue = cents((s.today.revenue || 0) + b.price);
+        }
+        s.board = s.board.filter((x) => x !== b);
+        return { state: s };
+      }
       case 'storePoster':
       case 'takePoster': {
         // Plakate zwischen Inventar und Safe bewegen
@@ -1053,6 +1155,6 @@
 
   return {
     UNIT_W, UNIT_D, MAX_UNITS, START_COINS, MAX_COINS, MAX_ITEMS, DOOR, SIDEWALK,
-    posterEffect, INVENTORY, invUsed, TABLE, gameTables, RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
+    posterEffect, INVENTORY, invUsed, BOARD_ID, hasBoard, refreshBoard, TABLE, gameTables, RUF, UNLOCK, levelFor, nextLevelAt, DAMP, MOUNT_Z, wallOnSide, mountCells, hasWallNext, wallPieces, dampStatus, spoilStorage, ROOM, CABINET_ID, roomAt, roomCells, roomEdges, outerEdge, wallSet, wallBetween, outsideOfDoor, roomCost, MARKET, marketPrice, roundPrice, priceStepUp, moveMarket, TOOLS, MAX_DIRT, FRONT, rot4, frontCells, REVIEW_TEXTS, MAX_JOBS, SERVICE_ORDER, servicePrice, nextService, supplier, fresh, normalize, ensureCounter, PC_ID, size, cells, check, apply, wallLength, blocked, walkable, used, price,
   };
 });
