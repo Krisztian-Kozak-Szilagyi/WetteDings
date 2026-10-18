@@ -52,6 +52,9 @@
   const licensePrices = () => Object.fromEntries(licenseList.map((l) => [l.id, l.price]));
 
   const doAct = (type, extra) => Object.assign({ type }, extra);
+  // Platzhalter-Töne (public/js/shop-sound.js)
+  const snd = (name) => { if (window.ShopSound) window.ShopSound.play(name); };
+  let stepT = 0;
 
   // ---------- Server ----------
   function send(action) {
@@ -68,7 +71,7 @@
   /** Lokal prüfen + zeichnen, dann speichern */
   function act(action) {
     const r = L.apply(state, catalog, goods, Object.assign({ price: unitPrice }, action), more);
-    if (r.error) { toast(r.error); return false; }
+    if (r.error) { toast(r.error); snd('error'); return false; }
     state = r.state;
     refresh();
     send(action);
@@ -725,7 +728,7 @@
     const c = candidate();
     if (!c) return;
     if (mode.kind === 'build') {
-      if (act(doAct('build', c))) mode = null;
+      if (act(doAct('build', c))) { mode = null; snd('place'); }
       refresh();
     } else if (act(doAct('move', Object.assign({ uid: mode.uid }, c)))) {
       const uid = mode.uid;
@@ -1084,7 +1087,7 @@
     if (mopping.t >= MOP_SECONDS) {
       const did = mopping.did;
       mopping = null;
-      act(doAct('mop', { did: did }));
+      if (act(doAct('mop', { did: did }))) snd('mop');
     }
   }
 
@@ -1198,6 +1201,7 @@
     const rest = all.filter((it) => !withWish.includes(it)).sort(() => day.rng() - 0.5);
     c.visit = c.services ? [] : withWish.slice(0, 2).concat(rest).slice(0, 3).map((it) => it.uid);
     day.customers.push(c);
+    snd('door');
   }
 
   function goTo(c, goals) {
@@ -1385,6 +1389,7 @@
       const capped = capDirt({ stars: stars0, why: 'job' + stars0 });
       const stars = capped.stars;
       const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
+      snd('kaching');
       act(doAct('serviceCheckout', { jid: job.jid, stars: stars, why: capped.why === 'dirty' ? 'dirty' : 'job' + stars, method: res.method, lost: res.lost }));
       say(c, '+' + fmt(total) + ' Kanacoin', 2);
       leave(c, null, 'paid');
@@ -1405,6 +1410,7 @@
       if (res.short && rev && rev.stars > 3) rev = { stars: 3, why: '3' }; // zu wenig Wechselgeld
       const full = c.basket.reduce((a, b) => a + b.qty * L.price(state, goods, b.ware), 0);
       const paid = res.deal || full;
+      snd('kaching');
       act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '', method: res.method, deal: res.deal || undefined, lost: res.lost || 0 }, rev || {})));
       say(c, '+' + fmt(paid - (res.lost || 0)) + ' Kanacoin', 2);
       leave(c, null, 'paid');
@@ -1532,6 +1538,7 @@
 
   let noteTimer = 0;
   function note(msg) {
+    snd(/Ruf-Stufe/.test(msg) ? 'level' : 'note');
     const n = $('[data-shop-note]');
     n.textContent = msg;
     n.hidden = false;
@@ -1682,7 +1689,9 @@
       const fromY = player.y;
       if (canStand(player.x + gx, player.y, fromY) && !throughWall(player.x, player.y, player.x + gx, player.y)) player.x += gx;
       if (canStand(player.x, player.y + gy, fromY) && !throughWall(player.x, player.y, player.x, player.y + gy)) player.y += gy;
-    }
+      stepT += sec;
+      if (stepT >= 0.3) { stepT = 0; snd('step'); }
+    } else stepT = 0.25; // erster Schritt kommt gleich
     findTarget();
   }
 
@@ -1880,7 +1889,7 @@
       t = { label: 'E: ' + catalog[h.id].name + ' aufbauen', run: () => { mode = { kind: 'build', id: h.id, rot: 0 }; selected = null; refresh(); } };
     } else if (h) {
       const fit = holders.find((o) => catalog[o.it.id].holds.includes(h.id) && L.used(o.it) < catalog[o.it.id].slots);
-      if (fit) t = { label: 'E: in ' + catalog[fit.it.id].name + ' einräumen', run: () => act(doAct('stock', { uid: fit.it.uid })) };
+      if (fit) t = { label: 'E: in ' + catalog[fit.it.id].name + ' einräumen', run: () => { if (act(doAct('stock', { uid: fit.it.uid }))) snd('stock'); } };
       else if (pc) t = { label: 'E: PC benutzen', run: openPc };
       else t = { label: 'E: Karton abstellen', run: dropHere };
     } else {
@@ -1892,7 +1901,7 @@
       const first = near.find((o) => o.it.id === 'cashier_counter' || catalog[o.it.id].holds);
       const cab = near.find((o) => catalog[o.it.id].secret);
       if (cab && (!box || cab.dist <= box.dist)) t = { label: 'E: Schrank schieben', run: () => act(doAct('slideCabinet', { uid: cab.it.uid, avoid: bodyCells() })) };
-      else if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => act(doAct('pick', { bid: box.b.bid })) };
+      else if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => { if (act(doAct('pick', { bid: box.b.bid }))) snd('pickup'); } };
       else if (first && first.it.id === 'cashier_counter') t = { label: 'E: PC benutzen', run: openPc };
       else if (first) t = { label: 'E: ' + catalog[first.it.id].name + ' ansehen', run: () => openShelf(first.it.uid) };
     }
@@ -1900,7 +1909,7 @@
   }
 
   function dropHere() {
-    act(doAct('drop', { x: Math.round(player.x * 100) / 100, y: Math.round(player.y * 100) / 100 }));
+    if (act(doAct('drop', { x: Math.round(player.x * 100) / 100, y: Math.round(player.y * 100) / 100 }))) snd('drop');
   }
 
   function pick(wx, wy) {
@@ -2425,7 +2434,7 @@
       row.append(el('span', '', name), r, v);
       body.appendChild(row);
     });
-    body.appendChild(el('p', 'sd-later', 'Noch gibt es keine Töne – die Regler wirken, sobald welche dazukommen (auch mitten im Spiel über Esc).'));
+    body.appendChild(el('p', 'sd-later', 'Platzhalter-Töne und -Musik (im Browser erzeugt) – echte Aufnahmen kommen später. Wirkt sofort, auch mitten im Spiel über Esc.'));
     const box = el('label', 'sd-check');
     const c = el('input');
     c.type = 'checkbox';
@@ -2443,6 +2452,8 @@
     body.appendChild(t);
   }
   applySettings();
+  // Klick-Ton für alle Knöpfe (Menü, PC, Fenster)
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button')) snd('click'); }, true);
   // Esc schließt das Menü nicht, solange kein Spiel läuft
   $('[data-shop-menu]').addEventListener('cancel', (e) => { if (noGame()) e.preventDefault(); });
   // Hauptmenü beim Öffnen – außer direkt nach einem Spielstand-Wechsel
