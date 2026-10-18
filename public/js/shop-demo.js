@@ -2196,6 +2196,7 @@
   function refresh() {
     noteMarket();
     refreshHud();
+    if (window.ShopSound) window.ShopSound.radio(state.items.some((it) => it.id === 'radio')); // Musik nur mit Radio
     refreshClock();
     drawAll();
     if (state && state.open && day.rng) reflowLine();
@@ -2434,7 +2435,7 @@
       row.append(el('span', '', name), r, v);
       body.appendChild(row);
     });
-    body.appendChild(el('p', 'sd-later', 'Platzhalter-Töne und -Musik (im Browser erzeugt) – echte Aufnahmen kommen später. Wirkt sofort, auch mitten im Spiel über Esc.'));
+    body.appendChild(el('p', 'sd-later', 'Platzhalter-Töne und -Musik (im Browser erzeugt) – echte Aufnahmen kommen später. Musik läuft nur, wenn im Laden ein Radio hängt. Wirkt sofort, auch mitten im Spiel über Esc.'));
     const box = el('label', 'sd-check');
     const c = el('input');
     c.type = 'checkbox';

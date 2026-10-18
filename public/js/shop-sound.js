@@ -1,12 +1,13 @@
 // Shop-Demo: Platzhalter-Töne und -Musik, alles synthetisch erzeugt (Web Audio, keine Dateien).
 // Lautstärke aus window.ShopSettings (Menü → Einstellungen): Gesamt × Geräusche bzw. Gesamt × Musik, wirkt sofort.
 // Später durch echte Aufnahmen ersetzen – die Schnittstelle bleibt: ShopSound.play('kaching') usw.
-// Browser spielen Ton erst nach der ersten Taste/Maus: dann startet auch die Musik.
+// Browser spielen Ton erst nach der ersten Taste/Maus: dann startet auch die Musik – hörbar nur mit Radio (ShopSound.radio).
 (function () {
   let ac = null;
   let sfxBus = null;
   let musicBus = null;
   let hooked = false;
+  let radioOn = false; // Musik nur, wenn im Laden ein Radio hängt
 
   function volumes() {
     const s = window.ShopSettings ? window.ShopSettings.get() : { master: 80, music: 60, sfx: 80 };
@@ -16,7 +17,7 @@
     if (!ac) return;
     const v = volumes();
     sfxBus.gain.setTargetAtTime(v.sfx, ac.currentTime, 0.02);
-    musicBus.gain.setTargetAtTime(v.music, ac.currentTime, 0.05);
+    musicBus.gain.setTargetAtTime(radioOn ? v.music : 0, ac.currentTime, 0.3);
   }
   function ensure() {
     if (!ac) {
@@ -145,5 +146,6 @@
     play,
     tone: (freq, ms, type, vol, opts) => { try { tone(freq, ms, type, vol, opts); } catch (e) { /* ohne Ton */ } },
     startMusic,
+    radio: (on) => { if (radioOn === !!on) return; radioOn = !!on; applyVolume(); },
   };
 })();

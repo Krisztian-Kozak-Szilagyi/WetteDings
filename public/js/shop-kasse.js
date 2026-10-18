@@ -191,7 +191,7 @@
       this.add.rectangle(bagX, bagY, 100, 70, 0xe8dcc0).setStrokeStyle(2, 0x9a8a6a);
       this.add.text(bagX, bagY, 'Tüte', { fontSize: '12px', color: '#6a5a3a' }).setOrigin(0.5);
       const hintText = this.add.text(cx, top - 18, '', { fontSize: '15px', color: '#fff3c8' }).setOrigin(0.5);
-      const sayText = this.add.text(left + 140, top + 30, '', { fontSize: '14px', color: '#1c1f2b', backgroundColor: '#fff3c8', padding: { x: 8, y: 4 }, wordWrap: { width: pw - 470 } });
+      const sayText = this.add.text(left + 140, top + 30, '', { fontSize: '14px', color: '#1c1f2b', backgroundColor: '#fff3c8', padding: { x: 8, y: 4 }, wordWrap: { width: pw - 470 } }).setVisible(false);
       this.add.text(left + 8, top + ph + 10, 'Esc = abbrechen (der Kunde wartet weiter)', { fontSize: '12px', color: '#9aa0b4' });
 
       // Waren auf der Theke (links), große Mengen gestapelt
@@ -227,7 +227,7 @@
         addToTotal(v) { total += v; totalText.setText(fmt(total)); },
         setTotal(v) { total = v; totalText.setText(fmt(total)); },
         hint(t) { hintText.setText(t); },
-        say(t) { sayText.setText(t); },
+        say(t) { sayText.setText(t).setVisible(!!t); }, // leer = keine Blase
         clearPanel() { panel.forEach((o) => o.destroy()); panel = []; if (keyHandler) { scene.input.keyboard.off('keydown', keyHandler); keyHandler = null; } },
         panelText(t, row) { const o = scene.add.text(panelX, panelY + row * 40, t, { fontSize: '13px', color: '#fff', backgroundColor: '#00000088', padding: { x: 6, y: 4 } }); panel.push(o); return o; },
         panelButton(label, row, fn, w, dx) {
