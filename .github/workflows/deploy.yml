@@ -70,6 +70,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Das AWS-Spiegelarchiv (public.ecr.aws) lehnt anonyme Abrufe oft mit "toomanyrequests: Rate exceeded" ab.
+      # Deshalb die Basis-Images vorher holen und bis zu 6-mal mit wachsender Pause neu versuchen (30, 60 … 150 s);
+      # Build und Probelauf nehmen dann die schon geladenen Images.
+      - name: Basis-Images holen (mit Wiederholung)
+        run: |
+          for img in public.ecr.aws/docker/library/node:22-slim public.ecr.aws/docker/library/mongo:7; do
+            for i in 1 2 3 4 5 6; do
+              docker pull -q "$img" && break
+              if [ "$i" = 6 ]; then echo "::error::$img nicht erreichbar"; exit 1; fi
+              echo "::warning::$img: Versuch $i fehlgeschlagen, neuer Versuch in $((i * 30)) s"
+              sleep $((i * 30))
+            done
+          done
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
