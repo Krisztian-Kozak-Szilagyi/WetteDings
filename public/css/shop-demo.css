@@ -211,3 +211,6 @@ html, body.sd-body {
 .sd-menu-msg { color: #e88; margin: 4px 0 0; }
 .sd-pc-btns { display: flex; gap: 8px; margin-top: 12px; }
 .sd-no-dev .sd-dev { display: none; }
+.sd-menu-slot { display: flex; gap: 8px; align-items: stretch; }
+.sd-menu-slot .sd-menu-btn { flex: 1; min-width: 0; }
+.sd-menu-del { flex: none; }

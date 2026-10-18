@@ -2326,6 +2326,9 @@
     renderMenu();
     const dlg = $('[data-shop-menu]');
     if (!dlg.open) dlg.showModal();
+    fetchSlots();
+  }
+  function fetchSlots() {
     fetch('/api/shop-demo/spielstaende', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then((r) => r.json())
       .then((j) => { if (j.slots) { slotInfo = j; renderMenu(); } })
@@ -2350,6 +2353,7 @@
       .then((r) => r.json())
       .then((j) => {
         if (j.error) { menuMsg = j.error; renderMenu(); return; }
+        if (aktion === 'loeschen' && !j.reload) { fetchSlots(); return; } // anderer Platz: nur die Liste neu
         try { sessionStorage.setItem('sd-skip-menu', '1'); } catch (e) { /* dann eben wieder das Menü */ }
         location.reload();
       })
@@ -2383,8 +2387,19 @@
     slotInfo.slots.forEach((s) => {
       const cur = s.slot === slotInfo.active;
       const label = 'Platz ' + s.slot + (cur ? ' (läuft gerade)' : '') + ' – ' + slotText(s);
-      if (menuScreen === 'laden') menuBtn(body, label, () => { if (cur) closeMenu(); else switchSlot('laden', s.slot); }, { disabled: !s.summary });
-      else {
+      if (menuScreen === 'laden') {
+        const row = el('div', 'sd-menu-slot');
+        menuBtn(row, label, () => { if (cur) closeMenu(); else switchSlot('laden', s.slot); }, { disabled: !s.summary });
+        const del = el('button', 'sd-btn sd-menu-del', 'Löschen');
+        del.type = 'button';
+        del.disabled = !s.summary;
+        del.addEventListener('click', () => {
+          ask(cur ? 'Den laufenden Spielstand auf Platz ' + s.slot + ' löschen? Du fängst dort mit einem leeren Laden neu an.'
+            : 'Platz ' + s.slot + ' löschen? Das lässt sich nicht rückgängig machen.').then((ok) => { if (ok) switchSlot('loeschen', s.slot); });
+        });
+        row.appendChild(del);
+        body.appendChild(row);
+      } else {
         menuBtn(body, label, () => {
           if (!s.summary) { switchSlot('neu', s.slot); return; }
           ask('Platz ' + s.slot + ' überschreiben? Der Spielstand dort ist dann weg.').then((ok) => { if (ok) switchSlot('neu', s.slot); });
