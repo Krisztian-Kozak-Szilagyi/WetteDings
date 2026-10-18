@@ -2018,7 +2018,8 @@
   const LOW_STOCK = 0.2; // bis 20 % belegt = fast leer (gelbes Warnzeichen)
   let hoverUid = null;
   let etikettKey = '';
-  const holdsWare = (it) => !!catalog[it.id] && (catalog[it.id].holds || []).some(isWare);
+  // alles, was etwas aufnimmt: Regale, Kühlschrank, Vitrinen – und die Arbeitstische mit Material (Slabs, Sleeves)
+  const holdsWare = (it) => !!catalog[it.id] && (catalog[it.id].holds || []).some((id) => !!goods[id]);
   function etikettFor() {
     if (!state || mode || dialogOpen()) return null;
     const h = hoverUid && state.items.find((i) => i.uid === hoverUid && holdsWare(i));
