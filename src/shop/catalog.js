@@ -80,6 +80,9 @@ const CATALOG = Object.entries(LOOK)
     // Luftentfeuchter an der Wand (Krisztian, 2026-10-16): teurer, braucht keinen Platz am Boden – nur neben einer Wand
     { id: 'dehumidifier_wall', name: 'Luftentfeuchter (Wand)', group: 'technik', w: 1, d: 1, height: 18, layer: 'wandnah', counter: false, price: 350,
       utility: 'Schützt Karten im Lager vor Feuchtigkeit (1 Gerät je 16 Felder). Hängt an der Wand, braucht keinen Platz.', capacity: null, lagerOk: true },
+    // Radio (Krisztian, 2026-10-18): Musik im Laden nur, wenn eins hängt – reine Atmosphäre, kein Bonus. Preis = Platzhalter
+    { id: 'radio', name: 'Radio (Wand)', group: 'technik', w: 1, d: 1, height: 14, layer: 'wandnah', counter: false, price: 80,
+      utility: 'Spielt Musik im Laden – ohne Radio ist es still. Hängt an der Wand, braucht keinen Platz.', capacity: null, lagerOk: true },
     { id: 'geheimschrank', name: 'Schrank (Geheimtür)', group: 'technik', w: 1, d: 1, height: 74, layer: 'boden', counter: false, price: 300,
       utility: 'Verdeckt den Eingang zum Geheimraum – E schiebt ihn zur Seite. Darin lässt sich auch etwas lagern.', capacity: '20 Stück',
       secret: true }, // kommt mit dem Geheimraum, nicht einzeln bestellbar
