@@ -330,13 +330,19 @@ router.get('/api/shop-demo/spielstaende', requireAdmin, async (req, res, next) =
 });
 
 // laden = anderen Platz holen (der laufende wird auf seinen Platz gelegt) · neu = frischer Laden auf diesem Platz
+// loeschen = Platz leeren; der laufende fängt dabei neu an (irgendein Spielstand läuft immer)
 router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) => {
   try {
     const u = req.user._id;
-    const aktion = ['laden', 'neu'].find((k) => k === req.body.aktion);
+    const aktion = ['laden', 'neu', 'loeschen'].find((k) => k === req.body.aktion);
     const n = Number(req.body.slot);
     if (!aktion || !Number.isInteger(n) || n < 1 || n > SLOTS) return res.status(400).json({ error: 'Unbekannter Spielstand.' });
     const active = await activeSlot(u);
+    if (aktion === 'loeschen') {
+      if (n === active) await ShopDemo.deleteOne({ _id: u });
+      else await ShopDemoSlot.deleteOne({ _id: slotId(u, n) });
+      return res.json({ ok: true, reload: n === active });
+    }
     if (aktion === 'laden' && n === active) return res.json({ ok: true });
     const target = n === active ? null : await ShopDemoSlot.findById(slotId(u, n)).lean();
     if (aktion === 'laden' && !(target && target.data)) return res.status(400).json({ error: 'Der Platz ist leer.' });
