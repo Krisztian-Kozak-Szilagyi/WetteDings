@@ -29,6 +29,8 @@
     <button type="button" data-shop-dev="kunde">+ Kunde</button>
     <button type="button" data-shop-dev="auftrag">+ Kunde mit Karte</button>
     <button type="button" data-shop-dev="ruf">+100 Ruf</button>
+    <button type="button" data-shop-dev="arcade">+ Spielautomat</button>
+    <button type="button" data-shop-dev="dungeon">+ Dungeon-Karte</button>
   </div>
   <div class="sd-hud sd-hud-right">
     <label class="sd-check"><input type="checkbox" data-shop-names checked> Namen</label>
@@ -87,6 +89,15 @@
       <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
     </div>
     <div class="sd-shelf-body" data-shop-inv-body></div>
+  </dialog>
+
+  <%# Spielautomat und Schwarzes Brett: public/js/shop-demo.js „Spielautomat“ / „Schwarzes Brett“ %>
+  <dialog class="sd-win sd-shelf" data-shop-misc>
+    <div class="sd-win-head">
+      <strong data-shop-misc-name></strong>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <div class="sd-shelf-body" data-shop-misc-body></div>
   </dialog>
 
   <%# Hauptmenü beim Start und Pause (Esc): public/js/shop-demo.js „Menü“, Spielstände: /api/shop-demo/spielstaende %>

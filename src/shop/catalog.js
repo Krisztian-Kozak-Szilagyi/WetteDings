@@ -92,12 +92,17 @@ const CATALOG = Object.entries(LOOK)
 CATALOG.forEach((d) => { if (d.id === 'safe') { d.raidSafe = true; d.holdsPosters = true; d.utility = 'Wertsachen (Einzelkarten, Slabs, Booster-Boxen) und Plakate – später sicher vor Razzien.'; } });
 // Kühlschrank: kann zum Gäste-Kühlschrank werden (wartende Kunden nehmen sich gratis etwas – Krisztian, 2026-10-18)
 CATALOG.forEach((d) => { if (d.id === 'drink_refrigerator') d.guestOk = true; });
+// Spielautomat (Krisztian, 2026-10-18): nicht im Handel – wird irgendwo gefunden. Dungeon-Karte einlegen = Dungeon (kommt später)
+CATALOG.forEach((d) => {
+  if (d.id === 'arcade_machine') { d.findOnly = true; d.utility = 'Nur zu finden, nicht im Handel. Dungeon-Karte einlegen → Dungeon startet (kommt später).'; }
+  if (d.id === 'bulletin_board') d.utility = 'NPCs hängen hier Gesuche und Angebote für seltene Karten aus (später auch Aufträge).';
+});
 // Spieltisch: Turniere mit 2 Stühlen direkt daneben (Krisztian, 2026-10-17; Regeln kommen noch)
 CATALOG.forEach((d) => { if (d.id === 'playmat_table') d.utility = 'Für Turniere – braucht 2 Stühle direkt daneben (PC → Turniere).'; });
 // Trophäen-Vitrine (Krisztian, 2026-10-17): Trophäen aus Matches, jede bringt täglich Ruf, solange sie drin steht – vorbereitet
 CATALOG.forEach((d) => { if (d.id === 'trophy_cabinet') d.utility = 'Trophäen aus Matches ausstellen – jede bringt täglich Ruf (kommt mit den Matches).'; });
 // Ruf-Stufe, ab der ein Möbel bestellbar ist (Krisztian, 2026-10-16, Platzhalter): 2 Lager-Sachen, 3 CD/DVD-Ständer
-const LEVEL_OF = { lager_regal_klein: 2, lager_regal_gross: 2, dehumidifier: 2, dehumidifier_wall: 2, cd_dvd_holder: 3 };
+const LEVEL_OF = { lager_regal_klein: 2, lager_regal_gross: 2, dehumidifier: 2, dehumidifier_wall: 2, cd_dvd_holder: 3, bulletin_board: 3 };
 CATALOG.forEach((d) => { d.level = LEVEL_OF[d.id] || 1; });
 // Luftentfeuchter am Boden: darf ins Lager, deutscher Text
 CATALOG.forEach((d) => {
@@ -228,4 +233,15 @@ const POSTER_SPOTS = [
   { id: 'spielhalle', name: 'Spielhalle' },
 ];
 
-module.exports = { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS, POSTER, POSTER_TYPES, POSTER_SPOTS };
+// Dungeon-Karten (Krisztian, 2026-10-18): fallen später von Bossen / liegen an versteckten Orten. Namen + Stufen = Platzhalter
+const DUNGEON_CARDS = [
+  { id: 'dk1', name: 'Dungeon-Karte I', tier: 1 },
+  { id: 'dk2', name: 'Dungeon-Karte II', tier: 2 },
+  { id: 'dk3', name: 'Dungeon-Karte III', tier: 3 },
+];
+// Hirdetőtábla / Schwarzes Brett (Krisztian, 2026-10-18): nur seltene Karten (ab Holo). Preise = Bank-Ankauf ÷ 40 (Platzhalter),
+// Angebote teurer, Gesuche zahlen um den Wert. Je Art 2–3 Aushänge, sie hängen 3–5 Tage.
+const BOARD = { minRank: 3, scale: 1 / 40, offer: [1.1, 1.6], wanted: [0.9, 1.3], perKind: [2, 3], days: [3, 5],
+  npcs: ['Jonas', 'Mia', 'Lukas', 'Lea', 'Finn', 'Emma', 'Ben', 'Hannah', 'Paul', 'Sophie', 'Tim', 'Lina'] };
+
+module.exports = { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS, POSTER, POSTER_TYPES, POSTER_SPOTS, DUNGEON_CARDS, BOARD };
