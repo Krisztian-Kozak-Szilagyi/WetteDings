@@ -2334,9 +2334,11 @@
       .then((j) => { if (j.slots) { slotInfo = j; renderMenu(); } })
       .catch(() => {});
   }
+  // kein laufendes Spiel (gelöscht): das Hauptmenü bleibt offen, bis Neues Spiel / Laden gewählt ist
+  const noGame = () => !!slotInfo && slotInfo.active === 0;
   function closeMenu() {
     const dlg = $('[data-shop-menu]');
-    if (dlg.open) dlg.close();
+    if (dlg.open && !noGame()) dlg.close();
   }
   function menuBtn(parent, label, fn, opts) {
     const b = el('button', 'sd-menu-btn' + (opts && opts.main ? ' is-main' : ''), label);
@@ -2354,7 +2356,8 @@
       .then((j) => {
         if (j.error) { menuMsg = j.error; renderMenu(); return; }
         if (aktion === 'loeschen' && !j.reload) { fetchSlots(); return; } // anderer Platz: nur die Liste neu
-        try { sessionStorage.setItem('sd-skip-menu', '1'); } catch (e) { /* dann eben wieder das Menü */ }
+        // laufenden Spielstand gelöscht → neu laden ins Hauptmenü; sonst gleich ins Spiel
+        if (aktion !== 'loeschen') try { sessionStorage.setItem('sd-skip-menu', '1'); } catch (e) { /* dann eben wieder das Menü */ }
         location.reload();
       })
       .catch(() => { menuMsg = 'Keine Verbindung.'; renderMenu(); });
@@ -2367,7 +2370,7 @@
       body.appendChild(el('h2', 'sd-menu-title', menuPause ? 'Pause' : 'Grading Shop'));
       if (!menuPause) body.appendChild(el('p', 'sd-menu-sub', 'Demo · Platzhalter-Grafik'));
       const cur = slotInfo && slotInfo.slots.find((s) => s.slot === slotInfo.active);
-      menuBtn(body, 'Weiter' + (cur && cur.summary ? ' (Platz ' + cur.slot + ', Tag ' + cur.summary.day + ')' : ''), closeMenu, { main: true });
+      menuBtn(body, 'Weiter' + (cur && cur.summary ? ' (Platz ' + cur.slot + ', Tag ' + cur.summary.day + ')' : ''), closeMenu, { main: true, disabled: !slotInfo || noGame() });
       menuBtn(body, 'Neues Spiel', () => { menuScreen = 'neu'; renderMenu(); });
       menuBtn(body, 'Laden', () => { menuScreen = 'laden'; renderMenu(); });
       menuBtn(body, 'Einstellungen', () => { menuScreen = 'einst'; renderMenu(); });
@@ -2394,7 +2397,7 @@
         del.type = 'button';
         del.disabled = !s.summary;
         del.addEventListener('click', () => {
-          ask(cur ? 'Den laufenden Spielstand auf Platz ' + s.slot + ' löschen? Du fängst dort mit einem leeren Laden neu an.'
+          ask(cur ? 'Den laufenden Spielstand auf Platz ' + s.slot + ' löschen? Danach geht es ins Hauptmenü.'
             : 'Platz ' + s.slot + ' löschen? Das lässt sich nicht rückgängig machen.').then((ok) => { if (ok) switchSlot('loeschen', s.slot); });
         });
         row.appendChild(del);
@@ -2406,7 +2409,7 @@
         });
       }
     });
-    body.appendChild(el('p', 'sd-later', menuScreen === 'neu' ? 'Dein jetziger Spielstand bleibt auf seinem Platz gespeichert.' : 'Gespeichert wird von selbst. Ein offener Tag wird beim Wechseln abgebrochen.'));
+    body.appendChild(el('p', 'sd-later', menuScreen === 'neu' ? (noGame() ? 'Wähle einen Platz für dein neues Spiel.' : 'Dein jetziger Spielstand bleibt auf seinem Platz gespeichert.') : 'Gespeichert wird von selbst. Ein offener Tag wird beim Wechseln abgebrochen.'));
     if (menuMsg) body.appendChild(el('p', 'sd-menu-msg', menuMsg));
   }
   function menuSettings(body) {
@@ -2440,6 +2443,8 @@
     body.appendChild(t);
   }
   applySettings();
+  // Esc schließt das Menü nicht, solange kein Spiel läuft
+  $('[data-shop-menu]').addEventListener('cancel', (e) => { if (noGame()) e.preventDefault(); });
   // Hauptmenü beim Öffnen – außer direkt nach einem Spielstand-Wechsel
   let skipMenu = false;
   try { skipMenu = !!sessionStorage.getItem('sd-skip-menu'); sessionStorage.removeItem('sd-skip-menu'); } catch (e) { /* egal */ }
