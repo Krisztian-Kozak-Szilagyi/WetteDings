@@ -23,7 +23,7 @@ const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS };
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'storePoster', 'takePoster', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'storePoster', 'takePoster', 'setGuest', 'guestTake', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'], pack_opening_counter: ['foil'] };
@@ -32,13 +32,14 @@ function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
   const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
-  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, posters, rid, home }) => {
+  const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, posters, guest, rid, home }) => {
     const it = { uid, id, x, y, rot };
     if (rid) it.rid = rid;
     if (home) it.home = { x: home.x, y: home.y };
     if (wall) it.wall = wall;
     if (stock && Object.keys(stock).length) it.stock = stock;
     if (posters && Object.keys(posters).length) it.posters = posters;
+    if (guest) it.guest = true;
     return it;
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
@@ -141,6 +142,7 @@ router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
       deal: Number(a.deal),
       lost: Number(a.lost),
       secret: !!a.secret,
+      on: !!a.on,
       spot: typeof a.spot === 'string' ? a.spot : '',
       key: typeof a.key === 'string' ? a.key.slice(0, 40) : '',
       ...(type === 'buyUnit' ? { price: UNIT_PRICE } : {}),

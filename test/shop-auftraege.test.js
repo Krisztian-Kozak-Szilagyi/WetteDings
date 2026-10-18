@@ -46,7 +46,10 @@ test('Auftrag nur mit passenden Tischen, höchstens 2, Arbeit → Sterne', () =>
   assert.deepStrictEqual(onlyClean, ['clean']);
   assert.strictEqual(C.workStars(['clean', 'grade', 'slab'], { clean: 100, guess: 8, grade: 8, seal: 95 }), 5);
   assert.strictEqual(C.workStars(['clean', 'grade', 'slab'], { clean: 100, guess: 7, grade: 8, seal: 95 }), 4);
-  assert.strictEqual(C.workStars(['clean'], { clean: 50 }), 3);
+  assert.strictEqual(C.workStars(['clean'], { clean: 65 }), 3);
+  assert.strictEqual(C.workStars(['clean'], { clean: 50 }), 2, 'schlechte Arbeit: unter 3');
+  assert.strictEqual(C.workStars(['grade'], { guess: 4, grade: 9 }), 1);
+  assert.deepStrictEqual([C.comfortStars(false, false), C.comfortStars(true, false), C.comfortStars(true, true), C.comfortStars(false, true)], [3, 4, 5, 3]);
 });
 
 test('Auftrag: annehmen, Tische, Slab/Sleeve verbrauchen, kassieren', () => {

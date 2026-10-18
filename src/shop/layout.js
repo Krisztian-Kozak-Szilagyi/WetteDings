@@ -841,6 +841,24 @@
         s.hung[spot.id] = key; // ersetzt ein altes Plakat an diesem Ort
         return { state: s };
       }
+      case 'setGuest': {
+        // Gäste-Kühlschrank: wartende Auftrags-Kunden dürfen sich gratis etwas nehmen, verkauft wird daraus nichts
+        const it = find(a.uid);
+        if (!it || !cat[it.id] || !cat[it.id].guestOk) return fail('Das geht nur beim Kühlschrank.');
+        if (a.on) it.guest = true;
+        else delete it.guest;
+        return { state: s };
+      }
+      case 'guestTake': {
+        const it = find(a.uid);
+        if (!it || !it.guest) return fail('Das ist kein Gäste-Kühlschrank.');
+        if (!it.stock || !(it.stock[a.ware] > 0)) return fail('Der Kühlschrank ist leer.');
+        it.stock = Object.assign({}, it.stock);
+        it.stock[a.ware] -= 1;
+        if (!it.stock[a.ware]) delete it.stock[a.ware];
+        s.today.guest = (s.today.guest || 0) + 1;
+        return { state: s };
+      }
       case 'storePoster':
       case 'takePoster': {
         // Plakate zwischen Inventar und Safe bewegen
