@@ -971,6 +971,7 @@
       });
       this.input.on('pointermove', (p) => {
         setHover(p);
+        hoverUid = mode ? null : pick(p.worldX, p.worldY);
         if (drag && drag.uid && p.isDown && !drag.moved && Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y) > 6) {
           drag.moved = true;
           startMove(drag.uid);
@@ -1005,6 +1006,7 @@
       tickDay(sec);
       drawCustomers();
       drawHero();
+      drawEtikett();
       sortDepth();
       fadeWalls();
       this.clockT = (this.clockT || 0) + sec;
@@ -2011,6 +2013,67 @@
     add(front, 0, 0.12, L.UNIT_D + 0.12);
   }
 
+  // ---------- Regal-Etikett (Krisztian, 2026-10-18): was drin ist – am Möbel in der Nähe oder unter der Maus ----------
+  // Egal wie das Möbel gedreht ist: über ihm erscheint ein Schild mit Ware, Stückzahl und Füllstand.
+  const LOW_STOCK = 0.2; // bis 20 % belegt = fast leer (gelbes Warnzeichen)
+  let hoverUid = null;
+  let etikettKey = '';
+  const holdsWare = (it) => !!catalog[it.id] && (catalog[it.id].holds || []).some(isWare);
+  function etikettFor() {
+    if (!state || mode || dialogOpen()) return null;
+    const h = hoverUid && state.items.find((i) => i.uid === hoverUid && holdsWare(i));
+    if (h) return h;
+    let best = null;
+    let bd = 1.3;
+    state.items.forEach((it) => {
+      if (!holdsWare(it)) return;
+      L.cells(catalog[it.id], it).forEach((k) => {
+        const [x, y] = k.split(',').map(Number);
+        const dd = Math.hypot(Math.max(x - player.x, 0, player.x - (x + 1)), Math.max(y - player.y, 0, player.y - (y + 1)));
+        if (dd < bd) { bd = dd; best = it; }
+      });
+    });
+    return best;
+  }
+  function drawEtikett() {
+    const it = etikettFor();
+    const top = it && scene.tops && scene.tops[it.uid];
+    const key = top ? it.uid + '|' + JSON.stringify(it.stock || {}) + '|' + top.x + ',' + top.y + '|' + showNames : '';
+    if (key === etikettKey) return;
+    etikettKey = key;
+    if (scene.etikett) { scene.etikett.destroy(); scene.etikett = null; }
+    if (!key) return;
+    const d = catalog[it.id];
+    const ids = Object.keys(it.stock || {}).filter((w) => it.stock[w] > 0);
+    const lines = ids.slice(0, 5);
+    const w = 160;
+    const h = 32 + Math.max(1, lines.length) * 14 + (ids.length > 5 ? 14 : 0);
+    const c = scene.add.container(top.x, top.y - (showNames ? 20 : 6)).setDepth(31000);
+    const g = scene.add.graphics();
+    g.fillStyle(0x1c1f2b, 0.94);
+    g.fillRoundedRect(-w / 2, -h, w, h, 6);
+    g.lineStyle(1, 0x5a6078, 1);
+    g.strokeRoundedRect(-w / 2, -h, w, h, 6);
+    const used = L.used(it);
+    const frac = d.slots ? Math.min(1, used / d.slots) : 0;
+    g.fillStyle(0x000000, 0.5);
+    g.fillRect(-w / 2 + 8, -h + 21, w - 16, 4);
+    g.fillStyle(frac === 0 ? 0xe0525a : frac <= LOW_STOCK ? 0xe0b040 : 0x4fd17a, 1);
+    g.fillRect(-w / 2 + 8, -h + 21, (w - 16) * frac, 4);
+    c.add(g);
+    const txt = (x, y, s, col) => c.add(scene.add.text(x, y, s, { fontSize: '10px', color: col || '#e6e1d6' }).setResolution(2));
+    txt(-w / 2 + 8, -h + 5, (it.guest ? 'Gäste · ' : '') + used + ' / ' + d.slots + ' belegt');
+    if (!lines.length) txt(-w / 2 + 8, -h + 30, 'leer', '#e0525a');
+    lines.forEach((wid, i) => {
+      const y = -h + 30 + i * 14;
+      g.fillStyle(goods[wid] ? goods[wid].color : 0xffffff, 1);
+      g.fillRect(-w / 2 + 8, y + 2, 8, 8);
+      txt(-w / 2 + 20, y, (goods[wid] ? goods[wid].name : wid) + '  ×' + it.stock[wid]);
+    });
+    if (ids.length > 5) txt(-w / 2 + 8, -h + 30 + 5 * 14, '+' + (ids.length - 5) + ' weitere', '#8a90a4');
+    scene.etikett = c;
+  }
+
   function drawAll() {
     if (!scene) return;
     blockSet = L.blocked(state, catalog);
@@ -2066,6 +2129,25 @@
       }
     });
 
+    scene.tops = {};
+    drawn.forEach(({ it, r }) => { scene.tops[it.uid] = r.top || r.hull[0]; });
+    etikettKey = '';
+    // Warnzeichen über leeren (rot) / fast leeren (gelb) Verkaufsmöbeln – Krisztian, 2026-10-18
+    drawn.forEach(({ it, r }) => {
+      const d = catalog[it.id];
+      if (!holdsWare(it) || d.secret || d.lagerOnly || !d.slots || L.roomAt(state, it.x, it.y)) return;
+      const frac = L.used(it) / d.slots;
+      if (frac > LOW_STOCK) return;
+      const p = r.top || r.hull[0];
+      const y = p.y - (showNames ? 30 : 16);
+      const g = scene.add.graphics().setDepth(15500);
+      g.fillStyle(frac === 0 ? 0xe0525a : 0xe0b040, 1);
+      g.fillCircle(p.x, y, 8);
+      g.lineStyle(2, 0x1c1f2b, 1);
+      g.strokeCircle(p.x, y, 8);
+      scene.extra.push(g);
+      scene.extra.push(scene.add.text(p.x, y, '!', { fontSize: '12px', color: '#1c1f2b', fontStyle: 'bold' }).setOrigin(0.5).setDepth(15501).setResolution(2));
+    });
     if (showNames) {
       drawn.forEach(({ it, r }) => {
         const d = catalog[it.id];
