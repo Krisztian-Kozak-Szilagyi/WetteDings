@@ -59,3 +59,11 @@ test('Gäste-Kühlschrank: nur Kühlschrank, gratis, zählt nicht als Verkauf', 
   s = run(s, { type: 'setGuest', uid: 70, on: false });
   assert.strictEqual(s.items[0].guest, undefined);
 });
+
+test('Radio hängt an der Wand (wie der Wand-Luftentfeuchter), nicht mitten im Raum', () => {
+  let s = run(L.fresh(), { type: 'orderMoebel', id: 'radio' }, { type: 'pick', bid: 1 });
+  assert.ok(apply(s, { type: 'build', x: 3, y: 3, rot: 0 }).error, 'ohne Wand geht es nicht');
+  s = run(s, { type: 'build', x: 3, y: 0, rot: 0 });
+  assert.ok(s.items.some((it) => it.id === 'radio'));
+  assert.strictEqual(cat.radio.layer, 'wandnah');
+});
