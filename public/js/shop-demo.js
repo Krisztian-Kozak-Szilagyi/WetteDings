@@ -1452,12 +1452,21 @@
     }
     if (c.phase === 'wait') {
       c.wait += sec;
-      // am Stuhl angekommen: aus dem Gäste-Kühlschrank gratis etwas nehmen (einmal)
-      if (c.chair && !c.drinkTried && !c.path.length) {
-        c.drinkTried = true;
-        const f = state.items.find((it) => it.guest && Object.keys(it.stock || {}).some((w) => it.stock[w] > 0));
-        const w = f && Object.keys(f.stock).find((x) => f.stock[x] > 0);
-        if (w && act(doAct('guestTake', { uid: f.uid, ware: w }))) { c.drink = true; say(c, 'Danke für ' + goods[w].name + '!', 2.5); }
+      // am Stuhl angekommen: steht auf, holt sich gratis etwas aus dem Gäste-Kühlschrank (einmal) und setzt sich wieder
+      if (c.chair && !c.path.length) {
+        const guestFridge = (uid) => state.items.find((it) => it.guest && (!uid || it.uid === uid) && Object.keys(it.stock || {}).some((w) => it.stock[w] > 0));
+        if (!c.drinkTried) {
+          c.drinkTried = true;
+          const f = guestFridge();
+          if (f && goTo(c, C.approach(state, catalog, f, custBlock))) { c.fetch = f.uid; say(c, 'Ich hol mir was zu trinken.', 2); }
+        } else if (c.fetch) {
+          const f = guestFridge(c.fetch);
+          const w = f && Object.keys(f.stock).find((x) => f.stock[x] > 0);
+          c.fetch = null;
+          if (w && act(doAct('guestTake', { uid: f.uid, ware: w }))) { c.drink = true; say(c, 'Danke für ' + goods[w].name + '!', 2.5); }
+          else say(c, 'Schon leer …', 2);
+          if (c.seat) goTo(c, new Set([c.seat]));
+        }
       }
       const job = jobOf(c);
       if (job && !L.nextService(job)) { c.phase = 'queue'; c.wait = 0; say(c, 'Ist meine Karte fertig?', 2.5); queueUp(c); return; }
