@@ -228,12 +228,13 @@
       name.appendChild(el('span', 'sub', d.utility));
       tr.appendChild(name);
       tr.appendChild(el('td', '', d.layer === 'wand' ? 'Wand, ' + d.w + ' breit' : d.layer === 'theke' ? 'auf Theke' : d.w + '×' + d.d + (d.slots ? ' · ' + d.slots + ' Plätze' : '')));
-      tr.appendChild(el('td', 'num', fmt(d.price)));
+      tr.appendChild(el('td', 'num', d.findOnly ? '–' : fmt(d.price)));
       const td = el('td', 'num');
       const b = el('button', 'sd-btn', 'Bestellen');
       b.type = 'button';
-      b.disabled = d.price > state.coins || lockedFor(d.level);
+      b.disabled = d.price > state.coins || lockedFor(d.level) || !!d.findOnly;
       if (lockedFor(d.level)) b.textContent = 'ab Stufe ' + d.level;
+      if (d.findOnly) b.textContent = 'nur zu finden';
       b.addEventListener('click', () => { if (act(doAct('orderMoebel', { id: d.id }))) renderPc(); });
       td.appendChild(b);
       tr.appendChild(td);
@@ -680,6 +681,83 @@
     body.appendChild(t);
   }
 
+  // ---------- Spielautomat / Schwarzes Brett (ein gemeinsames Fenster) ----------
+  let misc = null; // { kind: 'arcade' | 'brett', uid }
+  function openMisc(kind, uid) {
+    misc = { kind, uid };
+    renderMisc();
+    const dlg = $('[data-shop-misc]');
+    if (!dlg.open) dlg.showModal();
+  }
+  function miscButton(td, label, disabled, fn) {
+    const b = el('button', 'sd-btn', label);
+    b.type = 'button';
+    b.disabled = !!disabled;
+    b.addEventListener('click', () => { fn(); renderMisc(); });
+    td.append(b, ' ');
+    return b;
+  }
+  function renderMisc() {
+    const dlg = $('[data-shop-misc]');
+    const it = misc && state.items.find((i) => i.uid === misc.uid);
+    if (!it) { if (dlg.open) dlg.close(); return; }
+    const body = $('[data-shop-misc-body]');
+    body.textContent = '';
+    const full = L.invUsed(state) >= L.INVENTORY.slots;
+    if (misc.kind === 'arcade') {
+      $('[data-shop-misc-name]').textContent = 'Spielautomat';
+      if (it.card) {
+        body.appendChild(el('p', '', 'Eingelegt: ' + (it.cardName || it.card)));
+        const row = el('div', 'sd-pc-btns');
+        miscButton(row, 'Dungeon starten', true, () => {});
+        miscButton(row, 'Karte herausnehmen', full, () => act(doAct('ejectCard', { uid: it.uid })));
+        body.appendChild(row);
+        body.appendChild(el('p', 'sd-later', 'Der Dungeon selbst kommt später – die Karte wird erst beim Start verbraucht.'));
+        return;
+      }
+      const cards = Object.keys(state.bag || {}).filter((k) => /^dungeon:/.test(k) && state.bag[k].n > 0);
+      if (!cards.length) {
+        body.appendChild(el('p', 'sd-later', 'Leg eine Dungeon-Karte ein, um einen Dungeon zu starten. Du hast keine – sie fallen später von Bossen oder liegen an versteckten Orten.'));
+        return;
+      }
+      const { t, tb } = table([['Dungeon-Karte'], ['Stück', 1], ['']]);
+      cards.forEach((k) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', '', state.bag[k].name));
+        tr.appendChild(el('td', 'num', String(state.bag[k].n)));
+        const td = el('td', 'num');
+        miscButton(td, 'Einlegen', false, () => act(doAct('insertCard', { uid: it.uid, key: k })));
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      });
+      body.appendChild(t);
+      return;
+    }
+    $('[data-shop-misc-name]').textContent = 'Schwarzes Brett';
+    const has = (card) => !!(state.bag['card:' + card] && state.bag['card:' + card].n > 0);
+    const left = (b) => { const n = b.until - state.day; return n <= 0 ? 'nur heute' : 'noch ' + n + (n === 1 ? ' Tag' : ' Tage'); };
+    [['biete', 'Zu verkaufen', 'Preis', 'Kaufen'], ['suche', 'Gesucht', 'Zahlt', 'Verkaufen']].forEach(([kind, head, priceHead, btn]) => {
+      body.appendChild(el('div', 'sd-group', head));
+      const list = state.board.filter((b) => b.kind === kind);
+      if (!list.length) { body.appendChild(el('p', 'sd-later', 'Gerade nichts.')); return; }
+      const { t, tb } = table([['Karte'], ['Von'], [priceHead, 1], [''], ['']]);
+      list.forEach((b) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', '', b.name + ' (' + b.label + ')'));
+        tr.appendChild(el('td', '', b.npc));
+        tr.appendChild(el('td', 'num', fmt(b.price)));
+        tr.appendChild(el('td', 'sd-later', left(b)));
+        const td = el('td', 'num');
+        if (kind === 'biete') miscButton(td, btn, b.price > state.coins || full, () => { if (act(doAct('boardBuy', { pid: b.pid }))) snd('kaching'); });
+        else miscButton(td, btn, !has(b.card), () => { if (act(doAct('boardSell', { pid: b.pid }))) snd('kaching'); });
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      });
+      body.appendChild(t);
+    });
+    body.appendChild(el('p', 'sd-later', 'Hier hängen nur seltene Karten (ab Holo). Gekaufte Karten liegen im Inventar (I). Jeden Tag kommen neue Aushänge; Aufträge der NPCs folgen später.'));
+  }
+
   function openInventory() {
     renderInventory();
     const dlg = $('[data-shop-inv]');
@@ -690,11 +768,19 @@
     const body = $('[data-shop-inv-body]');
     body.textContent = '';
     const keys = Object.keys(state.posters).filter((k) => state.posters[k] > 0);
-    if (!keys.length) {
-      body.appendChild(el('p', 'sd-later', 'Leer. Gedruckte Plakate (PC → Propaganda) landen hier – aufhängen kannst du sie später in der Stadt.'));
+    const bag = Object.keys(state.bag || {}).filter((k) => state.bag[k].n > 0);
+    if (!keys.length && !bag.length) {
+      body.appendChild(el('p', 'sd-later', 'Leer. Gedruckte Plakate (PC → Propaganda), Dungeon-Karten und Karten vom Schwarzen Brett landen hier.'));
       return;
     }
     const { t, tb } = table([['Gegenstand'], ['Stück', 1]]);
+    bag.forEach((k) => {
+      const tr = el('tr');
+      const b = state.bag[k];
+      tr.appendChild(el('td', '', b.name + (b.label ? ' (' + b.label + ')' : '')));
+      tr.appendChild(el('td', 'num', String(b.n)));
+      tb.appendChild(tr);
+    });
     keys.forEach((k) => {
       const tr = el('tr');
       tr.appendChild(el('td', '', posterLabel(k)));
@@ -1902,8 +1988,14 @@
         .sort((a, b) => a.dist - b.dist)[0];
       const first = near.find((o) => o.it.id === 'cashier_counter' || catalog[o.it.id].holds);
       const cab = near.find((o) => catalog[o.it.id].secret);
+      const special = near.find((o) => o.it.id === 'arcade_machine' || o.it.id === L.BOARD_ID);
       if (cab && (!box || cab.dist <= box.dist)) t = { label: 'E: Schrank schieben', run: () => act(doAct('slideCabinet', { uid: cab.it.uid, avoid: bodyCells() })) };
       else if (box && (!first || box.dist <= first.dist)) t = { label: 'E: Karton aufheben (' + boxName(box.b) + ')', run: () => { if (act(doAct('pick', { bid: box.b.bid }))) snd('pickup'); } };
+      else if (special && (!first || special.dist <= first.dist)) {
+        t = special.it.id === 'arcade_machine'
+          ? { label: 'E: Spielautomat', run: () => openMisc('arcade', special.it.uid) }
+          : { label: 'E: Schwarzes Brett ansehen', run: () => openMisc('brett', special.it.uid) };
+      }
       else if (first && first.it.id === 'cashier_counter') t = { label: 'E: PC benutzen', run: openPc };
       else if (first) t = { label: 'E: ' + catalog[first.it.id].name + ' ansehen', run: () => openShelf(first.it.uid) };
     }
@@ -2355,6 +2447,12 @@
   document.querySelectorAll('[data-shop-dev]').forEach((b) => {
     b.addEventListener('click', () => {
       if (b.dataset.shopDev === 'ruf') { act(doAct('devRuf', { amount: 100 })); return; }
+      if (b.dataset.shopDev === 'arcade') { act(doAct('devFind', { id: 'arcade' })); return; }
+      if (b.dataset.shopDev === 'dungeon') {
+        const dk = more.dungeonCards[Math.floor(Math.random() * more.dungeonCards.length)];
+        if (dk && act(doAct('devFind', { id: dk.id }))) toast(dk.name + ' gefunden (Inventar: I).');
+        return;
+      }
       if (!state.open || !day.rng) { toast('Erst den Laden an der Tür öffnen.'); return; }
       if (b.dataset.shopDev === 'auftrag') {
         const stations = new Set(state.items.map((it) => it.id));
@@ -2564,7 +2662,7 @@
       more.poster = data.poster;
       more.posterTypes = posterTypes;
       more.posterSpots = posterSpots;
-      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])), clothes: clothesList, poster: data.poster, posterTypes: data.posterTypes || [], posterSpots: data.posterSpots || [] };
+      more = { licenses: Object.fromEntries(licenseList.map((l) => [l.id, l])), services: Object.fromEntries(serviceList.map((x) => [x.id, x])), clothes: clothesList, poster: data.poster, posterTypes: data.posterTypes || [], posterSpots: data.posterSpots || [], dungeonCards: data.dungeonCards || [] };
       catalog = Object.fromEntries(list.map((d) => [d.id, d]));
       goods = Object.fromEntries(goodsList.map((g) => [g.id, g]));
       refreshHud();

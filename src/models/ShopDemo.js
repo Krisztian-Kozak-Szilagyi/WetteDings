@@ -41,6 +41,11 @@ const shopDemoSchema = new Schema(
     // Plakate: gedruckt (Typ → Stück), aufgehängt (Ort → Typ)
     posters: { type: Schema.Types.Mixed, default: {} },
     hung: { type: Schema.Types.Mixed, default: {} },
+    // Tasche (Dungeon-Karten, Karten vom Brett) und Schwarzes Brett (Aushänge der NPCs) – src/shop/layout.js
+    bag: { type: Schema.Types.Mixed, default: {} },
+    board: { type: [Schema.Types.Mixed], default: [] },
+    nextPid: { type: Number, default: 1 },
+    boardDay: { type: Number, default: 0 },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {
@@ -53,7 +58,9 @@ const shopDemoSchema = new Schema(
         wall: String,
         stock: Schema.Types.Mixed,
         posters: Schema.Types.Mixed, // Safe: gelagerte Plakate
-        guest: Boolean, // Kühlschrank nur für wartende Gäste (gratis, kein Verkauf)
+        guest: Boolean,
+        card: String, // Spielautomat: eingelegte Dungeon-Karte
+        cardName: String, // Kühlschrank nur für wartende Gäste (gratis, kein Verkauf)
         rid: Number, // Geheimschrank: zu welchem Raum
         home: Schema.Types.Mixed, // Geheimschrank: Platz vor der Tür
       },
