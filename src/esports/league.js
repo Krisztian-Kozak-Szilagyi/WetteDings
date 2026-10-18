@@ -11,7 +11,7 @@
  */
 
 const REPORT_DAY = 0; // Sonntag (Date.getDay)
-const REPORT_TIME = '20:00';
+const REPORT_TIME = '16:00';
 // Liga-Start (Krisztian, 2026-10-09): erst ab Montag, 12.10.2026 00:00 (deutsche Zeit) zählen Läufe – der erste
 // Wochenbericht mit Kurssprung und Preisen ist der vom 18.10.; der Bericht vom 11.10. entfällt.
 const LEAGUE_START = new Date(Date.UTC(2026, 9, 11, 22, 0));
