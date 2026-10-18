@@ -71,13 +71,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       # Das AWS-Spiegelarchiv (public.ecr.aws) lehnt anonyme Abrufe oft mit "toomanyrequests: Rate exceeded" ab.
-      # Deshalb die Basis-Images vorher holen und bis zu 6-mal mit wachsender Pause neu versuchen (30, 60 … 150 s);
+      # Deshalb die Basis-Images vorher holen: erst AWS, sonst Googles Docker-Hub-Spiegel (mirror.gcr.io, dann unter
+      # dem AWS-Namen markiert), bis zu 6 Runden mit wachsender Pause (30, 60 … 150 s).
       # Build und Probelauf nehmen dann die schon geladenen Images.
       - name: Basis-Images holen (mit Wiederholung)
         run: |
           for img in public.ecr.aws/docker/library/node:22-slim public.ecr.aws/docker/library/mongo:7; do
+            alt="mirror.gcr.io/library/${img##*/}"
             for i in 1 2 3 4 5 6; do
               docker pull -q "$img" && break
+              docker pull -q "$alt" && docker tag "$alt" "$img" && echo "::notice::$img über $alt geholt" && break
               if [ "$i" = 6 ]; then echo "::error::$img nicht erreichbar"; exit 1; fi
               echo "::warning::$img: Versuch $i fehlgeschlagen, neuer Versuch in $((i * 30)) s"
               sleep $((i * 30))
