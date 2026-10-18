@@ -604,6 +604,35 @@ async function awardTrophy(team, { day, from, place, score, prize }) {
 
 const lastWeek = () => EsportsWeek.findOne({ status: 'fertig' }).sort({ _id: -1 }).lean();
 
+/**
+ * Zwischenstand der laufenden Woche – NUR für das Admin-Panel (die Seite und der Bot verraten keine Zahlen).
+ * Gleiche Wertung wie der Sonntagsbericht (publish); Teams, die diese Woche nicht gewertet werden, stehen ohne Platz darunter.
+ */
+async function weekStandings(now = Date.now()) {
+  const start = weekStart(now);
+  const from = new Date(Math.max(start.getTime(), league.LEAGUE_START.getTime()));
+  const to = new Date(start.getTime() + 7 * DAY);
+  const teams = await EsportsTeam.find({ status: { $in: LIVE } }).select('name ticker status listedAt lastRank members').lean();
+  const runs = teams.length
+    ? await DungeonRun.find({ mode: 'tower', esportsTeam: { $in: teams.map((t) => t._id) }, startedAt: { $gte: from, $lt: to } }).select('esportsTeam rounds fights.total').lean()
+    : [];
+  const runsOf = (t) => runs.filter((r) => r.esportsTeam.equals(t._id)).map(runScore);
+  const counted = (t) => t.status === 'aktiv' && t.listedAt && t.listedAt <= from;
+  const ranked = teams.filter(counted);
+  const rows = league.rankWeek(ranked.map((t) => ({ id: String(t._id), prevRank: t.lastRank, runs: runsOf(t) })));
+  const won = new Map(league.trophies(rows, settings.minTeams).map((t) => [t.id, t.place]));
+  const info = (t) => ({ name: t.name, ticker: t.ticker, status: t.status, members: t.members.length, prevRank: t.lastRank ?? null, runs: runsOf(t).length });
+  return {
+    from,
+    to,
+    rows: rows.map((r) => {
+      const t = ranked.find((x) => String(x._id) === r.id);
+      return { ...info(t), rank: r.rank, of: r.of, score: r.score, points: r.points, best: r.best, held: r.held, change: r.change, trophy: won.get(r.id) || null };
+    }),
+    others: teams.filter((t) => !counted(t)).map((t) => ({ ...info(t), ...league.scoreOf(runsOf(t)) })),
+  };
+}
+
 module.exports = {
   isOpen,
   lastDue,
@@ -639,4 +668,5 @@ module.exports = {
   awardTrophy,
   runDue,
   lastWeek,
+  weekStandings,
 };

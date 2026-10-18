@@ -308,6 +308,47 @@
       </form>
     </div>
   </section>
+  <% const wk = esportsAdmin.week; const placeLabel = (p) => (esportsAdmin.places.find((x) => x.place === p) || {}).label; %>
+  <section class="stats-block" id="esports-woche">
+    <%- blockHead('Zwischenstand der Woche', 'Nur hier im Admin-Panel sichtbar – die Seite und der Bot verraten keine Zahlen. Gleiche Wertung wie der Sonntagsbericht: Punkte = Runden der 2 besten Läufe, bei Gleichstand zählen die Kampfpunkte. „Sprung“ ist der Kurssprung, wenn die Woche jetzt enden würde.') %>
+    <div class="card">
+      <p class="muted small">Woche <%= date(wk.from) %> bis <%= date(wk.to) %> (Bericht).</p>
+      <% if (!wk.rows.length) { %>
+        <p class="muted">Diese Woche wird noch kein Team gewertet.</p>
+      <% } else { %>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Platz</th><th>Team</th><th>Punkte</th><th>Beste Läufe</th><th>Kampfpunkte</th><th>Läufe</th><th>Letzte Woche</th><th>Sprung</th><th>Trophäe</th></tr></thead>
+            <tbody>
+              <% wk.rows.forEach((r) => { %>
+                <tr>
+                  <td><%= r.rank %>/<%= r.of %></td>
+                  <td><a href="/esports/team/<%= r.ticker.toLowerCase() %>"><%= r.name %></a> <span class="muted">(<%= r.ticker %>)</span></td>
+                  <td><strong><%= r.score %></strong></td>
+                  <td><%= r.best.length ? r.best.join(' + ') : '–' %></td>
+                  <td><%= r.points.toLocaleString('de-DE') %></td>
+                  <td><%= r.runs %></td>
+                  <td><%= r.prevRank ? r.prevRank + '.' : '–' %><%= r.held ? ' · gehalten' : '' %></td>
+                  <td><%= signedPercent(r.change) %></td>
+                  <td><%= r.trophy ? placeLabel(r.trophy) : '–' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (!wk.rows.some((r) => r.trophy)) { %><p class="muted small">Trophäen gibt es erst, wenn mindestens <%= esportsAdmin.minTeams %> Teams Punkte haben.</p><% } %>
+      <% } %>
+      <% if (wk.others.length) { %>
+        <h4>Diese Woche ohne Wertung</h4>
+        <p class="muted small">Noch nicht gehandelt (unter 3 Mitgliedern), eingefroren oder erst während der Woche an die Börse gekommen.</p>
+        <ul>
+          <% wk.others.forEach((t) => { %>
+            <li><%= t.name %> <span class="muted">(<%= t.ticker %>)</span> · <%= t.status %> · <%= t.members %> Mitglieder · <%= t.runs %> Läufe<%= t.score ? ` · ${t.score} Punkte` : '' %></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  </section>
 <% } %>
 
   <% if (sub === 'lotterie') { %>

@@ -178,6 +178,8 @@ router.get('/admin', requireStaff, async (req, res) => {
     // Passwort zurücksetzen (nur Admin): offene Einmal-Codes
     needs('team') && isAdmin ? User.find({ deletedAt: null, resetExpires: { $gt: new Date() } }).select('username resetExpires').sort({ resetExpires: 1 }).lean() : [],
   ]);
+  // eSports-Zwischenstand der laufenden Woche – nur der Admin sieht die Zahlen
+  const esportsWeek = needsSub('spielwerte', 'esports') && isAdmin ? await esportsService.weekStandings() : null;
   // Gerade erzeugter Einmal-Code: wird genau einmal angezeigt
   const resetShown = needs('team') && isAdmin && req.session.resetShown ? req.session.resetShown : null;
   if (resetShown) delete req.session.resetShown;
@@ -228,7 +230,7 @@ router.get('/admin', requireStaff, async (req, res) => {
     cosmeticAdmin: needsSub('spielwerte', 'kosmetik') && isAdmin ? { currency: cosmetics.currencyName(), avatars: cosmetics.avatars(), effects: cosmeticCatalog.EFFECTS, expectedPack: tcgCatalog.expectedPackValue(), defaults: Object.fromEntries(cosmeticCatalog.AVATARS.map((a) => [a.key, a])) } : null,
     lottoSettings: lotteryService.settings,
     // eSports: Preis je Trophäe (Geld + Packs) und Mindestzahl der Teams mit Punkten
-    esportsAdmin: needsSub('spielwerte', 'esports') && isAdmin ? { foundCost: esportsService.foundCost(), prizes: esportsService.prizeList(), minTeams: esportsService.settings.minTeams, maxPacks: esportsLeague.MAX_PRIZE_PACKS } : null,
+    esportsAdmin: needsSub('spielwerte', 'esports') && isAdmin ? { foundCost: esportsService.foundCost(), prizes: esportsService.prizeList(), minTeams: esportsService.settings.minTeams, maxPacks: esportsLeague.MAX_PRIZE_PACKS, week: esportsWeek, places: esportsLeague.PLACES } : null,
     // Karten für "Karte vergeben", nach Seltenheit gruppiert
     lotteryGrantKinds: lotteryService.GRANT_KINDS.map(lotteryService.kindByKey),
     // noch nicht erhältliche Karten (z. B. Mark Suntouched) nur für Admins
