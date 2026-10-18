@@ -45,3 +45,17 @@ test('Spieltisch: bereit erst mit 2 Stühlen direkt daneben', () => {
   s.items.push({ uid: 63, id: 'chair', x: 4, y: 3, rot: 0 });
   assert.deepStrictEqual(L.gameTables(s, cat), [{ uid: 60, chairs: 2, ready: true }]);
 });
+
+test('Gäste-Kühlschrank: nur Kühlschrank, gratis, zählt nicht als Verkauf', () => {
+  let s = L.fresh();
+  s.items.push({ uid: 70, id: 'drink_refrigerator', x: 0, y: 0, rot: 0, stock: { coffee: 1 } }, { uid: 71, id: 'shelf_small', x: 4, y: 0, rot: 0 });
+  assert.match(apply(s, { type: 'setGuest', uid: 71, on: true }).error, /Kühlschrank/);
+  assert.match(apply(s, { type: 'guestTake', uid: 70, ware: 'coffee' }).error, /kein Gäste/);
+  s = run(s, { type: 'setGuest', uid: 70, on: true });
+  const coins = s.coins;
+  s = run(s, { type: 'guestTake', uid: 70, ware: 'coffee' });
+  assert.deepStrictEqual([s.coins, s.items[0].stock, s.today.guest], [coins, {}, 1]);
+  assert.match(apply(s, { type: 'guestTake', uid: 70, ware: 'coffee' }).error, /leer/);
+  s = run(s, { type: 'setGuest', uid: 70, on: false });
+  assert.strictEqual(s.items[0].guest, undefined);
+});

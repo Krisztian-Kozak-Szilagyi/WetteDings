@@ -53,6 +53,7 @@ const shopDemoSchema = new Schema(
         wall: String,
         stock: Schema.Types.Mixed,
         posters: Schema.Types.Mixed, // Safe: gelagerte Plakate
+        guest: Boolean, // Kühlschrank nur für wartende Gäste (gratis, kein Verkauf)
         rid: Number, // Geheimschrank: zu welchem Raum
         home: Schema.Types.Mixed, // Geheimschrank: Platz vor der Tür
       },

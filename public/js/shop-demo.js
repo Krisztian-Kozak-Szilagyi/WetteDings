@@ -607,6 +607,15 @@
     $('[data-shop-shelf-used]').textContent = L.used(it) + ' / ' + d.slots + ' Plätze belegt';
     const body = $('[data-shop-shelf-body]');
     body.textContent = '';
+    if (d.guestOk) {
+      const box = el('label', 'sd-check sd-guest');
+      const c = el('input');
+      c.type = 'checkbox';
+      c.checked = !!it.guest;
+      c.addEventListener('change', () => { act(doAct('setGuest', { uid: it.uid, on: c.checked })); renderShelf(); });
+      box.append(c, ' Gäste-Kühlschrank: wartende Kunden (Aufträge) nehmen sich gratis etwas – daraus wird nichts verkauft');
+      body.appendChild(box);
+    }
     const ids = Object.keys(it.stock || {});
     if (!ids.length) body.appendChild(el('p', 'sd-later', 'Leer. Bring einen Karton und drück E.'));
     else {
@@ -1120,11 +1129,12 @@
   const isWare = (id) => !!goods[id] && (goods[id].kind || 'ware') === 'ware';
   /** Verkäufliche Ware im ganzen Laden (Material an den Arbeitstischen zählt nicht) */
   function shopStock() {
-    return state.items.reduce((a, it) => a + Object.keys(it.stock || {}).filter(isWare).reduce((n, w) => n + it.stock[w], 0), 0);
+    return state.items.filter((it) => !it.guest).reduce((a, it) => a + Object.keys(it.stock || {}).filter(isWare).reduce((n, w) => n + it.stock[w], 0), 0);
   }
   // Möbel, an denen Kunden sich Ware ansehen (nicht die Arbeitstische mit Material)
   // Regale, an die Kunden kommen: nicht in Räumen (Lager, Geheimraum), nicht der Geheimschrank
-  const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare) && !catalog[it.id].secret && !L.roomAt(state, it.x, it.y));
+  // … und nicht der Gäste-Kühlschrank (daraus wird nichts verkauft)
+  const holders = () => state.items.filter((it) => (catalog[it.id].holds || []).some(isWare) && !catalog[it.id].secret && !it.guest && !L.roomAt(state, it.x, it.y));
   const counter = () => state.items.find((it) => it.id === L.PC_ID);
 
   /** Nachfrage-Daten für heute (Bekanntheit, Sterne, Wochentag, Plakate) */
@@ -1323,8 +1333,9 @@
     const taken = new Set(day.customers.filter((o) => o !== c && o.phase === 'wait' && o.seat).map((o) => o.seat));
     for (const it of state.items.filter((i) => i.id === 'chair' || i.id === 'beanbag')) {
       const spots = Array.from(C.approach(state, catalog, it, custBlock)).filter((k) => !taken.has(k));
-      if (spots.length) { c.seat = spots[0]; return new Set([spots[0]]); }
+      if (spots.length) { c.seat = spots[0]; c.chair = true; return new Set([spots[0]]); }
     }
+    c.chair = false;
     const line = new Set(queueSpots());
     const free = [];
     for (let y = 0; y < L.UNIT_D - 1; y++) {
@@ -1370,7 +1381,7 @@
     if (!job) { leave(c, null); return; }
     const lines = job.services.map((id) => ({ name: (more.services[id] || {}).name || id, qty: 1, price: L.servicePrice(state, more, id), color: 0xffffff }));
     scanThen(c, 'Auftrag Kunde ' + job.jid, lines, (res) => {
-      const stars0 = Math.min(c.priceStars || 5, C.workStars(job.services, job.results), res.short ? 3 : 5);
+      const stars0 = Math.min(c.priceStars || 5, C.workStars(job.services, job.results), C.comfortStars(c.chair, c.drink), res.short ? 3 : 5);
       const capped = capDirt({ stars: stars0, why: 'job' + stars0 });
       const stars = capped.stars;
       const total = job.services.reduce((a, id) => a + L.servicePrice(state, more, id), 0);
@@ -1441,6 +1452,13 @@
     }
     if (c.phase === 'wait') {
       c.wait += sec;
+      // am Stuhl angekommen: aus dem Gäste-Kühlschrank gratis etwas nehmen (einmal)
+      if (c.chair && !c.drinkTried && !c.path.length) {
+        c.drinkTried = true;
+        const f = state.items.find((it) => it.guest && Object.keys(it.stock || {}).some((w) => it.stock[w] > 0));
+        const w = f && Object.keys(f.stock).find((x) => f.stock[x] > 0);
+        if (w && act(doAct('guestTake', { uid: f.uid, ware: w }))) { c.drink = true; say(c, 'Danke für ' + goods[w].name + '!', 2.5); }
+      }
       const job = jobOf(c);
       if (job && !L.nextService(job)) { c.phase = 'queue'; c.wait = 0; say(c, 'Ist meine Karte fertig?', 2.5); queueUp(c); return; }
       if (!job || c.wait >= c.patience) {

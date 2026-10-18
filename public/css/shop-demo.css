@@ -193,7 +193,9 @@ html, body.sd-body {
 .sd-name-input { width: 160px; padding: 4px 6px; border: 1px solid #3a3f52; border-radius: 5px; background: #14161f; color: inherit; font: inherit; }
 
 /* Hauptmenü / Pause (Esc) – public/js/shop-demo.js „Menü“ */
-.sd-menu { width: min(420px, calc(100vw - 32px)); }
+.sd-menu { width: min(420px, calc(100vw - 32px)); overflow-x: hidden; }
+.sd-menu *, .sd-menu *::before, .sd-menu *::after { box-sizing: border-box; }
+.sd-guest { height: auto; padding: 8px 10px; margin-bottom: 10px; }
 .sd-menu::backdrop { background: rgba(8, 9, 14, .78); }
 .sd-menu-body { display: flex; flex-direction: column; gap: 8px; padding: 22px; }
 .sd-menu-title { margin: 0 0 4px; font-size: 22px; text-align: center; }

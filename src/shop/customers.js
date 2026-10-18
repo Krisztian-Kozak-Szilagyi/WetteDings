@@ -31,7 +31,7 @@
   const WISH_CHANCE = 0.7;
   const IMPULSE_CHANCE = 0.25;
   const BUYER_REVIEWS = 0.8;
-  const EMPTY_SHOP = 5; // so wenig Ware im ganzen Laden = „leer“
+  const EMPTY_SHOP = 3; // so wenig Ware im ganzen Laden = „leer“ (Krisztian, 2026-10-18: nur wenn man wirklich nicht aufpasst)
   const PATIENCE = 30; // Sekunden an der Kasse
   const BIG_CHANCE = 0.05;
   const SERVICE_CHANCE = 0.1;
@@ -217,16 +217,24 @@
     return pack.services.slice();
   }
 
-  /** Wie zufrieden mit der Arbeit an der Karte? results = { clean %, iron %, guess, grade, seal % } → 3–5★ */
+  /**
+   * Wie zufrieden mit der Arbeit an der Karte? results = { clean %, iron %, guess, grade, seal % } → 1–5★
+   * Krisztian (2026-10-18): unter 3★ nur bei schlechter Arbeit (Schwellen = Platzhalter)
+   */
+  // Warten auf den Auftrag (Krisztian, 2026-10-18): ohne Stuhl höchstens 3★, mit Stuhl 4★, mit Stuhl + Gratis-Getränk 5★
+  function comfortStars(chair, drink) {
+    return chair ? (drink ? 5 : 4) : 3;
+  }
+
   function workStars(services, results) {
     const r = results || {};
-    const pct = (v) => (v >= 90 ? 5 : v >= 70 ? 4 : 3);
+    const pct = (v) => (v >= 90 ? 5 : v >= 70 ? 4 : v >= 50 ? 3 : v >= 30 ? 2 : 1);
     let stars = 5;
-    if (services.includes('clean')) stars = Math.min(stars, r.clean >= 95 ? 5 : r.clean >= 80 ? 4 : 3);
+    if (services.includes('clean')) { const c = r.clean || 0; stars = Math.min(stars, c >= 95 ? 5 : c >= 80 ? 4 : c >= 60 ? 3 : c >= 40 ? 2 : 1); }
     if (services.includes('iron')) stars = Math.min(stars, pct(r.iron || 0));
     if (services.includes('grade')) {
       const diff = Math.abs((r.guess || 0) - (r.grade || 0));
-      stars = Math.min(stars, diff === 0 ? 5 : diff === 1 ? 4 : 3);
+      stars = Math.min(stars, Math.max(1, 5 - diff));
     }
     if (services.includes('slab')) stars = Math.min(stars, pct(r.seal || 0));
     if (services.includes('foil') && typeof r.foil === 'number') stars = Math.min(stars, pct(r.foil));
@@ -383,7 +391,7 @@
 
   return {
     OPEN_MIN, CLOSE_MIN, DAY_SECONDS, LAST_ARRIVAL, HAPPY, OK, TOL_SPREAD, REVIEW_WINDOW, START_RATING,
-    EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars,
+    EMPTY_SHOP, PATIENCE, BIG_CHANCE, SERVICE_CHANCE, SERVICE_PATIENCE, serviceWish, workStars, comfortStars,
     PAY, HAGGLE, payMethod, cashGiven, fakeBill, changeResult, haggle, haggleAnswer, rngFrom, rating, DEMAND, weekday, expectedCustomers, customersToday, arrivals, clock, judge, wishPool, newCustomer, shop, review, angryReview,
     walkableCell, path, approach, baseOf, queueLine, DIRT_CHANCE, DIRT_LIMIT, DIRT_GRACE_MS, dirtCount, dirtCap,
   };
