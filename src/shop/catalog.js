@@ -87,6 +87,8 @@ const CATALOG = Object.entries(LOOK)
   .sort((a, b) => Object.keys(GROUPS).indexOf(a.group) - Object.keys(GROUPS).indexOf(b.group));
 // Safe: Inhalt ist vor Razzien sicher (Razzien kommen mit der Stadt)
 CATALOG.forEach((d) => { if (d.id === 'safe') { d.raidSafe = true; d.holdsPosters = true; d.utility = 'Wertsachen (Einzelkarten, Slabs, Booster-Boxen) und Plakate – später sicher vor Razzien.'; } });
+// Kühlschrank: kann zum Gäste-Kühlschrank werden (wartende Kunden nehmen sich gratis etwas – Krisztian, 2026-10-18)
+CATALOG.forEach((d) => { if (d.id === 'drink_refrigerator') d.guestOk = true; });
 // Spieltisch: Turniere mit 2 Stühlen direkt daneben (Krisztian, 2026-10-17; Regeln kommen noch)
 CATALOG.forEach((d) => { if (d.id === 'playmat_table') d.utility = 'Für Turniere – braucht 2 Stühle direkt daneben (PC → Turniere).'; });
 // Trophäen-Vitrine (Krisztian, 2026-10-17): Trophäen aus Matches, jede bringt täglich Ruf, solange sie drin steht – vorbereitet
