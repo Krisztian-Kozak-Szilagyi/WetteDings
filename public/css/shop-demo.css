@@ -214,3 +214,8 @@ html, body.sd-body {
 .sd-menu-slot { display: flex; gap: 8px; align-items: stretch; }
 .sd-menu-slot .sd-menu-btn { flex: 1; min-width: 0; }
 .sd-menu-del { flex: none; }
+
+/* QA-Notiz (Taste O) */
+.sd-notiz { width: min(520px, calc(100vw - 32px)); }
+.sd-notiz-body { padding: 14px 16px 16px; }
+.sd-notiz-body textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 8px; border-radius: 8px; border: 1px solid #3a3f52; background: #14161f; color: #e6e1d6; font: inherit; }

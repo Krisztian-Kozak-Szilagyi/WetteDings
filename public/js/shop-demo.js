@@ -29,6 +29,7 @@
   let groups = {};
   let unitPrice = 0;
   let showNames = true;
+  let isAdmin = false; // Hauptmenü: Link zu den QA-Notizen
 
   // Modus: null | { kind: 'build', id, rot } (Möbel aus dem Karton) | { kind: 'move', uid, id, rot }
   let mode = null;
@@ -758,6 +759,48 @@
     body.appendChild(el('p', 'sd-later', 'Hier hängen nur seltene Karten (ab Holo). Gekaufte Karten liegen im Inventar (I). Jeden Tag kommen neue Aushänge; Aufträge der NPCs folgen später.'));
   }
 
+  // ---------- QA-Notiz (Taste O): Tester schreibt auf, was auffällt; der Moment im Spiel wird mitgeschickt ----------
+  const notizOpen = () => !!document.querySelector('[data-shop-notiz][open]');
+  function notizCtx() {
+    const dlg = document.querySelector('dialog[open]:not([data-shop-notiz])');
+    const near = state.items.map((it) => ({ it, d: itemDist(it) })).sort((a, b) => a.d - b.d)[0];
+    return {
+      day: state.day, weekday: C.weekday(state.day).name, open: !!state.open,
+      clock: state.open && day.rng ? C.clock(day.t / C.DAY_SECONDS) : '', level: state.level || 1, coins: state.coins,
+      x: player.x, y: player.y, where: near && near.d < 2 ? 'bei ' + catalog[near.it.id].name : '',
+      window: dlg ? (dlg.querySelector('.sd-win-head strong') || {}).textContent || dlg.className : (kasseOpen() ? 'Kasse/Arbeitstisch' : ''),
+      held, carry: hand() ? boxName(hand()) : '', mode: mode ? mode.kind : '', customers: day.customers ? day.customers.length : 0,
+      screen: window.innerWidth + '×' + window.innerHeight,
+    };
+  }
+  function openNotiz() {
+    if (!state || notizOpen()) return;
+    const dlg = $('[data-shop-notiz]');
+    dlg.dataset.ctx = JSON.stringify(notizCtx());
+    $('[data-shop-notiz-msg]').hidden = true;
+    dlg.showModal();
+    $('[data-shop-notiz-text]').focus();
+  }
+  $('[data-shop-notiz-cancel]').addEventListener('click', () => $('[data-shop-notiz]').close());
+  $('[data-shop-notiz-save]').addEventListener('click', () => {
+    const dlg = $('[data-shop-notiz]');
+    const ta = $('[data-shop-notiz-text]');
+    const msg = $('[data-shop-notiz-msg]');
+    const text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    const body = new URLSearchParams({ _csrf: root.dataset.csrf, text, ctx: dlg.dataset.ctx || '{}' });
+    fetch('/api/shop-demo/notiz', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.error) { msg.textContent = j.error; msg.hidden = false; return; }
+        ta.value = '';
+        dlg.close();
+        snd('note');
+        toast('Notiz gespeichert – danke!');
+      })
+      .catch(() => { msg.textContent = 'Keine Verbindung – Notiz nicht gespeichert.'; msg.hidden = false; });
+  });
+
   function openInventory() {
     renderInventory();
     const dlg = $('[data-shop-inv]');
@@ -1020,7 +1063,7 @@
       this.cameras.main.setZoom(window.innerWidth < 900 ? 1 : 1.4);
 
       // false: Tasten in Eingabefeldern (Preise, Dialog) nicht schlucken
-      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,I,ESC,DELETE,ONE,TWO', false);
+      const keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,R,E,Q,I,O,ESC,DELETE,ONE,TWO', false);
       // Tab: Werkzeug-Rad, solange gedrückt. Nur im Laden abfangen (sonst springt der Fokus) – in Fenstern bleibt Tab normal
       const tab = this.input.keyboard.addKey('TAB', false);
       window.addEventListener('keydown', (e) => { if (e.key === 'Tab' && !dialogOpen()) e.preventDefault(); });
@@ -1035,6 +1078,7 @@
       this.eKey = keys.E;
       keys.Q.on('down', () => { if (free() && !mode && hand()) dropHere(); });
       keys.I.on('down', () => { if (free() && !mode) openInventory(); });
+      keys.O.on('down', () => { if (free()) setTimeout(openNotiz, 0); }); // nach dem Tastendruck, sonst landet das „o“ im Textfeld
       // Esc: erst Bau-Modus / Auswahl abbrechen, sonst Pause-Menü (nach dem Tastendruck, sonst schließt es Esc gleich wieder)
       keys.ESC.on('down', () => {
         if (!free()) return;
@@ -1085,7 +1129,7 @@
       drawAll();
     },
     update: function (time, dt) {
-      if (menuOpen()) return; // Pause
+      if (menuOpen() || notizOpen()) return; // Pause (Menü, QA-Notiz)
       const sec = Math.min(dt, 50) / 1000;
       walk(this.keys, sec);
       tickMop(sec, this.eKey && this.eKey.isDown);
@@ -2503,7 +2547,7 @@
   }
   const KEYS = [
     ['W A S D', 'laufen'], ['E', 'benutzen'], ['Q', 'Karton abstellen'], ['R', 'drehen'], ['Tab (halten)', 'Werkzeug-Rad'],
-    ['1 / 2', 'Hände / Wischmopp'], ['I', 'Inventar'], ['Esc', 'Pause / Menü'], ['Entf', 'Möbel zurückgeben'], ['Mausrad', 'Zoom'],
+    ['1 / 2', 'Hände / Wischmopp'], ['I', 'Inventar'], ['O', 'Notiz für die Entwicklung (QA)'], ['Esc', 'Pause / Menü'], ['Entf', 'Möbel zurückgeben'], ['Mausrad', 'Zoom'],
   ];
   let menuScreen = 'haupt';
   let menuPause = false;
@@ -2565,6 +2609,11 @@
       menuBtn(body, 'Neues Spiel', () => { menuScreen = 'neu'; renderMenu(); });
       menuBtn(body, 'Laden', () => { menuScreen = 'laden'; renderMenu(); });
       menuBtn(body, 'Einstellungen', () => { menuScreen = 'einst'; renderMenu(); });
+      if (isAdmin) {
+        const qa = el('a', 'sd-menu-btn', 'QA-Notizen lesen');
+        qa.href = '/shop-demo/notizen';
+        body.appendChild(qa);
+      }
       const site = el('a', 'sd-menu-btn', 'Zurück zur Seite');
       site.href = '/';
       body.appendChild(site);
@@ -2647,6 +2696,8 @@
     .then((r) => r.json())
     .then((data) => {
       state = data.state;
+      isAdmin = !!data.isAdmin;
+      if (menuOpen()) renderMenu();
       list = data.catalog;
       goodsList = data.goods;
       groups = data.groups;
