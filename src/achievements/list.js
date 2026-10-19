@@ -62,6 +62,9 @@ async function trophyMembers(places) {
 const topShopLevel = () => require('../grading/gradingService').LEVELS.length;
 /** Schlüssel aller Werkzeug-Upgrades des Grading-Shops (spät geladen wie topShopLevel) */
 const toolKeys = () => require('../grading/gradingService').TOOLS.map((t) => t.key);
+// Rangliste (spät geladen wie der Grading-Service); Top Seller vom Job Center ab mehr als 100.000 € Gesamtvermögen (Cent)
+const rankService = () => require('../services/rankService');
+const TOP_SELLER = 10000000;
 // Versiegelte Aufträge (Grading-Meilensteine, #204)
 const SEALED = { status: 'fertig', seal: { $ne: null } };
 
@@ -340,6 +343,14 @@ const ACHIEVEMENTS = [
 
   // ---- Rangliste & Dungeon ----
   {
+    key: 'top-seller',
+    name: 'Top Seller vom Job Center',
+    text: 'Besitze insgesamt mehr als 100.000 € Vermögen – Konto, offene Einsätze, Broker, Karten und Grading-Shop zählen alle mit.',
+    icon: { glyph: 'top-seller', tone: 'gold', frame: 'gold' },
+    // Gesamtvermögen wie in der Rangliste (rankService.ranking: abzüglich offener Schulden); Team-Konten zählen auch
+    holders: async () => (await rankService().ranking({ team: true })).filter((r) => r.total > TOP_SELLER).map((r) => r._id),
+  },
+  {
     key: 'thronfolger',
     name: 'Thronfolger',
     text: 'Stehe insgesamt 24 Stunden auf Platz 1 der Rangliste (Team-Mitglieder: Platz 1 im Team).',
@@ -504,6 +515,10 @@ const avatarCount = async (user) => {
 };
 
 const PROGRESS = {
+  'top-seller': async (user) => {
+    const [row] = await rankService().ranking({ team: true, userId: user });
+    return [part(Math.max(0, (row && row.total) || 0), TOP_SELLER, 'Gesamtvermögen', 'euro')];
+  },
   volltreffer: async (user) => {
     const best = await sumOf(Position, [{ $match: { user, payout: { $gt: 0 }, amount: { $gt: 0 } } }, { $group: { _id: null, n: { $max: { $divide: ['$payout', '$amount'] } } } }]);
     return [part(Math.floor(best * 10) / 10, 5, 'bester Gewinn', 'times')];
