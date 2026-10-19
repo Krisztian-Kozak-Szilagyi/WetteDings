@@ -16,7 +16,7 @@ router.get('/img/erfolge/:file', (req, res, next) => {
   if (!body) return next();
   res.set({
     'Content-Type': 'image/svg+xml; charset=utf-8',
-    'Content-Security-Policy': "default-src 'none'",
+    'Content-Security-Policy': "default-src 'none'; img-src data:", // Motive aus Zeichnungen sind als data:-Bild eingebettet
     'Cache-Control': config.isProd ? 'public, max-age=604800' : 'no-cache',
   });
   res.send(body);

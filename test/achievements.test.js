@@ -111,3 +111,31 @@ test('Neue Erfolge: eSports, Inventar, Black Market, Grading-Shop, Turm, Boss-Be
   for (const a of ACHIEVEMENTS) if (a.progress) assert.ok(!a.secret && !a.unique, a.key);
   assert.ok(find('orakel').progress && find('himmelsstuermer').progress && !find('esports-sieg').progress);
 });
+
+test('Top Seller vom Job Center: ab mehr als 100.000 € Gesamtvermögen (wie die Rangliste), Motiv aus dem Referenzbild', async () => {
+  const a = find('top-seller');
+  assert.ok(a && !a.unique && !a.secret);
+  assert.equal(a.name, 'Top Seller vom Job Center');
+  // Rangliste nachstellen: total = Konto + Einsätze + Broker + Karten + Grading-Shop − Schulden (Cent)
+  const rs = require('../src/services/rankService');
+  const orig = rs.ranking;
+  const rows = [
+    { _id: 'reich', total: 10000001 },
+    { _id: 'genau', total: 10000000 },
+    { _id: 'arm', total: 500000 },
+  ];
+  rs.ranking = async ({ userId } = {}) => (userId ? rows.filter((r) => r._id === userId) : rows);
+  try {
+    assert.deepEqual(await a.holders(), ['reich'], 'genau 100.000 € reicht noch nicht – erst mehr als 100.000 €');
+    // Fortschrittsbalken im eigenen Profil: Vermögen von 100.000 €
+    const [p] = await a.progress('arm');
+    assert.deepEqual([p.have, p.need, p.kind], [500000, 10000000, 'euro']);
+  } finally {
+    rs.ranking = orig;
+  }
+  // Symbol: Medaille mit eingebetteter Zeichnung (Silhouette + Linien als Masken)
+  const svg = icons.render(a.icon);
+  assert.ok(svg.includes('mask="url(#top-seller-s)"') && svg.includes('mask="url(#top-seller-l)"'));
+  assert.equal((svg.match(/data:image\/png;base64,/g) || []).length, 2);
+  assert.ok(!/="[FSD]"/.test(svg), 'keine übrigen Platzhalter');
+});
