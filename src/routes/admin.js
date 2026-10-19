@@ -1147,8 +1147,9 @@ router.get('/admin/pack-log', requireStaff, (req, res) => {
   res.redirect(panelUrl('protokolle', 'protokoll', { log: 'vergaben', ...(q ? { spieler: q } : {}) }));
 });
 
-// ---------- Rollen vergeben / entziehen: Devs und Mods (nur Admin) ----------
-const ROLE_LABEL = { dev: 'Dev', mod: 'Mod' };
+// ---------- Rollen vergeben / entziehen: Devs, Mods und QA Tester (nur Admin) ----------
+const ROLE_LABEL = { dev: 'Dev', mod: 'Mod', qa: 'QA Tester' };
+const ROLE_SECTION = { dev: 'devs', mod: 'mods', qa: 'qa' };
 
 router.post('/admin/rollen', requireAdmin, async (req, res) => {
   const userId = typeof req.body.user === 'string' ? req.body.user : '';
@@ -1162,7 +1163,7 @@ router.post('/admin/rollen', requireAdmin, async (req, res) => {
     await roles.setRole(user._id, on ? role : null);
     req.flash('success', on ? `${user.username} ist jetzt ${ROLE_LABEL[role]}.` : `${user.username} ist kein ${ROLE_LABEL[role]} mehr.`);
   }
-  res.redirect(panelUrl('team', role === 'mod' ? 'mods' : 'devs'));
+  res.redirect(panelUrl('team', ROLE_SECTION[role] || 'devs'));
 });
 
 // ---------- Passwort zurücksetzen (nur Admin) ----------

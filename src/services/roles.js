@@ -3,6 +3,7 @@
 //       bannt befristet (höchstens 7 Tage, keine Devs), bearbeitet Meldungen und Mehrfach-Konten-Hinweise im Dev-Panel
 //       und lädt neue Mitglieder per Einladungscode ein.
 //  Mod: moderiert das Forum und Kommentare (löschen, bearbeiten, anpinnen, schließen) – sonst nichts.
+//  QA Tester: sieht Seiten im Test (Shop-Demo) – ohne Abzeichen, nicht im Team der Rangliste, sonst ein normales Mitglied.
 // Für die Zusätze neben Namen (echter Name in Klammern, Abzeichen) gibt es ein kleines Verzeichnis im
 // Speicher (Name → Rolle / echter Name), damit Listen mit gespeicherten Namen (Kommentare, Wetten, …)
 // ohne Datenbankabfrage auskommen.
@@ -10,8 +11,8 @@ const config = require('../config');
 const User = require('../models/User');
 const { systemAuthor } = require('../forum/systemAuthors');
 
-const ASSIGNABLE = ['dev', 'mod']; // Rollen, die der Admin vergeben kann
-const byRole = { dev: new Set(), mod: new Set() }; // usernameLower je Rolle
+const ASSIGNABLE = ['dev', 'mod', 'qa']; // Rollen, die der Admin vergeben kann
+const byRole = { dev: new Set(), mod: new Set() }; // usernameLower je Rolle mit Abzeichen (QA Tester bewusst nicht)
 const realNames = new Map(); // usernameLower → echter Name (freiwillige Angabe)
 
 async function load() {
@@ -33,7 +34,7 @@ function roleOf(username) {
   return byRole.mod.has(lower) ? 'mod' : null;
 }
 
-/** Rolle vergeben ('dev' | 'mod') oder entziehen (null) */
+/** Rolle vergeben ('dev' | 'mod' | 'qa') oder entziehen (null) */
 async function setRole(userId, role) {
   await User.updateOne({ _id: userId }, { $set: { role: ASSIGNABLE.includes(role) ? role : null } });
   await load();
