@@ -48,8 +48,8 @@ const userSchema = new Schema(
     // (packs = Booster Packs, withheld = Grund, falls keine, z. B. gleiches Gerät)
     invitedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     inviteReward: { type: new Schema({ packs: Number, withheld: String }, { _id: false }), default: undefined },
-    // Rolle: 'dev' oder 'mod' (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
-    role: { type: String, enum: ['dev', 'mod', null], default: null },
+    // Rolle: 'dev', 'mod' oder 'qa' (QA Tester, ohne Abzeichen) (vom Admin ernannt) oder null. Der Admin selbst steht in ADMIN_USERNAMES.
+    role: { type: String, enum: ['dev', 'mod', 'qa', null], default: null },
     // Profil: selbst geschriebener Text (höchstens 300 Zeichen, siehe achievements/logic.cleanBio) und bis zu
     // zwei angeheftete Erfolge (Schlüssel aus src/achievements/list.js)
     bio: { type: String, default: '' },

@@ -1,5 +1,5 @@
 // Shop-Demo: eigener Laden (2:1-isometrisch, Platzhalter aus src/shop/items.json) mit Figur, PC (Bestellen, Preise,
-// Lizenzen), Kartons, Regalen, Kunden und Kunden-Aufträgen. Vorerst nur für Admins.
+// Lizenzen), Kartons, Regalen, Kunden und Kunden-Aufträgen. Vorerst nur für Admin und QA Tester.
 // EJS ist nur der Rahmen, gezeichnet wird mit Phaser in public/js/shop-demo.js; Regeln in src/shop/layout.js
 // (dieselbe Datei läuft im Browser als /js/shop-layout.js). Kanacoin = Demo-Geld, getrennt vom Kontostand.
 // Aufträge: Karte und Zustand würfelt der Server (wie im Grading-Shop der Seite); gearbeitet wird am Arbeitstisch
@@ -7,7 +7,7 @@
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
-const { requireAdmin } = require('../middleware');
+const { requireLogin } = require('../middleware');
 const ShopDemo = require('../models/ShopDemo');
 const ShopDemoSlot = require('../models/ShopDemoSlot');
 const layout = require('../shop/layout');
@@ -18,6 +18,13 @@ const tcg = require('../tcg/catalog');
 const { str } = require('../lib/util');
 
 const router = express.Router();
+
+/** Nur für Admin und QA Tester. Andere bekommen eine 404 (wie bei requireAdmin). */
+function requireTester(req, res, next) {
+  if (!req.user) return requireLogin(req, res, next);
+  if (!req.user.isAdmin && !req.user.isQa) return next('route');
+  next();
+}
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
 const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS };
@@ -72,24 +79,24 @@ function rollJob(services) {
   return { services: list, card: grading.rollCard(1), defects, spots: grading.rollSpots(), seed: crypto.randomBytes(2).toString('hex') };
 }
 
-router.get('/shop-demo', requireAdmin, (req, res) => {
+router.get('/shop-demo', requireTester, (req, res) => {
   res.render('shop-demo', { title: 'Shop-Demo' });
 });
 
-router.get('/js/shop-layout.js', requireAdmin, (req, res) => {
+router.get('/js/shop-layout.js', requireTester, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'layout.js'));
 });
 
-router.get('/js/shop-customers.js', requireAdmin, (req, res) => {
+router.get('/js/shop-customers.js', requireTester, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'customers.js'));
 });
 
-router.get('/vendor/phaser.min.js', requireAdmin, (req, res) => {
+router.get('/vendor/phaser.min.js', requireTester, (req, res) => {
   res.set('Cache-Control', 'private, max-age=604800');
   res.type('application/javascript').sendFile(require.resolve('phaser/dist/phaser.min.js'));
 });
 
-router.get('/api/shop-demo', requireAdmin, async (req, res, next) => {
+router.get('/api/shop-demo', requireTester, async (req, res, next) => {
   try {
     res.json({
       state: await load(req.user._id), catalog: CATALOG, goods: GOODS, groups: GROUPS, unitPrice: UNIT_PRICE,
@@ -102,7 +109,7 @@ router.get('/api/shop-demo', requireAdmin, async (req, res, next) => {
 });
 
 // Eine Aktion: { type, ... } als JSON im Feld "aktion" (dazu _csrf)
-router.post('/api/shop-demo', requireAdmin, async (req, res, next) => {
+router.post('/api/shop-demo', requireTester, async (req, res, next) => {
   try {
     let a;
     try {
@@ -233,7 +240,7 @@ async function openBench(userId, jid, station, remember) {
   };
 }
 
-router.get('/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
+router.get('/shop-demo/werkbank', requireTester, async (req, res, next) => {
   try {
     const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch), true);
     if (b.error) return res.status(400).type('text/plain').send(b.error);
@@ -243,7 +250,7 @@ router.get('/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
   }
 });
 
-router.get('/api/shop-demo/werkbank', requireAdmin, async (req, res, next) => {
+router.get('/api/shop-demo/werkbank', requireTester, async (req, res, next) => {
   try {
     const b = await openBench(req.user._id, Number(req.query.auftrag), str(req.query.tisch));
     if (b.error) return res.status(400).json({ error: b.error });
@@ -269,7 +276,7 @@ async function benchStep(req, res, fn) {
   res.json(out.json);
 }
 
-router.post('/shop-demo/werkbank/buegeln', requireAdmin, (req, res, next) =>
+router.post('/shop-demo/werkbank/buegeln', requireTester, (req, res, next) =>
   benchStep(req, res, (job) => {
     if (!job.services.includes('iron') || job.results.iron !== undefined) return { error: 'Diese Karte ist schon gebügelt.' };
     const input = grading.ironInput({ smooth: Number(str(req.body.smooth)), burns: Number(str(req.body.burns)) });
@@ -279,7 +286,7 @@ router.post('/shop-demo/werkbank/buegeln', requireAdmin, (req, res, next) =>
   }).catch(next)
 );
 
-router.post('/shop-demo/werkbank/benoten', requireAdmin, (req, res, next) =>
+router.post('/shop-demo/werkbank/benoten', requireTester, (req, res, next) =>
   benchStep(req, res, (job) => {
     const guess = Number.parseInt(str(req.body.grade), 10);
     if (!job.services.includes('grade') || job.results.guess) return { error: 'Die Karte ist schon benotet.' };
@@ -291,7 +298,7 @@ router.post('/shop-demo/werkbank/benoten', requireAdmin, (req, res, next) =>
 );
 
 // Fertig am Tisch: Reinigung/Versiegelung übernehmen, Schritte abhaken (verbraucht beim Versiegeln einen leeren Slab)
-router.post('/shop-demo/werkbank/fertig', requireAdmin, (req, res, next) =>
+router.post('/shop-demo/werkbank/fertig', requireTester, (req, res, next) =>
   benchStep(req, res, (job, state) => {
     const steps = (BENCH_STEPS[job.bench] || []).filter((id) => job.services.includes(id) && !job.done.includes(id));
     const pct = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
@@ -320,7 +327,7 @@ async function activeSlot(u) {
   return a ? a.slot : 1;
 }
 
-router.get('/api/shop-demo/spielstaende', requireAdmin, async (req, res, next) => {
+router.get('/api/shop-demo/spielstaende', requireTester, async (req, res, next) => {
   try {
     const u = req.user._id;
     const [active, docs, live] = await Promise.all([activeSlot(u), ShopDemoSlot.find({ user: u }).lean(), ShopDemo.findById(u).lean()]);
@@ -341,7 +348,7 @@ router.get('/api/shop-demo/spielstaende', requireAdmin, async (req, res, next) =
 
 // laden = anderen Platz holen (der laufende wird auf seinen Platz gelegt) · neu = frischer Laden auf diesem Platz
 // loeschen = Platz leeren; war es der laufende, läuft danach keiner (Platz 0) – zurück ins Hauptmenü (Krisztian, 2026-10-18)
-router.post('/api/shop-demo/spielstand', requireAdmin, async (req, res, next) => {
+router.post('/api/shop-demo/spielstand', requireTester, async (req, res, next) => {
   try {
     const u = req.user._id;
     const aktion = ['laden', 'neu', 'loeschen'].find((k) => k === req.body.aktion);
