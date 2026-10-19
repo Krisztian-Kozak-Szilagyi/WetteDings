@@ -98,11 +98,11 @@ CATALOG.forEach((d) => {
   if (d.id === 'bulletin_board') d.utility = 'NPCs hängen hier Gesuche und Angebote für seltene Karten aus (später auch Aufträge).';
 });
 // Spieltisch: Turniere mit 2 Stühlen direkt daneben (Krisztian, 2026-10-17; Regeln kommen noch)
-CATALOG.forEach((d) => { if (d.id === 'playmat_table') d.utility = 'Für Turniere – braucht 2 Stühle direkt daneben (PC → Turniere).'; });
+CATALOG.forEach((d) => { if (d.id === 'playmat_table') d.utility = 'Kunden spielen hier (und holen sich oft ein Getränk); ab Stufe 4 Turniere – braucht 2 Stühle direkt daneben.'; });
 // Trophäen-Vitrine (Krisztian, 2026-10-17): Trophäen aus Matches, jede bringt täglich Ruf, solange sie drin steht – vorbereitet
 CATALOG.forEach((d) => { if (d.id === 'trophy_cabinet') d.utility = 'Trophäen aus Matches ausstellen – jede bringt täglich Ruf (kommt mit den Matches).'; });
 // Ruf-Stufe, ab der ein Möbel bestellbar ist (Krisztian, 2026-10-16, Platzhalter): 2 Lager-Sachen, 3 CD/DVD-Ständer
-const LEVEL_OF = { lager_regal_klein: 2, lager_regal_gross: 2, dehumidifier: 2, dehumidifier_wall: 2, cd_dvd_holder: 3, bulletin_board: 3 };
+const LEVEL_OF = { lager_regal_klein: 2, lager_regal_gross: 2, dehumidifier: 2, dehumidifier_wall: 2, cd_dvd_holder: 3, bulletin_board: 3, playmat_table: 3 };
 CATALOG.forEach((d) => { d.level = LEVEL_OF[d.id] || 1; });
 // Luftentfeuchter am Boden: darf ins Lager, deutscher Text
 CATALOG.forEach((d) => {
@@ -146,6 +146,13 @@ const GOODS = Object.entries(WARE)
     // Alte Spiele für den CD/DVD-Ständer (Krisztian, 2026-10-16: vorbereitet; Preise = Platzhalter, ab Ruf-Stufe 3)
     { id: 'retro_cd', kind: 'ware', name: 'Altes Spiel (CD)', perBox: 10, color: 0xd8d8e8, market: 15, buy: 7.5, tier: 1, license: null, level: 3 },
     { id: 'retro_dvd', kind: 'ware', name: 'Altes Spiel (DVD)', perBox: 10, color: 0x6a7ad8, market: 25, buy: 12.5, tier: 1, license: null, level: 3 },
+    // Laden-Merch (Krisztian, 2026-10-19): eigene Ware des Ladens, keine Lizenz, ab Ruf-Stufe 2. Die Turnier-Edition verkauft sich
+    // bei Turnieren besonders gut (ShopTurnier.TURNIER.boost). Preise = Platzhalter
+    { id: 'deckbox', kind: 'ware', name: 'Deckbox (Laden-Merch)', perBox: 10, color: 0x3a6ad0, market: 12, buy: 6, tier: 1, license: null, level: 2, merch: 'laden' },
+    { id: 'playmat', kind: 'ware', name: 'Spielmatte (Laden-Merch)', perBox: 5, color: 0x2a9a8a, market: 25, buy: 12.5, tier: 1, license: null, level: 2, merch: 'laden' },
+    { id: 'sleeves_te', kind: 'ware', name: 'Kartenhüllen (Turnier-Edition)', perBox: 10, color: 0xb07ae0, market: 15, buy: 7.5, tier: 1, license: null, level: 2, merch: 'turnier' },
+    { id: 'deckbox_te', kind: 'ware', name: 'Deckbox (Turnier-Edition)', perBox: 10, color: 0x6a4ae0, market: 18, buy: 9, tier: 1, license: null, level: 2, merch: 'turnier' },
+    { id: 'playmat_te', kind: 'ware', name: 'Spielmatte (Turnier-Edition)', perBox: 5, color: 0x1ac0a0, market: 35, buy: 17.5, tier: 1, license: null, level: 2, merch: 'turnier' },
     { id: 'mat_sleeve', kind: 'material', name: 'TCG Sleeve', perBox: 10, color: 0xc0a0f0, market: 15, buy: 15, tier: 1, license: null },
     { id: 'mat_slab', kind: 'material', name: 'Leerer Slab', perBox: 5, color: 0xd8e8f0, market: 40, buy: 40, tier: 1, license: null },
   ]);
@@ -170,7 +177,7 @@ const SERVICE_PACKS = [
 ];
 
 // Was in welches Möbel passt (Platz = Stückzahl, jedes Stück braucht einen Platz; gemischt erlaubt)
-const SHELF_GOODS = ['board_game_box', 'booster_box', 'sleeve_pack', 'toploader', 'booster_pack'];
+const SHELF_GOODS = ['board_game_box', 'booster_box', 'sleeve_pack', 'toploader', 'booster_pack', 'deckbox', 'playmat', 'sleeves_te', 'deckbox_te', 'playmat_te'];
 const HOLDS = {
   shelf_small: SHELF_GOODS,
   shelf_medium: SHELF_GOODS,

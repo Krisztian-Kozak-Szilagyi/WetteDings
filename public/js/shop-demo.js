@@ -10,6 +10,7 @@
   if (!root || !window.Phaser || !window.ShopLayout || !window.ShopCustomers) return;
   const L = window.ShopLayout;
   const C = window.ShopCustomers;
+  const T = window.ShopTurnier; // Turnier-Regeln (src/shop/turnier.js)
   const $ = (sel) => document.querySelector(sel);
 
   const TW = 32; // halbe Kachelbreite
@@ -424,11 +425,18 @@
   }
 
   function pcTurnier(body) {
+    const cfg = T.TURNIER;
     const tables = L.gameTables(state, catalog);
-    body.appendChild(el('p', '', 'Turniere laufen am Spieltisch (Möbel bestellen) – mit ' + L.TABLE.chairs + ' Stühlen direkt daneben, sonst ist niemand zum Mitspielen da.'));
-    if (!tables.length) body.appendChild(el('p', 'sd-later', 'Noch kein Spieltisch im Laden.'));
-    else {
-      const { t, tb } = table([['Spieltisch'], ['Stühle daneben', 1], ['']]);
+    const tu = state.turnier || {};
+    // Heute läuft ein Turnier: Runden steuern
+    if (tu.active || tour.on) {
+      pcTurnierLive(body);
+      return;
+    }
+    body.appendChild(el('p', '', 'Am Spieltisch (mit ' + L.TABLE.chairs + ' Stühlen direkt daneben) spielen Kunden auch so. Ab Ruf-Stufe ' + cfg.level +
+      ' kannst du Turniere ansetzen: Startgeld und Preisgeld bestimmst du. Mehr Preisgeld und weniger Startgeld = mehr Teilnehmer, aber weniger Gewinn – dafür kaufen Teilnehmer viel Merch und Getränke.'));
+    if (tables.length) {
+      const { t: tt, tb } = table([['Spieltisch'], ['Stühle daneben', 1], ['']]);
       tables.forEach((x, i) => {
         const tr = el('tr');
         tr.appendChild(el('td', '', 'Tisch ' + (i + 1)));
@@ -437,17 +445,97 @@
         tr.appendChild(el('td', 'num', x.ready ? 'bereit' : 'noch ' + miss + (miss === 1 ? ' Stuhl' : ' Stühle')));
         tb.appendChild(tr);
       });
-      body.appendChild(t);
+      body.appendChild(tt);
+    } else body.appendChild(el('p', 'sd-later', 'Noch kein Spieltisch im Laden (Möbel bestellen, ab Stufe ' + cfg.tableLevel + ').'));
+    if (tu.plan) {
+      const p = tu.plan;
+      body.appendChild(el('div', 'sd-group', 'Angekündigt'));
+      body.appendChild(el('p', '', 'Tag ' + p.day + ' (' + C.weekday(p.day).name + ') · Startgeld ' + fmt(p.fee) + ' · Preisgeld ' + fmt(p.prize) +
+        ' (zurückgelegt)' + (p.n !== null && p.n !== undefined ? ' · ' + p.n + ' Anmeldungen' : '')));
+      const row = el('div', 'sd-pc-btns');
+      const c = el('button', 'sd-btn', 'Absagen (Preisgeld zurück)');
+      c.type = 'button';
+      c.addEventListener('click', () => { if (act(doAct('cancelTurnier'))) renderPc(); });
+      row.appendChild(c);
+      body.appendChild(row);
+    } else if (lockedFor(cfg.level)) {
+      body.appendChild(el('p', 'sd-later', 'Turniere ab Ruf-Stufe ' + cfg.level + '.'));
+    } else {
+      body.appendChild(el('div', 'sd-group', 'Turnier ansetzen'));
+      const form = el('div', 'sd-turnier-form');
+      const daySel = el('select');
+      daySel.className = 'sd-name-input';
+      for (let d = state.day + cfg.lead; d <= state.day + 14; d++) {
+        const o = el('option', '', 'Tag ' + d + ' (' + C.weekday(d).name + ')');
+        o.value = String(d);
+        daySel.appendChild(o);
+      }
+      const num = (val, max) => { const i = el('input'); i.type = 'number'; i.min = '0'; i.max = String(max); i.step = '1'; i.value = String(val); i.className = 'sd-name-input'; return i; };
+      const fee = num(10, cfg.feeMax);
+      const prize = num(100, cfg.prizeMax);
+      const preview = el('p', 'sd-later');
+      const show = () => {
+        const dd = Number(daySel.value);
+        const e = T.signups({ level: state.level, prize: Number(prize.value) || 0, fee: Number(fee.value) || 0, board: L.hasBoard(state), posters: 0, daysSinceLast: state.turnier.last ? dd - state.turnier.last : null }).expected;
+        preview.textContent = 'Erwartet ca. ' + e + ' Teilnehmer · Startgeld zusammen ca. ' + fmt(e * (Number(fee.value) || 0)) + ' · das Preisgeld wird jetzt schon zurückgelegt.' +
+          (state.turnier.last && dd - state.turnier.last < cfg.fatigueDays ? ' Kurz nach dem letzten Turnier kommen weniger.' : '');
+      };
+      [daySel, fee, prize].forEach((x) => x.addEventListener('input', show));
+      const lab = (txt, x) => { const l = el('label', 'sd-turnier-row'); l.append(el('span', '', txt), x); return l; };
+      form.append(lab('Tag', daySel), lab('Startgeld', fee), lab('Preisgeld', prize));
+      body.appendChild(form);
+      show();
+      body.appendChild(preview);
+      const row = el('div', 'sd-pc-btns');
+      const go = el('button', 'sd-btn', 'Turnier ankündigen');
+      go.type = 'button';
+      go.disabled = !tables.some((x) => x.ready);
+      go.addEventListener('click', () => { if (act(doAct('planTurnier', { day: Number(daySel.value), fee: Number(fee.value), prize: Number(prize.value) }))) renderPc(); });
+      row.appendChild(go);
+      body.appendChild(row);
+      body.appendChild(el('p', 'sd-later', 'Am Turniertag melden sich die Teilnehmer an der Kasse an (Startgeld). Du startest die Runden hier am PC, die Sieger melden ihr Ergebnis an der Kasse – manchmal gibt es Streit. Sie brauchen Stühle zum Warten und kaufen gern Getränke und Merch (Turnier-Edition!).'));
     }
-    const btns = el('div', 'sd-pc-btns');
-    ['Turnier starten', 'Turnier bewerben'].forEach((txt) => {
-      const b = el('button', 'sd-btn', txt);
-      b.type = 'button';
-      b.disabled = true;
-      btns.appendChild(b);
-    });
-    body.appendChild(btns);
-    body.appendChild(el('p', 'sd-later', 'Starten und Bewerben kommen, sobald die Turnier-Regeln stehen (Startgeld, Mitspieler, Preise).'));
+    if ((tu.history || []).length) {
+      body.appendChild(el('div', 'sd-group', 'Letzte Turniere'));
+      const { t: ht, tb } = table([['Tag'], ['Teilnehmer', 1], ['Startgeld', 1], ['Preisgeld', 1], ['']]);
+      tu.history.slice().reverse().forEach((h) => {
+        const tr = el('tr');
+        tr.append(el('td', '', String(h.day)), el('td', 'num', String(h.players)), el('td', 'num', fmt(h.fees || 0)), el('td', 'num', fmt(h.prize)), el('td', '', h.aborted ? 'abgebrochen' : ''));
+        tb.appendChild(tr);
+      });
+      body.appendChild(ht);
+    }
+  }
+
+  function pcTurnierLive(body) {
+    const tu = state.turnier.active;
+    const alive = tourAlive();
+    body.appendChild(el('p', '', 'Turnier heute' + (tu ? ' · Startgeld ' + fmt(tu.fee) + ' · Preisgeld ' + fmt(tu.prize) + ' · angemeldet ' + tu.checked + ' / ' + tu.n : '') +
+      (tour.round ? ' · Runde ' + tour.round : '') + ' · noch dabei: ' + alive.length));
+    if (tour.matches.length) {
+      const { t: mt, tb } = table([['Partie'], ['Stand']]);
+      const label = { wait: 'wartet auf einen Tisch', walk: 'geht zum Tisch', play: 'spielt', report: 'Ergebnis an der Kasse melden', done: '' };
+      tour.matches.forEach((m) => {
+        const tr = el('tr');
+        tr.append(el('td', '', m.a.name + ' – ' + m.b.name), el('td', '', m.state === 'done' ? m.winner.name + ' gewinnt' : label[m.state]));
+        tb.appendChild(tr);
+      });
+      body.appendChild(mt);
+    }
+    if (tour.bye) body.appendChild(el('p', 'sd-later', tour.bye.name + ' kommt diese Runde kampflos weiter.'));
+    const row = el('div', 'sd-pc-btns');
+    const start = el('button', 'sd-btn', tour.round ? 'Nächste Runde starten' : 'Erste Runde starten');
+    start.type = 'button';
+    start.disabled = tour.ended || tour.roundActive || alive.length < 2 || !state.open;
+    start.addEventListener('click', () => { startRound(); renderPc(); });
+    const stop = el('button', 'sd-btn', 'Turnier abbrechen');
+    stop.type = 'button';
+    stop.disabled = tour.ended || !tu;
+    stop.addEventListener('click', () => ask('Turnier abbrechen? Das Preisgeld bekommst du zurück, die Teilnehmer gehen verärgert.').then((ok) => { if (ok) { abortTour(); renderPc(); } }));
+    row.append(start, stop);
+    body.appendChild(row);
+    body.appendChild(el('p', 'sd-later', tour.round ? 'Ist eine Runde fertig, startest du hier die nächste. Die Sieger melden sich an der Kasse.' :
+      'Wer da ist, meldet sich an der Kasse an. Wer nach dem Start der ersten Runde kommt, ist zu spät.'));
   }
 
   function pcWerkzeug(body) {
@@ -1246,6 +1334,12 @@
   // Jeder Abschluss/Abgang geht sofort an den Server (checkout/leave); nach Ladenschluss und wenn alle weg sind: closeDay.
   const CUSTOMER_SPEED = 2.4;
   const LOOK_SECONDS = 1.2;
+  // Turnier heute: Teilnehmer (Kunden mit tp), Runden, Partien { a, b, state, table, t, dur, winner }
+  const NPC_NAMES = ['Jonas', 'Mia', 'Lukas', 'Lea', 'Finn', 'Emma', 'Ben', 'Hannah', 'Paul', 'Sophie', 'Tim', 'Lina', 'Noah', 'Ella', 'Max', 'Clara', 'Leon', 'Ida'];
+  const newTour = () => ({ on: false, n: 0, spawnQ: [], players: [], round: 0, roundActive: false, matches: [], bye: null, ended: false });
+  let tour = newTour();
+  const tourAlive = () => tour.players.filter((p) => !p.out && !p.gone);
+  const DRINKS = ['energy_drink_can', 'coffee'];
   const COLORS = [0xd0503a, 0x3aa0a0, 0x9a5ad0, 0xd09a2a, 0x5a8a3a, 0xc05a8a, 0x4a6ad0];
   const day = { t: 0, rng: null, queue: [], customers: [], nextId: 1, closing: false };
   const reserved = {}; // "uid|ware" → Stück, die Kunden schon im Korb haben
@@ -1284,6 +1378,15 @@
     day.line = [];
     day.closing = false;
     Object.keys(reserved).forEach((k) => delete reserved[k]);
+    tour = newTour();
+    const tu = state.turnier && state.turnier.active;
+    if (tu && T) {
+      tour.on = true;
+      tour.n = tu.n;
+      // Teilnehmer kommen in der ersten Stunde
+      tour.spawnQ = Array.from({ length: tu.n }, () => day.rng() * 0.12).sort((x, y) => x - y);
+      note(tu.n ? 'Heute ist Turnier! ' + tu.n + ' Anmeldungen – sie melden sich an der Kasse an, die Runden startest du am PC.' : 'Heute wäre Turnier – aber niemand hat sich angemeldet.');
+    }
   }
 
   function tickDay(sec) {
@@ -1294,7 +1397,12 @@
       day.queue.shift();
       spawn();
     }
+    while (tour.on && tour.spawnQ.length && tour.spawnQ[0] <= frac) {
+      tour.spawnQ.shift();
+      spawnPlayer();
+    }
     day.customers.forEach((c) => tickCustomer(c, sec));
+    if (tour.on && !tour.ended) tickTour(sec, frac);
     day.customers.forEach((c) => { if (c.gone && c.g) c.g.destroy(); });
     day.customers = day.customers.filter((c) => !c.gone);
     if (frac >= 1 && !day.customers.length && !day.closing) {
@@ -1318,6 +1426,11 @@
       c.services = ok[Math.floor(day.rng() * ok.length)].services.slice();
     }
     if (c.services) c.wish = null;
+    // ohne Turnier: manche wollen am Spieltisch spielen und holen sich vorher oft ein Getränk
+    if (!c.services && !tour.on && T && freeTableSeat() && day.rng() < T.TURNIER.casualChance) {
+      c.casual = true;
+      if (day.rng() < T.TURNIER.casualDrink) c.wish = DRINKS[Math.floor(day.rng() * DRINKS.length)];
+    }
     const sx = Math.floor(day.rng() * state.units * L.UNIT_W);
     Object.assign(c, {
       id: day.nextId++, x: sx + 0.5, y: L.UNIT_D + L.SIDEWALK - 0.4, path: [], phase: 'enter', wait: 0,
@@ -1348,6 +1461,7 @@
   }
 
   function nextLeg(c) {
+    if (c.turnier === 'checkin') { c.phase = 'queue'; c.wait = 0; queueUp(c); say(c, 'Ich will mich fürs Turnier anmelden!', 2.5); return; }
     if (c.services) { c.phase = 'queue'; c.wait = 0; queueUp(c); say(c, 'Ich hab eine Karte für euch!', 2.5); return; }
     while (c.visit.length) {
       const it = state.items.find((i) => i.uid === c.visit[0]);
@@ -1373,7 +1487,7 @@
     else if (r.tooExpensive.length && !r.basket.length) say(c, 'Viel zu teuer!', 2.5);
     else if (r.stars < 5 && r.basket.length) say(c, 'Hmm, teuer …', 2);
     if (r.basket.length) { c.phase = 'queue'; c.wait = 0; queueUp(c); }
-    else leave(c, capDirt(C.review(r, shopStock(), day.rng)));
+    else afterShop(c, capDirt(C.review(r, shopStock(), day.rng)), false);
   }
 
   /** Warteplätze an der Kasse: freie Zellen neben der Theke, dann dahinter */
@@ -1465,8 +1579,9 @@
 
   /** Wo ein Kunde mit Auftrag wartet: neben einem freien Stuhl, sonst irgendwo frei im Laden */
   function waitSpot(c) {
-    const taken = new Set(day.customers.filter((o) => o !== c && o.phase === 'wait' && o.seat).map((o) => o.seat));
-    for (const it of state.items.filter((i) => i.id === 'chair' || i.id === 'beanbag')) {
+    const taken = new Set(day.customers.filter((o) => o !== c && ['wait', 'tidle', 'tsit', 'tplay'].includes(o.phase) && o.seat).map((o) => o.seat));
+    const tableChairs = new Set(L.gameTables(state, catalog).flatMap((g) => g.chairUids));
+    for (const it of state.items.filter((i) => (i.id === 'chair' && !tableChairs.has(i.uid)) || i.id === 'beanbag')) {
       const spots = Array.from(C.approach(state, catalog, it, custBlock)).filter((k) => !taken.has(k));
       if (spots.length) { c.seat = spots[0]; c.chair = true; return new Set([spots[0]]); }
     }
@@ -1527,7 +1642,228 @@
     });
   }
 
+  // ---------- Nach dem Einkauf: Turnier-Teilnehmer warten auf ihre Partie, Gelegenheitsspieler setzen sich an den Spieltisch ----------
+  function afterShop(c, rev, paid) {
+    if (c.tp) { toIdle(c); return; }
+    if (c.casual) {
+      const seat = freeTableSeat();
+      if (seat) {
+        c.phase = 'tsit';
+        c.seat = seat;
+        c.sitT = T.TURNIER.casualSeconds[0] + day.rng() * (T.TURNIER.casualSeconds[1] - T.TURNIER.casualSeconds[0]);
+        c.pendingRev = rev;
+        c.paidAlready = paid;
+        dequeue(c);
+        goTo(c, new Set([seat]));
+        say(c, 'Eine Runde spielen …', 2);
+        return;
+      }
+    }
+    leave(c, rev, paid ? 'paid' : undefined);
+  }
+  /** Freier Platz vor einem Stuhl am Spieltisch (nicht während eines Turniers) */
+  function freeTableSeat() {
+    if (tour.on) return null;
+    const taken = new Set(day.customers.filter((o) => o.seat && ['wait', 'tidle', 'tsit', 'tplay'].includes(o.phase)).map((o) => o.seat));
+    for (const g of L.gameTables(state, catalog)) {
+      if (!g.ready) continue;
+      for (const uid of g.chairUids) {
+        const ch = state.items.find((i) => i.uid === uid);
+        const spot = ch && Array.from(C.approach(state, catalog, ch, custBlock)).find((k) => !taken.has(k));
+        if (spot) return spot;
+      }
+    }
+    return null;
+  }
+
+  // ---------- Turnier am Turniertag ----------
+  function spawnPlayer() {
+    const boost = {};
+    goodsList.forEach((g) => {
+      if (g.merch === 'turnier') boost[g.id] = T.TURNIER.boost.turnier;
+      else if (g.merch) boost[g.id] = T.TURNIER.boost.merch;
+      if (DRINKS.includes(g.id)) boost[g.id] = T.TURNIER.boost.drink;
+    });
+    const c = C.newCustomer(day.rng, goodsList, { boost, tier: 1, level: state.level || 1, licenses: state.licenses, coins: state.coins, prices: licensePrices() });
+    const sx = Math.floor(day.rng() * state.units * L.UNIT_W);
+    Object.assign(c, {
+      id: day.nextId++, x: sx + 0.5, y: L.UNIT_D + L.SIDEWALK - 0.4, path: [], phase: 'enter', wait: 0,
+      color: COLORS[Math.floor(day.rng() * COLORS.length)], seen: [], visit: [], bubble: '', bubbleT: 0, basket: [],
+      dirty: day.rng() < C.DIRT_CHANCE, services: null, tp: true, turnier: 'checkin', annoy: 0,
+      name: NPC_NAMES[Math.floor(day.rng() * NPC_NAMES.length)],
+    });
+    const door = L.DOOR[Math.floor(day.rng() * L.DOOR.length)];
+    goTo(c, new Set([door.x + ',' + door.y]));
+    day.customers.push(c);
+    snd('door');
+  }
+  function turnierCheckin(c) {
+    dequeue(c);
+    if (tour.round > 0 || tour.ended) {
+      say(c, 'Schon angefangen?! Na toll.', 2.5);
+      c.tp = false;
+      leave(c, { stars: 2, why: 'turnier2' });
+      return;
+    }
+    if (!act(doAct('turnierCheckin'))) { c.tp = false; leave(c, null); return; }
+    snd('kaching');
+    say(c, 'Angemeldet! +' + fmt(state.turnier.active ? state.turnier.active.fee : 0), 2);
+    tour.players.push(c);
+    c.turnier = 'lobby';
+    // bis es losgeht: im Laden stöbern (Merch, Getränke), dann warten
+    const all = holders();
+    const withWish = all.filter((it) => c.wish && freeStock(it, c.wish) > 0);
+    const rest = all.filter((it) => !withWish.includes(it)).sort(() => day.rng() - 0.5);
+    c.visit = withWish.slice(0, 2).concat(rest).slice(0, 3).map((it) => it.uid);
+    c.seen = [];
+    c.basket = [];
+    nextLeg(c);
+  }
+  function toIdle(c) {
+    dequeue(c);
+    c.turnier = 'idle';
+    c.phase = 'tidle';
+    c.wait = 0;
+    c.basket = [];
+    goTo(c, waitSpot(c));
+  }
+  function startRound() {
+    if (!tour.on || tour.roundActive || tour.ended) return;
+    tour.spawnQ = []; // wer jetzt noch kommt, ist zu spät
+    const alive = tourAlive();
+    if (alive.length < 2) return;
+    tour.round += 1;
+    const r = T.pairRound(alive, day.rng);
+    tour.bye = r.bye;
+    tour.matches = r.matches.map(([x, y]) => ({ a: x, b: y, state: 'wait', table: null, t: 0, dur: T.matchSeconds(day.rng), winner: null }));
+    tour.roundActive = true;
+    alive.forEach((p) => { p.idleAnnoyed = false; p.wait = 0; say(p, 'Runde ' + tour.round + '!', 2); });
+    snd('note');
+  }
+  function busyTables() {
+    return new Set(tour.matches.filter((m) => m.table && m.state !== 'done').map((m) => m.table));
+  }
+  function seatAt(c, chairUid) {
+    const ch = state.items.find((i) => i.uid === chairUid);
+    const spot = ch && Array.from(C.approach(state, catalog, ch, custBlock))[0];
+    dequeue(c);
+    c.phase = 'tplay';
+    c.turnier = 'playing';
+    c.seat = spot || null;
+    if (spot) goTo(c, new Set([spot]));
+  }
+  function tickTour(sec, frac) {
+    // Partien an freie Spieltische setzen
+    const busy = busyTables();
+    tour.matches.filter((m) => m.state === 'wait' && m.a.phase === 'tidle' && m.b.phase === 'tidle').forEach((m) => { // erst wenn beide nicht mehr einkaufen
+      const g = L.gameTables(state, catalog).find((x) => x.ready && !busy.has(x.uid));
+      if (!g) return;
+      busy.add(g.uid);
+      m.table = g.uid;
+      m.chairs = g.chairUids.slice(0, 2);
+      seatAt(m.a, m.chairs[0]);
+      seatAt(m.b, m.chairs[1]);
+      m.state = 'walk';
+    });
+    tour.matches.forEach((m) => {
+      if (m.state === 'walk' && !m.a.path.length && !m.b.path.length) { m.state = 'play'; m.t = 0; }
+      else if (m.state === 'play') {
+        m.t += sec;
+        if (m.t >= m.dur) {
+          m.winner = T.winner([m.a, m.b], day.rng);
+          m.state = 'report';
+          const w = m.winner;
+          w.turnier = 'report';
+          w.match = m;
+          w.phase = 'queue';
+          w.wait = 0;
+          queueUp(w);
+          say(w, 'Gewonnen! Ich melde das Ergebnis.', 2.5);
+        }
+      }
+    });
+    // Runde fertig?
+    if (tour.roundActive && tour.matches.every((m) => m.state === 'done')) {
+      tour.roundActive = false;
+      const alive = tourAlive();
+      if (alive.length <= 1) finishTour(alive[0] || null);
+      else note('Runde ' + tour.round + ' ist fertig – am PC die nächste Runde starten.');
+    }
+    // zu lange über Ladenschluss: Abbruch
+    if (!tour.ended && frac >= 1 + T.TURNIER.overtime) abortTour();
+  }
+  function turnierReport(c) {
+    const m = c.match;
+    dequeue(c);
+    if (!m) { toIdle(c); return; }
+    const loser = m.a === c ? m.b : m.a;
+    const done = () => {
+      m.state = 'done';
+      c.match = null;
+      loser.out = true;
+      say(loser, 'Ausgeschieden …', 2);
+      leaveTour(loser);
+      toIdle(c);
+      say(c, 'Weiter in der nächsten Runde!', 2);
+      snd('note');
+    };
+    if (!T.dispute(day.rng)) { done(); return; }
+    // Streit: der Verlierer zweifelt das Ergebnis an
+    c.serving = true;
+    askChoice('Streit am Tisch: ' + loser.name + ' sagt, ' + c.name + ' hat geschummelt. Was entscheidest du?', 'Ergebnis gilt', 'Neu spielen').then((ok) => {
+      c.serving = false;
+      if (ok) { loser.annoy = (loser.annoy || 0) + 1; done(); return; }
+      // neu spielen: beide zurück an den Tisch, etwas genervt
+      c.annoy = (c.annoy || 0) + 1;
+      c.match = null;
+      seatAt(c, m.chairs[m.a === c ? 0 : 1]);
+      m.winner = null;
+      m.t = 0;
+      m.dur = T.matchSeconds(day.rng);
+      m.state = 'walk';
+      say(c, 'Na gut, noch mal …', 2);
+    });
+  }
+  function leaveTour(p, aborted) {
+    p.out = true;
+    p.tp = false;
+    const stars = aborted ? 2 : T.reviewStars({ chair: p.chair, drink: p.drink, annoy: p.annoy });
+    const rev = aborted ? { stars: 2, why: 'turnierAbbruch' } : capDirt({ stars, why: 'turnier' + stars });
+    leave(p, rev);
+  }
+  function finishTour(champ) {
+    tour.ended = true;
+    act(doAct('turnierEnd'));
+    if (champ) {
+      say(champ, 'Ich habe gewonnen!', 3);
+      leaveTour(champ);
+    }
+    note('Turnier vorbei' + (champ ? ' – ' + champ.name + ' gewinnt das Preisgeld!' : '.'));
+    snd('level');
+  }
+  function abortTour() {
+    if (tour.ended) return;
+    tour.ended = true;
+    tour.spawnQ = [];
+    if (state.turnier && state.turnier.active) act(doAct('turnierEnd', { aborted: true }));
+    day.customers.filter((p) => p.tp && !p.out).forEach((p) => leaveTour(p, true));
+    note('Turnier abgebrochen – das Preisgeld ist zurück.');
+  }
+  /** Frage mit eigenen Knöpfen (OK-Knopf = okLabel, Abbrechen = cancelLabel) */
+  function askChoice(text, okLabel, cancelLabel) {
+    const dlg = $('[data-shop-dialog]');
+    const okB = $('[data-shop-dialog-ok]');
+    const noB = dlg.querySelector('button[value="cancel"]');
+    const o = okB.textContent;
+    const n = noB.textContent;
+    okB.textContent = okLabel;
+    noB.textContent = cancelLabel;
+    return ask(text).then((r) => { okB.textContent = o; noB.textContent = n; return r; });
+  }
+
   function serve(c) {
+    if (c.turnier === 'checkin') { turnierCheckin(c); return; }
+    if (c.turnier === 'report') { turnierReport(c); return; }
     if (c.services && !c.jid) { acceptJob(c); return; }
     if (c.jid) { serveJob(c); return; }
     const scan = c.basket.map((b) => ({ name: goods[b.ware].name, qty: b.qty, price: L.price(state, goods, b.ware), color: goods[b.ware].color }));
@@ -1544,7 +1880,8 @@
       snd('kaching');
       act(doAct('checkout', Object.assign({ lines: lines, miss: c.result.missWish ? c.wish : '', method: res.method, deal: res.deal || undefined, lost: res.lost || 0 }, rev || {})));
       say(c, '+' + fmt(paid - (res.lost || 0)) + ' Kanacoin', 2);
-      leave(c, null, 'paid');
+      if (c.basket.some((x) => DRINKS.includes(x.ware))) c.drink = true;
+      afterShop(c, null, true);
     }, { haggle: true });
   }
 
@@ -1579,6 +1916,12 @@
     if (c.phase === 'queue') {
       if (c.serving) return;
       c.wait += sec;
+      if (c.wait >= C.PATIENCE && c.tp) {
+        c.wait = 0;
+        c.annoy = (c.annoy || 0) + 1;
+        say(c, 'Hallo? Ich warte hier!', 2.5);
+        return;
+      }
       if (c.wait >= C.PATIENCE) {
         release(c);
         say(c, 'Zu lange gewartet!', 2.5);
@@ -1612,6 +1955,19 @@
         if (job) act(doAct('jobCancel', { jid: job.jid, stars: 2, why: 'jobwait' }));
         leave(c, null, 'paid'); // jobCancel zählt den Besuch schon
       }
+      return;
+    }
+    if (c.phase === 'tidle') {
+      // Turnier: wartet auf seine Partie; zu lange ohne Partie → Ärger
+      c.wait += sec;
+      if (c.wait > 120 && !c.idleAnnoyed) { c.idleAnnoyed = true; c.annoy = (c.annoy || 0) + 1; say(c, 'Wann geht es weiter?', 2.5); }
+      return;
+    }
+    if (c.phase === 'tplay') return; // sitzt am Spieltisch (tickTour)
+    if (c.phase === 'tsit') {
+      // Gelegenheitsspieler am Spieltisch
+      c.sitT -= sec;
+      if (c.sitT <= 0) leave(c, c.pendingRev, c.paidAlready ? 'paid' : undefined);
       return;
     }
     if (c.phase === 'leave') c.gone = true;
