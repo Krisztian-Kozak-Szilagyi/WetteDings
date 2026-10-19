@@ -1,5 +1,22 @@
 // Symbole der Erfolge als SVG (/img/erfolge/<key>.svg): sechseckige Medaille mit Metallrahmen und Motiv.
 // F = Füllung des Motivs (Metallverlauf), S = Linienfarbe des Motivs, D = dunkle Farbe für Ausschnitte.
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Motiv aus einer Strichzeichnung (src/achievements/art/<name>-silhouette.png und -linien.png, Graustufen: weiß = sichtbar):
+ * Silhouette im Metallverlauf, die Linien dunkel darüber – wie die gezeichneten Motive. Platz x/y/w/h im 128er-Raster.
+ */
+function art(name, x, y, w, h) {
+  const png = (part) => `data:image/png;base64,${fs.readFileSync(path.join(__dirname, 'art', `${name}-${part}.png`)).toString('base64')}`;
+  const mask = (id, part) => `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128"><image href="${png(part)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/></mask>`;
+  return (
+    mask(`${name}-s`, 'silhouette') +
+    mask(`${name}-l`, 'linien') +
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="F" mask="url(#${name}-s)"/>` +
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="D" mask="url(#${name}-l)"/>`
+  );
+}
 
 const TONES = {
   bronze: ['#ffe0bd', '#d0915a', '#6e3f1c'],
@@ -31,6 +48,8 @@ function chain(x1, y1, x2, y2, n = 9) {
 }
 
 const GLYPHS = {
+  // Top Seller vom Job Center: der Mann mit Zylinder läuft mit dem Geldsack davon (Referenzbild, src/achievements/art)
+  'top-seller': art('top-seller', 23, 38, 82, 56),
   // zu starke Karte: glüht vor Kraft, liegt aber in Ketten mit Schloss
   hermann:
     '<g stroke="F" stroke-width="3" stroke-linecap="round" opacity=".9"><path d="M40 30 l-7 -7 M88 30 l7 -7 M34 58 h-9 M94 58 h9 M64 18 v-8"/></g>' +
