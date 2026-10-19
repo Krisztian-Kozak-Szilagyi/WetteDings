@@ -17,6 +17,7 @@ const { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, C
 const grading = require('../grading/gradingService');
 const { centerShift, centeringCap, CENTERING_SCALE, creaseLine, applyIron, ironCap, gradeFor } = require('../grading/condition');
 const tcg = require('../tcg/catalog');
+const turnier = require('../shop/turnier');
 const { str } = require('../lib/util');
 
 const router = express.Router();
@@ -35,7 +36,7 @@ function requireAdminOnly(req, res, next) {
 }
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 const goods = Object.fromEntries(GOODS.map((g) => [g.id, g]));
-const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS };
+const more = { licenses: Object.fromEntries(LICENSES.map((l) => [l.id, l])), services: Object.fromEntries(SERVICES.map((x) => [x.id, x])), clothes: CLOTHES, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS, turnier: turnier.TURNIER };
 // Seltene Karten fürs Schwarze Brett (ab Holo, ohne versteckte Seltenheiten), Wert = Bank-Ankauf × BOARD.scale
 const BOARD_CARDS = Object.values(tcg.cardById)
   .map((c) => ({ c, r: tcg.RARITIES.find((x) => x.key === c.rarity), rank: tcg.rarityByKey[c.rarity] && tcg.rarityByKey[c.rarity].rank }))
@@ -43,14 +44,14 @@ const BOARD_CARDS = Object.values(tcg.cardById)
   .map(({ c, r, rank }) => ({ id: c.id, name: c.name, label: r.label, rank, value: Math.round(r.sell * BOARD.scale), weight: r.weight }));
 const ACTIONS = [
   'openDay', 'checkout', 'leave', 'closeDay', 'orderWare', 'orderMoebel', 'pick', 'drop', 'stock', 'unstock', 'build', 'move',
-  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'storePoster', 'takePoster', 'setGuest', 'guestTake', 'devFind', 'insertCard', 'ejectCard', 'boardBuy', 'boardSell', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
+  'remove', 'setPrice', 'buyUnit', 'setCoins', 'reset', 'buildRoom', 'removeRoom', 'renameRoom', 'slideCabinet', 'buyClothes', 'wear', 'devRuf', 'printPoster', 'hangPoster', 'storePoster', 'takePoster', 'setGuest', 'guestTake', 'devFind', 'insertCard', 'ejectCard', 'boardBuy', 'boardSell', 'planTurnier', 'cancelTurnier', 'turnierCheckin', 'turnierEnd', 'buyTool', 'dirt', 'mop', 'buyLicense', 'setServicePrice', 'takeJob', 'foil', 'serviceCheckout', 'jobCancel',
 ];
 // Welcher Arbeitstisch welche Schritte des Grading-Tisches übernimmt
 const BENCH_STEPS = { card_cleaning_table: ['clean', 'iron'], card_grading_table: ['grade', 'slab'], pack_opening_counter: ['foil'] };
 
 function plain(doc) {
   if (!doc) return layout.ensureCounter(layout.fresh(), catalog);
-  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung, bag, board, nextPid, boardDay } = doc;
+  const { coins, units, nextUid, nextBid, carry, prices, day, open, today, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung, bag, board, nextPid, boardDay, turnier: tu } = doc;
   const reviews = (doc.reviews || []).map(({ day: d, stars, text }) => ({ day: d, stars, text }));
   const items = (doc.items || []).map(({ uid, id, x, y, rot, wall, stock, posters, guest, card, cardName, rid, home }) => {
     const it = { uid, id, x, y, rot };
@@ -65,7 +66,7 @@ function plain(doc) {
   });
   const boxes = (doc.boxes || []).map(({ bid, kind, id, qty, x, y }) => ({ bid, kind, id, qty, x, y }));
   return layout.ensureCounter(
-    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung, bag, board, nextPid, boardDay }),
+    layout.normalize({ coins, units, nextUid, nextBid, carry, prices, items, boxes, day, open, today: today || undefined, reviews, reports, licenses, servicePrices, jobs, nextJid, dirt, nextDid, tools, market, marketMoves, marketDay, rooms, nextRid, ruf, level, wardrobe, outfit, posters, hung, bag, board, nextPid, boardDay, turnier: tu }),
     catalog
   );
 }
@@ -91,6 +92,10 @@ router.get('/shop-demo', requireTester, (req, res) => {
   res.render('shop-demo', { title: 'Shop-Demo' });
 });
 
+router.get('/js/shop-turnier.js', requireTester, (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'turnier.js'));
+});
+
 router.get('/js/shop-layout.js', requireTester, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, '..', 'shop', 'layout.js'));
 });
@@ -108,7 +113,7 @@ router.get('/api/shop-demo', requireTester, async (req, res, next) => {
   try {
     res.json({
       state: await load(req.user._id), catalog: CATALOG, goods: GOODS, groups: GROUPS, unitPrice: UNIT_PRICE,
-      licenses: LICENSES, services: SERVICES, packs: SERVICE_PACKS, clothes: CLOTHES, clothesSlots: CLOTHES_SLOTS, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS,
+      licenses: LICENSES, services: SERVICES, packs: SERVICE_PACKS, clothes: CLOTHES, clothesSlots: CLOTHES_SLOTS, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS, turnier: turnier.TURNIER,
       ruf: { levels: layout.RUF.levels, unlock: layout.UNLOCK, perCoins: layout.RUF.perCoins, stars: layout.RUF.stars },
       isAdmin: !!req.user.isAdmin, // Hauptmenü: Link zu den QA-Notizen
     });
@@ -135,6 +140,9 @@ router.post('/api/shop-demo', requireTester, async (req, res, next) => {
       bid: Number(a.bid),
       jid: Number(a.jid),
       pid: Number(a.pid),
+      day: Number(a.day),
+      fee: Number(a.fee),
+      prize: Number(a.prize),
       did: Number(a.did),
       rid: Number(a.rid),
       name: typeof a.name === 'string' ? a.name.slice(0, 60) : '',
@@ -178,6 +186,12 @@ router.post('/api/shop-demo', requireTester, async (req, res, next) => {
     // nach Ladenschluss bewegen sich die Marktpreise (Zufall nur hier auf dem Server)
     // … und im Lager ohne Luftentfeuchter verdirbt Papier-Ware (steht dann im Tagesbericht)
     if (type === 'closeDay') r.state = layout.spoilStorage(layout.moveMarket(r.state, goods, Math.random), catalog, goods, Math.random).state;
+    // Turnier angekündigt: wie viele kommen werden, würfelt nur der Server (Ruf-Stufe, Angebot, Brett, Müdigkeit)
+    if (type === 'planTurnier') {
+      const s = r.state;
+      const plan = s.turnier.plan;
+      plan.n = turnier.signups({ level: s.level, prize: plan.prize, fee: plan.fee, board: layout.hasBoard(s), posters: 0, daysSinceLast: s.turnier.last ? plan.day - s.turnier.last : null }, Math.random).n;
+    }
     // Schwarzes Brett: einmal pro Tag neue Aushänge (auch gleich, wenn das Brett neu hängt) – Zufall nur hier
     if (layout.hasBoard(r.state) && r.state.boardDay !== r.state.day) r.state = layout.refreshBoard(r.state, BOARD_CARDS, BOARD, Math.random);
     await save(req.user._id, r.state);

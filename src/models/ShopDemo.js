@@ -46,6 +46,8 @@ const shopDemoSchema = new Schema(
     board: { type: [Schema.Types.Mixed], default: [] },
     nextPid: { type: Number, default: 1 },
     boardDay: { type: Number, default: 0 },
+    // Turniere: angekündigt (plan), heute laufend (active), letztes, Verlauf – src/shop/layout.js, Regeln src/shop/turnier.js
+    turnier: { type: Schema.Types.Mixed, default: () => ({ plan: null, active: null, last: 0, history: [] }) },
     boxes: [{ _id: false, bid: Number, kind: String, id: String, qty: Number, x: Number, y: Number }],
     items: [
       {

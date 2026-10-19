@@ -219,3 +219,7 @@ html, body.sd-body {
 .sd-notiz { width: min(520px, calc(100vw - 32px)); }
 .sd-notiz-body { padding: 14px 16px 16px; }
 .sd-notiz-body textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 8px; border-radius: 8px; border: 1px solid #3a3f52; background: #14161f; color: #e6e1d6; font: inherit; }
+
+/* Turnier ansetzen (PC → Turniere) */
+.sd-turnier-form { display: grid; gap: 6px; max-width: 360px; }
+.sd-turnier-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; font-size: 14px; }
