@@ -28,7 +28,6 @@
   let goodsList = [];
   let groups = {};
   let unitPrice = 0;
-  let showNames = true;
   let isAdmin = false; // Hauptmenü: Link zu den QA-Notizen
 
   // Modus: null | { kind: 'build', id, rot } (Möbel aus dem Karton) | { kind: 'move', uid, id, rot }
@@ -2123,13 +2122,11 @@
       scene.sortables.push(entry);
     });
     // Raumnamen auf dem Boden
-    if (showNames) {
-      (state.rooms || []).forEach((r) => {
-        const c = iso(r.x + r.w / 2, r.y + r.d / 2);
-        const t = scene.add.text(c.x, c.y, r.name || '', { fontSize: '11px', color: '#f0e6d0', backgroundColor: '#00000066', padding: { x: 4, y: 1 } });
-        scene.labels.push(t.setOrigin(0.5).setDepth(-7900).setResolution(2));
-      });
-    }
+    (state.rooms || []).forEach((r) => {
+      const c = iso(r.x + r.w / 2, r.y + r.d / 2);
+      const t = scene.add.text(c.x, c.y, r.name || '', { fontSize: '11px', color: '#f0e6d0', backgroundColor: '#00000066', padding: { x: 4, y: 1 } });
+      scene.labels.push(t.setOrigin(0.5).setDepth(-7900).setResolution(2));
+    });
   }
 
   /** Vorder- und rechte Seitenwand nur niedrig (wie abgeschnitten), damit nichts dahinter verschwindet */
@@ -2175,7 +2172,7 @@
   function drawEtikett() {
     const it = etikettFor();
     const top = it && scene.tops && scene.tops[it.uid];
-    const key = top ? it.uid + '|' + JSON.stringify(it.stock || {}) + '|' + top.x + ',' + top.y + '|' + showNames : '';
+    const key = top ? it.uid + '|' + JSON.stringify(it.stock || {}) + '|' + top.x + ',' + top.y  : '';
     if (key === etikettKey) return;
     etikettKey = key;
     if (scene.etikett) { scene.etikett.destroy(); scene.etikett = null; }
@@ -2185,7 +2182,7 @@
     const lines = ids.slice(0, 5);
     const w = 160;
     const h = 32 + Math.max(1, lines.length) * 14 + (ids.length > 5 ? 14 : 0);
-    const c = scene.add.container(top.x, top.y - (showNames ? 20 : 6)).setDepth(31000);
+    const c = scene.add.container(top.x, top.y - 6).setDepth(31000);
     const g = scene.add.graphics();
     g.fillStyle(0x1c1f2b, 0.94);
     g.fillRoundedRect(-w / 2, -h, w, h, 6);
@@ -2259,11 +2256,10 @@
       g.setDepth((b.x + b.y) * 10);
       scene.items.push(g);
       scene.sortables.push({ g: g, box: { x0: b.x - 0.2, y0: b.y - 0.2, x1: b.x + 0.2, y1: b.y + 0.2, bias: 0 } });
-      if (showNames) {
-        const p = iso(b.x, b.y, 18);
-        const t = scene.add.text(p.x, p.y, b.kind === 'moebel' ? catalog[b.id].name : '×' + b.qty, { fontSize: '9px', color: '#ffe9c0', backgroundColor: '#00000088', padding: { x: 2, y: 0 } });
-        scene.labels.push(t.setOrigin(0.5, 1).setDepth(14000).setResolution(2));
-      }
+      // Karton: was drin ist
+      const p = iso(b.x, b.y, 18);
+      const t = scene.add.text(p.x, p.y, b.kind === 'moebel' ? catalog[b.id].name : '×' + b.qty, { fontSize: '9px', color: '#ffe9c0', backgroundColor: '#00000088', padding: { x: 2, y: 0 } });
+      scene.labels.push(t.setOrigin(0.5, 1).setDepth(14000).setResolution(2));
     });
 
     scene.tops = {};
@@ -2276,7 +2272,7 @@
       const frac = L.used(it) / d.slots;
       if (frac > LOW_STOCK) return;
       const p = r.top || r.hull[0];
-      const y = p.y - (showNames ? 30 : 16);
+      const y = p.y - 16;
       const g = scene.add.graphics().setDepth(15500);
       g.fillStyle(frac === 0 ? 0xe0525a : 0xe0b040, 1);
       g.fillCircle(p.x, y, 8);
@@ -2285,14 +2281,6 @@
       scene.extra.push(g);
       scene.extra.push(scene.add.text(p.x, y, '!', { fontSize: '12px', color: '#1c1f2b', fontStyle: 'bold' }).setOrigin(0.5).setDepth(15501).setResolution(2));
     });
-    if (showNames) {
-      drawn.forEach(({ it, r }) => {
-        const d = catalog[it.id];
-        const p = r.top || r.hull[0];
-        const t = scene.add.text(p.x, p.y - 4, d.name, { fontSize: '10px', color: '#ffffff', backgroundColor: '#00000088', padding: { x: 3, y: 1 } });
-        scene.labels.push(t.setOrigin(0.5, 1).setDepth(15000).setResolution(2));
-      });
-    }
     drawGhost();
   }
 
@@ -2520,11 +2508,6 @@
       day.rng = null;
       act(doAct('reset'));
     });
-  });
-
-  $('[data-shop-names]').addEventListener('change', (e) => {
-    showNames = e.target.checked;
-    drawAll();
   });
 
   // ---------- Start ----------
