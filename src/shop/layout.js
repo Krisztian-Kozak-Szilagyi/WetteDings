@@ -71,6 +71,12 @@
     job3: 'Mit meiner Karte bin ich nicht ganz zufrieden.',
     jobwait: 'Meine Karte hat ewig gedauert.',
     dirty: 'Ziemlich schmutzig hier.',
+    turnier5: 'Super organisiertes Turnier!',
+    turnier4: 'Schönes Turnier.',
+    turnier3: 'Turnier war okay.',
+    turnier2: 'Chaotisches Turnier.',
+    turnier1: 'Furchtbar organisiertes Turnier.',
+    turnierAbbruch: 'Das Turnier wurde abgebrochen!',
   };
 
   const cents = (n) => Math.round(n * 100) / 100;
@@ -83,7 +89,7 @@
     return {
       coins: START_COINS, units: 1, nextUid: 1, nextBid: 1, items: [], boxes: [], carry: null, prices: {},
       day: 1, open: false, today: freshDay(), reviews: [], reports: [],
-      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {}, posters: {}, hung: {}, bag: {}, board: [], nextPid: 1, boardDay: 0,
+      licenses: [], servicePrices: {}, jobs: [], nextJid: 1, dirt: [], nextDid: 1, tools: [], market: {}, marketMoves: [], marketDay: 0, rooms: [], nextRid: 1, ruf: 0, level: 1, wardrobe: [], outfit: {}, posters: {}, hung: {}, bag: {}, board: [], nextPid: 1, boardDay: 0, turnier: { plan: null, active: null, last: 0, history: [] },
     };
   }
 
@@ -108,6 +114,8 @@
     out.board = (out.board || []).map((b) => Object.assign({}, b));
     out.nextPid = out.nextPid || 1;
     out.boardDay = out.boardDay || 0;
+    const tu = out.turnier || {};
+    out.turnier = { plan: tu.plan ? Object.assign({}, tu.plan) : null, active: tu.active ? Object.assign({}, tu.active) : null, last: tu.last || 0, history: (tu.history || []).slice(-20).map((h) => Object.assign({}, h)) };
     out.outfit = Object.assign({}, out.outfit || {});
     out.rooms = (out.rooms || []).map((r) => Object.assign({}, r, { door: r.door ? Object.assign({}, r.door) : null }));
     out.marketMoves = (out.marketMoves || []).map((m) => Object.assign({}, m));
@@ -331,8 +339,18 @@
           if (!own.has(n) && chairs.has(n)) near.add(n);
         });
       });
-      return { uid: it.uid, chairs: near.size, ready: near.size >= TABLE.chairs };
+      const chairUids = state.items.filter((c) => c.id === 'chair' && near.has(c.x + ',' + c.y)).map((c) => c.uid);
+      return { uid: it.uid, chairs: near.size, ready: near.size >= TABLE.chairs, chairUids };
     });
+  }
+
+  /** Turnier beenden: Preisgeld geht an den Sieger (war schon zurückgelegt) – oder bei Abbruch zurück an den Laden */
+  function endTurnier(s, aborted) {
+    const tu = s.turnier.active;
+    if (aborted) s.coins = cents(s.coins + tu.prize);
+    s.turnier.history = s.turnier.history.concat({ day: s.day, fee: tu.fee, prize: tu.prize, players: tu.checked, fees: tu.fees, aborted: !!aborted }).slice(-20);
+    s.turnier.last = s.day;
+    s.turnier.active = null;
   }
 
   // ---------- Plakate ----------
@@ -720,6 +738,12 @@
         if (s.open) return fail('Der Laden ist schon offen.');
         s.open = true;
         s.today = freshDay();
+        // Turniertag: angekündigtes Turnier beginnt (n = Teilnehmer, vom Server bei der Ankündigung ausgewürfelt)
+        const plan = s.turnier.plan;
+        if (plan && plan.day <= s.day) {
+          s.turnier.active = { fee: plan.fee, prize: plan.prize, n: plan.n || 0, checked: 0, fees: 0 };
+          s.turnier.plan = null;
+        }
         return { state: s };
       }
       case 'checkout':
@@ -777,6 +801,8 @@
       }
       case 'closeDay': {
         if (!s.open) return fail('Der Laden ist schon zu.');
+        // ein nicht beendetes Turnier gilt als abgebrochen: Preisgeld zurück
+        if (s.turnier.active) endTurnier(s, true);
         const t = s.today;
         s.reports = s.reports.concat({
           day: s.day, revenue: t.revenue, sold: t.sold, visitors: t.visitors, buyers: t.buyers, misses: t.misses,
@@ -905,6 +931,45 @@
         it.stock[a.ware] -= 1;
         if (!it.stock[a.ware]) delete it.stock[a.ware];
         s.today.guest = (s.today.guest || 0) + 1;
+        return { state: s };
+      }
+      // ---------- Turniere (Regeln: src/shop/turnier.js) ----------
+      case 'planTurnier': {
+        const cfg = more.turnier;
+        if (!cfg) return fail('Turniere gibt es hier noch nicht.');
+        if (needLevel(s, cfg.level)) return fail('Turniere ab Ruf-Stufe ' + cfg.level + '.');
+        if (s.turnier.plan || s.turnier.active) return fail('Es ist schon ein Turnier angesetzt.');
+        if (!gameTables(s, cat).some((g) => g.ready)) return fail('Dafür brauchst du einen Spieltisch mit 2 Stühlen direkt daneben.');
+        const dayN = Math.floor(Number(a.day));
+        const fee = Math.floor(Number(a.fee));
+        const prize = Math.floor(Number(a.prize));
+        if (!Number.isInteger(dayN) || dayN < s.day + cfg.lead || dayN > s.day + 14) return fail('Turnier frühestens in ' + cfg.lead + ' Tagen ansetzen (höchstens 14).');
+        if (!(fee >= 0 && fee <= cfg.feeMax) || !(prize >= 0 && prize <= cfg.prizeMax)) return fail('Startgeld 0–' + cfg.feeMax + ', Preisgeld 0–' + cfg.prizeMax + '.');
+        if (s.coins < prize) return fail('Das Preisgeld musst du jetzt schon zurücklegen – so viel hast du nicht.');
+        s.coins = cents(s.coins - prize); // Preisgeld wird zurückgelegt
+        s.turnier.plan = { day: dayN, fee, prize, n: null };
+        return { state: s };
+      }
+      case 'cancelTurnier': {
+        if (!s.turnier.plan) return fail('Es ist kein Turnier angesetzt.');
+        s.coins = cents(s.coins + s.turnier.plan.prize);
+        s.turnier.plan = null;
+        return { state: s };
+      }
+      case 'turnierCheckin': {
+        const tu = s.turnier.active;
+        if (!s.open || !tu) return fail('Heute ist kein Turnier.');
+        if (tu.checked >= tu.n) return fail('Alle Teilnehmer sind schon angemeldet.');
+        tu.checked += 1;
+        tu.fees = cents(tu.fees + tu.fee);
+        s.coins = cents(s.coins + tu.fee);
+        s.today.revenue = cents(s.today.revenue + tu.fee);
+        s.today.turnierFees = cents((s.today.turnierFees || 0) + tu.fee);
+        return { state: s };
+      }
+      case 'turnierEnd': {
+        if (!s.turnier.active) return fail('Heute läuft kein Turnier.');
+        endTurnier(s, !!a.aborted);
         return { state: s };
       }
       case 'devFind': {

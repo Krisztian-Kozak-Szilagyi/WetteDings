@@ -41,9 +41,9 @@ test('Safe lagert Plakate (zählen als Plätze), zurück ins Inventar', () => {
 test('Spieltisch: bereit erst mit 2 Stühlen direkt daneben', () => {
   const s = L.fresh();
   s.items.push({ uid: 60, id: 'playmat_table', x: 2, y: 2, rot: 0 }, { uid: 61, id: 'chair', x: 1, y: 2, rot: 0 }, { uid: 62, id: 'chair', x: 6, y: 6, rot: 0 });
-  assert.deepStrictEqual(L.gameTables(s, cat), [{ uid: 60, chairs: 1, ready: false }]);
+  assert.deepStrictEqual(L.gameTables(s, cat), [{ uid: 60, chairs: 1, ready: false, chairUids: [61] }]);
   s.items.push({ uid: 63, id: 'chair', x: 4, y: 3, rot: 0 });
-  assert.deepStrictEqual(L.gameTables(s, cat), [{ uid: 60, chairs: 2, ready: true }]);
+  assert.deepStrictEqual(L.gameTables(s, cat), [{ uid: 60, chairs: 2, ready: true, chairUids: [61, 63] }]);
 });
 
 test('Gäste-Kühlschrank: nur Kühlschrank, gratis, zählt nicht als Verkauf', () => {
