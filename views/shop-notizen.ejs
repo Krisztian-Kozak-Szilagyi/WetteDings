@@ -1,0 +1,35 @@
+<%- include('partials/head') %>
+<%# QA-Notizen aus der Shop-Demo (Taste O) – nur Admin. Export: /shop-demo/notizen.json %>
+<div class="narrow">
+  <h1>QA-Notizen (Shop-Demo)</h1>
+  <div class="card">
+    <p class="muted small">Notizen der Tester (Taste O im Spiel) mit dem Moment im Spiel. Der Export enthält zusätzlich den ganzen Spielstand von damals.</p>
+    <p>
+      <a class="btn btn-ghost btn-sm" href="/shop-demo/notizen"<%= alle ? '' : ' aria-current="page"' %>>Offen (<%= offen %>)</a>
+      <a class="btn btn-ghost btn-sm" href="/shop-demo/notizen?alle=1"<%= alle ? ' aria-current="page"' : '' %>>Alle</a>
+      <a class="btn btn-primary btn-sm" href="/shop-demo/notizen.json<%= alle ? '?alle=1' : '' %>">JSON exportieren</a>
+      <a class="btn btn-ghost btn-sm" href="/shop-demo">Zur Shop-Demo</a>
+    </p>
+  </div>
+  <% if (!notizen.length) { %>
+    <div class="card"><p class="muted">Keine <%= alle ? '' : 'offenen ' %>Notizen.</p></div>
+  <% } %>
+  <% notizen.forEach((n) => { const c = n.ctx || {}; %>
+    <div class="card">
+      <p class="muted small">
+        <%= new Date(n.createdAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) %> · <strong><%= n.username %></strong>
+        · Tag <%= c.day %><%= c.weekday ? ' (' + c.weekday + ')' : '' %><%= c.open ? ', ' + (c.clock || 'geöffnet') : ', geschlossen' %>
+        · Stufe <%= c.level %> · <%= c.coins %> Kanacoin
+        <%= c.where ? '· ' + c.where : '' %><%= c.window ? ' · Fenster: ' + c.window : '' %>
+        <%= n.done ? '· erledigt' : '' %>
+      </p>
+      <p style="white-space: pre-wrap"><%= n.text %></p>
+      <form method="post" action="/shop-demo/notizen/<%= n._id %>/erledigt">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="alle" value="<%= alle ? '1' : '' %>">
+        <button class="btn btn-ghost btn-sm" type="submit"><%= n.done ? 'Wieder öffnen' : 'Erledigt' %></button>
+      </form>
+    </div>
+  <% }) %>
+</div>
+<%- include('partials/foot') %>

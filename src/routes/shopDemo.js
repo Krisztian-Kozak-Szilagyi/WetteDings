@@ -10,6 +10,8 @@ const express = require('express');
 const { requireLogin } = require('../middleware');
 const ShopDemo = require('../models/ShopDemo');
 const ShopDemoSlot = require('../models/ShopDemoSlot');
+const ShopNotiz = require('../models/ShopNotiz');
+const mongoose = require('mongoose');
 const layout = require('../shop/layout');
 const { CATALOG, GROUPS, GOODS, LICENSES, SERVICES, SERVICE_PACKS, UNIT_PRICE, CLOTHES, CLOTHES_SLOTS, POSTER, POSTER_TYPES, POSTER_SPOTS, DUNGEON_CARDS, BOARD } = require('../shop/catalog');
 const grading = require('../grading/gradingService');
@@ -23,6 +25,12 @@ const router = express.Router();
 function requireTester(req, res, next) {
   if (!req.user) return requireLogin(req, res, next);
   if (!req.user.isAdmin && !req.user.isQa) return next('route');
+  next();
+}
+/** Nur Admin (QA-Notizen lesen). Andere bekommen eine 404. */
+function requireAdminOnly(req, res, next) {
+  if (!req.user) return requireLogin(req, res, next);
+  if (!req.user.isAdmin) return next('route');
   next();
 }
 const catalog = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
@@ -102,6 +110,7 @@ router.get('/api/shop-demo', requireTester, async (req, res, next) => {
       state: await load(req.user._id), catalog: CATALOG, goods: GOODS, groups: GROUPS, unitPrice: UNIT_PRICE,
       licenses: LICENSES, services: SERVICES, packs: SERVICE_PACKS, clothes: CLOTHES, clothesSlots: CLOTHES_SLOTS, poster: POSTER, posterTypes: POSTER_TYPES, posterSpots: POSTER_SPOTS, dungeonCards: DUNGEON_CARDS,
       ruf: { levels: layout.RUF.levels, unlock: layout.UNLOCK, perCoins: layout.RUF.perCoins, stars: layout.RUF.stars },
+      isAdmin: !!req.user.isAdmin, // Hauptmenü: Link zu den QA-Notizen
     });
   } catch (err) {
     next(err);
@@ -383,6 +392,79 @@ router.post('/api/shop-demo/spielstand', requireTester, async (req, res, next) =
       { upsert: true }
     );
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- QA-Notizen (Taste O): Tester schreiben auf, was auffällt; der Admin liest und exportiert ----------
+const NOTIZ_MAX = 1000;
+const NOTIZ_PER_DAY = 100;
+// Moment im Spiel (vom Browser): nur diese Felder, nur einfache Werte, Texte gekürzt
+const CTX_KEYS = ['day', 'weekday', 'clock', 'open', 'level', 'coins', 'x', 'y', 'where', 'window', 'held', 'carry', 'mode', 'customers', 'screen'];
+function cleanCtx(raw) {
+  let o = null;
+  try {
+    o = JSON.parse(typeof raw === 'string' && raw.length <= 4000 ? raw : 'null');
+  } catch {
+    o = null;
+  }
+  const out = {};
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
+  CTX_KEYS.forEach((k) => {
+    const v = o[k];
+    if (typeof v === 'number' && Number.isFinite(v)) out[k] = Math.round(v * 100) / 100;
+    else if (typeof v === 'boolean') out[k] = v;
+    else if (typeof v === 'string') out[k] = v.slice(0, 80);
+  });
+  return out;
+}
+
+router.post('/api/shop-demo/notiz', requireTester, async (req, res, next) => {
+  try {
+    const text = str(req.body.text).trim().slice(0, NOTIZ_MAX);
+    if (!text) return res.status(400).json({ error: 'Schreib erst etwas auf.' });
+    const since = new Date(Date.now() - 24 * 3600 * 1000);
+    if ((await ShopNotiz.countDocuments({ user: req.user._id, createdAt: { $gte: since } })) >= NOTIZ_PER_DAY) return res.status(429).json({ error: 'Heute sind es schon sehr viele Notizen.' });
+    await ShopNotiz.create({ user: req.user._id, username: req.user.username, text, ctx: cleanCtx(req.body.ctx), state: await load(req.user._id) });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/shop-demo/notizen', requireAdminOnly, async (req, res, next) => {
+  try {
+    const alle = req.query.alle === '1';
+    const [notizen, offen] = await Promise.all([
+      ShopNotiz.find(alle ? {} : { done: false }).select('-state').sort({ createdAt: -1 }).limit(300).lean(),
+      ShopNotiz.countDocuments({ done: false }),
+    ]);
+    res.render('shop-notizen', { title: 'QA-Notizen', notizen, offen, alle });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Export: alle (oder nur offene) Notizen samt Spielstand von damals – zum Durchlesen in einem Rutsch
+router.get('/shop-demo/notizen.json', requireAdminOnly, async (req, res, next) => {
+  try {
+    const alle = req.query.alle === '1';
+    const notizen = await ShopNotiz.find(alle ? {} : { done: false }).sort({ createdAt: 1 }).lean();
+    res.attachment('qa-notizen-' + new Date().toISOString().slice(0, 10) + '.json');
+    res.json({ created: new Date(), count: notizen.length, notizen: notizen.map(({ _id, username, text, ctx, state, done, createdAt }) => ({ id: _id, username, text, ctx, done, createdAt, state })) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/shop-demo/notizen/:id/erledigt', requireAdminOnly, async (req, res, next) => {
+  try {
+    if (mongoose.isValidObjectId(req.params.id)) {
+      const n = await ShopNotiz.findById(req.params.id).select('done');
+      if (n) await ShopNotiz.updateOne({ _id: n._id }, { $set: { done: !n.done } });
+    }
+    res.redirect(req.body.alle === '1' ? '/shop-demo/notizen?alle=1' : '/shop-demo/notizen');
   } catch (err) {
     next(err);
   }
