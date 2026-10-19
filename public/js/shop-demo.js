@@ -493,7 +493,7 @@
       go.addEventListener('click', () => { if (act(doAct('planTurnier', { day: Number(daySel.value), fee: Number(fee.value), prize: Number(prize.value) }))) renderPc(); });
       row.appendChild(go);
       body.appendChild(row);
-      body.appendChild(el('p', 'sd-later', 'Am Turniertag melden sich die Teilnehmer an der Kasse an (Startgeld). Du startest die Runden hier am PC, die Sieger melden ihr Ergebnis an der Kasse – manchmal gibt es Streit. Sie brauchen Stühle zum Warten und kaufen gern Getränke und Merch (Turnier-Edition!).'));
+      body.appendChild(el('p', 'sd-later', 'Am Turniertag melden sich die Teilnehmer an der Kasse an (Startgeld). Du startest die Runden hier am PC, die Sieger melden ihr Ergebnis an der Kasse. Sie brauchen Stühle zum Warten und kaufen gern Getränke und Merch (Turnier-Edition!).'));
     }
     if ((tu.history || []).length) {
       body.appendChild(el('div', 'sd-group', 'Letzte Turniere'));
@@ -1797,32 +1797,14 @@
     dequeue(c);
     if (!m) { toIdle(c); return; }
     const loser = m.a === c ? m.b : m.a;
-    const done = () => {
-      m.state = 'done';
-      c.match = null;
-      loser.out = true;
-      say(loser, 'Ausgeschieden …', 2);
-      leaveTour(loser);
-      toIdle(c);
-      say(c, 'Weiter in der nächsten Runde!', 2);
-      snd('note');
-    };
-    if (!T.dispute(day.rng)) { done(); return; }
-    // Streit: der Verlierer zweifelt das Ergebnis an
-    c.serving = true;
-    askChoice('Streit am Tisch: ' + loser.name + ' sagt, ' + c.name + ' hat geschummelt. Was entscheidest du?', 'Ergebnis gilt', 'Neu spielen').then((ok) => {
-      c.serving = false;
-      if (ok) { loser.annoy = (loser.annoy || 0) + 1; done(); return; }
-      // neu spielen: beide zurück an den Tisch, etwas genervt
-      c.annoy = (c.annoy || 0) + 1;
-      c.match = null;
-      seatAt(c, m.chairs[m.a === c ? 0 : 1]);
-      m.winner = null;
-      m.t = 0;
-      m.dur = T.matchSeconds(day.rng);
-      m.state = 'walk';
-      say(c, 'Na gut, noch mal …', 2);
-    });
+    m.state = 'done';
+    c.match = null;
+    loser.out = true;
+    say(loser, 'Ausgeschieden …', 2);
+    leaveTour(loser);
+    toIdle(c);
+    say(c, 'Weiter in der nächsten Runde!', 2);
+    snd('note');
   }
   function leaveTour(p, aborted) {
     p.out = true;
@@ -1849,18 +1831,6 @@
     day.customers.filter((p) => p.tp && !p.out).forEach((p) => leaveTour(p, true));
     note('Turnier abgebrochen – das Preisgeld ist zurück.');
   }
-  /** Frage mit eigenen Knöpfen (OK-Knopf = okLabel, Abbrechen = cancelLabel) */
-  function askChoice(text, okLabel, cancelLabel) {
-    const dlg = $('[data-shop-dialog]');
-    const okB = $('[data-shop-dialog-ok]');
-    const noB = dlg.querySelector('button[value="cancel"]');
-    const o = okB.textContent;
-    const n = noB.textContent;
-    okB.textContent = okLabel;
-    noB.textContent = cancelLabel;
-    return ask(text).then((r) => { okB.textContent = o; noB.textContent = n; return r; });
-  }
-
   function serve(c) {
     if (c.turnier === 'checkin') { turnierCheckin(c); return; }
     if (c.turnier === 'report') { turnierReport(c); return; }
