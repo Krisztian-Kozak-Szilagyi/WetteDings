@@ -2,7 +2,7 @@
 // Der Spieler legt Startgeld und Preisgeld fest und kündigt das Turnier mindestens TURNIER.lead Tage vorher am PC an.
 // Je höher der Preis und je niedriger das Startgeld, desto mehr kommen – aber desto weniger bleibt übrig. Wer zu oft
 // Turniere macht, bekommt weniger Teilnehmer (Turnier-Müdigkeit). Am Turniertag melden sich die Teilnehmer an der
-// Kasse an, der Spieler startet die Runden am PC, die Sieger melden ihr Ergebnis an der Kasse, ab und zu gibt es Streit.
+// Kasse an, der Spieler startet die Runden am PC, die Sieger melden ihr Ergebnis an der Kasse.
 // Alle Zahlen = Platzhalter. Zufall immer als Parameter (rng), im Browser: window.ShopTurnier.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -21,7 +21,6 @@
     boardHype: 0.3, // Schwarzes Brett im Laden: +30 % Interesse
     posterHype: 0.1, // je hängendem Plakat +10 % (kommt mit der Stadt)
     matchSeconds: [20, 35], // Dauer einer Partie (Spielsekunden)
-    disputeChance: 0.1, // so oft streiten sich die beiden über das Ergebnis
     overtime: 0.25, // so lange (Anteil eines Tages) nach Ladenschluss läuft ein Turnier höchstens weiter, dann Abbruch
     // Teilnehmer kaufen lieber Merch und Getränke (Wunsch-Gewicht), Turnier-Edition am liebsten
     boost: { merch: 3, turnier: 6, drink: 3 },
@@ -74,16 +73,15 @@
   /** Wer gewinnt? 50:50 (später: Deck-Stärke) */
   const winner = (match, rng) => (rng() < 0.5 ? match[0] : match[1]);
   const matchSeconds = (rng, cfg) => { const c = cfg || TURNIER; return c.matchSeconds[0] + rng() * (c.matchSeconds[1] - c.matchSeconds[0]); };
-  const dispute = (rng, cfg) => rng() < (cfg || TURNIER).disputeChance;
 
   /**
    * Bewertung eines Teilnehmers: Komfort beim Warten (wie bei Aufträgen: ohne Stuhl höchstens 3★, Stuhl 4★, Stuhl + Getränk 5★)
-   * minus Ärger (lange angestanden, Streit verloren …). Nie unter 1.
+   * minus Ärger (lange angestanden, lange ohne Partie …). Nie unter 1.
    */
   function reviewStars(p) {
     const comfort = p.chair ? (p.drink ? 5 : 4) : 3;
     return clamp(comfort - (p.annoy || 0), 1, 5);
   }
 
-  return { TURNIER, appeal, fatigue, signups, pairRound, winner, matchSeconds, dispute, reviewStars };
+  return { TURNIER, appeal, fatigue, signups, pairRound, winner, matchSeconds, reviewStars };
 });
