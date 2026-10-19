@@ -163,6 +163,10 @@ async function deleteAccount({ user, password }) {
       GradingShop.deleteOne({ _id: id }, opt),
       GradingJob.deleteMany({ user: id }, opt),
       require('../models/Deck').deleteMany({ user: id }, opt),
+      // Shop-Demo (Admin / QA Tester): Spielstände und QA-Notizen
+      require('../models/ShopDemo').deleteOne({ _id: id }, opt),
+      require('../models/ShopDemoSlot').deleteMany({ user: id }, opt),
+      require('../models/ShopNotiz').deleteMany({ user: id }, opt),
       // offene Handelsangebote verschwinden (auch Gegenangebote auf eigene Markt-Angebote – sie tragen den Verkäufer);
       // abgeschlossene bleiben (mit neutralem Namen) für die Gegenseite
       Trade.deleteMany({ seller: id, status: 'offen' }, opt),

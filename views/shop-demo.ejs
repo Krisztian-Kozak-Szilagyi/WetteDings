@@ -48,7 +48,7 @@
     </div>
   </div>
 
-  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · R drehen · Tab Werkzeug-Rad · I Inventar · Esc Menü · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
+  <div class="sd-hint" data-shop-hint>WASD laufen · E benutzen · Q Karton abstellen · R drehen · Tab Werkzeug-Rad · I Inventar · O Notiz (QA) · Esc Menü · Mausrad Zoom · Möbel anklicken = verschieben/drehen</div>
   <div class="sd-toast" data-shop-toast hidden></div>
   <%# Werkzeug-Rad (Tab gedrückt halten): public/js/shop-demo.js „Werkzeug in der Hand“ %>
   <div class="sd-wheel" data-shop-wheel hidden></div>
@@ -98,6 +98,23 @@
       <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
     </div>
     <div class="sd-shelf-body" data-shop-misc-body></div>
+  </dialog>
+
+  <%# QA-Notiz (Taste O): public/js/shop-demo.js „QA-Notiz“, Server: POST /api/shop-demo/notiz, Admin: /shop-demo/notizen %>
+  <dialog class="sd-win sd-notiz" data-shop-notiz>
+    <div class="sd-win-head">
+      <strong>Notiz für die Entwicklung</strong>
+      <form method="dialog"><button type="submit" class="sd-x" aria-label="Schließen">×</button></form>
+    </div>
+    <div class="sd-notiz-body">
+      <p class="sd-later">Was ist dir aufgefallen? Fehler, zu teuer, nervt, unklar … Der Moment im Spiel wird mitgespeichert. Das Spiel pausiert solange.</p>
+      <textarea maxlength="1000" rows="6" data-shop-notiz-text></textarea>
+      <p class="sd-menu-msg" data-shop-notiz-msg hidden></p>
+      <div class="sd-dialog-btns">
+        <button type="button" data-shop-notiz-cancel>Abbrechen</button>
+        <button type="button" class="is-main" data-shop-notiz-save>Speichern</button>
+      </div>
+    </div>
   </dialog>
 
   <%# Hauptmenü beim Start und Pause (Esc): public/js/shop-demo.js „Menü“, Spielstände: /api/shop-demo/spielstaende %>
