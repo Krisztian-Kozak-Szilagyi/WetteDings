@@ -114,4 +114,11 @@ for (const [key, c] of Object.entries(RARITY_COLORS)) {
     text: { x: 92, y: 790, w: 520, h: 144, size: 25, minSize: 15, lineHeight: 1.32 },
     colors: { ...module.exports.gilded.colors, ...c },
   };
+  // Spell (Karten ohne Werte, z. B. die Hunde Hugo und Lilly): keine Wertefenster, Plakette „✦ SPELL“, größeres Textfeld
+  module.exports[`rar-${key}-spell`] = {
+    ...module.exports[`rar-${key}`],
+    stats: [],
+    badge: 'SPELL',
+    text: { x: 92, y: 730, w: 520, h: 204, size: 26, minSize: 15, lineHeight: 1.34 },
+  };
 }

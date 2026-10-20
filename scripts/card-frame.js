@@ -6,9 +6,11 @@
 // Name, Werte und Fähigkeitstext setzt der Code (src/tcg/frames.js „rar-<seltenheit>“, src/tcg/cardSvg.js) – hier
 // entstehen nur Motiv und Rahmen (720 × 1008, WebP).
 //
-// node scripts/card-frame.js <bild> <seltenheit> <ziel.webp> [vorschau.png]
+// node scripts/card-frame.js <bild> <seltenheit> <ziel.webp> [vorschau.png] [--spell]
+// --spell: Karte ohne Werte (Hunde wie Hugo und Lilly) – keine Wertefenster, größeres Textfenster (Rahmen „rar-<s>-spell“)
 const sharp = require('sharp');
-const [SRC, RARITY, DEST, PREVIEW] = process.argv.slice(2);
+const SPELL = process.argv.includes('--spell');
+const [SRC, RARITY, DEST, PREVIEW] = process.argv.slice(2).filter((a) => a !== '--spell');
 const W = 720;
 const H = 1008;
 
@@ -96,7 +98,8 @@ const EFFECTS = {
     '<rect x="711" y="300" width="9" height="74" fill="#22d3ee"/><rect x="713" y="820" width="7" height="30" fill="#22d3ee" opacity=".8"/>',
 };
 
-const stats = [432, 563, 691].map((cy) => pane(62, cy - 48, 100, 96, 18) + gem(162, cy)).join('');
+const stats = SPELL ? '' : [432, 563, 691].map((cy) => pane(62, cy - 48, 100, 96, 18) + gem(162, cy)).join('');
+const TEXT_Y = SPELL ? 712 : 772; // Spell: Textfenster höher (längerer Text, keine Werte)
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">${accentStops}</linearGradient>
@@ -124,9 +127,9 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   <rect x="40" y="40" width="400" height="66" rx="26" fill="none" stroke="url(#acc)" stroke-width="3"/>
   <rect x="47" y="47" width="386" height="52" rx="20" fill="none" stroke="${S.dark}" stroke-width="1.5"/>
   ${stats}
-  ${pane(62, 772, 580, 180, 24)}
-  ${gem(352, 772, 12)}
-  <path d="M120 772 H330 M374 772 H584" stroke="${S.light}" stroke-width="1" opacity=".5"/>
+  ${pane(62, TEXT_Y, 580, 952 - TEXT_Y, 24)}
+  ${gem(352, TEXT_Y, 12)}
+  <path d="M120 ${TEXT_Y} H330 M374 ${TEXT_Y} H584" stroke="${S.light}" stroke-width="1" opacity=".5"/>
   ${RARITY === 'crumpled' ? EFFECTS.crumpled().replace(/<circle[\s\S]*$/, '') : ''}
 </svg>`;
 

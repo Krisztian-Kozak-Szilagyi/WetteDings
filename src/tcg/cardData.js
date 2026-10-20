@@ -87,12 +87,17 @@ const SEASON1_UNRELEASED = {
   ...unreleased('The Gracebringer', ['the-gracebringer-1-footman', 'the-gracebringer-2-gold', 'the-gracebringer-3-holo', 'the-gracebringer-4-arcane']),
 };
 
-// Karten-Overhaul Teil 1: Ömer und Aleks im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und
+// Karten-Overhaul Teil 1: Ömer, Aleks, Matze, Luca, Hugo und Lilly im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und
 // Effekte (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer
 // die Karte hatte, hat jetzt die überarbeitete. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
 const overhaul = (name, abilityName, ability) => (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name, title, stats: require('./stats')[id], abilityName, ability });
 const omer = overhaul('Ömer', 'Macht der Osmanen', 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.');
 const aleks = overhaul('Aleks', 'Russische Telefonnummer', 'Nach dem Anrufen einer russischen Telefonnummer ist es in der Lage, die von ihm selbst generierten Punkte einmalig auf das Maximum (99) zu fälschen.');
+const matze = overhaul('Matze', 'Hundekarte!', 'Für jede ausgespielte Hundekarte erhält man +10 auf FIS und +5 auf alle anderen Stats.');
+const luca = overhaul('Luca', 'Simulationsspiel-Erfahrung', 'Aufgrund seiner wirtschaftlichen Erfahrungen aus Simulationsspielen ist er in der Lage, sein eigenes BWL-Niveau um 50 % zu steigern.');
+// Hunde (Spell, ohne Werte): Rahmen ohne Wertefenster, Plakette „✦ SPELL“ (rar-holo-spell)
+const DOG_TEXT = 'Jede ausgespielte Hundekarte erhöht alle Werte der freundlichen Charaktere um 3. Es können maximal zwei Hunde gleichzeitig ausgespielt werden, und derselbe Hund darf nicht mehrfach ausgespielt werden.';
+const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-spell', name, stats: [0, 0, 0, 0], ability: DOG_TEXT });
 const OVERHAUL = {
   'omer-1-crumpled': omer('omer-1-crumpled', 'crumpled', 'Ömer the Crumpled'),
   'omer-2-bfwler': omer('omer-2-bfwler', 'bfwler', 'Ömer the BFWler'),
@@ -106,6 +111,20 @@ const OVERHAUL = {
   'aleks-4-holo': aleks('aleks-4-holo', 'holo', 'Aleks the Holographic'),
   'aleks-5-bockhaber': aleks('aleks-5-bockhaber', 'bockhaber', 'Aleks the Bockhaber'),
   'aleks-6-glitch': aleks('aleks-6-glitch', 'glitch', 'Glitch the Aleksed'),
+  'matze-1-crumpled': matze('matze-1-crumpled', 'crumpled', 'Matze the Crumpled'),
+  'matze-2-bfwler': matze('matze-2-bfwler', 'bfwler', 'Matze the BFWler'),
+  'matze-3-gold': matze('matze-3-gold', 'gold', 'Matze the Golden'),
+  'matze-4-holo': matze('matze-4-holo', 'holo', 'Matze the Holographic'),
+  'matze-5-bockhaber': matze('matze-5-bockhaber', 'bockhaber', 'Matze the Bockhaber'),
+  'matze-6-glitch': matze('matze-6-glitch', 'glitch', 'Glitch the Matzed'),
+  'luca-1-crumpled': luca('luca-1-crumpled', 'crumpled', 'Luca the Crumpled'),
+  'luca-2-bfwler': luca('luca-2-bfwler', 'bfwler', 'Luca the BFWler'),
+  'luca-3-gold': luca('luca-3-gold', 'gold', 'Luca the Golden'),
+  'luca-4-holo': luca('luca-4-holo', 'holo', 'Luca the Holographic'),
+  'luca-5-bockhaber': luca('luca-5-bockhaber', 'bockhaber', 'Luca the Bockhaber'),
+  'luca-6-glitch': luca('luca-6-glitch', 'glitch', 'Glitch the Lucaed'),
+  'hugo-holo': dog('Hugo'),
+  'lilly-holo': dog('Lilly'),
 };
 
 module.exports = {

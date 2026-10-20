@@ -80,6 +80,17 @@ function statsSvg(frame, values, base) {
     .join('');
 }
 
+// Plakette mit Text statt Zahl (Spell-Karten): „✦ SPELL“
+function badgeSvg(frame) {
+  const p = frame.speed;
+  const c = frame.colors;
+  const cy = p.y + p.h / 2;
+  return (
+    `<rect x="${p.x - 30}" y="${p.y}" width="${p.w + 30}" height="${p.h}" rx="${p.h / 2}" fill="${c.plate}" stroke="${c.plateBorder}" stroke-width="3"/>` +
+    `<text x="${p.x - 30 + (p.w + 30) / 2}" y="${cy + 8}" text-anchor="middle" font-size="22" font-weight="700" letter-spacing="2" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>✦ ${esc(frame.badge)}</text>`
+  );
+}
+
 function speedSvg(frame, value, base) {
   const p = frame.speed;
   const c = frame.colors;
@@ -140,7 +151,7 @@ function render(card, values = {}) {
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
     (frame.name ? nameSvg(frame, card.title || card.name) : '') +
-    (frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
+    (frame.badge ? badgeSvg(frame) : frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'

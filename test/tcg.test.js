@@ -213,13 +213,15 @@ test('#204: Bank – ungebügelter Knick halber Preis, beschädigte Exemplare ge
   assert.equal(bankProceeds([{ rarity: 'holo', creased: true }, { rarity: 'holo' }]), Math.floor(holo.sell / 2) + holo.sell);
 });
 
-test('Karten-Overhaul Teil 1: Ömer und Aleks im Vollbild-Layout je Seltenheit – gleiche Karten-IDs, Werte und Fähigkeit', () => {
+test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je Seltenheit – gleiche Karten-IDs, Werte und Fähigkeit', () => {
   const catalog = require('../src/tcg/catalog');
   const cardSvg = require('../src/tcg/cardSvg');
   const STATS = require('../src/tcg/stats');
   const sets = {
     Ömer: ['omer', 'Macht der Osmanen', { crumpled: 'Ömer the Crumpled', bfwler: 'Ömer the BFWler', gold: 'Ömer the Golden', holo: 'Ömer the Holographic', bockhaber: 'Ömer the Bockhaber', glitch: 'Glitch the Ömered' }],
     Aleks: ['aleks', 'Russische Telefonnummer', { crumpled: 'Aleks the Crumpled', bfwler: 'Aleks the BFWler', gold: 'Aleks the Golden', holo: 'Aleks the Holographic', bockhaber: 'Aleks the Bockhaber', glitch: 'Glitch the Aleksed' }],
+    Matze: ['matze', 'Hundekarte!', { crumpled: 'Matze the Crumpled', bfwler: 'Matze the BFWler', gold: 'Matze the Golden', holo: 'Matze the Holographic', bockhaber: 'Matze the Bockhaber', glitch: 'Glitch the Matzed' }],
+    Luca: ['luca', 'Simulationsspiel-Erfahrung', { crumpled: 'Luca the Crumpled', bfwler: 'Luca the BFWler', gold: 'Luca the Golden', holo: 'Luca the Holographic', bockhaber: 'Luca the Bockhaber', glitch: 'Glitch the Lucaed' }],
   };
   const order = ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch'];
   for (const [name, [slug, abilityName, titles]] of Object.entries(sets)) for (const [rarity, title] of Object.entries(titles)) {
@@ -235,5 +237,20 @@ test('Karten-Overhaul Teil 1: Ömer und Aleks im Vollbild-Layout je Seltenheit �
     assert.ok(c.image.startsWith(`/img/tcg/karte/${slug}-`), c.image);
     const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
     for (const t of [title, abilityName, 'FIA', 'FIS', 'BWL', `>${c.stats.fis}<`]) assert.ok(svg.includes(t), `${id}: ${t}`);
+  }
+});
+
+test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell – ohne Wertefenster, Plakette „SPELL“, weiter keine Charaktere', () => {
+  const catalog = require('../src/tcg/catalog');
+  const cardSvg = require('../src/tcg/cardSvg');
+  for (const [id, name] of [['hugo-holo', 'Hugo'], ['lilly-holo', 'Lilly']]) {
+    const c = catalog.cardById[id];
+    assert.ok(c && catalog.CARDS.includes(c), id);
+    assert.equal(c.name, name);
+    assert.equal(c.frame, 'rar-holo-spell');
+    assert.equal(c.isCharacter, false, 'Hunde bleiben Spells (Boost, kein Charakter)');
+    const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
+    assert.ok(svg.includes('SPELL') && svg.includes('Hundekarte') && svg.includes(name));
+    assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), 'keine Wertefenster');
   }
 });
