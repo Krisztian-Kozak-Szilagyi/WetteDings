@@ -78,10 +78,14 @@
   </section>
 </div>
 
-<%# Ergebnis: Walze wie beim Kistenöffnen, die Markierung zeigt die gezogene Karte %>
+<%# Verschmelzen: die Karten fliegen auf einer Spirale zusammen, der Kern leuchtet Stufe um Stufe durch die Seltenheiten
+    (Crumpled zuerst) und hält bei der Farbe der gezogenen Karte – dann erscheint sie (public/js/aufwertung.js) %>
 <div class="up-reveal" data-up-reveal hidden>
   <div class="up-reveal-box" role="dialog" aria-modal="true" aria-labelledby="up-result-title">
-    <div class="up-reel-window"><div class="up-reel" data-up-reel></div><span class="up-marker" aria-hidden="true"></span></div>
+    <div class="up-fuse" data-up-fuse aria-live="polite">
+      <div class="up-core" data-up-core aria-hidden="true"><span class="up-rays"></span><span class="up-rays up-rays-2"></span><span class="up-orb"></span></div>
+      <p class="up-fuse-label" data-up-fuse-label></p>
+    </div>
     <div class="up-result" data-up-result hidden>
       <img data-up-result-img alt="" width="720" height="1008">
       <div>

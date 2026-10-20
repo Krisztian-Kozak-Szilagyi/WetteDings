@@ -276,16 +276,8 @@ router.post('/tcg/aufwertung', async (req, res) => {
   try {
     const docs = [].concat(req.body.doc || []).map(str);
     const r = await upgrade.upgrade({ user: req.user, docIds: docs });
-    // Walze wie beim Kistenöffnen: zufällige Karten der möglichen Ausgänge (Ziel und Seltenheiten des Einsatzes),
-    // das Ergebnis an fester Stelle
-    const v = r.contract;
-    const failKeys = [...new Set(r.inputs)];
-    const reel = Array.from({ length: 48 }, () => {
-      const key = Math.random() < v.chance ? v.target : failKeys[Math.floor(Math.random() * failKeys.length)];
-      const pool = upgrade.poolOf(key);
-      return cardView(pool[Math.floor(Math.random() * pool.length)]);
-    });
-    res.json({ ok: true, success: r.success, kind: r.kind, chance: pctText(v.chance), card: { ...cardView(r.card), missing: r.missing }, reel, stop: 40 });
+    // die Verschmelzung (public/js/aufwertung.js) leuchtet durch die Seltenheiten bis zu der der neuen Karte
+    res.json({ ok: true, success: r.success, kind: r.kind, chance: pctText(r.contract.chance), card: { ...cardView(r.card), missing: r.missing } });
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     res.status(400).json({ error: err.message });

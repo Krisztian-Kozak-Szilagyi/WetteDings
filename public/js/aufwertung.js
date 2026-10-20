@@ -1,7 +1,7 @@
 // Kartenaufwertung (views/tcg-aufwertung.ejs): Karten in den Vertrag legen (Seltenheiten gemischt), verschmelzen.
 // Die Chance rechnet window.AufwertungRegeln (public/js/aufwertung-regeln.js) – dieselbe Rechnung wie auf dem Server.
-// Entschieden wird auf dem Server (POST /tcg/aufwertung, src/tcg/upgrade.js); hier nur Auswahl und die Walze, die wie
-// beim Kistenöffnen an der gezogenen Karte stehen bleibt.
+// Entschieden wird auf dem Server (POST /tcg/aufwertung, src/tcg/upgrade.js); hier nur Auswahl und die Verschmelzung:
+// Karten fliegen auf einer Spirale zusammen, das Leuchten steigt durch die Seltenheiten bis zur gezogenen Karte.
 (function () {
   var page = document.querySelector('[data-upgrade]');
   var R = window.AufwertungRegeln;
@@ -189,22 +189,36 @@
   }
 
   // ---------- Verschmelzen ----------
+  // Ablauf: Karten fliegen auf einer Spirale in die Mitte → der Kern leuchtet in Crumpled auf und steigt Stufe um Stufe
+  // durch die Seltenheiten, bis er bei der Seltenheit der gezogenen Karte hält → Lichtblitz → die Karte erscheint.
+  // Die Anfrage läuft schon während des Flugs; erst mit der Antwort steht fest, wo das Leuchten anhält.
   var reveal = document.querySelector('[data-up-reveal]');
-  var reel = document.querySelector('[data-up-reel]');
+  var fuse = document.querySelector('[data-up-fuse]');
+  var core = document.querySelector('[data-up-core]');
+  var fuseLabel = document.querySelector('[data-up-fuse-label]');
   var result = document.querySelector('[data-up-result]');
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var css = getComputedStyle(document.documentElement);
+  var colorOf = function (k) { return (css.getPropertyValue('--r-' + k) || '#ffffff').trim(); };
+  var wait = function (ms) { return new Promise(function (ok) { setTimeout(ok, still ? 0 : ms); }); };
+
   function go() {
     if (picked.length !== COUNT) return;
     goBtn.disabled = true;
     goBtn.textContent = 'Wird verschmolzen …';
     var body = new URLSearchParams({ _csrf: csrf });
     picked.forEach(function (p) { body.append('doc', p.doc); });
-    fetch('/tcg/aufwertung', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
+    var request = fetch('/tcg/aufwertung', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body: body })
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res.error) throw new Error(res.error);
-        spin(res);
-      })
+        return res;
+      });
+    var flight = spiral();
+    Promise.all([request, flight])
+      .then(function (both) { return glow(both[0]).then(function () { done(both[0]); }); })
       .catch(function (err) {
+        closeFuse();
         goBtn.disabled = false;
         goBtn.textContent = 'Aufwerten';
         alertBox(err.message || 'Das hat nicht geklappt – bitte lade die Seite neu.');
@@ -218,37 +232,81 @@
     goBtn.insertAdjacentElement('afterend', p);
   }
 
-  // Walze: Karten nebeneinander, die gezogene an Position res.stop; sie läuft aus und hält unter der Markierung
-  function spin(res) {
-    reel.innerHTML = '';
-    var items = res.reel.slice();
-    items[res.stop] = res.card;
-    items.forEach(function (c, i) {
-      var it = el('div', 'up-reel-item r-' + c.rarity + (i === res.stop ? ' is-win' : ''));
-      it.appendChild(img(c));
-      reel.appendChild(it);
-    });
+  // Karten aus den Vertragsplätzen fliegen auf einer Spirale (2 Umdrehungen, enger werdend) in den Kern
+  function spiral() {
+    var from = Array.prototype.slice.call(slotsEl.querySelectorAll('.up-slot.is-full img')).map(function (im) { return { src: im.src, rect: im.getBoundingClientRect() }; });
     result.hidden = true;
+    core.className = 'up-core';
+    core.style.setProperty('--lvl', 0);
+    fuseLabel.textContent = '';
+    fuse.hidden = false;
     reveal.hidden = false;
     document.body.classList.add('up-open');
-    var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    requestAnimationFrame(function () {
-      var item = reel.children[res.stop];
-      var win = reel.parentNode.getBoundingClientRect().width;
-      // leicht versetzt auf der Karte stehen bleiben, damit es nicht wie abgezählt wirkt
-      var jitter = (Math.random() - 0.5) * item.offsetWidth * 0.6;
-      var x = item.offsetLeft + item.offsetWidth / 2 - win / 2 + jitter;
-      reel.style.transition = 'none';
-      reel.style.transform = 'translateX(0)';
-      void reel.offsetWidth;
-      reel.style.transition = still ? 'none' : 'transform 5.2s cubic-bezier(.12, .7, .1, 1)';
-      reel.style.transform = 'translateX(' + -x + 'px)';
-      setTimeout(function () { done(res); }, still ? 50 : 5400);
+    slotsEl.classList.add('is-fusing');
+    var c = core.getBoundingClientRect();
+    var cx = c.left + c.width / 2;
+    var cy = c.top + c.height / 2;
+    if (still || !Element.prototype.animate) return Promise.resolve();
+    var flights = from.map(function (f, i) {
+      var fly = el('img', 'up-fly');
+      fly.src = f.src;
+      fly.alt = '';
+      fly.style.width = f.rect.width + 'px';
+      fly.style.left = cx - f.rect.width / 2 + 'px';
+      fly.style.top = cy - f.rect.height / 2 + 'px';
+      reveal.appendChild(fly);
+      var dx = f.rect.left + f.rect.width / 2 - cx;
+      var dy = f.rect.top + f.rect.height / 2 - cy;
+      var r0 = Math.sqrt(dx * dx + dy * dy);
+      var a0 = Math.atan2(dy, dx);
+      var frames = [];
+      for (var s = 0; s <= 24; s++) {
+        var t = s / 24;
+        var e = t * t * (3 - 2 * t); // sanft an- und auslaufen
+        var a = a0 + e * Math.PI * 4; // zwei Umdrehungen
+        var r = r0 * (1 - e);
+        frames.push({
+          transform: 'translate(' + (Math.cos(a) * r).toFixed(1) + 'px, ' + (Math.sin(a) * r).toFixed(1) + 'px) rotate(' + (e * 540).toFixed(0) + 'deg) scale(' + (1 - e * 0.8).toFixed(3) + ')',
+          opacity: t > 0.85 ? (1 - (t - 0.85) / 0.15).toFixed(2) : 1,
+          filter: 'brightness(' + (1 + e * 1.6).toFixed(2) + ')',
+          offset: t,
+        });
+      }
+      return fly.animate(frames, { duration: 1700, delay: i * 70, easing: 'linear', fill: 'forwards' }).finished.then(function () { fly.remove(); });
+    });
+    // der Kern wird sichtbar, während die ersten Karten ankommen
+    setTimeout(function () { core.classList.add('is-on'); }, 900);
+    return Promise.all(flights);
+  }
+
+  // Leuchten: in Crumpled anfangen, Stufe für Stufe heller und strahlender bis zur Seltenheit der neuen Karte
+  function glow(res) {
+    var keys = data.ladder.map(function (r) { return r.key; });
+    var end = Math.max(0, keys.indexOf(res.card.rarity));
+    core.classList.add('is-on');
+    var step = function (i) {
+      if (i > end) return Promise.resolve();
+      var k = keys[i];
+      core.style.setProperty('--c', colorOf(k));
+      core.style.setProperty('--lvl', i);
+      core.classList.toggle('is-crumpled', i === 0); // Crumpled: zerknittertes Flackern, danach immer heller
+      core.classList.remove('is-step');
+      void core.offsetWidth;
+      core.classList.add('is-step');
+      fuseLabel.textContent = label[k] + (i === end ? '!' : ' …');
+      fuseLabel.style.color = colorOf(k);
+      // je höher, desto länger bleibt die Stufe stehen – die Spannung steigt
+      return wait(i === end ? 900 : 420 + i * 70).then(function () { return step(i + 1); });
+    };
+    return step(0).then(function () {
+      core.classList.add('is-burst');
+      return wait(450);
     });
   }
+
   var KICKER = { jackpot: 'JACKPOT!', bonus: 'Glückstreffer!', erfolg: 'Aufgewertet!', fehlschlag: 'Nicht aufgewertet' };
   function done(res) {
-    reel.children[res.stop].classList.add('is-shown');
+    fuse.hidden = true;
     var c = res.card;
     document.querySelector('[data-up-result-img]').src = c.image;
     document.querySelector('[data-up-result-img]').alt = c.name;
@@ -264,6 +322,12 @@
     result.className = 'up-result r-' + c.rarity + (res.success ? ' is-up' : ' is-same') + (res.kind === 'jackpot' || res.kind === 'bonus' ? ' is-lucky' : '');
     result.hidden = false;
     document.querySelector('[data-up-again]').focus();
+  }
+  function closeFuse() {
+    reveal.hidden = true;
+    document.body.classList.remove('up-open');
+    slotsEl.classList.remove('is-fusing');
+    reveal.querySelectorAll('.up-fly').forEach(function (f) { f.remove(); });
   }
   // neu laden: Auswahl und Verlauf kommen frisch vom Server
   document.querySelector('[data-up-again]').addEventListener('click', function () { location.reload(); });
