@@ -6,6 +6,7 @@
 //   season:  Schlüssel aus src/tcg/seasons.js
 //   frame:   Rahmen-Layout aus src/tcg/frames.js (wo die Fenster auf dem Bild liegen)
 //   name:    Name wie auf der Karte (sonst aus dem Dateinamen)
+//   title:   Text im Namensbalken, wenn er vom Namen abweicht (Varianten wie „Ömer the Golden“; der Name bleibt „Ömer“)
 //   stats:   [Speed, FIA, FIS, BWL]
 //   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
@@ -86,8 +87,23 @@ const SEASON1_UNRELEASED = {
   ...unreleased('The Gracebringer', ['the-gracebringer-1-footman', 'the-gracebringer-2-gold', 'the-gracebringer-3-holo', 'the-gracebringer-4-arcane']),
 };
 
+// Karten-Overhaul Teil 1: Ömer im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und Effekte
+// (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer Ömer
+// hatte, hat jetzt die überarbeitete Karte. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
+const OMER_TEXT = 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.';
+const omer = (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name: 'Ömer', title, stats: require('./stats')[id], abilityName: 'Macht der Osmanen', ability: OMER_TEXT });
+const OVERHAUL = {
+  'omer-1-crumpled': omer('omer-1-crumpled', 'crumpled', 'Ömer the Crumpled'),
+  'omer-2-bfwler': omer('omer-2-bfwler', 'bfwler', 'Ömer the BFWler'),
+  'omer-3-gold': omer('omer-3-gold', 'gold', 'Ömer the Golden'),
+  'omer-4-holo': omer('omer-4-holo', 'holo', 'Ömer the Holographic'),
+  'omer-5-bockhaber': omer('omer-5-bockhaber', 'bockhaber', 'Ömer the Bockhaber'),
+  'omer-6-glitch': omer('omer-6-glitch', 'glitch', 'Glitch the Ömered'),
+};
+
 module.exports = {
   ...TEST_ITEMS,
+  ...OVERHAUL,
   ...TEST_HELDEN,
   ...SEASON1_UNRELEASED,
   'st-ivan-boss': {

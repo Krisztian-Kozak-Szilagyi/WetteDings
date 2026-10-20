@@ -96,3 +96,22 @@ module.exports.eis = heldFrame({
   text: { x: 92, y: 772, w: 536, h: 150, size: 26, minSize: 15, lineHeight: 1.32 },
   colors: { value: '#eaf6ff', label: '#9fc8ee', text: '#e6f1fb', outline: '#06122a', plate: '#0e2446', plateBorder: '#9fd0ff' },
 });
+
+// Karten-Overhaul: Vollbild-Layout wie St. Ivan, the Forsaken (Fenster wie gilded) in den Farben der Seltenheit – das
+// Rahmenbild baut scripts/card-frame.js. Name per Code (card.title, sonst card.name), Werte wie gilded (Speed, FIA, FIS, BWL).
+const RARITY_COLORS = {
+  crumpled: { value: '#f4e8cf', label: '#cbb48c', text: '#f1e6d0', outline: '#1f1912', plate: '#3a3024', plateBorder: '#d8c3a0' },
+  bfwler: { value: '#e1eaf8', label: '#9fb3d6', text: '#e6edf8', outline: '#0e131c', plate: '#212a3a', plateBorder: '#9fb3d6' },
+  gold: { value: '#ffe9a8', label: '#e3b341', text: '#fbefd0', outline: '#1c1406', plate: '#3a2a0c', plateBorder: '#e3b341' },
+  holo: { value: '#f4f9ff', label: '#bfe3ff', text: '#eef5ff', outline: '#10132a', plate: '#1f2644', plateBorder: '#bfe3ff' },
+  bockhaber: { value: '#efe6ff', label: '#c9a8ff', text: '#efe8ff', outline: '#120a20', plate: '#2a1a45', plateBorder: '#b48cf2' },
+  glitch: { value: '#dcffe9', label: '#4ade80', text: '#dcffe9', outline: '#03100a', plate: '#0b2116', plateBorder: '#4ade80' },
+};
+for (const [key, c] of Object.entries(RARITY_COLORS)) {
+  module.exports[`rar-${key}`] = {
+    ...module.exports.gilded,
+    name: { x: 240, y: 73, w: 360, size: 34, minSize: 20 },
+    text: { x: 92, y: 790, w: 520, h: 144, size: 25, minSize: 15, lineHeight: 1.32 },
+    colors: { ...module.exports.gilded.colors, ...c },
+  };
+}

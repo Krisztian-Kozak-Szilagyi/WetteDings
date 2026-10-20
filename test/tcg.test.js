@@ -212,3 +212,22 @@ test('#204: Bank – ungebügelter Knick halber Preis, beschädigte Exemplare ge
   const holo = require('../src/tcg/catalog').rarityByKey.holo;
   assert.equal(bankProceeds([{ rarity: 'holo', creased: true }, { rarity: 'holo' }]), Math.floor(holo.sell / 2) + holo.sell);
 });
+
+test('Karten-Overhaul Teil 1: Ömer im Vollbild-Layout je Seltenheit – gleiche Karten-IDs, Werte und Fähigkeit', () => {
+  const catalog = require('../src/tcg/catalog');
+  const cardSvg = require('../src/tcg/cardSvg');
+  const STATS = require('../src/tcg/stats');
+  const variants = { 'omer-1-crumpled': 'Ömer the Crumpled', 'omer-2-bfwler': 'Ömer the BFWler', 'omer-3-gold': 'Ömer the Golden', 'omer-4-holo': 'Ömer the Holographic', 'omer-5-bockhaber': 'Ömer the Bockhaber', 'omer-6-glitch': 'Glitch the Ömered' };
+  for (const [id, title] of Object.entries(variants)) {
+    const c = catalog.cardById[id];
+    assert.ok(c && catalog.CARDS.includes(c), id);
+    assert.equal(c.name, 'Ömer', 'der Name bleibt überall „Ömer“');
+    assert.equal(c.title, title);
+    assert.equal(c.frame, `rar-${c.rarity}`);
+    assert.deepEqual([c.stats.speed, c.stats.fia, c.stats.fis, c.stats.bwl], STATS[id], 'Werte unverändert');
+    assert.ok(c.isCharacter);
+    assert.match(c.image, /\/img\/tcg\/karte\/omer-/);
+    const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
+    for (const t of [title, 'Macht der Osmanen', 'FIA', 'FIS', 'BWL', `>${c.stats.fis}<`]) assert.ok(svg.includes(t), `${id}: ${t}`);
+  }
+});
