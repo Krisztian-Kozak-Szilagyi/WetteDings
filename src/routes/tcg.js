@@ -54,6 +54,9 @@ router.get('/tcg', async (req, res) => {
     invMinis: [{ image: catalog.PACK_IMAGE, label: 'Booster Pack' }, ...ITEM_TYPES.map((t) => ({ image: t.image, label: t.label }))], // Miniaturen auf der Inventar-Kachel
     packType: catalog.DEFAULT_PACK,
     cardsPerPack: catalog.CARDS_PER_PACK,
+    // Kachel zur Kartenaufwertung (für alle freigegeben oder Admin)
+    upgradeOpen: require('../tcg/upgrade').mayUse(req.user),
+    upgradeCount: require('../tcg/upgrade').settings.count,
   });
 });
 
@@ -216,6 +219,54 @@ router.post('/tcg/favorit', async (req, res) => {
     },
     () => (on ? `/tcg#favorit-${encodeURIComponent(cardId)}` : '/tcg/album')
   );
+});
+
+// ---------- Kartenaufwertung: 10 Karten einer Seltenheit verschmelzen (src/tcg/upgrade.js) ----------
+const upgrade = require('../tcg/upgrade');
+
+/** Prozent für die Anzeige: 100 %, 88,9 %, 12,5 % */
+const pctText = (p) => `${(Math.round(p * 1000) / 10).toLocaleString('de-DE')} %`;
+
+router.get('/tcg/aufwertung', async (req, res) => {
+  if (!upgrade.mayUse(req.user)) return res.status(404).render('error', { title: 'Kartenaufwertung', status: 'Kartenaufwertung', message: 'Die Kartenaufwertung ist derzeit nicht verfügbar. Schau später wieder vorbei!' });
+  const [choices, owned, history] = await Promise.all([upgrade.choices(req.user._id), upgrade.ownedIds(req.user._id), upgrade.history(req.user._id)]);
+  const s = upgrade.settings;
+  const odds = (rarity) => upgrade.oddsOf(upgrade.poolOf(rarity), owned, s.fehlend).map((o) => ({ ...cardView(o.card), missing: o.missing, p: pctText(o.p) }));
+  // Je aufwertbarer Seltenheit: eigene freie Karten, Ziel, Chance und welche Karten herauskommen können
+  const tiers = upgrade
+    .ladder()
+    .filter((r) => upgrade.nextRarity(r))
+    .map((key) => {
+      const next = upgrade.nextRarity(key);
+      const cards = (choices[key] || []).map((e) => ({ ...cardView(catalog.cardById[e.card]), docs: e.docs, dupes: e.dupes })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      return { key, label: catalog.rarityByKey[key].label, next, nextLabel: catalog.rarityByKey[next].label, chance: upgrade.chanceFor(key), chanceText: pctText(upgrade.chanceFor(key)), cards, free: cards.reduce((n, c) => n + c.docs.length, 0), odds: { up: odds(next), same: odds(key) } };
+    });
+  res.render('tcg-aufwertung', {
+    title: 'Kartenaufwertung',
+    tiers,
+    count: s.count,
+    fehlend: s.fehlend,
+    history: history.map((h) => ({ ...h, card: catalog.cardById[h.result.card] || null, fromLabel: (catalog.rarityByKey[h.rarity] || {}).label || h.rarity })),
+    closedForOthers: !s.open,
+  });
+});
+
+router.post('/tcg/aufwertung', async (req, res) => {
+  try {
+    const docs = [].concat(req.body.doc || []).map(str);
+    const r = await upgrade.upgrade({ user: req.user, docIds: docs });
+    // Walze wie beim Kistenöffnen: zufällige Karten beider möglichen Ausgänge, das Ergebnis an fester Stelle
+    const up = upgrade.poolOf(r.target);
+    const same = upgrade.poolOf(r.rarity);
+    const reel = Array.from({ length: 48 }, () => {
+      const pool = Math.random() < r.chance ? up : same;
+      return cardView(pool[Math.floor(Math.random() * pool.length)]);
+    });
+    res.json({ ok: true, success: r.success, chance: pctText(r.chance), card: { ...cardView(r.card), missing: r.missing }, reel, stop: 40 });
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    res.status(400).json({ error: err.message });
+  }
 });
 
 module.exports = router;

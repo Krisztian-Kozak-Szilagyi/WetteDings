@@ -60,8 +60,8 @@ const logByKey = Object.fromEntries(LOGS.map((l) => [l.key, l]));
 
 const KIND_LABEL = { markt: 'Markt', privat: 'Privat', tausch: 'Tausch' };
 const PACK_SOURCE_LABEL = { kauf: 'Gekauft', quest: 'IHK-Fund', admin: 'Geschenk (Team)', lotto: 'Lotterie', einladung: 'Einladung', esports: 'eSports-Trophäe' };
-const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'item_verkauf', 'item_kauf', 'black_market', 'bazaar_kauf'];
-const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', item_verkauf: 'Gegenstand verkauft', item_kauf: 'Gegenstand gekauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
+const SELL_TYPES = ['tcg_verkauf', 'tcg_zerkleinert', 'tcg_aufwertung', 'item_verkauf', 'item_kauf', 'black_market', 'bazaar_kauf'];
+const SELL_LABEL = { tcg_verkauf: 'An die Bank verkauft', tcg_zerkleinert: 'Zerkleinert (Konfetti)', tcg_aufwertung: 'Aufgewertet (eingesetzt)', item_verkauf: 'Gegenstand verkauft', item_kauf: 'Gegenstand gekauft', black_market: 'Black Market gekauft', bazaar_kauf: "Lil Dré's Bazaar gekauft" };
 
 // ab dieser Seltenheit werden gezogene Karten im Log hervorgehoben
 const RARE_FROM = tcgCatalog.rarityByKey.holo ? tcgCatalog.rarityByKey.holo.rank : 3;
@@ -199,7 +199,7 @@ async function packLog(query, { player = null, all = false } = {}) {
 function sellRow(l, name) {
   const m = l.meta || {};
   let items;
-  if (l.type === 'tcg_verkauf' || l.type === 'tcg_zerkleinert') items = cardSummary(m.cards);
+  if (l.type === 'tcg_verkauf' || l.type === 'tcg_zerkleinert' || l.type === 'tcg_aufwertung') items = cardSummary(m.cards);
   else if ((l.type === 'black_market' || l.type === 'bazaar_kauf') && m.card) items = cardSummary([{ card: m.card, rarity: m.rarity }]);
   else {
     // verkaufter Gegenstand oder Gegenstand aus dem Black Market (meta.item)
@@ -488,7 +488,7 @@ async function registrationLog(query, { player = null, all = false } = {}) {
 
 // ---------- Einstellungen: jede Änderung an Preisen, Chancen, Steuern usw. ----------
 
-const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Sleeve & Slab', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', config: 'Serverstart (.env)' };
+const SETTINGS_AREA = { tcg: 'TCG', ihk: 'IHK', handel: 'Steuern', bonus: 'Tagesbonus', grading: 'Grading', folie: 'Sleeve & Slab', kosmetik: 'Kosmetik', esports: 'eSports', dungeon: 'Dungeon', lotterie: 'Lotterie', karten: 'Kartensperren', aufwertung: 'Kartenaufwertung', config: 'Serverstart (.env)' };
 const valueText = (v) => (v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function settingsRow(c) {

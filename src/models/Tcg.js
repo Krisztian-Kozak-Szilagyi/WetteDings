@@ -9,6 +9,7 @@ const cardSchema = new Schema(
     card: { type: String, required: true }, // Karten-ID aus dem Katalog, z. B. "krisz-6-glitch"
     rarity: { type: String, required: true },
     opening: { type: Schema.Types.ObjectId, ref: 'TcgOpening', default: null },
+    upgrade: { type: Schema.Types.ObjectId, ref: 'TcgUpgrade', default: undefined }, // entstanden in der Kartenaufwertung (src/tcg/upgrade.js)
     foiledAt: { type: Date, default: null }, // foliert seit (null = ohne Folie) – siehe src/items
     // Geheimer Zustand dieses Exemplars (#73): Mängel und Note, beim Entstehen ausgewürfelt und für immer daran
     // gebunden. Sichtbar nur auf der Folie. select: false – wird nur geladen, wenn ausdrücklich angefordert

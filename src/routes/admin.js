@@ -13,6 +13,7 @@ const { notify } = require('../services/notifyService');
 const { verdictRole } = require('../lib/verdict');
 const { UserError, str } = require('../lib/util');
 const tcgCatalog = require('../tcg/catalog');
+const cardUpgrade = require('../tcg/upgrade');
 const tcgSettings = require('../tcg/settings');
 const tcgService = require('../tcg/tcgService');
 const cardBans = require('../tcg/cardBans');
@@ -266,6 +267,16 @@ router.get('/admin', requireStaff, async (req, res) => {
           }
         : null,
     ihk: { settings: ihk.settings, difficulties: DIFFICULTIES },
+    // Kartenaufwertung (src/tcg/upgrade.js): Werte und die Chance je Stufe mit den aktuellen Bankpreisen
+    upgrade: {
+      settings: cardUpgrade.settings,
+      defaults: cardUpgrade.DEFAULTS,
+      limits: cardUpgrade.LIMITS,
+      tiers: cardUpgrade
+        .ladder()
+        .filter((r) => cardUpgrade.nextRarity(r))
+        .map((r) => ({ from: tcgCatalog.rarityByKey[r], to: tcgCatalog.rarityByKey[cardUpgrade.nextRarity(r)], chance: cardUpgrade.chanceFor(r) })),
+    },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
     gradingLevels: grading.LEVELS,
@@ -671,6 +682,22 @@ router.post('/admin/ihk', requireAdmin, requireReauth('/admin?bereich=spielwerte
     req.flash('success', 'IHK-Einstellungen gespeichert.');
   }
   res.redirect(subUrl('spielwerte', 'ihk'));
+});
+
+// ---------- Kartenaufwertung: freigegeben, Anzahl, Chance (src/tcg/upgrade.js) ----------
+router.post('/admin/aufwertung', requireAdmin, requireReauth('/admin?bereich=spielwerte'), async (req, res) => {
+  const num = (v) => Number.parseInt(typeof v === 'string' ? v.trim() : '', 10);
+  try {
+    await cardUpgrade.saveSettings({
+      admin: req.user,
+      values: { open: req.body.open === '1', count: num(req.body.count), rueckgabe: num(req.body.rueckgabe), maxChance: num(req.body.maxChance), fehlend: num(req.body.fehlend) },
+    });
+    req.flash('success', 'Kartenaufwertung gespeichert – gilt ab sofort.');
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(subUrl('spielwerte', 'tcg'));
 });
 
 // ---------- TCG-Preise und Chancen ----------

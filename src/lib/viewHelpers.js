@@ -166,6 +166,7 @@ const ledgerLabels = {
   tcg_pack: 'Booster Pack gekauft',
   tcg_verkauf: 'TCG-Karte verkauft',
   tcg_zerkleinert: 'TCG-Karten zerkleinert',
+  tcg_aufwertung: 'TCG-Karten aufgewertet',
   kosmetik_kauf: 'Kosmetik gekauft',
   item_verkauf: 'Gegenstand verkauft',
   item_kauf: 'Gegenstand gekauft',

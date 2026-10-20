@@ -57,6 +57,42 @@
       </form>
     </div>
   </section>
+  <section class="stats-block" id="aufwertung">
+    <%- blockHead('Kartenaufwertung', 'Mitglieder verschmelzen eine feste Anzahl Karten derselben Seltenheit (/tcg/aufwertung). Mit der Erfolgschance kommt eine zufällige Karte der nächsten Seltenheit heraus, sonst eine zufällige derselben – Karten, die einem fehlen, öfter. Die Chance ergibt sich aus den Bankpreisen oben: Im Mittel gibt es höchstens „Höchstens zurück“ % des Einsatzwerts zurück, eine aufgewertete Karte ist also nie billiger als ihr Wert. Sith- und Boss-Karten (St. Ivan) gibt es dort nie, Icon ist die oberste Stufe.') %>
+    <div class="card">
+      <form method="post" data-reauth action="/admin/aufwertung" class="form panel-form" data-confirm="Einstellungen der Kartenaufwertung wirklich ändern?">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="check admin-ihk-open">
+          <input type="checkbox" name="open" value="1" <%= upgrade.settings.open ? 'checked' : '' %>>
+          <span><strong>Für alle Mitglieder verfügbar</strong> <span class="muted small">(sonst nur für Admins)</span></span>
+        </label>
+        <fieldset class="admin-tax-group">
+          <legend>Regeln</legend>
+          <% [['count', 'Karten je Aufwertung', ''], ['rueckgabe', 'Höchstens zurück (% des Einsatzwerts)', '%'], ['maxChance', 'Höchste Erfolgschance', '%'], ['fehlend', 'Fehlende Karten kommen … mal so oft', '×']].forEach(([k, l, u]) => { %>
+            <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="<%= k %>" min="<%= upgrade.limits[k][0] %>" max="<%= upgrade.limits[k][1] %>" step="1" value="<%= upgrade.settings[k] %>" required><small class="muted">Standard <%= upgrade.defaults[k] %></small></label>
+          <% }) %>
+        </fieldset>
+        <div class="table-wrap">
+          <table class="table admin-tcg-table">
+            <thead><tr><th>Einsatz</th><th>Ziel</th><th class="num">Wert Einsatz</th><th class="num">Wert Ziel</th><th class="num">Erfolgschance</th></tr></thead>
+            <tbody>
+              <% upgrade.tiers.forEach((t) => { %>
+                <tr>
+                  <td class="r-<%= t.from.key %>"><span class="tcg-dot"></span> <%= upgrade.settings.count %>× <%= t.from.label %></td>
+                  <td class="r-<%= t.to.key %>"><span class="tcg-dot"></span> <%= t.to.label %></td>
+                  <td class="num"><%= euro(t.from.sell * upgrade.settings.count) %></td>
+                  <td class="num"><%= euro(t.to.sell) %></td>
+                  <td class="num"><strong><%= (Math.round(t.chance * 1000) / 10).toLocaleString('de-DE') %> %</strong></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <small class="muted">Die Chancen in der Tabelle gelten mit den gespeicherten Werten; nach dem Speichern rechnet sie neu.</small>
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </form>
+    </div>
+  </section>
 <% } %>
 
   <% if (sub === 'steuer') { %>

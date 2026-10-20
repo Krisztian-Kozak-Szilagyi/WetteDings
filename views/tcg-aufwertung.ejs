@@ -1,0 +1,98 @@
+<%- include('partials/head') %>
+<%# Kartenaufwertung (src/routes/tcg.js, Regeln: src/tcg/upgrade.js): 10 Karten einer Seltenheit in den Vertrag legen und
+    verschmelzen. Auswahl, Vertrag und Walze zeichnet public/js/aufwertung.js aus den Daten unten. %>
+<div class="up-page" data-upgrade='<%= JSON.stringify({ tiers, count, fehlend }) %>' data-csrf="<%= csrfToken %>">
+  <section class="up-hero">
+    <div>
+      <span class="kicker">Sammlung</span>
+      <h1>Kartenaufwertung</h1>
+      <p>Lege <strong><%= count %> Karten derselben Seltenheit</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>nächsten Seltenheit</strong>, sonst eine zufällige Karte derselben. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong>.</p>
+      <p class="muted small">Karten im Sleeve oder Slab und Karten auf Quest, im Dungeon, Handel, Duell oder beim Grading spielen nicht mit. Icon ist die höchste Stufe – Sith- und Boss-Karten gibt es hier nicht.</p>
+      <% if (closedForOthers) { %><p class="up-admin-note">Noch nicht für alle freigegeben – nur Admins sehen diese Seite (Admin-Panel → Spielwerte → TCG).</p><% } %>
+    </div>
+    <a class="btn btn-ghost" href="/tcg">← Zurück zum TCG</a>
+  </section>
+
+  <nav class="up-tabs" role="tablist" aria-label="Seltenheit" data-up-tabs>
+    <% tiers.forEach((t, i) => { %>
+      <button type="button" role="tab" class="up-tab r-<%= t.key %>" data-up-tab="<%= t.key %>" aria-selected="<%= i === 0 %>">
+        <span class="tcg-dot"></span><%= t.label %> <span class="up-tab-arrow" aria-hidden="true">→</span> <%= t.nextLabel %>
+        <span class="up-tab-count" title="freie Karten"><%= t.free %></span>
+      </button>
+    <% }) %>
+  </nav>
+
+  <div class="up-layout">
+    <section class="card up-pick" aria-label="Deine Karten">
+      <div class="up-pick-head">
+        <h2 data-up-pick-title>Deine Karten</h2>
+        <span class="muted small">Klick legt ein Exemplar in den Vertrag</span>
+      </div>
+      <div class="up-grid" data-up-grid></div>
+      <p class="muted up-empty" data-up-empty hidden>Von dieser Seltenheit hast du gerade keine freien Karten.</p>
+    </section>
+
+    <aside class="card up-contract" aria-label="Vertrag">
+      <div class="up-contract-head">
+        <h2>Vertrag</h2>
+        <span class="up-filled" data-up-filled>0 / <%= count %></span>
+      </div>
+      <div class="up-slots" data-up-slots></div>
+      <div class="up-chance r-holo" data-up-chance>
+        <span class="up-chance-label">Chance auf <b data-up-next>–</b></span>
+        <strong class="up-chance-value" data-up-chance-value>–</strong>
+      </div>
+      <p class="muted small up-else" data-up-else></p>
+      <div class="up-actions">
+        <button type="button" class="btn btn-ghost btn-sm" data-up-fill>Mit Duplikaten auffüllen</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-up-clear>Leeren</button>
+      </div>
+      <button type="button" class="btn btn-primary btn-lg up-go" data-up-go disabled>Aufwerten</button>
+      <details class="up-pool">
+        <summary>Welche Karten herauskommen können</summary>
+        <div data-up-pool></div>
+      </details>
+    </aside>
+  </div>
+
+  <section class="card up-history">
+    <h2>Deine letzten Aufwertungen</h2>
+    <% if (!history.length) { %>
+      <p class="muted">Noch keine Aufwertung.</p>
+    <% } else { %>
+      <ul class="up-history-list">
+        <% history.forEach((h) => { %>
+          <li class="<%= h.success ? 'is-up' : 'is-same' %>">
+            <% if (h.card) { %><img src="<%= h.card.image %>" alt="" width="720" height="1008" loading="lazy"><% } %>
+            <span>
+              <strong><%= h.card ? h.card.name : h.result.card %></strong>
+              <span class="small muted"><%= h.inputs.length %>× <%= h.fromLabel %> · <%= h.success ? 'aufgewertet' : 'gleiche Seltenheit' %><%= h.result.missing ? ' · war neu' : '' %> · <%= date(h.createdAt) %></span>
+            </span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+
+<%# Ergebnis: Walze wie beim Kistenöffnen, die Markierung zeigt die gezogene Karte %>
+<div class="up-reveal" data-up-reveal hidden>
+  <div class="up-reveal-box" role="dialog" aria-modal="true" aria-labelledby="up-result-title">
+    <div class="up-reel-window"><div class="up-reel" data-up-reel></div><span class="up-marker" aria-hidden="true"></span></div>
+    <div class="up-result" data-up-result hidden>
+      <img data-up-result-img alt="" width="720" height="1008">
+      <div>
+        <p class="kicker" data-up-result-kicker></p>
+        <h2 id="up-result-title" data-up-result-title></h2>
+        <p data-up-result-text></p>
+        <div class="up-result-actions">
+          <a class="btn btn-ghost" href="/tcg/album">Zum Album</a>
+          <button type="button" class="btn btn-primary" data-up-again>Weiter aufwerten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/aufwertung.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>
