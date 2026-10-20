@@ -107,6 +107,9 @@ const RARITY_COLORS = {
   bockhaber: { value: '#efe6ff', label: '#c9a8ff', text: '#efe8ff', outline: '#120a20', plate: '#2a1a45', plateBorder: '#b48cf2' },
   glitch: { value: '#dcffe9', label: '#4ade80', text: '#dcffe9', outline: '#03100a', plate: '#0b2116', plateBorder: '#4ade80' },
 };
+// Legende (Boss-Karten mit legendärer Animation, „Dio, der letzte Morgen“): lila-gold, schon mit den neuen Werten
+// Angriff / Leben / Support (gespeichert weiter als fia / fis / bwl, bis die Spielmodi umgestellt sind)
+RARITY_COLORS.legende = { value: '#ffe6a3', label: '#d9a6ff', text: '#f6ecff', outline: '#12061f', plate: '#2a1145', plateBorder: '#e8b34a' };
 for (const [key, c] of Object.entries(RARITY_COLORS)) {
   module.exports[`rar-${key}`] = {
     ...module.exports.gilded,
@@ -114,6 +117,14 @@ for (const [key, c] of Object.entries(RARITY_COLORS)) {
     text: { x: 92, y: 790, w: 520, h: 144, size: 25, minSize: 15, lineHeight: 1.32 },
     colors: { ...module.exports.gilded.colors, ...c },
   };
+  if (key === 'legende') {
+    module.exports[`rar-${key}`].stats = [
+      { key: 'fia', label: 'ANG', x: 111, y: 432 },
+      { key: 'fis', label: 'LEB', x: 111, y: 563 },
+      { key: 'bwl', label: 'SUP', x: 111, y: 691 },
+    ];
+    module.exports[`rar-${key}`].text = { x: 90, y: 786, w: 524, h: 152, size: 23, minSize: 14, lineHeight: 1.3 };
+  }
   // Spell (Karten ohne Werte, z. B. die Hunde Hugo und Lilly): keine Wertefenster, Plakette „✦ SPELL“, größeres Textfeld
   module.exports[`rar-${key}-spell`] = {
     ...module.exports[`rar-${key}`],

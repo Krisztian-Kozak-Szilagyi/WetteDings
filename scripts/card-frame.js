@@ -3,6 +3,8 @@
 //   crumpled  Sepia, Risse und Kaffeering        bfwler    kühles Blaugrau
 //   gold      Gold mit Glanz                     holo      Regenbogen-Schimmer
 //   bockhaber Violett                            glitch    Neongrün, verschobene Bildstreifen, Scanlines, Farbbalken
+//   legende   Boss-Karten mit legendärer Animation („Dio, der letzte Morgen“): Farben bleiben, lila-goldene Flammen
+//             am Rand, Glutfunken; die Bewegung kommt aus dem CSS (.tcg-fx-morgen)
 // Name, Werte und Fähigkeitstext setzt der Code (src/tcg/frames.js „rar-<seltenheit>“, src/tcg/cardSvg.js) – hier
 // entstehen nur Motiv und Rahmen (720 × 1008, WebP).
 //
@@ -22,6 +24,7 @@ const STYLE = {
   gold: { duo: ['#2a1500', '#ffd65c'], accent: '#e3b341', light: '#ffe9a8', dark: '#8c5f16', pane: ['#3a2a0c', '#1c1406'], band: ['#5e4314', '#271b07'], gem: '#ffd36b', tint: '#e9c25e', brightness: 1.04, saturation: 1.1 },
   holo: { accent: '#bfe3ff', light: '#ffffff', dark: '#5a6fa0', pane: ['#1f2644', '#12142a'], band: ['#2d3560', '#141836'], gem: '#bfe3ff', tint: null, brightness: 1.12, saturation: 0.85, hue: ['#a8d8ff', '#ffb3e6', '#fff3a3', '#b3ffd9', '#a8d8ff'] },
   bockhaber: { duo: ['#170b2b', '#e6d8ff'], accent: '#b48cf2', light: '#e8dcff', dark: '#4a3078', pane: ['#2a1a45', '#140b24'], band: ['#3d2566', '#180d2c'], gem: '#cbb0ff', tint: '#b893f0', brightness: 0.98, saturation: 1 },
+  legende: { accent: '#e8b34a', light: '#ffe6a3', dark: '#5b2a8c', pane: ['#2a1145', '#12061f'], band: ['#3d1766', '#14061f'], gem: '#ffd36b', tint: null, brightness: 1.04, saturation: 1.08 },
   glitch: { duo: ['#010e07', '#86ffb8'], accent: '#4ade80', light: '#c8fbdc', dark: '#14633a', pane: ['#0b2116', '#050d09'], band: ['#0e2c1c', '#04100a'], gem: '#4ade80', tint: '#54e08b', brightness: 0.9, saturation: 1.2 },
 };
 const S = STYLE[RARITY];
@@ -72,7 +75,7 @@ const border = () => {
   return `<g fill="none" stroke="${S.dark}" stroke-width="1.4" opacity=".85">${d}</g>`;
 };
 // Halbton-Raster über dem Motiv (wie auf den bisherigen Karten), nicht bei Glitch
-const halftone = RARITY === 'glitch' ? '' : '<rect x="24" y="24" width="672" height="960" fill="url(#dots)" opacity=".16"/>';
+const halftone = RARITY === 'glitch' || RARITY === 'legende' ? '' : '<rect x="24" y="24" width="672" height="960" fill="url(#dots)" opacity=".16"/>';
 
 const EFFECTS = {
   // Risse über die ganze Karte und ein Kaffeering um das dritte Wertefenster
@@ -91,6 +94,19 @@ const EFFECTS = {
     '<rect x="24" y="24" width="672" height="960" fill="url(#shine)" opacity=".35"/>' +
     [[150, 180], [600, 260], [520, 520], [210, 610], [640, 720], [330, 140]].map(([x, y]) => `<path d="M${x} ${y - 9} L${x + 2.5} ${y - 2.5} L${x + 9} ${y} L${x + 2.5} ${y + 2.5} L${x} ${y + 9} L${x - 2.5} ${y + 2.5} L${x - 9} ${y} L${x - 2.5} ${y - 2.5} Z" fill="#fff" opacity=".85"/>`).join(''),
   bockhaber: () => '<rect x="24" y="24" width="672" height="960" fill="url(#violetGlow)" opacity=".35"/>',
+  // Legende: lila-goldene Flammenzungen an Rand und Boden, darüber Glutfunken
+  legende: () => {
+    const tongue = (x, h, w, c) => `<path d="M${x - w} 984 C${x - w} ${984 - h * 0.45} ${x - w * 0.2} ${984 - h * 0.7} ${x} ${984 - h} C${x + w * 0.25} ${984 - h * 0.65} ${x + w} ${984 - h * 0.4} ${x + w} 984 Z" fill="${c}"/>`;
+    let f = '';
+    for (let i = 0; i < 18; i++) {
+      const x = 30 + i * 39 + (i % 3) * 7;
+      const h = 70 + ((i * 53) % 90);
+      f += tongue(x, h, 26, 'url(#flameV)') + tongue(x + 14, h * 0.6, 16, 'url(#flameG)');
+    }
+    const side = (x, flip) => [180, 330, 470, 620, 760].map((y, i) => `<path d="M${x} ${y + 60} C${x + flip * 30} ${y + 30} ${x + flip * 10} ${y} ${x + flip * (38 + (i % 2) * 14)} ${y - 40} C${x + flip * 20} ${y + 10} ${x + flip * 44} ${y + 30} ${x} ${y + 80} Z" fill="url(#flameV)" opacity=".7"/>`).join('');
+    const embers = [[120, 700], [210, 640], [520, 610], [610, 690], [350, 560], [80, 520], [650, 480], [440, 660], [300, 720], [560, 760]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${1.6 + (i % 3)}" fill="${i % 2 ? '#ffd36b' : '#d9a6ff'}" opacity=".9"/>`).join('');
+    return `<g opacity=".9">${f}</g>${side(24, 1)}${side(696, -1)}${embers}<rect x="24" y="24" width="672" height="960" fill="url(#violetGlow)" opacity=".28"/>`;
+  },
   // Scanlines, Farbbalken an den Seiten (wie die bisherigen Glitch-Karten)
   glitch: () =>
     '<rect x="24" y="24" width="672" height="960" fill="url(#scan)" opacity=".5"/>' +
@@ -110,6 +126,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
     <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">${(S.hue || ['#fff', '#fff']).map((c, i, a) => `<stop offset="${(i / (a.length - 1)).toFixed(2)}" stop-color="${c}"/>`).join('')}</linearGradient>
     <linearGradient id="cool" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe0ff"/><stop offset="1" stop-color="#1b2433"/></linearGradient>
     <radialGradient id="violetGlow" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#e3d3ff" stop-opacity=".0"/><stop offset="1" stop-color="#5b2ea6"/></radialGradient>
+    <linearGradient id="flameV" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#7b2fd1" stop-opacity=".95"/><stop offset=".6" stop-color="#b56cff" stop-opacity=".55"/><stop offset="1" stop-color="#f0d0ff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="flameG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffb52e" stop-opacity=".95"/><stop offset=".55" stop-color="#ffe08a" stop-opacity=".6"/><stop offset="1" stop-color="#fff6d6" stop-opacity="0"/></linearGradient>
     <pattern id="dots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="3.5" cy="3.5" r="1.1" fill="${S.dark}"/></pattern>
     <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1.3" fill="#000"/></pattern>
     <mask id="frameMask"><rect width="${W}" height="${H}" fill="#fff"/><rect x="24" y="24" width="${W - 48}" height="${H - 48}" rx="14" fill="#000"/></mask>
