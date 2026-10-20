@@ -87,11 +87,12 @@ const SEASON1_UNRELEASED = {
   ...unreleased('The Gracebringer', ['the-gracebringer-1-footman', 'the-gracebringer-2-gold', 'the-gracebringer-3-holo', 'the-gracebringer-4-arcane']),
 };
 
-// Karten-Overhaul Teil 1: Ömer im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und Effekte
-// (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer Ömer
-// hatte, hat jetzt die überarbeitete Karte. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
-const OMER_TEXT = 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.';
-const omer = (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name: 'Ömer', title, stats: require('./stats')[id], abilityName: 'Macht der Osmanen', ability: OMER_TEXT });
+// Karten-Overhaul Teil 1: Ömer und Aleks im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und
+// Effekte (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer
+// die Karte hatte, hat jetzt die überarbeitete. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
+const overhaul = (name, abilityName, ability) => (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name, title, stats: require('./stats')[id], abilityName, ability });
+const omer = overhaul('Ömer', 'Macht der Osmanen', 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.');
+const aleks = overhaul('Aleks', 'Russische Telefonnummer', 'Nach dem Anrufen einer russischen Telefonnummer ist es in der Lage, die von ihm selbst generierten Punkte einmalig auf das Maximum (99) zu fälschen.');
 const OVERHAUL = {
   'omer-1-crumpled': omer('omer-1-crumpled', 'crumpled', 'Ömer the Crumpled'),
   'omer-2-bfwler': omer('omer-2-bfwler', 'bfwler', 'Ömer the BFWler'),
@@ -99,6 +100,12 @@ const OVERHAUL = {
   'omer-4-holo': omer('omer-4-holo', 'holo', 'Ömer the Holographic'),
   'omer-5-bockhaber': omer('omer-5-bockhaber', 'bockhaber', 'Ömer the Bockhaber'),
   'omer-6-glitch': omer('omer-6-glitch', 'glitch', 'Glitch the Ömered'),
+  'aleks-1-crumpled': aleks('aleks-1-crumpled', 'crumpled', 'Aleks the Crumpled'),
+  'aleks-2-bfwler': aleks('aleks-2-bfwler', 'bfwler', 'Aleks the BFWler'),
+  'aleks-3-gold': aleks('aleks-3-gold', 'gold', 'Aleks the Golden'),
+  'aleks-4-holo': aleks('aleks-4-holo', 'holo', 'Aleks the Holographic'),
+  'aleks-5-bockhaber': aleks('aleks-5-bockhaber', 'bockhaber', 'Aleks the Bockhaber'),
+  'aleks-6-glitch': aleks('aleks-6-glitch', 'glitch', 'Glitch the Aleksed'),
 };
 
 module.exports = {
