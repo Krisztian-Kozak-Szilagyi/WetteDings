@@ -35,6 +35,7 @@
     i.draggable = false;
     return i;
   }
+  var euro = function (c) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(c / 100); };
   function pct(p) {
     var v = p >= 0.01 ? Math.round(p * 1000) / 10 : Math.round(p * 100000) / 1000;
     return String(v).replace('.', ',') + ' %';
@@ -105,6 +106,7 @@
       $('[data-up-chance-value]').textContent = '–';
       $('[data-up-else]').textContent = 'Lege ' + COUNT + ' Karten in den Vertrag – das Ziel ist die Seltenheit über deiner seltensten Karte.';
       $('[data-up-extra]').textContent = '';
+      $('[data-up-back]').textContent = '';
       drawPool(null, keys);
       return;
     }
@@ -112,15 +114,17 @@
     $('[data-up-next]').textContent = label[v.target];
     var full = keys.length === COUNT;
     $('[data-up-chance-value]').textContent = full ? pct(v.chance) : '…';
-    // Fehlschlag: Seltenheit einer zufällig gewählten eingesetzten Karte
-    var share = {};
-    keys.forEach(function (k) { share[k] = (share[k] || 0) + 1; });
-    var parts = Object.keys(share).map(function (k) { return (Object.keys(share).length > 1 ? pct(share[k] / keys.length) + ' ' : '') + label[k]; });
+    // Fehlschlag: eine Karte der seltensten eingesetzten Seltenheit
     var elseText;
     if (!full) elseText = 'Die Chance steht fest, sobald ' + COUNT + ' Karten im Vertrag liegen.' + (v.q < 1 ? ' Gemischt ist sie kleiner.' : '');
     else if (v.chance >= 1) elseText = 'Gelingt sicher: eine zufällige ' + label[v.target] + '-Karte.';
-    else elseText = 'Sonst eine Karte aus: ' + parts.join(', ') + '.' + (v.q < 1 ? ' Gemischter Einsatz: ' + pct(v.q) + ' einer vollen ' + label[v.top] + '-Runde.' : '');
+    else if (v.chance < 0.02) elseText = 'Kaum Chance auf ' + label[v.target] + ': Fast der ganze Wert steckt in deiner ' + label[v.top] + '-Karte – du bekommst eine ' + label[v.top] + '-Karte (gern eine, die dir fehlt). Für eine echte Chance nimm mehr ' + label[v.top] + '-Karten.';
+    else elseText = 'Sonst bekommst du eine ' + label[v.top] + '-Karte.' + (v.q < 1 ? ' Gemischter Einsatz: ' + pct(v.q) + ' einer vollen ' + label[v.top] + '-Runde – mehr ' + label[v.top] + '-Karten erhöhen die Chance.' : '');
     $('[data-up-else]').textContent = elseText;
+    // Rückgabe: mindestens (Karte + Wertausgleich) und im Schnitt, gemessen am Bankwert des Einsatzes
+    $('[data-up-back]').textContent = full
+      ? 'Einsatz ' + euro(v.value) + ' · du bekommst mindestens ' + euro(v.floor) + ' zurück (Karte + Wertausgleich), im Schnitt ' + pct(v.ev / v.value) + '.'
+      : '';
     var extra = [];
     if (v.pBonus) extra.push('Glückstreffer ' + pct(v.pBonus) + ' → ' + label[v.bonus || v.target]);
     if (v.pJackpot && v.jackpot.length) extra.push('Jackpot ' + pct(v.pJackpot) + ' → ' + v.jackpot.map(function (j) { return label[j.key]; }).join(' oder '));
@@ -170,9 +174,7 @@
     }
     var groups = [];
     if (v.chance > 0) groups.push([label[v.target] + ' (bei Erfolg)', v.target]);
-    if (v.chance < 1 || keys.length < COUNT) {
-      keys.filter(function (k, i) { return keys.indexOf(k) === i; }).forEach(function (k) { groups.push([label[k] + ' (sonst)', k]); });
-    }
+    if (v.chance < 1) groups.push([label[v.top] + ' (sonst)', v.top]);
     groups.forEach(function (g) {
       box.appendChild(el('h3', 'up-pool-head', g[0]));
       var ul = el('ul', 'up-pool-list');
@@ -319,6 +321,9 @@
       fehlschlag: 'Diesmal hat es nicht gereicht (Chance ' + res.chance + ') – dafür bekommst du eine ' + c.rarityLabel + '-Karte.',
     };
     document.querySelector('[data-up-result-text]').textContent = text[res.kind] || text.erfolg;
+    var pay = document.querySelector('[data-up-result-payout]');
+    pay.textContent = res.payout ? '+ ' + res.payoutText + ' Wertausgleich – auf deinem Konto gutgeschrieben.' : '';
+    pay.hidden = !res.payout;
     result.className = 'up-result r-' + c.rarity + (res.success ? ' is-up' : ' is-same') + (res.kind === 'jackpot' || res.kind === 'bonus' ? ' is-lucky' : '');
     result.hidden = false;
     document.querySelector('[data-up-again]').focus();
