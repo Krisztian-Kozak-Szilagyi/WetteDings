@@ -262,7 +262,8 @@ router.get('/tcg/aufwertung', async (req, res) => {
     tiers,
     ladder,
     pools,
-    rules: { count: s.count, rueckgabe: s.rueckgabe, maxChance: s.maxChance, bonus: s.bonus, jackpot: s.jackpot, fehlend: s.fehlend },
+    rules: { count: s.count, rueckgabe: s.rueckgabe, ausgleich: s.ausgleich, maxChance: s.maxChance, bonus: s.bonus, jackpot: s.jackpot, fehlend: s.fehlend },
+    ausgleich: s.ausgleich,
     count: s.count,
     fehlend: s.fehlend,
     bonusText: pctText(s.bonus / 10000),
@@ -277,7 +278,7 @@ router.post('/tcg/aufwertung', async (req, res) => {
     const docs = [].concat(req.body.doc || []).map(str);
     const r = await upgrade.upgrade({ user: req.user, docIds: docs });
     // die Verschmelzung (public/js/aufwertung.js) leuchtet durch die Seltenheiten bis zu der der neuen Karte
-    res.json({ ok: true, success: r.success, kind: r.kind, chance: pctText(r.contract.chance), card: { ...cardView(r.card), missing: r.missing } });
+    res.json({ ok: true, success: r.success, kind: r.kind, chance: pctText(r.contract.chance), card: { ...cardView(r.card), missing: r.missing }, payout: r.payout, payoutText: r.payout ? euro(r.payout) : '' });
   } catch (err) {
     if (!(err instanceof UserError)) throw err;
     res.status(400).json({ error: err.message });

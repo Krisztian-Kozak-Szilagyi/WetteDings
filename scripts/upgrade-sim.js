@@ -1,6 +1,6 @@
 // Kartenaufwertung: Belastet sie die Wirtschaft? Spielt sehr viele Verträge mit den echten Regeln
 // (public/js/aufwertung-regeln.js) und den Standardwerten bzw. gespeicherten Preisen nach und zeigt je Einsatz:
-//   - wie viel Kartenwert im Mittel zurückkommt (unter 100 % = es verschwindet Wert, die Aufwertung ist ein Abfluss)
+//   - wie viel Wert im Mittel zurückkommt – Karte + Wertausgleich (unter 100 % = es verschwindet Wert, ein Abfluss)
 //   - wie oft Erfolg, Glückstreffer und Jackpot fallen
 //   - wie viele Glitch- und Icon-Karten so netto neu entstehen – verglichen mit denen, die Packs nebenbei liefern, während
 //     man die eingesetzten Karten zieht (wer 10 Crumpled zieht, bekommt dabei im Mittel 0,017 Glitch/Icon)
@@ -19,7 +19,7 @@ const arg = (name, def) => {
 };
 const N = arg('n', 1000000);
 const S = { ...up.DEFAULTS };
-for (const k of ['bonus', 'jackpot', 'rueckgabe', 'maxChance', 'count']) S[k] = arg(k, S[k]);
+for (const k of ['bonus', 'jackpot', 'rueckgabe', 'ausgleich', 'maxChance', 'count']) S[k] = arg(k, S[k]);
 
 // Zufall mit festem Startwert (mulberry32), damit Läufe vergleichbar sind
 let seed = 12345;
@@ -59,7 +59,7 @@ for (const sc of SCENARIOS) {
   for (let i = 0; i < N; i++) {
     const r = Regeln.wurf(sc.keys, v, rand);
     kinds[r.kind]++;
-    value += sell[r.rarity];
+    value += sell[r.rarity] + Regeln.ausgleich(v, sell[r.rarity]); // Karte + Wertausgleich
     if (r.rarity === 'glitch' || r.rarity === 'icon') rare++;
   }
   // abzüglich der eingesetzten Glitch/Icon (sie verschwinden) – netto neu entstanden

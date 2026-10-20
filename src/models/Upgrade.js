@@ -12,6 +12,8 @@ const upgradeSchema = new Schema(
     chance: { type: Number, required: true }, // Erfolgschance 0 … 1 zum Zeitpunkt der Aufwertung
     success: { type: Boolean, required: true }, // nicht fehlgeschlagen (Erfolg, Glückstreffer oder Jackpot)
     kind: { type: String, enum: ['erfolg', 'fehlschlag', 'bonus', 'jackpot'], default: undefined },
+    value: { type: Number, default: undefined }, // Bankwert des Einsatzes (Cent)
+    payout: { type: Number, default: undefined }, // Wertausgleich in Spielgeld (Cent)
     inputs: { type: [new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String }, { _id: false })], default: [] },
     result: { type: new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String, missing: Boolean }, { _id: false }), required: true }, // missing: fehlte im Album
   },

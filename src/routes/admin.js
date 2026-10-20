@@ -695,7 +695,7 @@ router.post('/admin/aufwertung', requireAdmin, requireReauth('/admin?bereich=spi
   try {
     await cardUpgrade.saveSettings({
       admin: req.user,
-      values: { open: req.body.open === '1', count: num(req.body.count), rueckgabe: num(req.body.rueckgabe), maxChance: num(req.body.maxChance), fehlend: num(req.body.fehlend), bonus: num(req.body.bonus), jackpot: num(req.body.jackpot) },
+      values: { open: req.body.open === '1', count: num(req.body.count), rueckgabe: num(req.body.rueckgabe), ausgleich: num(req.body.ausgleich), maxChance: num(req.body.maxChance), fehlend: num(req.body.fehlend), bonus: num(req.body.bonus), jackpot: num(req.body.jackpot) },
     });
     req.flash('success', 'Kartenaufwertung gespeichert – gilt ab sofort.');
   } catch (err) {
