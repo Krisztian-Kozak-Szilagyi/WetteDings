@@ -8911,3 +8911,29 @@ body.up-open { overflow: hidden; }
   .up-reel-window { height: 174px; }
 }
 @media (prefers-reduced-motion: reduce) { .up-slot.is-full, .up-result { animation: none; } }
+
+/* ========== Alle Packs öffnen: Übersicht nach Seltenheit (views/inventar.ejs, public/js/packs-alle.js) ========== */
+.pack-all { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(6, 6, 12, .82); backdrop-filter: blur(4px); }
+.pack-all[hidden] { display: none; }
+.pack-all-box { width: min(1040px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), 0 30px 80px rgba(0, 0, 0, .55); overflow: hidden; }
+.pack-all-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; padding: 18px 20px 14px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.pack-all-head h2 { margin: 2px 0 4px; }
+.pack-all-head p { margin: 0; }
+.pack-all-list { overflow-y: auto; padding: 8px 20px 22px; overscroll-behavior: contain; }
+.pack-all-list:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.pack-all-wait, .pack-all-error { margin: 24px 0; text-align: center; }
+.pack-all-error { color: var(--nein, #f87171); font-weight: 600; }
+.pack-all-group { padding-top: 14px; }
+.pack-all-group-head {
+  position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 8px 0;
+  font-size: 15px; background: var(--surface); box-shadow: 0 1px 0 color-mix(in srgb, var(--rar) 40%, transparent);
+}
+.pack-all-group-n { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pack-all-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 14px 12px; }
+.pack-all-card { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.pack-all-card img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--rar) 55%, transparent), 0 6px 14px rgba(0, 0, 0, .45); }
+.pack-all-card.is-new img { box-shadow: 0 0 0 2px #4ade80, 0 0 18px rgba(74, 222, 128, .35); }
+.pack-all-n { position: absolute; top: 6px; left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; background: rgba(10, 10, 16, .85); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rar) 70%, transparent); }
+.pack-all-card .tcg-new-badge { display: inline-block; position: absolute; top: 6px; right: 6px; margin: 0; } /* sofort sichtbar (beim Einzelöffnen erst nach dem Aufdecken) */
+.pack-all-name { font-size: 12px; line-height: 1.3; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .pack-all-grid { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }

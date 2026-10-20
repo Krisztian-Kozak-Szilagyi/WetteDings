@@ -122,6 +122,13 @@
             <input type="hidden" name="type" value="<%= s.pack.key %>">
             <button class="btn btn-primary btn-block" type="submit">Öffnen</button>
           </form>
+          <% const allPacks = packs.reduce((n, p) => n + p.count, 0); if (allPacks > 1) { %>
+            <%# Alle Packs auf einmal (jeder Art): Übersicht nach Seltenheit, public/js/packs-alle.js %>
+            <form method="post" action="/tcg/alle-oeffnen" data-tcg-open-all data-count="<%= allPacks %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-ghost btn-block" type="submit">Alle Packs öffnen (<%= allPacks %>)</button>
+            </form>
+          <% } %>
         <% } else { const it = s.item; const free = it.count - it.inTrade; %>
           <% if (it.key === 'folie') { %>
             <% if (free && foilable.length) { %>
@@ -176,6 +183,22 @@
   </div>
 </div>
 
+<%# Alle Packs geöffnet: scrollbare Übersicht, seltenste Karten zuerst (public/js/packs-alle.js) %>
+<div class="pack-all" data-pack-all hidden>
+  <div class="pack-all-box" role="dialog" aria-modal="true" aria-labelledby="pack-all-title">
+    <div class="pack-all-head">
+      <div>
+        <p class="kicker" data-pack-all-kicker>Booster Packs</p>
+        <h2 id="pack-all-title" data-pack-all-title>Packs werden geöffnet …</h2>
+        <p class="muted small" data-pack-all-sum></p>
+      </div>
+      <a class="btn btn-primary" href="/tcg/album">Zum Album</a>
+    </div>
+    <div class="pack-all-list" data-pack-all-list tabindex="0" aria-label="Gezogene Karten nach Seltenheit"></div>
+  </div>
+</div>
+
 <script src="/js/tcg.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/packs-alle.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/inventar.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

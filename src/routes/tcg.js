@@ -123,6 +123,22 @@ router.post('/tcg/oeffnen', async (req, res) => {
   res.redirect('/inventar#packs');
 });
 
+// Alle Packs auf einmal öffnen (Inventar): die Karten kommen als Liste zurück – die Übersicht sortiert der Browser
+// nach Seltenheit (public/js/packs-alle.js)
+router.post('/tcg/alle-oeffnen', async (req, res) => {
+  try {
+    const r = await tcg.openAllPacks({ user: req.user });
+    const cards = r.cards.map((c, i) => ({ ...cardView(c), isNew: !!r.isNew[i], value: catalog.rarityByKey[c.rarity].sell }));
+    if (wantsJson(req)) return res.json({ cards, packs: r.packs, packsLeft: r.packsLeft, total: cards.reduce((s, c) => s + c.value, 0) });
+    req.flash('success', `${r.packs} Booster Packs geöffnet: ${cards.length} Karten.${r.packsLeft ? ` ${r.packsLeft} Packs sind noch übrig.` : ''}`);
+  } catch (err) {
+    if (!(err instanceof UserError)) throw err;
+    if (wantsJson(req)) return res.status(400).json({ error: err.message });
+    req.flash('error', err.message);
+  }
+  res.redirect('/tcg/album');
+});
+
 /** Aktion ausführen, Meldung setzen, zurück ins Album (to: anderes Ziel, erst nach der Aktion bestimmt) */
 async function albumAction(req, res, fn, to = () => '/tcg/album') {
   try {
