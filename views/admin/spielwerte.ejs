@@ -58,7 +58,7 @@
     </div>
   </section>
   <section class="stats-block" id="aufwertung">
-    <%- blockHead('Kartenaufwertung', 'Mitglieder verschmelzen eine feste Anzahl Karten derselben Seltenheit (/tcg/aufwertung). Mit der Erfolgschance kommt eine zufällige Karte der nächsten Seltenheit heraus, sonst eine zufällige derselben – Karten, die einem fehlen, öfter. Die Chance ergibt sich aus den Bankpreisen oben: Im Mittel gibt es höchstens „Höchstens zurück“ % des Einsatzwerts zurück, eine aufgewertete Karte ist also nie billiger als ihr Wert. Sith- und Boss-Karten (St. Ivan) gibt es dort nie, Icon ist die oberste Stufe.') %>
+    <%- blockHead('Kartenaufwertung', 'Mitglieder verschmelzen eine feste Anzahl Karten (/tcg/aufwertung), Seltenheiten gemischt. Ziel ist die Stufe über der seltensten Karte; gemischt sinkt die Chance (jede Karte zählt nach ihrer Seltenheit in Packs). Ohne Erfolg kommt eine Karte aus der Seltenheit einer zufällig gewählten eingesetzten Karte – Karten, die einem fehlen, öfter. Dazu Glückstreffer (eine Stufe höher) und Jackpot (Glitch oder Icon). Die Chance ergibt sich aus den Bankpreisen oben: Im Mittel gibt es höchstens „Höchstens zurück“ % des Einsatzwerts zurück, eine aufgewertete Karte ist also nie billiger als ihr Wert. Sith- und Boss-Karten (St. Ivan) gibt es dort nie, Icon ist die oberste Stufe.') %>
     <div class="card">
       <form method="post" data-reauth action="/admin/aufwertung" class="form panel-form" data-confirm="Einstellungen der Kartenaufwertung wirklich ändern?">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -68,13 +68,13 @@
         </label>
         <fieldset class="admin-tax-group">
           <legend>Regeln</legend>
-          <% [['count', 'Karten je Aufwertung', ''], ['rueckgabe', 'Höchstens zurück (% des Einsatzwerts)', '%'], ['maxChance', 'Höchste Erfolgschance', '%'], ['fehlend', 'Fehlende Karten kommen … mal so oft', '×']].forEach(([k, l, u]) => { %>
-            <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="<%= k %>" min="<%= upgrade.limits[k][0] %>" max="<%= upgrade.limits[k][1] %>" step="1" value="<%= upgrade.settings[k] %>" required><small class="muted">Standard <%= upgrade.defaults[k] %></small></label>
+          <% [['count', 'Karten je Aufwertung', ''], ['rueckgabe', 'Höchstens zurück (% des Einsatzwerts)', '%'], ['maxChance', 'Höchste Erfolgschance', '%'], ['fehlend', 'Fehlende Karten kommen … mal so oft', '×'], ['bonus', 'Glückstreffer: eine Stufe höher (in 0,01 %)', ''], ['jackpot', 'Jackpot: Glitch oder Icon (in 0,01 %)', '']].forEach(([k, l, u]) => { %>
+            <label class="field"><span><%= l %><%= u ? ' (' + u + ')' : '' %></span><input type="number" name="<%= k %>" min="<%= upgrade.limits[k][0] %>" max="<%= upgrade.limits[k][1] %>" step="1" value="<%= upgrade.settings[k] %>" required><small class="muted">Standard <%= upgrade.defaults[k] %><%= ['bonus', 'jackpot'].includes(k) ? ' = ' + String(upgrade.defaults[k] / 100).replace('.', ',') + ' %' : '' %></small></label>
           <% }) %>
         </fieldset>
         <div class="table-wrap">
           <table class="table admin-tcg-table">
-            <thead><tr><th>Einsatz</th><th>Ziel</th><th class="num">Wert Einsatz</th><th class="num">Wert Ziel</th><th class="num">Erfolgschance</th></tr></thead>
+            <thead><tr><th>Einsatz</th><th>Ziel</th><th class="num">Wert Einsatz</th><th class="num">Wert Ziel</th><th class="num">Erfolgschance</th><th class="num">Rückgabe Ø</th></tr></thead>
             <tbody>
               <% upgrade.tiers.forEach((t) => { %>
                 <tr>
@@ -83,12 +83,23 @@
                   <td class="num"><%= euro(t.from.sell * upgrade.settings.count) %></td>
                   <td class="num"><%= euro(t.to.sell) %></td>
                   <td class="num"><strong><%= (Math.round(t.chance * 1000) / 10).toLocaleString('de-DE') %> %</strong></td>
+                  <td class="num muted"><%= t.ev ? Math.round(t.ev.ev / t.ev.value * 100) + ' %' : '–' %></td>
+                </tr>
+              <% }) %>
+              <% upgrade.mixed.forEach((m) => { if (!m.v) return; %>
+                <tr>
+                  <td><span class="muted small">gemischt:</span> <%= m.name %></td>
+                  <td class="r-<%= m.to.key %>"><span class="tcg-dot"></span> <%= m.to.label %></td>
+                  <td class="num"><%= euro(m.v.value) %></td>
+                  <td class="num"><%= euro(m.to.sell) %></td>
+                  <td class="num"><strong><%= (Math.round(m.v.chance * 1000) / 10).toLocaleString('de-DE') %> %</strong></td>
+                  <td class="num muted"><%= Math.round(m.v.ev / m.v.value * 100) %> %</td>
                 </tr>
               <% }) %>
             </tbody>
           </table>
         </div>
-        <small class="muted">Die Chancen in der Tabelle gelten mit den gespeicherten Werten; nach dem Speichern rechnet sie neu.</small>
+        <small class="muted">Rückgabe Ø = erwarteter Wert der neuen Karte (mit Glückstreffer und Jackpot) ÷ Wert der eingesetzten Karten – nie über „Höchstens zurück“. Die Tabelle gilt mit den gespeicherten Werten; nach dem Speichern rechnet sie neu. Ausführlich: <code>npm run sim:aufwertung</code>.</small>
         <button class="btn btn-primary" type="submit">Speichern</button>
       </form>
     </div>

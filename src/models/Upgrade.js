@@ -7,11 +7,12 @@ const upgradeSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     username: { type: String, required: true },
-    rarity: { type: String, required: true }, // Seltenheit der eingesetzten Karten
-    target: { type: String, required: true }, // nächste Seltenheit (bei Erfolg)
+    rarity: { type: String, required: true }, // seltenste eingesetzte Seltenheit (Seltenheiten dürfen gemischt sein)
+    target: { type: String, required: true }, // nächste Seltenheit darüber (bei Erfolg)
     chance: { type: Number, required: true }, // Erfolgschance 0 … 1 zum Zeitpunkt der Aufwertung
-    success: { type: Boolean, required: true },
-    inputs: { type: [new Schema({ doc: Schema.Types.ObjectId, card: String }, { _id: false })], default: [] },
+    success: { type: Boolean, required: true }, // nicht fehlgeschlagen (Erfolg, Glückstreffer oder Jackpot)
+    kind: { type: String, enum: ['erfolg', 'fehlschlag', 'bonus', 'jackpot'], default: undefined },
+    inputs: { type: [new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String }, { _id: false })], default: [] },
     result: { type: new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String, missing: Boolean }, { _id: false }), required: true }, // missing: fehlte im Album
   },
   { timestamps: true }

@@ -275,7 +275,12 @@ router.get('/admin', requireStaff, async (req, res) => {
       tiers: cardUpgrade
         .ladder()
         .filter((r) => cardUpgrade.nextRarity(r))
-        .map((r) => ({ from: tcgCatalog.rarityByKey[r], to: tcgCatalog.rarityByKey[cardUpgrade.nextRarity(r)], chance: cardUpgrade.chanceFor(r) })),
+        .map((r) => ({ from: tcgCatalog.rarityByKey[r], to: tcgCatalog.rarityByKey[cardUpgrade.nextRarity(r)], chance: cardUpgrade.chanceFor(r), ev: cardUpgrade.contract(Array.from({ length: cardUpgrade.settings.count }, () => r)) })),
+      // gemischte Beispiele: Chance und Rückgabe (erwarteter Wert ÷ Einsatzwert)
+      mixed: [['gold', 1, 'bfwler'], ['gold', 1, 'crumpled'], ['holo', 1, 'gold'], ['glitch', 1, 'crumpled']].map(([top, k, low]) => {
+        const keys = [...Array.from({ length: k }, () => top), ...Array.from({ length: cardUpgrade.settings.count - k }, () => low)];
+        return { name: `${k} ${tcgCatalog.rarityByKey[top].label} + ${cardUpgrade.settings.count - k} ${tcgCatalog.rarityByKey[low].label}`, v: cardUpgrade.contract(keys), to: tcgCatalog.rarityByKey[cardUpgrade.nextRarity(top)] };
+      }),
     },
     dungeon: { settings: dungeonService.settings, defaults: dungeonService.DEFAULTS, floors: towerTexts.TOWER.floors, floorDefaults: towerTexts.FLOOR_DEFAULTS, textMax: towerTexts.TEXT_FIELDS },
     gradingSettings: grading.settings,
@@ -690,7 +695,7 @@ router.post('/admin/aufwertung', requireAdmin, requireReauth('/admin?bereich=spi
   try {
     await cardUpgrade.saveSettings({
       admin: req.user,
-      values: { open: req.body.open === '1', count: num(req.body.count), rueckgabe: num(req.body.rueckgabe), maxChance: num(req.body.maxChance), fehlend: num(req.body.fehlend) },
+      values: { open: req.body.open === '1', count: num(req.body.count), rueckgabe: num(req.body.rueckgabe), maxChance: num(req.body.maxChance), fehlend: num(req.body.fehlend), bonus: num(req.body.bonus), jackpot: num(req.body.jackpot) },
     });
     req.flash('success', 'Kartenaufwertung gespeichert – gilt ab sofort.');
   } catch (err) {

@@ -1,12 +1,13 @@
 <%- include('partials/head') %>
-<%# Kartenaufwertung (src/routes/tcg.js, Regeln: src/tcg/upgrade.js): 10 Karten einer Seltenheit in den Vertrag legen und
-    verschmelzen. Auswahl, Vertrag und Walze zeichnet public/js/aufwertung.js aus den Daten unten. %>
-<div class="up-page" data-upgrade='<%= JSON.stringify({ tiers, count, fehlend }) %>' data-csrf="<%= csrfToken %>">
+<%# Kartenaufwertung (src/routes/tcg.js, Regeln: src/tcg/upgrade.js und public/js/aufwertung-regeln.js): 10 Karten in den
+    Vertrag legen (Seltenheiten gemischt) und verschmelzen. Auswahl, Vertrag, Chance und Walze zeichnet public/js/aufwertung.js. %>
+<div class="up-page" data-upgrade='<%= JSON.stringify({ tiers, ladder, pools, rules }) %>' data-csrf="<%= csrfToken %>">
   <section class="up-hero">
     <div>
       <span class="kicker">Sammlung</span>
       <h1>Kartenaufwertung</h1>
-      <p>Lege <strong><%= count %> Karten derselben Seltenheit</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>nächsten Seltenheit</strong>, sonst eine zufällige Karte derselben. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong>.</p>
+      <p>Lege <strong><%= count %> Karten</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>Seltenheit über deiner seltensten Karte</strong>, sonst eine Karte aus der Seltenheit einer zufällig gewählten eingesetzten Karte. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong>.</p>
+      <p>Seltenheiten darfst du mischen – je mehr häufigere Karten dabei sind, desto kleiner die Chance. Bei jeder Aufwertung gibt es außerdem einen <strong>Glückstreffer</strong> (<%= bonusText %>: eine Stufe höher) und den <strong>Jackpot</strong> (<%= jackpotText %>: eine Glitch- oder Icon-Karte).</p>
       <p class="muted small">Karten im Sleeve oder Slab und Karten auf Quest, im Dungeon, Handel, Duell oder beim Grading spielen nicht mit. Icon ist die höchste Stufe – Sith- und Boss-Karten gibt es hier nicht.</p>
       <% if (closedForOthers) { %><p class="up-admin-note">Noch nicht für alle freigegeben – nur Admins sehen diese Seite (Admin-Panel → Spielwerte → TCG).</p><% } %>
     </div>
@@ -16,7 +17,7 @@
   <nav class="up-tabs" role="tablist" aria-label="Seltenheit" data-up-tabs>
     <% tiers.forEach((t, i) => { %>
       <button type="button" role="tab" class="up-tab r-<%= t.key %>" data-up-tab="<%= t.key %>" aria-selected="<%= i === 0 %>">
-        <span class="tcg-dot"></span><%= t.label %> <span class="up-tab-arrow" aria-hidden="true">→</span> <%= t.nextLabel %>
+        <span class="tcg-dot"></span><%= t.label %>
         <span class="up-tab-count" title="freie Karten"><%= t.free %></span>
       </button>
     <% }) %>
@@ -43,6 +44,7 @@
         <strong class="up-chance-value" data-up-chance-value>–</strong>
       </div>
       <p class="muted small up-else" data-up-else></p>
+      <p class="small up-extra" data-up-extra></p>
       <div class="up-actions">
         <button type="button" class="btn btn-ghost btn-sm" data-up-fill>Mit Duplikaten auffüllen</button>
         <button type="button" class="btn btn-ghost btn-sm" data-up-clear>Leeren</button>
@@ -62,11 +64,12 @@
     <% } else { %>
       <ul class="up-history-list">
         <% history.forEach((h) => { %>
-          <li class="<%= h.success ? 'is-up' : 'is-same' %>">
+          <li class="<%= h.kind === 'jackpot' || h.kind === 'bonus' ? 'is-lucky' : h.success ? 'is-up' : 'is-same' %>">
             <% if (h.card) { %><img src="<%= h.card.image %>" alt="" width="720" height="1008" loading="lazy"><% } %>
             <span>
               <strong><%= h.card ? h.card.name : h.result.card %></strong>
-              <span class="small muted"><%= h.inputs.length %>× <%= h.fromLabel %> · <%= h.success ? 'aufgewertet' : 'gleiche Seltenheit' %><%= h.result.missing ? ' · war neu' : '' %> · <%= date(h.createdAt) %></span>
+              <% const KIND = { erfolg: 'aufgewertet', bonus: 'Glückstreffer!', jackpot: 'JACKPOT!', fehlschlag: 'nicht aufgewertet' }; %>
+              <span class="small muted"><%= h.inputs.length %> Karten<%= h.mixed ? ' gemischt' : '' %> bis <%= h.fromLabel %> · <%= KIND[h.kind] || (h.success ? 'aufgewertet' : 'nicht aufgewertet') %><%= h.result.missing ? ' · war neu' : '' %> · <%= date(h.createdAt) %></span>
             </span>
           </li>
         <% }) %>
@@ -94,5 +97,6 @@
   </div>
 </div>
 
+<script src="/js/aufwertung-regeln.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/aufwertung.js?v=<%= assetVersion %>" defer></script>
 <%- include('partials/foot') %>

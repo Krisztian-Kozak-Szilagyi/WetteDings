@@ -1,12 +1,15 @@
-// Kartenaufwertung (/tcg/aufwertung): 10 Karten derselben Seltenheit verschmelzen – ähnlich wie der Trade-up-Vertrag in
-// Counter-Strike, nur ist es Zufall, welche Karte herauskommt.
+// Kartenaufwertung (/tcg/aufwertung): 10 Karten verschmelzen – ähnlich wie der Trade-up-Vertrag in Counter-Strike, nur
+// ist es Zufall, welche Karte herauskommt. Die Rechnung steht in public/js/aufwertung-regeln.js (auch im Browser).
 //
-// - Mit der Erfolgschance kommt eine zufällige Karte der nächsten Seltenheit heraus, sonst eine zufällige Karte derselben
-//   Seltenheit (man geht nie leer aus). Karten, die man noch nicht besitzt, kommen fehlend-fach so oft.
+// - Ziel ist die Stufe über der seltensten eingesetzten Karte; Seltenheiten dürfen gemischt sein. Mit der Erfolgschance
+//   kommt eine zufällige Karte des Ziels, sonst eine aus der Seltenheit einer zufällig gewählten eingesetzten Karte
+//   (man geht nie leer aus). Karten, die man noch nicht besitzt, kommen fehlend-fach so oft.
+// - Gemischt sinkt die Chance: jede Karte zählt nach ihrer Seltenheit in Packs (1 Gold + 9 BFWler → Holo ≈ 45 %).
+// - Glückstreffer (bonus, in 1/100 %): eine Stufe über dem Ziel. Jackpot (jackpot, in 1/100 %): Glitch oder Icon.
 // - Faire Chance, ohne seltene Karten zu entwerten: Im Mittel bekommt man höchstens rueckgabe % des Bankwerts der
-//   eingesetzten Karten zurück – eine aufgewertete Karte ist also nie billiger zu haben als ihr Wert. Darüber hinaus
-//   höchstens maxChance %. Mit den Standardwerten (Bankpreise im Admin-Panel → TCG) gelingt jede Stufe sicher, nur
-//   Holo → Bockhaber liegt bei ≈ 89 % (10 Holo = 500 €, ein Bockhaber = 500 €).
+//   eingesetzten Karten zurück (Glückstreffer und Jackpot eingerechnet) – eine aufgewertete Karte ist also nie billiger
+//   zu haben als ihr Wert. Darüber hinaus höchstens maxChance %. Mit den Standardwerten gelingt jede volle Stufe sicher,
+//   nur Holo → Bockhaber liegt bei ≈ 89 % (10 Holo = 500 €, ein Bockhaber = 500 €). Prüfen: npm run sim:aufwertung
 // - Stufen: die Pack-Seltenheiten von Crumpled bis Icon. Geheime Seltenheiten (Sith) und Boss-Karten (St. Ivan) kommen
 //   nie heraus und lassen sich nicht einsetzen; Icon ist die oberste Stufe.
 // - Eingesetzt werden nur freie Exemplare: nichts auf Quest, im Dungeon, Handel, Duell oder Grading, keine Folie/kein Slab.
@@ -21,10 +24,12 @@ const { lockedDocs, isLocked } = require('./locks');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const { logSettingsChange } = require('../stats/settingsLog');
+const Regeln = require('../../public/js/aufwertung-regeln');
 
 // Standardwerte (Admin-Panel → Spielwerte → TCG). Prozentwerte als ganze Zahlen.
-const DEFAULTS = { open: false, count: 10, rueckgabe: 90, maxChance: 100, fehlend: 3 };
-const LIMITS = { count: [2, 30], rueckgabe: [0, 100], maxChance: [0, 100], fehlend: [1, 20] };
+// bonus / jackpot in Hundertstel-Prozent: 9 = 0,09 %, 1 = 0,01 %
+const DEFAULTS = { open: false, count: 10, rueckgabe: 90, maxChance: 100, fehlend: 3, bonus: 9, jackpot: 1 };
+const LIMITS = { count: [2, 30], rueckgabe: [0, 100], maxChance: [0, 100], fehlend: [1, 20], bonus: [0, 1000], jackpot: [0, 1000] };
 
 let settings = { ...DEFAULTS };
 
@@ -32,7 +37,7 @@ let settings = { ...DEFAULTS };
 function cleanSettings(s) {
   const out = { open: !!(s && s.open) };
   const errors = [];
-  const label = { count: 'Karten je Aufwertung', rueckgabe: 'Höchstens zurück (% des Einsatzwerts)', maxChance: 'Höchste Erfolgschance (%)', fehlend: 'Fehlende Karten so oft' };
+  const label = { count: 'Karten je Aufwertung', rueckgabe: 'Höchstens zurück (% des Einsatzwerts)', maxChance: 'Höchste Erfolgschance (%)', fehlend: 'Fehlende Karten so oft', bonus: 'Glückstreffer (0,01 %)', jackpot: 'Jackpot (0,01 %)' };
   for (const [k, [min, max]] of Object.entries(LIMITS)) {
     const v = s && s[k];
     if (!Number.isInteger(v) || v < min || v > max) errors.push(`${label[k]}: ${min} bis ${max}`);
@@ -80,21 +85,16 @@ function nextRarity(rarity) {
   return i >= 0 && i < l.length - 1 ? l[i + 1] : null;
 }
 
-const sellOf = (rarity) => (catalog.rarityByKey[rarity] ? catalog.rarityByKey[rarity].sell : 0);
+/** Stufen für die Rechnung: { key, label, sell, weight } (Preise und Pack-Gewichte wie im Admin-Panel → TCG) */
+const ladderDefs = () => ladder().map((k) => ({ key: k, label: catalog.rarityByKey[k].label, sell: catalog.rarityByKey[k].sell, weight: catalog.rarityByKey[k].weight }));
 
-/**
- * Erfolgschance (0 … 1) für count Karten dieser Seltenheit: im Mittel höchstens rueckgabe % des Einsatzwerts zurück,
- * dazu höchstens maxChance %. p · Ziel + (1 − p) · gleiche ≤ rueckgabe · count · gleiche.
- */
+/** Vertrag auswerten: keys = Seltenheiten der eingesetzten Karten → Ausgänge (public/js/aufwertung-regeln.js) oder null */
+const contract = (keys, s = settings) => Regeln.vertrag(keys, ladderDefs(), s);
+
+/** Erfolgschance (0 … 1) für count Karten dieser einen Seltenheit (ohne Glückstreffer und Jackpot) */
 function chanceFor(rarity, s = settings) {
-  const next = nextRarity(rarity);
-  if (!next) return 0;
-  const same = sellOf(rarity);
-  const up = sellOf(next);
-  const cap = s.maxChance / 100;
-  if (up <= same) return cap;
-  const fair = ((s.rueckgabe / 100) * s.count * same - same) / (up - same);
-  return Math.max(0, Math.min(cap, fair));
+  const v = contract(Array.from({ length: s.count }, () => rarity), s);
+  return v ? v.chance : 0;
 }
 
 /** Karten, die herauskommen können: alle erhältlichen Karten der Seltenheit (CARDS: ohne Unveröffentlichte und Test-Karten) */
@@ -135,7 +135,7 @@ const ownedIds = async (userId, session) => new Set(await TcgCard.distinct('card
  * Frei = keine Folie/kein Slab, nicht gesperrt. dupes = so viele davon sind Duplikate (eins bleibt, wie beim Verkauf).
  */
 async function choices(userId) {
-  const docs = await TcgCard.find({ user: userId, foiledAt: null, rarity: { $in: ladder().filter((r) => nextRarity(r)) } }).select('_id card rarity createdAt').sort({ createdAt: 1 }).lean();
+  const docs = await TcgCard.find({ user: userId, foiledAt: null, rarity: { $in: ladder().filter((r) => nextRarity(r)) } }) // Icon ist die oberste Stufe.select('_id card rarity createdAt').sort({ createdAt: 1 }).lean();
   const locked = await lockedDocs(userId);
   const byCard = new Map();
   const total = new Map(); // alle Exemplare der Karte (auch gesperrte): eins bleibt beim Auffüllen
@@ -154,7 +154,7 @@ async function choices(userId) {
 }
 
 /**
- * Aufwerten: docIds = genau settings.count Exemplare derselben Seltenheit. Alles in einer Transaktion: Exemplare weg,
+ * Aufwerten: docIds = genau settings.count Exemplare (Seltenheiten gemischt erlaubt, siehe oben). Alles in einer Transaktion: Exemplare weg,
  * neue Karte dazu, Eintrag im Verlauf und im Kontoauszug (0 €, für die Kartenhistorie).
  * rand: nur für Tests. Gibt { success, chance, rarity, target, card, missing, upgrade } zurück.
  */
@@ -165,18 +165,18 @@ async function upgrade({ user, docIds, rand = secureRand }) {
   return inTransaction(async (session) => {
     const docs = await TcgCard.find({ _id: { $in: ids }, user: user._id }).select('_id card rarity foiledAt').session(session).lean();
     if (docs.length !== ids.length) throw new UserError('Einige dieser Karten besitzt du nicht mehr. Bitte lade die Seite neu.');
-    const rarity = docs[0].rarity;
-    if (docs.some((d) => d.rarity !== rarity)) throw new UserError('Alle Karten müssen dieselbe Seltenheit haben.');
-    const target = nextRarity(rarity);
-    if (!target) throw new UserError(`${(catalog.rarityByKey[rarity] || {}).label || 'Diese'}-Karten lassen sich nicht aufwerten.`);
+    const keys = docs.map((d) => d.rarity);
+    const odd = docs.find((d) => !ladder().includes(d.rarity));
+    if (odd) throw new UserError(`${(catalog.rarityByKey[odd.rarity] || {}).label || 'Diese'}-Karten lassen sich nicht aufwerten.`);
+    const v = contract(keys);
+    if (!v) throw new UserError(`Mit ${catalog.rarityByKey[ladder()[ladder().length - 1]].label}-Karten geht es nicht höher – nimm sie aus dem Vertrag.`);
     if (docs.some((d) => d.foiledAt)) throw new UserError('Karten im Sleeve oder Slab lassen sich nicht aufwerten.');
     const locked = await lockedDocs(user._id, session);
     if (docs.some((d) => isLocked(locked, d))) throw new UserError('Eine der Karten ist gerade auf einer Quest, im Dungeon, im Handel, im Duell oder beim Grading.');
 
-    const chance = chanceFor(rarity);
-    const success = rand() < chance;
-    const resultRarity = success ? target : rarity;
-    const pool = poolOf(resultRarity);
+    const roll = Regeln.wurf(keys, v, rand);
+    const success = roll.kind !== 'fehlschlag';
+    const pool = poolOf(roll.rarity);
     if (!pool.length) throw new UserError('Für diese Seltenheit gibt es gerade keine Karten.');
     // „Fehlt noch“: nach dem Einsatz (eingesetzte Karten, von denen man kein weiteres Exemplar hat, fehlen danach)
     const del = await TcgCard.deleteMany({ _id: { $in: docs.map((d) => d._id) }, user: user._id }, { session });
@@ -187,14 +187,14 @@ async function upgrade({ user, docIds, rand = secureRand }) {
     const upgradeId = new mongoose.Types.ObjectId();
     const [copy] = await TcgCard.create([{ user: user._id, card: card.id, rarity: card.rarity, upgrade: upgradeId }], { session });
     await TcgUpgrade.create(
-      [{ _id: upgradeId, user: user._id, username: user.username, rarity, target, chance, success, inputs: docs.map((d) => ({ doc: d._id, card: d.card })), result: { doc: copy._id, card: card.id, rarity: card.rarity, missing } }],
+      [{ _id: upgradeId, user: user._id, username: user.username, rarity: v.top, target: v.target, chance: v.chance, success, kind: roll.kind, inputs: docs.map((d) => ({ doc: d._id, card: d.card, rarity: d.rarity })), result: { doc: copy._id, card: card.id, rarity: card.rarity, missing } }],
       { session }
     );
     const byCard = new Map();
     for (const d of docs) byCard.set(d.card, { card: d.card, rarity: d.rarity, count: ((byCard.get(d.card) || {}).count || 0) + 1 });
-    await Ledger.create([{ user: user._id, type: 'tcg_aufwertung', amount: 0, meta: { cards: [...byCard.values()], docs: docs.map((d) => ({ doc: d._id, card: d.card })), result: { doc: copy._id, card: card.id, rarity: card.rarity }, success } }], { session });
+    await Ledger.create([{ user: user._id, type: 'tcg_aufwertung', amount: 0, meta: { cards: [...byCard.values()], docs: docs.map((d) => ({ doc: d._id, card: d.card })), result: { doc: copy._id, card: card.id, rarity: card.rarity }, success, kind: roll.kind } }], { session });
     await User.updateOne({ _id: user._id }, { $addToSet: { tcgSeen: card.id } }, { session });
-    return { success, chance, rarity, target, card, missing, upgrade: upgradeId };
+    return { success, kind: roll.kind, chance: v.chance, contract: v, inputs: keys, rarity: v.top, target: v.target, card, missing, upgrade: upgradeId };
   });
 }
 
@@ -213,6 +213,8 @@ module.exports = {
   saveSettings,
   mayUse,
   ladder,
+  ladderDefs,
+  contract,
   nextRarity,
   chanceFor,
   poolOf,
