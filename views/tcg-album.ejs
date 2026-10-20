@@ -65,7 +65,7 @@
         <span class="tcg-progress-num"><%= counted.filter((g) => g.owned.length).length %> / <%= counted.length %> Karten</span>
       </div>
       <div class="tcg-grid tcg-album album-groups">
-        <% sg.forEach((g) => { const c = g.shownCard; const fx = c && g.best ? c.fx || fxFor(c.rarity) : ''; const many = g.list.length > 1; %>
+        <% sg.forEach((g) => { const c = g.shownCard; const fx = c && g.best ? fxFor(c.rarity) : ''; const many = g.list.length > 1; %>
           <% if (g.soon) { %>
             <%# noch nicht erhältlich: eine Farbe für alle, Seltenheiten nicht verraten %>
             <div class="tcg-slot tcg-locked tcg-soon album-group" data-rarity="soon" title="Noch nicht erhältlich">

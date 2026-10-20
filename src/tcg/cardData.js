@@ -127,25 +127,8 @@ const OVERHAUL = {
   'lilly-holo': dog('Lilly'),
 };
 
-// „Dio, der letzte Morgen“ – Boss-Karte (Season 1) und neuer Maßstab für die Stärke aller Karten und Spielmodi.
-// Werte schon nach dem neuen System: Angriff 99, Leben 90, Support 99 (gespeichert als fia/fis/bwl); Plakette = Wert der
-// Seltenheit (Boss 101). Fähigkeit „Schwur der Morgenröte“ wirkt, sobald Dungeon und Mage Tower Leben und Tod kennen
-// (Plan: Aura, Untote mit 20 % Angriff / 200 % Leben, 9 Marken → Wiedergeburt, Aura-Stapel). Animation: fx „morgen“.
-const DIO_MORGEN = {
-  'dio-der-letzte-morgen-boss': {
-    season: 'season-1',
-    frame: 'rar-legende',
-    name: 'Dio, der letzte Morgen',
-    stats: [101, 99, 90, 99],
-    fx: 'morgen',
-    abilityName: 'Schwur der Morgenröte',
-    ability: 'Seine Aura schadet Gegnern und heilt Verbündete. Fällt ein Verbündeter, erhebt er sich einmal als Untoter (20 % Angriff, 200 % Leben). Jeder Treffer eines Untoten bringt eine Marke des nächsten Morgens – bei 9 kehren die Gefallenen zurück und die Aura wird stärker.',
-  },
-};
-
 module.exports = {
   ...TEST_ITEMS,
-  ...DIO_MORGEN,
   ...OVERHAUL,
   ...TEST_HELDEN,
   ...SEASON1_UNRELEASED,

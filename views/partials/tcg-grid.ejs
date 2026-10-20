@@ -25,7 +25,7 @@
   // Effekte je Seltenheit: Glanzstreifen, Regenbogen, Glitch, Arcane (Mana-Welle als Echo-Bild)
   const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch', arcane: 'arcane' })[rarity] || '';
   const art = (c, extra) => {
-    const fx = c.fx || fxFor(c.rarity); // eigene Animation einer Karte (z. B. „morgen“) vor der ihrer Seltenheit
+    const fx = fxFor(c.rarity);
     let h = '<img src="' + c.image + '" alt="' + (extra && extra.alt ? extra.alt : '') + '" loading="lazy" width="720" height="1008">';
     if (fx === 'glitch') h += '<img class="tcg-glitch-a" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008"><img class="tcg-glitch-b" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008">';
     if (fx === 'arcane') h += '<img class="tcg-arcane-echo" src="' + c.image + '" alt="" loading="lazy" width="720" height="1008">';
@@ -69,7 +69,7 @@
       <% if (isAlbum) { %>
         <%# data-count = freie Exemplare (Verkaufen), data-locked = gesperrte (Anzeige im Fenster, z. B. „1× Auf Quest“) %>
         <button type="button" class="tcg-slot<%= allLocked ? ' tcg-in-exam' : '' %> r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
-          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"<%- c.fx ? ' data-fx="' + c.fx + '"' : '' %>
+          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
           data-image="<%= c.image %>" data-count="<%= Math.max(0, freeN) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
           data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>" data-creased="<%= creasedBy[c.id] || 0 %>"
           <% if (lockedPlain) { %>data-locked="<%= lockedPlain %>" data-lock-label="<%= lockLabel %>"<% } %>

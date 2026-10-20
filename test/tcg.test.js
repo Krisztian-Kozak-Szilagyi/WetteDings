@@ -52,7 +52,7 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 92); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
+  assert.equal(catalog.CARDS.length, 91); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
   assert.equal(catalog.TEST_CARDS.length, 23);
   assert.equal(catalog.cardsByRarity['test-item'].length, 0);
   assert.ok(catalog.cardById[catalog.TEST_CARDS[0].id]); // vergebene Exemplare funktionieren weiter
@@ -253,22 +253,6 @@ test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell – ohne Wertefenster, Pl
     assert.ok(svg.includes('SPELL') && svg.includes('Hundekarte') && svg.includes(name));
     assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), 'keine Wertefenster');
   }
-});
-
-test('„Dio, der letzte Morgen“: Boss-Karte mit Angriff/Leben/Support, Schwur der Morgenröte und legendärer Animation', () => {
-  const catalog = require('../src/tcg/catalog');
-  const cardSvg = require('../src/tcg/cardSvg');
-  const c = catalog.cardById['dio-der-letzte-morgen-boss'];
-  assert.ok(c && catalog.CARDS.includes(c));
-  assert.equal(c.rarity, 'boss');
-  assert.equal(c.name, 'Dio, der letzte Morgen');
-  assert.equal(c.frame, 'rar-legende');
-  assert.equal(c.fx, 'morgen');
-  assert.deepEqual(c.stats, { speed: 101, fia: 99, fis: 90, bwl: 99 });
-  assert.equal(c.isCharacter, true);
-  const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
-  for (const s of ['>ANG<', '>LEB<', '>SUP<', 'Schwur der Morgenröte', 'Untoter']) assert.ok(svg.includes(s), s);
-  assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), 'neue Bezeichnungen statt FIA/FIS/BWL');
 });
 
 test('Album: jede Karte nur einmal – Versionen zusammengefasst, Fortschritt zählt Karten in beliebiger Seltenheit', () => {

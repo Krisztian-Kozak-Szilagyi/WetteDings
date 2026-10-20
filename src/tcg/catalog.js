@@ -137,8 +137,6 @@ function loadCards(dir = IMAGE_DIR) {
       // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
       if (data && data.unreleased) card.unreleased = true;
       // title: Text im Namensbalken (z. B. „Ömer the Golden“), der Kartenname bleibt überall sonst name („Ömer“)
-      // fx: eigene Animation dieser Karte statt der ihrer Seltenheit (z. B. „morgen“: lila-golden brennend)
-      if (data && data.fx) card.fx = data.fx;
       if (framed) Object.assign(card, { frame: data.frame, title: data.title || '', ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });

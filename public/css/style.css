@@ -1733,27 +1733,6 @@ a.chat-msg-from:hover { text-decoration: underline; }
 .tcg-slot .tcg-art img.tcg-glitch-a { filter: hue-rotate(90deg) saturate(2); mix-blend-mode: screen; animation: glitchSlice 3.4s steps(1) infinite; clip-path: inset(0 0 100% 0); }
 .tcg-slot .tcg-art img.tcg-glitch-b { filter: hue-rotate(-120deg) saturate(2); mix-blend-mode: screen; opacity: .8; animation: glitchSlice 3.4s steps(1) infinite reverse; clip-path: inset(0 0 100% 0); }
 .r-glitch .tcg-art:has(.tcg-glitch-a) { animation: glitchShake 3.4s steps(1) infinite; }
-/* Legendär „morgen“ (Dio, der letzte Morgen): lila-goldene Flammen steigen auf, der Rand glüht und flackert */
-.tcg-fx-morgen {
-  background:
-    radial-gradient(120% 45% at 50% 108%, rgba(255, 196, 92, .55), transparent 62%),
-    radial-gradient(90% 60% at 20% 110%, rgba(168, 85, 247, .55), transparent 65%),
-    radial-gradient(90% 60% at 80% 110%, rgba(168, 85, 247, .5), transparent 65%),
-    linear-gradient(0deg, rgba(255, 210, 120, .28), transparent 40%, transparent 70%, rgba(124, 58, 237, .22));
-  background-size: 100% 200%, 100% 200%, 100% 200%, 100% 100%;
-  mix-blend-mode: screen; animation: morgenFlame 2.6s ease-in-out infinite alternate;
-}
-.tcg-slot .tcg-art:has(.tcg-fx-morgen), .tcg-card-3d.is-fx-morgen { animation: morgenGlow 2.2s ease-in-out infinite alternate; }
-@keyframes morgenFlame {
-  0% { background-position: 50% 0%, 0% 10%, 100% 0%, 0 0; filter: hue-rotate(0deg); opacity: .75; }
-  50% { opacity: 1; }
-  100% { background-position: 50% 18%, 0% 0%, 100% 14%, 0 0; filter: hue-rotate(-14deg); opacity: .85; }
-}
-@keyframes morgenGlow {
-  0% { box-shadow: 0 0 0 1px #e8b34a, 0 0 14px 2px rgba(168, 85, 247, .55), 0 0 30px 6px rgba(232, 179, 74, .25); }
-  100% { box-shadow: 0 0 0 2px #ffd36b, 0 0 22px 5px rgba(232, 179, 74, .6), 0 0 42px 12px rgba(124, 58, 237, .45); }
-}
-@media (prefers-reduced-motion: reduce) { .tcg-card-3d.is-fx-morgen { animation: none; box-shadow: 0 0 0 2px #e8b34a, 0 0 24px 6px rgba(168, 85, 247, .5); } }
 @keyframes holoSheen { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
 @keyframes tcgShine { 0%, 55% { background-position: 160% 0; } 100% { background-position: -60% 0; } }
 @keyframes glitchSlice {

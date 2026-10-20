@@ -203,12 +203,6 @@
       var slot = e.target.closest('[data-tcg-card]');
       if (!slot) return;
       var d = slot.dataset;
-      // eigene Animation der Karte (z. B. „morgen“: lila-golden brennend) auch in der Großansicht
-      var card3d = $('.tcg-card-3d', modal);
-      if (card3d) {
-        card3d.className = card3d.className.replace(/\s*is-fx-\S+/g, '');
-        if (d.fx) card3d.classList.add('is-fx-' + d.fx);
-      }
       var count = parseInt(d.count, 10) || 0;
       var rank = parseInt(d.rank, 10) || 0;
       var sell = parseInt(d.sell, 10) || 0;
