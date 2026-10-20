@@ -128,6 +128,19 @@
       <span class="inv-tile-arrow" aria-hidden="true">→</span>
     </a>
     <%# Eigener Knopf unter dem Inventar: Packs und Gegenstände kaufen %>
+    <% if (upgradeOpen) { %>
+    <a class="inv-tile is-upgrade" href="/tcg/aufwertung">
+      <span class="inv-tile-art" aria-hidden="true">
+        <svg class="inv-tile-icon" viewBox="0 0 52 72" width="52" height="72"><rect x="4" y="14" width="30" height="42" rx="4" fill="#2a2d3d" stroke="#8b8fa8" stroke-width="2"/><rect x="18" y="8" width="30" height="42" rx="4" fill="#33374a" stroke="#c4b5fd" stroke-width="2"/><path d="M33 40 V22 M26 29 l7 -7 7 7" fill="none" stroke="#facc15" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="inv-tile-text">
+        <span class="kicker">Sammlung</span>
+        <span class="inv-tile-title">Kartenaufwertung</span>
+        <span class="inv-tile-hint"><%= upgradeCount %> gleiche Karten → eine bessere</span>
+      </span>
+      <span class="inv-tile-arrow" aria-hidden="true">→</span>
+    </a>
+    <% } %>
     <a class="inv-tile is-shop" href="/inventar/shop">
       <span class="inv-tile-art" aria-hidden="true">
         <img class="inv-tile-icon" src="/img/items/folie.svg" alt="" width="52" height="72" loading="lazy">
