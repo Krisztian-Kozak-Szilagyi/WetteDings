@@ -159,6 +159,36 @@ const cardById = Object.fromEntries(LOADED.map((c) => [c.id, c]));
 const cardsByRarity = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
 const cardsBySeason = Object.fromEntries(SEASONS.map((s) => [s.key, CARDS.filter((c) => c.season === s.key)]));
 
+// ---------- Karten und ihre Versionen ----------
+// Eine „Karte“ im Album ist eine Person bzw. ein Gegenstand mit allen Versionen (Seltenheiten): „omer-1-crumpled“ …
+// „omer-6-glitch“ gehören zu „omer“, „st-ivan-boss“ zu „st-ivan“. Für den Fortschritt zählt, ob man die Karte in
+// irgendeiner Version besitzt – das Ziel ist jede Karte in ihrer besten Version, nicht jede Version.
+const GROUP_SUFFIX = new RegExp(`(-\\d+)?-(${ALL_RARITIES.map((r) => r.key).join('|')})$`);
+/** Schlüssel der Karte einer Version: "omer-3-gold" → "omer" */
+const groupKeyOf = (id) => String(id).replace(GROUP_SUFFIX, '');
+/** Versionen je Karte (nur erhältliche): Map Schlüssel → [Versionen, häufig → selten] */
+const cardGroups = new Map();
+for (const c of CARDS) {
+  if (!cardGroups.has(groupKeyOf(c.id))) cardGroups.set(groupKeyOf(c.id), []);
+  cardGroups.get(groupKeyOf(c.id)).push(c);
+}
+/**
+ * Fortschritt der Sammlung: { owned, total } in Karten (nicht Versionen). owns(cardId) → besitzt man diese Version?
+ * Karten nur in geheimer Seltenheit (Sith) zählen wie bisher erst mit, wenn man sie besitzt.
+ */
+function collectionProgress(owns) {
+  let owned = 0;
+  let total = 0;
+  for (const versions of cardGroups.values()) {
+    const has = versions.some((c) => owns(c.id));
+    const visible = versions.some((c) => !(rarityByKey[c.rarity] || {}).hidden);
+    if (!visible && !has) continue;
+    total++;
+    if (has) owned++;
+  }
+  return { owned, total };
+}
+
 /**
  * Bild-URL einer Rahmen-Karte (SVG, src/tcg/cardSvg.js). values: abweichende Werte, z. B. { fia: 110 } bei einem Boost –
  * sie erscheinen farbig auf der Karte. v = Version aus Werten, Text und Bild: Änderungen umgehen den Browser-Cache.
@@ -224,6 +254,9 @@ const expectedPackValue = () => expectedCardValue() * CARDS_PER_PACK;
 const chance = (key) => rarityByKey[key].weight / TOTAL_WEIGHT;
 
 module.exports = {
+  groupKeyOf,
+  cardGroups,
+  collectionProgress,
   PACK_IMAGE,
   CARDS_PER_PACK,
   PACK_TYPES,

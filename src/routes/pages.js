@@ -106,8 +106,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     top1: rankService.top1Text(profile.top1Seconds),
     profileIsTeam: rankService.isTeam(profile), // Team-Mitglieder sammeln die Zeit auf Platz 1 der Team-Wertung
     cardCount: owned.reduce((s, o) => s + o.n, 0),
-    uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
-    totalCards: catalog.CARDS.length,
+    uniqueOwned: catalog.collectionProgress((id) => has.has(id)).owned, // Karten in irgendeiner Seltenheit
+    totalCards: catalog.collectionProgress((id) => has.has(id)).total, // geheime Karten zählen mit, sobald man sie besitzt
     cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung der Slabs
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln

@@ -1,12 +1,33 @@
 <%- include('partials/head') %>
-<% const albumCards = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
+<%
+  // Eine Kachel je Karte: alle Versionen (Seltenheiten) einer Person bzw. eines Gegenstands zusammen. Die Kachel zeigt die
+  // beste eigene Version; ein Klick entfaltet alle Versionen (public/js/tcg.js, Album: Versionen). Fortschritt in Karten.
+  const rankOf = (c) => (rarityByKey[c.rarity] || {}).rank || 0;
+  const isHidden = (c) => !!(rarityByKey[c.rarity] || {}).hidden;
+  const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch', arcane: 'arcane' })[rarity] || '';
+  const groupMap = new Map();
+  for (const c of cards.filter((x) => x.rarity !== 'test-item').concat(unreleased)) {
+    const key = groupKeyOf(c.id);
+    if (!groupMap.has(key)) groupMap.set(key, { key, season: c.season, cards: [] });
+    groupMap.get(key).cards.push(c);
+  }
+  const groups = [...groupMap.values()].map((g) => {
+    const list = g.cards.filter((c) => !isHidden(c) || counts[c.id]).sort((a, b) => rankOf(a) - rankOf(b));
+    const owned = list.filter((c) => counts[c.id] || (foiledCopies[c.id] || []).length);
+    const seen = list.filter((c) => seenIds.has(c.id));
+    const best = owned.length ? owned[owned.length - 1] : null;
+    const shownCard = best || (seen.length ? seen[seen.length - 1] : null);
+    // Name der Karte: der Name der häufigsten Version (Boss-Versionen heißen oft anders, z. B. „St. Ivan, the Forsaken“)
+    return { ...g, list, owned, best, shownCard, name: list.length ? list[0].name : g.cards[0].name, soon: list.every((c) => c.unreleased), copies: list.reduce((n, c) => n + (counts[c.id] || 0), 0) };
+  }).filter((g) => g.list.length).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+%>
 
 <div class="album-head">
   <div class="album-title">
     <h1>Album</h1>
     <div class="tcg-progress">
-      <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
-      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Händlerwert <%= euro(collectionValue) %></span>
+      <span class="progress album-progress"><span style="width: <%= totalCards ? Math.round(uniqueOwned / totalCards * 100) : 0 %>%"></span></span>
+      <span class="tcg-progress-num" title="Eine Karte zählt, sobald du sie in irgendeiner Seltenheit besitzt"><%= uniqueOwned %> / <%= totalCards %> Karten · Händlerwert <%= euro(collectionValue) %></span>
     </div>
     <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
@@ -37,13 +58,43 @@
   <% } %>
   <%# Slabs: ganz oben als einzelne Karten. Karten im Sleeve stehen unten in den Seasons neben ihren Varianten ohne Sleeve. %>
   <%- include('partials/slab-shelf') %>
-  <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
+  <% seasonList.forEach((s) => { const sg = groups.filter((g) => g.season === s.key); if (!sg.length) return; const counted = sg.filter((g) => !g.soon); %>
     <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>">
       <div class="album-season-head">
         <h2 id="season-<%= s.key %>"><%= s.label %></h2>
-        <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
+        <span class="tcg-progress-num"><%= counted.filter((g) => g.owned.length).length %> / <%= counted.length %> Karten</span>
       </div>
-      <%- include('partials/tcg-grid', { mode: 'album', cards: s.list.concat(s.soon), slabsAbove: true }) %>
+      <div class="tcg-grid tcg-album album-groups">
+        <% sg.forEach((g) => { const c = g.shownCard; const fx = c && g.best ? fxFor(c.rarity) : ''; const many = g.list.length > 1; %>
+          <% if (g.soon) { %>
+            <%# noch nicht erhältlich: eine Farbe für alle, Seltenheiten nicht verraten %>
+            <div class="tcg-slot tcg-locked tcg-soon album-group" data-rarity="soon" title="Noch nicht erhältlich">
+              <div class="tcg-locked-inner"><span>?</span></div>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span>???</span>
+            </div>
+          <% } else { %>
+            <button type="button" class="tcg-slot album-group<%= many ? ' is-stack' : '' %><%= g.best ? ' r-' + g.best.rarity : c ? ' tcg-seen r-' + c.rarity : ' tcg-locked' %>"
+              data-album-group="<%= g.key %>" data-name="<%= g.name %>" data-rarities="<%= g.list.map((x) => x.rarity).join(' ') %>"
+              aria-label="<%= g.name %>: <%= g.owned.length %> von <%= g.list.length %> Versionen<%= g.best ? ', beste: ' + rarityByKey[g.best.rarity].label : '' %> – Versionen ansehen">
+              <% if (c) { %>
+                <span class="tcg-art">
+                  <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+                  <% if (fx === 'glitch') { %><img class="tcg-glitch-a" src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><img class="tcg-glitch-b" src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><% } %>
+                  <% if (fx) { %><span class="tcg-fx tcg-fx-<%= fx %>"></span><% } %>
+                  <% if (g.copies > 1) { %><span class="tcg-count">×<%= g.copies %></span><% } %>
+                </span>
+              <% } else { %>
+                <div class="tcg-locked-inner"><span>?</span></div>
+              <% } %>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= g.name %><% if (many) { %> <span class="album-group-n"><%= g.owned.length %>/<%= g.list.length %></span><% } %></span>
+            </button>
+            <%# alle Versionen – werden beim Anklicken in die Übersicht geholt; dort öffnet jede Version wie gewohnt die Großansicht %>
+            <div class="album-versions" data-album-versions="<%= g.key %>" data-title="<%= g.name %>" data-sub="<%= g.owned.length %> von <%= g.list.length %> <%= g.list.length === 1 ? 'Version' : 'Versionen' %><%= g.best ? ' · beste: ' + rarityByKey[g.best.rarity].label : ' · noch keine' %>" hidden>
+              <%- include('partials/tcg-grid', { mode: 'album', cards: g.list, slabsAbove: true }) %>
+            </div>
+          <% } %>
+        <% }) %>
+      </div>
     </section>
   <% }) %>
   <% if (testCards.length) { %>
@@ -55,6 +106,18 @@
       <%- include('partials/tcg-grid', { mode: 'album', cards: testCards, slabsAbove: true }) %>
     </section>
   <% } %>
+</div>
+
+<%# Versionen einer Karte: Hintergrund unscharf, die Versionen entfalten sich aus der Kachel (public/js/tcg.js) %>
+<div class="album-unfold" data-album-unfold hidden>
+  <div class="album-unfold-stage" role="dialog" aria-modal="true" aria-labelledby="album-unfold-title">
+    <button type="button" class="tcg-close album-unfold-close" data-album-unfold-close aria-label="Schließen">×</button>
+    <div class="album-unfold-head">
+      <h2 id="album-unfold-title" data-album-unfold-title></h2>
+      <p class="muted" data-album-unfold-sub></p>
+    </div>
+    <div class="album-unfold-cards" data-album-unfold-cards></div>
+  </div>
 </div>
 
 <!-- Karte vergrößern -->

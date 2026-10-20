@@ -84,8 +84,8 @@
           <span class="kicker">Sammlung</span>
           <span class="tcg-album-title">Zum Album</span>
           <span class="tcg-progress">
-            <span class="progress"><span style="width: <%= cards.length ? Math.round(uniqueOwned / cards.length * 100) : 0 %>%"></span></span>
-            <span class="tcg-progress-num"><%= uniqueOwned %> / <%= cards.length %></span>
+            <span class="progress"><span style="width: <%= totalCards ? Math.round(uniqueOwned / totalCards * 100) : 0 %>%"></span></span>
+            <span class="tcg-progress-num"><%= uniqueOwned %> / <%= totalCards %></span>
           </span>
         </span>
         <span class="tcg-album-arrow" aria-hidden="true">→</span>

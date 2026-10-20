@@ -35,8 +35,11 @@
     var search = $('[data-tcg-search]', scope);
     var q = search ? search.value.trim().toLowerCase() : '';
     $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
+      if (slot.closest('[data-album-versions], [data-album-unfold]')) return; // Versionen einer Karte (Album): bleiben
       var name = (slot.getAttribute('data-name') || '').toLowerCase();
-      var hide = (key !== 'all' && slot.getAttribute('data-rarity') !== key) || (q && name.indexOf(q) === -1);
+      // Kachel einer Karte (Album): passt, wenn es die Karte in dieser Seltenheit gibt
+      var rarities = slot.hasAttribute('data-rarities') ? slot.getAttribute('data-rarities').split(' ') : [slot.getAttribute('data-rarity')];
+      var hide = (key !== 'all' && rarities.indexOf(key) === -1) || (q && name.indexOf(q) === -1);
       (slot.closest('.tcg-pick-multi') || slot).hidden = !!hide;
     });
   };
@@ -68,6 +71,73 @@
       });
     });
   });
+
+  // ---------- Album: Versionen einer Karte entfalten ----------
+  // Jede Karte steht im Album nur einmal (beste eigene Version). Ein Klick legt einen unscharfen Schleier über die Seite;
+  // die Versionen fliegen aus der Kachel an ihren Platz (FLIP-Animation, versetzt). Jede Version öffnet wie gewohnt die
+  // Großansicht (Verkaufen, Sleeve, Favorit …). Die Versionen liegen versteckt neben der Kachel ([data-album-versions])
+  // und wandern beim Öffnen in die Übersicht – beim Schließen zurück.
+  var unfold = $('[data-album-unfold]');
+  var unfoldOpen = null; // { box, grid, tile }
+  var calmMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function closeUnfold() {
+    if (!unfoldOpen) return;
+    unfoldOpen.box.appendChild(unfoldOpen.grid);
+    unfold.hidden = true;
+    document.body.classList.remove('album-unfold-on');
+    var tile = unfoldOpen.tile;
+    unfoldOpen = null;
+    if (tile) tile.focus({ preventScroll: true });
+  }
+  function openUnfold(tile, instant) {
+    if (!unfold || !tile) return;
+    var key = tile.getAttribute('data-album-group');
+    var box = $('[data-album-versions="' + key.replace(/["\\]/g, '') + '"]');
+    if (!box) return;
+    closeUnfold();
+    var grid = $('.tcg-grid', box);
+    $('[data-album-unfold-title]', unfold).textContent = box.getAttribute('data-title') || '';
+    $('[data-album-unfold-sub]', unfold).textContent = box.getAttribute('data-sub') || '';
+    $('[data-album-unfold-cards]', unfold).appendChild(grid);
+    unfold.hidden = false;
+    document.body.classList.add('album-unfold-on');
+    unfoldOpen = { box: box, grid: grid, tile: tile };
+    var from = tile.getBoundingClientRect();
+    var slots = $all('.tcg-slot', grid);
+    if (instant || calmMotion) return;
+    // aus der Kachel heraus entfalten: jede Version startet auf der Kachel und gleitet versetzt an ihren Platz
+    slots.forEach(function (s, i) {
+      var to = s.getBoundingClientRect();
+      var dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      var dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      var turn = (i - (slots.length - 1) / 2) * 6;
+      s.style.transition = 'none';
+      s.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + (from.width / to.width).toFixed(3) + ') rotate(' + turn + 'deg)';
+      s.style.opacity = '0';
+      void s.offsetWidth;
+      s.style.transition = 'transform .55s cubic-bezier(.2, .9, .25, 1.15) ' + i * 60 + 'ms, opacity .25s ease ' + i * 60 + 'ms';
+      s.style.transform = '';
+      s.style.opacity = '';
+    });
+    setTimeout(function () { slots.forEach(function (s) { s.style.transition = ''; }); }, 700 + slots.length * 60);
+  }
+  /** Versteckte Version (z. B. Sprungziel #karte-<id>): erst ihre Karte entfalten, damit man sie sieht */
+  function revealVersion(el, instant) {
+    var box = el && el.closest('[data-album-versions]');
+    if (box) openUnfold($('[data-album-group="' + box.getAttribute('data-album-versions').replace(/["\\]/g, '') + '"]'), instant);
+  }
+  if (unfold) {
+    $all('[data-album-group]').forEach(function (tile) {
+      tile.addEventListener('click', function () { openUnfold(tile); });
+    });
+    $('[data-album-unfold-close]', unfold).addEventListener('click', closeUnfold);
+    // Klick auf den unscharfen Hintergrund schließt (nicht auf die Karten selbst)
+    unfold.addEventListener('click', function (e) { if (e.target === unfold) closeUnfold(); });
+    document.addEventListener('keydown', function (e) {
+      // Esc schließt die Übersicht – außer die Großansicht einer Version ist gerade offen (die schließt zuerst)
+      if (e.key === 'Escape' && unfoldOpen && !document.querySelector('dialog[open]')) closeUnfold();
+    });
+  }
 
   // ---------- Anzahl Packs im Shop ----------
   var qty = $('[data-tcg-qty]');
@@ -262,6 +332,7 @@
       if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       window.scrollTo(0, back.y);
       if (slot) {
+        revealVersion(slot, true); // Album: erst die Versionen der Karte zeigen
         slot.click(); // öffnet das Kartenfenster mit dem neuen Stand
         var note = $('[data-tcg-modal-note]', modal);
         if (message && note) {
@@ -282,6 +353,18 @@
   var jump = jumpRule && jumpRule[0].exec(window.location.hash);
   if (jump) {
     var target = $('[' + jumpRule[1] + '="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
+    if (target && target.closest('[data-album-versions]')) {
+      // Album: die Version steckt in ihrer Karte – Karte entfalten und die Version aufleuchten lassen
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      var tileOf = $('[data-album-group="' + target.closest('[data-album-versions]').getAttribute('data-album-versions').replace(/["\\]/g, '') + '"]');
+      if (tileOf) tileOf.scrollIntoView({ block: 'center' });
+      revealVersion(target);
+      setTimeout(function () {
+        target.classList.add('is-spotlight');
+        setTimeout(function () { target.classList.remove('is-spotlight'); }, 2200);
+      }, 600);
+      target = null;
+    }
     if (target) {
       history.replaceState(null, '', window.location.pathname + window.location.search); // Neuladen springt nicht erneut
       var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

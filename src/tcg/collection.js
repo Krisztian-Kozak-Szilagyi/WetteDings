@@ -81,7 +81,9 @@ async function collection(user) {
     markedCopies,
     graded: gradeStats(foiledDocs.map((d) => d.slab && d.slab.grade)), // beste Note und Schnitt der Slabs
     protectedIds,
-    uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
+    // Fortschritt in Karten: eine Karte zählt, sobald man sie in irgendeiner Seltenheit besitzt
+    uniqueOwned: catalog.collectionProgress((id) => counts[id]).owned,
+    totalCards: catalog.collectionProgress((id) => counts[id]).total, // geheime Karten zählen mit, sobald man sie besitzt
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     collectionValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
     dupCount: dups.reduce((s, o) => s + o.n - 1, 0),

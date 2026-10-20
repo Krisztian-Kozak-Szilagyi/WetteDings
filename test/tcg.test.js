@@ -254,3 +254,25 @@ test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell – ohne Wertefenster, Pl
     assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), 'keine Wertefenster');
   }
 });
+
+test('Album: jede Karte nur einmal – Versionen zusammengefasst, Fortschritt zählt Karten in beliebiger Seltenheit', () => {
+  const catalog = require('../src/tcg/catalog');
+  assert.equal(catalog.groupKeyOf('omer-3-gold'), 'omer');
+  assert.equal(catalog.groupKeyOf('st-ivan-boss'), 'st-ivan', 'die Boss-Version gehört zu St. Ivan');
+  assert.equal(catalog.groupKeyOf('hugo-holo'), 'hugo');
+  assert.equal(catalog.groupKeyOf('grafikkarte-amd-gold'), 'grafikkarte-amd');
+  assert.equal(catalog.groupKeyOf('casino-kaffee-6-glitch'), 'casino-kaffee');
+  assert.equal(catalog.cardGroups.get('omer').length, 6);
+  assert.equal(catalog.cardGroups.get('st-ivan').length, 7);
+  // jede erhältliche Version steckt in genau einer Karte
+  assert.equal([...catalog.cardGroups.values()].reduce((n, v) => n + v.length, 0), catalog.CARDS.length);
+  const none = catalog.collectionProgress(() => false);
+  assert.ok(none.total < catalog.CARDS.length && none.owned === 0);
+  // nur eine Crumpled-Version von Ömer: zählt schon als Karte
+  assert.equal(catalog.collectionProgress((id) => id === 'omer-1-crumpled').owned, 1);
+  assert.equal(catalog.collectionProgress((id) => id.startsWith('omer-')).owned, 1, 'mehr Versionen = immer noch eine Karte');
+  // geheime Seltenheit (Sith) zählt erst, wenn man sie besitzt
+  const all = catalog.collectionProgress(() => true);
+  assert.equal(all.owned, all.total);
+  assert.equal(all.total, none.total + 1);
+});

@@ -86,6 +86,7 @@ router.get('/tcg/album', async (req, res) => {
     testCards: req.user.isAdmin ? catalog.TEST_CARDS : [],
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
+    groupKeyOf: catalog.groupKeyOf, // Versionen einer Karte zusammenfassen (eine Kachel je Karte)
     favoriteIds: new Set(req.user.tcgFavorites || []),
     // schon einmal besessene Karten: durchsichtig statt "?"
     seenIds: new Set(req.user.tcgSeen || []),
