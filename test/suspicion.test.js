@@ -471,3 +471,36 @@ test('#204 C: Wertverschiebung – die Position geht an valueOf (Slab zum Marktp
   assert.ok(s.valueFinding(t, bankOnly)); // nach Händlerpreis: 300 € für eine 10-€-Karte – sieht nach Verschiebung aus
   assert.equal(s.valueFinding(t, withMarket), null); // zum Marktpreis des Slabs: fair
 });
+
+test('Kartenaufwertung: Tempo/Takt kennt die Aufwertung, Glück wird gegen die gespeicherten Chancen geprüft', () => {
+  assert.ok(s.ACTIONS.aufwerten && s.ACTIONS.aufwerten.floorMs >= 3000);
+  const t0 = Date.parse('2026-10-20T10:00:00Z');
+  const at = (i, ms) => new Date(t0 + i * ms);
+  // schneller als die Verschmelzung (alle 1,5 s): Tempo
+  assert.ok(s.tempoFinding(Array.from({ length: 12 }, (_, i) => at(i, 1500)), 'aufwerten'));
+  assert.equal(s.tempoFinding(Array.from({ length: 12 }, (_, i) => at(i, 20000)), 'aufwerten'), null);
+  // Verteilungen
+  assert.ok(Math.abs(s.normalTail(0) - 0.5) < 1e-6 && Math.abs(s.normalTail(1.96) - 0.025) < 1e-3);
+  assert.ok(Math.abs(s.poissonTail(1, 1) - (1 - Math.exp(-1))) < 1e-9 && s.poissonTail(0, 3) === 1);
+  // normales Glück: 50 Verträge mit 50 %, 26 gelungen, ein Glückstreffer bei 0,1 % Chance → kein Hinweis
+  const ups = (n, chance, wonEvery, extra = []) => Array.from({ length: n }, (_, i) => ({ createdAt: at(i, 60000), chance, pLucky: 0.001, kind: i % wonEvery === 0 ? 'erfolg' : 'fehlschlag' })).concat(extra);
+  assert.equal(s.upgradeLuckFinding(ups(50, 0.5, 2)), null);
+  assert.equal(s.upgradeLuckFinding(ups(50, 0.5, 2, [{ createdAt: at(60, 60000), chance: 1, pLucky: 0.001, kind: 'bonus' }])), null, 'ein Glückstreffer allein ist kein Muster');
+  // 40 von 40 gelungen bei 30 % Chance: unmöglich als Zufall
+  const lucky = s.upgradeLuckFinding(ups(40, 0.3, 1));
+  assert.ok(lucky && lucky.level === LEVEL.wahrscheinlich, JSON.stringify(lucky));
+  assert.equal(lucky.hitRate, 1);
+  assert.ok(Math.abs(lucky.expected - (0.001 + 0.999 * 0.3)) < 1e-9);
+  // zu wenige Verträge: noch keine Aussage
+  assert.equal(s.upgradeLuckFinding(ups(10, 0.3, 1)), null);
+  // 3 Glückstreffer/Jackpots in 200 Aufwertungen bei je 0,1 % (erwartet 0,2) sind noch denkbar (≈ 1 zu 870) – 4 nicht mehr
+  const luckyRun = (k) => s.upgradeLuckFinding(Array.from({ length: 200 }, (_, i) => ({ createdAt: at(i, 60000), chance: 1, pLucky: 0.001, kind: i < k ? 'jackpot' : 'erfolg' })));
+  assert.equal(luckyRun(3), null);
+  const jack = luckyRun(4);
+  assert.ok(jack && jack.lucky === 4 && jack.odds < s.LUCK_P, JSON.stringify(jack));
+  assert.ok(/Glückstreffer\/Jackpots/.test(jack.summary));
+  // Anzeige im Panel
+  const facts = s.factsOf('glueck', { count: 40, hitRate: 1, expected: 0.3, lucky: 0, odds: 1e-9 });
+  assert.ok(facts.some((f) => f.label === 'gelungen') && facts.some((f) => f.label === 'als Zufall'));
+  assert.ok(s.KIND_LABEL.glueck);
+});

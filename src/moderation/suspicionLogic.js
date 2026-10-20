@@ -15,13 +15,15 @@ const HOUR = 60 * MIN;
 
 // Aktionen, deren Abstände geprüft werden. floorMs = schneller klickt kein Mensch über mehrere Aktionen hinweg:
 // Pack kaufen ist ein Formular mit Neuladen, Pack öffnen braucht Anfrage, Aufreißen (650 ms), Aufdecken und den
-// Knopf "Nächstes Pack", ein Bank-Verkauf lädt das Album neu. log = passendes Protokoll im Panel.
+// Knopf "Nächstes Pack", ein Bank-Verkauf lädt das Album neu. Eine Kartenaufwertung zeigt erst die Verschmelzung (mind.
+// rund 3 s), danach lädt die Seite neu und 10 Karten wollen ausgewählt sein. log = passendes Protokoll im Panel.
 const ACTIONS = {
   kaufen: { label: 'Pack-Käufe', floorMs: 400, log: 'konto' },
   oeffnen: { label: 'Pack-Öffnungen', floorMs: 1500, log: 'packs' },
   verkaufen: { label: 'Bank-Verkäufe', floorMs: 800, log: 'verkauf' },
   broker: { label: 'Broker-Aufträge', floorMs: 1000, log: 'broker' },
   wetten: { label: 'Wett-Einsätze', floorMs: 1500, log: 'einsaetze' },
+  aufwerten: { label: 'Kartenaufwertungen', floorMs: 3000, log: 'verkauf' },
 };
 
 const TEMPO_RUN = 5; // so viele Abstände in Folge unter der Untergrenze
@@ -124,7 +126,7 @@ const PARALLEL_STRONG = 2; // so viele solche Zeitfenster: wahrscheinlich
 const RATING_AREAS = {
   verhalten: { label: 'Spielverhalten', kinds: ['tempo', 'takt', 'ihk', 'dungeon', 'grading', 'scalping', 'dauer', 'markt'] },
   technik: { label: 'Technik', kinds: ['browser', 'reaktion', 'eingabe', 'falle', 'rechenzentrum', 'parallel'] },
-  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert', 'kreislauf', 'rang', 'netz', 'gefaellig', 'gradingnetz'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
+  ergebnis: { label: 'Ergebnis', kinds: ['ertrag', 'wert', 'kreislauf', 'rang', 'netz', 'gefaellig', 'gradingnetz', 'glueck'] }, // dazu ein Mehrfach-Konto (Geräte-Hinweis)
 };
 const RATING_POINTS = { 1: 1, 2: 3 }; // Punkte je Stufe des stärksten Hinweises im Bereich (möglich, wahrscheinlich)
 const RATING_EXTRA = 1; // jeder weitere Hinweis im selben Bereich
@@ -132,6 +134,13 @@ const RATING_AREA_MAX = 5; // höchstens so viele Punkte je Bereich
 const RATING_FACTOR = { 1: 1, 2: 1.5, 3: 2 }; // Bonus, wenn Belege aus 2 bzw. 3 Bereichen kommen
 const STAGE = { beobachten: 1, verdacht: 2, stark: 3, eindeutig: 4 };
 const STAGE_LABEL = { 1: 'Beobachten', 2: 'Verdacht', 3: 'Starker Verdacht', 4: 'Eindeutig' };
+
+// Kartenaufwertung (src/tcg/upgrade.js): mehr Glück, als die gespeicherten Chancen hergeben. Jede Aufwertung trägt ihre
+// Erfolgschance und die Chance auf Glückstreffer/Jackpot; verglichen wird mit dem, was der Zufall erwarten lässt.
+const LUCK_MIN = 20; // so viele Aufwertungen mit offenem Ausgang (Chance zwischen 0 und 100 %) braucht der Erfolgs-Vergleich
+const LUCK_P = 1e-4; // so unwahrscheinlich (oder weniger), dass es Zufall ist: möglich …
+const LUCK_P_STRONG = 1e-7; // … und wahrscheinlich
+const LUCK_RARE_MIN = 2; // Glückstreffer/Jackpots: erst ab so vielen
 
 const INCOME_MIN_PLAYERS = 8; // Vergleich erst ab so vielen Spielern mit Einnahmen
 const INCOME_FACTOR = 5; // Einnahmen mindestens das Fünffache des Medians …
@@ -160,6 +169,7 @@ const KIND_LABEL = {
   markt: 'Reaktion auf Kurssprünge',
   gefaellig: 'Gefälligkeitsnote',
   gradingnetz: 'Grading unter Mehrfach-Konten',
+  glueck: 'Unwahrscheinliches Glück (Aufwertung)',
   mehrfachkonto: 'Mehrfach-Konto', // aus der Geräte-Erkennung (device/deviceVerdictLog.js), nur im Urteils-Protokoll
 };
 
@@ -371,6 +381,84 @@ function scalpFinding(trades) {
     // neue Belege nur durch Runden im Plus – eine normale Runde danach öffnet einen erledigten Hinweis nicht
     to: new Date(rounds.filter((r) => r.gain > 0).pop().at),
     summary: `${rounds.length} Kauf-Verkauf-Runden mit je ${seconds(holdMs)} Haltedauer, ${wins} davon im Plus (${percent(rate)}, Zufall wäre etwa 50 %), zusammen ${euro(gain)}`,
+  };
+}
+
+// ---------- Kartenaufwertung: unwahrscheinliches Glück ----------
+
+/** Obere Tail-Wahrscheinlichkeit der Standardnormalverteilung P(Z ≥ z) (Abramowitz/Stegun 7.1.26, genau genug hier) */
+function normalTail(z) {
+  if (z < 0) return 1 - normalTail(-z); // z = 0 (auch −0) rechnet unten: 0,5
+  const x = z / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erfc = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x);
+  return erfc / 2;
+}
+
+/** P(X ≥ k) für X ~ Poisson(lambda) – für seltene Ereignisse (Glückstreffer, Jackpot) */
+function poissonTail(k, lambda) {
+  if (k <= 0) return 1;
+  let term = Math.exp(-lambda);
+  let below = term;
+  for (let i = 1; i < k; i++) {
+    term *= lambda / i;
+    below += term;
+  }
+  return Math.max(0, 1 - below);
+}
+
+/** „1 zu 25.000“ */
+const oddsText = (p) => (p < 1e-9 ? 'unter 1 zu 1 Milliarde' : `1 zu ${Math.round(1 / p).toLocaleString('de-DE')}`);
+
+/**
+ * Aufwertungen eines Mitglieds: [{ createdAt, chance, kind, pLucky }] (chance = Erfolgschance des Vertrags, pLucky =
+ * Chance auf Glückstreffer oder Jackpot, kind = Ausgang). Zwei Vergleiche mit dem Zufall:
+ *   Erfolge  – Verträge mit offenem Ausgang (0 < chance < 1): beobachtete Erfolge gegen die Summe der Chancen
+ *              (Normalnäherung, ab LUCK_MIN Verträgen)
+ *   Glück    – Glückstreffer und Jackpots gegen die Summe ihrer Chancen (Poisson, ab LUCK_RARE_MIN Treffern)
+ * Hinweis, wenn das Ergebnis seltener als LUCK_P zufällig so ausfällt.
+ */
+function upgradeLuckFinding(list) {
+  const ups = [...list].sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
+  if (!ups.length) return null;
+  const won = (u) => u.kind && u.kind !== 'fehlschlag';
+  const lucky = (u) => u.kind === 'bonus' || u.kind === 'jackpot';
+  const hits = [];
+  // Erfolge bei offenem Ausgang
+  const open = ups.filter((u) => u.chance > 0 && u.chance < 1);
+  if (open.length >= LUCK_MIN) {
+    const pOf = (u) => (u.pLucky || 0) + (1 - (u.pLucky || 0)) * u.chance;
+    const mu = open.reduce((s, u) => s + pOf(u), 0);
+    const sd = Math.sqrt(open.reduce((s, u) => s + pOf(u) * (1 - pOf(u)), 0));
+    const obs = open.filter(won).length;
+    const p = sd > 0 ? normalTail((obs - 0.5 - mu) / sd) : obs > mu ? 0 : 1;
+    if (p < LUCK_P) hits.push({ what: 'erfolg', p, count: open.length, obs, mu, last: open.filter(won).pop() });
+  }
+  // Glückstreffer und Jackpots
+  const rare = ups.filter(lucky);
+  if (rare.length >= LUCK_RARE_MIN) {
+    const lambda = ups.reduce((s, u) => s + (u.pLucky || 0), 0);
+    const p = poissonTail(rare.length, lambda);
+    if (p < LUCK_P) hits.push({ what: 'glueck', p, count: ups.length, obs: rare.length, mu: lambda, last: rare[rare.length - 1] });
+  }
+  if (!hits.length) return null;
+  const best = hits.reduce((a, b) => (b.p < a.p ? b : a));
+  const success = hits.find((h) => h.what === 'erfolg');
+  const luck = hits.find((h) => h.what === 'glueck');
+  const parts = [];
+  if (success) parts.push(`${success.obs} von ${success.count} Aufwertungen mit offenem Ausgang gelungen, erwartet wären etwa ${Math.round(success.mu)} (Zufall: ${oddsText(success.p)})`);
+  if (luck) parts.push(`${luck.obs} Glückstreffer/Jackpots in ${luck.count} Aufwertungen, erwartet ${luck.mu.toLocaleString('de-DE', { maximumFractionDigits: 2 })} (Zufall: ${oddsText(luck.p)})`);
+  return {
+    level: best.p < LUCK_P_STRONG ? LEVEL.wahrscheinlich : LEVEL.moeglich,
+    count: ups.length,
+    hitRate: success ? success.obs / success.count : undefined,
+    expected: success ? success.mu / success.count : undefined,
+    lucky: rare.length,
+    odds: best.p,
+    from: new Date(toMs(ups[0].createdAt)),
+    // neue Belege nur durch weitere Glücksfälle – eine normale Aufwertung danach öffnet einen erledigten Hinweis nicht
+    to: new Date(toMs(best.last.createdAt)),
+    summary: parts.join('; '),
   };
 }
 
@@ -1067,6 +1155,7 @@ const COUNT_LABEL = {
   markt: 'Reaktionen',
   gefaellig: 'zu hohe Noten',
   gradingnetz: 'Aufträge',
+  glueck: 'Aufwertungen',
 };
 
 /**
@@ -1106,6 +1195,10 @@ function factsOf(kind, details = {}) {
   add(num(d.total), euro(d.total), TOTAL_LABEL[kind] || 'verschoben');
   add(num(d.back) && d.back > 0, euro(d.back), 'zurück');
   add(num(d.factor), `${Math.round(d.factor)}×`, 'das Übliche');
+  add(num(d.hitRate), percent(d.hitRate), 'gelungen');
+  add(num(d.expected), percent(d.expected), 'erwartet');
+  add(num(d.lucky) && d.lucky > 0, String(d.lucky), 'Glückstreffer/Jackpots');
+  add(num(d.odds), oddsText(d.odds), 'als Zufall');
   return out;
 }
 
@@ -1226,6 +1319,11 @@ module.exports = {
   rhythmFinding,
   ihkFinding,
   scalpFinding,
+  upgradeLuckFinding,
+  normalTail,
+  poissonTail,
+  LUCK_MIN,
+  LUCK_P,
   tradeFlow,
   valueFinding,
   favorFinding,
