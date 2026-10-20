@@ -18,6 +18,7 @@ async function main() {
   await require('./src/ihk/ihkService').loadSettings(); // IHK: Tageslimit und Belohnungen
   await require('./src/dungeon/dungeonService').loadSettings(); // Dungeon: Termine, Lohn, Beute, Bot-Karten
   await require('./src/tcg/cardBans').load(); // Kartensperren je Spielmodus (Moderation → Kartensperren)
+  await require('./src/tcg/upgrade').loadSettings(); // Kartenaufwertung: freigegeben? Chance, Anzahl
   await require('./src/services/taxService').loadSettings(); // Steuersätze: Handel (Markt, Privat, Tausch) und Broker (Coins, ETFs)
   await require('./src/services/bonusService').loadSettings(); // Tagesbonus
   await require('./src/grading/gradingService').loadSettings(); // Grading-Shop: freigegeben?

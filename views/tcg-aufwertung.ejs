@@ -1,0 +1,106 @@
+<%- include('partials/head') %>
+<%# Kartenaufwertung (src/routes/tcg.js, Regeln: src/tcg/upgrade.js und public/js/aufwertung-regeln.js): 10 Karten in den
+    Vertrag legen (Seltenheiten gemischt) und verschmelzen. Auswahl, Vertrag, Chance und Walze zeichnet public/js/aufwertung.js. %>
+<div class="up-page" data-upgrade='<%= JSON.stringify({ tiers, ladder, pools, rules }) %>' data-csrf="<%= csrfToken %>">
+  <section class="up-hero">
+    <div>
+      <span class="kicker">Sammlung</span>
+      <h1>Kartenaufwertung</h1>
+      <p>Lege <strong><%= count %> Karten</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>Seltenheit über deiner seltensten Karte</strong>, sonst eine Karte aus der Seltenheit einer zufällig gewählten eingesetzten Karte. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong>.</p>
+      <p>Seltenheiten darfst du mischen – je mehr häufigere Karten dabei sind, desto kleiner die Chance. Bei jeder Aufwertung gibt es außerdem einen <strong>Glückstreffer</strong> (<%= bonusText %>: eine Stufe höher) und den <strong>Jackpot</strong> (<%= jackpotText %>: eine Glitch- oder Icon-Karte).</p>
+      <p class="muted small">Karten im Sleeve oder Slab und Karten auf Quest, im Dungeon, Handel, Duell oder beim Grading spielen nicht mit. Icon ist die höchste Stufe – Sith- und Boss-Karten gibt es hier nicht.</p>
+      <% if (closedForOthers) { %><p class="up-admin-note">Noch nicht für alle freigegeben – nur Admins sehen diese Seite (Admin-Panel → Spielwerte → TCG).</p><% } %>
+    </div>
+    <a class="btn btn-ghost" href="/tcg">← Zurück zum TCG</a>
+  </section>
+
+  <nav class="up-tabs" role="tablist" aria-label="Seltenheit" data-up-tabs>
+    <% tiers.forEach((t, i) => { %>
+      <button type="button" role="tab" class="up-tab r-<%= t.key %>" data-up-tab="<%= t.key %>" aria-selected="<%= i === 0 %>">
+        <span class="tcg-dot"></span><%= t.label %>
+        <span class="up-tab-count" title="freie Karten"><%= t.free %></span>
+      </button>
+    <% }) %>
+  </nav>
+
+  <div class="up-layout">
+    <section class="card up-pick" aria-label="Deine Karten">
+      <div class="up-pick-head">
+        <h2 data-up-pick-title>Deine Karten</h2>
+        <span class="muted small">Klick legt ein Exemplar in den Vertrag</span>
+      </div>
+      <div class="up-grid" data-up-grid></div>
+      <p class="muted up-empty" data-up-empty hidden>Von dieser Seltenheit hast du gerade keine freien Karten.</p>
+    </section>
+
+    <aside class="card up-contract" aria-label="Vertrag">
+      <div class="up-contract-head">
+        <h2>Vertrag</h2>
+        <span class="up-filled" data-up-filled>0 / <%= count %></span>
+      </div>
+      <div class="up-slots" data-up-slots></div>
+      <div class="up-chance r-holo" data-up-chance>
+        <span class="up-chance-label">Chance auf <b data-up-next>–</b></span>
+        <strong class="up-chance-value" data-up-chance-value>–</strong>
+      </div>
+      <p class="muted small up-else" data-up-else></p>
+      <p class="small up-extra" data-up-extra></p>
+      <div class="up-actions">
+        <button type="button" class="btn btn-ghost btn-sm" data-up-fill>Mit Duplikaten auffüllen</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-up-clear>Leeren</button>
+      </div>
+      <button type="button" class="btn btn-primary btn-lg up-go" data-up-go disabled>Aufwerten</button>
+      <details class="up-pool">
+        <summary>Welche Karten herauskommen können</summary>
+        <div data-up-pool></div>
+      </details>
+    </aside>
+  </div>
+
+  <section class="card up-history">
+    <h2>Deine letzten Aufwertungen</h2>
+    <% if (!history.length) { %>
+      <p class="muted">Noch keine Aufwertung.</p>
+    <% } else { %>
+      <ul class="up-history-list">
+        <% history.forEach((h) => { %>
+          <li class="<%= h.kind === 'jackpot' || h.kind === 'bonus' ? 'is-lucky' : h.success ? 'is-up' : 'is-same' %>">
+            <% if (h.card) { %><img src="<%= h.card.image %>" alt="" width="720" height="1008" loading="lazy"><% } %>
+            <span>
+              <strong><%= h.card ? h.card.name : h.result.card %></strong>
+              <% const KIND = { erfolg: 'aufgewertet', bonus: 'Glückstreffer!', jackpot: 'JACKPOT!', fehlschlag: 'nicht aufgewertet' }; %>
+              <span class="small muted"><%= h.inputs.length %> Karten<%= h.mixed ? ' gemischt' : '' %> bis <%= h.fromLabel %> · <%= KIND[h.kind] || (h.success ? 'aufgewertet' : 'nicht aufgewertet') %><%= h.result.missing ? ' · war neu' : '' %> · <%= date(h.createdAt) %></span>
+            </span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+
+<%# Verschmelzen: die Karten fliegen auf einer Spirale zusammen, der Kern leuchtet Stufe um Stufe durch die Seltenheiten
+    (Crumpled zuerst) und hält bei der Farbe der gezogenen Karte – dann erscheint sie (public/js/aufwertung.js) %>
+<div class="up-reveal" data-up-reveal hidden>
+  <div class="up-reveal-box" role="dialog" aria-modal="true" aria-labelledby="up-result-title">
+    <div class="up-fuse" data-up-fuse aria-live="polite">
+      <div class="up-core" data-up-core aria-hidden="true"><span class="up-rays"></span><span class="up-rays up-rays-2"></span><span class="up-orb"></span></div>
+      <p class="up-fuse-label" data-up-fuse-label></p>
+    </div>
+    <div class="up-result" data-up-result hidden>
+      <img data-up-result-img alt="" width="720" height="1008">
+      <div>
+        <p class="kicker" data-up-result-kicker></p>
+        <h2 id="up-result-title" data-up-result-title></h2>
+        <p data-up-result-text></p>
+        <div class="up-result-actions">
+          <a class="btn btn-ghost" href="/tcg/album">Zum Album</a>
+          <button type="button" class="btn btn-primary" data-up-again>Weiter aufwerten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/aufwertung-regeln.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/aufwertung.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot') %>

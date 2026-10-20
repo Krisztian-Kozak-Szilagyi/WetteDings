@@ -179,6 +179,45 @@ async function openPack({ user, type }) {
   });
 }
 
+// Alle Packs auf einmal öffnen: höchstens so viele je Klick (eine Transaktion; der Rest bleibt für den nächsten Klick)
+const MAX_OPEN_ALL = 200;
+
+/**
+ * Alle ungeöffneten Packs (jeder Art, die ältesten zuerst) auf einmal öffnen – jedes Pack wird einzeln gezogen und als
+ * eigene Öffnung gespeichert, genau wie beim einzelnen Öffnen. Gibt { cards, isNew, packs, packsLeft } zurück;
+ * cards in Zugreihenfolge (5 je Pack), isNew wie bei openPack (nur das erste Exemplar einer neuen Karte).
+ */
+async function openAllPacks({ user, max = MAX_OPEN_ALL }) {
+  if (!catalog.CARDS.length) throw new UserError('Der TCG-Shop ist gerade geschlossen.');
+  return inTransaction(async (session) => {
+    const packs = await TcgPack.find({ user: user._id, type: { $in: catalog.PACK_TYPES.map((t) => t.key) } }).sort({ createdAt: 1 }).limit(max).session(session).lean();
+    if (!packs.length) throw new UserError('Du hast keine ungeöffneten Booster Packs.');
+    const del = await TcgPack.deleteMany({ _id: { $in: packs.map((p) => p._id) }, user: user._id }, { session });
+    if (del.deletedCount !== packs.length) throw new UserError('Deine Packs haben sich gerade geändert. Bitte versuche es erneut.');
+
+    const draws = packs.map(() => catalog.drawPack());
+    const openings = await TcgOpening.insertMany(
+      packs.map((p, i) => ({ user: user._id, username: user.username, cost: p.cost, type: p.type, source: p.source, cards: draws[i].map((c) => ({ card: c.id, rarity: c.rarity })), best: Math.max(...draws[i].map((c) => catalog.rarityByKey[c.rarity].rank)) })),
+      { session }
+    );
+    await TcgCard.insertMany(
+      draws.flatMap((d, i) => d.map((c) => ({ user: user._id, card: c.id, rarity: c.rarity, opening: openings[i]._id }))),
+      { session }
+    );
+    const cards = draws.flat();
+    const me = await User.findById(user._id).select('tcgSeen').session(session).lean();
+    const seen = new Set((me && me.tcgSeen) || []);
+    const isNew = cards.map((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+    await markSeen(user._id, cards.map((c) => c.id), session, { looted: true });
+    const packsLeft = await TcgPack.countDocuments({ user: user._id }).session(session);
+    return { cards, isNew, packs: packs.length, packsLeft };
+  });
+}
+
 /** Ungeöffnete Packs eines Nutzers: [{ ...Pack-Art, count }] (nur Arten mit mindestens einem Pack) */
 async function packInventory(userId) {
   const agg = await TcgPack.aggregate([{ $match: { user: userId } }, { $group: { _id: '$type', n: { $sum: 1 } } }]);
@@ -477,4 +516,4 @@ async function cardValueCents(userId) {
 }
 
 module.exports = {
-  revokePacks, soldMeta, pickDuplicates, CREASE_BANK_PERCENT, bankPrice, bankOrder, bankProceeds, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, packInventory, sellCards, sellAllDuplicates, shredCards, shredAllDuplicates, inventory, sellValueExpr, cardValueCents };
+  revokePacks, soldMeta, pickDuplicates, CREASE_BANK_PERCENT, bankPrice, bankOrder, bankProceeds, MAX_FAVORITES, favoriteList, MAX_PACKS_PER_PURCHASE, pruneCardLists, toggleProtected, toggleFavorite, newPackCount, buyPack, grantPacks, grantPacksToMany, grantCards, revokeCards, markSeen, openPack, openAllPacks, MAX_OPEN_ALL, packInventory, sellCards, sellAllDuplicates, shredCards, shredAllDuplicates, inventory, sellValueExpr, cardValueCents };
