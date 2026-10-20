@@ -37,8 +37,8 @@ test('Kartenaufwertung: faire Chance – im Mittel höchstens 90 % des Einsatzwe
   // Standardpreise: jede volle Stufe gelingt sicher, nur Holo → Bockhaber (10 × 50 € gegen 500 €) liegt darunter
   for (const r of ['crumpled', 'bfwler', 'gold', 'bockhaber', 'glitch']) assert.equal(up.chanceFor(r, S), 1, r);
   const holo = up.contract(Array.from({ length: 10 }, () => 'holo'), S);
-  assert.ok(holo.chance > 0.85 && holo.chance < 0.9, `Holo: ${holo.chance}`);
-  assert.ok(Math.abs(holo.ev - 0.9 * holo.value) < 1e-6, 'Holo liegt genau an der Wertgrenze (Glückstreffer und Jackpot eingerechnet)');
+  assert.ok(holo.chance > 0.4 && holo.chance < 0.6, `Holo: ${holo.chance} (der sichere Ausgleich von 400 € kostet Chance)`);
+  assert.ok(Math.abs(holo.ev - 0.9 * holo.value) < 1e-6, 'Holo liegt genau an der Wertgrenze (Karte + Ausgleich, Glückstreffer und Jackpot eingerechnet)');
   assert.equal(up.chanceFor('icon', S), 0);
   // Obergrenze greift
   assert.equal(up.chanceFor('crumpled', { ...S, maxChance: 80 }), 0.8);
@@ -65,12 +65,14 @@ test('Kartenaufwertung: Wertgrenze gilt für jede Mischung – auch mit Glückst
   const keys = up.ladder().filter((k) => up.nextRarity(k));
   let seed = 3;
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-  for (const s of [S, { ...S, rueckgabe: 50 }, { ...S, bonus: 500, jackpot: 200 }, { ...S, count: 5 }]) {
+  for (const s of [S, { ...S, rueckgabe: 50, ausgleich: 40 }, { ...S, bonus: 500, jackpot: 200 }, { ...S, count: 5 }, { ...S, ausgleich: 0 }]) {
     for (let i = 0; i < 400; i++) {
       const mix = Array.from({ length: s.count }, () => keys[Math.floor(rand() * keys.length)]);
       const v = up.contract(mix, s);
       assert.ok(v, mix.join(','));
       assert.ok(v.ev <= (s.rueckgabe / 100) * v.value + 1e-6 || v.chance === 0, `${mix.join(',')}: ${v.ev} > ${v.value}`);
+      assert.ok(v.ev < v.value, `${mix.join(',')}: nie Gewinn im Mittel (${v.ev} von ${v.value})`);
+      assert.ok(v.floor <= v.ev + 1e-6 && v.floor === Math.floor((s.ausgleich / 100) * v.value));
       assert.ok(v.chance >= 0 && v.chance <= s.maxChance / 100);
     }
   }
@@ -100,13 +102,10 @@ test('Kartenaufwertung: Glückstreffer 0,09 %, Jackpot 0,01 % (Glitch/Icon, nie 
   const g = up.contract(Array.from({ length: 10 }, () => 'glitch'), S);
   assert.equal(g.pJackpot, 0);
   assert.equal(g.bonus, null, 'über Icon gibt es nichts (Sith kommt nie heraus)');
-  // Fehlschlag: Seltenheit einer eingesetzten Karte
+  // Fehlschlag: eine Karte der seltensten eingesetzten Seltenheit
   const mix = ['gold', ...Array.from({ length: 9 }, () => 'bfwler')];
   const vm = up.contract(mix, S);
-  for (let i = 0; i < 2000; i++) {
-    const r = R.wurf(mix, { ...vm, chance: 0, pBonus: 0, pJackpot: 0 }, rand);
-    assert.ok(['gold', 'bfwler'].includes(r.rarity));
-  }
+  for (let i = 0; i < 200; i++) assert.equal(R.wurf(mix, { ...vm, chance: 0, pBonus: 0, pJackpot: 0 }, rand).rarity, 'gold');
 });
 
 test('Kartenaufwertung: fehlende Karten kommen fehlend-fach so oft', () => {
@@ -140,4 +139,32 @@ test('Kartenaufwertung: Einstellungen prüfen, ungültige Speicherstände fallen
   assert.equal(up.mergeSettings({ fehlend: 5 }).fehlend, 5);
   assert.equal(up.mayUse({ isAdmin: true }), true);
   assert.equal(up.mayUse({ isAdmin: false }), false);
+});
+
+test('Kartenaufwertung: Wertausgleich – nie mehr als 20 % Verlust, aber immer weniger als bei der Bank', () => {
+  const R = require('../public/js/aufwertung-regeln');
+  const sellOf = (k) => catalog.rarityByKey[k].sell;
+  const n = (k, c) => Array.from({ length: c }, () => k);
+  // 10 BFWler (130 €) → Gold (20 €): 84 € Ausgleich, zusammen 104 € = 80 %
+  const v = up.contract(n('bfwler', 10), S);
+  assert.equal(v.floor, 10400);
+  assert.equal(R.ausgleich(v, sellOf('gold')), 8400);
+  assert.equal(R.ausgleich(v, 1000000), 0, 'ist die Karte mehr wert, gibt es keinen Ausgleich');
+  // jeder Ausgang zusammen mit dem Ausgleich: mindestens 80 %, mit dem Ausgleich nie über dem Bankwert des Einsatzes
+  const rand = mulberry(5);
+  const keys = up.ladder().filter((k) => up.nextRarity(k));
+  for (let i = 0; i < 3000; i++) {
+    const mix = Array.from({ length: 10 }, () => keys[Math.floor(rand() * keys.length)]);
+    const c = up.contract(mix, S);
+    const w = R.wurf(mix, c, rand);
+    const back = sellOf(w.rarity) + R.ausgleich(c, sellOf(w.rarity));
+    assert.ok(back >= 0.8 * c.value - 1, `${mix.join(',')} → ${w.rarity}: ${back} von ${c.value}`);
+    assert.ok(R.ausgleich(c, sellOf(w.rarity)) < c.value, 'Spielgeld immer unter dem Bankwert');
+  }
+  // volle Stufen: im Schnitt 80–90 % zurück statt 16–44 %
+  for (const r of keys) {
+    const c = up.contract(n(r, 10), S);
+    assert.ok(c.ev / c.value >= 0.8 - 1e-9 && c.ev / c.value <= 0.9 + 1e-9, `${r}: ${c.ev / c.value}`);
+  }
+  assert.throws(() => up.cleanSettings({ ...S, ausgleich: 95 }), /Mindestens zurück/);
 });

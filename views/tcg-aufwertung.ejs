@@ -6,9 +6,10 @@
     <div>
       <span class="kicker">Sammlung</span>
       <h1>Kartenaufwertung</h1>
-      <p>Lege <strong><%= count %> Karten</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>Seltenheit über deiner seltensten Karte</strong>, sonst eine Karte aus der Seltenheit einer zufällig gewählten eingesetzten Karte. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong>.</p>
+      <p>Lege <strong><%= count %> Karten</strong> in den Vertrag und verschmelze sie. Mit der angezeigten Chance bekommst du eine zufällige Karte der <strong>Seltenheit über deiner seltensten Karte</strong>, sonst eine Karte der seltensten eingesetzten Seltenheit. Karten, die dir noch fehlen, kommen <strong><%= fehlend %>× so oft</strong> – ideal, um deine Sammlung zu vervollständigen.</p>
+      <p><strong>Du verlierst nie viel:</strong> Ist die neue Karte weniger wert als <strong><%= ausgleich %> %</strong> deines Einsatzes (Bankwert), gibt es die Differenz als <strong>Wertausgleich in Spielgeld</strong> dazu.</p>
       <p>Seltenheiten darfst du mischen – je mehr häufigere Karten dabei sind, desto kleiner die Chance. Bei jeder Aufwertung gibt es außerdem einen <strong>Glückstreffer</strong> (<%= bonusText %>: eine Stufe höher) und den <strong>Jackpot</strong> (<%= jackpotText %>: eine Glitch- oder Icon-Karte).</p>
-      <p class="muted small">Karten im Sleeve oder Slab und Karten auf Quest, im Dungeon, Handel, Duell oder beim Grading spielen nicht mit. Icon ist die höchste Stufe – Sith- und Boss-Karten gibt es hier nicht.</p>
+      <p class="muted small">Karten im Sleeve oder Slab, mit ungebügeltem Knick und Karten auf Quest, im Dungeon, Handel, Duell oder beim Grading spielen nicht mit. Icon ist die höchste Stufe – Sith- und Boss-Karten gibt es hier nicht.</p>
       <% if (closedForOthers) { %><p class="up-admin-note">Noch nicht für alle freigegeben – nur Admins sehen diese Seite (Admin-Panel → Spielwerte → TCG).</p><% } %>
     </div>
     <a class="btn btn-ghost" href="/tcg">← Zurück zum TCG</a>
@@ -44,6 +45,7 @@
         <strong class="up-chance-value" data-up-chance-value>–</strong>
       </div>
       <p class="muted small up-else" data-up-else></p>
+      <p class="up-back" data-up-back></p>
       <p class="small up-extra" data-up-extra></p>
       <div class="up-actions">
         <button type="button" class="btn btn-ghost btn-sm" data-up-fill>Mit Duplikaten auffüllen</button>
@@ -69,7 +71,7 @@
             <span>
               <strong><%= h.card ? h.card.name : h.result.card %></strong>
               <% const KIND = { erfolg: 'aufgewertet', bonus: 'Glückstreffer!', jackpot: 'JACKPOT!', fehlschlag: 'nicht aufgewertet' }; %>
-              <span class="small muted"><%= h.inputs.length %> Karten<%= h.mixed ? ' gemischt' : '' %> bis <%= h.fromLabel %> · <%= KIND[h.kind] || (h.success ? 'aufgewertet' : 'nicht aufgewertet') %><%= h.result.missing ? ' · war neu' : '' %> · <%= date(h.createdAt) %></span>
+              <span class="small muted"><%= h.inputs.length %> Karten<%= h.mixed ? ' gemischt' : '' %> bis <%= h.fromLabel %> · <%= KIND[h.kind] || (h.success ? 'aufgewertet' : 'nicht aufgewertet') %><%= h.result.missing ? ' · war neu' : '' %><%= h.payout ? ' · +' + euro(h.payout) + ' Ausgleich' : '' %> · <%= date(h.createdAt) %></span>
             </span>
           </li>
         <% }) %>
@@ -92,6 +94,7 @@
         <p class="kicker" data-up-result-kicker></p>
         <h2 id="up-result-title" data-up-result-title></h2>
         <p data-up-result-text></p>
+        <p class="up-result-payout" data-up-result-payout hidden></p>
         <div class="up-result-actions">
           <a class="btn btn-ghost" href="/tcg/album">Zum Album</a>
           <button type="button" class="btn btn-primary" data-up-again>Weiter aufwerten</button>
