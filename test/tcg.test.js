@@ -236,7 +236,9 @@ test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je
     assert.ok(c.isCharacter);
     assert.ok(c.image.startsWith(`/img/tcg/karte/${slug}-`), c.image);
     const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
-    for (const t of [title, abilityName, 'FIA', 'FIS', 'BWL', `>${c.stats.fis}<`]) assert.ok(svg.includes(t), `${id}: ${t}`);
+    // Meta-Patch: Angriff / Leben / Kosten statt FIA / FIS / BWL (vorläufig Angriff = FIA, Leben = FIS)
+    for (const t of [title, abilityName, `>${c.stats.fia}<`, `>${c.stats.fis}<`, `>${c.werte.kosten}<`]) assert.ok(svg.includes(t), `${id}: ${t}`);
+    assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), `${id}: alte Bezeichnungen`);
   }
 });
 
