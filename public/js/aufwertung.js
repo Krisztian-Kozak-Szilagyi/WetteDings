@@ -25,14 +25,13 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  // Kartenbilder kommen fertig vom Server (<template data-up-images>) und werden nur geklont
+  var images = page.querySelector('[data-up-images]');
   function img(card, cls) {
-    var i = el('img', cls);
-    i.src = card.image;
+    var found = images && Array.prototype.find.call(images.content.querySelectorAll('[data-up-img]'), function (x) { return x.getAttribute('data-up-img') === card.id; });
+    var i = found ? found.cloneNode(false) : el('img');
+    if (cls) i.className = cls;
     i.alt = card.name;
-    i.width = 720;
-    i.height = 1008;
-    i.loading = 'lazy';
-    i.draggable = false;
     return i;
   }
   var euro = function (c) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(c / 100); };
