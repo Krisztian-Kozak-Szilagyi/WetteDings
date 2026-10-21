@@ -97,6 +97,8 @@ const matze = overhaul('Matze', 'Hundekarte!', 'Für jede ausgespielte Hundekart
 const luca = overhaul('Luca', 'Simulationsspiel-Erfahrung', 'Aufgrund seiner wirtschaftlichen Erfahrungen aus Simulationsspielen ist er in der Lage, sein eigenes BWL-Niveau um 50 % zu steigern.');
 // Mark, the Suntouched (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Sonnendurchbruch“ in abilities.js
 const mark = (id, rarity) => ({ ...overhaul('Mark', 'Sonnendurchbruch', 'Zur Halbzeit bricht die Sonne durch: In Quests und Dungeons verlängert sich die Zeit um 50 % der Gesamtdauer, im Mage Tower füllt er den Bock seiner Gruppe um 30 % auf. Danach erhalten er und seine Gruppe +5 auf alle Werte.')(id, rarity, 'Mark, the Suntouched'), season: 'season-1' });
+// Mirjam, the Gracebringer (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Alles Pink!“ in abilities.js
+const mirjam = (id, rarity) => ({ ...overhaul('Mirjam', 'Alles Pink!', 'Zur Halbzeit verdoppelt Mirjam bei sich selbst und bei jedem Gruppenmitglied den jeweils niedrigsten Wert.')(id, rarity, 'Mirjam, the Gracebringer'), season: 'season-1' });
 // Hunde (Spell, ohne Werte): Rahmen ohne Wertefenster, Plakette „✦ SPELL“ (rar-holo-spell)
 const DOG_TEXT = 'Jede ausgespielte Hundekarte erhöht alle Werte der freundlichen Charaktere um 3. Es können maximal zwei Hunde gleichzeitig ausgespielt werden, und derselbe Hund darf nicht mehrfach ausgespielt werden.';
 const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-spell', name, stats: [0, 0, 0, 0], ability: DOG_TEXT });
@@ -131,6 +133,12 @@ const OVERHAUL = {
   'mark-4-holo': mark('mark-4-holo', 'holo'),
   'mark-5-bockhaber': mark('mark-5-bockhaber', 'bockhaber'),
   'mark-6-glitch': mark('mark-6-glitch', 'glitch'),
+  'mirjam-1-crumpled': mirjam('mirjam-1-crumpled', 'crumpled'),
+  'mirjam-2-bfwler': mirjam('mirjam-2-bfwler', 'bfwler'),
+  'mirjam-3-gold': mirjam('mirjam-3-gold', 'gold'),
+  'mirjam-4-holo': mirjam('mirjam-4-holo', 'holo'),
+  'mirjam-5-bockhaber': mirjam('mirjam-5-bockhaber', 'bockhaber'),
+  'mirjam-6-glitch': mirjam('mirjam-6-glitch', 'glitch'),
   'hugo-holo': dog('Hugo'),
   'lilly-holo': dog('Lilly'),
 };

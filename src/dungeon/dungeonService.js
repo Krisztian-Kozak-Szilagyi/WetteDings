@@ -236,8 +236,8 @@ function botBoost(rand = random, weights = settings.botWeights, banned = new Set
 // (alle freundlichen Charaktere), Mauch (schickt die Gruppe zum Gruschteln) und Matzes Hundekarte-Bonus, sobald
 // irgendwer einen Hund mitbringt. Bloodlust und Reality Check treffen den Gegner – also die Deadline aller.
 // Fähigkeiten von Hauptkarten, die für die ganze Gruppe wirken
-const TEAM_MAIN_KEYS = new Set(['forkbomb', 'sonnendurchbruch']);
-const TEAM_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
+const TEAM_MAIN_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'alles-pink']);
+const TEAM_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'alles-pink', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
 
 /** Fähigkeiten eines Spielers: eigene Karte + eigener Boost, dazu die Gruppen-Fähigkeiten der Boosts der anderen */
 function teamEffects(members, m) {

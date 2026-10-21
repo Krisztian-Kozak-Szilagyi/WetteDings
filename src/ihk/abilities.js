@@ -107,6 +107,14 @@ function resolve(main, boost) {
       s.stats.bwl += MARK.plus;
     } });
   }
+  // Mirjam, the Gracebringer: zur Halbzeit verdoppelt sich der niedrigste Wert (FIA, FIS oder BWL; bei Gleichstand
+  // der erste) – bei ihr und, im Dungeon und Turm, bei jedem Gruppenmitglied (TEAM_MAIN_KEYS in dungeonService)
+  if (m === 'mirjam') {
+    add({ key: 'alles-pink', label: 'Alles Pink!', text: 'Der niedrigste Wert wird verdoppelt.', fx: 'fx-love', target: 'player', apply: (s) => {
+      const low = ['fia', 'fis', 'bwl'].reduce((a, k) => (s.stats[k] < s.stats[a] ? k : a), 'fia');
+      s.stats[low] *= 2;
+    } });
+  }
   return out;
 }
 

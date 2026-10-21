@@ -58,6 +58,13 @@ module.exports = {
   'mark-4-holo': [40, 30, 30, 30],
   'mark-5-bockhaber': [40, 35, 35, 35],
   'mark-6-glitch': [40, 90, 90, 90],
+  // Mirjam, the Gracebringer: Platzhalter-Werte
+  'mirjam-1-crumpled': [40, 15, 15, 15],
+  'mirjam-2-bfwler': [40, 20, 20, 20],
+  'mirjam-3-gold': [40, 25, 25, 25],
+  'mirjam-4-holo': [40, 30, 30, 30],
+  'mirjam-5-bockhaber': [40, 35, 35, 35],
+  'mirjam-6-glitch': [40, 90, 90, 90],
   'luca-1-crumpled': [15, 20, 19, 31],
   'luca-2-bfwler': [21, 28, 27, 42],
   'luca-3-gold': [25, 33, 32, 50],
