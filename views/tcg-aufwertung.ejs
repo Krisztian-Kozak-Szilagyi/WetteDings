@@ -2,6 +2,9 @@
 <%# Kartenaufwertung (src/routes/tcg.js, Regeln: src/tcg/upgrade.js und public/js/aufwertung-regeln.js): 10 Karten in den
     Vertrag legen (Seltenheiten gemischt) und verschmelzen. Auswahl, Vertrag, Chance und Walze zeichnet public/js/aufwertung.js. %>
 <div class="up-page" data-upgrade='<%= JSON.stringify({ tiers, ladder, pools, rules }) %>' data-csrf="<%= csrfToken %>">
+  <%# Kartenbilder: public/js/aufwertung.js klont sie (die Bild-Adresse kommt nicht aus dem JSON oben – CodeQL js/xss-through-dom) %>
+  <% const upImages = new Map(); Object.values(pools).flat().concat(tiers.flatMap((t) => t.cards)).forEach((c) => upImages.set(c.id, c.image)); %>
+  <template data-up-images><% upImages.forEach((src, id) => { %><img data-up-img="<%= id %>" src="<%= src %>" alt="" width="720" height="1008" loading="lazy" draggable="false"><% }) %></template>
   <section class="up-hero">
     <div>
       <span class="kicker">Sammlung</span>
