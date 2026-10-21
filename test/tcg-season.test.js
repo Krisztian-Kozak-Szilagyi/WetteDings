@@ -69,13 +69,10 @@ test('SVG: Werte im Rahmen, Boost farbig, Text maskiert', () => {
   const c = boss();
   const base = cardSvg.render(c);
   assert.ok(base.startsWith('<svg') && base.includes('data:image/webp;base64,'));
-  // neues Design (Meta-Patch): Angriff 95, Leben 99, Kosten 7 – keine FIA / FIS / BWL mehr
-  for (const v of ['>95<', '>99<', '>7<']) assert.ok(base.includes(v), v);
-  assert.ok(!/>FIA<|>FIS<|>BWL</.test(base));
+  for (const v of ['>96<', '>95<', '>99<', '>90<', '>FIA<', '>FIS<', '>BWL<']) assert.ok(base.includes(v), v);
   const { colors } = FRAMES.gilded;
   assert.ok(!base.includes(colors.up) && !base.includes(colors.down));
-  // Übergang: Buff auf FIA zeigt sich am Angriff (95 + 15), Debuff auf FIS am Leben (99 − 19)
-  const boosted = cardSvg.render(c, { fia: 110, fis: 80 });
+  const boosted = cardSvg.render(c, { fia: 110, bwl: 80 });
   assert.ok(boosted.includes(`fill="${colors.up}" stroke-width="4" font-family="Georgia`) && boosted.includes('>110<'));
   assert.ok(boosted.includes(colors.down) && boosted.includes('>80<'));
   const evil = cardSvg.render({ ...c, name: '<x>', ability: 'a <script>"&' });
@@ -130,10 +127,8 @@ test('Bilder je Werte-Wechsel: nur Rahmen-Karten, Schlüssel "Speed,FIA,FIS,BWL"
 
 test('SVG: geänderte Werte bekommen ein Dreieck (▲ Buff / ▼ Debuff)', () => {
   const { colors } = FRAMES.gilded;
-  const arrows = (svg) => (svg.match(new RegExp(`fill="(${colors.up}|${colors.down})" stroke="${colors.outline}"`, 'g')) || []).length;
-  assert.equal(arrows(cardSvg.render(boss())), 0);
-  // neues Design: FIA wirkt auf Angriff (▲), FIS auf Leben (▼); BWL und Speed stehen nicht mehr auf der Karte
-  const s = cardSvg.render(boss(), { fia: 99, fis: 50, bwl: 10, speed: 50 });
-  assert.equal(arrows(s), 2);
+  assert.ok(!cardSvg.render(boss()).includes('<path d="M'));
+  const s = cardSvg.render(boss(), { bwl: 99, speed: 50 });
+  assert.equal((s.match(/<path d="M/g) || []).length, 2);
   assert.ok(s.includes(`fill="${colors.up}" stroke="${colors.outline}"`) && s.includes(`fill="${colors.down}" stroke="${colors.outline}"`));
 });

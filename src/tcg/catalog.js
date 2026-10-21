@@ -134,8 +134,6 @@ function loadCards(dir = IMAGE_DIR) {
       };
       // Kampfwerte (eigener Block, nur neue Karten) für den kommenden Kampfmodus
       if (data && data.kampf) card.kampf = data.kampf;
-      // Meta-Patch (neues Design): Klasse und Werte Angriff / Leben / Kosten – die Karte zeigt dann das neue Layout
-      if (data && data.werte) Object.assign(card, { klasse: data.klasse, werte: data.werte });
       // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
       if (data && data.unreleased) card.unreleased = true;
       // title: Text im Namensbalken (z. B. „Ömer the Golden“), der Kartenname bleibt überall sonst name („Ömer“)

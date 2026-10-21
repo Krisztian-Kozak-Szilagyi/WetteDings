@@ -12,12 +12,6 @@
 //   ability: Fähigkeitstext im großen Fenster
 //   kampf:   Kampfwerte für den kommenden Kampfmodus (eigener Block, getrennt von den IHK-Werten in stats).
 //            Die Felder legen wir mit den Spielregeln fest.
-//   klasse, werte: Meta-Patch – PFLICHT für jede Karte mit neuem Design (Test: test/meta-design.test.js).
-//            klasse: tank | schaden | heiler (src/tcg/klassen.js) – im dritten Wertefenster (Schild / Schwert / Kreuz).
-//            werte: { ang, leb, kosten } – Angriff (Schwert) und Leben (Herz) in den ersten beiden Fenstern statt
-//            FIA / FIS, Kosten in Mana (Münze) in der Plakette, wo früher Speed war. Speed gibt es nicht mehr (der Kampf
-//            läuft in Runden).
-//            Bis die Spielmodi umgestellt sind, rechnen IHK und Dungeon weiter mit stats; die Karte zeigt schon werte.
 // Test-Karten für den Bosskampf (Seltenheit test-item, Admins bekommen sie beim Start – src/migrate.js).
 // Regeln: public/js/bossfight-regeln.js. Balance per Simulation: npm run sim:bosskampf (scripts/bossfight-sim.js).
 // Die Kartentexte werden aus den Zahlen gebaut – Werte ändern genügt, Text und Bild passen sich an.
@@ -95,19 +89,12 @@ const SEASON1_UNRELEASED = {
 
 // Karten-Overhaul Teil 1: Ömer, Aleks, Matze, Luca, Hugo und Lilly im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und
 // Effekte (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer
-// die Karte hatte, hat jetzt die überarbeitete. Fähigkeit wie in src/ihk/abilities.js.
-// Meta-Patch: klasse je Charakter, werte VORLÄUFIG (bis zur Balance mit Dio als Maßstab): Angriff = bisher FIA,
-// Leben = bisher FIS, Kosten je Seltenheit (KOSTEN). stats bleiben für IHK und Dungeon, bis diese umgestellt sind.
-const KOSTEN = { crumpled: 1, bfwler: 2, gold: 3, holo: 4, bockhaber: 5, glitch: 6, boss: 7 };
-const vorlaeufig = (stats, rarity) => ({ ang: stats[1], leb: stats[2], kosten: KOSTEN[rarity] });
-const overhaul = (name, klasse, abilityName, ability) => (id, rarity, title) => {
-  const stats = require('./stats')[id];
-  return { season: 'pre-season', frame: `rar-${rarity}`, name, title, stats, klasse, werte: vorlaeufig(stats, rarity), abilityName, ability };
-};
-const omer = overhaul('Ömer', 'tank', 'Macht der Osmanen', 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.');
-const aleks = overhaul('Aleks', 'schaden', 'Russische Telefonnummer', 'Nach dem Anrufen einer russischen Telefonnummer ist es in der Lage, die von ihm selbst generierten Punkte einmalig auf das Maximum (99) zu fälschen.');
-const matze = overhaul('Matze', 'tank', 'Hundekarte!', 'Für jede ausgespielte Hundekarte erhält man +10 auf FIS und +5 auf alle anderen Stats.');
-const luca = overhaul('Luca', 'heiler', 'Simulationsspiel-Erfahrung', 'Aufgrund seiner wirtschaftlichen Erfahrungen aus Simulationsspielen ist er in der Lage, sein eigenes BWL-Niveau um 50 % zu steigern.');
+// die Karte hatte, hat jetzt die überarbeitete. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
+const overhaul = (name, abilityName, ability) => (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name, title, stats: require('./stats')[id], abilityName, ability });
+const omer = overhaul('Ömer', 'Macht der Osmanen', 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.');
+const aleks = overhaul('Aleks', 'Russische Telefonnummer', 'Nach dem Anrufen einer russischen Telefonnummer ist es in der Lage, die von ihm selbst generierten Punkte einmalig auf das Maximum (99) zu fälschen.');
+const matze = overhaul('Matze', 'Hundekarte!', 'Für jede ausgespielte Hundekarte erhält man +10 auf FIS und +5 auf alle anderen Stats.');
+const luca = overhaul('Luca', 'Simulationsspiel-Erfahrung', 'Aufgrund seiner wirtschaftlichen Erfahrungen aus Simulationsspielen ist er in der Lage, sein eigenes BWL-Niveau um 50 % zu steigern.');
 // Hunde (Spell, ohne Werte): Rahmen ohne Wertefenster, Plakette „✦ SPELL“ (rar-holo-spell)
 const DOG_TEXT = 'Jede ausgespielte Hundekarte erhöht alle Werte der freundlichen Charaktere um 3. Es können maximal zwei Hunde gleichzeitig ausgespielt werden, und derselbe Hund darf nicht mehrfach ausgespielt werden.';
 const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-spell', name, stats: [0, 0, 0, 0], ability: DOG_TEXT });
@@ -150,8 +137,6 @@ module.exports = {
     frame: 'gilded',
     name: 'St. Ivan, the Forsaken',
     stats: [96, 95, 99, 90],
-    klasse: 'tank',
-    werte: { ang: 95, leb: 99, kosten: KOSTEN.boss }, // vorläufig wie die Overhaul-Karten
     // Forkbomb (Idee: Krisztian) – wirkt auf gegnerische Karten, also erst im kommenden Spielmodus.
     // Regeln dafür (stehen absichtlich nicht auf der Karte): Reinigung (z. B. St. Ivans „Backup“) hebt den
     // Effekt auf; verlässt St. Ivan das Spielfeld (z. B. durch Hermann), endet er sofort.

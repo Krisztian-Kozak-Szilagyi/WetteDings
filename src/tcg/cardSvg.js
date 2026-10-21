@@ -4,7 +4,6 @@
 const fs = require('fs');
 const path = require('path');
 const FRAMES = require('./frames');
-const { klasseByKey, VALUE_ICONS } = require('./klassen');
 
 const STAT_KEYS = ['speed', 'fia', 'fis', 'bwl'];
 const FONT = "Georgia, 'Times New Roman', 'Noto Serif', serif";
@@ -107,55 +106,6 @@ function speedSvg(frame, value, base) {
   );
 }
 
-// ---------- Neues Design (Meta-Patch): Kosten statt Speed, Angriff / Leben / Klasse in den Fenstern ----------
-// Gilt für jede Karte mit card.werte (siehe cardData.js) – so bekommt jede überarbeitete Karte automatisch das Layout.
-// Alle Symbole in den Farben der Seltenheit (frame.colors), wie früher die Bezeichnungen FIA / FIS / BWL.
-// Symbol aus dem 24er-Raster (src/tcg/klassen.js) an Mittelpunkt x/y in Größe size
-const icon = (paths, x, y, size, color, c) =>
-  `<g transform="translate(${(x - size / 2).toFixed(1)} ${(y - size / 2).toFixed(1)}) scale(${(size / 24).toFixed(3)})" fill="${color}" color="${color}" stroke="${c.outline}" stroke-width="${((2.4 * 24) / size).toFixed(2)}" paint-order="stroke" stroke-linejoin="round">${paths}</g>`;
-
-// Übergang, bis IHK und Dungeon mit den neuen Werten rechnen: dort ändern Effekte noch FIA / FIS (Buff, Debuff) –
-// die Karte zeigt die Änderung an Angriff (FIA) und Leben (FIS), mit Farbe und ▲ / ▼ wie bisher.
-const CHANGED_BY = { ang: 'fia', leb: 'fis' };
-
-// Fenster 1 und 2: Symbol oben (Schwert = Angriff, Herz = Leben), Zahl darunter
-function valueWindowSvg(s, k, werte, values, base, c) {
-  const old = CHANGED_BY[k];
-  const v = werte[k] + (old ? values[old] - base[old] : 0);
-  return (
-    icon(VALUE_ICONS[k], s.x, s.y - 20, 34, c.label, c) +
-    `<text x="${s.x}" y="${s.y + 26}" text-anchor="middle" font-size="${v >= 100 ? 36 : 42}" font-weight="700" fill="${colorFor(v, werte[k], c)}" stroke-width="4" ${textAttrs(c)}>${v}</text>` +
-    arrow(s.x + 39, s.y - 24, v, werte[k], c)
-  );
-}
-
-// Fenster 3: die Klasse – großes Symbol (Schild = Tank, Schwert = Schaden, Kreuz = Heiler), Name darunter
-function klasseSvg(s, klasse, c) {
-  const k = klasseByKey[klasse];
-  return (
-    icon(k.icon, s.x, s.y - 8, 44, c.value, c) +
-    `<text x="${s.x}" y="${s.y + 34}" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="2" fill="${c.label}" stroke-width="3" ${textAttrs(c)}>${esc(k.name.toUpperCase())}</text>`
-  );
-}
-
-function newStatsSvg(frame, card, values, base) {
-  const c = frame.colors;
-  const [ang, leb, kl] = frame.stats;
-  return valueWindowSvg(ang, 'ang', card.werte, values, base, c) + valueWindowSvg(leb, 'leb', card.werte, values, base, c) + klasseSvg(kl, card.klasse, c);
-}
-
-// Plakette oben rechts (früher Speed): Kosten in Mana mit Münze – Plakette und Münze in den Farben der Seltenheit
-function kostenSvg(frame, kosten) {
-  const p = frame.speed;
-  const c = frame.colors;
-  const cy = p.y + p.h / 2;
-  return (
-    `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.h / 2}" fill="${c.plate}" stroke="${c.plateBorder}" stroke-width="3"/>` +
-    icon(VALUE_ICONS.kosten, p.x + p.h * 0.52, cy, p.h * 0.62, c.label, c) +
-    `<text x="${p.x + p.w * 0.66}" y="${cy + 12}" text-anchor="middle" font-size="34" font-weight="700" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>${kosten}</text>`
-  );
-}
-
 // Kartenname im leeren Namensbalken (Helden-Karten); lange Namen werden kleiner, bis sie passen
 function nameSvg(frame, name) {
   const n = frame.name;
@@ -201,9 +151,8 @@ function render(card, values = {}) {
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
     (frame.name ? nameSvg(frame, card.title || card.name) : '') +
-    (card.werte
-      ? (frame.badge ? badgeSvg(frame) : kostenSvg(frame, card.werte.kosten)) + newStatsSvg(frame, card, v, base)
-      : (frame.badge ? badgeSvg(frame) : frame.speed ? speedSvg(frame, v.speed, base.speed) : '') + statsSvg(frame, v, base)) +
+    (frame.badge ? badgeSvg(frame) : frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
+    statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'
   );
