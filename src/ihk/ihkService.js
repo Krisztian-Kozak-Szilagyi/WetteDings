@@ -10,7 +10,7 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const tcgService = require('../tcg/tcgService');
 const { QUESTS, DIFFICULTIES, questById, difficulty, statsOf, isHybrid } = require('./quests');
-const { resolveAll, who, canBoost, needsCoffee, isCoffee } = require('./abilities');
+const { resolveAll, who, canBoost, needsCoffee, isCoffee, checkDogs, isAleks, ALEKS, OMER } = require('./abilities');
 const { lockedDocs, pickCopy, claim } = require('../tcg/locks');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { damageCards, ihkSeverity, damageText } = require('../grading/damage');
@@ -85,8 +85,63 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 // Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
 const FORKBOMB_STEP = 2;
 
-function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
+// Werte, deren Zuwachs Luca (You can't handle my Potions) verstärkt: Werte, Tempo, Stillstand und Zeitgewinn der Deadline
+const AMP_FIELDS = [
+  [(s) => s.stats, 'fia'], [(s) => s.stats, 'fis'], [(s) => s.stats, 'bwl'], [(s) => s, 'speed'],
+  [(s) => s, 'extraTicks'], [(s) => s, 'extraTime'], [(s) => s, 'forkbomb'],
+];
+const snapshot = (s) => AMP_FIELDS.map(([o, k]) => o(s)[k]);
+/** Nur die Vorteile eines Effekts verstärken: was seit before gestiegen ist, steigt um amp mehr */
+function amplify(s, before, amp) {
+  AMP_FIELDS.forEach(([o, k], i) => {
+    const d = o(s)[k] - before[i];
+    if (d > 0) o(s)[k] += d * amp;
+  });
+}
+
+/**
+ * Fähigkeiten zur Halbzeit anwenden. Ist Luca im Team (amp), wirken Boost-Effekte (e.boost) stärker – nur ihre
+ * Vorteile: höhere Werte und Tempo, mehr Zeit, ein Tempo-Schub (tempSpeed > 1), Mauchs Bonus danach, stärkere Hunde an
+ * Matze. Nachteile (Mauchs Verlangsamung, AMD, Hermanns stärkere Aufgabe) bleiben, wie sie sind.
+ */
+function applyEffects(effects, s) {
+  const amp = Math.max(0, ...effects.map((e) => e.amp || 0)); // mehrere Lucas zählen einmal
+  // Lucas eigenes Tempo und BWL +50 kommen erst danach (sonst verstärkten Boosts wie BFW Energy sie mit)
+  for (const e of [...effects.filter((x) => !x.amp), ...effects.filter((x) => x.amp)]) {
+    if (!amp || !e.boost) {
+      e.apply(s);
+      continue;
+    }
+    const before = snapshot(s);
+    const temp = s.tempSpeed;
+    const dogs = s.dogs.length;
+    e.apply(s);
+    amplify(s, before, amp);
+    if (s.tempSpeed && s.tempSpeed !== temp) {
+      const t = s.tempSpeed;
+      if (t.factor > 1) t.factor = 1 + (t.factor - 1) * (1 + amp);
+      if (t.then) {
+        const then = t.then;
+        t.then = (st) => {
+          const b = snapshot(st);
+          then(st);
+          amplify(st, b, amp);
+        };
+      }
+    }
+    for (const d of s.dogs.slice(dogs)) for (const k of ['fia', 'fis', 'bwl']) d[k] *= 1 + amp;
+  }
+}
+
+// mode: 'ihk' | 'dungeon' | 'tower' – manche Fähigkeiten wirken je Spielmodus anders (z. B. Mark, the Suntouched)
+// opts.coin (Aleks, Gruß aus dem Osten): { left: Geld in Cent, bonus: schon gewonnene Werte, active: wirft schon } – im
+// Dungeon und Turm aus den Kämpfen davor (dungeonService.fight). Jeder Münzwurf steht im Takt als coin: 'kopf' | 'zahl'.
+function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = [], mode = 'ihk', opts = {}) {
+  // dogs: Hunde, die mit jedem Schlag mitangreifen (Treue Seele an Matze) – je { id, fia, fis, bwl }
+  // coinFlip: Aleks wirft bei jedem Angriff eine Münze, solange coinLeft reicht
+  const coin = opts.coin || null;
+  // omer: { n } – so viele Ömer greifen gemeinsam an (Mach das Unmögliche möglich); rush: so viel schneller läuft die Deadline
+  const s = { mode, duration: WORK_TIME, speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, tempSpeed: null, doom: null, forkbomb: 0, dogs: [], coinFlip: !!(coin && coin.active), coinLeft: coin ? coin.left : 0, omer: null, rush: 0 };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);
@@ -97,13 +152,19 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
   let applied = effects.length === 0;
   let freeze = 0; // Sekunden, in denen die Deadline steht (Bloodlust)
   const slow = []; // Forkbomb: [von, bis, Prozent] – in diesen Spiel-Sekunden läuft die Deadline langsamer
-  // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen)
-  const used = (x) => deadlineUsed(x, half, freeze, slow);
+  // Verbrauchte Deadline bis zur Spielzeit x (Stillstand und Verlangsamung abgezogen, Ömer beschleunigt: rush vor und ab der Halbzeit)
+  const rush = [0, 0];
+  const used = (x) => rushedUsed(x, half, freeze, slow, rush);
   let t = 0;
   // Angezeigte Werte der Karte [Speed, FIA, FIS, BWL]: ändern sie sich (Boost, Debuff, Ende eines Effekts),
   // trägt der Takt sie als st – der Browser schreibt sie dann auf die Karte (src/tcg/cardSvg.js).
   const shown = () => [s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1), s.stats.fia, s.stats.fis, s.stats.bwl].map((v) => Math.round(v));
   let lastShown = shown().join();
+  // Kopf aus früheren Kämpfen: gilt von Anfang an (der erste Takt schreibt die Werte auf die Karte)
+  if (coin && coin.bonus) for (const k of ['fia', 'fis', 'bwl']) s.stats[k] += coin.bonus;
+  // Fähigkeiten, die schon zu Beginn wirken (Ömer dupliziert sich)
+  for (const e of effects) if (e.start) e.start(s);
+  rush[0] = rush[1] = s.rush;
   const withShown = (tick) => {
     const now = shown();
     if (now.join() === lastShown) return tick;
@@ -115,7 +176,8 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     if (!applied && next > half) {
       // Halbzeit: Fähigkeiten aktivieren
       s.elapsed = half; // bisher abgelaufene Deadline (für Sigrist)
-      effects.forEach((e) => e.apply(s));
+      applyEffects(effects, s);
+      rush[1] = s.rush; // ab der Halbzeit (z. B. der dritte Ömer)
       applied = true;
       ticks.push(withShown({ t: half, p: 0, ability: true }));
       if (s.extraTicks || s.extraTime) {
@@ -131,13 +193,26 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
       break;
     }
     if (s.forkbomb > 0 && next > half) s.forkbomb = Math.max(0, s.forkbomb - FORKBOMB_STEP); // lässt jede Runde nach
-    const fake = s.fakeNext;
+    // Gruß aus dem Osten: vor dem Angriff fliegt die Münze – Kopf gilt schon für diesen Angriff
+    let flip = null;
+    if (s.coinFlip && s.coinLeft >= ALEKS.cost) {
+      s.coinLeft -= ALEKS.cost;
+      flip = rand() < ALEKS.chance ? 'kopf' : 'zahl';
+      if (flip === 'kopf') for (const k of ['fia', 'fis', 'bwl']) s.stats[k] += ALEKS.plus;
+    }
+    // Mach das Unmögliche möglich: greift ein Ömer an, gehen alle mit – je zusätzlichem Ömer bekommt jeder
+    // OMER.grow · (Grundwert + 1) / 2 auf alle Werte, und das bleibt. Getroffen wird schon mit den neuen Werten.
+    if (s.omer) for (const k of ['fia', 'fis', 'bwl']) s.stats[k] += ((s.omer.n - 1) * OMER.grow * (s.omer.base[k] + 1)) / 2;
     const crit = rand() < CRIT_CHANCE;
     // ein Wurf pro Runde – bei Hybrid-Quests gilt er für beide Balken
     // Hermann: Solange die Aufgabe gestärkt ist, bringt jede Runde entsprechend weniger Punkte
     const factor = ((0.8 + 0.4 * rand()) * (crit ? 2 : 1)) / (s.doom ? s.doom.factor : 1);
-    const ps = keys.map((k) => Math.max(1, Math.round((fake ? 99 : s.stats[k]) * factor)));
-    s.fakeNext = false;
+    const ps = keys.map((k) => Math.max(1, Math.round(s.stats[k] * factor)) * (s.omer ? s.omer.n : 1));
+    // Treue Seele: jeder Hund an Matze trifft mit demselben Wurf mit (dg = ihr Anteil am ersten Balken, steckt schon in p)
+    const dps = keys.map((k) => s.dogs.reduce((sum, d) => sum + Math.round(d[k] * factor), 0));
+    dps.forEach((d, i) => {
+      ps[i] += d;
+    });
     if (s.tempSpeed && --s.tempSpeed.ticks <= 0) {
       const { then } = s.tempSpeed;
       s.tempSpeed = null;
@@ -146,7 +221,7 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     ps.forEach((p, i) => {
       totals[i] += p;
     });
-    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(fake ? { fake: true } : {}) }));
+    ticks.push(withShown({ t: Math.round(next * 10) / 10, p: ps[0], ...(hybrid ? { p2: ps[1] } : {}), crit, ...(flip ? { coin: flip } : {}), ...(dps[0] ? { dg: dps[0] } : {}), ...(s.omer ? { om: s.omer.n } : {}) }));
     t = next;
     if (s.doom && --s.doom.ticks <= 0) {
       // Nach der zweiten Runde ist die Aufgabe zerstört: der Rest des Ziels fällt auf einen Schlag
@@ -170,7 +245,27 @@ function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) 
     // Forkbomb: verlangsamte Abschnitte und die dadurch gewonnene Zeit (Deadline endet bei WORK_TIME + freeze + extend)
     slow: slow.map(([a, b, p]) => [r1(a), r1(b), p]),
     extend: r1(slowGain(half, freeze, slow)),
+    // Ömer: schnellere Deadline vor und ab der Halbzeit und wann sie dadurch endet (Spielzeit)
+    ...(rush[0] || rush[1] ? { rush: [...rush], end: r1(deadlineEnd((x) => used(x))) } : {}),
   };
+}
+
+/** Verbrauchte Deadline mit Ömers Beschleunigung: rush[0] bis zur Halbzeit, rush[1] danach (Stillstand zählt nicht) */
+function rushedUsed(x, half, freeze, slow, rush) {
+  const base = deadlineUsed(x, half, freeze, slow);
+  return Math.min(x, half) * (1 + rush[0]) + Math.max(0, base - half) * (1 + rush[1]);
+}
+
+/** Spielzeit, zu der die Deadline (WORK_TIME) verbraucht ist – used wächst monoton */
+function deadlineEnd(used) {
+  let lo = 0;
+  let hi = WORK_TIME * 4;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (used(mid) >= WORK_TIME) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
 
 /** Überlappung der Strecken [a, b] und [c, d] in Sekunden */
@@ -270,8 +365,38 @@ async function checkBoost(user, card, boostId) {
   return boost;
 }
 
-/** foiled: folierte Exemplare einsetzen (geschützt vor Schaden, #204) – sonst lieber unfolierte */
-async function start({ user, cardId, boostId, boost2Id, offerIndex, foiled = false }) {
+/**
+ * Geld für Aleks (Gruß aus dem Osten) in Cent: ganze Euro von 0 bis ALEKS.maxMoney; andere Karten nehmen keins mit.
+ * Wird beim Start abgebucht, der Rest kommt am Ende zurück.
+ */
+function aleksBudget(card, euros) {
+  const n = Number(euros) || 0;
+  if (!n || !isAleks(card)) return 0;
+  if (!Number.isInteger(n) || n < 0 || n * 100 > ALEKS.maxMoney) throw new UserError(`Aleks kann zwischen 0 und ${ALEKS.maxMoney / 100} € mitnehmen (ganze Euro).`);
+  return n * 100;
+}
+
+/** Münzwürfe eines Laufs (Takte mit coin) → { budget, spent, heads } für das Abrechnen am Ende */
+const coinTally = (budget, ticks) => {
+  const flips = ticks.filter((x) => x.coin);
+  return { budget, spent: flips.length * ALEKS.cost, heads: flips.filter((x) => x.coin === 'kopf').length };
+};
+
+/** Geld zurückbuchen, das Aleks nicht verworfen hat (coins = { budget, spent }) – in der Transaktion des Abschlusses */
+async function refundCoins(userId, coins, title, session) {
+  const rest = coins ? coins.budget - coins.spent : 0;
+  if (rest <= 0) return 0;
+  await User.updateOne({ _id: userId }, { $inc: { balance: rest } }, { session });
+  await Ledger.create([{ user: userId, type: 'aleks_muenzen', amount: rest, betTitle: title }], { session });
+  return rest;
+}
+
+/**
+ * foiled: folierte Exemplare einsetzen (geschützt vor Schaden, #204) – sonst lieber unfolierte.
+ * dogId: Hunde-Slot (Yo Dawg) – nur für Matze mit genau einem Hund in den Boost-Slots, dort der andere Hund.
+ * coins: Geld für Aleks in Euro (Gruß aus dem Osten), höchstens ALEKS.maxMoney.
+ */
+async function start({ user, cardId, boostId, boost2Id, dogId, coins = 0, offerIndex, foiled = false }) {
   const card = catalog.cardById[cardId];
   if (!card || !card.isCharacter) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   const { running, used, limit } = await getState(user._id);
@@ -287,10 +412,14 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex, foiled = fal
   if (boost2Id && !isHybrid(quest)) throw new UserError('Nur Hybrid-Quests haben einen zweiten Boost-Slot.');
   const boosts = [await checkBoost(user, card, boostId), await checkBoost(user, card, boost2Id)].filter(Boolean);
   if (boosts.length === 2 && who(boosts[0]) === who(boosts[1])) throw new UserError('Die beiden Boost-Karten müssen verschieden sein.');
+  const dog = await checkBoost(user, card, dogId);
+  const dogError = checkDogs(card, boosts, dog);
+  if (dogError) throw new UserError(dogError);
+  const budget = aleksBudget(card, coins);
 
   const required = requiredFor(offer.difficulty, quest);
-  const effects = resolveAll(card, boosts);
-  const result = simulate(card.stats, statsOf(quest), required, undefined, effects);
+  const effects = resolveAll(card, [...boosts, dog]); // der Hund im Hunde-Slot wirkt wie ein Boost
+  const result = simulate(card.stats, statsOf(quest), required, undefined, effects, 'ihk', { coin: budget ? { left: budget, bonus: 0, active: false } : null });
   try {
     // Sperrprüfung und Quest-Anlage in einer Transaktion, damit die Karte nicht gleichzeitig verkauft oder gehandelt wird
     return await inTransaction(async (session) => {
@@ -306,7 +435,15 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex, foiled = fal
         if (!d) throw new UserError(`Die Boost-Karte besitzt du nicht (oder ${why}).`);
         boostDocs.push(d);
       }
-      await claim([doc, ...boostDocs], user._id, session);
+      const dogDoc = dog ? await freeDoc(dog.id) : null;
+      if (dog && !dogDoc) throw new UserError(`${dog.name} besitzt du nicht (oder ${why}).`);
+      await claim([doc, ...boostDocs, dogDoc].filter(Boolean), user._id, session);
+      // Aleks: Geld für die Münzwürfe gleich abbuchen (der Rest kommt beim Abholen zurück)
+      if (budget) {
+        const paid = await User.updateOne({ _id: user._id, balance: { $gte: budget } }, { $inc: { balance: -budget } }, { session });
+        if (!paid.modifiedCount) throw new UserError(`Für Aleks' Münzwürfe fehlt dir Geld (${budget / 100} €).`);
+        await Ledger.create([{ user: user._id, type: 'aleks_muenzen', amount: -budget, betTitle: quest.title }], { session });
+      }
 
       const [run] = await IhkRun.create(
         [
@@ -321,6 +458,9 @@ async function start({ user, cardId, boostId, boost2Id, offerIndex, foiled = fal
             boostDoc: boostDocs[0] ? boostDocs[0]._id : null,
             boost2: boosts[1] ? boosts[1].id : null,
             boost2Doc: boostDocs[1] ? boostDocs[1]._id : null,
+            dog: dog ? dog.id : null,
+            dogDoc: dogDoc ? dogDoc._id : null,
+            ...(budget ? { coins: coinTally(budget, result.ticks) } : {}),
             // nur Fähigkeiten, die vor Erreichen des Ziels (Halbzeit) wirklich aktiv wurden
             abilities: result.ticks.some((x) => x.ability) ? effects.map(({ apply, ...a }) => a) : [],
             stats: card.stats,
@@ -353,6 +493,8 @@ async function collect({ user }) {
       { new: true, session }
     );
     if (!run) throw new UserError('Es gibt keine abgeschlossene Quest zum Abholen.');
+    // Aleks: nicht verworfenes Geld zurück – egal, ob die Quest geschafft ist
+    run.$locals.coinsBack = await refundCoins(user._id, run.coins, questById[run.quest] ? questById[run.quest].title : null, session);
     if (run.reward > 0) {
       await User.updateOne({ _id: user._id }, { $inc: { balance: run.reward } }, { session });
       await Ledger.create([{ user: user._id, type: 'ihk_lohn', amount: run.reward, betTitle: questById[run.quest] ? questById[run.quest].title : null }], { session });
@@ -365,7 +507,7 @@ async function collect({ user }) {
       await run.save({ session });
     }
     // Verloren: die eingesetzten (unfolierten) Karten können Kratzer oder einen Knick abbekommen (#204)
-    if (!run.success) hits = await damageCards({ userId: user._id, docs: [run.cardDoc, run.boostDoc, run.boost2Doc], severity: ihkSeverity(run), session });
+    if (!run.success) hits = await damageCards({ userId: user._id, docs: [run.cardDoc, run.boostDoc, run.boost2Doc, run.dogDoc], severity: ihkSeverity(run), session });
     return run;
   });
   await IhkState.updateOne({ _id: user._id }, { $set: { offers: generateOffers() } }, { upsert: true });
@@ -374,4 +516,4 @@ async function collect({ user }) {
   return result;
 }
 
-module.exports = { WORK_TIME, settings, requiredFor, durationFor, rewardFor, packChanceFor, loadSettings, saveSettings, simulate, generateOffers, rollsPack, getOffers, canReroll, reroll, getState, start, collect };
+module.exports = { aleksBudget, coinTally, refundCoins, WORK_TIME, settings, requiredFor, durationFor, rewardFor, packChanceFor, loadSettings, saveSettings, simulate, generateOffers, rollsPack, getOffers, canReroll, reroll, getState, start, collect };

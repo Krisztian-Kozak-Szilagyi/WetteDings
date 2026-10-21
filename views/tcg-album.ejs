@@ -1,19 +1,30 @@
 <%- include('partials/head') %>
-<% const albumCards = cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
 
 <div class="album-head">
   <div class="album-title">
     <h1>Album</h1>
     <div class="tcg-progress">
-      <span class="progress album-progress"><span style="width: <%= albumCards.length ? Math.round(uniqueOwned / albumCards.length * 100) : 0 %>%"></span></span>
-      <span class="tcg-progress-num"><%= uniqueOwned %> / <%= albumCards.length %> Karten · Händlerwert <%= euro(collectionValue) %></span>
+      <span class="progress album-progress"><span style="width: <%= totalCards ? Math.round(uniqueOwned / totalCards * 100) : 0 %>%"></span></span>
+      <span class="tcg-progress-num" title="Eine Karte zählt, sobald du sie in irgendeiner Seltenheit besitzt"><%= uniqueOwned %> / <%= totalCards %> Karten · Händlerwert <%= euro(collectionValue) %></span>
     </div>
     <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
 </div>
 
 <div class="album-body" id="sammlung">
-  <%- include('partials/collection-view', { mode: 'album', dupes: true, emptyText: 'Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!' }) %>
+  <%- include('partials/collection-view', { mode: 'album', dupes: true, grouped: true, emptyText: 'Du hast noch keine Karten. Kauf und öffne dein erstes Booster Pack im <a href="/tcg">TCG</a>!' }) %>
+</div>
+
+<%# Versionen einer Karte: Hintergrund unscharf, die Versionen entfalten sich aus der Kachel (public/js/tcg.js) %>
+<div class="album-unfold" data-album-unfold hidden>
+  <div class="album-unfold-stage" role="dialog" aria-modal="true" aria-labelledby="album-unfold-title">
+    <button type="button" class="tcg-close album-unfold-close" data-album-unfold-close aria-label="Schließen">×</button>
+    <div class="album-unfold-head">
+      <h2 id="album-unfold-title" data-album-unfold-title></h2>
+      <p class="muted" data-album-unfold-sub></p>
+    </div>
+    <div class="album-unfold-cards" data-album-unfold-cards></div>
+  </div>
 </div>
 
 <!-- Karte vergrößern -->

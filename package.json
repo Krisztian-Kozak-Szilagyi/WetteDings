@@ -16,6 +16,7 @@
     "dev:stufe": "node scripts/dev-stufe.js",
     "dev:ruf": "node scripts/dev-ruf.js",
     "dev:tests": "node scripts/dev-tests.js",
+    "dev:alles": "node scripts/dev-alles.js",
     "test": "node --test",
     "webp": "node scripts/webp.js",
     "sim:bosskampf": "node scripts/bossfight-sim.js",

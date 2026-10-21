@@ -3,6 +3,8 @@
   „Nur Karten im Besitz“, darunter Slab-Regal und je Season ein Raster mit einer Kachel je Karte (partials/tcg-grid).
   mode: 'album' (eigenes Album, Standard) oder 'view' (Sammlung eines Mitglieds, mit linkFor = „Angebot machen“),
   dupes: true zeigt die Duplikate-Leiste (nur Album), emptyText = Hinweis ohne Karten.
+  grouped: true (Album) – eine Kachel je Karte (alle Seltenheiten zusammen, beste eigene Version vorn); ein Klick entfaltet
+  die Versionen (public/js/tcg.js, Album: Versionen). Braucht dann groupKeyOf und seenIds.
   Erwartet die Daten der Sammlung (tcg/collection) plus cards, seasons, unreleased, testCards, slabCopies, rarityByKey, rarities.
 %>
 <% const gridMode = locals.mode === 'view' ? 'view' : 'album'; %>
@@ -12,6 +14,29 @@
 <%# Im Raster stehen die höchsten Wertungen oben: erst die beste Note der Karte (Slab oder zuletzt bewertet), dann die Seltenheit; Karten ohne Note in der Reihenfolge der Season %>
 <% const bestGrade = (c) => Math.max(0, ...(foiledCopies[c.id] || []).map((f) => (f.slab ? f.slab.grade : 0)), ...(markedCopies[c.id] || []).map((m) => (m.lastGrade ? m.lastGrade.grade : 0)));
    const byQuality = (a, b) => bestGrade(b) - bestGrade(a) || (rarityByKey[b.rarity].rank || 0) - (rarityByKey[a.rarity].rank || 0); %>
+<%
+  // Album (grouped): eine Kachel je Karte – alle Versionen einer Person bzw. eines Gegenstands zusammen
+  const rankOf = (c) => (rarityByKey[c.rarity] || {}).rank || 0;
+  const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch', arcane: 'arcane' })[rarity] || '';
+  const groupsOf = (list) => {
+    const map = new Map();
+    for (const c of list) {
+      const key = groupKeyOf(c.id);
+      if (!map.has(key)) map.set(key, { key, cards: [] });
+      map.get(key).cards.push(c);
+    }
+    return [...map.values()].map((g) => {
+      const vs = g.cards.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]).sort((a, b) => rankOf(a) - rankOf(b));
+      const owned = vs.filter((c) => counts[c.id] || (foiledCopies[c.id] || []).length);
+      const seen = vs.filter((c) => (locals.seenIds || new Set()).has(c.id));
+      const best = owned.length ? owned[owned.length - 1] : null;
+      // Name der Karte: der Name der häufigsten Version (Boss-Versionen heißen oft anders, z. B. „St. Ivan, the Forsaken“)
+      return { ...g, list: vs, owned, best, shownCard: best || (seen.length ? seen[seen.length - 1] : null), name: vs.length ? vs[0].name : g.cards[0].name,
+        soon: vs.every((c) => c.unreleased), copies: vs.reduce((n, c) => n + (counts[c.id] || 0), 0), grade: Math.max(0, ...owned.map(bestGrade)) };
+    }).filter((g) => g.list.length)
+      // höchste Wertung oben (beste Note, dann beste eigene Seltenheit), dann nach Name; noch nicht erhältliche ans Ende
+      .sort((a, b) => a.soon - b.soon || b.grade - a.grade || (b.best ? rankOf(b.best) : -1) - (a.best ? rankOf(a.best) : -1) || a.name.localeCompare(b.name, 'de'));
+  }; %>
 <% const seasonList = seasons.slice().reverse().map((s) => ({ ...s, list: cards.filter((c) => c.season === s.key && c.rarity !== 'test-item').sort(byQuality), soon: unreleased.filter((c) => c.season === s.key) })).filter((s) => s.list.length || s.soon.length); %>
 <%# Reiter statt langer Seite: immer nur eine Season (die neueste zuerst) oder das Slab-Regal; „Alle“ zeigt alles %>
 <% const tabs = seasonList.map((s) => ({ key: s.key, label: s.label })).concat(testCards.length ? [{ key: 'test', label: 'Test' }] : []);
@@ -38,11 +63,50 @@
 <%- include('slab-shelf', { shelfMode: gridMode, shelfTitle: locals.shelfTitle || 'Meine Slabs', favoriteIds: locals.favoriteIds || new Set() }) %>
 <% seasonList.forEach((s) => { const shown = s.list.filter((c) => !(rarityByKey[c.rarity] || {}).hidden || counts[c.id]); %>
   <section class="album-season" data-album-season-section="<%= s.key %>" aria-labelledby="season-<%= s.key %>"<%- s.key === firstTab ? '' : ' hidden' %>>
-    <div class="album-season-head">
-      <h2 id="season-<%= s.key %>"><%= s.label %></h2>
-      <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
-    </div>
-    <%- include('tcg-grid', { mode: gridMode, cards: s.list.concat(s.soon), lockedByCard: gridMode === 'view' ? {} : locals.lockedByCard }) %>
+    <% if (locals.grouped) { const sg = groupsOf(s.list.concat(s.soon)); const counted = sg.filter((g) => !g.soon); %>
+      <div class="album-season-head">
+        <h2 id="season-<%= s.key %>"><%= s.label %></h2>
+        <span class="tcg-progress-num"><%= counted.filter((g) => g.owned.length).length %> / <%= counted.length %> Karten</span>
+      </div>
+      <div class="tcg-grid tcg-album album-groups">
+        <% sg.forEach((g) => { const c = g.shownCard; const fx = c && g.best ? fxFor(c.rarity) : ''; const many = g.list.length > 1; %>
+          <% if (g.soon) { %>
+            <%# noch nicht erhältlich: eine Farbe für alle, Seltenheiten nicht verraten %>
+            <div class="tcg-slot tcg-locked tcg-soon album-group" data-rarity="soon" title="Noch nicht erhältlich">
+              <div class="tcg-locked-inner"><span>?</span></div>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span>???</span>
+            </div>
+          <% } else { %>
+            <%# data-album-has: im Besitz („Nur Karten im Besitz zeigen“) %>
+            <button type="button" class="tcg-slot album-group<%= many ? ' is-stack' : '' %><%= g.best ? ' r-' + g.best.rarity : c ? ' tcg-seen r-' + c.rarity : ' tcg-locked' %>"
+              data-album-group="<%= g.key %>" data-name="<%= g.name %>" data-rarities="<%= g.list.map((x) => x.rarity).join(' ') %>"<%- g.owned.length ? ' data-album-has' : '' %>
+              aria-label="<%= g.name %>: <%= g.owned.length %> von <%= g.list.length %> Versionen<%= g.best ? ', beste: ' + rarityByKey[g.best.rarity].label : '' %> – Versionen ansehen">
+              <% if (c) { %>
+                <span class="tcg-art">
+                  <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
+                  <% if (fx === 'glitch') { %><img class="tcg-glitch-a" src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><img class="tcg-glitch-b" src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"><% } %>
+                  <% if (fx) { %><span class="tcg-fx tcg-fx-<%= fx %>"></span><% } %>
+                  <% if (g.copies > 1) { %><span class="tcg-count">×<%= g.copies %></span><% } %>
+                </span>
+              <% } else { %>
+                <div class="tcg-locked-inner"><span>?</span></div>
+              <% } %>
+              <span class="tcg-slot-label"><span class="tcg-dot"></span><%= g.name %><% if (many) { %> <span class="album-group-n"><%= g.owned.length %>/<%= g.list.length %></span><% } %></span>
+            </button>
+            <%# alle Versionen – werden beim Anklicken in die Übersicht geholt; dort öffnet jede Version wie gewohnt die Großansicht %>
+            <div class="album-versions" data-album-versions="<%= g.key %>" data-title="<%= g.name %>" data-sub="<%= g.owned.length %> von <%= g.list.length %> <%= g.list.length === 1 ? 'Version' : 'Versionen' %><%= g.best ? ' · beste: ' + rarityByKey[g.best.rarity].label : ' · noch keine' %>" hidden>
+              <%- include('tcg-grid', { mode: gridMode, cards: g.list, lockedByCard: gridMode === 'view' ? {} : locals.lockedByCard }) %>
+            </div>
+          <% } %>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="album-season-head">
+        <h2 id="season-<%= s.key %>"><%= s.label %></h2>
+        <span class="tcg-progress-num"><%= shown.filter((c) => counts[c.id]).length %> / <%= shown.length %></span>
+      </div>
+      <%- include('tcg-grid', { mode: gridMode, cards: s.list.concat(s.soon), lockedByCard: gridMode === 'view' ? {} : locals.lockedByCard }) %>
+    <% } %>
   </section>
 <% }) %>
 <% if (testCards.length) { %>

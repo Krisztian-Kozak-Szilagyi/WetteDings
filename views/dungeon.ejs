@@ -1,6 +1,6 @@
 <%- include('partials/head') %>
 <%
-  const statLine = (c) => c && c.stats ? `⚡${c.stats.speed} · FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
+  const statLine = (c) => c && c.stats ? `FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
   const canLeave = (phase === 'solo' || phase === 'gruppe') && !lockedIn;
   // Lobby: eigene Karten per Klick auf den eigenen Platz wählen (#111) – bis kurz vor dem Start
   const canPick = (phase === 'solo' || phase === 'gruppe') && !lockedIn && !!cards;
@@ -143,8 +143,10 @@
           </div>
           <span class="dg-slot-name"><%= s.name %><% if (s.bot) { %> <span class="dg-bot-tag">Bot</span><% } %><% if (s.banned) { %> <span class="dg-ban-tag is-inline" title="Gesperrt bis zum Balance-Patch – bitte eine andere Karte wählen">Gesperrt</span><% } %></span>
           <span class="dg-slot-stats"><%= s.card ? statLine(s.card) : '' %></span>
-          <%# Boost-Karte: eigener kleiner Kartenplatz unter dem Charakter, für alle Spieler gleich %>
-          <div class="dg-boost<%= s.boost ? ' r-' + s.boost.rarity : ' is-none' %>">
+          <%# Boost-Karte: eigener kleiner Kartenplatz unter dem Charakter, für alle Spieler gleich; daneben bei Matze der
+              Hunde-Slot (Yo Dawg), sobald ein Hund sein Boost ist %>
+          <div class="dg-boosts">
+          <div class="dg-boost<%= s.boost ? ' r-' + s.boost.rarity : ' is-none' %>" data-dg-boost-id="<%= s.boost ? s.boost.id : '' %>">
             <span class="dg-boost-label">Boost</span>
             <% if (pickMe) { %>
               <button type="button" class="dg-boost-card dg-boost-pick<%= s.boost ? '' : ' dg-boost-empty' %>" data-dg-open="boost" aria-label="<%= s.boost ? 'Boost wechseln (' + s.boost.name + ')' : 'Boost wählen' %>"><% if (s.boost) { %><img src="<%= s.boost.image %>" alt="" width="720" height="1008" loading="lazy"><% } else { %><b aria-hidden="true">+</b><% } %></button>
@@ -157,6 +159,30 @@
               <span class="dg-boost-name muted">kein Boost</span>
             <% } %>
           </div>
+          <% if (s.dog || (pickMe && s.dogSlot)) { %>
+            <div class="dg-boost dg-boost-dog<%= s.dog ? ' r-' + s.dog.rarity : ' is-none' %>" data-dg-boost-id="<%= s.dog ? s.dog.id : '' %>">
+              <span class="dg-boost-label">Hund</span>
+              <% if (pickMe) { %>
+                <button type="button" class="dg-boost-card dg-boost-pick<%= s.dog ? '' : ' dg-boost-empty' %>" data-dg-open="dog" aria-label="<%= s.dog ? 'Hund wechseln (' + s.dog.name + ')' : 'Zweiten Hund wählen' %>"><% if (s.dog) { %><img src="<%= s.dog.image %>" alt="" width="720" height="1008" loading="lazy"><% } else { %><b aria-hidden="true">+</b><% } %></button>
+                <span class="dg-boost-name<%= s.dog ? '' : ' muted' %>"><%= s.dog ? s.dog.name : 'Yo Dawg: zweiter Hund' %></span>
+              <% } else { %>
+                <button type="button" class="dg-boost-card" <%- zoomAttrs(s.dog) %> aria-label="Hund <%= s.dog.name %> vergrößern"><img src="<%= s.dog.image %>" alt="" width="720" height="1008" loading="lazy"></button>
+                <span class="dg-boost-name"><%= s.dog.name %></span>
+              <% } %>
+            </div>
+          <% } %>
+          </div>
+          <%# Gruß aus dem Osten: Geld für Aleks – in der Lobby wählbar, im Durchlauf steht, was daraus wurde %>
+          <% if (s.aleks && pickMe) { %>
+            <form method="post" action="/dungeon/aleks-geld" class="dg-coins">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <label><span>Geld für Aleks</span><span class="dg-coins-field"><input type="number" name="coins" min="0" max="<%= aleks.max %>" step="50" value="<%= s.coins / 100 %>" inputmode="numeric"> €</span></label>
+              <button type="submit" class="btn btn-ghost btn-sm">Mitgeben</button>
+              <small class="muted">bis <%= aleks.max %> € · je Münzwurf <%= aleks.cost %> € · abgebucht beim Start, Rest zurück</small>
+            </form>
+          <% } else if (s.aleks && s.coins) { %>
+            <span class="dg-coins-note muted small">Aleks hat <b data-dg-coin-left><%= (s.coins / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) %> €</b> für Münzwürfe dabei</span>
+          <% } %>
           <% if (esLobby) { %>
             <%# eSports-Live-Turm: Vorrat (wird beim Benutzen verbraucht) und Bereit %>
             <div class="dg-supply">
@@ -318,19 +344,19 @@
       </div>
     <% } %>
     <div class="dg-pick-grid" data-dg-grid>
-      <% if (kind === 'boost') { %>
-        <%# "Ohne Boost" steht vorn – nur ohne Suche und Filter %>
+      <% if (kind !== 'card') { %>
+        <%# "Ohne Boost" (bzw. "Ohne Hund") steht vorn – nur ohne Suche und Filter %>
         <label class="dg-pick dg-pick-none" data-dg-none style="--i: 0; order: -300">
-          <input type="radio" name="boost" value="" <%= !sel || !sel.boost ? 'checked' : '' %>>
-          <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
+          <input type="radio" name="<%= kind %>" value="" <%= !sel || !sel[kind] ? 'checked' : '' %>>
+          <span class="dg-slot-placeholder"><span><%= kind === 'dog' ? 'Ohne Hund' : 'Ohne Boost' %></span></span>
         </label>
       <% } %>
       <% if (favCount) { %><h3 class="pick-group" data-pick-group="fav">★ Favoriten</h3><% } %>
       <% if (sc.freq.size) { %><h3 class="pick-group" data-pick-group="freq" style="order: -101" hidden>Häufig verwendet</h3><% } %>
-      <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const checked = !!sel && (kind === 'card' ? sel.card === c.id : sel.boost === c.id); const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const taken = !banned && teamTaken.has(c.id); const lock = cards.locks[c.id]; const busy = !banned && !taken && !(cards.counts[c.id] > 0); const off = banned || taken || busy; %>
+      <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const checked = !!sel && sel[kind] === c.id; const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const banned = cards.banned.has(c.id); const dogUsed = !banned && kind !== 'card' && (dogTaken.has(c.id) || (kind === 'dog' && !!sel && sel.boost === c.id)); const taken = !banned && (teamTaken.has(c.id) || dogUsed); const lock = cards.locks[c.id]; const busy = !banned && !taken && !(cards.counts[c.id] > 0); const off = banned || taken || busy; %>
         <%# Gesperrte Karten (Kartensperren, Im Team) und Karten ohne freies Exemplar (Auf Quest, Im Handel …): sichtbar, aber nicht wählbar.
             Ist nur ein Teil der Exemplare gesperrt, bleibt die Karte wählbar und zeigt es klein an (z. B. „1× Auf Quest“). %>
-        <label class="dg-pick r-<%= c.rarity %><%= off ? ' is-blocked is-banned' : '' %>" data-dg-item <%= off ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %> title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : busy ? 'Kein freies Exemplar (' + lock.label + ')' : lock ? label + ' – ' + lock.n + '× ' + lock.label : label %>" style="--i: <%= kind === 'boost' ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
+        <label class="dg-pick r-<%= c.rarity %><%= off ? ' is-blocked is-banned' : '' %>" data-dg-item <%= off ? 'data-banned' : '' %> data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>" data-count="<%= cards.counts[c.id] || 0 %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %> title="<%= banned ? 'Gesperrt bis zum Balance-Patch' : dogUsed ? 'Spielt schon mit – jede Hundekarte nur einmal' : taken ? 'Spielt schon in deinem Team mit – im Mage Tower jede Karte nur einmal' : busy ? 'Kein freies Exemplar (' + lock.label + ')' : lock ? label + ' – ' + lock.n + '× ' + lock.label : label %>" style="--i: <%= kind !== 'card' ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
           <input type="radio" name="<%= kind %>" value="<%= c.id %>" <%= checked ? 'checked' : '' %> <%= off ? 'disabled' : '' %>>
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
           <% if (banned) { %><span class="dg-ban-tag">Gesperrt</span><% } else if (taken) { %><span class="dg-ban-tag">Im Team</span><% } else if (busy) { %><span class="dg-ban-tag"><%= lock.label %></span><% } else if (lock) { %><span class="dg-lock-tag"><%= lock.n %>× <%= lock.label %></span><% } %>
@@ -346,7 +372,7 @@
 <% if (canPick) { %>
   <form method="post" action="/dungeon/karten" data-dg-cards-form <%= tower ? 'data-dg-unique' : '' %>>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <% [['card', 'Charakter wählen', cards.characters], ['boost', 'Boost wählen', cards.boosts]].forEach(([kind, title, list]) => { %>
+    <% [['card', 'Charakter wählen', cards.characters], ['boost', 'Boost wählen', cards.boosts], ...(dogChoices ? [['dog', 'Zweiten Hund wählen', dogChoices]] : [])].forEach(([kind, title, list]) => { %>
       <dialog class="dg-picker" data-dg-picker="<%= kind %>" aria-labelledby="dg-picker-<%= kind %>">
         <div class="dg-picker-head">
           <h2 id="dg-picker-<%= kind %>"><%= title %></h2>

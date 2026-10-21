@@ -52,7 +52,7 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 91); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
+  assert.equal(catalog.CARDS.length, 103); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
   assert.equal(catalog.TEST_CARDS.length, 23);
   assert.equal(catalog.cardsByRarity['test-item'].length, 0);
   assert.ok(catalog.cardById[catalog.TEST_CARDS[0].id]); // vergebene Exemplare funktionieren weiter
@@ -215,4 +215,73 @@ test('#204: Bank – ungebügelter Knick halber Preis, beschädigte Exemplare ge
   assert.deepEqual(pickDuplicates([...graded].sort(bankOrder), none).map((d) => d._id), ['h']);
   const holo = require('../src/tcg/catalog').rarityByKey.holo;
   assert.equal(bankProceeds([{ rarity: 'holo', creased: true }, { rarity: 'holo' }]), Math.floor(holo.sell / 2) + holo.sell);
+});
+
+test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je Seltenheit – gleiche Karten-IDs, Werte und Fähigkeit', () => {
+  const catalog = require('../src/tcg/catalog');
+  const cardSvg = require('../src/tcg/cardSvg');
+  const STATS = require('../src/tcg/stats');
+  const sets = {
+    Ömer: ['omer', 'Mach das Unmögliche möglich', { crumpled: 'Ömer the Crumpled', bfwler: 'Ömer the BFWler', gold: 'Ömer the Golden', holo: 'Ömer the Holographic', bockhaber: 'Ömer the Bockhaber', glitch: 'Glitch the Ömered' }],
+    Aleks: ['aleks', 'Gruß aus dem Osten', { crumpled: 'Aleks the Crumpled', bfwler: 'Aleks the BFWler', gold: 'Aleks the Golden', holo: 'Aleks the Holographic', bockhaber: 'Aleks the Bockhaber', glitch: 'Glitch the Aleksed' }],
+    Matze: ['matze', 'Yo Dawg', { crumpled: 'Matze the Crumpled', bfwler: 'Matze the BFWler', gold: 'Matze the Golden', holo: 'Matze the Holographic', bockhaber: 'Matze the Bockhaber', glitch: 'Glitch the Matzed' }],
+    Luca: ['luca', "You can't handle my Potions", { crumpled: 'Luca the Crumpled', bfwler: 'Luca the BFWler', gold: 'Luca the Golden', holo: 'Luca the Holographic', bockhaber: 'Luca the Bockhaber', glitch: 'Glitch the Lucaed' }],
+  };
+  const order = ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch'];
+  for (const [name, [slug, abilityName, titles]] of Object.entries(sets)) for (const [rarity, title] of Object.entries(titles)) {
+    const id = `${slug}-${order.indexOf(rarity) + 1}-${rarity}`;
+    const c = catalog.cardById[id];
+    assert.ok(c && catalog.CARDS.includes(c), id);
+    assert.equal(c.name, name, `der Name bleibt überall „${name}“`);
+    assert.equal(c.abilityName, abilityName);
+    assert.equal(c.title, title);
+    assert.equal(c.frame, `rar-${c.rarity}`);
+    assert.deepEqual([c.stats.fia, c.stats.fis, c.stats.bwl], STATS[id].slice(1), 'Werte unverändert');
+    assert.equal(c.stats.speed, catalog.SPEED, 'alle Charaktere gleich schnell');
+    assert.ok(c.isCharacter);
+    assert.ok(c.image.startsWith(`/img/tcg/karte/${slug}-`), c.image);
+    const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
+    for (const t of [title, abilityName, 'FIA', 'FIS', 'BWL', `>${c.stats.fis}<`]) assert.ok(svg.includes(t), `${id}: ${t}`);
+  }
+});
+
+test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell mit Wertefenstern FIA/FIS/BWL auf 0 – Treue Seele, weiter keine Charaktere', () => {
+  const catalog = require('../src/tcg/catalog');
+  const cardSvg = require('../src/tcg/cardSvg');
+  for (const [id, name] of [['hugo-holo', 'Hugo'], ['lilly-holo', 'Lilly']]) {
+    const c = catalog.cardById[id];
+    assert.ok(c && catalog.CARDS.includes(c), id);
+    assert.equal(c.name, name);
+    assert.equal(c.frame, 'rar-holo-hund');
+    assert.equal(c.abilityName, 'Treue Seele');
+    assert.equal(c.isCharacter, false, 'Hunde bleiben Spells (Boost, kein Charakter)');
+    const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
+    assert.ok(svg.includes('SPELL') && svg.includes('Treue Seele') && svg.includes(name));
+    for (const t of ['>FIA<', '>FIS<', '>BWL<']) assert.ok(svg.includes(t), t);
+    assert.equal((svg.match(/>0</g) || []).length, 3, 'alle drei Werte 0');
+    // an Matze: 25 auf allen Werten
+    assert.equal((cardSvg.render(c, { fia: 25, fis: 25, bwl: 25 }).match(/>25</g) || []).length, 3);
+  }
+});
+
+test('Album: jede Karte nur einmal – Versionen zusammengefasst, Fortschritt zählt Karten in beliebiger Seltenheit', () => {
+  const catalog = require('../src/tcg/catalog');
+  assert.equal(catalog.groupKeyOf('omer-3-gold'), 'omer');
+  assert.equal(catalog.groupKeyOf('st-ivan-boss'), 'st-ivan', 'die Boss-Version gehört zu St. Ivan');
+  assert.equal(catalog.groupKeyOf('hugo-holo'), 'hugo');
+  assert.equal(catalog.groupKeyOf('grafikkarte-amd-gold'), 'grafikkarte-amd');
+  assert.equal(catalog.groupKeyOf('casino-kaffee-6-glitch'), 'casino-kaffee');
+  assert.equal(catalog.cardGroups.get('omer').length, 6);
+  assert.equal(catalog.cardGroups.get('st-ivan').length, 7);
+  // jede erhältliche Version steckt in genau einer Karte
+  assert.equal([...catalog.cardGroups.values()].reduce((n, v) => n + v.length, 0), catalog.CARDS.length);
+  const none = catalog.collectionProgress(() => false);
+  assert.ok(none.total < catalog.CARDS.length && none.owned === 0);
+  // nur eine Crumpled-Version von Ömer: zählt schon als Karte
+  assert.equal(catalog.collectionProgress((id) => id === 'omer-1-crumpled').owned, 1);
+  assert.equal(catalog.collectionProgress((id) => id.startsWith('omer-')).owned, 1, 'mehr Versionen = immer noch eine Karte');
+  // geheime Seltenheit (Sith) zählt erst, wenn man sie besitzt
+  const all = catalog.collectionProgress(() => true);
+  assert.equal(all.owned, all.total);
+  assert.equal(all.total, none.total + 1);
 });

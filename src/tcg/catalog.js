@@ -8,6 +8,8 @@ const { SEASONS, DEFAULT_SEASON, seasonByKey } = require('./seasons');
 
 const IMAGE_DIR = path.join(__dirname, '..', '..', 'public', 'img', 'tcg');
 const IMAGE_URL = '/img/tcg';
+// Tempo aller Charaktere (Quests, Dungeon, Mage Tower): 40 = 14 Arbeitstakte, etwa der alte Durchschnitt aller Karten
+const SPEED = 40;
 /** Bild-URL mit Änderungszeit als Version – ausgetauschte Bilder umgehen so den Browser-Cache */
 function imageUrl(file) {
   let v = '';
@@ -132,11 +134,15 @@ function loadCards(dir = IMAGE_DIR) {
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
+      // Einheitliches Tempo: jeder Charakter arbeitet gleich schnell (der Speed im Bild oder in stats.js zählt nicht
+      // mehr). Effekte wie Nachtschicht oder Casino-Kaffee ändern das Tempo weiterhin ausgehend von SPEED.
+      if (card.isCharacter) stats.speed = SPEED;
       // Kampfwerte (eigener Block, nur neue Karten) für den kommenden Kampfmodus
       if (data && data.kampf) card.kampf = data.kampf;
       // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
       if (data && data.unreleased) card.unreleased = true;
-      if (framed) Object.assign(card, { frame: data.frame, ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
+      // title: Text im Namensbalken (z. B. „Ömer the Golden“), der Kartenname bleibt überall sonst name („Ömer“)
+      if (framed) Object.assign(card, { frame: data.frame, title: data.title || '', ability: data.ability || '', abilityName: data.abilityName || '', artFile: path.join(dir, file) });
       // Bild-URL bei jedem Zugriff neu (Version = Änderungszeit): ein ausgetauschtes Bild erscheint ohne Neustart
       Object.defineProperty(card, 'image', { enumerable: true, get: () => (framed ? cardImage(card) : imageUrl(file)) });
       return card;
@@ -158,6 +164,36 @@ const cardById = Object.fromEntries(LOADED.map((c) => [c.id, c]));
 const cardsByRarity = Object.fromEntries(ALL_RARITIES.map((r) => [r.key, CARDS.filter((c) => c.rarity === r.key)]));
 const cardsBySeason = Object.fromEntries(SEASONS.map((s) => [s.key, CARDS.filter((c) => c.season === s.key)]));
 
+// ---------- Karten und ihre Versionen ----------
+// Eine „Karte“ im Album ist eine Person bzw. ein Gegenstand mit allen Versionen (Seltenheiten): „omer-1-crumpled“ …
+// „omer-6-glitch“ gehören zu „omer“, „st-ivan-boss“ zu „st-ivan“. Für den Fortschritt zählt, ob man die Karte in
+// irgendeiner Version besitzt – das Ziel ist jede Karte in ihrer besten Version, nicht jede Version.
+const GROUP_SUFFIX = new RegExp(`(-\\d+)?-(${ALL_RARITIES.map((r) => r.key).join('|')})$`);
+/** Schlüssel der Karte einer Version: "omer-3-gold" → "omer" */
+const groupKeyOf = (id) => String(id).replace(GROUP_SUFFIX, '');
+/** Versionen je Karte (nur erhältliche): Map Schlüssel → [Versionen, häufig → selten] */
+const cardGroups = new Map();
+for (const c of CARDS) {
+  if (!cardGroups.has(groupKeyOf(c.id))) cardGroups.set(groupKeyOf(c.id), []);
+  cardGroups.get(groupKeyOf(c.id)).push(c);
+}
+/**
+ * Fortschritt der Sammlung: { owned, total } in Karten (nicht Versionen). owns(cardId) → besitzt man diese Version?
+ * Karten nur in geheimer Seltenheit (Sith) zählen wie bisher erst mit, wenn man sie besitzt.
+ */
+function collectionProgress(owns) {
+  let owned = 0;
+  let total = 0;
+  for (const versions of cardGroups.values()) {
+    const has = versions.some((c) => owns(c.id));
+    const visible = versions.some((c) => !(rarityByKey[c.rarity] || {}).hidden);
+    if (!visible && !has) continue;
+    total++;
+    if (has) owned++;
+  }
+  return { owned, total };
+}
+
 /**
  * Bild-URL einer Rahmen-Karte (SVG, src/tcg/cardSvg.js). values: abweichende Werte, z. B. { fia: 110 } bei einem Boost –
  * sie erscheinen farbig auf der Karte. v = Version aus Werten, Text und Bild: Änderungen umgehen den Browser-Cache.
@@ -169,7 +205,7 @@ function cardImage(card, values = {}) {
   } catch {
     // Datei fehlt – ohne Bildversion
   }
-  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.frame, card.stats, card.abilityName, card.ability, card.kampf || null, mtime])).digest('hex').slice(0, 10);
+  const v = crypto.createHash('sha1').update(JSON.stringify([card.name, card.title || '', card.frame, card.stats, card.abilityName, card.ability, card.kampf || null, mtime])).digest('hex').slice(0, 10);
   const q = ['speed', 'fia', 'fis', 'bwl'].filter((k) => Number.isInteger(values[k]) && card.stats && values[k] !== card.stats[k]).map((k) => `${k}=${Math.max(0, Math.min(999, values[k]))}`);
   return `${IMAGE_URL}/karte/${card.id}.svg?${[...q, `v=${v}`].join('&')}`;
 }
@@ -223,6 +259,10 @@ const expectedPackValue = () => expectedCardValue() * CARDS_PER_PACK;
 const chance = (key) => rarityByKey[key].weight / TOTAL_WEIGHT;
 
 module.exports = {
+  SPEED,
+  groupKeyOf,
+  cardGroups,
+  collectionProgress,
   PACK_IMAGE,
   CARDS_PER_PACK,
   PACK_TYPES,

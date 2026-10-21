@@ -6,6 +6,7 @@
 //   season:  Schlüssel aus src/tcg/seasons.js
 //   frame:   Rahmen-Layout aus src/tcg/frames.js (wo die Fenster auf dem Bild liegen)
 //   name:    Name wie auf der Karte (sonst aus dem Dateinamen)
+//   title:   Text im Namensbalken, wenn er vom Namen abweicht (Varianten wie „Ömer the Golden“; der Name bleibt „Ömer“)
 //   stats:   [Speed, FIA, FIS, BWL]
 //   abilityName: Name der Fähigkeit (fett über dem Text, optional)
 //   ability: Fähigkeitstext im großen Fenster
@@ -83,11 +84,72 @@ const TEST_HELDEN = {
 const unreleased = (name, ids) => Object.fromEntries(ids.map((id) => [id, { season: 'season-1', name, unreleased: true }]));
 const SEASON1_UNRELEASED = {
   ...unreleased('Mark Suntouched', ['mark-suntouched-1-footman', 'mark-suntouched-2-gold', 'mark-suntouched-3-holo', 'mark-suntouched-4-arcane']),
-  ...unreleased('The Gracebringer', ['the-gracebringer-1-footman', 'the-gracebringer-2-gold', 'the-gracebringer-3-holo', 'the-gracebringer-4-arcane']),
+};
+
+// Karten-Overhaul Teil 1: Ömer, Aleks, Matze, Luca, Hugo und Lilly im Vollbild-Layout von St. Ivan, the Forsaken – je Seltenheit eigene Farben und
+// Effekte (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer
+// die Karte hatte, hat jetzt die überarbeitete. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
+const overhaul = (name, abilityName, ability) => (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name, title, stats: require('./stats')[id], abilityName, ability });
+// Mach das Unmögliche möglich: Duplikate, Schneeball und schnellere Deadline in src/ihk/abilities.js (OMER), ihkService.simulate
+const omer = overhaul('Ömer', 'Mach das Unmögliche möglich', 'Zu Beginn und zur Halbzeit dupliziert sich Ömer, wobei seine Grundwerte halbiert werden. Die Duplikate werden als Ömer behandelt. Greift ein Ömer an, fühlen sich die anderen verpflichtet, mit draufzugehen: Für jeden weiteren Ömer erhalten alle Ömer (Grundwert\u00a0+\u00a01)\u00a0/\u00a08 auf alle Werte. Für jeden Ömer im Spiel läuft der Timer 15\u00a0% schneller.');
+// Gruß aus dem Osten: Geld und Münzwürfe in src/ihk/abilities.js (ALEKS), ihkService.simulate (opts.coin)
+const aleks = overhaul('Aleks', 'Gruß aus dem Osten', 'Du kannst Aleks bis zu 1000\u00a0€ mit auf Missionen geben. Zur Halbzeit beginnt er mit Münzwürfen: Jeder Angriff verbraucht 50\u00a0€, mit 49,9\u00a0% Chance landet die Münze auf Kopf – dann erhält er für den Rest der Quest, des Dungeons oder des Mage Towers +10 auf alle Werte.');
+// Yo Dawg: der zusätzliche Hunde-Slot (src/ihk/abilities.js hasDogSlot). Nicht auf der Karte: In Hybrid-Quests hat
+// Matze so drei Plätze (zwei Hunde und einer frei), sonst zwei – sofern er beide Hunde spielt.
+const matze = overhaul('Matze', 'Yo Dawg', 'Wird Hugo oder Lilly als Boost für Matze gewählt, erhältst du einen zweiten Platz, um eine weitere Hundekarte mit anderem Namen zu spielen.');
+const luca = overhaul('Luca', "You can't handle my Potions", 'Zur Halbzeit erhöht er die Stärke der Halbzeit-Booster in seinem Team um 10 %. Danach werden sein Tempo und seine BWL um +50 erhöht.');
+// Mark, the Suntouched (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Sonnendurchbruch“ in abilities.js
+const mark = (id, rarity) => ({ ...overhaul('Mark', 'Sonnendurchbruch', 'Zur Halbzeit bricht die Sonne durch: In Quests und Dungeons verlängert sich die Zeit um 50 % der Gesamtdauer, im Mage Tower füllt er den Bock seiner Gruppe um 30 % auf. Danach erhalten er und seine Gruppe +5 auf alle Werte.')(id, rarity, 'Mark, the Suntouched'), season: 'season-1' });
+// Mirjam, the Gracebringer (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Alles Pink!“ in abilities.js
+const mirjam = (id, rarity) => ({ ...overhaul('Mirjam', 'Alles Pink!', 'Zur Halbzeit verdoppelt Mirjam bei sich selbst und bei jedem Gruppenmitglied den jeweils niedrigsten Wert.')(id, rarity, 'Mirjam, the Gracebringer'), season: 'season-1' });
+// Hunde (Spell): Plakette „✦ SPELL“, drei Wertefenster FIA/FIS/BWL mit 0 (rar-holo-hund) – an Matze steigen sie auf 25
+// (Treue Seele, src/ihk/abilities.js). Ohne Speed bleiben sie Spells, keine Charaktere (catalog.js isCharacter).
+const DOG_TEXT = 'Gibt der geboosteten Karte +5 auf alle Werte. Handelt es sich bei der geboosteten Karte um Matze, bekommt diese Karte +25 auf alle Werte und greift mit jedem Schlag von Matze ebenfalls an. Insgesamt dürfen nur zwei Hundekarten ausgespielt werden, jede nur einmal.';
+const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-hund', name, stats: [0, 0, 0, 0], abilityName: 'Treue Seele', ability: DOG_TEXT });
+const OVERHAUL = {
+  'omer-1-crumpled': omer('omer-1-crumpled', 'crumpled', 'Ömer the Crumpled'),
+  'omer-2-bfwler': omer('omer-2-bfwler', 'bfwler', 'Ömer the BFWler'),
+  'omer-3-gold': omer('omer-3-gold', 'gold', 'Ömer the Golden'),
+  'omer-4-holo': omer('omer-4-holo', 'holo', 'Ömer the Holographic'),
+  'omer-5-bockhaber': omer('omer-5-bockhaber', 'bockhaber', 'Ömer the Bockhaber'),
+  'omer-6-glitch': omer('omer-6-glitch', 'glitch', 'Glitch the Ömered'),
+  'aleks-1-crumpled': aleks('aleks-1-crumpled', 'crumpled', 'Aleks the Crumpled'),
+  'aleks-2-bfwler': aleks('aleks-2-bfwler', 'bfwler', 'Aleks the BFWler'),
+  'aleks-3-gold': aleks('aleks-3-gold', 'gold', 'Aleks the Golden'),
+  'aleks-4-holo': aleks('aleks-4-holo', 'holo', 'Aleks the Holographic'),
+  'aleks-5-bockhaber': aleks('aleks-5-bockhaber', 'bockhaber', 'Aleks the Bockhaber'),
+  'aleks-6-glitch': aleks('aleks-6-glitch', 'glitch', 'Glitch the Aleksed'),
+  'matze-1-crumpled': matze('matze-1-crumpled', 'crumpled', 'Matze the Crumpled'),
+  'matze-2-bfwler': matze('matze-2-bfwler', 'bfwler', 'Matze the BFWler'),
+  'matze-3-gold': matze('matze-3-gold', 'gold', 'Matze the Golden'),
+  'matze-4-holo': matze('matze-4-holo', 'holo', 'Matze the Holographic'),
+  'matze-5-bockhaber': matze('matze-5-bockhaber', 'bockhaber', 'Matze the Bockhaber'),
+  'matze-6-glitch': matze('matze-6-glitch', 'glitch', 'Glitch the Matzed'),
+  'luca-1-crumpled': luca('luca-1-crumpled', 'crumpled', 'Luca the Crumpled'),
+  'luca-2-bfwler': luca('luca-2-bfwler', 'bfwler', 'Luca the BFWler'),
+  'luca-3-gold': luca('luca-3-gold', 'gold', 'Luca the Golden'),
+  'luca-4-holo': luca('luca-4-holo', 'holo', 'Luca the Holographic'),
+  'luca-5-bockhaber': luca('luca-5-bockhaber', 'bockhaber', 'Luca the Bockhaber'),
+  'luca-6-glitch': luca('luca-6-glitch', 'glitch', 'Glitch the Lucaed'),
+  'mark-1-crumpled': mark('mark-1-crumpled', 'crumpled'),
+  'mark-2-bfwler': mark('mark-2-bfwler', 'bfwler'),
+  'mark-3-gold': mark('mark-3-gold', 'gold'),
+  'mark-4-holo': mark('mark-4-holo', 'holo'),
+  'mark-5-bockhaber': mark('mark-5-bockhaber', 'bockhaber'),
+  'mark-6-glitch': mark('mark-6-glitch', 'glitch'),
+  'mirjam-1-crumpled': mirjam('mirjam-1-crumpled', 'crumpled'),
+  'mirjam-2-bfwler': mirjam('mirjam-2-bfwler', 'bfwler'),
+  'mirjam-3-gold': mirjam('mirjam-3-gold', 'gold'),
+  'mirjam-4-holo': mirjam('mirjam-4-holo', 'holo'),
+  'mirjam-5-bockhaber': mirjam('mirjam-5-bockhaber', 'bockhaber'),
+  'mirjam-6-glitch': mirjam('mirjam-6-glitch', 'glitch'),
+  'hugo-holo': dog('Hugo'),
+  'lilly-holo': dog('Lilly'),
 };
 
 module.exports = {
   ...TEST_ITEMS,
+  ...OVERHAUL,
   ...TEST_HELDEN,
   ...SEASON1_UNRELEASED,
   'st-ivan-boss': {
