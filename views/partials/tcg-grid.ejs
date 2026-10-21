@@ -17,11 +17,11 @@
   const foiledCopies = locals.foiledCopies || {};
   // markedCopies: unfolierte Exemplare mit sichtbarem Schaden (#204) – eigene Plätze wie folierte Exemplare
   const markedCopies = locals.markedCopies || {};
-  const lockLabelOf = (reason) => ({ handel: 'Im Handel', quest: 'Auf Quest', dungeon: 'Im Dungeon', duell: 'Im Duell' })[reason] || 'Gesperrt';
+  // Kartennummer der Season (#01 …): im Album ist das Raster nach Wertung sortiert, die Nummer bleibt die der Karte (cardNo)
+  const noOf = (c, idx) => (locals.cardNo || {})[c.id] || String(idx + 1).padStart(2, '0');
+  const lockLabelOf = (reason) => ({ handel: 'Im Handel', quest: 'Auf Quest', dungeon: 'Im Dungeon', duell: 'Im Duell', vitrine: 'In der Vitrine' })[reason] || 'Gesperrt';
   const favoriteIds = locals.favoriteIds || new Set();
   const isAlbum = mode === 'album';
-  // slabsAbove: die Slabs stehen über den Seasons im Slab-Regal (Album) – im Raster nur Karten und Sleeves
-  const slabsAbove = !!locals.slabsAbove;
   // Effekte je Seltenheit: Glanzstreifen, Regenbogen, Glitch, Arcane (Mana-Welle als Echo-Bild)
   const fxFor = (rarity) => ({ bfwler: 'shine', gold: 'shine', icon: 'shine', sith: 'shine', holo: 'holo', bockhaber: 'bock', glitch: 'glitch', arcane: 'arcane' })[rarity] || '';
   const art = (c, extra) => {
@@ -36,8 +36,8 @@
 <div class="tcg-grid<%= isAlbum ? ' tcg-album' : '' %>">
   <% cards.forEach((c, idx) => { const r = rarityByKey[c.rarity]; %>
     <% const foiledN = foiledBy[c.id] || (foiledCopies[c.id] || []).length; const n = Math.max(0, (counts[c.id] || 0) - foiledN); %>
-    <% const inlineCopies = (foiledCopies[c.id] || []).filter((f) => !(slabsAbove && f.slab)); const onlySlabs = slabsAbove && !inlineCopies.length && (foiledCopies[c.id] || []).length > 0; %>
-    <% if (!n && !showMissing && !(foiledCopies[c.id] || []).length) return; %>
+    <% const allFoiled = foiledCopies[c.id] || []; const allMarked = markedCopies[c.id] || []; const hasCopies = (allFoiled.length || allMarked.length) > 0; %>
+    <% if (!n && !showMissing && !allFoiled.length) return; %>
     <% const lk = locks[c.id]; const lockedPlain = lk ? Math.max(0, lk.n - foiledN) : 0; const lockLabel = lk && lk.reason === 'handel' ? 'Im Handel' : lk && lk.reason === 'duell' ? 'Im Duell' : lk && lk.reason === 'dungeon' ? 'Im Dungeon' : 'Auf Quest'; %>
     <% const freeN = n - lockedPlain; const allLocked = n > 0 && freeN <= 0; %>
     <% const prot = isAlbum && protectedIds.has(c.id); const fav = isAlbum && favoriteIds.has(c.id); %>
@@ -50,7 +50,7 @@
         </span>
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
       </div>
-    <% } else if (n) { %>
+    <% } else if (n || hasCopies) { %>
       <% const inner = () => { %>
         <span class="tcg-art">
           <%- art(c) %>
@@ -66,43 +66,49 @@
         </span>
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
       <% } %>
+      <%# Zustände dieser Karte auf einen Blick: beste Note im Slab, Sleeves, früher bewertete Exemplare – im Album wie in fremden Sammlungen %>
+      <% const slabsOf = allFoiled.filter((f) => f.slab); const sleevesN = allFoiled.length - slabsOf.length; const wasOf = allMarked.filter((m) => m.lastGrade);
+         const bestSlab = slabsOf.reduce((b, f) => Math.max(b, f.slab.grade), 0); const bestWas = wasOf.reduce((b, m) => Math.max(b, m.lastGrade.grade), 0);
+         const copyN = allFoiled.length + allMarked.length;
+         const gradeTone = (g) => (g >= 9 ? 'is-gold' : g >= 6 ? 'is-silver' : 'is-bronze');
+         const chips = () => { if (!(slabsOf.length || sleevesN || wasOf.length)) return; %>
+        <span class="tcg-chips">
+          <% if (slabsOf.length) { %><span class="tcg-chip <%= gradeTone(bestSlab) %>" title="<%= slabsOf.length %>× Slab, beste Note <%= bestSlab %>">Slab <b><%= bestSlab %></b><%= slabsOf.length > 1 ? ' ×' + slabsOf.length : '' %></span><% } %>
+          <% if (sleevesN) { %><span class="tcg-chip is-sleeve" title="<%= sleevesN %>× im Sleeve">Sleeve<%= sleevesN > 1 ? ' ×' + sleevesN : '' %></span><% } %>
+          <% if (wasOf.length) { %><span class="tcg-chip <%= gradeTone(bestWas) %> is-was" title="<%= wasOf.length %>× ohne Slab, zuletzt bewertet – beste Note <%= bestWas %>">zuletzt <b><%= bestWas %></b><%= wasOf.length > 1 ? ' ×' + wasOf.length : '' %></span><% } %>
+        </span>
+      <% }; %>
       <% if (isAlbum) { %>
         <%# data-count = freie Exemplare (Verkaufen), data-locked = gesperrte (Anzeige im Fenster, z. B. „1× Auf Quest“) %>
         <button type="button" class="tcg-slot<%= allLocked ? ' tcg-in-exam' : '' %> r-<%= c.rarity %>" data-album-card="<%= c.id %>" data-rarity="<%= c.rarity %>"
-          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
+          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= noOf(c, idx) %>"
           data-image="<%= c.image %>" data-count="<%= Math.max(0, freeN) %>" data-sell="<%= r.sell %>" data-sell-text="<%= euro(r.sell) %>"<%- r.noBank ? ' data-no-bank="1"' : '' %>
           data-protected="<%= prot ? 1 : 0 %>" data-favorite="<%= fav ? 1 : 0 %>" data-foiled="<%= foiledBy[c.id] || 0 %>" data-creased="<%= creasedBy[c.id] || 0 %>"
           <% if (lockedPlain) { %>data-locked="<%= lockedPlain %>" data-lock-label="<%= lockLabel %>"<% } %>
           <% if (allLocked) { %>title="Diese Karte ist gerade gesperrt (<%= lockLabel %>)"<% } %>
           aria-label="<%= c.name %>, <%= r.label %>, <%= n %> Stück<%= lockedPlain ? ', ' + lockedPlain + ' davon ' + lockLabel : '' %><%= prot ? ', geschützt' : '' %><%= fav ? ', Favorit' : '' %> – vergrößern">
           <% inner() %>
+          <% chips() %>
         </button>
-      <% } else if (locals.linkFor) { %>
-        <%# Fremde Sammlung: erst groß ansehen (public/js/handel.js), dort führt "Angebot machen" zu linkFor %>
-        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card
-          data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity="<%= c.rarity %>" data-rarity-label="<%= r.label %>"
-          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= (locals.ownedCounts || {})[c.id] || 0 %>" data-trade-href="<%= linkFor(c.id) %>"
+        <% if (copyN) { %><%- include('album-copies', { popStatsOf: locals.popStatsOf, c, r, foiled: allFoiled, marked: allMarked, no: noOf(c, idx), favoriteIds, highlight: locals.highlight || '', lockLabelOf }) %><% } %>
+      <% } else { %>
+        <%# Sammlung eines Mitglieds: erst groß ansehen (public/js/handel.js), dort die Exemplare nach Wertung; bei fremden führt
+            „Angebot machen“ zu linkFor. Gleiche Kachel wie im Album, nur ohne Verkaufen und Schützen. %>
+        <button type="button" class="tcg-slot r-<%= c.rarity %>" data-zoom-card data-album-card="<%= c.id %>" data-card-id="<%= c.id %>" data-rarity="<%= c.rarity %>"
+          data-image="<%= c.image %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>"
+          data-sell-text="<%= euro(r.sell || 0) %>" data-owned="<%= (locals.ownedCounts || {})[c.id] || 0 %>"<% if (locals.linkFor) { %> data-trade-href="<%= linkFor(c.id) %>"<% } %>
           aria-label="<%= c.name %>, <%= r.label %> – vergrößern">
           <% inner() %>
+          <% chips() %>
         </button>
-      <% } else { %>
-        <div class="tcg-slot r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" title="<%= c.name %>">
-          <% inner() %>
-        </div>
+        <% if (copyN) { %><%- include('album-copies', { isAlbum: false, linkFor: locals.linkFor || null, popStatsOf: locals.popStatsOf, c, r, foiled: allFoiled, marked: allMarked, no: noOf(c, idx), favoriteIds, highlight: '', lockLabelOf }) %><% } %>
       <% } %>
-    <% } else if (isAlbum && inlineCopies.length) { %>
-      <%# nur im Sleeve vorhanden: kein „?“-Platzhalter, die Exemplare stehen gleich daneben %>
-    <% } else if (onlySlabs) { %>
-      <%# nur im Slab vorhanden: Hinweis auf das Slab-Regal oben %>
-      <a class="tcg-slot tcg-seen tcg-in-slab r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" data-name="<%= c.name %>" href="#slabs" title="<%= c.name %> – steht im Slab-Regal oben">
-        <span class="tcg-art"><img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"></span>
-        <span class="tcg-slot-label"><span class="tcg-dot"></span>Im Slab ↑</span>
-      </a>
+    <%# Album: Exemplare (Slab, Sleeve, früher bewertet, mit Spuren) hängen an der Kachel ihrer Karte (partials/album-copies) %>
     <% } else if (!showMissing) { %>
     <% } else if (seenIds.has(c.id)) { %>
       <% if (isAlbum) { %>
         <button type="button" class="tcg-slot tcg-seen r-<%= c.rarity %>" data-rarity="<%= c.rarity %>" title="<%= c.name %> – früher besessen"
-          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= String(idx + 1).padStart(2, '0') %>"
+          data-tcg-card="<%= c.id %>" data-name="<%= c.name %>" data-rarity-label="<%= r.label %>" data-rank="<%= r.rank %>" data-no="<%= noOf(c, idx) %>"
           data-image="<%= c.image %>" data-count="0" data-former="1" aria-label="<%= c.name %>, <%= r.label %> – früher besessen, vergrößern">
           <span class="tcg-art"><img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008"></span>
           <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.label %></span>
@@ -120,24 +126,5 @@
         <span class="tcg-slot-label"><span class="tcg-dot"></span><%= r.hidden || c.unreleased ? '???' : r.label %></span>
       </div>
     <% } %>
-    <%# Exemplare im Sleeve oder Slab: eigener Platz je Exemplar (Album: auch als Favorit wählbar; fremde Sammlung: ansehen und
-        Angebot machen). Im Album stehen die Slabs ganz oben im Slab-Regal (tcg-album) – hier nur die Sleeves. %>
-    <% if (isAlbum || mode === 'view') { inlineCopies.forEach((f) => { %>
-      <%- include('foil-copy-slot', { c, r, f, isAlbum, favoriteIds, linkFor: locals.linkFor || null, highlight: locals.highlight || '', no: String(idx + 1).padStart(2, '0') }) %>
-    <% }) } %>
-    <%# Beschädigte Exemplare (#204): eigener Platz je Exemplar, Großansicht mit Kratzern und Knick (copyViewAttrs).
-        Album: „Im Handel anbieten“ für genau dieses Exemplar; fremde Sammlung: „Angebot machen“ %>
-    <% if (isAlbum || mode === 'view') { (markedCopies[c.id] || []).forEach((m) => {
-         const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : 'Gebrauchsspuren';
-         const no = String(idx + 1).padStart(2, '0');
-         const opts = isAlbum ? { offer: m.lock === 'handel' ? null : '/handel/neu?gib=f:' + m.id, note: 'Exemplar · ' + what + (m.lock ? ' · ' + lockLabelOf(m.lock) : ''), no } : { trade: locals.linkFor ? linkFor('f:' + m.id) : null, note: 'Exemplar · ' + what, no }; %>
-      <button type="button" class="tcg-slot copy-slot r-<%= c.rarity %>"<%- copyViewAttrs(c, r.label, m.marks, opts) %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar – genau ansehen">
-        <span class="tcg-art">
-          <%- art(c) %>
-          <% if (m.creased) { %><span class="tcg-crease-tag"><%= m.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
-        </span>
-        <span class="tcg-slot-label"><span class="tcg-dot"></span>Exemplar<%= m.lock ? ' · ' + lockLabelOf(m.lock) : '' %></span>
-      </button>
-    <% }) } %>
   <% }) %>
 </div>

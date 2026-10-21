@@ -11,14 +11,36 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
-// Hundekarten (Spells): Hugo und Lilly
+// Mark, the Suntouched (Platzhalter-Werte): time = Anteil der vollen Zeit, refill = Bock in %, plus = auf alle Werte
+const MARK = { time: 0.5, refill: 30, plus: 5 };
+// Hundekarten (Spells): Hugo und Lilly. Treue Seele: die geboostete Karte bekommt DOG_PLUS auf alle Werte – ist sie
+// Matze, bekommt stattdessen der Hund selbst DOG_MATZE auf alle Werte (seine Fenster stehen sonst auf 0) und greift mit
+// jedem Schlag von Matze mit an. Höchstens MAX_DOGS Hunde spielen mit (im Dungeon und Turm je Team), jeder nur einmal.
 const DOGS = new Set(['hugo', 'lilly']);
 const isDog = (card) => DOGS.has(who(card));
+const isMatze = (card) => who(card) === 'matze';
+const DOG_PLUS = 5;
+const DOG_MATZE = 25;
+const MAX_DOGS = 2;
+// Ömer (Mach das Unmögliche möglich): so viele Ömer zu Beginn und ab der Halbzeit; je Ömer läuft die Deadline rush
+// schneller. grow = Multiplikator des Bonus je Angriff (je weiterem Ömer grow · (Grundwert + 1) / 2) – aus dem Grundwert je
+// Ömer, nicht aus dem aktuellen Wert, damit er gleichmäßig wächst statt exponentiell
+// Balance (Quests, 2026-10-21): 0,25 – Ömer Crumpled schafft Gold zu 70 %, Ömer Glitch Glitch zu 36 % (Luca Glitch: 1 %)
+const OMER = { copies: [2, 3], rush: 0.15, grow: 0.25 };
+// Luca (You can't handle my Potions): Boost-Effekte im Team so viel stärker, danach eigenes Tempo und BWL +LUCA_PLUS
+const LUCA_AMP = 0.1;
+const LUCA_PLUS = 50;
+// Aleks (Gruß aus dem Osten): bis maxMoney Spielgeld (Cent) mit auf die Mission; ab der Halbzeit kostet jeder Angriff
+// cost, mit chance landet die Münze auf Kopf – dann alle Werte +plus für den Rest (Quest, Dungeon oder Mage Tower)
+const ALEKS = { maxMoney: 100000, cost: 5000, chance: 0.499, plus: 10 };
+const isAleks = (card) => who(card) === 'aleks';
+// Effekte, die aus einem Boost-Slot kommen (nur sie verstärkt Luca); Bloodlust nur, wenn Pascal der Boost ist
+const BOOST_KEYS = new Set(['lili', 'treue-seele', 'treue-seele-matze', 'nvidia', 'amd', 'bfw-energy', 'kaffee', 'gruschteln', 'reality-check', 'hermann']);
 
 /**
  * Liefert die aktiven Fähigkeiten für diese Kombination.
  * Jede Fähigkeit: { key, label, text, fx, target, apply(state) }.
- * state: { speed, stats: { fia, fis, bwl }, extraTicks, extraTime, elapsed, fakeNext, tempSpeed: { factor, ticks, then }, doom: { factor, ticks } }
+ * state: { speed, stats: { fia, fis, bwl }, extraTicks, extraTime, elapsed, tempSpeed: { factor, ticks, then }, doom: { factor, ticks }, dogs, coinFlip }
  */
 function resolve(main, boost) {
   const m = who(main);
@@ -34,27 +56,58 @@ function resolve(main, boost) {
   if (m === 'krisz' && b === 'lili') {
     add({ key: 'lili', label: 'Lili an seiner Seite', text: 'Alle Eigenschaften von Krisz werden verdoppelt.', fx: 'fx-love', target: 'player', apply: (s) => { s.speed *= 2; s.stats.fia *= 2; s.stats.fis *= 2; s.stats.bwl *= 2; } });
   }
+  // You can't handle my Potions: Boost-Effekte (BOOST_KEYS) seines Teams wirken LUCA_AMP stärker – nur ihre Vorteile,
+  // siehe ihkService.applyEffects (im Dungeon und Turm für die ganze Gruppe, TEAM_MAIN_KEYS). Danach Tempo und BWL +50.
   if (m === 'luca') {
-    add({ key: 'simulation', label: 'Simulationsspiel-Erfahrung', text: 'BWL +50 %.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.bwl *= 1.5; } });
+    add({ key: 'potions', label: "You can't handle my Potions", text: `Boost-Effekte im Team ${LUCA_AMP * 100} % stärker, danach Tempo und BWL +${LUCA_PLUS}.`, fx: 'fx-buff', target: 'player', amp: LUCA_AMP, apply: (s) => { s.speed += LUCA_PLUS; s.stats.bwl += LUCA_PLUS; } });
   }
-  // Ömer verleiht die Macht den *anderen* (befreundeten) ITler-Karten – wirkt also nur aus dem Boost-Slot
-  if (b === 'omer') {
-    add({ key: 'osmanen', label: 'Macht der Osmanen', text: 'FIS +15 %.', fx: 'fx-aura', target: 'player', apply: (s) => { s.stats.fis *= 1.15; } });
+  // Mach das Unmögliche möglich: zu Beginn 2 Ömer (je halbe Werte), zur Halbzeit 3 (die Stärke verteilt sich auf alle).
+  // Alle greifen gemeinsam an und wachsen dabei (simulate: s.omer). Je Ömer läuft die Deadline OMER.rush schneller – im
+  // Dungeon und Turm für die ganze Gruppe (teamStart/teamApply, TEAM_MAIN_KEYS in dungeonService).
+  if (m === 'omer') {
+    const [first, second] = OMER.copies;
+    add({
+      key: 'omer',
+      label: 'Mach das Unmögliche möglich',
+      text: `Ein ${second}. Ömer kommt dazu – alle greifen gemeinsam an, die Deadline läuft ${Math.round(second * OMER.rush * 100)} % schneller.`,
+      fx: 'fx-aura',
+      target: 'player',
+      start: (s) => {
+        // base: Grundwert je Ömer (die Werte der Karte geteilt durch die Zahl der Ömer) – daraus wächst der Bonus
+        s.omer = { n: first, card: { ...s.stats }, base: {} };
+        for (const k of ['fia', 'fis', 'bwl']) {
+          s.stats[k] /= first;
+          s.omer.base[k] = s.omer.card[k] / first;
+        }
+        s.rush += first * OMER.rush;
+      },
+      apply: (s) => {
+        if (s.omer) {
+          for (const k of ['fia', 'fis', 'bwl']) {
+            s.stats[k] = (s.stats[k] * s.omer.n) / second;
+            s.omer.base[k] = s.omer.card[k] / second;
+          }
+          s.omer.n = second;
+        }
+        s.rush += (second - first) * OMER.rush;
+      },
+      teamStart: (s) => { s.rush += first * OMER.rush; },
+      teamApply: (s) => { s.rush += (second - first) * OMER.rush; },
+    });
   }
+  // Gruß aus dem Osten: ab der Halbzeit Münzwürfe mit dem mitgegebenen Geld (ihkService.simulate, opts.coin)
   if (m === 'aleks') {
-    add({ key: 'faelschung', label: 'Russische Telefonnummer', text: 'Die nächsten Punkte werden auf das Maximum (99) gefälscht.', fx: 'fx-glitch', target: 'player', apply: (s) => { s.fakeNext = true; } });
+    add({ key: 'gruss-aus-dem-osten', label: 'Gruß aus dem Osten', text: `Münzwürfe: jeder Angriff kostet ${ALEKS.cost / 100} €, bei Kopf (${String(ALEKS.chance * 100).replace('.', ',')} %) alle Werte +${ALEKS.plus} für den Rest.`, fx: 'fx-glitch', target: 'player', apply: (s) => { s.coinFlip = true; } });
   }
   if (both.includes('pascal')) {
     add({ key: 'bloodlust', label: 'Bloodlust', text: 'Die Aufgabe ist eine Runde lang gelähmt – die Deadline steht kurz still.', fx: 'fx-bloodlust', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.extraTicks += 1; } });
   }
-  // Matze stärkt sich selbst, wenn eine Hundekarte (Hugo, Lilly) mitgespielt wird – er ist kein Boost
-  if (m === 'matze' && isDog(boost)) {
-    add({ key: 'hundekarte', label: 'Hundekarte!', text: '+10 FIS und +5 auf alle anderen Stats.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fis += 10; s.stats.fia += 5; s.stats.bwl += 5; } });
-  }
-  // Hundekarte: erhöht alle Werte der freundlichen Charaktere um 3. (Laut Karte höchstens zwei verschiedene
-  // Hunde gleichzeitig – in der IHK gibt es nur einen Boost-Slot, also immer genau einen.)
-  if (isDog(boost)) {
-    add({ key: 'hund', label: boost.name, text: 'Hundekarte: alle Werte +3.', fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fia += 3; s.stats.fis += 3; s.stats.bwl += 3; } });
+  // Treue Seele (Hundekarten): an Matze greift der Hund mit eigenen Werten mit an (simulate: s.dogs), sonst +5 für die
+  // geboostete Karte. Matzes eigene Fähigkeit „Yo Dawg“ ist der zusätzliche Hunde-Slot (checkDogs), kein Effekt hier.
+  if (isDog(boost) && m === 'matze') {
+    add({ key: 'treue-seele-matze', label: `${boost.name}: Treue Seele`, text: `${boost.name} bekommt +${DOG_MATZE} auf alle Werte und greift mit jedem Schlag von Matze mit an.`, fx: 'fx-buff', target: 'player', dog: boost.id, apply: (s) => { s.dogs.push({ id: boost.id, fia: DOG_MATZE, fis: DOG_MATZE, bwl: DOG_MATZE }); } });
+  } else if (isDog(boost)) {
+    add({ key: 'treue-seele', label: `${boost.name}: Treue Seele`, text: `Alle Werte +${DOG_PLUS}.`, fx: 'fx-buff', target: 'player', apply: (s) => { s.stats.fia += DOG_PLUS; s.stats.fis += DOG_PLUS; s.stats.bwl += DOG_PLUS; } });
   }
   if (m === 'seven' && b === 'grafikkarte-nvidia') {
     add({ key: 'nvidia', label: 'NVIDIA-Grafikkarte', text: '7 ist glücklich: doppelte Geschwindigkeit für 3 Runden.', fx: 'fx-speed', target: 'player', apply: (s) => { s.tempSpeed = { factor: 2, ticks: 3 }; } });
@@ -94,6 +147,27 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
+  // Mark, the Suntouched: zur Halbzeit bricht die Sonne durch – Quest und Dungeon bekommen 50 % der vollen Zeit
+  // dazu, im Mage Tower füllt er stattdessen den Bock der Gruppe um MARK.refill auf. Danach alle Werte +MARK.plus
+  // (für die ganze Gruppe, siehe TEAM_MAIN_KEYS in dungeonService). s.mode: 'ihk' | 'dungeon' | 'tower'.
+  if (m === 'mark') {
+    add({ key: 'sonnendurchbruch', label: 'Sonnendurchbruch', text: `Die Sonne bricht durch: mehr Zeit (im Mage Tower +${MARK.refill} % Bock), alle Werte +${MARK.plus}.`, fx: 'fx-aura', target: 'player', refill: MARK.refill, apply: (s) => {
+      if (s.mode !== 'tower') s.extraTime += MARK.time * s.duration;
+      s.stats.fia += MARK.plus;
+      s.stats.fis += MARK.plus;
+      s.stats.bwl += MARK.plus;
+    } });
+  }
+  // Mirjam, the Gracebringer: zur Halbzeit verdoppelt sich der niedrigste Wert (FIA, FIS oder BWL; bei Gleichstand
+  // der erste) – bei ihr und, im Dungeon und Turm, bei jedem Gruppenmitglied (TEAM_MAIN_KEYS in dungeonService)
+  if (m === 'mirjam') {
+    add({ key: 'alles-pink', label: 'Alles Pink!', text: 'Der niedrigste Wert wird verdoppelt.', fx: 'fx-love', target: 'player', apply: (s) => {
+      const low = ['fia', 'fis', 'bwl'].reduce((a, k) => (s.stats[k] < s.stats[a] ? k : a), 'fia');
+      s.stats[low] *= 2;
+    } });
+  }
+  // boost = Effekt einer Boost-Karte (Luca verstärkt ihn)
+  for (const a of out) if (BOOST_KEYS.has(a.key) || (a.key === 'bloodlust' && b === 'pascal')) a.boost = true;
   return out;
 }
 
@@ -111,7 +185,7 @@ function resolveAll(main, boosts) {
 }
 
 // Charaktere, deren Fähigkeit auch aus dem Boost-Slot wirkt (alle anderen wären dort nutzlos)
-const BOOST_CHARACTERS = new Set(['pascal', 'omer', 'lili']);
+const BOOST_CHARACTERS = new Set(['pascal', 'lili']);
 
 // Oliver the Sigrist "kann nicht im Spiel eingesetzt werden".
 // Hermann ist für einen kommenden Spielmodus gedacht und in den Quests gesperrt (er würde jede Quest
@@ -124,4 +198,30 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+/**
+ * Yo Dawg (Matze): Steht schon genau ein Hund in seinen Boost-Slots, gibt es einen zusätzlichen Hunde-Slot für den
+ * anderen Hund. boosts = Karten in den normalen Boost-Slots (Katalog-Karten oder null).
+ */
+const hasDogSlot = (main, boosts) => isMatze(main) && boosts.filter(isDog).length === 1;
+
+/**
+ * Hunde prüfen. boosts = normale Boost-Slots, dog = Karte im Hunde-Slot (oder null), others = Hunde, die schon im Team
+ * mitspielen (Dungeon, Turm). Gibt eine Fehlermeldung zurück oder null.
+ */
+function checkDogs(main, boosts, dog, others = []) {
+  const list = boosts.filter(Boolean);
+  if (dog) {
+    if (!isDog(dog)) return 'In den Hunde-Slot passt nur eine Hundekarte (Hugo oder Lilly).';
+    if (!hasDogSlot(main, list)) return 'Den Hunde-Slot gibt es nur für Matze, wenn schon ein Hund in seinem Boost-Slot steht.';
+  }
+  const dogs = [...list, dog].filter(isDog);
+  const seen = new Set(others.filter(isDog).map(who));
+  for (const d of dogs) {
+    if (seen.has(who(d))) return `${d.name} spielt schon mit – jede Hundekarte darf nur einmal ausgespielt werden.`;
+    seen.add(who(d));
+  }
+  if (seen.size > MAX_DOGS) return `Insgesamt dürfen nur ${MAX_DOGS} Hundekarten ausgespielt werden.`;
+  return null;
+}
+
+module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee, isDog, isMatze, hasDogSlot, checkDogs, MARK, DOG_PLUS, DOG_MATZE, MAX_DOGS, LUCA_AMP, LUCA_PLUS, ALEKS, isAleks, OMER };

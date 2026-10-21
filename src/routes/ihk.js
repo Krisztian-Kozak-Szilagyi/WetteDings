@@ -3,7 +3,7 @@ const { requireLogin } = require('../middleware');
 const catalog = require('../tcg/catalog');
 const ihk = require('../ihk/ihkService');
 const { questById, difficulty, isHybrid } = require('../ihk/quests');
-const { canBoost } = require('../ihk/abilities');
+const { canBoost, isDog, isMatze, isAleks, who, DOG_MATZE, ALEKS } = require('../ihk/abilities');
 const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
 const { copiesByCard, lockLabel } = require('../tcg/locks');
 const { str, UserError } = require('../lib/util');
@@ -66,10 +66,20 @@ router.get('/ihk', async (req, res) => {
     runImages: running ? catalog.statImages(catalog.cardById[running.card], running.ticks) : {},
     runBoost: running && running.boost ? catalog.cardById[running.boost] : null,
     runBoost2: running && running.boost2 ? catalog.cardById[running.boost2] : null,
+    runDog: running && running.dog ? catalog.cardById[running.dog] : null,
+    // Treue Seele an Matze: Bild des Hundes mit den neuen Werten, sobald die Fähigkeit wirkt (je Hund, Karten-ID → Bild)
+    dogImages: running ? Object.fromEntries((running.abilities || []).filter((a) => a.dog && catalog.cardById[a.dog]).map((a) => [a.dog, catalog.cardImage(catalog.cardById[a.dog], { fia: DOG_MATZE, fis: DOG_MATZE, bwl: DOG_MATZE })])) : {},
     cards,
     items,
     rarityByKey: catalog.rarityByKey,
     canBoost,
+    isDog,
+    isMatze,
+    isAleks,
+    aleksMax: ALEKS.maxMoney / 100,
+    aleksCost: ALEKS.cost / 100,
+    aleksPlus: ALEKS.plus,
+    who,
     used,
     limit,
     closedForOthers: !ihk.settings.open,
@@ -97,6 +107,8 @@ router.post('/ihk/start', (req, res) =>
       cardId: str(req.body.card),
       boostId: str(req.body.boost) || null,
       boost2Id: str(req.body.boost2) || null,
+      dogId: str(req.body.dog) || null,
+      coins: Number.parseInt(str(req.body.coins), 10) || 0,
       offerIndex: Number.parseInt(str(req.body.offer), 10),
       foiled: str(req.body.foil) === '1',
     });
@@ -114,9 +126,12 @@ router.post('/ihk/neu-wuerfeln', (req, res) =>
 router.post('/ihk/abholen', (req, res) =>
   handle(req, res, async () => {
     const run = await ihk.collect({ user: req.user });
-    if (!run.success) return null;
+    // Aleks: was er verworfen hat und was zurückkommt
+    const c = run.coins;
+    const coins = c ? ` Aleks hat ${c.spent / c.budget === 1 ? 'sein ganzes Geld' : euro(c.spent)} verworfen (${c.heads}× Kopf)${run.$locals.coinsBack ? `, ${euro(run.$locals.coinsBack)} kommen zurück` : ''}.` : '';
+    if (!run.success) return coins ? coins.trim() : null;
     const pack = run.pack ? ' Außerdem hast du ein Booster Pack gefunden – es liegt bei deinen Packs im TCG!' : '';
-    return `Quest geschafft – ${euro(run.reward)} wurden dir gutgeschrieben.${pack}`;
+    return `Quest geschafft – ${euro(run.reward)} wurden dir gutgeschrieben.${pack}${coins}`;
   })
 );
 

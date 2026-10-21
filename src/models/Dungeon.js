@@ -9,6 +9,14 @@ const memberFields = {
   cardDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
   boost: { type: String, default: null },
   boostDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+  // Hunde-Slot (Yo Dawg): nur Matze mit einem Hund als Boost – dort der andere Hund
+  dog: { type: String, default: null },
+  dogDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+  // Aleks (Gruß aus dem Osten), Cent: in der Anmeldung das gewünschte Geld, im Durchlauf das abgebuchte; coinSpent =
+  // davon verworfen (je Münzwurf), coinHeads = wie oft Kopf – der Rest kommt am Ende zurück (finishDue)
+  coins: { type: Number, default: 0 },
+  coinSpent: { type: Number, default: 0 },
+  coinHeads: { type: Number, default: 0 },
   // Live-Turm (eSports): mitgenommener Kaffee (Karten-ID + Exemplar) und BfW Energy – werden beim Benutzen verbraucht
   coffee: { type: String, default: null },
   coffeeDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
@@ -38,8 +46,9 @@ partySchema.index({ 'members.user': 1 }, { unique: true });
 partySchema.index({ 'invites.user': 1 });
 partySchema.index({ slot: 1 });
 
-// st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate
-const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, boost: Boolean, st: { type: [Number], default: undefined } }, { _id: false });
+// st = neue Kartenwerte [Speed, FIA, FIS, BWL] ab diesem Takt (Boost/Debuff), siehe ihkService.simulate;
+// dg = Punkte der Hunde an Matze (Treue Seele, schon in p enthalten), coin = Münzwurf von Aleks ('kopf' | 'zahl')
+const tickSchema = new Schema({ m: Number, t: Number, p: Number, crit: Boolean, ability: Boolean, destroy: Boolean, boost: Boolean, dg: Number, coin: String, om: Number, st: { type: [Number], default: undefined } }, { _id: false });
 
 // Ein Dungeon-Durchlauf (drei Spieler, Bots füllen auf). Alle Kämpfe werden beim Start ausgewürfelt und
 // danach nur noch abgespielt; Lohn und Beute werden am Ende (endsAt) gutgeschrieben, der Chat gelöscht.
@@ -82,14 +91,14 @@ const runSchema = new Schema(
             seconds: Number, // Dauer der Wiedergabe in echten Sekunden
             start: Number, // ab dieser Spielzeit wird abgespielt (kurz vor dem ersten Treffer)
             ticks: { type: [tickSchema], default: [] },
-            abilities: { type: [new Schema({ m: Number, from: Number, team: Boolean, label: String, text: String }, { _id: false })], default: [] },
+            abilities: { type: [new Schema({ m: Number, from: Number, team: Boolean, label: String, text: String, dog: String }, { _id: false })], default: [] }, // dog = Hund, der mit Matze angreift
             total: Number,
             success: Boolean,
             doneAt: Number,
             // Live-Turm: Boss-Eigenschaft, gesuchter Wert, Bock-Treffer und Kampfbeginn (ms)
             trait: { type: String, default: undefined },
             stat: { type: String, default: undefined },
-            drains: { type: [new Schema({ m: Number, t: Number, amount: Number, bock: Number }, { _id: false })], default: undefined },
+            drains: { type: [new Schema({ m: Number, t: Number, amount: Number, bock: Number, refill: Boolean }, { _id: false })], default: undefined },
             startAt: { type: Number, default: undefined },
             bockBefore: { type: [Number], default: undefined },
           },

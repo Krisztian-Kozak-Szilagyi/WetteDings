@@ -33,10 +33,20 @@
     var active = $('[data-tcg-filter].active', scope);
     var key = active ? active.getAttribute('data-tcg-filter') : 'all';
     var search = $('[data-tcg-search]', scope);
+    var ownedOnly = $('[data-album-owned]', scope);
+    var gradeBtn = $('[data-slab-grade].active', scope);
+    var grade = gradeBtn ? gradeBtn.getAttribute('data-slab-grade') : 'all';
     var q = search ? search.value.trim().toLowerCase() : '';
     $all('.tcg-grid .tcg-slot', scope).forEach(function (slot) {
+      if (slot.closest('[data-album-versions], [data-album-unfold]')) return; // Versionen einer Karte (Album): bleiben
       var name = (slot.getAttribute('data-name') || '').toLowerCase();
-      var hide = (key !== 'all' && slot.getAttribute('data-rarity') !== key) || (q && name.indexOf(q) === -1);
+      // Kachel einer Karte (Album): passt, wenn es die Karte in dieser Seltenheit gibt
+      var rarities = slot.hasAttribute('data-rarities') ? slot.getAttribute('data-rarities').split(' ') : [slot.getAttribute('data-rarity')];
+      var hide = (key !== 'all' && rarities.indexOf(key) === -1) || (q && name.indexOf(q) === -1);
+      // Album: nur Karten im Besitz (Kacheln eigener Karten tragen data-album-card bzw. data-album-has; Slabs im Regal sind immer eigene)
+      var shelf = slot.closest('.tcg-slab-shelf');
+      if (ownedOnly && ownedOnly.checked && !shelf && !slot.hasAttribute('data-album-card') && !slot.hasAttribute('data-album-has')) hide = true;
+      if (shelf && grade !== 'all' && slot.getAttribute('data-grade') !== grade) hide = true;
       (slot.closest('.tcg-pick-multi') || slot).hidden = !!hide;
     });
   };
@@ -68,6 +78,106 @@
       });
     });
   });
+
+  // Album: „Nur Karten im Besitz zeigen“ – die Wahl bleibt erhalten
+  var ownedBox = $('[data-album-owned]');
+  if (ownedBox) {
+    try { ownedBox.checked = localStorage.getItem('album-owned') === '1'; } catch (err) { /* egal */ }
+    ownedBox.addEventListener('change', function () {
+      try { localStorage.setItem('album-owned', ownedBox.checked ? '1' : '0'); } catch (err) { /* egal */ }
+      filterScope(document);
+    });
+    if (ownedBox.checked) filterScope(document);
+  }
+
+  // Album: wer sucht, sucht in der ganzen Sammlung – nicht nur in der gerade offenen Season
+  $all('[data-tcg-search]').forEach(function (input) {
+    input.addEventListener('input', function () {
+      var all = input.value.trim() && $('[data-album-season="all"]');
+      if (all && !all.classList.contains('active')) all.click();
+    });
+  });
+
+  // ---------- Slab-Regal im Album: nach Note filtern ----------
+  $all('[data-slab-grade]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var g = btn.getAttribute('data-slab-grade');
+      $all('[data-slab-grade]').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      filterScope(document);
+    });
+  });
+
+  // ---------- Album: Versionen einer Karte entfalten ----------
+  // Jede Karte steht im Album nur einmal (beste eigene Version). Ein Klick legt einen unscharfen Schleier über die Seite;
+  // die Versionen fliegen aus der Kachel an ihren Platz (FLIP-Animation, versetzt). Jede Version öffnet wie gewohnt die
+  // Großansicht (Verkaufen, Sleeve, Favorit …). Die Versionen liegen versteckt neben der Kachel ([data-album-versions])
+  // und wandern beim Öffnen in die Übersicht – beim Schließen zurück.
+  var unfold = $('[data-album-unfold]');
+  var unfoldOpen = null; // { box, grid, tile }
+  var calmMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function closeUnfold() {
+    if (!unfoldOpen) return;
+    unfoldOpen.box.appendChild(unfoldOpen.grid);
+    unfold.hidden = true;
+    document.body.classList.remove('album-unfold-on');
+    var tile = unfoldOpen.tile;
+    unfoldOpen = null;
+    if (tile) tile.focus({ preventScroll: true });
+  }
+  function openUnfold(tile, instant) {
+    if (!unfold || !tile) return;
+    var key = tile.getAttribute('data-album-group');
+    var box = $('[data-album-versions="' + key.replace(/["\\]/g, '') + '"]');
+    if (!box) return;
+    closeUnfold();
+    var grid = $('.tcg-grid', box);
+    $('[data-album-unfold-title]', unfold).textContent = box.getAttribute('data-title') || '';
+    $('[data-album-unfold-sub]', unfold).textContent = box.getAttribute('data-sub') || '';
+    $('[data-album-unfold-cards]', unfold).appendChild(grid);
+    unfold.hidden = false;
+    document.body.classList.add('album-unfold-on');
+    unfoldOpen = { box: box, grid: grid, tile: tile };
+    var from = tile.getBoundingClientRect();
+    var slots = $all('.tcg-slot', grid);
+    if (instant || calmMotion) return;
+    // aus der Kachel heraus entfalten: jede Version startet auf der Kachel und gleitet versetzt an ihren Platz
+    slots.forEach(function (s, i) {
+      var to = s.getBoundingClientRect();
+      var dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      var dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      var turn = (i - (slots.length - 1) / 2) * 6;
+      s.style.transition = 'none';
+      s.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + (from.width / to.width).toFixed(3) + ') rotate(' + turn + 'deg)';
+      s.style.opacity = '0';
+      void s.offsetWidth;
+      s.style.transition = 'transform .55s cubic-bezier(.2, .9, .25, 1.15) ' + i * 60 + 'ms, opacity .25s ease ' + i * 60 + 'ms';
+      s.style.transform = '';
+      s.style.opacity = '';
+    });
+    setTimeout(function () { slots.forEach(function (s) { s.style.transition = ''; }); }, 700 + slots.length * 60);
+  }
+  /** Versteckte Version (z. B. Sprungziel #karte-<id>): erst ihre Karte entfalten, damit man sie sieht */
+  function revealVersion(el, instant) {
+    var box = el && el.closest('[data-album-versions]');
+    if (box) openUnfold($('[data-album-group="' + box.getAttribute('data-album-versions').replace(/["\\]/g, '') + '"]'), instant);
+  }
+  if (unfold) {
+    // per Delegation: nach Aktionen im Album (ohne Neuladen) sind die Kacheln neu
+    document.addEventListener('click', function (e) {
+      var tile = e.target.closest && e.target.closest('[data-album-group]');
+      if (tile) openUnfold(tile);
+    });
+    $('[data-album-unfold-close]', unfold).addEventListener('click', closeUnfold);
+    // Klick auf den unscharfen Hintergrund schließt (nicht auf die Karten selbst)
+    unfold.addEventListener('click', function (e) { if (e.target === unfold) closeUnfold(); });
+    document.addEventListener('keydown', function (e) {
+      // Esc schließt die Übersicht – außer die Großansicht einer Version ist gerade offen (die schließt zuerst)
+      if (e.key === 'Escape' && unfoldOpen && !document.querySelector('dialog[open]')) closeUnfold();
+    });
+  }
 
   // ---------- Anzahl Packs im Shop ----------
   var qty = $('[data-tcg-qty]');
@@ -143,6 +253,7 @@
       var euroFmt = function (cents) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(cents / 100); };
       var worth = function (n, f) { var k = Math.min(creased, n); return k * f(half) + (n - k) * f(sell); };
 
+      modal.setAttribute('data-card', d.tcgCard);
       var former = d.former === '1';
       var note = $('[data-tcg-modal-note]', modal);
       if (note) note.hidden = true; // Meldung gilt nur direkt nach einer Aktion (siehe unten, #131)
@@ -159,11 +270,19 @@
       $('[data-tcg-modal-count]', modal).textContent = former ? 'Früher besessen – aktuell nicht in deiner Sammlung.'
         : (owned ? owned + '× im Besitz' : '') + (locked ? ' · ' + locked + '× ' + d.lockLabel : '') + (foiled ? (owned ? ' · ' : '') + foiled + '× foliert' : '') + (d.protected === '1' ? ' · geschützt' : '')
         + (noBank ? ' · Grundwert ' + d.sellText + ' (nur Handel, kein Händlerpreis)' : ' · Händlerpreis ' + d.sellText);
+      // Album: alle Exemplare der Karte nach Wertung (Slabs, Sleeves, früher bewertet) – jede Zeile öffnet die 3D-Ansicht
+      var copyBox = $('[data-tcg-copylist]', modal);
+      if (copyBox) {
+        var src = former ? null : $('[data-tcg-copies="' + d.tcgCard + '"]');
+        var list = $('[data-tcg-copyrows]', copyBox);
+        list.innerHTML = '';
+        if (src) $all('.tcg-copy', src).forEach(function (row) { list.appendChild(row.cloneNode(true)); });
+        copyBox.hidden = !list.children.length;
+      }
       $('[data-tcg-owned-actions]', modal).hidden = former;
       $('[data-tcg-former-action]', modal).hidden = !former;
       if (former) {
-        if (typeof modal.showModal === 'function') modal.showModal();
-        else modal.setAttribute('open', '');
+        if (!modal.open) { if (typeof modal.showModal === 'function') modal.showModal(); else modal.setAttribute('open', ''); }
         return;
       }
 
@@ -209,8 +328,7 @@
         shredDupes.setAttribute('data-confirm', (count - 1) + '× ' + d.name + ' zerkleinern und eine behalten?');
       }
 
-      if (typeof modal.showModal === 'function') modal.showModal();
-      else modal.setAttribute('open', '');
+      if (!modal.open) { if (typeof modal.showModal === 'function') modal.showModal(); else modal.setAttribute('open', ''); }
     });
 
     function closeModal() {
@@ -224,53 +342,119 @@
     });
   }
 
-  // ---------- Album: nach Favorit, Schützen oder Verkaufen an derselben Stelle weiter (#131) ----------
-  // Die Aktionen sind Formulare und laden das Album neu – vorher merken wir uns Scroll-Position und Karte.
-  // Danach: gleiche Stelle, das Kartenfenster wieder offen und die Meldung darin (sonst unten als kurzer Hinweis).
-  var BACK_KEY = 'tcg-album-back';
-  var session = {
-    get: function () { try { return JSON.parse(sessionStorage.getItem(BACK_KEY)); } catch (e) { return null; } },
-    set: function (v) { try { sessionStorage.setItem(BACK_KEY, JSON.stringify(v)); } catch (e) { /* ohne Speicher: wie bisher */ } },
-    clear: function () { try { sessionStorage.removeItem(BACK_KEY); } catch (e) { /* egal */ } },
-  };
-  // Führt eine Aktion woandershin (ein neuer Favorit z. B. zur TCG-Seite), verfällt der Merker dort – sonst fände
-  // man beim nächsten Besuch im Album unerwartet das alte Kartenfenster offen (der Referrer ist leer: no-referrer)
-  if (window.location.pathname !== '/tcg/album') session.clear();
+  // ---------- Album: Aktionen ohne Neuladen (#131) ----------
+  // Favorit, Schützen, Verkaufen, Zerkleinern, Sleeve abziehen / Slab aufbrechen und die Duplikat-Knöpfe gehen per fetch an
+  // den Server; danach tauscht die Seite nur die Bereiche (Seasons, Slab-Regal, Kopf, Duplikat-Leiste) gegen den neuen Stand.
+  // Scroll-Position, offener Reiter, Suche, „Nur Karten im Besitz“ und das Kartenfenster bleiben, wo sie sind.
   if (window.location.pathname === '/tcg/album') {
+    var ALBUM_ACTION = /^\/tcg\/(favorit|schuetzen|verkaufen|zerkleinern|huelle-abziehen|duplikate-verkaufen|duplikate-zerkleinern)$|^\/grading\/vitrine\/entfernen$/;
+    var albumBusy = false;
+    var toast = function (text, error) {
+      var area = $('[data-flash-area]');
+      if (!area || !text) return;
+      var div = document.createElement('div');
+      div.className = 'flash flash-' + (error ? 'error' : 'success') + ' flash-toast';
+      div.setAttribute('role', 'status');
+      var span = document.createElement('span');
+      span.textContent = text;
+      div.appendChild(span);
+      area.appendChild(div);
+      setTimeout(function () { div.classList.add('is-gone'); }, 4500);
+      setTimeout(function () { div.remove(); }, 5000);
+    };
+    var sectionKeys = function (root) {
+      return $all('[data-album-season-section]', root).map(function (s) { return s.getAttribute('data-album-season-section'); }).join(',');
+    };
+    // neuen Stand einsetzen; { reload: true } = Aufbau hat sich geändert (z. B. erster Slab), dann hilft nur Neuladen
+    var applyAlbum = function (html) {
+      var next = new DOMParser().parseFromString(html, 'text/html');
+      var flash = $('[data-flash-area] .flash', next);
+      var message = flash ? { text: $('span', flash).textContent, error: flash.classList.contains('flash-error') } : null;
+      if (!$('.album-body', next) || sectionKeys(next) !== sectionKeys(document)) return { reload: true };
+      // offene Versionen einer Karte (Album): schließen, nach dem Einsetzen mit dem neuen Stand wieder öffnen
+      var openGroup = unfoldOpen && unfoldOpen.tile.getAttribute('data-album-group');
+      if (openGroup) closeUnfold();
+      $all('[data-album-season-section]', next).forEach(function (sec) {
+        var old = $('[data-album-season-section="' + sec.getAttribute('data-album-season-section') + '"]');
+        var fresh = document.importNode(sec, true);
+        fresh.hidden = old.hidden; // der offene Reiter bleibt offen
+        old.replaceWith(fresh);
+      });
+      ['.album-head', '.album-dupes'].forEach(function (sel) {
+        var a = $(sel);
+        var b = $(sel, next);
+        if (a && b) a.replaceWith(document.importNode(b, true));
+      });
+      $all('[data-album-season]').forEach(function (tab) {
+        var cnt = $('.hb-tab-count', tab);
+        var again = $('[data-album-season="' + tab.getAttribute('data-album-season') + '"] .hb-tab-count', next);
+        if (cnt && again) cnt.textContent = again.textContent;
+      });
+      // die gewählte Note im Slab-Regal bleibt gewählt (das Regal ist neu aufgebaut)
+      var gradeBtn = $('[data-slab-grade].active');
+      var grade = gradeBtn ? gradeBtn.getAttribute('data-slab-grade') : 'all';
+      if (grade !== 'all') {
+        var again = $('[data-slab-grade="' + grade + '"]');
+        $all('[data-slab-grade]').forEach(function (b) { b.classList.toggle('active', b === again); });
+      }
+      filterScope(document); // Suche, Seltenheit, Note und „Nur Karten im Besitz“ gelten auch für die neuen Kacheln
+      if (openGroup) openUnfold($('[data-album-group="' + openGroup.replace(/["\\]/g, '') + '"]'), true);
+      return { message: message };
+    };
+    var finish = function (result, cardId) {
+      if (result.reload) { window.location.reload(); return; }
+      var note = modal && $('[data-tcg-modal-note]', modal);
+      var slot = cardId && modal && modal.open && $('[data-tcg-card="' + cardId.replace(/["\\]/g, '') + '"][data-album-card]');
+      if (modal && modal.open && !slot) modal.close(); // die Karte ist nicht mehr da (z. B. letztes Exemplar verkauft)
+      if (slot) {
+        slot.click(); // Kartenfenster mit dem neuen Stand (Exemplar-Liste, Zähler, Knöpfe)
+        if (result.message && note) {
+          note.textContent = result.message.text;
+          note.className = 'tcg-modal-note ' + (result.message.error ? 'is-error' : 'is-success');
+          note.hidden = false;
+          return;
+        }
+      }
+      if (result.message) toast(result.message.text, result.message.error);
+    };
     // app.js fragt vorher nach (data-confirm) – wer abbricht, bleibt einfach hier
     document.addEventListener('submit', function (e) {
       var f = e.target;
-      if (e.defaultPrevented || !/^\/tcg\/(favorit|schuetzen|verkaufen)$/.test(new URL(f.action, window.location.href).pathname)) return;
-      var input = f.closest('[data-tcg-modal]') && f.querySelector('input[name="card"]');
-      session.set({ y: window.scrollY, card: input ? input.value : null, at: Date.now() });
+      if (e.defaultPrevented || !ALBUM_ACTION.test(new URL(f.action, window.location.href).pathname)) return;
+      e.preventDefault();
+      if (albumBusy) return;
+      albumBusy = true;
+      var inFoil = !!f.closest('[data-foil-modal]');
+      var cardId = modal && modal.open ? modal.getAttribute('data-card') : null; // das Kartenfenster darunter bleibt offen
+      var refresh = function () {
+        return fetch('/tcg/album', { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+          .then(function (r) { return r.text(); })
+          .then(applyAlbum);
+      };
+      fetch(f.action, { method: 'POST', body: new URLSearchParams(new FormData(f)), credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', Accept: 'application/json, text/html' } })
+        .then(function (r) {
+          var json = /json/.test(r.headers.get('Content-Type') || '');
+          if (json) {
+            // Favorit: JSON statt Weiterleitung – danach den Stand holen
+            return r.json().then(function (j) {
+              return refresh().then(function (res) { if (!j.ok) res.message = { text: j.error, error: true }; return res; });
+            });
+          }
+          if (!r.ok) throw new Error('fetch');
+          if (!/\/tcg\/album$/.test(new URL(r.url).pathname)) { window.location.href = r.url; return null; } // z. B. Anmeldung abgelaufen
+          return r.text().then(applyAlbum);
+        })
+        .then(function (result) {
+          albumBusy = false;
+          if (!result) return;
+          if (inFoil) {
+            var fm = $('[data-foil-modal]');
+            if (fm && fm.open) fm.close();
+          }
+          finish(result, cardId);
+        })
+        .catch(function () { albumBusy = false; f.submit(); }); // ohne fetch wie früher: normale Weiterleitung
     });
-
-    var back = session.get();
-    session.clear();
-    if (back && Date.now() - back.at < 30000) {
-      // Erfolg zeigt die Seite selbst (grüne Meldungen nur für Admins, middleware/flash) – ein Fehler kommt als Meldung.
-      // Sie verlässt zuerst ihren Platz oben, sonst verschöbe sie die Seite nach dem Zurückscrollen um ihre Höhe.
-      var flash = $('[data-flash-area] .flash');
-      var slot = back.card && modal && $('[data-tcg-card="' + back.card.replace(/["\\]/g, '') + '"]');
-      var message = flash ? { text: $('span', flash).textContent, error: flash.classList.contains('flash-error') } : null;
-      if (flash && slot) flash.remove();
-      else if (flash) {
-        flash.classList.add('flash-toast');
-        setTimeout(function () { flash.classList.add('is-gone'); }, 4500);
-        setTimeout(function () { flash.remove(); }, 5000);
-      }
-      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-      window.scrollTo(0, back.y);
-      if (slot) {
-        slot.click(); // öffnet das Kartenfenster mit dem neuen Stand
-        var note = $('[data-tcg-modal-note]', modal);
-        if (message && note) {
-          note.textContent = message.text;
-          note.className = 'tcg-modal-note ' + (message.error ? 'is-error' : 'is-success');
-          note.hidden = false;
-        }
-      }
-    }
   }
 
   // ---------- Direkt zu einer Karte springen und sie aufleuchten lassen ----------
@@ -282,6 +466,18 @@
   var jump = jumpRule && jumpRule[0].exec(window.location.hash);
   if (jump) {
     var target = $('[' + jumpRule[1] + '="' + decodeURIComponent(jump[1]).replace(/["\\]/g, '') + '"]');
+    if (target && target.closest('[data-album-versions]')) {
+      // Album: die Version steckt in ihrer Karte – Karte entfalten und die Version aufleuchten lassen
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      var tileOf = $('[data-album-group="' + target.closest('[data-album-versions]').getAttribute('data-album-versions').replace(/["\\]/g, '') + '"]');
+      if (tileOf) tileOf.scrollIntoView({ block: 'center' });
+      revealVersion(target);
+      setTimeout(function () {
+        target.classList.add('is-spotlight');
+        setTimeout(function () { target.classList.remove('is-spotlight'); }, 2200);
+      }, 600);
+      target = null;
+    }
     if (target) {
       history.replaceState(null, '', window.location.pathname + window.location.search); // Neuladen springt nicht erneut
       var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

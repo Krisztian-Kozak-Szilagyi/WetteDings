@@ -24,6 +24,7 @@ const grading = require('../grading/gradingService');
 const gradingOrders = require('../grading/orderService');
 const { GradingShop } = require('../models/Grading');
 
+const { viewData } = require('../tcg/albumView');
 const router = express.Router();
 const LEADERBOARD_LIMIT = 100; // so viele Zeilen zeigt die Rangliste höchstens
 
@@ -106,8 +107,8 @@ router.get('/profil/:name', requireLogin, async (req, res) => {
     top1: rankService.top1Text(profile.top1Seconds),
     profileIsTeam: rankService.isTeam(profile), // Team-Mitglieder sammeln die Zeit auf Platz 1 der Team-Wertung
     cardCount: owned.reduce((s, o) => s + o.n, 0),
-    uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
-    totalCards: catalog.CARDS.length,
+    uniqueOwned: catalog.collectionProgress((id) => has.has(id)).owned, // Karten in irgendeiner Seltenheit
+    totalCards: catalog.collectionProgress((id) => has.has(id)).total, // geheime Karten zählen mit, sobald man sie besitzt
     cardValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung der Slabs
     stats: statsAgg[0] || { won: 0, lost: 0 },
     favorites: await favoriteList(profile, Object.fromEntries(owned.map((o) => [o._id, o.n - (o.foiled || 0)]))), // folierte zählen einzeln
@@ -226,6 +227,10 @@ router.get('/profil/:name/sammlung', requireLogin, async (req, res) => {
     isMe,
     ...coll,
     // eigene Karten: "du besitzt …" in der großen Ansicht (eigene Sammlung: die gezeigten Zahlen)
+    ...(await viewData(coll)),
+    seasons: catalog.SEASONS,
+    unreleased: [],
+    testCards: [],
     ownedCounts: mine ? Object.fromEntries(mine.map((o) => [o._id, o.n])) : coll.counts,
     cards: catalog.CARDS,
     rarities: catalog.visibleRarities(),

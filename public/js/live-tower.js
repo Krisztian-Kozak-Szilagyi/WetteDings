@@ -133,7 +133,7 @@
     const f = state.fight;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const bock = f && state.phase === 'kampf' ? bockAt(f, sec) : state.players.map((p) => p.bock);
-    const hitNow = new Set(f && state.phase === 'kampf' ? (f.drains || []).filter((d) => toReal(f, d.t) <= sec && sec - toReal(f, d.t) < 3).map((d) => d.m) : []);
+    const hitNow = new Set(f && state.phase === 'kampf' ? (f.drains || []).filter((d) => !d.refill && toReal(f, d.t) <= sec && sec - toReal(f, d.t) < 3).map((d) => d.m) : []);
     state.players.forEach((p, i) => {
       const card = el('article', `lt-player${p.me ? ' is-me' : ''}${hitNow.has(i) ? ' is-hit' : ''}`);
       const top = el('div', 'lt-player-top');
@@ -154,25 +154,38 @@
         let mine = 0;
         for (const t of f.ticks) if (t.m === i && toReal(f, t.t) <= sec + 1e-6) mine += t.p;
         info.appendChild(el('span', 'muted small', `${STAT[f.stat]} ${p.card.stats[f.stat]} · Beitrag ${fmt(mine)}`));
+        // Gruß aus dem Osten: Geld von Aleks sinkt mit jedem Münzwurf, der schon zu sehen ist
+        const before = (f.coinsBefore || [])[i];
+        if (before != null) {
+          let flips = 0;
+          for (const t of f.ticks) if (t.m === i && t.coin && toReal(f, t.t) <= sec + 1e-6) flips++;
+          const left = Math.max(0, before - flips * (f.coinCost || 0));
+          info.appendChild(el('span', 'muted small', `Aleks: ${(left / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € dabei`));
+        }
       }
-      if (hitNow.has(i)) info.appendChild(el('span', 'lt-hit', `−${pctText(f.drains.find((d) => d.m === i).amount)} Bock`));
-      const boost = el('div', 'lt-boostcard');
-      const mini = el('span', `lt-mini r-${p.boost ? p.boost.rarity : 'none'}`);
-      if (p.boost) {
-        const im = el('img');
-        im.src = p.boost.image;
-        im.alt = '';
-        im.width = 720;
-        im.height = 1008;
-        im.loading = 'lazy';
-        mini.appendChild(im);
-      }
-      boost.appendChild(mini);
-      const bt = el('span', 'lt-boostcard-text');
-      bt.appendChild(el('span', 'muted small', 'Boost'));
-      bt.appendChild(el('span', '', p.boost ? p.boost.name : 'kein Boost'));
-      boost.appendChild(bt);
-      info.appendChild(boost);
+      if (hitNow.has(i)) info.appendChild(el('span', 'lt-hit', `−${pctText(f.drains.find((d) => d.m === i && !d.refill).amount)} Bock`));
+      // Boost und – bei Matze mit Yo Dawg – der Hund im Hunde-Slot
+      const miniCard = (c, label, none) => {
+        const box = el('div', 'lt-boostcard');
+        const mini = el('span', `lt-mini r-${c ? c.rarity : 'none'}`);
+        if (c) {
+          const im = el('img');
+          im.src = c.image;
+          im.alt = '';
+          im.width = 720;
+          im.height = 1008;
+          im.loading = 'lazy';
+          mini.appendChild(im);
+        }
+        box.appendChild(mini);
+        const bt = el('span', 'lt-boostcard-text');
+        bt.appendChild(el('span', 'muted small', label));
+        bt.appendChild(el('span', '', c ? c.name : none));
+        box.appendChild(bt);
+        info.appendChild(box);
+      };
+      miniCard(p.boost, 'Boost', 'kein Boost');
+      if (p.dog) miniCard(p.dog, 'Hund', '');
       top.appendChild(info);
       card.appendChild(top);
 
@@ -201,7 +214,9 @@
     if (!f) return;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const items = [];
-    (f.drains || []).forEach((d) => items.push({ t: toReal(f, d.t), text: `${d.t > 0 ? 'Halbzeit' : 'Kampfbeginn'} – ${state.players[d.m].name} verliert ${pctText(d.amount)} Bock`, cls: 'is-bad' }));
+    (f.drains || []).forEach((d) => items.push(d.refill
+      ? { t: toReal(f, d.t), text: `Sonnendurchbruch – ${state.players[d.m].name} bekommt ${pctText(d.amount)} Bock`, cls: 'is-good' }
+      : { t: toReal(f, d.t), text: `${d.t > 0 ? 'Halbzeit' : 'Kampfbeginn'} – ${state.players[d.m].name} verliert ${pctText(d.amount)} Bock`, cls: 'is-bad' }));
     f.ticks.filter((t) => t.crit).forEach((t) => items.push({ t: toReal(f, t.t), text: `Krit! ${state.players[t.m].card ? state.players[t.m].card.name : ''} +${fmt(t.p)}`, cls: '' }));
     const list = $('log');
     list.textContent = '';

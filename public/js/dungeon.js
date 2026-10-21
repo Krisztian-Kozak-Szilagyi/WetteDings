@@ -385,7 +385,7 @@
       el.textContent = text;
     };
     cardsForm.addEventListener('change', async (e) => {
-      if (saving || (e.target.name !== 'card' && e.target.name !== 'boost')) return;
+      if (saving || !['card', 'boost', 'dog'].includes(e.target.name)) return;
       const dlg = e.target.closest('[data-dg-picker]');
       const item = e.target.closest('.dg-pick');
       saving = true;
@@ -577,7 +577,30 @@
     if (st.some((v, k) => v < prev[k])) flash(btn, 'fx-stat-down');
   }
   const showStats = (m, st) => cardInfo[m] && st && setCard(m, st, cardInfo[m].imgs[st.join(',')]);
-  const resetStats = () => cardInfo.forEach((c, m) => c && setCard(m, c.stats, c.base, true));
+  // Treue Seele: Hunde an Matze zeigen ab der Halbzeit ihre neuen Werte (cardInfo[m].dogs: Karten-ID → Bild)
+  cardInfo.forEach((c) => c && c.dogs && Object.values(c.dogs).forEach((u) => { new Image().src = u; }));
+  const dogImg = (m, id) => slotEls[m] && slotEls[m].querySelector('[data-dg-boost-id="' + id + '"] img');
+  function setDog(m, id, on) {
+    const img = dogImg(m, id);
+    const url = cardInfo[m] && cardInfo[m].dogs && cardInfo[m].dogs[id];
+    if (!img || !url) return;
+    if (!img.dataset.base) img.dataset.base = img.getAttribute('src');
+    img.src = on ? url : img.dataset.base;
+    if (on && !first) flash(img.closest('.dg-boost-card'), 'fx-stat-up');
+  }
+  // Gruß aus dem Osten: Geld von Aleks sinkt mit jedem gezeigten Münzwurf – über alle Kämpfe hinweg
+  const coinLeft = cardInfo.map((c) => (c ? c.coins || 0 : 0));
+  const euroText = (cents) => (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  function spendCoin(m) {
+    const el = slotEls[m] && slotEls[m].querySelector('[data-dg-coin-left]');
+    coinLeft[m] = Math.max(0, coinLeft[m] - (pb.coinCost || 0));
+    if (el) el.textContent = euroText(coinLeft[m]);
+  }
+  const resetStats = () => cardInfo.forEach((c, m) => {
+    if (!c) return;
+    setCard(m, c.stats, c.base, true);
+    Object.keys(c.dogs || {}).forEach((id) => setDog(m, id, false));
+  });
 
   function cast(m) {
     pop(m, '★', 'is-ability');
@@ -642,6 +665,7 @@
         if (x.st) showStats(x.m, x.st);
         if (x.ability) {
           f.abilities.filter((a) => a.m === x.m).forEach((a) => {
+            if (a.dog) setDog(a.m, a.dog, true);
             if (!a.team) log(names[a.m] + ': ' + a.label + ' – ' + a.text, 'is-ability');
             else if (!s.team.has(a.from + a.label)) {
               s.team.add(a.from + a.label);
@@ -653,7 +677,14 @@
         } else if (x.destroy) {
           pop(x.m, 'Zerstört!', 'is-crit');
         } else {
-          pop(x.m, '+' + x.p, x.crit ? 'is-crit' : '');
+          pop(x.m, '+' + x.p + (x.dg ? ' (Hunde ' + x.dg + ')' : ''), x.crit ? 'is-crit' : ''); // dg: Anteil der Hunde an Matze
+          if (x.coin) spendCoin(x.m);
+          // Mach das Unmögliche möglich: so viele Ömer greifen gemeinsam an (Abzeichen an der Karte)
+          if (x.om && slotEls[x.m]) slotEls[x.m].querySelector('.dg-slot-card').setAttribute('data-copies', String(x.om));
+          if (x.coin) { // Gruß aus dem Osten: Münzwurf von Aleks
+            const el = pop(x.m, x.coin === 'kopf' ? 'Kopf! +' + (pb.coinPlus || 10) : 'Zahl', x.coin === 'kopf' ? 'is-coin-heads' : 'is-coin-tails');
+            if (el) el.style.marginTop = '-46px';
+          }
         }
       }
       const done = f.ticks.slice(0, s.ticks).reduce((sum, x) => sum + (x.p || 0), 0);

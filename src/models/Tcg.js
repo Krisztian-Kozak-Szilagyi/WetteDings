@@ -42,6 +42,13 @@ const cardSchema = new Schema(
       ),
       default: null,
     },
+    // Letzte Bewertung eines Shops: bleibt, wenn der Slab aufgebrochen wird (items.unfoilCard) – so sind mehrere Exemplare
+    // derselben Karte auch ohne Slab zu unterscheiden. Ein Exemplar mit lastGrade ist wie ein beschädigtes ein Einzelstück
+    // (eigener Platz im Album, im Handel gezielt, bei der Bank zuletzt). Mit neuem Slab gilt wieder slab.
+    lastGrade: {
+      type: new Schema({ code: String, grade: Number, at: Date, cert: String }, { _id: false }),
+      default: null,
+    },
     // Zuletzt per Handel bekommen (rankService.FRESH_DAYS): so lange zählt das Exemplar in der Rangliste höchstens mit
     // tradedCost, dem Anteil dessen, was der Empfänger dafür gegeben hat – eine geschenkte Karte bringt niemanden auf Platz 1
     tradedAt: { type: Date, default: undefined },

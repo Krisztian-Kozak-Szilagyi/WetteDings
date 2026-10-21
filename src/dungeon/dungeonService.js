@@ -18,8 +18,8 @@ const { UserError } = require('../lib/util');
 const catalog = require('../tcg/catalog');
 const { lockedDocs, isLocked, pickCopy, claim, copiesByCard, lockLabel } = require('../tcg/locks');
 const { damageCards, dungeonSeverity, damageText } = require('../grading/damage');
-const { simulate, WORK_TIME } = require('../ihk/ihkService');
-const { resolve, resolveAll, canBoost, needsCoffee, isCoffee } = require('../ihk/abilities');
+const { simulate, WORK_TIME, aleksBudget, refundCoins } = require('../ihk/ihkService');
+const { resolve, resolveAll, canBoost, needsCoffee, isCoffee, isDog, hasDogSlot, checkDogs, who, MAX_DOGS, isAleks, ALEKS } = require('../ihk/abilities');
 const { grantItems, splitFoilDrops } = require('../items/itemService');
 const { logSettingsChange } = require('../stats/settingsLog');
 const { defOf, dungeonForSlot, TOWER } = require('./dungeons');
@@ -182,16 +182,20 @@ const modeOf = (doc) => (doc && doc.mode === 'tower' ? 'tower' : 'dungeon');
 
 /** Karten, die die anderen Mitglieder einer Anmeldung schon gewählt haben (Charakter und Boost) */
 const teamTaken = (members, userId) =>
-  new Set(members.filter((m) => String(m.user) !== String(userId)).flatMap((m) => [m.card, m.boost]).filter(Boolean));
+  new Set(members.filter((m) => String(m.user) !== String(userId)).flatMap((m) => [m.card, m.boost, m.dog]).filter(Boolean));
+
+/** Hunde (Katalog-Karten), die die anderen Mitglieder schon mitbringen – als Boost oder im Hunde-Slot */
+const teamDogs = (members, userId) =>
+  members.filter((m) => String(m.user) !== String(userId)).flatMap((m) => [m.boost, m.dog]).map((id) => id && catalog.cardById[id]).filter(isDog);
 
 /**
  * Mage Tower: jede Karte nur einmal im Team – weder zwei Spieler mit derselben Karte (z. B. zweimal Krisz Glitch) noch
  * dieselbe Karte als Charakter und Boost. Gibt die doppelte Karten-ID zurück oder null.
  */
-function towerDuplicate(members, userId, cardId, boostId) {
+function towerDuplicate(members, userId, cardId, boostId, dogId = null) {
   if (cardId && boostId && cardId === boostId) return cardId;
   const taken = teamTaken(members, userId);
-  return [cardId, boostId].find((id) => id && taken.has(id)) || null;
+  return [cardId, boostId, dogId].find((id) => id && taken.has(id)) || null;
 }
 
 /** Karte eines Bots: Seltenheit nach botWeights, darin eine zufällige Charakterkarte (gesperrte Karten nicht) */
@@ -232,20 +236,25 @@ function botBoost(rand = random, weights = settings.botWeights, banned = new Set
 }
 
 // ---------- Kampf ----------
-// Boost-Fähigkeiten, die im Dungeon der ganzen Gruppe helfen: Ömer (FIS für die befreundeten Karten), Hundekarten
-// (alle freundlichen Charaktere), Mauch (schickt die Gruppe zum Gruschteln) und Matzes Hundekarte-Bonus, sobald
-// irgendwer einen Hund mitbringt. Bloodlust und Reality Check treffen den Gegner – also die Deadline aller.
+// Boost-Fähigkeiten, die im Dungeon der ganzen Gruppe helfen: Mauch (schickt die Gruppe zum Gruschteln). Hunde (Treue Seele) helfen nur der Karte, an der sie hängen. Bloodlust und Reality Check
+// treffen den Gegner – also die Deadline aller.
 // Fähigkeiten von Hauptkarten, die für die ganze Gruppe wirken
-const TEAM_MAIN_KEYS = new Set(['forkbomb']);
-const TEAM_KEYS = new Set(['forkbomb', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
+// potions (Luca): nur die Verstärkung der Boosts gilt für alle, Tempo und BWL +50 bekommt er selbst; omer (Ömer): für alle
+// läuft die Deadline schneller (teamStart/teamApply), duplizieren tut sich nur Ömer selbst
+const TEAM_MAIN_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'alles-pink', 'potions', 'omer']);
+const TEAM_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'alles-pink', 'potions', 'omer', 'gruschteln', 'bloodlust', 'reality-check']);
 
-/** Fähigkeiten eines Spielers: eigene Karte + eigener Boost, dazu die Gruppen-Fähigkeiten der Boosts der anderen */
+/** Was eine Gruppen-Fähigkeit einer Hauptkarte bei den anderen bewirkt: Ömer nur die schnellere Deadline (jeder Ömer
+ * zählt), Luca nur die Verstärkung, alle anderen dasselbe wie bei sich selbst */
+const teamPart = (e) => (e.teamApply ? { start: e.teamStart, apply: e.teamApply } : e.amp ? { apply: () => {} } : {});
+
+/** Fähigkeiten eines Spielers: eigene Karte + eigener Boost (und Hund im Hunde-Slot), dazu die Gruppen-Fähigkeiten der Boosts der anderen */
 function teamEffects(members, m) {
   const mem = members[m];
-  const out = resolveAll(mem.card, mem.boost ? [mem.boost] : []).map((e) => ({ ...e, from: m }));
+  const out = resolveAll(mem.card, [mem.boost, mem.dog].filter(Boolean)).map((e) => ({ ...e, from: m }));
   members.forEach((other, o) => {
     // Forkbomb einer Hauptkarte trifft die Aufgabe – also wirkt sie für die ganze Gruppe
-    if (o !== m) for (const e of resolve(other.card, null)) if (TEAM_MAIN_KEYS.has(e.key) && !out.some((x) => x.key === e.key)) out.push({ ...e, from: o });
+    if (o !== m) for (const e of resolve(other.card, null)) if (TEAM_MAIN_KEYS.has(e.key) && (e.teamApply || !out.some((x) => x.key === e.key))) out.push({ ...e, ...teamPart(e), from: o });
     if (o === m || !other.boost) return;
     for (const e of resolve(mem.card, other.boost)) {
       if (TEAM_KEYS.has(e.key) && !out.some((x) => x.key === e.key && x.label === e.label)) out.push({ ...e, from: o });
@@ -262,17 +271,18 @@ function teamEffects(members, m) {
  * abilities [{ m, from, team, label, text }] (from = wessen Karte die Fähigkeit bringt).
  * fightSeconds: volle Zeit in der Wiedergabe (Turm: kürzer).
  */
-function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECONDS) {
+function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECONDS, mode = 'dungeon') {
   const events = [];
   const abilities = [];
-  let limit = WORK_TIME;
+  let limit = 0;
   members.forEach((mem, m) => {
     const effects = teamEffects(members, m);
-    const r = simulate(mem.card.stats, stat, required, rand, effects);
-    if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text }));
-    limit = Math.max(limit, WORK_TIME + r.freeze + (r.extend || 0));
-    r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
+    const r = simulate(mem.card.stats, stat, required, rand, effects, mode, { coin: mem.coin || null });
+    if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text, ...(e.dog ? { dog: e.dog } : {}) }));
+    limit = Math.max(limit, r.end != null ? r.end : WORK_TIME + r.freeze + (r.extend || 0)); // Ömer: Deadline endet früher
+    r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.dg ? { dg: x.dg } : {}), ...(x.coin ? { coin: x.coin } : {}), ...(x.om ? { om: x.om } : {}), ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
   });
+  if (!limit) limit = WORK_TIME;
   events.sort((a, b) => a.t - b.t || a.m - b.m);
   const ticks = [];
   let total = 0;
@@ -287,6 +297,7 @@ function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECO
   }
   // Fähigkeiten, die erst nach dem Sieg ausgelöst hätten, zählen nicht
   const used = abilities.filter((a) => ticks.some((x) => x.ability && x.m === a.m));
+  carryCoins(members, ticks);
   const success = total >= required;
   // Wiedergabe in gleichmäßigem Tempo (volle Zeit = fightSeconds): ein gewonnener Kampf endet beim Sieg,
   // ein verlorener mit Ablauf der Deadline. Sie beginnt erst eine Sekunde vor dem ersten Treffer (start,
@@ -294,6 +305,43 @@ function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECO
   const start = Math.max(0, Math.round(((ticks.length ? ticks[0].t : 0) - limit / fightSeconds) * 10) / 10);
   const seconds = Math.max(1, Math.round((fightSeconds * ((success ? doneAt : limit) - start)) / limit * 10) / 10);
   return { ticks, abilities: used, total: Math.min(total, required), success, doneAt, limit, start, seconds };
+}
+
+/**
+ * Gruß aus dem Osten (Aleks): Würfe bis zum Ende des Kampfs abrechnen – Geld, Kopf-Bonus und „wirft schon“ (ab seiner
+ * ersten Halbzeit) gehen in den nächsten Kampf mit. members[m].coin = { left, bonus, active } wird dabei geändert.
+ */
+function carryCoins(members, ticks) {
+  members.forEach((mem, m) => {
+    if (!mem.coin) return;
+    const flips = ticks.filter((x) => x.m === m && x.coin);
+    mem.coin.left -= flips.length * ALEKS.cost;
+    mem.coin.bonus += flips.filter((x) => x.coin === 'kopf').length * ALEKS.plus;
+    if (ticks.some((x) => x.m === m && x.ability)) mem.coin.active = true;
+  });
+}
+
+/** Geld für Aleks: abgebucht (coins), davon verworfen und wie oft Kopf – für den Durchlauf (Rückzahlung am Ende) */
+const coinFields = (m, c) => (m.coins > 0 && c.coin ? { coins: m.coins, coinSpent: m.coins - c.coin.left, coinHeads: c.coin.bonus / ALEKS.plus } : { coins: 0 });
+
+/**
+ * Aleks: das gewünschte Geld (Anmeldung) auf das Guthaben begrenzen – nur für Spieler mit Aleks als Charakter.
+ * Gibt die Mitglieder mit dem Geld zurück, das beim Start abgebucht wird.
+ */
+async function coinBudgets(members) {
+  const ids = members.filter((m) => m.user && m.coins > 0 && isAleks(catalog.cardById[m.card])).map((m) => m.user);
+  const users = ids.length ? await User.find({ _id: { $in: ids } }).select('balance').lean() : [];
+  const balance = new Map(users.map((u) => [String(u._id), u.balance]));
+  return members.map((m) => ({ ...m, coins: ids.some((id) => String(id) === String(m.user)) ? Math.min(m.coins, ALEKS.maxMoney, balance.get(String(m.user)) || 0) : 0 }));
+}
+
+/** Geld für Aleks beim Start abbuchen (in der Transaktion des Starts) – reicht das Guthaben nicht mehr, bricht der Start ab */
+async function chargeCoins(members, title, session) {
+  for (const m of members.filter((x) => x.user && x.coins > 0)) {
+    const paid = await User.updateOne({ _id: m.user, balance: { $gte: m.coins } }, { $inc: { balance: -m.coins } }, { session });
+    if (!paid.modifiedCount) throw new UserError(`Für Aleks' Münzwürfe fehlt ${m.name} jetzt Geld – bitte weniger mitgeben.`);
+    await Ledger.create([{ user: m.user, type: 'aleks_muenzen', amount: -m.coins, betTitle: title }], { session });
+  }
 }
 
 /** Alle Kämpfe eines Dungeons; nach einer Niederlage ist Schluss */
@@ -345,7 +393,7 @@ function playTower(members, rand = random, opts = settings.tower, maxRounds = MA
     const floor = towerFloor(prev, rand);
     prev = floor.key;
     const required = towerRequired(n, opts);
-    const r = fight(members, floor.stat, required, rand, opts.fightSeconds);
+    const r = fight(members, floor.stat, required, rand, opts.fightSeconds, 'tower');
     fights.push({ key: floor.key, boss: false, required, reward: towerReward(n, opts), ...r });
     if (!r.success) break;
   }
@@ -423,13 +471,15 @@ async function availableCards(userId, { ownDungeon = false, mode = 'dungeon' } =
 }
 
 /** Mitglied ohne Karten – so tritt man bei, gewählt wird danach in der Lobby (#111) */
-const emptyMember = (user) => ({ user: user._id, name: user.username, card: null, cardDoc: null, boost: null, boostDoc: null });
+const emptyMember = (user) => ({ user: user._id, name: user.username, card: null, cardDoc: null, boost: null, boostDoc: null, dog: null, dogDoc: null });
 
 /**
  * Karten prüfen und Exemplare in der Transaktion sperren → Mitglieds-Eintrag.
  * Ohne cardId bleibt der Charakter offen (in der Lobby darf man zuerst den Boost wählen).
+ * dogId: Hunde-Slot (Yo Dawg) – passt er nicht mehr (anderer Charakter, kein Hund mehr im Boost, derselbe Hund), fällt
+ * er still weg. others = Hunde der anderen im Team (höchstens zwei Hunde je Team, jeder nur einmal).
  */
-async function memberEntry(user, cardId, boostId, session, { ownDungeon = false, mode = 'dungeon', foiled = false } = {}) {
+async function memberEntry(user, cardId, boostId, session, { ownDungeon = false, mode = 'dungeon', foiled = false, dogId = null, others = [] } = {}) {
   const card = cardId ? catalog.cardById[cardId] : null;
   if (cardId && (!card || !card.isCharacter)) throw new UserError('Bitte wähle eine Charakterkarte aus.');
   let boost = null;
@@ -437,7 +487,11 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false,
     boost = catalog.cardById[boostId];
     if (!boost || !canBoost(boost)) throw new UserError('Diese Karte hat im Boost-Slot keine Wirkung.');
   }
-  const banned = [card, boost].find((c) => c && cardBans.isBanned(c.id, mode));
+  let dog = dogId ? catalog.cardById[dogId] : null;
+  if (dog && (!isDog(dog) || !hasDogSlot(card, [boost]) || who(dog) === who(boost))) dog = null;
+  const dogError = checkDogs(card, [boost], dog, others);
+  if (dogError) throw new UserError(dogError);
+  const banned = [card, boost, dog].find((c) => c && cardBans.isBanned(c.id, mode));
   if (banned) throw new UserError(`${banned.name} ist im ${cardBans.modeByKey[mode].label} bis zum nächsten Balance-Patch gesperrt.`);
   if (boost && needsCoffee(boost)) {
     const owned = await TcgCard.distinct('card', { user: user._id }).session(session);
@@ -457,8 +511,10 @@ async function memberEntry(user, cardId, boostId, session, { ownDungeon = false,
   if (boost && !boostDoc) {
     throw new UserError(same ? `Für ${boost.name} als Charakter und Boost brauchst du zwei freie${foiled ? ' folierte' : ''} Exemplare.` : `Die Boost-Karte ist nicht frei (${why}).`);
   }
-  await claim([doc, boostDoc], user._id, session);
-  return { user: user._id, name: user.username, card: card ? card.id : null, cardDoc: doc ? doc._id : null, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null };
+  const dogDoc = dog ? await freeDoc(dog.id) : null;
+  if (dog && !dogDoc) throw new UserError(`${dog.name} ist nicht frei (${why}).`);
+  await claim([doc, boostDoc, dogDoc], user._id, session);
+  return { user: user._id, name: user.username, card: card ? card.id : null, cardDoc: doc ? doc._id : null, boost: boost ? boost.id : null, boostDoc: boostDoc ? boostDoc._id : null, dog: dog ? dog.id : null, dogDoc: dogDoc ? dogDoc._id : null };
 }
 
 const partyOf = (userId) => DungeonParty.findOne({ 'members.user': userId });
@@ -595,28 +651,46 @@ async function decline({ user, partyId }) {
 }
 
 /** Karten in der Lobby wählen oder tauschen (bis kurz vor dem Start); ohne cardId bleibt der Charakter offen */
-async function changeCards({ user, cardId, boostId, foiled = false }) {
+async function changeCards({ user, cardId, boostId, dogId = null, foiled = false }) {
   const party = await partyOf(user._id);
   if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – Karten tauschen ist nicht mehr möglich.');
   await inTransaction(async (session) => {
+    // in der Transaktion neu lesen: zwei Mitglieder, die gleichzeitig dieselbe Karte (oder denselben Hund) wählen, stoßen hier zusammen
+    const fresh = await DungeonParty.findById(party._id).session(session).lean();
     if (modeOf(party) === 'tower') {
-      // in der Transaktion neu lesen: zwei Mitglieder, die gleichzeitig dieselbe Karte wählen, stoßen hier zusammen
-      const fresh = await DungeonParty.findById(party._id).session(session).lean();
-      const dup = fresh && towerDuplicate(fresh.members, user._id, cardId || null, boostId || null);
+      const dup = fresh && towerDuplicate(fresh.members, user._id, cardId || null, boostId || null, dogId || null);
       if (dup) {
         const name = (catalog.cardById[dup] || { name: 'Diese Karte' }).name;
         throw new UserError(cardId === boostId ? `Im Mage Tower darf jede Karte nur einmal mitspielen – ${name} nicht als Charakter und Boost.` : `${name} ist schon in eurem Team – im Mage Tower darf jede Karte nur einmal mitspielen.`);
       }
     }
-    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party), foiled });
+    const m = await memberEntry(user, cardId, boostId, session, { ownDungeon: true, mode: modeOf(party), foiled, dogId, others: fresh ? teamDogs(fresh.members, user._id) : [] });
     const res = await DungeonParty.updateOne(
       { _id: party._id, 'members.user': user._id },
-      { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc, 'members.$.ready': false } },
+      { $set: { 'members.$.card': m.card, 'members.$.cardDoc': m.cardDoc, 'members.$.boost': m.boost, 'members.$.boostDoc': m.boostDoc, 'members.$.dog': m.dog, 'members.$.dogDoc': m.dogDoc, ...(isAleks(catalog.cardById[m.card]) ? {} : { 'members.$.coins': 0 }), 'members.$.ready': false } },
       { session }
     );
     if (!res.matchedCount) throw new UserError('Du bist für keinen Dungeon angemeldet.');
   });
+}
+
+/**
+ * Gruß aus dem Osten: Geld, das Aleks mitnimmt (Euro, höchstens ALEKS.maxMoney) – gemerkt in der Anmeldung, abgebucht
+ * erst beim Start (dann höchstens so viel, wie man noch hat). Nur mit Aleks als Charakter.
+ */
+async function setCoins({ user, euros }) {
+  const party = await partyOf(user._id);
+  if (!party) throw new UserError('Du bist für keinen Dungeon angemeldet.');
+  if (partyLocked(party)) throw new UserError('Der Dungeon startet gleich – das Geld lässt sich nicht mehr ändern.');
+  const me = party.members.find((m) => m.user && m.user.equals(user._id));
+  const card = me && me.card ? catalog.cardById[me.card] : null;
+  if (!isAleks(card)) throw new UserError('Geld für Münzwürfe nimmt nur Aleks mit.');
+  const budget = aleksBudget(card, euros);
+  const fresh = await User.findById(user._id).select('balance').lean();
+  if (budget > ((fresh && fresh.balance) || 0)) throw new UserError('So viel Geld hast du nicht.');
+  await DungeonParty.updateOne({ _id: party._id, 'members.user': user._id }, { $set: { 'members.$.coins': budget, 'members.$.ready': false } });
+  return budget;
 }
 
 /**
@@ -627,8 +701,8 @@ async function notifyBanned(cardId, modes) {
   const card = catalog.cardById[cardId];
   if (!card || !modes.length) return;
   const modeFilter = modes.includes('dungeon') ? (modes.includes('tower') ? {} : { mode: { $ne: 'tower' } }) : { mode: 'tower' };
-  const parties = await DungeonParty.find({ ...modeFilter, $or: [{ 'members.card': card.id }, { 'members.boost': card.id }] }).select('mode members').lean();
-  const users = parties.flatMap((p) => p.members.filter((m) => m.user && (m.card === card.id || m.boost === card.id)).map((m) => ({ user: m.user, mode: modeOf(p) })));
+  const parties = await DungeonParty.find({ ...modeFilter, $or: [{ 'members.card': card.id }, { 'members.boost': card.id }, { 'members.dog': card.id }] }).select('mode members').lean();
+  const users = parties.flatMap((p) => p.members.filter((m) => m.user && (m.card === card.id || m.boost === card.id || m.dog === card.id)).map((m) => ({ user: m.user, mode: modeOf(p) })));
   for (const mode of modes) {
     const ids = users.filter((u) => u.mode === mode).map((u) => u.user);
     if (!ids.length) continue;
@@ -729,7 +803,7 @@ async function chat({ user, text }) {
  */
 function splitPlayers(parties, bannedIds = new Set()) {
   const all = parties.flatMap((p) => p.members); // joinedAt bleibt im Durchlauf (Manipulationserkennung)
-  const isBannedPick = (m) => bannedIds.has(m.card) || (!!m.boost && bannedIds.has(m.boost));
+  const isBannedPick = (m) => bannedIds.has(m.card) || (!!m.boost && bannedIds.has(m.boost)) || (!!m.dog && bannedIds.has(m.dog));
   return {
     players: all.filter((m) => m.card && !isBannedPick(m)),
     dropped: all.filter((m) => !m.card && m.user).map((m) => m.user),
@@ -744,34 +818,64 @@ function fillBots(players, mode = 'dungeon') {
   const banned = cardBans.bannedIn(mode);
   // Mage Tower: jede Karte nur einmal im Team – auch Bots nehmen keine, die schon mitspielt
   const unique = mode === 'tower';
-  if (unique) players.forEach((p) => [p.card, p.boost].forEach((id) => id && banned.add(id)));
+  if (unique) players.forEach((p) => [p.card, p.boost, p.dog].forEach((id) => id && banned.add(id)));
+  // Hunde: höchstens zwei je Team, jeder nur einmal – auch für Bots
+  const banDogs = () => {
+    const used = new Set(members.flatMap((m) => [m.boost, m.dog]).map((id) => id && catalog.cardById[id]).filter(isDog).map(who));
+    for (const c of catalog.CARDS) if (isDog(c) && (used.has(who(c)) || used.size >= MAX_DOGS)) banned.add(c.id);
+  };
   while (members.length < TEAM_SIZE) {
+    banDogs();
     const card = botCard(random, settings.botWeights, banned);
     const name = BOT_NAMES.find((n) => !usedBots.has(n)) || 'Bot';
     usedBots.add(name);
     if (unique) banned.add(card.id);
     const boost = botBoost(random, settings.botWeights, banned);
     if (unique && boost) banned.add(boost.id);
-    members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, bot: true });
+    members.push({ user: null, name, card: card.id, cardDoc: null, boost: boost && boost.id !== card.id ? boost.id : null, boostDoc: null, dog: null, dogDoc: null, bot: true });
   }
   return members;
 }
 
-/** Mitglieder als Katalog-Karten für fight() */
-const teamCards = (members) => members.map((m) => ({ card: catalog.cardById[m.card], boost: m.boost ? catalog.cardById[m.boost] : null }));
+/**
+ * Mitglieder als Katalog-Karten für fight(). Hunde: höchstens MAX_DOGS je Team und jeder nur einmal – im Dungeon werden
+ * Einzelanmeldungen erst beim Start zu Teams gelost, dort lässt sich das nicht schon bei der Wahl prüfen. Wer später
+ * dran ist (Reihenfolge der Mitglieder), dessen Hund spielt nicht mit. Der Hunde-Slot zählt nur bei Matze mit einem Hund
+ * im Boost (Yo Dawg) – nach einem Kartenwechsel im Live-Turm kann das wegfallen.
+ */
+function teamCards(members) {
+  const seen = new Set();
+  const keep = (c) => {
+    if (!isDog(c)) return c;
+    if (seen.has(who(c)) || seen.size >= MAX_DOGS) return null;
+    seen.add(who(c));
+    return c;
+  };
+  return members.map((m) => {
+    const card = catalog.cardById[m.card];
+    const boost = keep(m.boost ? catalog.cardById[m.boost] : null);
+    const dogCard = m.dog ? catalog.cardById[m.dog] : null;
+    const dog = dogCard && hasDogSlot(card, [boost]) ? keep(dogCard) : null;
+    // Gruß aus dem Osten: mitgegebenes Geld (nur Aleks), Kopf-Bonus und „wirft schon“ wachsen über die Kämpfe (carryCoins)
+    const coin = isAleks(card) && m.coins > 0 ? { left: m.coins, bonus: 0, active: false } : null;
+    return { card, boost, dog, coin };
+  });
+}
 
 /** Ein Team starten: Anmeldungen löschen, Durchlauf anlegen (Bots füllen auf) */
 async function startTeam(slot, parties, players, chatLog, now) {
   const dungeon = dungeonForSlot(slot, settings.intervalHours);
-  const members = fillBots(players, 'dungeon');
-  const fights = playDungeon(dungeon, teamCards(members));
+  const members = await coinBudgets(fillBots(players, 'dungeon'));
+  const cards = teamCards(members);
+  const fights = playDungeon(dungeon, cards);
   const leaderId = parties.length === 1 && !parties[0].solo ? String(parties[0].leader) : null;
-  const runMembers = members.map(({ bot, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot) }));
+  const runMembers = members.map(({ bot, ...m }, i) => ({ ...m, ...coinFields(m, cards[i]), leader: !!leaderId && String(m.user) === leaderId, ...rewardsFor(fights, bot) }));
   const success = fights.length === dungeon.fights.length && fights[fights.length - 1].success;
   await inTransaction(async (session) => {
     const ids = parties.map((p) => p._id);
     const del = await DungeonParty.deleteMany({ _id: { $in: ids } }, { session });
     if (del.deletedCount !== ids.length) throw new Error('Dungeon-Anmeldung wurde gleichzeitig verändert.');
+    await chargeCoins(runMembers, dungeon.title, session);
     await DungeonRun.create(
       [{ slot, dungeon: dungeon.key, members: runMembers, fights, success, startedAt: new Date(now), endsAt: new Date(now + runSeconds(fights) * 1000), chat: chatLog }],
       { session }
@@ -790,9 +894,9 @@ async function startTower({ user, now = Date.now() }) {
   if (!party.leader.equals(user._id)) throw new UserError('Nur der Gruppenleiter kann den Turm betreten.');
   const waiting = party.members.filter((m) => !m.card);
   if (waiting.length) throw new UserError(`Noch ohne Charakter: ${waiting.map((m) => m.name).join(', ')}.`);
-  const doubled = party.members.filter((m) => towerDuplicate(party.members, m.user, m.card, m.boost));
+  const doubled = party.members.filter((m) => towerDuplicate(party.members, m.user, m.card, m.boost, m.dog));
   if (doubled.length) throw new UserError(`Im Mage Tower darf jede Karte nur einmal mitspielen – bitte tauschen: ${doubled.map((m) => m.name).join(', ')}.`);
-  const blocked = party.members.filter((m) => cardBans.isBanned(m.card, 'tower') || cardBans.isBanned(m.boost, 'tower'));
+  const blocked = party.members.filter((m) => cardBans.isBanned(m.card, 'tower') || cardBans.isBanned(m.boost, 'tower') || cardBans.isBanned(m.dog, 'tower'));
   if (blocked.length) throw new UserError(`Gesperrte Karte im Mage Tower – bitte tauschen: ${blocked.map((m) => m.name).join(', ')}.`);
   const day = towerDay(now);
   const humans = party.members.filter((m) => m.user);
@@ -814,16 +918,19 @@ async function startTower({ user, now = Date.now() }) {
     const notReady = humans.filter((m) => !m.ready).map((m) => m.name);
     if (notReady.length) throw new UserError(`Noch nicht bereit: ${notReady.join(', ')}.`);
   }
-  const members = esportsTeam ? party.members.map((m) => ({ ...m, bot: false })) : fillBots(party.members, 'tower');
-  const fights = esportsTeam ? [] : playTower(teamCards(members), random, opts);
+  const members = await coinBudgets(esportsTeam ? party.members.map((m) => ({ ...m, bot: false })) : fillBots(party.members, 'tower'));
+  const cards = teamCards(members);
+  const fights = esportsTeam ? [] : playTower(cards, random, opts);
   const rounds = fights.filter((f) => f.success).length;
   const leaderId = party.solo ? null : String(party.leader);
-  const runMembers = members.map(({ bot, ready, ...m }) => ({ ...m, leader: !!leaderId && String(m.user) === leaderId, ...(esportsTeam ? { reward: 0, foil: false, bossCard: false } : towerRewardsFor(fights, bot, random, opts)) }));
+  // Live-Turm: die Münzwürfe rechnet liveTowerService Kampf für Kampf ab (coinSpent erst am Ende)
+  const runMembers = members.map(({ bot, ready, ...m }, i) => ({ ...m, ...(esportsTeam ? { coins: m.coins } : coinFields(m, cards[i])), leader: !!leaderId && String(m.user) === leaderId, ...(esportsTeam ? { reward: 0, foil: false, bossCard: false } : towerRewardsFor(fights, bot, random, opts)) }));
   const liveFields = esportsTeam ? live().newRunFields(runMembers, opts, now) : {};
   try {
     await inTransaction(async (session) => {
       const del = await DungeonParty.deleteOne({ _id: party._id, mode: 'tower' }, { session });
       if (!del.deletedCount) throw new UserError('Die Anmeldung wurde gleichzeitig verändert – bitte lade die Seite neu.');
+      await chargeCoins(runMembers, TOWER.title, session);
       const [run] = await DungeonRun.create(
         [{
           mode: 'tower',
@@ -927,6 +1034,8 @@ async function finishDue({ now = Date.now() } = {}) {
             await User.updateOne({ _id: m.user }, { $inc: { balance: m.reward } }, { session });
             await Ledger.create([{ user: m.user, type: 'dungeon_lohn', amount: m.reward, betTitle: d ? d.title : null }], { session });
           }
+          // Aleks: nicht verworfenes Geld zurück
+          if (m.coins > 0) await refundCoins(m.user, { budget: m.coins, spent: m.coinSpent || 0 }, d ? d.title : null, session);
         }
         const foils = r.members.filter((x) => x.user && x.foil).map((x) => x.user);
         // Boss-Karte: ein neues Exemplar je Gewinner, gilt danach als „schon besessen“ (Album) und als selbst erbeutet (#127)
@@ -946,7 +1055,7 @@ async function finishDue({ now = Date.now() } = {}) {
         if (!r.success) {
           const severity = dungeonSeverity(r);
           for (const m of r.members.filter((x) => x.user)) {
-            const got = await damageCards({ userId: m.user, docs: [m.cardDoc, m.boostDoc], severity, session });
+            const got = await damageCards({ userId: m.user, docs: [m.cardDoc, m.boostDoc, m.dogDoc], severity, session });
             if (got.length) hits.set(String(m.user), got);
           }
         }
@@ -1030,7 +1139,7 @@ async function pageState(userId) {
   // Fingerabdruck: ändert er sich, lädt die Seite neu (Beitritte, Einladungen, Start, Ende)
   const rev = crypto
     .createHash('sha1')
-    .update(JSON.stringify([party && [party._id, party.leader, party.members.map((m) => [m.user, m.card, m.boost]), party.invites.map((i) => i.user)], invitations.map((p) => p._id), run && [run._id, run.status]]))
+    .update(JSON.stringify([party && [party._id, party.leader, party.members.map((m) => [m.user, m.card, m.boost, m.dog]), party.invites.map((i) => i.user)], invitations.map((p) => p._id), run && [run._id, run.status]]))
     .digest('hex')
     .slice(0, 12);
   return { party, invitations, run, unseen, rev };
@@ -1066,6 +1175,10 @@ module.exports = {
   modeOf,
   notifyBanned,
   teamTaken,
+  teamDogs,
+  setCoins,
+  carryCoins,
+  coinFields,
   towerDuplicate,
   teamEffects,
   fight,

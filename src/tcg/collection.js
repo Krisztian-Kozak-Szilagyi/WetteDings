@@ -13,7 +13,7 @@ async function collection(user) {
     lockedDocs(user._id),
     TcgCard.find({ user: user._id, foiledAt: { $ne: null } }).select('card rarity foiledAt slab condition.defects.centering').sort({ foiledAt: 1 }).lean(),
     // nur die sichtbaren Spuren laden – Note und übrige Mängel bleiben auf dem Server (#204)
-    TcgCard.find({ user: user._id, foiledAt: null, damaged: true }).select('card rarity creased ironedAt condition.defects.scratches condition.defects.crease').sort({ createdAt: 1 }).lean(),
+    TcgCard.find({ user: user._id, foiledAt: null, $or: [{ damaged: true }, { lastGrade: { $ne: null } }] }).select('card rarity creased ironedAt lastGrade condition.defects.scratches condition.defects.crease').sort({ createdAt: 1 }).lean(),
   ]);
   // Folierte Exemplare je Karte – im Album und in fremden Sammlungen eigene Plätze: { cardId: [{ id, foiledAt }] }
   const foiledCopies = {};
@@ -30,8 +30,8 @@ async function collection(user) {
       lock: lock && !isStateLock(lock) ? lock : null, // 'handel' | 'quest'
     });
   }
-  // Unfolierte Exemplare mit sichtbarem Schaden (#204) – eigene Plätze, in der Großansicht mit Kratzern und Knick:
-  // { cardId: [{ id, marks, creased, ironed, value, lock }] }
+  // Unfolierte Exemplare mit sichtbarem Schaden (#204) oder früherer Bewertung (lastGrade) – eigene Plätze, in der Großansicht mit Kratzern und Knick:
+  // { cardId: [{ id, marks, creased, ironed, lastGrade, value, lock }] }
   const markedCopies = {};
   for (const d of damagedDocs) {
     const r = catalog.rarityByKey[d.rarity];
@@ -41,6 +41,7 @@ async function collection(user) {
       marks: visibleMarks(d.condition && d.condition.defects, d._id, !!d.ironedAt),
       creased: !!d.creased,
       ironed: !!d.ironedAt,
+      lastGrade: d.lastGrade && d.lastGrade.grade ? { code: d.lastGrade.code, grade: d.lastGrade.grade } : null, // Note des letzten Shops, der Slab ist ab
       value: bankPrice(r ? r.sell : 0, d), // Bankwert: ungebügelter Knick die Hälfte
       lock: lock || null, // 'handel' | 'quest' | 'dungeon' | 'duell'
     });
@@ -81,7 +82,9 @@ async function collection(user) {
     markedCopies,
     graded: gradeStats(foiledDocs.map((d) => d.slab && d.slab.grade)), // beste Note und Schnitt der Slabs
     protectedIds,
-    uniqueOwned: catalog.CARDS.filter((c) => counts[c.id]).length,
+    // Fortschritt in Karten: eine Karte zählt, sobald man sie in irgendeiner Seltenheit besitzt
+    uniqueOwned: catalog.collectionProgress((id) => counts[id]).owned,
+    totalCards: catalog.collectionProgress((id) => counts[id]).total, // geheime Karten zählen mit, sobald man sie besitzt
     cardCount: owned.reduce((s, o) => s + o.n, 0),
     collectionValue: owned.reduce((s, o) => s + (o.v || 0), 0), // mit Wertsteigerung folierter Karten
     dupCount: dups.reduce((s, o) => s + o.n - 1, 0),

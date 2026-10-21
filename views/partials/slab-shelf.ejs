@@ -1,16 +1,24 @@
 <%#
-  Slab-Regal ganz oben im Album: die eigenen Slabs als einzelne Karten, beste Note zuerst (routes/tcg.js, slabCopies).
+  Slab-Regal im Album (Reiter „Slabs“): die eigenen Slabs als einzelne Karten, beste Note zuerst (routes/tcg.js, slabCopies).
   slabCopies = [{ id, card, foiledAt, slab, center, value, lock }], rarityByKey, favoriteIds, highlight
 %>
 <% if (slabCopies.length) { const best = Math.max(...slabCopies.map((s) => s.slab.grade)); %>
-  <section class="album-season album-slabs" id="slabs" data-album-season-section="slabs" aria-labelledby="season-slabs">
+  <section class="album-season album-slabs" id="slabs" data-album-season-section="slabs" aria-labelledby="season-slabs" hidden>
     <div class="album-season-head">
-      <h2 id="season-slabs">Meine Slabs</h2>
+      <h2 id="season-slabs"><%= locals.shelfTitle || 'Meine Slabs' %></h2>
       <span class="tcg-progress-num"><%= slabCopies.length %> <%= slabCopies.length === 1 ? 'Slab' : 'Slabs' %> · beste Note <%= best %></span>
     </div>
+    <%# Nach Note filtern (public/js/tcg.js): Chips je vorhandener Note, höchste zuerst %>
+    <% const grades = [...new Set(slabCopies.map((s) => s.slab.grade))].sort((a, b) => b - a); %>
+    <% if (grades.length > 1) { %>
+      <div class="hb-tabs slab-grades" role="group" aria-label="Nach Note filtern">
+        <button type="button" class="hb-tab active" data-slab-grade="all" aria-pressed="true">Alle Noten</button>
+        <% grades.forEach((g) => { %><button type="button" class="hb-tab" data-slab-grade="<%= g %>" aria-pressed="false">Note <%= g %> <span class="hb-tab-count"><%= slabCopies.filter((s) => s.slab.grade === g).length %></span></button><% }) %>
+      </div>
+    <% } %>
     <div class="tcg-grid tcg-album tcg-slab-shelf">
       <% slabCopies.forEach((s) => { %>
-        <%- include('foil-copy-slot', { c: s.card, r: rarityByKey[s.card.rarity] || { label: s.card.rarity, sell: 0 }, f: s, isAlbum: true, favoriteIds, linkFor: null, highlight: locals.highlight || '', no: (locals.cardNo || {})[s.card.id] || '' }) %>
+        <%- include('foil-copy-slot', { popStatsOf: locals.popStatsOf, c: s.card, r: rarityByKey[s.card.rarity] || { label: s.card.rarity, sell: 0 }, f: s, isAlbum: locals.shelfMode !== 'view', favoriteIds, linkFor: locals.linkFor || null, highlight: locals.highlight || '', no: (locals.cardNo || {})[s.card.id] || '' }) %>
       <% }) %>
     </div>
   </section>

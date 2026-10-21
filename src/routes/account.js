@@ -67,8 +67,8 @@ router.get('/konto', requireLogin, async (req, res) => {
     total: req.user.balance + inPlay + coinValue + cardValue + shopValue,
     stats: statsAgg[0] || { won: 0, lost: 0 },
     cardCount: owned.reduce((n, o) => n + o.n, 0),
-    uniqueOwned: catalog.CARDS.filter((c) => has.has(c.id)).length,
-    totalCards: catalog.CARDS.length,
+    uniqueOwned: catalog.collectionProgress((id) => has.has(id)).owned, // Karten in irgendeiner Seltenheit
+    totalCards: catalog.collectionProgress((id) => has.has(id)).total, // geheime Karten zählen mit, sobald man sie besitzt
   });
 });
 

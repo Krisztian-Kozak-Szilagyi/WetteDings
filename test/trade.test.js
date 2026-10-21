@@ -239,6 +239,8 @@ test('#204: Zustand einer Position – Slab, Folie, Knick; Kratzer verrät der T
   assert.equal(stateLabel({ foiledAt: new Date(), grade: 8 }), 'Slab BfW 8'); // alte Position mit Note = Folie mit Etikett
   assert.equal(stateLabel({ foiledAt: new Date(), slab: null }), 'foliert');
   assert.equal(stateLabel({ damaged: true, creased: true }), 'Knick');
+  assert.equal(stateLabel({ lastGrade: { code: 'PSA', grade: 7 } }), 'zuletzt PSA 7'); // Slab ab, Note des letzten Shops bleibt
+  assert.equal(stateLabel({ damaged: true, creased: true, lastGrade: { code: 'BfW', grade: 4 } }), 'Knick, zuletzt BfW 4');
   assert.equal(stateLabel({ damaged: true, creased: true, ironed: true }), 'Knick, gebügelt');
   assert.equal(stateLabel({ damaged: true }), 'Exemplar');
   assert.equal(stateLabel({}), '');

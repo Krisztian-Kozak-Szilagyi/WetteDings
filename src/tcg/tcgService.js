@@ -234,7 +234,7 @@ const openCrease = (copy) => !!(copy && copy.creased && !copy.ironedAt);
 /** Was die Bank für dieses Exemplar zahlt (Cent): Verkaufswert, mit ungebügeltem Knick die Hälfte (abgerundet) */
 const bankPrice = (sell, copy) => (openCrease(copy) ? Math.floor((sell * CREASE_BANK_PERCENT) / 100) : sell);
 /** Reihenfolge für Bank und Zerkleinern: ungebügelter Knick, sonst beschädigt, dann unbeschädigt – je die ältesten zuerst */
-const bankRank = (c) => (openCrease(c) ? 0 : c.damaged ? 1 : 2);
+const bankRank = (c) => (openCrease(c) ? 0 : c.damaged ? 1 : c.lastGrade ? 3 : 2); // früher bewertete Exemplare zuletzt: sie bleiben übrig
 const bankOrder = (a, b) => bankRank(a) - bankRank(b) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0) || String(a._id).localeCompare(String(b._id));
 const sellOf = (c) => (catalog.rarityByKey[c.rarity] ? catalog.rarityByKey[c.rarity].sell : 0);
 /** Erlös der Bank für diese Exemplare (Cent) */
@@ -259,7 +259,7 @@ function pickDuplicates(list, locked) {
 async function sellCards({ user, cardId, count = 1, keepOne = false }) {
   if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu verkaufen.');
   return inTransaction(async (session) => {
-    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id rarity foiledAt damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
+    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id rarity foiledAt damaged lastGrade creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
     if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
     // Boss-Karten (noBank) kauft die Bank nicht – nur Handel
     if (all.some((c) => (catalog.rarityByKey[c.rarity] || {}).noBank)) throw new UserError('Diese Karte kauft die Bank nicht. Du kannst sie im Handel anbieten.');
@@ -294,7 +294,7 @@ async function sellCards({ user, cardId, count = 1, keepOne = false }) {
  */
 async function allDuplicates(user, session) {
   // folierte Exemplare bleiben immer (die Bank kauft sie nicht)
-  const owned = (await TcgCard.find({ user: user._id, foiledAt: null }).select('_id card rarity damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
+  const owned = (await TcgCard.find({ user: user._id, foiledAt: null }).select('_id card rarity damaged lastGrade creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
   const byCard = new Map();
   for (const c of owned) {
     if (!byCard.has(c.card)) byCard.set(c.card, []);
@@ -352,7 +352,7 @@ async function creditKonfetti({ user, docs, session }) {
 async function shredCards({ user, cardId, keepOne = false }) {
   if (keepOne && (user.tcgProtected || []).includes(cardId)) throw new UserError('Diese Karte ist geschützt. Hebe den Schutz auf, um ihre Duplikate zu zerkleinern.');
   return inTransaction(async (session) => {
-    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id card rarity foiledAt damaged creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
+    const all = (await TcgCard.find({ user: user._id, card: cardId }).select('_id card rarity foiledAt damaged lastGrade creased ironedAt createdAt').session(session).lean()).sort(bankOrder);
     if (!all.length) throw new UserError('Du besitzt diese Karte nicht.');
     const owned = all.filter((c) => !c.foiledAt);
     if (!owned.length) throw new UserError('Folierte Karten lassen sich nicht zerkleinern.');

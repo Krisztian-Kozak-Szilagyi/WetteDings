@@ -1,0 +1,42 @@
+<%#
+  Exemplare einer Karte im Album (statt eigener Kacheln im Raster): Zeilen nach Wertung – Slabs (beste Note zuerst), Sleeves,
+  früher bewertete Exemplare, Exemplare mit Spuren. Der Inhalt bleibt unsichtbar in der Kachel und wandert beim Öffnen der
+  Karte in den Dialog (public/js/tcg.js, „Exemplare“); jede Zeile öffnet die 3D-Ansicht (public/js/foil-view.js).
+  c = Karte, r = Seltenheit, foiled = folierte Exemplare ({ id, foiledAt, slab, center, value, lock }), marked = unfolierte
+  Exemplare mit Spuren oder früherer Bewertung ({ id, marks, creased, ironed, lastGrade, value, lock }), no, favoriteIds, highlight, lockLabelOf
+%>
+<%
+  const isAlbum = locals.isAlbum !== false; // false: Sammlung eines Mitglieds – Angebot machen statt Favorit und Handel
+  const lockText = (reason) => (reason ? lockLabelOf(reason) : '');
+  const rows = [];
+  foiled.filter((f) => f.slab).sort((a, b) => b.slab.grade - a.slab.grade).forEach((f) => rows.push({ kind: 'slab', f }));
+  foiled.filter((f) => !f.slab).forEach((f) => rows.push({ kind: 'sleeve', f }));
+  marked.filter((m) => m.lastGrade).sort((a, b) => b.lastGrade.grade - a.lastGrade.grade).forEach((m) => rows.push({ kind: 'was', m }));
+  marked.filter((m) => !m.lastGrade).forEach((m) => rows.push({ kind: 'marked', m }));
+  const tone = (g) => (g >= 9 ? 'is-gold' : g >= 6 ? 'is-silver' : 'is-bronze');
+%>
+<div hidden data-tcg-copies="<%= c.id %>">
+  <% rows.forEach((row) => {
+       if (row.f) {
+         const f = row.f;
+         const favKey = 'f:' + f.id;
+         const favOn = isAlbum && favoriteIds.has(favKey);
+         const sellOff = f.lock === 'handel' ? 'Steht schon im Handel.' : f.lock ? 'Gerade gesperrt (' + (f.lock === 'quest' ? 'auf Quest' : f.lock === 'duell' ? 'im Duell' : f.lock === 'dungeon' ? 'im Dungeon' : f.lock === 'vitrine' ? 'in deiner Vitrine' : f.lock) + ').' : '';
+         const popSt = f.slab && locals.popStatsOf ? popStatsOf(c.id, f.slab.grade) : null;
+         const isNew = locals.highlight === f.id; %>
+    <button type="button" class="tcg-copy <%= row.kind === 'slab' ? tone(f.slab.grade) : 'is-sleeve' %><%= isNew ? ' is-new' : '' %>"<%- foilViewAttrs(c, r.label, f.foiledAt, isAlbum ? { fav: favKey, favOn, slab: f.slab, id: f.id, center: f.center, no } : { trade: locals.linkFor ? linkFor(favKey) : null, slab: f.slab, id: f.id, center: f.center, no }) %><% if (isAlbum) { %> data-album-foil<% } %><% if (f.slab) { %> data-plaque<% } %><% if (isAlbum && f.lock === 'vitrine') { %> data-in-vitrine<% } %><% if (popSt) { %> data-pop-stats="<%= JSON.stringify(popSt) %>"<% } %><% if (isAlbum) { %> data-sell-text="<%= euro(f.value) %>" data-base-text="<%= euro(r.sell || 0) %>"<% if (sellOff) { %> data-sell-off="<%= sellOff %>"<% } %><% } %> aria-label="<%= f.slab ? 'Slab ' + f.slab.code + ' Note ' + f.slab.grade : 'Karte im Sleeve' %> – genau ansehen">
+      <b class="tcg-copy-badge"><%= f.slab ? f.slab.grade : '–' %></b>
+      <span class="tcg-copy-text"><strong><%= f.slab ? 'Slab ' + f.slab.code + ' · ' + gradeWord(f.slab.grade) : 'Im Sleeve' %></strong><small><%= f.slab ? 'versiegelt ' + dayDate(f.slab.at || f.foiledAt) : 'Note geheim · seit ' + dayDate(f.foiledAt) %><%= isAlbum && f.lock ? ' · ' + lockText(f.lock) : '' %></small></span>
+      <% if (favOn) { %><span class="tcg-copy-fav" title="Favorit">★</span><% } %>
+    </button>
+  <% } else { const m = row.m;
+         const was = m.lastGrade ? 'zuletzt ' + (m.lastGrade.code || 'BfW') + ' · Note ' + m.lastGrade.grade : '';
+         const what = m.creased ? (m.ironed ? 'Knick, gebügelt' : 'Knick') : m.marks && (m.marks.c || (m.marks.s || []).length) ? 'Gebrauchsspuren' : '';
+         const note = ['Exemplar', what, was].filter(Boolean).join(' · ');
+         const opts = isAlbum ? { offer: m.lock === 'handel' ? null : '/handel/neu?gib=f:' + m.id, note: note + (m.lock ? ' · ' + lockText(m.lock) : ''), no } : { trade: locals.linkFor ? linkFor('f:' + m.id) : null, note, no }; %>
+    <button type="button" class="tcg-copy <%= m.lastGrade ? tone(m.lastGrade.grade) : 'is-marked' %>"<%- copyViewAttrs(c, r.label, m.marks, opts) %> aria-label="<%= c.name %>, einzelnes Exemplar<%= was ? ', ' + was : '' %> – genau ansehen">
+      <b class="tcg-copy-badge"><%= m.lastGrade ? m.lastGrade.grade : '·' %></b>
+      <span class="tcg-copy-text"><strong><%= m.lastGrade ? 'Zuletzt ' + (m.lastGrade.code || 'BfW') + ' · ' + gradeWord(m.lastGrade.grade) : 'Exemplar' %></strong><small><%= [what, 'ohne Slab'].filter(Boolean).join(' · ') %><%= m.lock ? ' · ' + lockText(m.lock) : '' %></small></span>
+    </button>
+  <% } }) %>
+</div>

@@ -36,7 +36,8 @@ function wrap(text, maxWidth, size) {
   const maxChars = Math.max(8, Math.floor(maxWidth / (size * CHAR_EM)));
   const lines = [];
   let line = '';
-  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+  // geschützte Leerzeichen ( , z. B. „50 €“) trennen nicht – \s würde sie mitnehmen
+  for (const word of String(text).split(/[ \t\r\n]+/).filter(Boolean)) {
     if (line && (line + ' ' + word).length > maxChars) {
       lines.push(line);
       line = word;
@@ -78,6 +79,17 @@ function statsSvg(frame, values, base) {
       );
     })
     .join('');
+}
+
+// Plakette mit Text statt Zahl (Spell-Karten): „✦ SPELL“
+function badgeSvg(frame) {
+  const p = frame.speed;
+  const c = frame.colors;
+  const cy = p.y + p.h / 2;
+  return (
+    `<rect x="${p.x - 30}" y="${p.y}" width="${p.w + 30}" height="${p.h}" rx="${p.h / 2}" fill="${c.plate}" stroke="${c.plateBorder}" stroke-width="3"/>` +
+    `<text x="${p.x - 30 + (p.w + 30) / 2}" y="${cy + 8}" text-anchor="middle" font-size="22" font-weight="700" letter-spacing="2" fill="${c.value}" stroke-width="3" ${textAttrs(c)}>✦ ${esc(frame.badge)}</text>`
+  );
 }
 
 function speedSvg(frame, value, base) {
@@ -139,8 +151,9 @@ function render(card, values = {}) {
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
-    (frame.name ? nameSvg(frame, card.name) : '') +
-    (frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
+    (frame.name ? nameSvg(frame, card.title || card.name) : '') +
+    // Speed-Plakette nur noch für Rahmen mit eigenen Werten (Helden: Energiekosten) – alle Charaktere sind gleich schnell
+    (frame.badge ? badgeSvg(frame) : frame.speed && frame.values ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'

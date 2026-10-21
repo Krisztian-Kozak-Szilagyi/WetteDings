@@ -13,17 +13,24 @@ const runSchema = new Schema(
     boostDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
     boost2: { type: String, default: null }, // zweiter Boost-Slot (nur Hybrid-Quests)
     boost2Doc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+    dog: { type: String, default: null }, // Hunde-Slot (Yo Dawg: nur Matze mit einem Hund im Boost-Slot)
+    dogDoc: { type: Schema.Types.ObjectId, ref: 'TcgCard', default: null },
+    // Aleks (Gruß aus dem Osten): mitgegebenes Geld, davon verworfen (je Münzwurf), wie oft Kopf – in Cent
+    coins: { type: new Schema({ budget: Number, spent: Number, heads: Number }, { _id: false }), default: undefined },
     abilities: {
-      type: [new Schema({ key: String, label: String, text: String, fx: String, target: String, enemyFx: String }, { _id: false })],
+      // dog = Hund, der mit Matze angreift (Treue Seele) – sein Bild zeigt dann die neuen Werte
+      type: [new Schema({ key: String, label: String, text: String, fx: String, target: String, enemyFx: String, dog: String }, { _id: false })],
       default: [],
     },
     freeze: { type: Number, default: 0 }, // Sekunden Stillstand der Deadline (Bloodlust)
     slow: { type: [[Number]], default: undefined }, // Forkbomb: [von, bis, Prozent] – Deadline läuft langsamer
     extend: { type: Number, default: 0 }, // Forkbomb: dadurch gewonnene Sekunden
+    rush: { type: [Number], default: undefined }, // Ömer: so viel schneller läuft die Deadline [bis zur Halbzeit, danach]
+    end: { type: Number, default: undefined }, // … und zu dieser Spielzeit endet sie
     stats: { speed: Number, fia: Number, fis: Number, bwl: Number },
     day: { type: String, required: true }, // "YYYY-MM-DD" deutsche Zeit (Tageslimit)
     endsAt: { type: Date, required: true },
-    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // st = neue Kartenwerte
+    ticks: { type: [new Schema({ t: Number, p: Number, p2: Number, crit: Boolean, fake: Boolean, ability: Boolean, destroy: Boolean, dg: Number, coin: String, om: Number, st: { type: [Number], default: undefined } }, { _id: false })], default: [] }, // dg = Punkte der Hunde (in p enthalten), coin = Münzwurf von Aleks ('kopf' | 'zahl'), st = neue Kartenwerte
     total: { type: Number, required: true },
     total2: { type: Number, default: null }, // zweiter Fortschrittsbalken (nur Hybrid-Quests)
     success: { type: Boolean, required: true },

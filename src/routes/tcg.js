@@ -6,6 +6,7 @@ const { collection } = require('../tcg/collection');
 const catalog = require('../tcg/catalog');
 const tcg = require('../tcg/tcgService');
 const settings = require('../tcg/settings');
+const { viewData } = require('../tcg/albumView');
 const items = require('../items/itemService');
 const { ITEM_TYPES } = require('../items/types');
 const { itemInventory } = items;
@@ -62,21 +63,15 @@ router.get('/tcg', async (req, res) => {
 
 router.get('/tcg/album', async (req, res) => {
   const coll = await collection(req.user);
-  // Eigene Slabs stehen ganz oben als einzelne Karten (beste Note zuerst, dann seltenste Karte); Karten im Sleeve bleiben
-  // unten im Raster neben ihren ungesleevten Varianten (partials/tcg-grid)
-  const slabCopies = Object.entries(coll.foiledCopies)
-    .flatMap(([cardId, list]) => list.filter((f) => f.slab).map((f) => ({ ...f, card: catalog.cardById[cardId] })))
-    .filter((s) => s.card)
-    .sort((a, b) => b.slab.grade - a.slab.grade || (catalog.rarityByKey[b.card.rarity].rank || 0) - (catalog.rarityByKey[a.card.rarity].rank || 0) || a.card.name.localeCompare(b.card.name, 'de'));
-  // Kartennummer je Season (#01 …) – wie im Raster des Albums gezählt; steht im Panel der Großansicht
-  const cardNo = {};
-  for (const s of catalog.SEASONS) catalog.CARDS.filter((c) => c.season === s.key && c.rarity !== 'test-item').forEach((c, i) => { cardNo[c.id] = String(i + 1).padStart(2, '0'); });
+  // Slab-Regal, Kartennummern und Zertifikatsschild (tcg/albumView) – wie in der Sammlung eines Mitglieds
+  const { slabCopies, cardNo, popStatsOf } = await viewData(coll);
   const neu = str(req.query.neu); // gerade in den Sleeve gesteckt: öffnet sich in 3D (public/js/foil-view.js)
   res.render('tcg-album', {
     title: 'Album',
     ...coll,
     slabCopies,
     cardNo,
+    popStatsOf,
     highlight: Object.values(coll.foiledCopies).some((l) => l.some((f) => f.id === neu)) ? neu : '',
     cards: catalog.CARDS,
     seasons: catalog.SEASONS,
@@ -86,6 +81,7 @@ router.get('/tcg/album', async (req, res) => {
     testCards: req.user.isAdmin ? catalog.TEST_CARDS : [],
     rarities: catalog.visibleRarities(),
     rarityByKey: catalog.rarityByKey,
+    groupKeyOf: catalog.groupKeyOf, // Versionen einer Karte zusammenfassen (eine Kachel je Karte)
     favoriteIds: new Set(req.user.tcgFavorites || []),
     // schon einmal besessene Karten: durchsichtig statt "?"
     seenIds: new Set(req.user.tcgSeen || []),

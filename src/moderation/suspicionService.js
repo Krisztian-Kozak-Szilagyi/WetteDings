@@ -16,6 +16,7 @@ const { Trade } = require('../models/Trade');
 const { DungeonRun } = require('../models/Dungeon');
 const { GradingJob, GradingOrder } = require('../models/Grading');
 const ScriptSignal = require('../models/ScriptSignal');
+const { TcgUpgrade } = require('../models/Upgrade');
 const ActionTrace = require('../models/ActionTrace');
 const { DeviceAlert } = require('../models/Device');
 const achievements = require('../achievements/list');
@@ -43,6 +44,7 @@ const CIRC_WINDOW_MS = 60 * DAY; // Kartenkreislauf: Besitzerwechsel aus so lang
 const AWAKE_WINDOW_MS = 2 * DAY; // rund um die Uhr: die letzten 48 Stunden
 const DUNGEON_WINDOW_MS = 7 * DAY;
 const IHK_WINDOW_MS = 14 * DAY; // IHK und Grading
+const LUCK_WINDOW_MS = 30 * DAY; // Kartenaufwertung: Glück über so lange Zeit
 const KEEP_DONE_DAYS = 30; // erledigte Hinweise werden danach vergessen …
 const KEEP_VERDICT_DAYS = 180; // … mit Urteil (bestätigt/Fehlalarm) erst danach – sie bilden die Trefferquote
 const VERDICTS = ['bestaetigt', 'fehlalarm'];
@@ -109,7 +111,8 @@ async function findAll(now = new Date()) {
   const ihkSince = new Date(now.getTime() - IHK_WINDOW_MS);
   const valueSince = new Date(now.getTime() - VALUE_WINDOW_MS);
   const circSince = new Date(now.getTime() - CIRC_WINDOW_MS);
-  const [buys, opens, sells, coins, bets, runs, dungeons, jobs, signals, traces, income, trades, pairs, duels, earned, stints, events, coinsWeek] = await Promise.all([
+  const luckSince = new Date(now.getTime() - LUCK_WINDOW_MS);
+  const [buys, opens, sells, coins, bets, runs, dungeons, jobs, signals, traces, income, trades, pairs, duels, earned, stints, events, coinsWeek, upgrades] = await Promise.all([
     Ledger.find({ type: 'tcg_pack', amount: { $lt: 0 }, createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
     TcgOpening.find({ createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
     Ledger.find({ type: 'tcg_verkauf', createdAt: { $gt: awakeSince } }).select('user createdAt').lean(),
@@ -136,6 +139,8 @@ async function findAll(now = new Date()) {
     RankStint.find({ to: { $gt: new Date(now.getTime() - FLOW_WINDOW_MS) } }).lean(),
     CoinEvent.find({ at: { $gt: valueSince } }).select('coin at type change').lean(),
     CoinTrade.find({ createdAt: { $gt: valueSince } }).select('user coin side createdAt').lean(),
+    // Kartenaufwertungen: Tempo/Takt und Dauer (48 Std.), Glück (30 Tage)
+    TcgUpgrade.find({ createdAt: { $gt: luckSince } }).select('user createdAt chance kind pLucky').lean(),
   ]);
   const found = [];
   const recent = (docs, field = 'createdAt') => docs.filter((d) => d[field] > since);
@@ -152,7 +157,7 @@ async function findAll(now = new Date()) {
   }
 
   // Tempo und Takt je Aktion
-  const streams = { kaufen: times(recent(buys)), oeffnen: times(recent(opens)), verkaufen: times(recent(sells)), broker: times(recent(coins)), wetten: times(recent(bets)) };
+  const streams = { kaufen: times(recent(buys)), oeffnen: times(recent(opens)), verkaufen: times(recent(sells)), broker: times(recent(coins)), wetten: times(recent(bets)), aufwerten: times(recent(upgrades)) };
   for (const [action, users] of Object.entries(streams)) {
     for (const [user, list] of users) {
       const tempo = logic.tempoFinding(list, action);
@@ -166,6 +171,15 @@ async function findAll(now = new Date()) {
   for (const [user, list] of groupByUser(runs)) {
     const f = logic.ihkFinding(list, config.timezone);
     if (f) found.push({ key: `ihk:${user}`, kind: 'ihk', action: null, users: [user], ...pick(f, ['count', 'reactMs', 'restartMs', 'night']), ...base(f) });
+  }
+
+  // Kartenaufwertung: mehr Glück, als die Chancen hergeben (Erfolge bei offenem Ausgang, Glückstreffer und Jackpots)
+  // ältere Aufwertungen ohne gespeicherte Glückschance: die eingestellte (Glückstreffer + Jackpot)
+  const upSettings = require('../tcg/upgrade').settings;
+  const luckDefault = (upSettings.bonus + upSettings.jackpot) / 10000;
+  for (const [user, list] of groupByUser(upgrades, (u) => ({ ...u, pLucky: Number.isFinite(u.pLucky) ? u.pLucky : luckDefault }))) {
+    const f = logic.upgradeLuckFinding(list);
+    if (f) found.push({ key: `glueck:${user}`, kind: 'glueck', action: null, users: [user], ...pick(f, ['count', 'hitRate', 'expected', 'lucky', 'odds']), ...base(f) });
   }
 
   // Broker-Scalping
@@ -189,7 +203,7 @@ async function findAll(now = new Date()) {
   }
 
   // Rund um die Uhr: alle Aktionen der letzten 48 Stunden zusammen
-  const awake = [buys, opens, sells, coins, bets].flatMap((docs) => docs.map((d) => ({ user: d.user, at: d.createdAt })));
+  const awake = [buys, opens, sells, coins, bets, upgrades].flatMap((docs) => docs.map((d) => ({ user: d.user, at: d.createdAt })));
   for (const r of runs) awake.push({ user: r.user, at: r.createdAt }, { user: r.user, at: r.collectedAt });
   for (const j of jobs) awake.push({ user: j.user, at: j.createdAt }, { user: j.user, at: j.doneAt });
   for (const [user, list] of dungeonByUser) for (const r of list) if (r.joinedAt) awake.push({ user, at: r.joinedAt });
@@ -560,7 +574,7 @@ async function list() {
   const ids = [...new Set(alerts.flatMap((a) => a.users.map(String)))];
   const users = await User.find({ _id: { $in: ids } }).select('username bannedUntil deletedAt').lean();
   const userById = new Map(users.map((u) => [String(u._id), u]));
-  const LOG_OF = { ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', gefaellig: 'grading', gradingnetz: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
+  const LOG_OF = { glueck: 'verkauf', ihk: 'ihk', scalping: 'broker', wert: 'handel', dungeon: 'dungeon', grading: 'grading', gefaellig: 'grading', gradingnetz: 'grading', ertrag: 'konto', kreislauf: 'handel', rang: 'handel', netz: 'handel', markt: 'broker' };
   return alerts
     .map((a) => {
       const list = a.users.map((id) => userById.get(String(id)));

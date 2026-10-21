@@ -21,7 +21,7 @@ const { UserError } = require('../lib/util');
 async function lockedDocs(userId, session) {
   const [foiled, run, trades, party, dungeon, duels, orders, shop] = await Promise.all([
     TcgCard.find({ user: userId, foiledAt: { $ne: null } }).select('_id slab').session(session || null).lean(),
-    IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc').session(session || null).lean(),
+    IhkRun.findOne({ user: userId, status: 'laeuft' }).select('cardDoc boostDoc boost2Doc dogDoc').session(session || null).lean(),
     // abgelaufene Angebote sperren nicht mehr (auch wenn ihr Status noch "offen" ist)
     Trade.find({ ...openFilter(), $or: [{ seller: userId }, { to: userId }], lockDocs: { $exists: true } }).select('seller to give want lockDocs').session(session || null).lean(),
     // Dungeon: angemeldet (bis zum Start) oder gerade im Durchlauf
@@ -35,9 +35,9 @@ async function lockedDocs(userId, session) {
   ]);
   const reasons = new Map();
   foiled.forEach((d) => reasons.set(String(d._id), d.slab ? 'slab' : 'folie'));
-  if (run) [run.cardDoc, run.boostDoc, run.boost2Doc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
+  if (run) [run.cardDoc, run.boostDoc, run.boost2Doc, run.dogDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'quest'));
   [party, dungeon].filter(Boolean).forEach((d) =>
-    d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc, m.coffeeDoc, m.energyDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
+    d.members.filter((m) => m.user && String(m.user) === String(userId)).forEach((m) => [m.cardDoc, m.boostDoc, m.dogDoc, m.coffeeDoc, m.energyDoc].filter(Boolean).forEach((id) => reasons.set(String(id), 'dungeon')))
   );
   trades.forEach((t) => lockedFor(t, userId).forEach((id) => reasons.set(String(id), 'handel')));
   duels.forEach((b) => b.duel.cards.filter((c) => String(c.user) === String(userId)).forEach((c) => reasons.set(String(c.doc), 'duell')));

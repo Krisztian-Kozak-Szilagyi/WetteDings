@@ -187,6 +187,7 @@ div.lt-tile { cursor: default; }
 .lt-log ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .lt-log li { display: flex; gap: 12px; font-size: .9rem; }
 .lt-log li.is-bad { color: #fca5a5; }
+.lt-log li.is-good { color: #fcd34d; }
 .lt-log-time { width: 40px; flex: none; color: var(--color-neutral-600); font-variant-numeric: tabular-nums; }
 
 /* Ergebnis */
