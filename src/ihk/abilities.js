@@ -11,6 +11,8 @@ const SIGRIST = { holo: 5, bockhaber: 10, glitch: 15, icon: 20 };
 // Hermann: so viel stärker wird der Gegner für zwei Runden, bevor er zerstört wird
 const HERMANN = { holo: 45, bockhaber: 40, glitch: 35, icon: 30 };
 const isCoffee = (card) => who(card) === 'casino-kaffee';
+// Mark, the Suntouched (Platzhalter-Werte): time = Anteil der vollen Zeit, refill = Bock in %, plus = auf alle Werte
+const MARK = { time: 0.5, refill: 30, plus: 5 };
 // Hundekarten (Spells): Hugo und Lilly
 const DOGS = new Set(['hugo', 'lilly']);
 const isDog = (card) => DOGS.has(who(card));
@@ -94,6 +96,17 @@ function resolve(main, boost) {
   if (m === 'st-ivan-boss') {
     add({ key: 'forkbomb', label: 'Forkbomb', text: 'Die Deadline läuft 30 % langsamer – jede Runde lässt der Effekt um 2 % nach.', fx: 'fx-glitch', target: 'player', enemyFx: 'fx-frozen', apply: (s) => { s.forkbomb = 30; } });
   }
+  // Mark, the Suntouched: zur Halbzeit bricht die Sonne durch – Quest und Dungeon bekommen 50 % der vollen Zeit
+  // dazu, im Mage Tower füllt er stattdessen den Bock der Gruppe um MARK.refill auf. Danach alle Werte +MARK.plus
+  // (für die ganze Gruppe, siehe TEAM_MAIN_KEYS in dungeonService). s.mode: 'ihk' | 'dungeon' | 'tower'.
+  if (m === 'mark') {
+    add({ key: 'sonnendurchbruch', label: 'Sonnendurchbruch', text: `Die Sonne bricht durch: mehr Zeit (im Mage Tower +${MARK.refill} % Bock), alle Werte +${MARK.plus}.`, fx: 'fx-aura', target: 'player', refill: MARK.refill, apply: (s) => {
+      if (s.mode !== 'tower') s.extraTime += MARK.time * s.duration;
+      s.stats.fia += MARK.plus;
+      s.stats.fis += MARK.plus;
+      s.stats.bwl += MARK.plus;
+    } });
+  }
   return out;
 }
 
@@ -124,4 +137,4 @@ const canBoost = (card) => !!card && !NO_BOOST.has(who(card)) && (!card.isCharac
 /** Braucht diese Boost-Karte eine Kaffee-Karte im Besitz? (Hermann) */
 const needsCoffee = (card) => who(card) === 'hermann';
 
-module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee };
+module.exports = { resolve, resolveAll, who, canBoost, needsCoffee, isCoffee, MARK };

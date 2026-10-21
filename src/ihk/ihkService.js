@@ -85,8 +85,9 @@ async function saveSettings({ open, dailyLimit, durations, rewards, required, pa
 // Forkbomb (St. Ivan, the Forsaken): so viele Prozentpunkte lässt die Verlangsamung pro Runde nach
 const FORKBOMB_STEP = 2;
 
-function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = []) {
-  const s = { speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
+// mode: 'ihk' | 'dungeon' | 'tower' – manche Fähigkeiten wirken je Spielmodus anders (z. B. Mark, the Suntouched)
+function simulate(stats, stat, required, rand = () => crypto.randomInt(1000000) / 1000000, effects = [], mode = 'ihk') {
+  const s = { mode, duration: WORK_TIME, speed: stats.speed, stats: { fia: stats.fia, fis: stats.fis, bwl: stats.bwl }, extraTicks: 0, extraTime: 0, elapsed: 0, fakeNext: false, tempSpeed: null, doom: null, forkbomb: 0 };
   const half = WORK_TIME / 2;
   const interval = () => WORK_TIME / tickCount(s.speed * (s.tempSpeed ? s.tempSpeed.factor : 1));
   const keys = [].concat(stat);

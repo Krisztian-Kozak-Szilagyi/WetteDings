@@ -136,6 +136,18 @@ function playFight(sims, bockIn, values, o) {
     drains.push({ m, t, amount, bock: bock[m] });
   };
   drain(0);
+  // Halbzeit: erst der Treffer des Bosses, dann füllen Fähigkeiten (Mark, the Suntouched) den Bock der ganzen Gruppe
+  // auf – nur, wenn die Karte, die sie bringt, dann noch Bock hat. Steht in drains mit refill: true.
+  const halftime = () => {
+    drain(W / 2);
+    for (const r of o.refills || []) {
+      if (bock[r.from] <= 0) continue;
+      bock.forEach((b, m) => {
+        bock[m] = Math.min(100, Math.round((b + r.pct) * 10) / 10);
+        drains.push({ m, t: W / 2, amount: r.pct, bock: bock[m], refill: true });
+      });
+    }
+  };
   let half = false;
   let total = 0;
   let doneAt = null;
@@ -143,7 +155,7 @@ function playFight(sims, bockIn, values, o) {
   for (const e of events) {
     if (e.t > limit + 1e-9) break;
     if (!half && e.t > W / 2) {
-      drain(W / 2);
+      halftime();
       half = true;
     }
     if (bock[e.m] <= 0) continue;
@@ -157,7 +169,7 @@ function playFight(sims, bockIn, values, o) {
       break;
     }
   }
-  if (!half && doneAt === null) drain(W / 2); // Kampf ohne Takte nach der Halbzeit: der Treffer kommt trotzdem
+  if (!half && doneAt === null) halftime(); // Kampf ohne Takte nach der Halbzeit: der Treffer kommt trotzdem
   const success = total >= o.required;
   const seconds = Math.max(1, Math.round(toReal(success ? doneAt : limit) * 10) / 10);
   return { ticks, drains, total: Math.min(total, o.required), success, doneAt, limit, seconds, bock };

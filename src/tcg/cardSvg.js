@@ -151,7 +151,8 @@ function render(card, values = {}) {
     `<title>${esc(card.name)}</title>` +
     `<image width="${w}" height="${h}" xlink:href="${artData(card.artFile)}"/>` +
     (frame.name ? nameSvg(frame, card.title || card.name) : '') +
-    (frame.badge ? badgeSvg(frame) : frame.speed ? speedSvg(frame, v.speed, base.speed) : '') +
+    // Speed-Plakette nur noch für Rahmen mit eigenen Werten (Helden: Energiekosten) – alle Charaktere sind gleich schnell
+    (frame.badge ? badgeSvg(frame) : frame.speed && frame.values ? speedSvg(frame, v.speed, base.speed) : '') +
     statsSvg(frame, v, base) +
     abilitySvg(frame, card.ability, card.abilityName) +
     '</svg>'

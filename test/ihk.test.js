@@ -19,7 +19,7 @@ const { QUESTS, DIFFICULTIES } = require('../src/ihk/quests');
 
 test('Alle Karten haben Werte; Items sind keine Charaktere', () => {
   for (const c of catalog.CARDS) assert.ok(c.stats, `${c.id} ohne Werte`);
-  assert.deepEqual(catalog.cardById['krisz-1-crumpled'].stats, { speed: 36, fia: 39, fis: 21, bwl: 12 });
+  assert.deepEqual(catalog.cardById['krisz-1-crumpled'].stats, { speed: catalog.SPEED, fia: 39, fis: 21, bwl: 12 }); // alle gleich schnell
   assert.equal(catalog.cardById['krisz-1-crumpled'].isCharacter, true);
   for (const id of ['bfw-energy-gold', 'casino-kaffee-3-gold', 'grafikkarte-amd-gold']) assert.equal(catalog.cardById[id].isCharacter, false);
 });
@@ -72,7 +72,7 @@ test('Fähigkeiten wirken erst ab der Halbzeit', () => {
   const luca = catalog.cardById['luca-3-gold'];
   const plain = simulate(luca.stats, 'bwl', 1e9, avg);
   const boosted = simulate(luca.stats, 'bwl', 1e9, avg, resolve(luca, null)); // BWL +50 %
-  const firstHalf = (r) => r.ticks.filter((t) => !t.ability && t.t <= WORK_TIME / 2).map((t) => t.p);
+  const firstHalf = (r) => r.ticks.filter((t) => !t.ability && t.t < WORK_TIME / 2).map((t) => t.p);
   assert.deepEqual(firstHalf(boosted), firstHalf(plain)); // vor der Halbzeit identisch
   assert.ok(boosted.total > plain.total * 1.15);
   assert.ok(boosted.ticks.some((t) => t.ability));
@@ -87,7 +87,8 @@ test('Spell-Karten: Mauch und Sigrist wirken aus dem Boost-Slot, Stärke je Selt
   const avg = () => 0.5;
   const luca = catalog.cardById['luca-3-gold'];
   const run = (boostId) => simulate(luca.stats, 'bwl', 1e9, avg, resolve(luca, catalog.cardById[boostId]));
-  const points = (r) => r.ticks.filter((t) => !t.ability && t.t > WORK_TIME / 2).map((t) => t.p);
+  // Punkte nach dem Aktivieren der Fähigkeit (ein Takt kann genau auf die Halbzeit fallen)
+  const points = (r) => r.ticks.slice(r.ticks.findIndex((t) => t.ability) + 1).map((t) => t.p);
   assert.ok(!resolve(luca, catalog.cardById['oliver-the-sigrist-sith']).some((a) => a.key !== 'simulation'));
 
   // Hermann: zwei schwächere Runden (Aufgabe +30 % bzw. +45 %), dann ist die Aufgabe zerstört
@@ -131,7 +132,7 @@ test('Werte im Dateinamen', () => {
   fs.writeFileSync(path.join(dir, 'anna-3-gold_36-39-21-12.png'), '');
   const [card] = catalog.loadCards(dir);
   assert.equal(card.id, 'anna-3-gold');
-  assert.deepEqual(card.stats, { speed: 36, fia: 39, fis: 21, bwl: 12 });
+  assert.deepEqual(card.stats, { speed: catalog.SPEED, fia: 39, fis: 21, bwl: 12 }); // Speed im Namen zählt nicht mehr
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -236,8 +236,8 @@ function botBoost(rand = random, weights = settings.botWeights, banned = new Set
 // (alle freundlichen Charaktere), Mauch (schickt die Gruppe zum Gruschteln) und Matzes Hundekarte-Bonus, sobald
 // irgendwer einen Hund mitbringt. Bloodlust und Reality Check treffen den Gegner – also die Deadline aller.
 // Fähigkeiten von Hauptkarten, die für die ganze Gruppe wirken
-const TEAM_MAIN_KEYS = new Set(['forkbomb']);
-const TEAM_KEYS = new Set(['forkbomb', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
+const TEAM_MAIN_KEYS = new Set(['forkbomb', 'sonnendurchbruch']);
+const TEAM_KEYS = new Set(['forkbomb', 'sonnendurchbruch', 'osmanen', 'hund', 'gruschteln', 'hundekarte', 'bloodlust', 'reality-check']);
 
 /** Fähigkeiten eines Spielers: eigene Karte + eigener Boost, dazu die Gruppen-Fähigkeiten der Boosts der anderen */
 function teamEffects(members, m) {
@@ -262,13 +262,13 @@ function teamEffects(members, m) {
  * abilities [{ m, from, team, label, text }] (from = wessen Karte die Fähigkeit bringt).
  * fightSeconds: volle Zeit in der Wiedergabe (Turm: kürzer).
  */
-function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECONDS) {
+function fight(members, stat, required, rand = random, fightSeconds = FIGHT_SECONDS, mode = 'dungeon') {
   const events = [];
   const abilities = [];
   let limit = WORK_TIME;
   members.forEach((mem, m) => {
     const effects = teamEffects(members, m);
-    const r = simulate(mem.card.stats, stat, required, rand, effects);
+    const r = simulate(mem.card.stats, stat, required, rand, effects, mode);
     if (effects.length && r.ticks.some((x) => x.ability)) effects.forEach((e) => abilities.push({ m, from: e.from, team: TEAM_KEYS.has(e.key), label: e.label, text: e.text }));
     limit = Math.max(limit, WORK_TIME + r.freeze + (r.extend || 0));
     r.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, ...(x.crit ? { crit: true } : {}), ...(x.ability ? { ability: true } : {}), ...(x.destroy ? { destroy: true } : {}), ...(x.st ? { st: x.st } : {}) }));
@@ -345,7 +345,7 @@ function playTower(members, rand = random, opts = settings.tower, maxRounds = MA
     const floor = towerFloor(prev, rand);
     prev = floor.key;
     const required = towerRequired(n, opts);
-    const r = fight(members, floor.stat, required, rand, opts.fightSeconds);
+    const r = fight(members, floor.stat, required, rand, opts.fightSeconds, 'tower');
     fights.push({ key: floor.key, boss: false, required, reward: towerReward(n, opts), ...r });
     if (!r.success) break;
   }

@@ -89,7 +89,7 @@ const runSchema = new Schema(
             // Live-Turm: Boss-Eigenschaft, gesuchter Wert, Bock-Treffer und Kampfbeginn (ms)
             trait: { type: String, default: undefined },
             stat: { type: String, default: undefined },
-            drains: { type: [new Schema({ m: Number, t: Number, amount: Number, bock: Number }, { _id: false })], default: undefined },
+            drains: { type: [new Schema({ m: Number, t: Number, amount: Number, bock: Number, refill: Boolean }, { _id: false })], default: undefined },
             startAt: { type: Number, default: undefined },
             bockBefore: { type: [Number], default: undefined },
           },

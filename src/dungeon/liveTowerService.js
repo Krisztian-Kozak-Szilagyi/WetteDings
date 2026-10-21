@@ -68,14 +68,18 @@ function startFight(run, t0) {
   const required = L.effectiveRequired(d.towerRequired(n, live.opts), floor.trait);
   const applied = L.applyChoices(live.chosen, live.energy, live.boostUntil, t0);
   const cards = d.teamCards(run.members);
+  // Bock-Auffüller zur Halbzeit (Mark, the Suntouched): wer ihn bringt (from) und wie viel – je Karte nur einmal
+  const refills = [];
   const sims = run.members.map((m, i) => {
     const card = cards[i].card;
-    const r = simulate(card.stats, floor.stat, required, random, d.teamEffects(cards, i));
+    const effects = d.teamEffects(cards, i);
+    for (const e of effects) if (e.refill && !refills.some((x) => x.from === e.from)) refills.push({ from: e.from, pct: e.refill });
+    const r = simulate(card.stats, floor.stat, required, random, effects, 'tower');
     return { ticks: r.ticks, freeze: r.freeze || 0, extend: r.extend || 0, speed: card.stats.speed };
   });
   const values = cards.map((c) => c.card.stats[floor.stat] || 0);
   const boostUntil = applied.boostUntil.map((ms) => Math.max(0, (ms - t0) / 1000));
-  const r = L.playFight(sims, live.bock, values, { required, trait: floor.trait, boostUntil, ext: applied.ext, rand: random, workTime: WORK_TIME, fightSeconds: live.opts.fightSeconds });
+  const r = L.playFight(sims, live.bock, values, { required, trait: floor.trait, boostUntil, ext: applied.ext, rand: random, workTime: WORK_TIME, fightSeconds: live.opts.fightSeconds, refills });
   run.fights.push({
     key: floor.key,
     boss: false,

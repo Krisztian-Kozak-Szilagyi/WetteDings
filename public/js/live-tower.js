@@ -133,7 +133,7 @@
     const f = state.fight;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const bock = f && state.phase === 'kampf' ? bockAt(f, sec) : state.players.map((p) => p.bock);
-    const hitNow = new Set(f && state.phase === 'kampf' ? (f.drains || []).filter((d) => toReal(f, d.t) <= sec && sec - toReal(f, d.t) < 3).map((d) => d.m) : []);
+    const hitNow = new Set(f && state.phase === 'kampf' ? (f.drains || []).filter((d) => !d.refill && toReal(f, d.t) <= sec && sec - toReal(f, d.t) < 3).map((d) => d.m) : []);
     state.players.forEach((p, i) => {
       const card = el('article', `lt-player${p.me ? ' is-me' : ''}${hitNow.has(i) ? ' is-hit' : ''}`);
       const top = el('div', 'lt-player-top');
@@ -155,7 +155,7 @@
         for (const t of f.ticks) if (t.m === i && toReal(f, t.t) <= sec + 1e-6) mine += t.p;
         info.appendChild(el('span', 'muted small', `${STAT[f.stat]} ${p.card.stats[f.stat]} · Beitrag ${fmt(mine)}`));
       }
-      if (hitNow.has(i)) info.appendChild(el('span', 'lt-hit', `−${pctText(f.drains.find((d) => d.m === i).amount)} Bock`));
+      if (hitNow.has(i)) info.appendChild(el('span', 'lt-hit', `−${pctText(f.drains.find((d) => d.m === i && !d.refill).amount)} Bock`));
       const boost = el('div', 'lt-boostcard');
       const mini = el('span', `lt-mini r-${p.boost ? p.boost.rarity : 'none'}`);
       if (p.boost) {
@@ -201,7 +201,9 @@
     if (!f) return;
     const sec = state.phase === 'kampf' ? fightElapsed() : Infinity;
     const items = [];
-    (f.drains || []).forEach((d) => items.push({ t: toReal(f, d.t), text: `${d.t > 0 ? 'Halbzeit' : 'Kampfbeginn'} – ${state.players[d.m].name} verliert ${pctText(d.amount)} Bock`, cls: 'is-bad' }));
+    (f.drains || []).forEach((d) => items.push(d.refill
+      ? { t: toReal(f, d.t), text: `Sonnendurchbruch – ${state.players[d.m].name} bekommt ${pctText(d.amount)} Bock`, cls: 'is-good' }
+      : { t: toReal(f, d.t), text: `${d.t > 0 ? 'Halbzeit' : 'Kampfbeginn'} – ${state.players[d.m].name} verliert ${pctText(d.amount)} Bock`, cls: 'is-bad' }));
     f.ticks.filter((t) => t.crit).forEach((t) => items.push({ t: toReal(f, t.t), text: `Krit! ${state.players[t.m].card ? state.players[t.m].card.name : ''} +${fmt(t.p)}`, cls: '' }));
     const list = $('log');
     list.textContent = '';

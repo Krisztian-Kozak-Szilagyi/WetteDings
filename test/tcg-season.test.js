@@ -29,7 +29,7 @@ test('St. Ivan (Boss): Season 1, Rahmen-Karte mit Werten aus cardData.js', () =>
   assert.equal(c.season, 'season-1');
   assert.equal(c.name, 'St. Ivan, the Forsaken');
   assert.equal(c.frame, 'gilded');
-  assert.deepEqual(c.stats, { speed: 96, fia: 95, fis: 99, bwl: 90 });
+  assert.deepEqual(c.stats, { speed: catalog.SPEED, fia: 95, fis: 99, bwl: 90 });
   assert.ok(c.isCharacter, 'kann auf Quests und in den Dungeon');
   assert.match(c.image, /^\/img\/tcg\/karte\/st-ivan-boss\.svg\?v=[0-9a-f]{10}$/);
   assert.ok(catalog.cardsBySeason['season-1'].includes(c));
@@ -69,7 +69,8 @@ test('SVG: Werte im Rahmen, Boost farbig, Text maskiert', () => {
   const c = boss();
   const base = cardSvg.render(c);
   assert.ok(base.startsWith('<svg') && base.includes('data:image/webp;base64,'));
-  for (const v of ['>96<', '>95<', '>99<', '>90<', '>FIA<', '>FIS<', '>BWL<']) assert.ok(base.includes(v), v);
+  assert.ok(!base.includes('>40<'), 'kein Speed mehr auf der Karte');
+  for (const v of ['>95<', '>99<', '>90<', '>FIA<', '>FIS<', '>BWL<']) assert.ok(base.includes(v), v);
   const { colors } = FRAMES.gilded;
   assert.ok(!base.includes(colors.up) && !base.includes(colors.down));
   const boosted = cardSvg.render(c, { fia: 110, bwl: 80 });
@@ -108,27 +109,27 @@ test('Kampf-Takte tragen geänderte Kartenwerte (st): Buff zur Halbzeit, Debuff,
   const changes = energy.ticks.filter((t) => t.st);
   assert.equal(changes.length, 1);
   assert.ok(changes[0].ability);
-  assert.deepEqual(changes[0].st, [96, 105, 109, 99]);
+  assert.deepEqual(changes[0].st, [catalog.SPEED, 105, 109, 99]);
   // Mauch: erst langsamer (Debuff), nach 2 Runden alle Werte höher
   const mauch = Object.values(catalog.cardById).find((x) => x.id.startsWith('mauch-') && x.rarity === 'holo');
   const m = simulate(c.stats, 'bwl', 1e9, avg, resolve(c, mauch)).ticks.filter((t) => t.st).map((t) => t.st);
   assert.equal(m.length, 2);
-  assert.ok(m[0][0] < 96, 'Speed sinkt');
-  assert.ok(m[1][0] > 96 && m[1][3] > 90, 'danach alles höher');
+  assert.ok(m[0][0] < catalog.SPEED, 'Speed sinkt');
+  assert.ok(m[1][0] > catalog.SPEED && m[1][3] > 90, 'danach alles höher');
 });
 
 test('Bilder je Werte-Wechsel: nur Rahmen-Karten, Schlüssel "Speed,FIA,FIS,BWL"', () => {
-  const ticks = [{ t: 1 }, { t: 2, st: [96, 105, 109, 99] }];
+  const ticks = [{ t: 1 }, { t: 2, st: [catalog.SPEED, 105, 109, 99] }];
   const imgs = catalog.statImages(boss(), ticks);
-  assert.deepEqual(Object.keys(imgs), ['96,105,109,99']);
-  assert.match(imgs['96,105,109,99'], /\?fia=105&fis=109&bwl=99&v=/);
+  assert.deepEqual(Object.keys(imgs), [`${catalog.SPEED},105,109,99`]);
+  assert.match(imgs[`${catalog.SPEED},105,109,99`], /\?fia=105&fis=109&bwl=99&v=/);
   assert.deepEqual(catalog.statImages(catalog.cardById['adrian-1-crumpled'], ticks), {});
 });
 
 test('SVG: geänderte Werte bekommen ein Dreieck (▲ Buff / ▼ Debuff)', () => {
   const { colors } = FRAMES.gilded;
   assert.ok(!cardSvg.render(boss()).includes('<path d="M'));
-  const s = cardSvg.render(boss(), { bwl: 99, speed: 50 });
+  const s = cardSvg.render(boss(), { bwl: 99, fia: 80 });
   assert.equal((s.match(/<path d="M/g) || []).length, 2);
   assert.ok(s.includes(`fill="${colors.up}" stroke="${colors.outline}"`) && s.includes(`fill="${colors.down}" stroke="${colors.outline}"`));
 });

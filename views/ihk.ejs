@@ -206,7 +206,7 @@
           <img src="<%= c.image %>" alt="<%= label %>" width="720" height="1008" loading="lazy">
           <% if (blocked) { %><span class="dg-ban-tag"><%= l.label %></span><% } else if (l) { %><span class="dg-lock-tag"><%= l.n %>× <%= l.label %></span><% } %>
           <% if (foiled[c.id]) { %><span class="pick-foil-tag" title="Exemplar im TCG Sleeve – geschützt vor Schaden">🛡 im Sleeve</span><% } %>
-          <% if (c.isCharacter) { %><span class="ihk-pick-stats"><span title="Speed">⚡<%= c.stats.speed %></span><span>FIA <%= c.stats.fia %></span><span>FIS <%= c.stats.fis %></span><span>BWL <%= c.stats.bwl %></span></span><% } %>
+          <% if (c.isCharacter) { %><span class="ihk-pick-stats"><span>FIA <%= c.stats.fia %></span><span>FIS <%= c.stats.fis %></span><span>BWL <%= c.stats.bwl %></span></span><% } %>
           <button type="button" class="dg-zoom-btn" data-ihk-zoom-btn data-zoom="<%= c.image %>" data-zoom-title="<%= label %>" aria-label="<%= c.name %> ansehen"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
         </label>
       <% }) %>

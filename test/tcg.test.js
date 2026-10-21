@@ -52,7 +52,7 @@ test('Karten werden aus den Dateinamen gelesen', () => {
   assert.equal(catalog.prettyName('casino-kaffee'), 'Casino-Kaffee');
   assert.equal(catalog.cardById['lili-6-glitch'].name, 'Lili');
   assert.equal(catalog.cardById['casino-kaffee-3-gold'].rarity, 'gold');
-  assert.equal(catalog.CARDS.length, 91); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
+  assert.equal(catalog.CARDS.length, 97); // ohne die 23 Test-Karten (Bosskampf: 6 Items, 17 Helden) – die sehen nur Admins
   assert.equal(catalog.TEST_CARDS.length, 23);
   assert.equal(catalog.cardsByRarity['test-item'].length, 0);
   assert.ok(catalog.cardById[catalog.TEST_CARDS[0].id]); // vergebene Exemplare funktionieren weiter
@@ -232,7 +232,8 @@ test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je
     assert.equal(c.abilityName, abilityName);
     assert.equal(c.title, title);
     assert.equal(c.frame, `rar-${c.rarity}`);
-    assert.deepEqual([c.stats.speed, c.stats.fia, c.stats.fis, c.stats.bwl], STATS[id], 'Werte unverändert');
+    assert.deepEqual([c.stats.fia, c.stats.fis, c.stats.bwl], STATS[id].slice(1), 'Werte unverändert');
+    assert.equal(c.stats.speed, catalog.SPEED, 'alle Charaktere gleich schnell');
     assert.ok(c.isCharacter);
     assert.ok(c.image.startsWith(`/img/tcg/karte/${slug}-`), c.image);
     const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');

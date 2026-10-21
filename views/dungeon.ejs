@@ -1,6 +1,6 @@
 <%- include('partials/head') %>
 <%
-  const statLine = (c) => c && c.stats ? `⚡${c.stats.speed} · FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
+  const statLine = (c) => c && c.stats ? `FIA ${c.stats.fia} · FIS ${c.stats.fis} · BWL ${c.stats.bwl}` : '';
   const canLeave = (phase === 'solo' || phase === 'gruppe') && !lockedIn;
   // Lobby: eigene Karten per Klick auf den eigenen Platz wählen (#111) – bis kurz vor dem Start
   const canPick = (phase === 'solo' || phase === 'gruppe') && !lockedIn && !!cards;

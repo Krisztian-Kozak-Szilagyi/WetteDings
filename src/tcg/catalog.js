@@ -8,6 +8,8 @@ const { SEASONS, DEFAULT_SEASON, seasonByKey } = require('./seasons');
 
 const IMAGE_DIR = path.join(__dirname, '..', '..', 'public', 'img', 'tcg');
 const IMAGE_URL = '/img/tcg';
+// Tempo aller Charaktere (Quests, Dungeon, Mage Tower): 40 = 14 Arbeitstakte, etwa der alte Durchschnitt aller Karten
+const SPEED = 40;
 /** Bild-URL mit Änderungszeit als Version – ausgetauschte Bilder umgehen so den Browser-Cache */
 function imageUrl(file) {
   let v = '';
@@ -132,6 +134,9 @@ function loadCards(dir = IMAGE_DIR) {
         // Charakter = hat FIA/FIS/BWL-Werte (Items wie Kaffee oder Grafikkarte haben 0)
         isCharacter: !!stats && stats.speed > 0 && stats.fia + stats.fis + stats.bwl > 0,
       };
+      // Einheitliches Tempo: jeder Charakter arbeitet gleich schnell (der Speed im Bild oder in stats.js zählt nicht
+      // mehr). Effekte wie Nachtschicht oder Casino-Kaffee ändern das Tempo weiterhin ausgehend von SPEED.
+      if (card.isCharacter) stats.speed = SPEED;
       // Kampfwerte (eigener Block, nur neue Karten) für den kommenden Kampfmodus
       if (data && data.kampf) card.kampf = data.kampf;
       // unreleased = Karte liegt schon bereit, ist aber für niemanden erhältlich (fehlt in CARDS, siehe unten)
@@ -254,6 +259,7 @@ const expectedPackValue = () => expectedCardValue() * CARDS_PER_PACK;
 const chance = (key) => rarityByKey[key].weight / TOTAL_WEIGHT;
 
 module.exports = {
+  SPEED,
   groupKeyOf,
   cardGroups,
   collectionProgress,
