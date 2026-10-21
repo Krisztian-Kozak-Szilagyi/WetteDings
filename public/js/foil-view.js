@@ -18,6 +18,8 @@
   var noteEl = modal.querySelector('[data-foil-note]');
   var favForm = modal.querySelector('[data-foil-fav]'); // nur mit favForm (Album, Dashboard)
   var sellLink = modal.querySelector('[data-foil-sell]'); // nur im Album: „Im Handel anbieten“
+  var vitrineLink = modal.querySelector('[data-foil-vitrine]'); // nur im Album: Slab steht in der Vitrine
+  var vitrineOut = modal.querySelector('[data-foil-vitrine-out]');
   var unwrapForm = modal.querySelector('[data-foil-unwrap]'); // nur im Album: Sleeve abziehen / Slab aufbrechen
   var tradeLink = modal.querySelector('[data-foil-trade]'); // nur in fremden Sammlungen: „Angebot machen“
   var certBtn = modal.querySelector('[data-foil-cert]'); // Zertifikat eines Slabs
@@ -145,11 +147,13 @@
       prev.addEventListener('click', function () { step(-1); });
       next.addEventListener('click', function () { step(1); });
       plaque = el('div', 'foil-plaque');
-      stage.insertAdjacentElement('afterend', plaque); // direkt unter der Karte, vor „Zertifikat ansehen“
     }
+    // Showroom: direkt unter der Karte; im normalen Dialog (Album, data-plaque) im Panel unter dem Status
+    if (group) stage.insertAdjacentElement('afterend', plaque);
+    else statusEl.insertAdjacentElement('afterend', plaque);
     nav.hidden = !gallery || gallery.list.length < 2;
-    plaque.hidden = !group;
-    if (group) fillPlaque(d);
+    plaque.hidden = !group && !('plaque' in d);
+    if (!plaque.hidden) fillPlaque(d);
   }
 
   /**
@@ -234,7 +238,7 @@
     }
     // Sleeve abziehen / Slab aufbrechen: nur für das eigene Exemplar im Album (fav = "f:<Exemplar>")
     if (unwrapForm) {
-      var mine = album && !copy && d.fav && d.fav.indexOf('f:') === 0;
+      var mine = album && !copy && d.fav && d.fav.indexOf('f:') === 0 && !('inVitrine' in d); // in der Vitrine: erst herausnehmen
       unwrapForm.hidden = !mine;
       if (mine) {
         unwrapForm.querySelector('input[name="copy"]').value = d.fav.slice(2);
@@ -243,6 +247,13 @@
           ? 'Slab von ' + d.name + ' aufbrechen? Kürzel ' + d.slabCode + ', Note ' + d.grade + (d.slabCode === 'BfW' ? ' und die Wertsteigerung' : '') + ' sind danach weg, das Gehäuse ist zerstört – die Note ist wieder geheim. Du kannst die Karte neu graden lassen.'
           : 'TCG Sleeve von ' + d.name + ' abziehen? Der Sleeve kommt zurück ins Inventar. Die Karte ist danach wieder ungeschützt.');
       }
+    }
+    // Slab in der Vitrine (Album): dort ansehen oder herausnehmen
+    var inVit = album && 'inVitrine' in d && d.fav && d.fav.indexOf('f:') === 0;
+    if (vitrineLink) vitrineLink.hidden = !inVit;
+    if (vitrineOut) {
+      vitrineOut.hidden = !inVit;
+      if (inVit) vitrineOut.querySelector('input[name="doc"]').value = d.fav.slice(2);
     }
     // Vitrine am Schreibtisch: tauschen / entfernen (nur für Slabs mit data-vit-id)
     vitBtns.forEach(function (b) { b.hidden = !d.vitId; });

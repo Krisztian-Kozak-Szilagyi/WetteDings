@@ -23,6 +23,13 @@
             <button class="btn btn-ghost btn-block" type="submit">☆ Als Favorit zeigen</button>
           </form>
           <a class="btn btn-primary btn-block" href="/handel" data-foil-sell hidden>Im Handel anbieten</a>
+          <%# Slab steht in der Vitrine: dort ansehen oder wieder herausnehmen (Album) %>
+          <a class="btn btn-primary btn-block" href="/grading?reiter=vitrine" data-foil-vitrine hidden>In der Vitrine ansehen</a>
+          <form method="post" action="/grading/vitrine/entfernen" data-foil-vitrine-out hidden>
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="doc" value="">
+            <button class="btn btn-ghost btn-block" type="submit">Aus der Vitrine nehmen</button>
+          </form>
           <%# Sleeve abziehen (kommt zurück ins Inventar) bzw. Slab aufbrechen – Text und Rückfrage setzt foil-view.js %>
           <form method="post" action="/tcg/huelle-abziehen" data-foil-unwrap hidden>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">

@@ -19,10 +19,11 @@
         <%# Mit Slab das starre Gehäuse mit Etikett (Kürzel, Note), sonst die Schutzhülle – wie in der Kartenauswahl %>
         <span class="foil-card foil-card-slot"><%- include('foil-mini', { card: c, rarityLabel: r.label, slab: l.slab || (l.grade ? { code: 'BfW', grade: l.grade } : null), id: l.doc || l.copy }) %></span>
       </button>
-    <% } else if (l.damaged && l.marks) { const what = stateLabel(l); %>
-      <button type="button" class="tstack-card r-<%= c.rarity %> is-marked" style="--i: <%= i %>"<%- copyViewAttrs(c, r.label, l.marks, { note: 'Exemplar · ' + (what === 'Exemplar' ? 'Gebrauchsspuren' : what) }) %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar – genau ansehen">
+    <% } else if ((l.damaged || (l.lastGrade && l.lastGrade.grade)) && !l.slab) { const what = stateLabel(l); %>
+      <button type="button" class="tstack-card r-<%= c.rarity %> is-marked" style="--i: <%= i %>"<%- copyViewAttrs(c, r.label, l.marks || {}, { note: 'Exemplar · ' + (what === 'Exemplar' ? 'Gebrauchsspuren' : what.replace('zuletzt', 'zuletzt Note')) }) %> aria-label="<%= c.name %>, <%= r.label %>, einzelnes Exemplar – genau ansehen">
         <img src="<%= c.image %>" alt="" loading="lazy" width="720" height="1008">
         <% if (l.creased) { %><span class="tcg-crease-tag"><%= l.ironed ? 'Gebügelt' : 'Knick' %></span><% } %>
+        <% if (l.lastGrade && l.lastGrade.grade) { %><span class="tcg-grade-tag"><%= l.lastGrade.code || 'BfW' %> <b><%= l.lastGrade.grade %></b></span><% } %>
       </button>
     <% } else { %>
       <button type="button" class="tstack-card r-<%= c.rarity %>" style="--i: <%= i %>" data-zoom-card
