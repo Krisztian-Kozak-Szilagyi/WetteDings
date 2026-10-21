@@ -14,6 +14,7 @@ const upgradeSchema = new Schema(
     kind: { type: String, enum: ['erfolg', 'fehlschlag', 'bonus', 'jackpot'], default: undefined },
     value: { type: Number, default: undefined }, // Bankwert des Einsatzes (Cent)
     payout: { type: Number, default: undefined }, // Wertausgleich in Spielgeld (Cent)
+    pLucky: { type: Number, default: undefined }, // Chance auf Glückstreffer oder Jackpot in diesem Vertrag (Manipulationserkennung)
     inputs: { type: [new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String }, { _id: false })], default: [] },
     result: { type: new Schema({ doc: Schema.Types.ObjectId, card: String, rarity: String, missing: Boolean }, { _id: false }), required: true }, // missing: fehlte im Album
   },

@@ -197,7 +197,7 @@ async function upgrade({ user, docIds, rand = secureRand }) {
     const upgradeId = new mongoose.Types.ObjectId();
     const [copy] = await TcgCard.create([{ user: user._id, card: card.id, rarity: card.rarity, upgrade: upgradeId }], { session });
     await TcgUpgrade.create(
-      [{ _id: upgradeId, user: user._id, username: user.username, rarity: v.top, target: v.target, chance: v.chance, success, kind: roll.kind, value: v.value, payout: Regeln.ausgleich(v, catalog.rarityByKey[card.rarity].sell), inputs: docs.map((d) => ({ doc: d._id, card: d.card, rarity: d.rarity })), result: { doc: copy._id, card: card.id, rarity: card.rarity, missing } }],
+      [{ _id: upgradeId, user: user._id, username: user.username, rarity: v.top, target: v.target, chance: v.chance, success, kind: roll.kind, pLucky: v.pBonus + v.pJackpot, value: v.value, payout: Regeln.ausgleich(v, catalog.rarityByKey[card.rarity].sell), inputs: docs.map((d) => ({ doc: d._id, card: d.card, rarity: d.rarity })), result: { doc: copy._id, card: card.id, rarity: card.rarity, missing } }],
       { session }
     );
     const byCard = new Map();
