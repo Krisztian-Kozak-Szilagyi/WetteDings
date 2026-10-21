@@ -25,9 +25,20 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  function safeImageUrl(url) {
+    if (typeof url !== 'string') return '';
+    var s = url.trim();
+    if (!s) return '';
+    if (s[0] === '/') return s; // same-origin relative path
+    try {
+      var u = new URL(s, window.location.origin);
+      if ((u.protocol === 'http:' || u.protocol === 'https:') && u.origin === window.location.origin) return u.href;
+    } catch (_) {}
+    return '';
+  }
   function img(card, cls) {
     var i = el('img', cls);
-    i.src = card.image;
+    i.src = safeImageUrl(card.image);
     i.alt = card.name;
     i.width = 720;
     i.height = 1008;
