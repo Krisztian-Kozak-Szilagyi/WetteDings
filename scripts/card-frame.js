@@ -8,9 +8,13 @@
 //
 // node scripts/card-frame.js <bild> <seltenheit> <ziel.webp> [vorschau.png] [--spell]
 // --spell: Karte ohne Werte (Hunde wie Hugo und Lilly) – keine Wertefenster, größeres Textfenster (Rahmen „rar-<s>-spell“)
+// --keep-hue=<von>-<bis>: dieser Farbton (Grad, 0–360) bleibt in jeder Seltenheit in Originalfarbe stehen, z. B. das Pink
+//   von Mirjam, the Gracebringer (--keep-hue=290-355). Weiche Übergänge nach Sättigung und Abstand zum Farbbereich.
 const sharp = require('sharp');
 const SPELL = process.argv.includes('--spell');
-const [SRC, RARITY, DEST, PREVIEW] = process.argv.slice(2).filter((a) => a !== '--spell');
+const KEEP = (process.argv.find((a) => a.startsWith('--keep-hue=')) || '').slice(11).split('-').map(Number);
+const KEEP_HUE = KEEP.length === 2 && KEEP.every(Number.isFinite) ? KEEP : null;
+const [SRC, RARITY, DEST, PREVIEW] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const W = 720;
 const H = 1008;
 
@@ -45,6 +49,7 @@ async function art() {
   } else {
     buf = await base.clone().modulate({ brightness: S.brightness, saturation: S.saturation }).png().toBuffer();
   }
+  if (KEEP_HUE) buf = await keepHue(buf, base);
   if (RARITY === 'glitch') {
     // verschobene Bildstreifen (Glitch): einige waagerechte Bänder seitlich versetzt
     const bands = [[178, 22, 18], [262, 10, -26], [318, 14, 14], [446, 26, -12], [520, 8, 30], [612, 18, -20]];
@@ -52,6 +57,33 @@ async function art() {
     buf = await sharp(buf).composite(layers).png().toBuffer();
   }
   return buf;
+}
+
+/** Bereiche im Farbton KEEP_HUE aus dem Originalbild über das eingefärbte Motiv legen (Deckkraft nach Sättigung) */
+async function keepHue(buf, base) {
+  const orig = await base.clone().removeAlpha().raw().toBuffer();
+  const tinted = await sharp(buf).removeAlpha().raw().toBuffer();
+  const [from, to] = KEEP_HUE;
+  const FEATHER = 15; // Grad weicher Rand um den Farbbereich
+  const out = Buffer.alloc(W * H * 3);
+  for (let i = 0; i < W * H; i++) {
+    const r = orig[i * 3] / 255;
+    const g = orig[i * 3 + 1] / 255;
+    const b = orig[i * 3 + 2] / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let a = 0;
+    if (d > 0 && max > 0.12) {
+      let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+      const dist = h >= from && h <= to ? 0 : Math.min(Math.abs(h - from), Math.abs(h - to), 360 - Math.abs(h - from), 360 - Math.abs(h - to));
+      const sat = d / max;
+      a = Math.max(0, 1 - dist / FEATHER) * Math.min(1, Math.max(0, (sat - 0.15) / 0.25));
+    }
+    for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.round(tinted[i * 3 + c] * (1 - a) + orig[i * 3 + c] * a);
+  }
+  return sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
 }
 
 // ---------- Rahmen und Effekte (SVG) ----------
