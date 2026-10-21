@@ -218,10 +218,10 @@ test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je
   const cardSvg = require('../src/tcg/cardSvg');
   const STATS = require('../src/tcg/stats');
   const sets = {
-    Ömer: ['omer', 'Macht der Osmanen', { crumpled: 'Ömer the Crumpled', bfwler: 'Ömer the BFWler', gold: 'Ömer the Golden', holo: 'Ömer the Holographic', bockhaber: 'Ömer the Bockhaber', glitch: 'Glitch the Ömered' }],
-    Aleks: ['aleks', 'Russische Telefonnummer', { crumpled: 'Aleks the Crumpled', bfwler: 'Aleks the BFWler', gold: 'Aleks the Golden', holo: 'Aleks the Holographic', bockhaber: 'Aleks the Bockhaber', glitch: 'Glitch the Aleksed' }],
-    Matze: ['matze', 'Hundekarte!', { crumpled: 'Matze the Crumpled', bfwler: 'Matze the BFWler', gold: 'Matze the Golden', holo: 'Matze the Holographic', bockhaber: 'Matze the Bockhaber', glitch: 'Glitch the Matzed' }],
-    Luca: ['luca', 'Simulationsspiel-Erfahrung', { crumpled: 'Luca the Crumpled', bfwler: 'Luca the BFWler', gold: 'Luca the Golden', holo: 'Luca the Holographic', bockhaber: 'Luca the Bockhaber', glitch: 'Glitch the Lucaed' }],
+    Ömer: ['omer', 'Mach das Unmögliche möglich', { crumpled: 'Ömer the Crumpled', bfwler: 'Ömer the BFWler', gold: 'Ömer the Golden', holo: 'Ömer the Holographic', bockhaber: 'Ömer the Bockhaber', glitch: 'Glitch the Ömered' }],
+    Aleks: ['aleks', 'Gruß aus dem Osten', { crumpled: 'Aleks the Crumpled', bfwler: 'Aleks the BFWler', gold: 'Aleks the Golden', holo: 'Aleks the Holographic', bockhaber: 'Aleks the Bockhaber', glitch: 'Glitch the Aleksed' }],
+    Matze: ['matze', 'Yo Dawg', { crumpled: 'Matze the Crumpled', bfwler: 'Matze the BFWler', gold: 'Matze the Golden', holo: 'Matze the Holographic', bockhaber: 'Matze the Bockhaber', glitch: 'Glitch the Matzed' }],
+    Luca: ['luca', "You can't handle my Potions", { crumpled: 'Luca the Crumpled', bfwler: 'Luca the BFWler', gold: 'Luca the Golden', holo: 'Luca the Holographic', bockhaber: 'Luca the Bockhaber', glitch: 'Glitch the Lucaed' }],
   };
   const order = ['crumpled', 'bfwler', 'gold', 'holo', 'bockhaber', 'glitch'];
   for (const [name, [slug, abilityName, titles]] of Object.entries(sets)) for (const [rarity, title] of Object.entries(titles)) {
@@ -241,18 +241,22 @@ test('Karten-Overhaul Teil 1: Ömer, Aleks, Matze und Luca im Vollbild-Layout je
   }
 });
 
-test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell – ohne Wertefenster, Plakette „SPELL“, weiter keine Charaktere', () => {
+test('Karten-Overhaul Teil 1: Hugo und Lilly als Spell mit Wertefenstern FIA/FIS/BWL auf 0 – Treue Seele, weiter keine Charaktere', () => {
   const catalog = require('../src/tcg/catalog');
   const cardSvg = require('../src/tcg/cardSvg');
   for (const [id, name] of [['hugo-holo', 'Hugo'], ['lilly-holo', 'Lilly']]) {
     const c = catalog.cardById[id];
     assert.ok(c && catalog.CARDS.includes(c), id);
     assert.equal(c.name, name);
-    assert.equal(c.frame, 'rar-holo-spell');
+    assert.equal(c.frame, 'rar-holo-hund');
+    assert.equal(c.abilityName, 'Treue Seele');
     assert.equal(c.isCharacter, false, 'Hunde bleiben Spells (Boost, kein Charakter)');
     const svg = cardSvg.render(c).replace(/<image[^>]*\/>/, '');
-    assert.ok(svg.includes('SPELL') && svg.includes('Hundekarte') && svg.includes(name));
-    assert.ok(!/>FIA<|>FIS<|>BWL</.test(svg), 'keine Wertefenster');
+    assert.ok(svg.includes('SPELL') && svg.includes('Treue Seele') && svg.includes(name));
+    for (const t of ['>FIA<', '>FIS<', '>BWL<']) assert.ok(svg.includes(t), t);
+    assert.equal((svg.match(/>0</g) || []).length, 3, 'alle drei Werte 0');
+    // an Matze: 25 auf allen Werten
+    assert.equal((cardSvg.render(c, { fia: 25, fis: 25, bwl: 25 }).match(/>25</g) || []).length, 3);
   }
 });
 

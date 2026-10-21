@@ -10,8 +10,13 @@
 // --spell: Karte ohne Werte (Hunde wie Hugo und Lilly) – keine Wertefenster, größeres Textfenster (Rahmen „rar-<s>-spell“)
 // --keep-hue=<von>-<bis>: dieser Farbton (Grad, 0–360) bleibt in jeder Seltenheit in Originalfarbe stehen, z. B. das Pink
 //   von Mirjam, the Gracebringer (--keep-hue=290-355). Weiche Übergänge nach Sättigung und Abstand zum Farbbereich.
+// --stats-at=<y>,<y>,<y>: Wertefenster an diesen Mittelpunkten (auch zusammen mit --spell) – z. B. die Hunde Hugo und
+//   Lilly: --spell --stats-at=330,452,574 (Rahmen „rar-<s>-hund“, Fenster über dem großen Textfeld)
+// --overlay: <bild> ist schon eine fertige Karte (720 × 1008) – es kommen nur die Wertefenster aus --stats-at dazu
 const sharp = require('sharp');
 const SPELL = process.argv.includes('--spell');
+const OVERLAY = process.argv.includes('--overlay');
+const STATS_AT = (process.argv.find((a) => a.startsWith('--stats-at=')) || '').slice(11).split(',').filter(Boolean).map(Number);
 const KEEP = (process.argv.find((a) => a.startsWith('--keep-hue=')) || '').slice(11).split('-').map(Number);
 const KEEP_HUE = KEEP.length === 2 && KEEP.every(Number.isFinite) ? KEEP : null;
 const [SRC, RARITY, DEST, PREVIEW] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -130,7 +135,8 @@ const EFFECTS = {
     '<rect x="711" y="300" width="9" height="74" fill="#22d3ee"/><rect x="713" y="820" width="7" height="30" fill="#22d3ee" opacity=".8"/>',
 };
 
-const stats = SPELL ? '' : [432, 563, 691].map((cy) => pane(62, cy - 48, 100, 96, 18) + gem(162, cy)).join('');
+const statYs = STATS_AT.length ? STATS_AT : SPELL ? [] : [432, 563, 691];
+const stats = statYs.map((cy) => pane(62, cy - 48, 100, 96, 18) + gem(162, cy)).join('');
 const TEXT_Y = SPELL ? 712 : 772; // Spell: Textfenster höher (längerer Text, keine Werte)
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -165,8 +171,18 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   ${RARITY === 'crumpled' ? EFFECTS.crumpled().replace(/<circle[\s\S]*$/, '') : ''}
 </svg>`;
 
+// --overlay: nur die Wertefenster (mit den Verläufen, die sie brauchen) auf die fertige Karte
+const overlaySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">${accentStops}</linearGradient>
+    <linearGradient id="pane" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${S.pane[0]}" stop-opacity=".93"/><stop offset="1" stop-color="${S.pane[1]}" stop-opacity=".96"/></linearGradient>
+  </defs>
+  ${stats}
+</svg>`;
+
 (async () => {
-  const out = sharp(await art()).composite([{ input: Buffer.from(svg) }]);
+  if (OVERLAY && !STATS_AT.length) throw new Error('--overlay braucht --stats-at=<y>,<y>,<y>');
+  const out = OVERLAY ? sharp(await sharp(SRC).resize(W, H).png().toBuffer()).composite([{ input: Buffer.from(overlaySvg) }]) : sharp(await art()).composite([{ input: Buffer.from(svg) }]);
   await out.clone().webp({ quality: 88, effort: 6 }).toFile(DEST);
   if (PREVIEW) await out.clone().png().toFile(PREVIEW);
   console.log(`${RARITY}: ${DEST}`);

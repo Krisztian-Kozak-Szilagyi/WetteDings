@@ -231,7 +231,7 @@ function ihkRow(r, name) {
     quest: quest ? quest.title : r.quest,
     difficulty: diff ? diff.label : String(r.difficulty),
     card: cardLabel(r.card),
-    boosts: [r.boost, r.boost2].filter(Boolean).map(cardLabel),
+    boosts: [r.boost, r.boost2, r.dog].filter(Boolean).map(cardLabel),
     // laufende Quests: das Ergebnis steht schon fest, wird aber erst nach Ablauf gezeigt
     state: running ? 'laeuft' : r.success ? 'geschafft' : 'gescheitert',
     reward: r.reward,
@@ -242,7 +242,7 @@ function ihkRow(r, name) {
 
 async function ihkLog(query, { player = null, all = false } = {}) {
   const filter = player ? { user: player._id } : {};
-  const { docs, ...pg } = await paged(IhkRun, filter, { createdAt: -1, _id: -1 }, query.ihkseite, 'user quest difficulty card boost boost2 success reward status endsAt collectedAt pack createdAt', all);
+  const { docs, ...pg } = await paged(IhkRun, filter, { createdAt: -1, _id: -1 }, query.ihkseite, 'user quest difficulty card boost boost2 dog success reward status endsAt collectedAt pack createdAt', all);
   const names = await namesOf(docs.map((r) => r.user));
   return { ...pg, rows: docs.map((r) => ihkRow(r, names.get(String(r.user)))) };
 }
@@ -664,7 +664,7 @@ const GESAMT_SOURCES = [
     log: 'ihk',
     Model: IhkRun,
     time: 'createdAt',
-    select: 'user quest difficulty card boost boost2 success reward status endsAt collectedAt pack createdAt',
+    select: 'user quest difficulty card boost boost2 dog success reward status endsAt collectedAt pack createdAt',
     filter: async (p) => (p ? { user: p._id } : {}),
     rows: async (docs) => {
       const names = await withNames(docs);

@@ -59,10 +59,13 @@
   }
   if (pick) {
     var startBtn = pick.querySelector('[data-ihk-start]');
-    var slots = { card: pick.querySelector('[data-ihk-drop="card"]'), boost: pick.querySelector('[data-ihk-drop="boost"]'), boost2: pick.querySelector('[data-ihk-drop="boost2"]'), offer: pick.querySelector('[data-ihk-drop="offer"]') };
+    var slots = { card: pick.querySelector('[data-ihk-drop="card"]'), boost: pick.querySelector('[data-ihk-drop="boost"]'), boost2: pick.querySelector('[data-ihk-drop="boost2"]'), dog: pick.querySelector('[data-ihk-drop="dog"]'), offer: pick.querySelector('[data-ihk-drop="offer"]') };
     var pickers = Array.prototype.slice.call(document.querySelectorAll('[data-ihk-picker]'));
     var pickerFor = function (k) { return document.querySelector('[data-ihk-picker="' + k + '"]'); };
-    var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2'; };
+    var isBoostSlot = function (k) { return k === 'boost' || k === 'boost2' || k === 'dog'; };
+    // Karte (Eintrag im Auswahlfenster) zu einer Karten-ID – data-dog = welcher Hund, data-matze = Matze
+    var itemOf = function (id) { return id ? document.querySelector('[data-ihk-item][data-value="' + id + '"]') : null; };
+    var dogOf = function (k) { var el = itemOf(input(k).value); return el ? el.dataset.dog || '' : ''; };
     var input = function (name) { return pick.querySelector('input[name="' + name + '"]'); };
     var calm = function () { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; };
     var PICK_MS = 380; // so lange hebt sich die gewählte Karte, bevor das Fenster schließt
@@ -75,7 +78,7 @@
         var empty = document.createElement('span');
         empty.className = 'ihk-slot-empty';
         // Boost 2 ist nur bei Hybrid-Quests aktiv – sonst ausgegraut
-        if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>' + (slot.classList.contains('is-disabled') ? 'nur bei Hybrid-Quests' : 'optional') + '</small>';
+        if (isBoostSlot(target)) empty.innerHTML = slot.dataset.emptyLabel + '<br><small>' + (target === 'dog' ? 'Yo Dawg: zweiter Hund' : slot.classList.contains('is-disabled') ? 'nur bei Hybrid-Quests' : 'optional') + '</small>';
         else empty.textContent = target === 'offer' ? 'Quest wählen' : 'Karte wählen';
         slot.appendChild(empty);
         return;
@@ -106,6 +109,29 @@
         slots.boost2.setAttribute('aria-disabled', hybrid ? 'false' : 'true');
         clear('boost2');
       }
+      // Yo Dawg: Matze mit genau einem Hund im Boost bekommt den Hunde-Slot – für den anderen Hund
+      var main = itemOf(input('card').value);
+      var dogs = ['boost', 'boost2'].map(dogOf).filter(Boolean);
+      var dogSlot = !!(main && main.dataset.matze) && dogs.length === 1;
+      // Gruß aus dem Osten: Geld nur für Aleks – bei einer anderen Karte zurück auf 0
+      var coins = pick.querySelector('[data-ihk-coins]');
+      var aleks = !!(main && main.dataset.aleks);
+      if (coins && coins.hidden === aleks) {
+        coins.hidden = !aleks;
+        if (!aleks) coins.querySelector('input').value = '0';
+      }
+      if (slots.dog.hidden === dogSlot) {
+        slots.dog.hidden = !dogSlot;
+        if (!dogSlot) clear('dog');
+      }
+      if (dogSlot && dogOf('dog') === dogs[0]) clear('dog'); // derselbe Hund steht jetzt im Boost
+      var dogPicker = pickerFor('dog');
+      if (dogPicker) dogPicker.querySelectorAll('[data-ihk-item]').forEach(function (el) {
+        var same = el.dataset.dog === dogs[0];
+        el.classList.toggle('is-blocked', same || !!el.dataset.blocked);
+        el.querySelector('input').disabled = same || !!el.dataset.blocked;
+        el.title = same ? 'Steht schon im Boost-Slot – jede Hundekarte nur einmal' : el.dataset.zoomTitle;
+      });
       pickers.forEach(function (dlg) {
         var v = input(dlg.dataset.ihkPicker).value;
         dlg.querySelectorAll('input[type="radio"]').forEach(function (r) { r.checked = r.value === v; });
@@ -116,15 +142,15 @@
     var assign = function (el, target) {
       if (el.dataset.blocked) return; // kein freies Exemplar (Im Dungeon, Im Handel …)
       var value = el.dataset.value;
+      if (target === 'dog' && (!el.dataset.dog || ['boost', 'boost2'].some(function (k) { return dogOf(k) === el.dataset.dog; }))) return;
       if (isBoostSlot(target)) {
         // dieselbe Karte nicht gleichzeitig als Haupt- und Boost-Karte; Charaktere nur mit Boost-Fähigkeit
         if (el.dataset.drag === 'card' && !el.dataset.boostable) return;
         // bisher Hauptkarte: wandert in den Boost-Slot, das Hauptfeld wird frei
         if (input('card').value === value) clear('card');
-        var other = target === 'boost' ? 'boost2' : 'boost';
-        if (input(other).value === value) clear(other);
+        ['boost', 'boost2', 'dog'].forEach(function (k) { if (k !== target && input(k).value === value) clear(k); });
       }
-      if (target === 'card') ['boost', 'boost2'].forEach(function (k) { if (input(k).value === value) clear(k); });
+      if (target === 'card') ['boost', 'boost2', 'dog'].forEach(function (k) { if (input(k).value === value) clear(k); });
       input(target).value = value;
       fillSlot(target, el);
       refresh();
@@ -260,7 +286,9 @@
   function slowGain(t) {
     return slow.reduce(function (sum, x) { return sum + ((overlap(x[0], x[1], 0, t) - overlap(x[0], x[1], half, Math.min(half + freeze, t))) * x[2]) / 100; }, 0);
   }
-  var span = data.workTime + freeze + slowGain(Infinity); // Spielzeit inkl. Stillstand und Verlangsamung
+  // Ömer (Mach das Unmögliche möglich): die Deadline läuft schneller – rush [bis zur Halbzeit, danach], end = ihr Ende
+  var rush = data.rush || [0, 0];
+  var span = data.end || data.workTime + freeze + slowGain(Infinity); // Spielzeit inkl. Stillstand und Verlangsamung
   var progress = fight.querySelector('[data-ihk-progress]');
   var timebar = fight.querySelector('[data-ihk-timebar]');
   var points = fight.querySelector('[data-ihk-points]');
@@ -274,6 +302,9 @@
   var skip = fight.querySelector('[data-ihk-skip]');
   var player = document.querySelector('.ihk-player .ihk-slot-card');
   var boostSlots = document.querySelectorAll('.ihk-player .ihk-slot-item');
+  // Treue Seele: Hunde an Matze (data-dog-image = Bild mit +25) – sie greifen bei jedem Schlag mit an (Takt dg)
+  var dogSlots = Array.prototype.slice.call(document.querySelectorAll('.ihk-player .ihk-slot-item[data-dog-image]'));
+  dogSlots.forEach(function (b) { new Image().src = b.dataset.dogImage; });
   var enemy = document.querySelector('.ihk-slot-enemy');
 
   var ticks = data.ticks.filter(function (t) { return !t.ability; });
@@ -326,7 +357,8 @@
 
   // Verstrichene Deadline-Zeit: während Bloodlust steht die Uhr, bei Forkbomb läuft sie langsamer
   function elapsed(t) {
-    return t - overlap(half, half + freeze, 0, t) - slowGain(t);
+    var base = t - overlap(half, half + freeze, 0, t) - slowGain(t);
+    return Math.min(t, half) * (1 + rush[0]) + Math.max(0, base - half) * (1 + rush[1]); // wie ihkService.rushedUsed
   }
   function render(t) {
     progress.style.width = (Math.min(1, total / data.required) * 100).toFixed(1) + '%';
@@ -349,12 +381,39 @@
     var el = document.createElement('span');
     el.className = 'ihk-floater' + (tk.crit || tk.destroy ? ' is-crit' : '') + (tk.fake ? ' is-fake' : '');
     el.textContent = tk.destroy ? 'ZERSTÖRT!' : (tk.fake ? 'GEFÄLSCHT! ' : tk.crit ? 'KRIT! ' : '+') + tk.p + (progress2 && tk.p2 != null ? ' / +' + tk.p2 : '');
+    if (tk.coin) coinFloater(tk.coin);
     if (tk.destroy && enemy) enemy.classList.add('fx-frozen');
     el.style.left = (15 + Math.random() * 60) + '%';
     floaters.appendChild(el);
     setTimeout(function () { el.remove(); }, 1200);
     bump(player, 'is-hit');
     bump(enemy, 'is-shake');
+    if (tk.dg) dogSlots.forEach(function (b) { bump(b, 'is-hit'); });
+  }
+  // Mach das Unmögliche möglich: so viele Ömer greifen gerade gemeinsam an (Abzeichen ×2 / ×3 an der Karte)
+  function showCopies(tk) {
+    if (!tk.om || !player || player.getAttribute('data-copies') === String(tk.om)) return;
+    player.setAttribute('data-copies', String(tk.om));
+    bump(player, 'fx-stat-up');
+  }
+  // Gruß aus dem Osten: das mitgegebene Geld sinkt mit jedem Münzwurf (coinBudget, coinCost in Cent)
+  var coinLeftEl = document.querySelector('[data-ihk-coin-left]');
+  var coinLeft = data.coinBudget || 0;
+  var euroText = function (cents) { return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; };
+  function spendCoin(tk) {
+    if (!tk.coin || !coinLeftEl) return;
+    coinLeft = Math.max(0, coinLeft - (data.coinCost || 0));
+    coinLeftEl.textContent = euroText(coinLeft);
+  }
+  // Gruß aus dem Osten: jeder Münzwurf von Aleks steigt als eigene Zahl auf – Kopf golden mit +10, Zahl grau
+  function coinFloater(side) {
+    var el = document.createElement('span');
+    el.className = 'ihk-floater ihk-coin ' + (side === 'kopf' ? 'is-heads' : 'is-tails');
+    el.textContent = side === 'kopf' ? 'KOPF! +' + (data.coinPlus || 10) : 'Zahl';
+    el.style.left = (10 + Math.random() * 30) + '%';
+    el.style.top = '18%';
+    floaters.appendChild(el);
+    setTimeout(function () { el.remove(); }, 1400);
   }
   // ---------- Fähigkeits-Effekte (gezeichnet, keine Emojis) ----------
   var SVGNS = 'http://www.w3.org/2000/svg';
@@ -484,8 +543,8 @@
     },
   };
   var EFFECT_OF = {
-    nachtschicht: 'bolts', 'bfw-energy': 'bolts', lili: 'hearts', simulation: 'chart', faelschung: 'scramble',
-    hund: 'sparkle', 'good-boy': 'sparkle', hundekarte: 'sparkle', nvidia: 'speed', amd: 'rain', kaffee: 'steam',
+    nachtschicht: 'bolts', 'bfw-energy': 'bolts', lili: 'hearts', potions: 'sparkle', faelschung: 'scramble', 'gruss-aus-dem-osten': 'scramble', omer: 'sparkle',
+    'treue-seele': 'sparkle', 'treue-seele-matze': 'sparkle', nvidia: 'speed', amd: 'rain', kaffee: 'steam',
   };
   function playEffect(slot, key) {
     var fn = EFFECTS[EFFECT_OF[key]];
@@ -501,11 +560,18 @@
     });
     data.ticks.forEach(function (t) { if (t.ability && t.st) showStats(t.st); });
     boostSlots.forEach(function (b) { if (b.querySelector('img')) bump(b, 'fx-flash'); });
+    dogSlots.forEach(function (b) {
+      var img = b.querySelector('img');
+      if (!img) return;
+      img.src = b.dataset.dogImage;
+      b.setAttribute('data-zoom', b.dataset.dogImage);
+      bump(b, 'fx-stat-up');
+    });
   }
   function finish() {
     if (done) return;
     done = true;
-    while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; i++; }
+    while (i < ticks.length) { total += ticks[i].p; total2 += ticks[i].p2 || 0; spendCoin(ticks[i]); showCopies(ticks[i]); i++; }
     if (hasAbility && (data.success ? last >= half : true)) activate();
     showStats(lastStats(), true);
     render(endT);
@@ -521,6 +587,8 @@
       total += ticks[i].p;
       total2 += ticks[i].p2 || 0;
       floater(ticks[i]);
+      spendCoin(ticks[i]);
+      showCopies(ticks[i]);
       showStats(ticks[i].st);
       i++;
     }

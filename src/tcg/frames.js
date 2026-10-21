@@ -121,4 +121,14 @@ for (const [key, c] of Object.entries(RARITY_COLORS)) {
     badge: 'SPELL',
     text: { x: 92, y: 730, w: 520, h: 204, size: 26, minSize: 15, lineHeight: 1.34 },
   };
+  // Hund (Spell mit Werten, Hugo und Lilly): wie Spell, dazu drei Wertefenster über dem großen Textfeld – gezeichnet mit
+  // scripts/card-frame.js --stats-at=330,452,574 (auf ein fertiges Bild: --overlay)
+  module.exports[`rar-${key}-hund`] = {
+    ...module.exports[`rar-${key}-spell`],
+    stats: [
+      { key: 'fia', label: 'FIA', x: 111, y: 330 },
+      { key: 'fis', label: 'FIS', x: 111, y: 452 },
+      { key: 'bwl', label: 'BWL', x: 111, y: 574 },
+    ],
+  };
 }

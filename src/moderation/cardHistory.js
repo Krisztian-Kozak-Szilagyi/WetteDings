@@ -111,8 +111,8 @@ async function historyOf(docId) {
     TcgCard.findById(id).select('user card rarity opening upgrade foiledAt createdAt condition.grade').lean(),
     Trade.find({ status: 'verkauft', $or: [{ 'give.doc': id }, { 'want.doc': id }] }).select('kind seller buyer to sellerName buyerName toName give want price extraFrom tax closedAt').sort({ closedAt: 1 }).lean(),
     Bet.find({ 'duel.cards.doc': id }).select('title status outcome creator duel.opponent duel.cards resolvedAt createdAt').lean(),
-    IhkRun.find({ $or: [{ cardDoc: id }, { boostDoc: id }, { boost2Doc: id }] }).select('user quest card cardDoc createdAt endsAt success status').lean(),
-    DungeonRun.find({ $or: [{ 'members.cardDoc': id }, { 'members.boostDoc': id }] }).select('dungeon startedAt status success members.user members.name members.card members.cardDoc members.boostDoc').lean(),
+    IhkRun.find({ $or: [{ cardDoc: id }, { boostDoc: id }, { boost2Doc: id }, { dogDoc: id }] }).select('user quest card cardDoc createdAt endsAt success status').lean(),
+    DungeonRun.find({ $or: [{ 'members.cardDoc': id }, { 'members.boostDoc': id }, { 'members.dogDoc': id }] }).select('dungeon startedAt status success members.user members.name members.card members.cardDoc members.boostDoc members.dogDoc').lean(),
     Ledger.findOne({ type: { $in: ['tcg_verkauf', 'tcg_zerkleinert', 'tcg_aufwertung'] }, 'meta.docs.doc': id }).lean(),
     PackGrant.findOne({ kind: 'entzug', docs: id }).lean(),
   ]);
@@ -159,7 +159,7 @@ async function historyOf(docId) {
   }
   for (const r of quests) events.push({ at: r.createdAt, type: 'ihk', who: r.user, quest: r.quest, main: r.cardDoc && r.cardDoc.equals(id), status: r.status, success: r.success });
   for (const r of dungeons) {
-    const m = r.members.find((x) => (x.cardDoc && x.cardDoc.equals(id)) || (x.boostDoc && x.boostDoc.equals(id)));
+    const m = r.members.find((x) => (x.cardDoc && x.cardDoc.equals(id)) || (x.boostDoc && x.boostDoc.equals(id)) || (x.dogDoc && x.dogDoc.equals(id)));
     if (m) events.push({ at: r.startedAt, type: 'dungeon', who: m.user, dungeon: r.dungeon, main: !!(m.cardDoc && m.cardDoc.equals(id)), status: r.status, success: r.success });
   }
   if (copy && copy.foiledAt) events.push({ at: copy.foiledAt, type: 'folie', grade: copy.condition ? copy.condition.grade : null, who: null });

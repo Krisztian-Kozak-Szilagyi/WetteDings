@@ -11,8 +11,8 @@ const FREQUENT_MAX = 6; // so viele „häufig verwendete“ Karten je Liste
  */
 async function usedCards(userId, area) {
   const roles = area === 'ihk'
-    ? [{ id: '$card', role: 'card' }, { id: '$boost', role: 'boost' }, { id: '$boost2', role: 'boost' }]
-    : [{ id: '$members.card', role: 'card' }, { id: '$members.boost', role: 'boost' }];
+    ? [{ id: '$card', role: 'card' }, { id: '$boost', role: 'boost' }, { id: '$boost2', role: 'boost' }, { id: '$dog', role: 'boost' }]
+    : [{ id: '$members.card', role: 'card' }, { id: '$members.boost', role: 'boost' }, { id: '$members.dog', role: 'boost' }];
   const pipeline = area === 'ihk'
     ? [{ $match: { user: userId } }]
     : [{ $match: { 'members.user': userId, mode: area } }, { $unwind: '$members' }, { $match: { 'members.user': userId } }];
@@ -25,7 +25,7 @@ async function usedCards(userId, area) {
     { $sort: { n: -1, '_id.id': 1 } },
   ]);
   const out = { card: [], boost: [] };
-  rows.forEach((r) => out[r._id.role].push(r._id.id));
+  rows.forEach((r) => !out[r._id.role].includes(r._id.id) && out[r._id.role].push(r._id.id)); // Hund: Boost- und Hunde-Slot zählen als ein Eintrag
   return out;
 }
 

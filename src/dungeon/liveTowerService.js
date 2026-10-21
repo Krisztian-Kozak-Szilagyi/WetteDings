@@ -12,6 +12,7 @@ const catalog = require('../tcg/catalog');
 const cardBans = require('../tcg/cardBans');
 const { lockedDocs, pickCopy, claim } = require('../tcg/locks');
 const { simulate, WORK_TIME } = require('../ihk/ihkService');
+const { ALEKS } = require('../ihk/abilities');
 const { inTransaction } = require('../services/betService');
 const { UserError } = require('../lib/util');
 const { TOWER, floorByKey } = require('./tower');
@@ -50,6 +51,8 @@ function newRunFields(members, opts, now) {
       bock: members.map(() => 100),
       boostUntil: members.map(() => 0),
       coffeeUsed: members.map(() => false),
+      // Aleks (Gruß aus dem Osten): Geld, Kopf-Bonus und „wirft schon“ – wächst Kampf für Kampf (startFight)
+      coins: members.map((m) => (m.coins > 0 ? { left: m.coins, bonus: 0, active: false } : null)),
       drink: { used: false, by: null, mode: null },
       points: 0,
       opts: { ...opts },
@@ -68,18 +71,26 @@ function startFight(run, t0) {
   const required = L.effectiveRequired(d.towerRequired(n, live.opts), floor.trait);
   const applied = L.applyChoices(live.chosen, live.energy, live.boostUntil, t0);
   const cards = d.teamCards(run.members);
+  // Gruß aus dem Osten: Münzwürfe mit dem Stand aus den Kämpfen davor (nur, solange Aleks die Karte ist)
+  if (!live.coins) live.coins = run.members.map(() => null);
+  cards.forEach((c, i) => { c.coin = c.coin && live.coins[i] ? live.coins[i] : null; });
   // Bock-Auffüller zur Halbzeit (Mark, the Suntouched): wer ihn bringt (from) und wie viel – je Karte nur einmal
   const refills = [];
   const sims = run.members.map((m, i) => {
     const card = cards[i].card;
     const effects = d.teamEffects(cards, i);
     for (const e of effects) if (e.refill && !refills.some((x) => x.from === e.from)) refills.push({ from: e.from, pct: e.refill });
-    const r = simulate(card.stats, floor.stat, required, random, effects, 'tower');
-    return { ticks: r.ticks, freeze: r.freeze || 0, extend: r.extend || 0, speed: card.stats.speed };
+    const r = simulate(card.stats, floor.stat, required, random, effects, 'tower', { coin: cards[i].coin });
+    return { ticks: r.ticks, freeze: r.freeze || 0, extend: r.extend || 0, end: r.end, speed: card.stats.speed };
   });
   const values = cards.map((c) => c.card.stats[floor.stat] || 0);
   const boostUntil = applied.boostUntil.map((ms) => Math.max(0, (ms - t0) / 1000));
   const r = L.playFight(sims, live.bock, values, { required, trait: floor.trait, boostUntil, ext: applied.ext, rand: random, workTime: WORK_TIME, fightSeconds: live.opts.fightSeconds, refills });
+  // Geld von Aleks zu Kampfbeginn – der Browser zieht je gezeigtem Münzwurf ab
+  const coinsBefore = cards.map((c) => (c.coin ? c.coin.left : null));
+  // nur Würfe bis zum Ende des Kampfs zählen; ab der ersten Halbzeit wirft Aleks durchgehend
+  const reachedHalf = (r.success ? r.doneAt : r.limit) > WORK_TIME / 2;
+  d.carryCoins(cards.map((c) => ({ coin: c.coin })), r.ticks.concat(reachedHalf ? cards.map((c, m) => ({ m, ability: true })) : []));
   run.fights.push({
     key: floor.key,
     boss: false,
@@ -98,6 +109,7 @@ function startFight(run, t0) {
     doneAt: r.doneAt,
     startAt: t0,
     bockBefore: [...live.bock],
+    coinsBefore,
   });
   Object.assign(live, {
     n,
@@ -118,7 +130,9 @@ function finish(run, now) {
   const opts = run.live.opts;
   run.rounds = run.fights.filter((f) => f.success).length;
   run.success = run.rounds > 0;
-  run.members = run.members.map((m) => ({ ...m, ...d.towerRewardsFor(run.fights, false, random, opts) }));
+  // Aleks: was er verworfen hat (der Rest kommt mit finishDue zurück)
+  const coins = run.live.coins || [];
+  run.members = run.members.map((m, i) => ({ ...m, ...d.towerRewardsFor(run.fights, false, random, opts), ...(m.coins > 0 ? { coinSpent: coins[i] ? m.coins - coins[i].left : 0, coinHeads: coins[i] ? coins[i].bonus / ALEKS.plus : 0 } : {}) }));
   run.endsAt = new Date(now);
   run.live.phase = 'ende';
   run.live.phaseEndsAt = now;
@@ -341,6 +355,7 @@ function view(run, userId, now = Date.now()) {
       me: i === me,
       card: cardView(m.card),
       boost: cardView(m.boost),
+      dog: cardView(m.dog), // Hunde-Slot (Yo Dawg)
       bock: live.bock[i],
       coffee: m.coffeeDoc && !live.coffeeUsed[i] ? { name: (catalog.cardById[m.coffee] || {}).name || 'Kaffee', rarity: (catalog.cardById[m.coffee] || {}).rarity, pct: L.COFFEE[m.coffee] || 0 } : null,
       weiter: live.weiter.includes(i),
@@ -358,6 +373,8 @@ function view(run, userId, now = Date.now()) {
           total: last.total,
           success: last.success,
           bockBefore: last.bockBefore || [],
+          coinsBefore: last.coinsBefore || [],
+          coinCost: ALEKS.cost,
           workTime: WORK_TIME,
           fightSeconds: live.opts.fightSeconds,
         }

@@ -171,6 +171,7 @@ const ledgerLabels = {
   item_verkauf: 'Gegenstand verkauft',
   item_kauf: 'Gegenstand gekauft',
   ihk_lohn: 'IHK-Quest geschafft',
+  aleks_muenzen: 'Aleks: Geld für Münzwürfe',
   dungeon_lohn: 'Dungeon-Beute',
   erfolg: 'Erfolg freigeschaltet',
   esports_gruendung: 'eSports: Team gegründet',

@@ -14,6 +14,7 @@ const config = require('../config');
 const { toZonedLocalInput } = require('../lib/time');
 const cardBans = require('../tcg/cardBans');
 const { usedCards, pickShortcuts } = require('../lib/pickShortcuts');
+const { isDog, hasDogSlot, isAleks, DOG_MATZE, ALEKS } = require('../ihk/abilities');
 
 const router = express.Router();
 
@@ -34,15 +35,24 @@ const same = (a, b) => a && b && String(a) === String(b);
 /** banMode: Modus einer noch nicht gestarteten Anmeldung – dann zeigt der Platz, ob eine gewählte Karte gesperrt ist */
 const slotView = (m, me, leaderId, banMode = null) => {
   const card = m.card ? catalog.cardById[m.card] : null;
+  const boost = m.boost ? catalog.cardById[m.boost] : null;
   return {
-    banned: !!banMode && (cardBans.isBanned(m.card, banMode) || cardBans.isBanned(m.boost, banMode)),
+    banned: !!banMode && (cardBans.isBanned(m.card, banMode) || cardBans.isBanned(m.boost, banMode) || cardBans.isBanned(m.dog, banMode)),
     choosing: !card,
     name: m.name,
     bot: !m.user,
     me: same(m.user, me),
     leader: m.leader === true || same(m.user, leaderId),
     card,
-    boost: m.boost ? catalog.cardById[m.boost] : null,
+    boost,
+    // Hunde-Slot (Yo Dawg): Matze mit einem Hund als Boost darf den anderen Hund mitnehmen
+    dog: m.dog ? catalog.cardById[m.dog] : null,
+    dogSlot: hasDogSlot(card, [boost]),
+    // Gruß aus dem Osten: Geld für Aleks (Anmeldung: gewünscht, Durchlauf: abgebucht) und was daraus wurde
+    aleks: isAleks(card),
+    coins: m.coins || 0,
+    coinSpent: m.coinSpent || 0,
+    coinHeads: m.coinHeads || 0,
     reward: m.reward,
     foil: m.foil,
     bossCard: m.bossCard,
@@ -66,9 +76,14 @@ const playback = (run, d, now) => ({
   cards: run.members.map((m, i) => {
     const card = catalog.cardById[m.card];
     const ticks = run.fights.flatMap((f) => f.ticks.filter((x) => x.m === i));
-    return card && card.stats ? { base: card.image, stats: [card.stats.speed, card.stats.fia, card.stats.fis, card.stats.bwl], imgs: catalog.statImages(card, ticks) } : null;
+    // Treue Seele an Matze: Bilder der Hunde mit ihren neuen Werten (Karten-ID → Bild), sobald die Fähigkeit wirkt
+    const dogs = Object.fromEntries([...new Set(run.fights.flatMap((f) => (f.abilities || []).filter((a) => a.m === i && a.dog).map((a) => a.dog)))].filter((id) => catalog.cardById[id]).map((id) => [id, catalog.cardImage(catalog.cardById[id], { fia: DOG_MATZE, fis: DOG_MATZE, bwl: DOG_MATZE })]));
+    // coins: Geld für Aleks – die Wiedergabe zieht je Münzwurf coinCost ab
+    return card && card.stats ? { base: card.image, stats: [card.stats.speed, card.stats.fia, card.stats.fis, card.stats.bwl], imgs: catalog.statImages(card, ticks), dogs, coins: m.coins || 0 } : null;
   }),
   pause: run.pause ?? dungeon.PAUSE_SECONDS,
+  coinPlus: ALEKS.plus, // Gruß aus dem Osten: Kopf gibt so viel auf alle Werte
+  coinCost: ALEKS.cost, // … und jeder Wurf kostet so viel (Cent)
   fights: run.fights.map((f, i) => {
     const def = (run.mode === 'tower' ? floorByKey[f.key] : d.fights[i]) || {};
     return { round: i + 1, title: def.title, text: def.text, successText: def.success, failText: def.fail, boss: f.boss, required: f.required, limit: f.limit || 180, seconds: f.seconds || dungeon.FIGHT_SECONDS, start: f.start || 0, success: f.success, doneAt: f.doneAt, ticks: f.ticks, abilities: f.abilities };
@@ -122,11 +137,11 @@ router.get('/dungeon', async (req, res) => {
   const esLobby = !!esTeamId;
   const esTeam = esTeamId ? await EsportsTeam.findById(esTeamId).select('name ticker').lean() : null;
   // frei = eigene Exemplare ohne die als Haupt- oder Boost-Karte gewählten (die eigenen Vorrats-Exemplare zählen als frei)
-  const inUse = (id) => (mine ? [mine.card, mine.boost].filter((x) => x === id).length : 0);
+  const inUse = (id) => (mine ? [mine.card, mine.boost, mine.dog].filter((x) => x === id).length : 0);
   // Kaffee und Energy werden verbraucht – dafür nie ein foliertes Exemplar (setSupplies), also ohne die folierten
   const freeOf = (id) => (cards ? Math.max(0, (cards.counts[id] || 0) - (cards.foiled[id] || 0) - inUse(id)) : 0);
   // Schalter „Folierte Exemplare einsetzen“ (#204): an, wenn die gewählte Karte schon ein foliertes Exemplar ist
-  const myDocs = mine ? [mine.cardDoc, mine.boostDoc].filter(Boolean) : [];
+  const myDocs = mine ? [mine.cardDoc, mine.boostDoc, mine.dogDoc].filter(Boolean) : [];
   const foilChecked = myDocs.length > 0 && !!(await TcgCard.exists({ _id: { $in: myDocs }, foiledAt: { $ne: null } }));
   const coffeeChoices = esLobby ? Object.entries(LIVE.COFFEE).map(([id, pct]) => ({ id, pct, card: catalog.cardById[id], free: freeOf(id), asBoost: !!mine && mine.boost === id })).filter((c) => c.card) : [];
 
@@ -171,10 +186,15 @@ router.get('/dungeon', async (req, res) => {
     energyFree: esLobby ? freeOf(LIVE.ENERGY_CARD) : 0,
     energyAsBoost: esLobby && !!mine && mine.boost === LIVE.ENERGY_CARD,
     allReady: !!party && party.members.every((m) => m.ready),
-    towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost)),
+    towerReady: tower && !!party && party.members.every((m) => m.card && !cardBans.isBanned(m.card, 'tower') && !cardBans.isBanned(m.boost, 'tower') && !cardBans.isBanned(m.dog, 'tower') && !dungeon.towerDuplicate(party.members, m.user, m.card, m.boost, m.dog)),
     // Mage Tower: Karten, die Mitspieler schon gewählt haben (jede Karte nur einmal im Team)
     teamTaken: tower && party ? dungeon.teamTaken(party.members, me) : new Set(),
+    // Hunde, die Mitspieler schon mitbringen (jeder Hund nur einmal, höchstens zwei je Team) – Dungeon und Turm
+    dogTaken: party ? new Set(dungeon.teamDogs(party.members, me).map((c) => c.id)) : new Set(),
+    // Hunde-Slot (Yo Dawg): Auswahl der Hundekarten, nur wenn der eigene Platz ihn gerade hat
+    dogChoices: cards && mine && hasDogSlot(catalog.cardById[mine.card], [mine.boost ? catalog.cardById[mine.boost] : null]) ? cards.boosts.filter(isDog) : null,
     towerSettings: dungeon.settings.tower,
+    aleks: { max: ALEKS.maxMoney / 100, cost: ALEKS.cost / 100, plus: ALEKS.plus },
     nextDungeon: next,
     run,
     runDungeon,
@@ -185,7 +205,7 @@ router.get('/dungeon', async (req, res) => {
     foilChecked,
     shortcuts,
     startFans,
-    current: mine ? { card: mine.card, boost: mine.boost } : null,
+    current: mine ? { card: mine.card, boost: mine.boost, dog: mine.dog } : null,
     loot,
     rareLoot,
     rarityByKey: catalog.rarityByKey,
@@ -253,7 +273,7 @@ router.get('/dungeon/geschichte/:key', (req, res, next) => {
 // Karten in der Lobby wählen: aus dem Auswahl-Fenster per fetch (JSON, Fehler erscheinen im Fenster), sonst wie gewohnt
 const wantsJson = (req) => (req.get('Accept') || '').includes('application/json');
 router.post('/dungeon/karten', async (req, res) => {
-  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null, foiled: str(req.body.foil) === '1' });
+  const pick = () => dungeon.changeCards({ user: req.user, cardId: str(req.body.card) || null, boostId: str(req.body.boost) || null, dogId: str(req.body.dog) || null, foiled: str(req.body.foil) === '1' });
   if (!wantsJson(req)) return handle(req, res, () => pick().then(() => null));
   try {
     await pick();
@@ -263,6 +283,14 @@ router.post('/dungeon/karten', async (req, res) => {
     res.status(400).json({ ok: false, error: err.message });
   }
 });
+
+// Gruß aus dem Osten: Geld, das Aleks mitnimmt (abgebucht wird erst beim Start)
+router.post('/dungeon/aleks-geld', (req, res) =>
+  handle(req, res, async () => {
+    const budget = await dungeon.setCoins({ user: req.user, euros: Number.parseInt(str(req.body.coins), 10) || 0 });
+    return budget ? `Aleks nimmt ${budget / 100} € für Münzwürfe mit – abgebucht wird beim Start, der Rest kommt danach zurück.` : 'Aleks nimmt kein Geld mit.';
+  })
+);
 
 // Beute-Fenster geschlossen (per fetch)
 router.post('/dungeon/beute-gesehen', async (req, res) => {

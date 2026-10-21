@@ -90,17 +90,22 @@ const SEASON1_UNRELEASED = {
 // Effekte (Rahmen „rar-<seltenheit>“ in frames.js, Bilder aus scripts/card-frame.js). Gleiche Karten-IDs wie bisher: wer
 // die Karte hatte, hat jetzt die überarbeitete. Werte unverändert aus stats.js, Fähigkeit wie in src/ihk/abilities.js.
 const overhaul = (name, abilityName, ability) => (id, rarity, title) => ({ season: 'pre-season', frame: `rar-${rarity}`, name, title, stats: require('./stats')[id], abilityName, ability });
-const omer = overhaul('Ömer', 'Macht der Osmanen', 'Verleiht freundlichen ITler-Karten die Macht der Osmanen und erhöht dadurch dauerhaft ihre FIS-Stärke um 15 %.');
-const aleks = overhaul('Aleks', 'Russische Telefonnummer', 'Nach dem Anrufen einer russischen Telefonnummer ist es in der Lage, die von ihm selbst generierten Punkte einmalig auf das Maximum (99) zu fälschen.');
-const matze = overhaul('Matze', 'Hundekarte!', 'Für jede ausgespielte Hundekarte erhält man +10 auf FIS und +5 auf alle anderen Stats.');
-const luca = overhaul('Luca', 'Simulationsspiel-Erfahrung', 'Aufgrund seiner wirtschaftlichen Erfahrungen aus Simulationsspielen ist er in der Lage, sein eigenes BWL-Niveau um 50 % zu steigern.');
+// Mach das Unmögliche möglich: Duplikate, Schneeball und schnellere Deadline in src/ihk/abilities.js (OMER), ihkService.simulate
+const omer = overhaul('Ömer', 'Mach das Unmögliche möglich', 'Zu Beginn und zur Halbzeit dupliziert sich Ömer, wobei seine Grundwerte halbiert werden. Die Duplikate werden als Ömer behandelt. Greift ein Ömer an, fühlen sich die anderen verpflichtet, mit draufzugehen: Für jeden weiteren Ömer erhalten alle Ömer (Grundwert\u00a0+\u00a01)\u00a0/\u00a08 auf alle Werte. Für jeden Ömer im Spiel läuft der Timer 15\u00a0% schneller.');
+// Gruß aus dem Osten: Geld und Münzwürfe in src/ihk/abilities.js (ALEKS), ihkService.simulate (opts.coin)
+const aleks = overhaul('Aleks', 'Gruß aus dem Osten', 'Du kannst Aleks bis zu 1000\u00a0€ mit auf Missionen geben. Zur Halbzeit beginnt er mit Münzwürfen: Jeder Angriff verbraucht 50\u00a0€, mit 49,9\u00a0% Chance landet die Münze auf Kopf – dann erhält er für den Rest der Quest, des Dungeons oder des Mage Towers +10 auf alle Werte.');
+// Yo Dawg: der zusätzliche Hunde-Slot (src/ihk/abilities.js hasDogSlot). Nicht auf der Karte: In Hybrid-Quests hat
+// Matze so drei Plätze (zwei Hunde und einer frei), sonst zwei – sofern er beide Hunde spielt.
+const matze = overhaul('Matze', 'Yo Dawg', 'Wird Hugo oder Lilly als Boost für Matze gewählt, erhältst du einen zweiten Platz, um eine weitere Hundekarte mit anderem Namen zu spielen.');
+const luca = overhaul('Luca', "You can't handle my Potions", 'Zur Halbzeit erhöht er die Stärke der Halbzeit-Booster in seinem Team um 10 %. Danach werden sein Tempo und seine BWL um +50 erhöht.');
 // Mark, the Suntouched (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Sonnendurchbruch“ in abilities.js
 const mark = (id, rarity) => ({ ...overhaul('Mark', 'Sonnendurchbruch', 'Zur Halbzeit bricht die Sonne durch: In Quests und Dungeons verlängert sich die Zeit um 50 % der Gesamtdauer, im Mage Tower füllt er den Bock seiner Gruppe um 30 % auf. Danach erhalten er und seine Gruppe +5 auf alle Werte.')(id, rarity, 'Mark, the Suntouched'), season: 'season-1' });
 // Mirjam, the Gracebringer (Season 1): neue Karte, Platzhalter-Werte in stats.js, Fähigkeit „Alles Pink!“ in abilities.js
 const mirjam = (id, rarity) => ({ ...overhaul('Mirjam', 'Alles Pink!', 'Zur Halbzeit verdoppelt Mirjam bei sich selbst und bei jedem Gruppenmitglied den jeweils niedrigsten Wert.')(id, rarity, 'Mirjam, the Gracebringer'), season: 'season-1' });
-// Hunde (Spell, ohne Werte): Rahmen ohne Wertefenster, Plakette „✦ SPELL“ (rar-holo-spell)
-const DOG_TEXT = 'Jede ausgespielte Hundekarte erhöht alle Werte der freundlichen Charaktere um 3. Es können maximal zwei Hunde gleichzeitig ausgespielt werden, und derselbe Hund darf nicht mehrfach ausgespielt werden.';
-const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-spell', name, stats: [0, 0, 0, 0], ability: DOG_TEXT });
+// Hunde (Spell): Plakette „✦ SPELL“, drei Wertefenster FIA/FIS/BWL mit 0 (rar-holo-hund) – an Matze steigen sie auf 25
+// (Treue Seele, src/ihk/abilities.js). Ohne Speed bleiben sie Spells, keine Charaktere (catalog.js isCharacter).
+const DOG_TEXT = 'Gibt der geboosteten Karte +5 auf alle Werte. Handelt es sich bei der geboosteten Karte um Matze, bekommt diese Karte +25 auf alle Werte und greift mit jedem Schlag von Matze ebenfalls an. Insgesamt dürfen nur zwei Hundekarten ausgespielt werden, jede nur einmal.';
+const dog = (name) => ({ season: 'pre-season', frame: 'rar-holo-hund', name, stats: [0, 0, 0, 0], abilityName: 'Treue Seele', ability: DOG_TEXT });
 const OVERHAUL = {
   'omer-1-crumpled': omer('omer-1-crumpled', 'crumpled', 'Ömer the Crumpled'),
   'omer-2-bfwler': omer('omer-2-bfwler', 'bfwler', 'Ömer the BFWler'),

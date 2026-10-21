@@ -132,21 +132,48 @@ test('Bots bringen eine Boost-Karte mit', () => {
   }
 });
 
-test('Gruppen-Boosts (Ömer, Hunde, Mauch) wirken auf alle, persönliche nur auf den eigenen Spieler', () => {
+test('Gruppen-Boosts (Mauch) wirken auf alle, persönliche und Hunde nur auf den eigenen Spieler', () => {
   const team = [{ card: card('krisz-3-gold'), boost: card('bfw-energy-gold') }, { card: card('adrian-3-gold'), boost: card('hugo-holo') }, { card: card('aleks-3-gold') }];
   const keys = (m) => d.teamEffects(team, m).map((e) => e.key);
-  // Hugo (Hund) hilft allen dreien, BFW Energy nur Krisz selbst (Nachtschicht + Energy)
-  assert.ok([0, 1, 2].every((m) => keys(m).includes('hund')));
+  // Hugo (Treue Seele) hilft nur Adrian, BFW Energy nur Krisz selbst (Nachtschicht + Energy)
+  assert.ok(keys(1).includes('treue-seele') && !keys(0).includes('treue-seele') && !keys(2).includes('treue-seele'));
   assert.ok(keys(0).includes('bfw-energy') && keys(0).includes('nachtschicht'));
   assert.ok(!keys(1).includes('bfw-energy') && !keys(2).includes('nachtschicht'));
-  const omer = catalog.CARDS.find((c) => c.id.startsWith('omer-'));
-  if (omer) {
-    const t2 = [{ card: card('krisz-3-gold'), boost: omer }, { card: card('adrian-3-gold') }, { card: card('aleks-3-gold') }];
-    assert.ok([0, 1, 2].every((m) => d.teamEffects(t2, m).some((e) => e.key === 'osmanen' && e.from === 0)));
-  }
   // derselbe Gruppen-Boost zweimal zählt nur einmal
-  const t3 = [{ card: card('krisz-3-gold'), boost: card('hugo-holo') }, { card: card('adrian-3-gold'), boost: card('hugo-holo') }, { card: card('aleks-3-gold') }];
-  assert.equal(d.teamEffects(t3, 2).filter((e) => e.key === 'hund').length, 1);
+  const mauch = card('mauch-1-holo');
+  const t3 = [{ card: card('krisz-3-gold'), boost: mauch }, { card: card('adrian-3-gold'), boost: mauch }, { card: card('aleks-3-gold') }];
+  assert.equal(d.teamEffects(t3, 2).filter((e) => e.key === 'gruschteln').length, 1);
+});
+
+test('Yo Dawg im Dungeon: Matze mit Hund und Hunde-Slot, höchstens zwei Hunde je Team, jeder nur einmal', () => {
+  const m = (cardId, boost = null, dog = null) => ({ card: cardId, boost, dog });
+  // Matze mit Hugo im Boost und Lilly im Hunde-Slot: beide greifen mit an
+  const [matze] = d.teamCards([m('matze-3-gold', 'hugo-holo', 'lilly-holo'), m('luca-3-gold'), m('aleks-3-gold')]);
+  assert.equal(matze.boost.id, 'hugo-holo');
+  assert.equal(matze.dog.id, 'lilly-holo');
+  const keys = d.teamEffects([matze], 0).map((e) => e.key + ':' + e.dog);
+  assert.deepEqual(keys, ['treue-seele-matze:hugo-holo', 'treue-seele-matze:lilly-holo']);
+  // Hunde-Slot ohne Matze oder ohne Hund im Boost zählt nicht
+  assert.equal(d.teamCards([m('luca-3-gold', 'hugo-holo', 'lilly-holo')])[0].dog, null);
+  assert.equal(d.teamCards([m('matze-3-gold', 'bfw-energy-gold', 'lilly-holo')])[0].dog, null);
+  // zugelostes Team: derselbe Hund zweimal oder ein dritter Hund – wer später kommt, dessen Hund spielt nicht mit
+  const t = d.teamCards([m('matze-3-gold', 'hugo-holo', 'lilly-holo'), m('luca-3-gold', 'hugo-holo'), m('aleks-3-gold', 'lilly-holo')]);
+  assert.deepEqual(t.map((x) => [x.boost && x.boost.id, x.dog && x.dog.id]), [['hugo-holo', 'lilly-holo'], [null, null], [null, null]]);
+  const t2 = d.teamCards([m('luca-3-gold', 'hugo-holo'), m('aleks-3-gold', 'hugo-holo')]);
+  assert.deepEqual(t2.map((x) => x.boost && x.boost.id), ['hugo-holo', null]);
+  // ein Kampf mit Hunden: Matzes Punkte enthalten ihren Anteil (dg)
+  const r = d.fight(d.teamCards([m('matze-3-gold', 'hugo-holo', 'lilly-holo')]), 'fis', 1e6, () => 0.5);
+  assert.ok(r.ticks.some((x) => x.dg === 50));
+  assert.ok(r.abilities.some((a) => a.dog === 'lilly-holo'));
+});
+
+test('Bots nehmen keinen Hund, der schon mitspielt, und keinen dritten', () => {
+  for (let i = 0; i < 100; i++) {
+    const team = d.fillBots([{ user: 'u', name: 'A', card: 'matze-3-gold', boost: 'hugo-holo', dog: 'lilly-holo' }], 'dungeon');
+    assert.ok(team.slice(1).every((b) => !['hugo-holo', 'lilly-holo'].includes(b.boost)), JSON.stringify(team.map((b) => b.boost)));
+    const one = d.fillBots([{ user: 'u', name: 'A', card: 'luca-3-gold', boost: 'hugo-holo' }], 'dungeon');
+    assert.ok(one.slice(1).every((b) => b.boost !== 'hugo-holo'));
+  }
 });
 
 test('Seltene Beute: nur echte Spieler mit Folie oder Boss-Karte, aktuelle Namen (#78)', () => {
@@ -195,4 +222,19 @@ test('Kartensperren: nur bekannte Modi, Text', () => {
   assert.equal(cardBans.isBanned('krisz-3-gold', 'dungeon'), false);
   assert.equal(d.modeOf({ mode: 'tower' }), 'tower');
   assert.equal(d.modeOf({}), 'dungeon');
+});
+
+test('Ömer im Dungeon: nur er dupliziert sich, die schnellere Deadline gilt für die ganze Gruppe', () => {
+  const { OMER } = require('../src/ihk/abilities');
+  const team = [{ card: card('omer-3-gold'), boost: null }, { card: card('adrian-3-gold'), boost: null }, { card: card('aleks-3-gold'), boost: null }];
+  const { simulate } = require('../src/ihk/ihkService');
+  const sim = (m) => simulate(team[m].card.stats, 'fis', 1e9, () => 0.5, d.teamEffects(team, m), 'dungeon');
+  const omer = sim(0);
+  const adrian = sim(1);
+  assert.ok(omer.ticks.some((t) => t.om === 3) && adrian.ticks.every((t) => !t.om), 'nur Ömer greift mehrfach an');
+  assert.deepEqual(adrian.rush, [2 * OMER.rush, 3 * OMER.rush], 'auch Adrians Deadline läuft schneller');
+  assert.equal(adrian.end, omer.end);
+  const r = d.fight(d.teamCards([{ card: 'omer-3-gold' }, { card: 'adrian-3-gold' }]), 'fis', 1e9, () => 0.5);
+  assert.ok(r.limit < 180 && Math.abs(r.limit - omer.end) < 0.2, 'der Kampf endet mit der schnelleren Deadline');
+  assert.ok(r.ticks.some((t) => t.m === 0 && t.om === 2));
 });

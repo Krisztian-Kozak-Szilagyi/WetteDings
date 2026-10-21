@@ -31,6 +31,7 @@
   <input type="hidden" name="card" value="">
   <input type="hidden" name="boost" value="">
   <input type="hidden" name="boost2" value="">
+  <input type="hidden" name="dog" value="">
   <input type="hidden" name="offer" value="">
 <% } %>
 
@@ -46,19 +47,31 @@
       <% } %>
     </div>
     <div class="ihk-boosts">
-      <% [{ key: 'boost', card: runBoost, label: 'Boost' }, { key: 'boost2', card: runBoost2, label: 'Boost 2' }].forEach((b) => { %>
+      <% [{ key: 'boost', card: runBoost, label: 'Boost' }, { key: 'boost2', card: runBoost2, label: 'Boost 2' }, { key: 'dog', card: runDog, label: 'Hund' }].forEach((b) => { %>
         <% if (b.key === 'boost' || b.card || canStart) { %>
-          <div class="ihk-slot ihk-slot-item<%= b.key === 'boost2' && canStart ? ' is-disabled' : '' %>" <%- canStart ? 'data-ihk-drop="' + b.key + '" role="button" tabindex="0"' : '' %> data-empty-label="<%= b.label %>"
-            <% if (b.card) { %>data-zoom="<%= b.card.image %>" data-zoom-title="<%= b.card.name %>"<% } %>>
+          <%# Hunde-Slot (Yo Dawg): nur Matze mit genau einem Hund im Boost – bis dahin ausgeblendet %>
+          <div class="ihk-slot ihk-slot-item<%= b.key === 'boost2' && canStart ? ' is-disabled' : '' %><%= b.key === 'dog' ? ' ihk-slot-dog' : '' %>" <%- canStart ? 'data-ihk-drop="' + b.key + '" role="button" tabindex="0"' : '' %> data-empty-label="<%= b.label %>"<%- b.key === 'dog' && canStart ? ' hidden' : '' %>
+            <% if (b.card) { %>data-zoom="<%= b.card.image %>" data-zoom-title="<%= b.card.name %>"<% } %><%- b.card && dogImages[b.card.id] ? ' data-dog-image="' + dogImages[b.card.id] + '"' : '' %>>
             <% if (b.card) { %>
               <img src="<%= b.card.image %>" alt="<%= b.card.name %>" width="720" height="1008" draggable="false">
             <% } else { %>
-              <span class="ihk-slot-empty"><%= b.label %><br><small><%= b.key === 'boost2' ? 'nur bei Hybrid-Quests' : 'optional' %></small></span>
+              <span class="ihk-slot-empty"><%= b.label %><br><small><%= b.key === 'boost2' ? 'nur bei Hybrid-Quests' : b.key === 'dog' ? 'Yo Dawg: zweiter Hund' : 'optional' %></small></span>
             <% } %>
           </div>
         <% } %>
       <% }) %>
     </div>
+    <%# Aleks (Gruß aus dem Osten): Geld für die Münzwürfe – erscheint, sobald Aleks die Karte ist (public/js/ihk.js) %>
+    <% if (canStart) { %>
+      <label class="ihk-coins" data-ihk-coins hidden>
+        <span>Geld für Aleks</span>
+        <span class="ihk-coins-field"><input type="number" name="coins" min="0" max="<%= aleksMax %>" step="50" value="0" inputmode="numeric"> €</span>
+        <small class="muted">bis <%= aleksMax %> € · je Münzwurf <%= aleksCost %> € · Rest kommt zurück</small>
+      </label>
+    <% } else if (run && run.coins) { %>
+      <%# Wiedergabe: der Betrag sinkt mit jedem Münzwurf (public/js/ihk.js) %>
+      <p class="ihk-coins-note muted small">Aleks: <strong data-ihk-coin-left><%= euro(run.coins.budget) %></strong> dabei</p>
+    <% } %>
   </div>
 
   <div class="ihk-col ihk-center">
@@ -107,7 +120,7 @@
         <span>Quest läuft … noch <strong data-ihk-countdown="<%= new Date(run.endsAt).getTime() %>">–</strong></span>
       </div>
     <% } else if (phase === 'result') { %>
-      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, slow: run.slow || [], abilities: run.abilities || [], imgs: runImages, base: runCard && runCard.stats ? [runCard.stats.speed, runCard.stats.fia, runCard.stats.fis, runCard.stats.bwl] : null }) %>'>
+      <div class="ihk-fight" data-ihk-fight='<%= JSON.stringify({ hybrid: quest.hybrid && run.total2 != null, ticks: run.ticks, required: run.required, workTime: workTime, success: run.success, freeze: run.freeze || 0, slow: run.slow || [], rush: run.rush || null, end: run.end || null, abilities: run.abilities || [], coinPlus: aleksPlus, coinBudget: run.coins ? run.coins.budget : 0, coinCost: aleksCost * 100, imgs: runImages, base: runCard && runCard.stats ? [runCard.stats.speed, runCard.stats.fia, runCard.stats.fis, runCard.stats.bwl] : null }) %>'>
         <% const twoBars = quest.hybrid && run.total2 != null; %>
         <div class="ihk-bar-label"><span>Fortschritt<%= twoBars ? ' 1' : '' %></span><span data-ihk-points>0 / <%= run.required %></span></div>
         <div class="ihk-bar"><span class="ihk-bar-fill ihk-bar-progress" data-ihk-progress></span></div>
@@ -181,6 +194,8 @@
 <%# Boost-Plätze: Boost-Karten, danach Charaktere, deren Fähigkeit als Boost wirkt %>
 <% const boostChars = cards.filter((c) => canBoost(c)); %>
 <% const scBoostAll = { list: scBoost.list.concat(boostChars), favs: scBoost.favs, freq: scBoost.freq }; %>
+<%# Hunde-Slot: nur Hundekarten (welcher Hund noch frei ist, prüft public/js/ihk.js) %>
+<% const scDog = { list: scBoost.list.filter((c) => isDog(c)), favs: scBoost.favs, freq: new Map() }; %>
 <% const ihkPickList = (slot, sc) => { const list = sc.list; const rars = [...new Set(list.map((c) => c.rarity))]; const favCount = list.filter((c) => sc.favs.has(c.id)).length; const isBoost = slot !== 'card'; %>
   <div class="dg-picklist" data-ihk-picklist>
     <div class="dg-pick-head">
@@ -192,14 +207,14 @@
         <%# "Ohne Boost" steht vorn – nur ohne Suche und Filter %>
         <label class="dg-pick dg-pick-none" data-ihk-none style="--i: 0; order: -300">
           <input type="radio" name="ihk-<%= slot %>" value="" checked>
-          <span class="dg-slot-placeholder"><span>Ohne Boost</span></span>
+          <span class="dg-slot-placeholder"><span><%= slot === 'dog' ? 'Ohne Hund' : 'Ohne Boost' %></span></span>
         </label>
       <% } %>
       <% if (favCount) { %><h3 class="pick-group" data-pick-group="fav">★ Favoriten</h3><% } %>
       <% if (sc.freq.size && !favCount) { %><h3 class="pick-group" data-pick-group="freq" style="order: -101" hidden>Häufig verwendet</h3><% } %>
       <% list.forEach((c, i) => { if (favCount && i === favCount) { %><h3 class="pick-group" data-pick-group="rest">Alle Karten</h3><% } else if (!favCount && i === 0 && sc.freq.size) { %><h3 class="pick-group" data-pick-group="rest" style="order: -1" hidden>Alle Karten</h3><% } const label = c.name + ' (' + rarityByKey[c.rarity].label + ')'; const l = lockInfo[c.id]; const blocked = l && !l.free; %>
         <%# Kein freies Exemplar (Im Dungeon, Im Handel …): sichtbar, aber nicht wählbar; sonst klein, wie viele gesperrt sind %>
-        <label class="dg-pick r-<%= c.rarity %><%= blocked ? ' is-blocked' : '' %>" data-ihk-item data-drag="<%= c.isCharacter ? 'card' : 'boost' %>" data-value="<%= c.id %>" data-image="<%= c.image %>"<%- c.isCharacter && canBoost(c) ? ' data-boostable="1"' : '' %><%- blocked ? ' data-blocked="1"' : '' %>
+        <label class="dg-pick r-<%= c.rarity %><%= blocked ? ' is-blocked' : '' %>" data-ihk-item data-drag="<%= c.isCharacter ? 'card' : 'boost' %>" data-value="<%= c.id %>" data-image="<%= c.image %>"<%- c.isCharacter && canBoost(c) ? ' data-boostable="1"' : '' %><%- isDog(c) ? ' data-dog="' + who(c) + '"' : '' %><%- isMatze(c) ? ' data-matze="1"' : '' %><%- isAleks(c) ? ' data-aleks="1"' : '' %><%- blocked ? ' data-blocked="1"' : '' %>
           data-name="<%= c.name.toLowerCase() %>" data-rarity="<%= c.rarity %>"<%- sc.favs.has(c.id) ? ' data-fav' : '' %><%- sc.freq.has(c.id) ? ' data-freq' : '' %>
           data-zoom="<%= c.image %>" data-zoom-title="<%= label %>" title="<%= blocked ? 'Kein freies Exemplar (' + l.label + ')' : l ? label + ' – ' + l.n + '× ' + l.label : label %>" style="--i: <%= isBoost ? i + 1 : i %><%= sc.freq.has(c.id) ? '; --fo: ' + (sc.freq.get(c.id) - 100) : '' %>">
           <input type="radio" name="ihk-<%= slot %>" value="<%= c.id %>" <%= blocked ? 'disabled' : '' %>>
@@ -214,7 +229,7 @@
     <p class="dg-pick-empty muted small" data-ihk-empty hidden>Keine passende Karte.</p>
   </div>
 <% } %>
-<% [['card', 'Karte wählen', scCard], ['boost', 'Boost wählen', scBoostAll], ['boost2', 'Boost 2 wählen', scBoostAll]].forEach(([slot, title, sc]) => { %>
+<% [['card', 'Karte wählen', scCard], ['boost', 'Boost wählen', scBoostAll], ['boost2', 'Boost 2 wählen', scBoostAll], ['dog', 'Zweiten Hund wählen', scDog]].forEach(([slot, title, sc]) => { %>
   <dialog class="dg-picker ihk-picker" data-ihk-picker="<%= slot %>" aria-labelledby="ihk-picker-<%= slot %>">
     <div class="dg-picker-head">
       <h2 id="ihk-picker-<%= slot %>"><%= title %></h2>

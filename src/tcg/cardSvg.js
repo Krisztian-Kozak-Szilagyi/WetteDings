@@ -36,7 +36,8 @@ function wrap(text, maxWidth, size) {
   const maxChars = Math.max(8, Math.floor(maxWidth / (size * CHAR_EM)));
   const lines = [];
   let line = '';
-  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+  // geschützte Leerzeichen ( , z. B. „50 €“) trennen nicht – \s würde sie mitnehmen
+  for (const word of String(text).split(/[ \t\r\n]+/).filter(Boolean)) {
     if (line && (line + ' ' + word).length > maxChars) {
       lines.push(line);
       line = word;

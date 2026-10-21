@@ -106,9 +106,9 @@ function playFight(sims, bockIn, values, o) {
   const events = [];
   let limit = W;
   sims.forEach((s, m) => {
-    const own = W + (s.freeze || 0) + (s.extend || 0);
+    const own = s.end != null ? s.end : W + (s.freeze || 0) + (s.extend || 0); // Ömer: Deadline endet früher
     limit = Math.max(limit, own);
-    s.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, crit: !!x.crit, destroy: !!x.destroy }));
+    s.ticks.forEach((x) => events.push({ m, t: x.t, p: x.p, crit: !!x.crit, destroy: !!x.destroy, ...(x.coin ? { coin: x.coin } : {}) }));
     // Verlängerung: weitere Takte im Grundtempo nach Ablauf der eigenen Zeit
     if (extGame > 0 && values[m] > 0) {
       const iv = W / (10 + Math.max(0, s.speed || 0) / 10);
@@ -163,7 +163,7 @@ function playFight(sims, bockIn, values, o) {
     let p = e.p;
     if (!e.destroy) p = Math.max(1, Math.round(p * (boost ? BOOST_FACTOR : 1) * (o.trait === 'fluch' && e.m === strongest ? FLUCH : 1)));
     total += p;
-    ticks.push({ m: e.m, t: e.t, p, crit: e.crit, boost });
+    ticks.push({ m: e.m, t: e.t, p, crit: e.crit, boost, ...(e.coin ? { coin: e.coin } : {}) }); // coin: Münzwurf von Aleks
     if (total >= o.required) {
       doneAt = e.t;
       break;
