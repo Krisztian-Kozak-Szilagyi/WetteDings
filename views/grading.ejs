@@ -69,7 +69,7 @@
     const popCls = `gd-sheet gd-pop gd-pop-${Math.min(4, Math.max(1, info.level || 1))}`;
     const sheetHead = (key, title) => `<header class="gd-sheet-head"><span class="gd-sheet-grip" aria-hidden="true"></span>${img(sheetIcon[key], 36, 'gd-sheet-icon')}<h2 id="gd-${key}-t">${title}</h2><button type="button" class="gd-sheet-help" data-tour-info="${key}" aria-label="Kurz erklärt">?</button><button type="button" class="gd-sheet-close" data-gd-close aria-label="Schließen">×</button></header>`;
     // Kassenzettel: NPC-Lohn je Schritt bzw. gebuchte Bausteine eines Mitglieds
-    const npcLabels = { clean: 'Reinigung', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln', extra: 'Zuschlag' };
+    const npcLabels = { clean: 'Reinigung', iron: 'Bügeln', grade: 'Benoten', slab: 'Versiegeln', extra: 'Zuschlag', bonus: 'Grundlohn' };
     const svcLabels = Object.fromEntries(services.map((s) => [s.key, s.label]));
     const linesOf = (parts, player) => Object.entries(parts || {}).filter(([k, v]) => v && (player ? svcLabels : npcLabels)[k]).map(([k, v]) => [(player ? svcLabels : npcLabels)[k], v]);
     const bonNote = (j) => [

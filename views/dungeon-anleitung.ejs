@@ -25,10 +25,10 @@
     <h2>Beute</h2>
     <ul>
       <li>Jeder gewonnene Kampf bringt jedem Spieler Geld: <%= euro(settings.rewards[0]) %> und <%= euro(settings.rewards[1]) %> für die beiden Gegner, <%= euro(settings.rewards[2]) %> für den Boss.</li>
-      <li>Fällt der Boss, würfelt jeder Spieler für sich: mit etwas Glück gibt es einen <strong>TCG Sleeve</strong> (oder einen leeren Slab) oder die <strong>Karte des Bosses</strong>.</li>
+      <li>Fällt der Boss, würfelt jeder Spieler für sich: mit etwas Glück gibt es die <strong>Karte des Bosses</strong> (<%= String(settings.cardChance).replace('.', ',') %> %).</li>
       <li>Verliert ihr einen Kampf, behaltet ihr das Geld der Kämpfe davor.</li>
     </ul>
-    <p class="muted small">Die Beute siehst du am Ende in einem Fenster; Sleeves und Slabs landen im Inventar.</p>
+    <p class="muted small">Die Beute siehst du am Ende in einem Fenster. TCG Sleeves und leere Slabs gibt es im Bank-Shop im Inventar.</p>
   </div>
 
   <% if (towerShown) { %>
@@ -40,7 +40,7 @@
         <li><strong>Kein festes Ende:</strong> Ihr kämpft Runde für Runde, bis ihr eine nicht schafft. Jede Runde ist <%= pct(tw.growth) %> % schwerer als die vorige.</li>
         <li><strong>Zufällige Prüfungen:</strong> Welche Fachrichtung eine Runde braucht, wird jedes Mal neu ausgewürfelt – wie im Dungeon verrät es nur der Text.</li>
         <li><strong>Lohn:</strong> <%= euro(tw.rewardBase) %> für die erste Runde, jede weitere bringt <%= euro(tw.rewardStep) %> mehr.</li>
-        <li><strong>Seltene Beute:</strong> Jede geschaffte Runde erhöht die Chance auf einen Fund (TCG Sleeve oder leerer Slab) (+<%= pct(tw.foilPerRound) %> %, höchstens <%= pct(tw.foilMax) %> %) und auf die Boss-Karte (+<%= pct(tw.cardPerRound) %> %, höchstens <%= pct(tw.cardMax) %> %). Gewürfelt wird für jeden Spieler einzeln.</li>
+        <li><strong>Seltene Beute:</strong> Jede geschaffte Runde erhöht die Chance auf die Boss-Karte (+<%= pct(tw.cardPerRound) %> %, höchstens <%= pct(tw.cardMax) %> %). Gewürfelt wird für jeden Spieler einzeln.</li>
         <li>Das Ergebnis steht fest, sobald ihr den Turm betretet. Danach seht ihr euren Aufstieg Runde für Runde.</li>
       </ul>
     </div>

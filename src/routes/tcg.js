@@ -61,13 +61,21 @@ router.get('/tcg', async (req, res) => {
   });
 });
 
+// Ansicht des Albums: 'stapel' = eine Kachel je Karte, Versionen beim Anklicken (Standard), 'einzeln' = jede Version
+// als eigene Karte (die bisherige Ansicht). ?ansicht=… wechselt, die Wahl bleibt für die Sitzung.
+const ALBUM_VIEWS = ['stapel', 'einzeln'];
+
 router.get('/tcg/album', async (req, res) => {
+  const wanted = str(req.query.ansicht);
+  if (ALBUM_VIEWS.includes(wanted)) req.session.albumView = wanted;
+  const albumView = ALBUM_VIEWS.includes(req.session.albumView) ? req.session.albumView : 'stapel';
   const coll = await collection(req.user);
   // Slab-Regal, Kartennummern und Zertifikatsschild (tcg/albumView) – wie in der Sammlung eines Mitglieds
   const { slabCopies, cardNo, popStatsOf } = await viewData(coll);
   const neu = str(req.query.neu); // gerade in den Sleeve gesteckt: öffnet sich in 3D (public/js/foil-view.js)
   res.render('tcg-album', {
     title: 'Album',
+    albumView,
     ...coll,
     slabCopies,
     cardNo,

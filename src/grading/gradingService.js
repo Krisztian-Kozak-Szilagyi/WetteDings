@@ -88,8 +88,10 @@ const DEFAULTS = {
   open: false,
   jobs: 10,
   playerJobs: 10,
-  // slab: Lohn fürs Versiegeln – seit 13.10. verbraucht auch ein NPC-Auftrag einen leeren Slab (Bank-Preis 40 €), darum von 35 € auf 60 € angehoben
-  pay: { clean: 2500, grade: 3000, slab: 6000, iron: 2000 },
+  // slab: Lohn fürs Versiegeln – seit 13.10. verbraucht auch ein NPC-Auftrag einen leeren Slab (Bank-Preis damals 40 €, seit 22.10. 10 €),
+  // darum von 35 € auf 60 € angehoben
+  // bonus: Grundlohn für jeden abgeschlossenen NPC-Auftrag – fest, ohne Premium- und Seltenheits-Zuschlag (22.10.: +10 €)
+  pay: { clean: 2500, grade: 3000, slab: 6000, iron: 2000, bonus: 1000 },
   // Stufe 2, 3, 4. Live-Daten (5.–13.10., 22 Spieler): Einkommen bei 10 Aufträgen ca. 255 € (Stufe 1), 265 € (Stufe 2, seit dem Bügel-Umbau am 10.10.), 825 € (Stufe 3), 1.100 € (Stufe 4).
   // Stufe 2 ist vor allem das Tor zu Stufe 3 (kleiner Preis), Stufe 3 und 4 kosten etwa 5–8 Tage Einkommen der Vorstufe: Weg bis ganz oben ca. 12 Tage statt 1–3.
   costs: [100000, 200000, 400000],
@@ -206,8 +208,10 @@ function payParts({ level, clean = 100, grade, guess, seal, rarity, iron = null 
   }
   if (info.steps.includes('slab')) parts.slab = Math.round((PAY.slab * Math.max(0, Math.min(100, seal))) / 100);
   const sum = Object.values(parts).reduce((a, b) => a + b, 0);
-  const total = Math.round(sum * info.factor * (1 + rarityBonus(rarity) / 100));
-  return { parts, extra: total - sum, total };
+  const scaled = Math.round(sum * info.factor * (1 + rarityBonus(rarity) / 100));
+  // Grundlohn: fest dazu, ohne Zuschläge
+  if (PAY.bonus) parts.bonus = PAY.bonus;
+  return { parts, extra: scaled - sum, total: scaled + (PAY.bonus || 0) };
 }
 const payFor = (input) => payParts(input).total;
 

@@ -131,7 +131,6 @@ const settingsSchema = new Schema(
     intervalHours: Number,
     required: [Number],
     rewards: [Number],
-    foilChance: Number,
     cardChance: Number,
     botWeights: Schema.Types.Mixed,
     tower: Schema.Types.Mixed, // Mage Tower (siehe dungeonService.DEFAULTS.tower)

@@ -33,16 +33,19 @@ test('Standardwerte: 10 Aufträge, Stufe 1 bis 25 € pro Auftrag', () => {
   assert.ok(LEVELS.every((l) => levelInfo(l.level).jobs === 10));
 });
 
-test('Lohn je Stufe: Putzen nach Sauberkeit, Note exakt/±1, Versiegeln nach Qualität', () => {
-  assert.equal(payFor({ level: 1, grade: 8, guess: NaN, seal: null }), PAY.clean);
-  assert.equal(payFor({ level: 1, clean: 60 }), Math.round(PAY.clean * 0.6));
-  assert.equal(payFor({ level: 1, clean: 0 }), 0);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 7, seal: null }), PAY.clean + PAY.grade / 2);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 5, seal: null }), PAY.clean);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 100 }), PAY.clean + PAY.grade + PAY.slab);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 500 }), PAY.clean + PAY.grade + PAY.slab); // gedeckelt
-  assert.equal(payFor({ level: 4, grade: 8, guess: 8, seal: 100 }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3));
+test('Lohn je Stufe: Putzen nach Sauberkeit, Note exakt/±1, Versiegeln nach Qualität – plus fester Grundlohn', () => {
+  const B = PAY.bonus; // Grundlohn je Auftrag, ohne Zuschläge (22.10.: 10 €)
+  assert.equal(B, 1000);
+  assert.equal(payFor({ level: 1, grade: 8, guess: NaN, seal: null }), PAY.clean + B);
+  assert.equal(payFor({ level: 1, clean: 60 }), Math.round(PAY.clean * 0.6) + B);
+  assert.equal(payFor({ level: 1, clean: 0 }), B);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade + B);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 7, seal: null }), PAY.clean + PAY.grade / 2 + B);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 5, seal: null }), PAY.clean + B);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 100 }), PAY.clean + PAY.grade + PAY.slab + B);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: 500 }), PAY.clean + PAY.grade + PAY.slab + B); // gedeckelt
+  // Premium (Stufe 4) gilt nicht für den Grundlohn
+  assert.equal(payFor({ level: 4, grade: 8, guess: 8, seal: 100 }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3) + B);
 });
 
 test('Stufen: aufsteigende Kosten, jede Stufe mindestens so viele Schritte wie die vorige', () => {
@@ -66,9 +69,10 @@ test('Grading: Kundenkarten erst ab Holo, seltener = weniger Chance und mehr Loh
   const allowed = new Set(CUSTOMER_RARITIES.map(([k]) => k));
   for (let i = 0; i < 500; i++) assert.ok(allowed.has(catalog.cardById[rollCard()].rarity));
   assert.strictEqual(rarityBonus('crumpled'), 0);
-  assert.strictEqual(payFor({ level: 1, rarity: 'sith' }), Math.round(PAY.clean * 1.5));
-  assert.strictEqual(payFor({ level: 1, rarity: 'bockhaber' }), Math.round(PAY.clean * 1.05));
-  assert.strictEqual(payFor({ level: 4, grade: 8, guess: 8, seal: 100, rarity: 'boss' }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3 * 1.2));
+  // Seltenheits-Zuschlag nicht auf den Grundlohn
+  assert.strictEqual(payFor({ level: 1, rarity: 'sith' }), Math.round(PAY.clean * 1.5) + PAY.bonus);
+  assert.strictEqual(payFor({ level: 1, rarity: 'bockhaber' }), Math.round(PAY.clean * 1.05) + PAY.bonus);
+  assert.strictEqual(payFor({ level: 4, grade: 8, guess: 8, seal: 100, rarity: 'boss' }), Math.round((PAY.clean + PAY.grade + PAY.slab) * 1.3 * 1.2) + PAY.bonus);
 });
 
 test('#96: nach einem Ausbau gibt es am selben Tag wieder volle Aufträge', () => {
@@ -124,10 +128,10 @@ test('#204: Bügeln – nur ab Stufe 2 und nur bei Karten mit Knick; Lohn nach G
   assert.equal(ironMinMs(100), 10 * MS_PER_SEGMENT);
   assert.equal(ironMinMs(0), 0);
   // Lohn: Bügeln nur ab Stufe 2 und nur, wenn gebügelt wurde
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 100 }), PAY.clean + PAY.grade + PAY.iron);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 50 }), PAY.clean + PAY.grade + PAY.iron / 2);
-  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade);
-  assert.equal(payFor({ level: 1, iron: 100 }), PAY.clean);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 100 }), PAY.clean + PAY.grade + PAY.iron + PAY.bonus);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null, iron: 50 }), PAY.clean + PAY.grade + PAY.iron / 2 + PAY.bonus);
+  assert.equal(payFor({ level: 3, grade: 8, guess: 8, seal: null }), PAY.clean + PAY.grade + PAY.bonus);
+  assert.equal(payFor({ level: 1, iron: 100 }), PAY.clean + PAY.bonus);
 });
 
 test('Kundenkarte: reichere Kundschaft bei hohem Rang würfelt ohne Fehler (ganzzahlige Gewichte)', () => {

@@ -13,7 +13,42 @@ const { GradingJob, GradingShop } = require('./models/Grading');
 /**
  * Datenbank-Migrationen, die beim Start laufen. Idempotent – mehrfaches Ausführen schadet nicht.
  */
+/**
+ * Einmalig (Marke in der Sammlung migrations): die Balance vom 22.10. auch in die im Admin-Panel gespeicherten Werte
+ * übernehmen – Boss-Karte doppelt so oft (Dungeon und Turm), keine Sleeve-/Slab-Funde mehr, Sleeve 5 € (Ankauf 3 €),
+ * Slab 10 € (Ankauf 6 €). Danach lassen sich alle Werte im Admin-Panel wieder frei ändern. Der Grundlohn im Grading
+ * braucht nichts: fehlt er in den gespeicherten Werten, gilt der Startwert.
+ */
+async function balance20261022() {
+  const marks = require('mongoose').connection.collection('migrations');
+  try {
+    await marks.insertOne({ _id: 'balance-2026-10-22', at: new Date() });
+  } catch (err) {
+    if (err.code === 11000) return; // schon übernommen
+    throw err;
+  }
+  const { DungeonSettings } = require('./models/Dungeon');
+  const { ItemSettings } = require('./models/Item');
+  const d = await DungeonSettings.findById('dungeon').lean();
+  if (d) {
+    const double = (v, fallback) => Math.min(100, (Number.isFinite(v) ? v : fallback) * 2);
+    const t = d.tower || {};
+    await DungeonSettings.updateOne(
+      { _id: 'dungeon' },
+      {
+        $set: { cardChance: double(d.cardChance, 1), 'tower.cardPerRound': double(t.cardPerRound, 0.5), 'tower.cardMax': double(t.cardMax, 10) },
+        $unset: { foilChance: '', 'tower.foilPerRound': '', 'tower.foilMax': '' },
+      }
+    );
+  }
+  if (await ItemSettings.exists({ _id: 'folie' })) {
+    await ItemSettings.updateOne({ _id: 'folie' }, { $set: { sleevePrice: 500, sleeveSell: 300, slabPrice: 1000, slabSell: 600 } });
+  }
+  console.log('Migration: Balance 22.10. übernommen (Boss-Karte ×2, keine Funde in Dungeon/Turm, Sleeve 5 €, Slab 10 €).');
+}
+
 async function migrate() {
+  await balance20261022();
   await migrateTrades();
 
   // Wochen-/Monats-Lotterie: Rundennummer und offene Runde gelten jetzt je Lotterie-Art – alte Indizes entfernen

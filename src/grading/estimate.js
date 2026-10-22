@@ -24,7 +24,7 @@ function jobPay({ steps, premium }, pay, premiumPercent, profile, factor, crease
   if (steps.includes('iron')) p += ((pay.iron || 0) * creaseChance * (profile.iron || 0)) / 100;
   if (steps.includes('grade')) p += pay.grade * (profile.exact + profile.near / 2);
   if (steps.includes('slab')) p += (pay.slab * profile.seal) / 100;
-  return p * (premium ? 1 + premiumPercent / 100 : 1) * factor;
+  return p * (premium ? 1 + premiumPercent / 100 : 1) * factor + (pay.bonus || 0); // Grundlohn ohne Zuschläge
 }
 
 /**

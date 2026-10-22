@@ -77,7 +77,7 @@ test('Kampf: gemeinsamer Balken, Ticks nach Zeit, Schluss beim Erreichen des Zie
 
 test('Dungeon: nach einer Niederlage ist Schluss; Lohn nur für gewonnene Kämpfe, Bots bekommen nichts', () => {
   const team = [{ card: card('krisz-1-crumpled') }, { card: card('adrian-1-crumpled') }, { card: card('aleks-1-crumpled') }];
-  const opts = { required: [1, 100000, 1], rewards: [1000, 1500, 4000], foilChance: 100, cardChance: 100 };
+  const opts = { required: [1, 100000, 1], rewards: [1000, 1500, 4000], cardChance: 100 };
   const fights = d.playDungeon(DUNGEONS[0], team, Math.random, opts);
   assert.equal(fights.length, 2);
   assert.deepEqual(fights.map((f) => f.success), [true, false]);
@@ -86,9 +86,10 @@ test('Dungeon: nach einer Niederlage ist Schluss; Lohn nur für gewonnene Kämpf
   const easy = { ...opts, required: [1, 1, 1] };
   const all = d.playDungeon(DUNGEONS[0], team, Math.random, easy);
   assert.equal(all.length, 3);
-  assert.deepEqual(d.rewardsFor(all, false, Math.random, easy), { reward: 6500, foil: true, bossCard: true });
+  // seit 22.10. keine Sleeve-/Slab-Funde mehr – nur noch die Boss-Karte
+  assert.deepEqual(d.rewardsFor(all, false, Math.random, easy), { reward: 6500, foil: false, bossCard: true });
   assert.deepEqual(d.rewardsFor(all, true, Math.random, easy), { reward: 0, foil: false, bossCard: false });
-  assert.deepEqual(d.rewardsFor(all, false, Math.random, { ...easy, foilChance: 0, cardChance: 0 }), { reward: 6500, foil: false, bossCard: false });
+  assert.deepEqual(d.rewardsFor(all, false, Math.random, { ...easy, cardChance: 0 }), { reward: 6500, foil: false, bossCard: false });
 });
 
 test('Einzelspieler werden in Dreiergruppen gelost', () => {
@@ -237,4 +238,12 @@ test('Ömer im Dungeon: nur er dupliziert sich, die schnellere Deadline gilt fü
   const r = d.fight(d.teamCards([{ card: 'omer-3-gold' }, { card: 'adrian-3-gold' }]), 'fis', 1e9, () => 0.5);
   assert.ok(r.limit < 180 && Math.abs(r.limit - omer.end) < 0.2, 'der Kampf endet mit der schnelleren Deadline');
   assert.ok(r.ticks.some((t) => t.m === 0 && t.om === 2));
+});
+
+test('Balance 22.10.: Boss-Karte doppelt so oft (Dungeon 2 %, Turm 1 % je Runde bis 20 %), keine Funde mehr', () => {
+  assert.equal(d.DEFAULTS.cardChance, 2);
+  assert.equal(d.DEFAULTS.tower.cardPerRound, 1);
+  assert.equal(d.DEFAULTS.tower.cardMax, 20);
+  assert.ok(!('foilChance' in d.DEFAULTS) && !('foilPerRound' in d.DEFAULTS.tower) && !('foilMax' in d.DEFAULTS.tower));
+  assert.deepEqual(d.towerChances(30), { card: 20 });
 });

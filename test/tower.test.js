@@ -26,15 +26,15 @@ test('Mage Tower: Begegnungen für jede Fachrichtung, vollständig und eindeutig
 });
 
 test('Mage Tower: Ziel und Lohn steigen mit jeder Runde, Chancen haben eine Obergrenze', () => {
-  const o = opts({ baseRequired: 1000, growth: 10, rewardBase: 1000, rewardStep: 500, foilPerRound: 2, foilMax: 15, cardPerRound: 1, cardMax: 5 });
+  const o = opts({ baseRequired: 1000, growth: 10, rewardBase: 1000, rewardStep: 500, cardPerRound: 1, cardMax: 5 });
   assert.equal(d.towerRequired(1, o), 1000);
   assert.equal(d.towerRequired(2, o), 1100);
   assert.equal(d.towerRequired(3, o), 1210);
   for (let n = 1; n < 30; n++) assert.ok(d.towerRequired(n + 1, o) > d.towerRequired(n, o));
   assert.deepEqual([1, 2, 5].map((n) => d.towerReward(n, o)), [1000, 1500, 3000]);
-  assert.deepEqual(d.towerChances(0, o), { foil: 0, card: 0 });
-  assert.deepEqual(d.towerChances(3, o), { foil: 6, card: 3 });
-  assert.deepEqual(d.towerChances(100, o), { foil: 15, card: 5 });
+  assert.deepEqual(d.towerChances(0, o), { card: 0 });
+  assert.deepEqual(d.towerChances(3, o), { card: 3 });
+  assert.deepEqual(d.towerChances(100, o), { card: 5 });
 });
 
 test('Mage Tower: Runden bis zur ersten Niederlage, zufällige Fachrichtung, nie zweimal dieselbe Begegnung', () => {
@@ -64,16 +64,16 @@ test('Mage Tower: Sicherheitsgrenze bei unendlich leichten Runden', () => {
   assert.ok(d.MAX_ROUNDS >= 50);
 });
 
-test('Mage Tower: Lohn aller geschafften Runden, Beute nach Runden gewürfelt, Bots bekommen nichts', () => {
+test('Mage Tower: Lohn aller geschafften Runden, Boss-Karte nach Runden gewürfelt (keine Funde mehr), Bots bekommen nichts', () => {
   const won = (reward) => ({ success: true, reward });
   const fights = [won(1000), won(1500), won(2000), { success: false, reward: 2500 }];
-  const sure = opts({ foilPerRound: 50, foilMax: 100, cardPerRound: 50, cardMax: 100 });
-  assert.deepEqual(d.towerRewardsFor(fights, false, () => 0.99, sure), { reward: 4500, foil: true, bossCard: true });
+  const sure = opts({ cardPerRound: 50, cardMax: 100 });
+  assert.deepEqual(d.towerRewardsFor(fights, false, () => 0.99, sure), { reward: 4500, foil: false, bossCard: true });
   assert.deepEqual(d.towerRewardsFor(fights, true, () => 0, sure), { reward: 0, foil: false, bossCard: false });
   // Chance 3 × 10 % = 30 %: Wurf 0,25 trifft, 0,35 nicht
-  const ten = opts({ foilPerRound: 10, foilMax: 100, cardPerRound: 10, cardMax: 100 });
-  assert.equal(d.towerRewardsFor(fights, false, () => 0.25, ten).foil, true);
-  assert.equal(d.towerRewardsFor(fights, false, () => 0.35, ten).foil, false);
+  const ten = opts({ cardPerRound: 10, cardMax: 100 });
+  assert.equal(d.towerRewardsFor(fights, false, () => 0.25, ten).bossCard, true);
+  assert.equal(d.towerRewardsFor(fights, false, () => 0.35, ten).bossCard, false);
   // gleich in Runde 1 gescheitert: nichts, auch kein Glückswurf
   assert.deepEqual(d.towerRewardsFor([{ success: false, reward: 1000 }], false, () => 0, sure), { reward: 0, foil: false, bossCard: false });
 });

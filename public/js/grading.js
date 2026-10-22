@@ -1186,6 +1186,7 @@
       if (p.grade != null) row('Note ' + res.guess + (res.grade != null ? (res.guess === res.grade ? ' · exakt' : ' · richtig ' + res.grade) : ''), euro(p.grade));
       if (p.slab != null) row('Versiegeln · ' + res.seal + ' %', euro(p.slab));
       if (res.breakdown && res.breakdown.extra) row('Zuschläge (Seltenheit, Premium)', euro(res.breakdown.extra));
+      if (p.bonus) row('Grundlohn', euro(p.bonus));
     }
     row('Summe', euro(res.pay), 'is-sum');
 

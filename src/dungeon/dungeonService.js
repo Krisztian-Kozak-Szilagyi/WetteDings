@@ -42,10 +42,11 @@ const BOT_NAMES = ['Praktikant-Bot', 'Azubi-Bot', 'Werkstudent-Bot'];
 // ---------- Einstellungen (Admin) ----------
 // open = für alle Mitglieder (sonst nur Admins); intervalHours = Abstand der Starts
 // required / rewards = Ziel-Punkte und Lohn (Cent pro Spieler) für [Trash 1, Trash 2, Boss]
-// foilChance / cardChance = Chance in % pro Spieler auf einen Fund (TCG Sleeve oder leerer Slab) bzw. die Boss-Karte (nur wenn der Boss fällt)
+// cardChance = Chance in % pro Spieler auf die Boss-Karte (nur wenn der Boss fällt). Sleeves und Slabs gibt es seit dem
+// 22.10. nicht mehr als Beute (Dungeon und Turm) – nur noch im Bank-Shop
 // botWeights = Gewicht je Seltenheit für die Karte eines Bots
 // tower = Mage Tower: open (zusätzlich zu open), Ziel-Punkte der ersten Runde und Anstieg pro Runde (%), Lohn pro Spieler
-// für Runde 1 und Zuwachs je weitere Runde (Cent), Beute-Chance pro geschaffter Runde und ihre Obergrenze (%),
+// für Runde 1 und Zuwachs je weitere Runde (Cent), Chance auf die Boss-Karte pro geschaffter Runde und ihre Obergrenze (%),
 // Wiedergabe je Runde und Pause (echte Sekunden), Läufe pro Spieler und Tag (dailyRuns) und davon höchstens esportsRuns als
 // eSports-Lauf (gemeinsames Kontingent: ein eSports-Lauf zählt auch zu dailyRuns)
 const DEFAULTS = {
@@ -54,14 +55,13 @@ const DEFAULTS = {
   // Von Krisztian festgelegt (2026-10-04); die Simulation dazu steht in .claude/notes/funkciok.md
   required: [1800, 1950, 2200],
   rewards: [5000, 5000, 15000],
-  foilChance: 2,
-  cardChance: 1,
+  cardChance: 2, // 22.10.: von 1 % verdoppelt
   // Bots bringen keine Crumpled-Karten; selten Bockhaber, ganz selten Glitch (Summe 100 = Prozent)
   botWeights: { crumpled: 0, bfwler: 40, gold: 40, holo: 15, bockhaber: 4, glitch: 1, icon: 0, sith: 0 },
   // Simulation (2026-10-07, strategische Gruppen: stärkste Charaktere der Seltenheit + beste Boosts): Gold ~6, Holo ~7,
   // Bockhaber ~8, Glitch ~14 Runden, beste Kombination (St. Ivan + Glitch, Mauch/Sigrist/Lili) ~17. Der steile Anstieg
   // hält den Abstand klein – mit +8 % schaffte die beste Kombination 36 Runden (~3.500 € am Tag).
-  tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, foilPerRound: 1, foilMax: 25, cardPerRound: 0.5, cardMax: 10, fightSeconds: 20, pauseSeconds: 4, dailyRuns: 1, esportsRuns: 1 },
+  tower: { open: false, baseRequired: 600, growth: 20, rewardBase: 1000, rewardStep: 500, cardPerRound: 1, cardMax: 20, fightSeconds: 20, pauseSeconds: 4, dailyRuns: 1, esportsRuns: 1 },
 };
 const settings = JSON.parse(JSON.stringify(DEFAULTS));
 
@@ -71,8 +71,6 @@ const TOWER_LIMITS = {
   growth: [1, 100, false],
   rewardBase: [0, 10000000, true],
   rewardStep: [0, 10000000, true],
-  foilPerRound: [0, 100, false],
-  foilMax: [0, 100, false],
   cardPerRound: [0, 100, false],
   cardMax: [0, 100, false],
   fightSeconds: [5, 120, true],
@@ -100,7 +98,6 @@ async function loadSettings() {
   if (validInterval(doc.intervalHours)) settings.intervalHours = doc.intervalHours;
   if (validTriple(doc.required, 1)) settings.required = doc.required;
   if (validTriple(doc.rewards, 0)) settings.rewards = doc.rewards;
-  if (validChance(doc.foilChance)) settings.foilChance = doc.foilChance;
   if (validChance(doc.cardChance)) settings.cardChance = doc.cardChance;
   if (validWeights(doc.botWeights)) settings.botWeights = Object.fromEntries(catalog.RARITIES.map((r) => [r.key, doc.botWeights[r.key]]));
   // Turm: fehlende Werte (neu hinzugekommen) vom Standard
@@ -110,16 +107,16 @@ async function loadSettings() {
   if (texts) applyFloorTexts(texts);
 }
 
-async function saveSettings({ open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower = settings.tower, admin }) {
+async function saveSettings({ open, intervalHours, required, rewards, cardChance, botWeights, tower = settings.tower, admin }) {
   if (!validInterval(intervalHours)) throw new UserError('Der Abstand muss 1, 2, 3, 4, 6, 8, 12 oder 24 Stunden sein.');
   if (!validTriple(required, 1) || required.some((r) => r > 100000)) throw new UserError('Bitte für jeden Kampf gültige Ziel-Punkte angeben (1–100000).');
   if (!validTriple(rewards, 0)) throw new UserError('Bitte für jeden Kampf einen gültigen Lohn angeben.');
-  if (!validChance(foilChance) || !validChance(cardChance)) throw new UserError('Die Chancen müssen zwischen 0 und 100 % liegen.');
+  if (!validChance(cardChance)) throw new UserError('Die Chance auf die Boss-Karte muss zwischen 0 und 100 % liegen.');
   if (!validWeights(botWeights)) throw new UserError('Bot-Karten: ganze Zahlen von 0 bis 10000, mindestens eine Seltenheit mit Charakterkarten über 0.');
   if (!validTower(tower)) {
     throw new UserError('Mage Tower: Ziel 1–100000 Punkte, Anstieg 1–100 %, Chancen 0–100 %, Wiedergabe 5–120 s, Pause 0–30 s je Runde und 1–10 Läufe pro Tag.');
   }
-  const next = { open, intervalHours, required, rewards, foilChance, cardChance, botWeights, tower };
+  const next = { open, intervalHours, required, rewards, cardChance, botWeights, tower };
   await DungeonSettings.updateOne({ _id: 'dungeon' }, { $set: { ...next, updatedByName: admin.username } }, { upsert: true });
   const before = JSON.parse(JSON.stringify(settings));
   Object.assign(settings, next);
@@ -372,9 +369,8 @@ const MAX_ROUNDS = 100; // Sicherheitsgrenze – der Anstieg sorgt lange vorher 
 const towerRequired = (n, opts = settings.tower) => Math.round(opts.baseRequired * (1 + opts.growth / 100) ** (n - 1));
 /** Lohn pro Spieler für Runde n (Cent) */
 const towerReward = (n, opts = settings.tower) => opts.rewardBase + opts.rewardStep * (n - 1);
-/** Beute-Chancen in % nach `rounds` geschafften Runden */
+/** Chance in % auf die Boss-Karte nach `rounds` geschafften Runden */
 const towerChances = (rounds, opts = settings.tower) => ({
-  foil: Math.min(opts.foilMax, opts.foilPerRound * rounds),
   card: Math.min(opts.cardMax, opts.cardPerRound * rounds),
 });
 
@@ -400,12 +396,12 @@ function playTower(members, rand = random, opts = settings.tower, maxRounds = MA
   return fights;
 }
 
-/** Lohn und Beute pro Spieler im Turm: Lohn aller geschafften Runden, Folie und Karte mit den Chancen der Runden */
+/** Lohn und Beute pro Spieler im Turm: Lohn aller geschafften Runden und die Boss-Karte mit der Chance der Runden (keine Funde mehr) */
 function towerRewardsFor(fights, isBot, rand = random, opts = settings.tower) {
   if (isBot) return { reward: 0, foil: false, bossCard: false };
   const won = fights.filter((f) => f.success);
   const chance = towerChances(won.length, opts);
-  return { reward: won.reduce((s, f) => s + f.reward, 0), foil: rand() * 100 < chance.foil, bossCard: rand() * 100 < chance.card };
+  return { reward: won.reduce((s, f) => s + f.reward, 0), foil: false, bossCard: rand() * 100 < chance.card };
 }
 
 /** Lohn und Beute pro Spieler (Bots bekommen nichts) */
@@ -413,7 +409,7 @@ function rewardsFor(fights, isBot, rand = random, opts = settings) {
   const money = fights.filter((f) => f.success).reduce((s, f) => s + f.reward, 0);
   const boss = fights.some((f) => f.boss && f.success);
   if (isBot) return { reward: 0, foil: false, bossCard: false };
-  return { reward: money, foil: boss && rand() * 100 < opts.foilChance, bossCard: boss && rand() * 100 < opts.cardChance };
+  return { reward: money, foil: false, bossCard: boss && rand() * 100 < opts.cardChance };
 }
 
 /**
@@ -1045,7 +1041,7 @@ async function finishDue({ now = Date.now() } = {}) {
           await TcgCard.insertMany(winners.map((user) => ({ user, card: card.id, rarity: card.rarity })), { session });
           await User.updateMany({ _id: { $in: winners } }, { $addToSet: { tcgSeen: card.id, tcgLooted: card.id } }, { session });
         }
-        // Funde: ein Teil (Einstellung slabDropPercent) ist ein leerer Slab, der Rest ein TCG Sleeve
+        // Funde (Sleeve oder leerer Slab): neue Läufe würfeln keine mehr – nur noch Läufe, die vor dem 22.10. gestartet sind
         const drops = splitFoilDrops(foils);
         if (drops.sleeves.length) await grantItems({ userIds: drops.sleeves, type: 'folie', source: 'dungeon', session });
         if (drops.slabs.length) await grantItems({ userIds: drops.slabs, type: 'slab', source: 'dungeon', session });

@@ -32,8 +32,8 @@ const ITEM_TYPES = [
     category: 'verpackung',
     storage: 'stueck',
     tradable: true,
-    sell: 1000,
-    buy: 1500,
+    sell: 300, // 22.10.: Shop 15 € → 5 €, Ankauf 10 € → 3 €
+    buy: 500,
     via: 'bank',
     image: '/img/items/folie.svg',
     text: 'Schutzhülle für eine Karte: Sie spielt weiter mit und ist auf Quests, im Dungeon und im Turm vor Kratzern und Knicken sicher. Die Note zeigt nur ein Slab. Abziehen im Album gibt dir den Sleeve zurück. Karten im Sleeve gehen nicht an die Bank und nicht ins Duell.',
@@ -44,8 +44,8 @@ const ITEM_TYPES = [
     category: 'material',
     storage: 'stueck',
     tradable: true,
-    sell: 2500,
-    buy: 4000,
+    sell: 600, // 22.10.: Shop 40 € → 10 €, Ankauf 25 € → 6 €
+    buy: 1000,
     via: 'grading',
     image: '/img/items/slab.svg',
     text: 'Das Gehäuse, in das ein Grading-Shop eine Karte einschweißt – jeder Auftrag mit „Benoten + Slab“ verbraucht einen. Kaufen: Bank-Shop oder Werkstatt (mit Grading-Shop) oder Handel.',

@@ -9037,6 +9037,11 @@ body.up-open { overflow: hidden; }
 /* ========== Album: eine Kachel je Karte, Versionen entfalten sich (views/tcg-album.ejs, public/js/tcg.js) ========== */
 /* Stapel hinter der Kachel deutet an, dass es weitere Versionen gibt */
 .album-group.is-stack .tcg-art { box-shadow: 6px -6px 0 -1px color-mix(in srgb, var(--rar, #888) 35%, #1b1d29), 12px -12px 0 -2px color-mix(in srgb, var(--rar, #888) 18%, #15161f); border-radius: 10px; }
+/* Album: Ansicht wählen (gestapelt / einzeln) */
+.album-view-toggle { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px var(--color-neutral-700); }
+.album-view-btn { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.album-view-btn:hover, .album-view-btn:focus-visible { color: var(--color-text, #fff); }
+.album-view-btn.is-active { color: #111; background: var(--color-accent-300, #fcd34d); }
 .album-group-n { margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--muted); background: rgba(255, 255, 255, .06); font-variant-numeric: tabular-nums; }
 .album-group.tcg-seen .tcg-art img { filter: grayscale(.9) brightness(.55); }
 .album-group:hover .tcg-art, .album-group:focus-visible .tcg-art { transform: translateY(-4px); }

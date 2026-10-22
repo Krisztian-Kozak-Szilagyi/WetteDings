@@ -538,7 +538,7 @@ router.post('/admin/bonus', requireAdmin, requireReauth('/admin?bereich=spielwer
   }
   const jobs = Number.parseInt(typeof req.body.gr_jobs === 'string' ? req.body.gr_jobs : '', 10);
   const premium = Number.parseInt(typeof req.body.gr_premium === 'string' ? req.body.gr_premium : '', 10);
-  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron) };
+  const pay = { clean: money(req.body.gr_pay_clean), grade: money(req.body.gr_pay_grade), slab: money(req.body.gr_pay_slab), iron: money(req.body.gr_pay_iron), bonus: money(req.body.gr_pay_bonus) };
   const costs = [2, 3, 4].map((l) => money(req.body[`gr_cost_${l}`]));
   // Spieler-Aufträge (#204, Etappe B)
   const int = (k) => Number.parseInt(typeof req.body[k] === 'string' ? req.body[k] : '', 10);
@@ -582,7 +582,6 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
       required: fights.map((i) => num(req.body[`required_${i}`])),
       // "0" / "0,00" = kein Lohn für diesen Kampf
       rewards: fights.map((i) => euroOrZero(req.body[`reward_${i}`])),
-      foilChance: pct(req.body.foilChance),
       cardChance: pct(req.body.cardChance),
       botWeights: Object.fromEntries(tcgCatalog.RARITIES.map((r) => [r.key, num(req.body[`bot_${r.key}`])])),
       tower: {
@@ -591,8 +590,6 @@ router.post('/admin/dungeon', requireAdmin, requireReauth('/admin?bereich=spielw
         growth: pct(req.body.towerGrowth),
         rewardBase: euroOrZero(req.body.towerRewardBase),
         rewardStep: euroOrZero(req.body.towerRewardStep),
-        foilPerRound: pct(req.body.towerFoilPerRound),
-        foilMax: pct(req.body.towerFoilMax),
         cardPerRound: pct(req.body.towerCardPerRound),
         cardMax: pct(req.body.towerCardMax),
         fightSeconds: num(req.body.towerFightSeconds),
@@ -784,7 +781,6 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
   const chance = percent(req.body.chance);
   const bonusPercent = percent(req.body.bonus);
   const dailyPercent = percent(req.body.daily);
-  const slabDropPercent = percent(req.body.slabanteil);
   const sleevePrice = parseEuro(req.body.sleeve);
   const slabPrice = parseEuro(req.body.slabpreis);
   const sleeveSell = parseEuro(req.body.sleeveankauf);
@@ -793,15 +789,13 @@ router.post('/admin/folie', requireAdmin, requireReauth('/admin?bereich=spielwer
     req.flash('error', 'Ankaufspreise: ganze Cent, höchstens 1.000 €.');
   } else if (!foil.validPrice('folie', sleevePrice, sleeveSell) || !foil.validPrice('slab', slabPrice, slabSell)) {
     req.flash('error', 'Verkaufspreise: ganze Cent, mindestens so hoch wie der Ankauf der Bank und höchstens 1.000 €.');
-  } else if (!(slabDropPercent >= 0 && slabDropPercent <= 100)) {
-    req.flash('error', 'Slab-Anteil: 0 bis 100 %.');
   } else if (!(chance >= 0 && chance <= 100)) {
     req.flash('error', 'Fundchance: 0 bis 100 % (höchstens zwei Nachkommastellen).');
   } else if (!(bonusPercent >= 0 && bonusPercent <= 1000) || !(dailyPercent >= 0 && dailyPercent <= 1000)) {
     req.flash('error', 'Wertsteigerung: 0 bis 1000 % (höchstens zwei Nachkommastellen).');
   } else {
-    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent, sleevePrice, slabPrice, slabDropPercent, sleeveSell, slabSell });
-    req.flash('success', `Gespeichert: ${String(chance).replace('.', ',')} % Fundchance, Sleeve ${euro(sleevePrice)} (Ankauf ${euro(sleeveSell)}), Slab ${euro(slabPrice)} (Ankauf ${euro(slabSell)}), ${String(slabDropPercent).replace('.', ',')} % der Dungeon-Funde sind Slabs.`);
+    await foil.saveSettings({ admin: req.user, gradingChance: Math.round(chance * 100), bonusPercent, dailyPercent, sleevePrice, slabPrice, sleeveSell, slabSell });
+    req.flash('success', `Gespeichert: ${String(chance).replace('.', ',')} % Fundchance, Sleeve ${euro(sleevePrice)} (Ankauf ${euro(sleeveSell)}), Slab ${euro(slabPrice)} (Ankauf ${euro(slabSell)}).`);
   }
   res.redirect(subUrl('spielwerte', 'folie'));
 });
