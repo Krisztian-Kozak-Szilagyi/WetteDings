@@ -80,7 +80,7 @@
   <% }) %>
   <%# Mage Tower: Läufe pro Tag laut Admin-Panel, ohne Termin – allein (Bots füllen auf) oder mit Gruppe %>
   <% if (towerShown) { %>
-    <form method="post" action="/dungeon/turm/anmelden" class="dg-tower-entry">
+    <form method="post" action="/dungeon/turm/anmelden" class="dg-tower-entry" id="mage-tower">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <span class="dg-tower-text">
         <span class="kicker">Mage Tower · <%= towerRuns === 1 ? 'einmal' : towerRuns + '×' %> am Tag<%= towerClosedForOthers ? ' · nur Admins' : '' %></span>

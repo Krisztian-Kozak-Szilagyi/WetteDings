@@ -96,6 +96,7 @@ function createApp() {
     dungeonOpen: () => require('./dungeon/dungeonService').settings.open, // Dungeon für alle freigegeben?
     esportsOpen: (user) => !!user && require('./dungeon/dungeonService').towerOpen(user), // eSports hängt am Mage Tower
     blackMarketOpen: () => require('./tcg/blackMarket').windowAt().open, // lila Punkt neben „Handel“
+    navModel: require('./lib/navModel'), // Menüpunkte samt Abzeichen (Leiste, Profil-Menü, HUD der Taverne)
     // Standardwerte, falls ein Fehler vor den Middlewares auftritt
     currentUser: null,
     tradeIncoming: 0,

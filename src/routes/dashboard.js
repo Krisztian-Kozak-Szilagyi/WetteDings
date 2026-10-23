@@ -1,7 +1,6 @@
-// Startseite: Gäste sehen die Landing-Page, Mitglieder ihr Dashboard (services/dashboardService)
+// Startseite: Gäste sehen die Landing-Page, Mitglieder die Taverne (views/hub.ejs, Daten: services/dashboardService)
 const express = require('express');
 const dashboard = require('../services/dashboardService');
-const catalog = require('../tcg/catalog');
 
 const router = express.Router();
 
@@ -12,7 +11,7 @@ router.get('/', async (req, res) => {
     const qs = new URLSearchParams(Object.entries(req.query).filter(([k, v]) => ['tab', 'q', 'seite'].includes(k) && typeof v === 'string')).toString();
     return res.redirect(301, `/wetten${qs ? `?${qs}` : ''}`);
   }
-  res.render('dashboard', { title: 'Dashboard', dash: await dashboard.load(req.user), rarityByKey: catalog.rarityByKey });
+  res.render('hub', { title: 'Taverne', dash: await dashboard.load(req.user) });
 });
 
 module.exports = router;

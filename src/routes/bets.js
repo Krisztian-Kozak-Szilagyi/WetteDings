@@ -63,7 +63,7 @@ router.use('/wetten/:id', async (req, res, next) => {
 
 // ---------- Übersicht ----------
 
-// (Die Startseite "/" ist das Dashboard – routes/dashboard.js)
+// (Die Startseite "/" ist die Taverne – routes/dashboard.js, views/hub.ejs)
 router.get('/wetten', requireLogin, async (req, res) => {
   const tab = TABS[str(req.query.tab)] ? str(req.query.tab) : 'offen';
   const page = Math.min(500, Math.max(1, parseInt(str(req.query.seite), 10) || 1));

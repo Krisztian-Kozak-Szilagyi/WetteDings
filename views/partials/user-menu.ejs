@@ -1,0 +1,31 @@
+<%# Profil-Menü der Leiste (head.ejs) – Verhalten in app.js. Klick auf Name, Kontostand oder Bild klappt es auf (schließt
+    bei Klick daneben). Auf Handy/Tablet stehen hier auch die Menüpunkte der Leiste. %>
+<% const items = locals.navItems || navModel.buildNav(locals); %>
+<details class="user-menu" data-user-menu>
+  <summary class="balance-chip" title="Mein Konto" data-live="balance">
+    <span class="balance-text">
+      <span class="balance-name"><%= currentUser.username %></span>
+      <strong><%= euro(currentUser.balance) %></strong>
+    </span>
+    <img class="avatar" src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="34" height="34">
+    <% if (items.some((it) => it.badges.length)) { %><span class="menu-dot" aria-hidden="true"></span><% } %>
+  </summary>
+  <div class="user-menu-list" role="menu">
+    <div class="menu-nav">
+      <% items.forEach((it) => { %><%- navModel.menuHtml(it) %><% }) %>
+    </div>
+    <a role="menuitem" href="/profil/<%= encodeURIComponent(currentUser.username) %>">Profil ansehen</a>
+    <a role="menuitem" href="/inventar">Inventar</a>
+    <a role="menuitem" href="/kosmetik">Kosmetik</a>
+    <a role="menuitem" href="/konto">Statistiken</a>
+    <a role="menuitem" href="/konto/wetten">Meine Wetten</a>
+    <a role="menuitem" href="/konto/auszug">Kontoauszug</a>
+    <a role="menuitem" href="/konto/gruppen">Wett-Gruppen</a>
+    <a role="menuitem" href="/konto/einstellungen">Konto-Einstellungen</a>
+    <button role="menuitem" type="button" class="app-install" data-app-install hidden>App herunterladen</button>
+    <form method="post" action="/abmelden">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button role="menuitem" type="submit">Abmelden</button>
+    </form>
+  </div>
+</details>

@@ -1,0 +1,10 @@
+<%# „Heute zu erledigen“ auf Pergament (Taverne: Desktop im Schwarzen Brett, mobil im Sheet). today = dashboardService.todayStatus %>
+<% today.items.forEach((q) => { %>
+  <a class="hub-quest<%= q.off ? ' is-off' : '' %><%= q.done ? ' is-done' : '' %>" href="<%= q.href %>">
+    <span class="hub-check" aria-hidden="true"><% if (q.done) { %><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg><% } %></span>
+    <span class="hub-quest-text">
+      <span class="hub-quest-title"><%= q.label %><span class="sr-only"><%= q.off ? ' (entfällt)' : q.done ? ' (erledigt)' : ' (offen)' %></span></span>
+      <span class="hub-quest-sub"><%= q.text %><% if (q.at && !q.done) { %> · <span data-hub-at="<%= q.at.toISOString() %>" data-hub-days><%= clock(q.at) %></span><% } %></span>
+    </span>
+  </a>
+<% }) %>

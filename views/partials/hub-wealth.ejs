@@ -1,0 +1,18 @@
+<%# Vermögen auf Pergament (Taverne: Desktop im Schwarzen Brett, mobil im Sheet). v = vorbereitete Werte aus hub.ejs %>
+<div class="hub-note-head">
+  <span class="cin hub-kicker">VERMÖGEN</span>
+  <span class="hub-tag"><%= v.tag %></span>
+</div>
+<div class="cin hub-wealth-total"><%= euro(v.total) %></div>
+<div class="hub-delta <%= v.deltaCls %>"><%= v.deltaText %><% if (v.deltaDays) { %> <span class="hub-delta-days">· <%= v.deltaDays %></span><% } %></div>
+<div class="hub-bar" role="img" aria-label="<%= v.barLabel %>">
+  <% v.parts.filter((p) => p.share > 0).forEach((p) => { %><span style="flex: <%= p.share.toFixed(2) %>; background: <%= p.color %>"></span><% }) %>
+</div>
+<div class="hub-parts">
+  <% v.parts.forEach((p) => { %>
+    <div class="hub-part">
+      <span class="hub-part-label"><span class="hub-diamond" style="background: <%= p.color %>"></span><%= p.label %></span>
+      <span class="cin hub-part-value"><%= euro(p.value) %></span>
+    </div>
+  <% }) %>
+</div>

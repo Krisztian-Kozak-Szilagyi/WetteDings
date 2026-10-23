@@ -1,0 +1,329 @@
+<%- include('partials/head', { title: 'Taverne', hub: true, pageCss: ['hub'] }) %>
+<%
+  // Startseite im Stil einer Fantasy-Taverne (Vorlage: Design-Paket „Eclipse TCG – Hub-Redesign“). Daten:
+  // dash = dashboardService.load(user). Desktop ist ein One-Pager (ein Bildschirm hoch), mobil eine Spalte mit Sheets.
+  // Verhalten (Countdowns, Weltkarte, Sheets) in public/js/hub.js, Aussehen in public/css/hub.css.
+  const d = dash;
+  const w = d.wealth;
+  const t = d.today;
+  const nav = navModel.buildNav(locals);
+  const admin = nav.find((it) => it.href === '/admin');
+  const forum = nav.find((it) => it.href === '/forum');
+  const tcg = nav.find((it) => it.href === '/tcg');
+  const gambling = nav.find((it) => it.group === 'gambling');
+  const tcgNews = !!(tcg && (tcg.badges.length || tcg.live));
+  const handel = nav.find((it) => it.href === '/handel');
+  const handelNews = !!(handel && handel.badges.length); // Angebote, Verhandlungen, neue Markt-Angebote
+  const IMG = '/img/taverne/';
+  const v = (f) => f + '?v=' + assetVersion;
+  const dateText = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' }).format(new Date()).toUpperCase();
+  const pad = (n) => String(n).padStart(2, '0');
+  // Countdown wie in hub.js: Tage nur, wenn es mehr als einen Tag ist
+  const clock = (at) => {
+    const s = Math.max(0, Math.floor((new Date(at).getTime() - Date.now()) / 1000));
+    const days = Math.floor(s / 86400);
+    return (days ? pad(days) + 'T ' : '') + pad(Math.floor((s % 86400) / 3600)) + ':' + pad(Math.floor((s % 3600) / 60)) + ':' + pad(s % 60);
+  };
+  const pct = (x, digits = 2) => (x * 100).toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits }) + ' %';
+  const signed = (txt, neg) => (neg ? '−' : '+') + txt;
+
+  // Vermögen: Gesamt, Veränderung, Aufteilung (Farben wie in der Vorlage)
+  const parts = [
+    { label: 'Verfügbar', value: w.balance, color: '#b8862b' },
+    { label: 'In Karten', value: w.cardValue || 0, color: '#3f86a6' },
+    { label: 'Grading-Shop', value: w.shopValue || 0, color: '#b3453b' },
+    { label: 'In Wetten', value: w.inPlay || 0, color: '#6d7f3a' },
+    { label: 'In Coins', value: w.coinValue || 0, color: '#8a6f42' },
+  ];
+  const partSum = parts.reduce((s, p) => s + Math.max(0, p.value), 0) || 1;
+  parts.forEach((p) => { p.share = (Math.max(0, p.value) / partSum) * 100; });
+  const ch = w.change;
+  const neg = ch && ch.diff < 0;
+  const deltaText = !ch || !ch.diff ? 'Unverändert' : (neg ? '▼ ' : '▲ ') + signed(euro(Math.abs(ch.diff)), neg) + (ch.pct !== null ? ' · ' + signed(pct(Math.abs(ch.pct)), neg) : '');
+  const wv = {
+    tag: w.team ? 'Team – nicht in der Wertung' : w.rank ? 'Platz ' + w.rank + ' von ' + w.players : 'Noch ohne Platz',
+    total: w.total,
+    deltaText,
+    deltaShort: !ch || !ch.diff ? 'Unverändert' : (neg ? '▼ ' : '▲ ') + (ch.pct !== null ? signed(pct(Math.abs(ch.pct)), neg) : signed(euro(Math.abs(ch.diff)), neg)),
+    deltaCls: !ch || !ch.diff ? '' : neg ? 'is-down' : 'is-up',
+    deltaDays: ch && w.days ? w.days + (w.days === 1 ? ' Tag' : ' Tage') : '',
+    parts,
+    barLabel: 'Verteilung: ' + parts.filter((p) => p.share > 0).map((p) => p.share.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' % ' + p.label).join(', '),
+  };
+  // Heute: der erste offene Punkt erscheint mobil auf dem Zettel
+  const firstOpen = t.items.find((i) => !i.done && !i.off) || t.items[0];
+  // Kurs-Ticker (Preis in Euro, kleine Werte mit 4 Nachkommastellen wie im Broker)
+  const price = (p) => p.toLocaleString('de-DE', { minimumFractionDigits: p < 10 ? 4 : 2, maximumFractionDigits: p < 10 ? 4 : 2 }) + ' €';
+  const ticker = d.ticker.map((c) => ({ ...c, priceText: price(c.price), changeText: (c.change < 0 ? '▼ ' : '▲ ') + signed(pct(Math.abs(c.change)), c.change < 0), cls: c.change < 0 ? 'is-down' : 'is-up' }));
+  const cd = Object.fromEntries(d.countdowns.map((c) => [c.key, c]));
+  const lotto = t.items.find((i) => i.key === 'lotto');
+  const badgesOf = (it) => (it ? navModel.badgesHtml(it) : '');
+
+  // Symbole (Pfade aus der Vorlage)
+  const D = {
+    rangliste: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3',
+    gambling: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01',
+    tcg: 'M8 3h9a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 7v12a2 2 0 0 0 2 2M12 9l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z',
+    handel: 'M4 8h14l-3-3M20 16H6l3 3',
+    grading: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
+    forum: 'M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z',
+    admin: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
+    dungeon: 'M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2',
+    ihk: 'M9 4h6v3H9zM7 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1M9 14l2 2 4-4',
+    tower: 'M8 21V10l4-6 4 6v11M6 21h12M12 13v3M10 10h4',
+    karte: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14',
+    coins: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v10M9.5 9.5c0-1 1-1.5 2.5-1.5s2.5.6 2.5 1.7c0 2.2-5 1.2-5 3.6 0 1.1 1.1 1.7 2.5 1.7s2.5-.6 2.5-1.5',
+    scroll: 'M5 4h12a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2zM9 9h6M9 13h6',
+    wetten: 'M4 4h16v16H4zM8 9h8M8 13h8M8 17h5',
+    broker: 'M4 19h16M6 15l4-5 3 3 5-7',
+    lotterie: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 7v2M14 11v2M14 15v2',
+  };
+  const icon = (key, size, stroke = 'currentColor', width = 1.7) => '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="' + width + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + D[key] + '"/></svg>';
+  const closeIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const pve = d.pve;
+  const firstPlace = pve[0];
+  const gamblingItems = gambling ? gambling.items : [];
+  const gIcon = { '/wetten': 'wetten', '/broker': 'broker', '/lotterie': 'lotterie' };
+%>
+
+<div class="hub" data-hub>
+  <div class="hub-glow hub-glow-l" aria-hidden="true"></div>
+  <div class="hub-glow hub-glow-r" aria-hidden="true"></div>
+  <div class="hub-vignette" aria-hidden="true"></div>
+  <div class="hub-beam" aria-hidden="true"></div>
+
+  <%# ---------- Kopfzeile: Logo, Gruß, HUD ---------- %>
+  <header class="hub-head">
+    <img class="hub-logo" src="<%= v(IMG + 'logo.webp') %>" alt="Eclipse TCG" width="900" height="300">
+    <div class="hub-title">
+      <span class="hub-date"><%= dateText %></span>
+      <h1 class="cin">Willkommen in der Taverne, <%= currentUser.username %></h1>
+    </div>
+    <div class="hub-hud">
+      <% if (admin) { %>
+        <a class="hub-round hub-hit" href="/admin" aria-label="<%= admin.label %><%= admin.badges.length ? ', ' + admin.badges.map((b) => b.aria).join(', ') : '' %>" title="<%= admin.label %>">
+          <%- icon('admin', 24, 'currentColor', 1.8) %>
+          <% if (admin.badges.length) { %><span class="hub-badges"><%- badgesOf(admin) %></span><% } %>
+        </a>
+      <% } %>
+      <div class="hub-bell"><%- include('partials/bell') %></div>
+      <a class="hub-round hub-hit" href="/forum" aria-label="Forum<%= forum && forum.badges.length ? ', ' + forum.badges.map((b) => b.aria).join(', ') : '' %>" title="Forum">
+        <%- icon('forum', 24, 'currentColor', 1.8) %>
+        <% if (forum && forum.badges.length) { %><span class="hub-badges"><%- badgesOf(forum) %></span><% } %>
+      </a>
+      <%# Geldbeutel (nur Anzeige) und Profilbild – ein Klick aufs Bild führt direkt zum eigenen Profil %>
+      <div class="hub-me">
+        <span class="hub-purse-pill">
+          <svg class="hub-purse-coin" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#e8bf6a" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#5a3a22"/><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5v5" stroke-linecap="round"/></svg>
+          <span class="hub-purse-text">
+            <span class="hub-purse-name"><span class="hub-m-only">Willkommen, </span><%= currentUser.username %></span>
+            <strong class="cin" data-live="balance"><%= euro(currentUser.balance) %></strong>
+          </span>
+        </span>
+        <a class="hub-round hub-avatar hub-hit" href="/profil/<%= encodeURIComponent(currentUser.username) %>" aria-label="Mein Profil" title="Mein Profil"><img src="<%= avatarUrl(currentUser) %>?v=<%= assetVersion %>" alt="" width="46" height="46"></a>
+      </div>
+    </div>
+  </header>
+
+  <%# ---------- Wand: Schwarzes Brett und Händlerstand ---------- %>
+  <div class="hub-scene">
+    <section class="hub-board" aria-label="Schwarzes Brett und PVE">
+      <div class="cin hub-plate">SCHWARZES BRETT</div>
+      <div class="hub-board-in">
+        <%# mobil: zwei Zettel, die das Sheet mit den Details öffnen %>
+        <button type="button" class="hub-spot hub-scroll-sm hub-note-m" data-hub-open="wealth">
+          <span class="cin hub-kicker">VERMÖGEN</span>
+          <span class="cin hub-note-total"><%= euro(w.total) %></span>
+          <span class="hub-delta <%= wv.deltaCls %>"><%= wv.deltaShort %><% if (wv.deltaDays) { %> · <%= wv.deltaDays %><% } %></span>
+          <span class="hub-bar hub-bar-sm" aria-hidden="true"><% parts.filter((p) => p.share > 0).forEach((p) => { %><span style="flex: <%= p.share.toFixed(2) %>; background: <%= p.color %>"></span><% }) %></span>
+        </button>
+        <button type="button" class="hub-spot hub-scroll-sm hub-note-m" data-hub-open="quests">
+          <span class="hub-note-head">
+            <span class="cin hub-kicker">HEUTE</span>
+            <span class="cin hub-seal hub-seal-sm"><%= t.done %>/<%= t.total %></span>
+          </span>
+          <% if (firstOpen) { %>
+            <span class="hub-note-quest"><%= firstOpen.label %></span>
+            <span class="hub-note-sub"><%= firstOpen.text %></span>
+          <% } %>
+        </button>
+
+        <div class="hub-col hub-col-l">
+          <article class="hub-scroll hub-wealth"><%- include('partials/hub-wealth', { v: wv }) %></article>
+          <div class="hub-pve">
+            <img src="<%= v(IMG + 'pve.webp') %>" alt="PVE: ein goldener Ritter in Rüstung zeigt auf dich" width="1672" height="941">
+            <% if (pve.length) { %>
+              <button type="button" class="hub-pve-hit" data-hub-open="map" aria-label="PVE öffnen" title="PVE öffnen"></button>
+            <% } %>
+            <% if (d.dungeonAt) { %>
+              <button type="button" class="hub-spot hub-pve-timer" data-hub-open="map" data-hub-place="dungeon">
+                <span class="hub-pve-timer-label">DUNGEON</span>
+                <span class="cin" data-hub-at="<%= d.dungeonAt.toISOString() %>"><%= clock(d.dungeonAt) %></span>
+              </button>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="hub-col hub-col-r">
+          <article class="hub-scroll hub-today">
+            <div class="hub-note-head">
+              <span class="cin hub-kicker">HEUTE ZU ERLEDIGEN</span>
+              <span class="cin hub-seal" title="<%= t.done %> von <%= t.total %> erledigt"><%= t.done %>/<%= t.total %></span>
+            </div>
+            <div class="hub-fit hub-quests"><%- include('partials/hub-quests', { today: t, clock }) %></div>
+            <% if (d.dungeonAt) { %>
+              <button type="button" class="hub-spot hub-next" data-hub-open="map" data-hub-place="dungeon">
+                <span class="cin hub-next-label">NÄCHSTER DUNGEON</span>
+                <span class="cin hub-next-time" data-hub-at="<%= d.dungeonAt.toISOString() %>"><%= clock(d.dungeonAt) %></span>
+              </button>
+            <% } %>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="hub-stall" aria-label="Händlerstand">
+      <%# Desktop: Bild des Stands, Tafeln prozentual darüber (wie slot() in der Vorlage) %>
+      <div class="hub-stall-frame">
+        <img src="<%= v(IMG + 'stall.webp') %>" alt="" width="941" height="1672">
+        <h2 class="cin hub-stall-title">HÄNDLERSTAND</h2>
+        <a class="hub-pane hub-ticker" href="/broker" aria-label="Broker: Coin-Kurse">
+          <% ticker.forEach((c) => { %>
+            <span class="hub-ticker-row">
+              <span class="cin hub-ticker-sym"><%= c.symbol %></span>
+              <span><%= c.priceText %></span>
+              <span class="hub-ticker-ch <%= c.cls %>"><%= c.changeText %></span>
+            </span>
+          <% }) %>
+        </a>
+        <a class="hub-pane hub-slot" style="left: 19.1%; top: 54.1%" href="/handel"><span class="hub-slot-ico"><%- icon('handel', 24, '#e8bf6a') %></span><span class="cin">Handel</span><% if (handelNews) { %><span class="hub-dot" aria-label="Neues im Handel"></span><% } %></a>
+        <button type="button" class="hub-pane hub-slot" style="left: 52.6%; top: 54.1%" data-hub-open="gambling"><span class="hub-slot-ico"><%- icon('gambling', 24, '#e8bf6a') %></span><span class="cin">Gambling</span><% if (gambling && gambling.badges.length) { %><span class="hub-dot" aria-label="Neues beim Gambling"></span><% } %></button>
+        <a class="hub-pane hub-slot" style="left: 19.1%; top: 72.4%" href="/tcg"><span class="hub-slot-ico"><%- icon('tcg', 24, '#e8bf6a') %></span><span class="cin">TCG</span><% if (tcgNews) { %><span class="hub-dot" aria-label="Neues im TCG"></span><% } %></a>
+        <a class="hub-pane hub-slot" style="left: 52.6%; top: 72.4%" href="/rangliste"><span class="hub-slot-ico"><%- icon('rangliste', 24, '#e8bf6a') %></span><span class="cin">Rangliste</span></a>
+      </div>
+      <%# mobil: oberer Ausschnitt des Stands als Dach, darunter vier Knöpfe %>
+      <div class="hub-stall-m">
+        <div class="hub-stall-roof"><h2 class="cin">HÄNDLERSTAND</h2></div>
+        <div class="hub-stall-grid">
+          <button type="button" class="hub-pane hub-slot-m" data-hub-open="handel"><span class="hub-slot-ico"><%- icon('handel', 22, '#e8bf6a') %></span><span class="cin">Handel</span><% if (handelNews) { %><span class="hub-dot" aria-label="Neues im Handel"></span><% } %></button>
+          <button type="button" class="hub-pane hub-slot-m" data-hub-open="gambling"><span class="hub-slot-ico"><%- icon('gambling', 22, '#e8bf6a') %></span><span class="cin">Gambling</span><% if (gambling && gambling.badges.length) { %><span class="hub-dot" aria-label="Neues beim Gambling"></span><% } %></button>
+          <a class="hub-pane hub-slot-m" href="/tcg"><span class="hub-slot-ico"><%- icon('tcg', 22, '#e8bf6a') %></span><span class="cin">TCG</span><% if (tcgNews) { %><span class="hub-dot" aria-label="Neues im TCG"></span><% } %></a>
+          <a class="hub-pane hub-slot-m" href="/rangliste"><span class="hub-slot-ico"><%- icon('rangliste', 22, '#e8bf6a') %></span><span class="cin">Rangliste</span></a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <%# ---------- Tresen, darauf die Pflicht-Links (statt der Fußzeile) ---------- %>
+  <section class="hub-tresen" aria-label="Tresen">
+    <div class="hub-tresen-top"></div>
+    <div class="hub-tresen-front">
+      <nav class="hub-legal" aria-label="Rechtliches">
+        <a href="/regeln">Regeln</a><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a><a href="/patchnotes">Patchnotes<% if (patchNew) { %> <span class="nav-badge" aria-label="<%= patchNew %> neue Patchnotes"><%= patchNew > 99 ? '99+' : patchNew %></span><% } %></a>
+      </nav>
+    </div>
+  </section>
+
+  <%# ---------- Fenster: Desktop als Pergament über der Taverne, mobil als Sheet von unten ---------- %>
+  <% if (pve.length) { %>
+    <dialog class="hub-dlg hub-dlg-map" id="hub-map" aria-labelledby="hub-map-title">
+      <div class="hub-dlg-head">
+        <span class="hub-dlg-ico hub-m-only"><%- icon('karte', 26, '#e8bf6a', 1.6) %></span>
+        <div class="hub-dlg-titles">
+          <span class="hub-dlg-sub hub-m-only">ABENTEUER</span>
+          <h2 class="cin" id="hub-map-title">PVE · WELTKARTE</h2>
+        </div>
+        <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
+      </div>
+      <div class="hub-map">
+        <svg viewBox="0 0 300 190" preserveAspectRatio="none" aria-hidden="true">
+          <rect width="300" height="190" fill="#d9c08a"/>
+          <path d="M30 120 C20 80 50 40 100 45 C130 20 190 25 215 50 C260 55 285 95 265 130 C250 165 190 175 150 165 C110 178 50 165 30 120Z" fill="#e8d6a6" stroke="#7a5a2c" stroke-width="1.5"/>
+          <path d="M70 78l10-16 10 16zM88 82l8-12 8 12zM196 52l9-14 9 14z" fill="#a98a54" stroke="#7a5a2c" stroke-width="1"/>
+          <g fill="#8a9a5a" stroke="#5f6e38" stroke-width="0.8"><circle cx="120" cy="140" r="6"/><circle cx="132" cy="146" r="5"/><circle cx="108" cy="148" r="5"/><circle cx="238" cy="80" r="5"/><circle cx="248" cy="88" r="4"/></g>
+          <path d="M60 118 Q100 70 150 68 Q210 66 232 110M150 68 L150 129" fill="none" stroke="#8c2f2a" stroke-width="2" stroke-dasharray="5 5"/>
+          <g stroke="#7a5a2c" stroke-width="0.8" fill="none" opacity="0.7"><path d="M8 20c8-4 14 4 22 0s14 4 22 0"/><path d="M250 172c8-4 14 4 22 0s14 4 22 0"/></g>
+        </svg>
+        <% pve.forEach((p) => { %>
+          <button type="button" class="hub-spot hub-pin" style="left: <%= p.x %>%; --y: <%= p.y %>%; --ym: <%= p.yMobile %>%" data-hub-pin="<%= p.key %>" aria-pressed="<%= p === firstPlace ? 'true' : 'false' %>" aria-label="<%= p.label %>">
+            <%- icon(p.key, 40, '#f3e3c3') %>
+            <span class="cin hub-pin-plate"><%= p.label %></span>
+          </button>
+        <% }) %>
+      </div>
+      <% pve.forEach((p) => { %>
+        <div class="hub-place" data-hub-place-info="<%= p.key %>"<%= p === firstPlace ? '' : ' hidden' %>>
+          <div class="hub-place-text">
+            <span class="cin hub-place-title"><%= p.label %></span>
+            <span class="hub-place-sub"><% if (p.at) { %><%= p.key === 'dungeon' ? 'Nächster Dungeon in ' : 'Fertig in ' %><span data-hub-at="<%= new Date(p.at).toISOString() %>"><%= clock(p.at) %></span>. <% } %><%= p.text %></span>
+          </div>
+          <a class="hub-enter cin" href="<%= p.href %>">BETRETEN</a>
+        </div>
+      <% }) %>
+    </dialog>
+  <% } %>
+
+  <dialog class="hub-dlg hub-dlg-area" id="hub-gambling" aria-labelledby="hub-gambling-title">
+    <div class="hub-dlg-head">
+      <span class="hub-dlg-ico"><%- icon('gambling', 30, '#e8bf6a', 1.6) %></span>
+      <div class="hub-dlg-titles">
+        <span class="hub-dlg-sub">HÄNDLERSTAND</span>
+        <h2 class="cin" id="hub-gambling-title">Gambling</h2>
+      </div>
+      <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
+    </div>
+    <div class="hub-dlg-body">
+      <% [lotto ? { label: 'TAGES-LOTTERIE', at: lotto.at } : null, cd.woche ? { label: 'WOCHEN-LOTTERIE', at: cd.woche.at } : null, cd.monat ? { label: 'MONATS-LOTTERIE', at: cd.monat.at } : null].filter(Boolean).forEach((x) => { %>
+        <div class="hub-extra"><span class="hub-extra-label"><%= x.label %></span><span class="cin hub-extra-value" data-hub-at="<%= x.at.toISOString() %>" data-hub-days><%= clock(x.at) %></span></div>
+      <% }) %>
+      <div class="hub-links">
+        <% gamblingItems.forEach((it) => { %>
+          <a class="hub-link" href="<%= it.href %>"><span class="hub-slot-ico"><%- icon(gIcon[it.href], 22, '#e8bf6a') %></span><span class="cin"><%= it.label %></span><%- badgesOf(it) %></a>
+        <% }) %>
+      </div>
+    </div>
+  </dialog>
+
+  <%# mobil: Handel als Sheet mit Black Market und Kursen (Desktop: direkter Link) %>
+  <dialog class="hub-dlg hub-dlg-area" id="hub-handel" aria-labelledby="hub-handel-title">
+    <div class="hub-dlg-head">
+      <span class="hub-dlg-ico"><%- icon('handel', 30, '#e8bf6a', 1.6) %></span>
+      <div class="hub-dlg-titles">
+        <span class="hub-dlg-sub">HÄNDLERSTAND</span>
+        <h2 class="cin" id="hub-handel-title">Handel</h2>
+      </div>
+      <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
+    </div>
+    <div class="hub-dlg-body">
+      <% if (cd.bm) { %><div class="hub-extra"><span class="hub-extra-label"><%= cd.bm.label.toUpperCase() %></span><span class="cin hub-extra-value" data-hub-at="<%= cd.bm.at.toISOString() %>" data-hub-days><%= clock(cd.bm.at) %></span></div><% } %>
+      <% ticker.forEach((c) => { %>
+        <a class="hub-extra" href="<%= c.href %>"><span class="hub-extra-label"><%= c.symbol %></span><span class="cin hub-extra-value"><%= c.priceText %> <span class="hub-ticker-ch <%= c.cls %>"><%= c.changeText %></span></span></a>
+      <% }) %>
+      <div class="hub-links">
+        <a class="hub-link" href="/handel"><span class="hub-slot-ico"><%- icon('handel', 22, '#e8bf6a') %></span><span class="cin">Zum Handel</span></a>
+        <a class="hub-link" href="/broker"><span class="hub-slot-ico"><%- icon('broker', 22, '#e8bf6a') %></span><span class="cin">Zum Broker</span></a>
+      </div>
+    </div>
+  </dialog>
+
+  <%# mobil: Details der beiden Zettel %>
+  <dialog class="hub-dlg hub-dlg-area" id="hub-wealth" aria-labelledby="hub-wealth-title">
+    <div class="hub-dlg-head">
+      <span class="hub-dlg-ico"><%- icon('coins', 26, '#e8bf6a', 1.6) %></span>
+      <div class="hub-dlg-titles"><span class="hub-dlg-sub">SCHWARZES BRETT</span><h2 class="cin" id="hub-wealth-title">Vermögen</h2></div>
+      <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
+    </div>
+    <div class="hub-scroll hub-wealth hub-sheet-scroll"><%- include('partials/hub-wealth', { v: wv }) %></div>
+  </dialog>
+  <dialog class="hub-dlg hub-dlg-area" id="hub-quests" aria-labelledby="hub-quests-title">
+    <div class="hub-dlg-head">
+      <span class="hub-dlg-ico"><%- icon('scroll', 26, '#e8bf6a', 1.6) %></span>
+      <div class="hub-dlg-titles"><span class="hub-dlg-sub">SCHWARZES BRETT · <%= t.done %>/<%= t.total %></span><h2 class="cin" id="hub-quests-title">Heute</h2></div>
+      <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
+    </div>
+    <div class="hub-scroll hub-sheet-scroll hub-quests"><%- include('partials/hub-quests', { today: t, clock }) %></div>
+  </dialog>
+</div>
+
+<script src="/js/hub.js?v=<%= assetVersion %>" defer></script>
+<%- include('partials/foot', { hub: true }) %>

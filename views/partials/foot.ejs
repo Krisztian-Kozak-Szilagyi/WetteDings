@@ -75,6 +75,8 @@
       <p class="muted small ach-pop-more" data-dev-more<%= dp && dp.left > 1 ? '' : ' hidden' %>><%= dp && dp.left > 1 ? 'Noch ' + (dp.left - 1) + (dp.left - 1 === 1 ? ' weitere Nachricht wartet.' : ' weitere Nachrichten warten.') : '' %></p>
     </dialog>
   <% } %>
+  <%# Auf der Taverne (hub) stehen diese Links unten im Tresen, der Desktop-Hub ist genau einen Bildschirm hoch %>
+  <% if (!locals.hub) { %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>
@@ -86,5 +88,6 @@
       </nav>
     </div>
   </footer>
+  <% } %>
 </body>
 </html>
