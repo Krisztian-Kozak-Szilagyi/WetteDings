@@ -14,6 +14,9 @@ const blackMarket = require('../tcg/blackMarket');
 const ihk = require('../ihk/ihkService');
 const grading = require('../grading/gradingService');
 const dungeon = require('../dungeon/dungeonService');
+const { EsportsTeam } = require('../models/Esports');
+const league = require('../esports/league');
+const avatars = require('../profile/avatars');
 
 const CURVE_DAYS = 7; // Vermögensänderung: höchstens so viele Tage zurück
 
@@ -128,11 +131,12 @@ function ticker() {
 }
 
 /**
- * Bereiche im PVE-Fenster (Dungeon, IHK, Mage Tower, Grading) – nur die, die das Mitglied sehen darf (wie in der
+ * Bereiche im PVE-Fenster (Dungeon, IHK, Mage Tower, Grading, Clan) – nur die, die das Mitglied sehen darf (wie in der
  * Navigation: freigegeben oder Admin). text: Stand von heute, at: Termin (Countdown im Fenster).
- * today = todayStatus(), dungeonAt = nächster Dungeon, towerLeft = Turm-Läufe heute (null = Turm nicht sichtbar).
+ * today = todayStatus(), dungeonAt = nächster Dungeon, towerLeft = Turm-Läufe heute (null = Turm nicht sichtbar),
+ * clan = eigener Clan (null = in keinem, undefined = Clans nicht sichtbar – sie hängen am Mage Tower).
  */
-function pvePlaces({ today, dungeonAt, towerLeft, show }) {
+function pvePlaces({ today, dungeonAt, towerLeft, show, clan }) {
   const item = (key) => today.items.find((i) => i.key === key);
   const places = [];
   if (show.dungeon) {
@@ -145,14 +149,23 @@ function pvePlaces({ today, dungeonAt, towerLeft, show }) {
     places.push({ key: 'tower', label: 'Mage Tower', href: '/dungeon#mage-tower', text });
   }
   if (item('grading')) places.push({ key: 'grading', label: 'Grading', href: '/grading', text: item('grading').text });
+  if (clan !== undefined) places.push({ key: 'clan', label: 'Clan', href: '/esports', text: clan ? `${clan.name} [${clan.ticker}]` : 'Noch in keinem Clan – gründe einen oder lass dich einladen.' });
   return places;
+}
+
+/** Eigener Clan (eSports-Team) für die Plakette auf dem PVE-Bild: Name, Kürzel, Teambild, Farbe – oder null */
+async function clanOf(user) {
+  const team = await EsportsTeam.findOne({ 'members.user': user._id, status: { $ne: 'aufgeloest' } }).select('name ticker avatar color').lean();
+  if (!team) return null;
+  const color = league.findColor(team.color);
+  return { name: team.name, ticker: team.ticker, avatar: team.avatar ? avatars.urlOf(team.avatar) : null, color: color ? color.hex : null };
 }
 
 async function load(user) {
   const show = { dungeon: dungeon.settings.open || user.isAdmin, tower: dungeon.towerOpen(user) };
-  const [w, today, cds, towerLeft] = await Promise.all([wealth(user), todayStatus(user), countdowns(user), show.tower ? dungeon.towerRunsLeft(user._id) : null]);
+  const [w, today, cds, towerLeft, clan] = await Promise.all([wealth(user), todayStatus(user), countdowns(user), show.tower ? dungeon.towerRunsLeft(user._id) : null, show.tower ? clanOf(user) : undefined]);
   const dungeonAt = show.dungeon ? dungeon.slotAfter() : null;
-  return { wealth: w, today, countdowns: cds, ticker: ticker(), dungeonAt, pve: pvePlaces({ today, dungeonAt, towerLeft, show }) };
+  return { wealth: w, today, countdowns: cds, ticker: ticker(), dungeonAt, clan, pve: pvePlaces({ today, dungeonAt, towerLeft, show, clan }) };
 }
 
 module.exports = { CURVE_DAYS, dayBefore, change, upcoming, tally, pvePlaces, ticker, load };

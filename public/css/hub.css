@@ -1,6 +1,7 @@
 /* Startseite im Stil einer Fantasy-Taverne (views/hub.ejs, Verhalten in public/js/hub.js).
-   Maße, Farben und Prozentwerte aus der Vorlage „Eclipse TCG – Hub-Redesign“ (Taverne.dc.html / TaverneMobile.dc.html).
-   Desktop (ab 1000px): ein Bildschirm hoch, kein Seiten-Scroll. 701–1000px: eine Spalte. Bis 700px: Mobil-Ansicht. */
+   Aufbau: Kopfzeile (Kontostand links, HUD rechts), Brett so breit wie der Tresen mit dem Logo auf der Oberkante,
+   darin ein Pergament (Vermögen | Dailys | Broker-Kurse) und fünf gleich große Kacheln.
+   Desktop (ab 1000px): ein Bildschirm hoch, kein Seiten-Scroll. 701–1000px: Seite scrollt. Bis 700px: Mobil-Ansicht. */
 
 /* Schriften Cinzel und Lora: public/css/taverne.css (wird vor dieser Datei geladen) */
 
@@ -13,12 +14,11 @@ body:has(.hub) { background: #1d120c; }
   position: relative; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box;
   height: 100vh; min-height: 760px;
   color: #f3e3c3; font-family: "Lora", Georgia, serif; font-size: 15px; line-height: 1.4;
-  background: linear-gradient(180deg, rgba(10, 8, 20, .35), rgba(10, 8, 20, .2)), url("/img/taverne/bg.webp") center / cover no-repeat, #141026;
+  background: linear-gradient(180deg, rgba(10, 8, 20, .35), rgba(10, 8, 20, .2)), url("/img/taverne/bg-tal.webp") center / cover no-repeat, #141026;
 }
 .hub *, .hub *::before, .hub *::after { box-sizing: border-box; }
 .hub .cin, .hub h1, .hub h2 { font-family: "Cinzel", Georgia, serif; }
 .hub a { color: inherit; text-decoration: none; }
-.hub-m-only { display: none; }
 .hub-glow { position: absolute; top: -40px; width: 420px; height: 420px; border-radius: 50%; pointer-events: none; animation: hubFlicker 3.2s ease-in-out infinite; }
 .hub-glow-l { left: 14%; background: radial-gradient(circle, rgba(255, 184, 80, .30), transparent 68%); }
 .hub-glow-r { right: 12%; background: radial-gradient(circle, rgba(255, 184, 80, .26), transparent 68%); }
@@ -26,33 +26,20 @@ body:has(.hub) { background: #1d120c; }
 .hub-beam { flex: none; position: relative; height: 14px; background: linear-gradient(#5a3a22, #2a1a12); border-bottom: 3px solid #0f0805; }
 @keyframes hubFlicker { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
 
-/* Knöpfe: Fokusring, Hover-Leuchten (.hub-pane wie .pve in der Vorlage), Anheben (.hub-spot) */
+/* Knöpfe: Fokusring, Anheben (.hub-spot) */
 .hub button { font-family: inherit; cursor: var(--cur-pointer, pointer); }
 .hub-spot { transition: transform .18s ease, filter .18s ease; }
 .hub-spot:hover { transform: translateY(-4px); filter: brightness(1.14); }
 .hub-spot:active { transform: translateY(-1px); }
-.hub-spot:focus-visible, .hub-hit:focus-visible, .hub-link:focus-visible, .hub-quest:focus-visible, .hub-legal a:focus-visible,
+.hub-spot:focus-visible, .hub-hit:focus-visible, .hub-link:focus-visible, .hub-quest:focus-visible, .hub-kurs:focus-visible, .hub-legal a:focus-visible,
 .hub .bell-btn:focus-visible { outline: 2px solid #f3e3c3; outline-offset: 3px; }
-.hub-pane, .hub-pve-hit {
-  background: transparent; border: 2px solid transparent; border-radius: 12px;
-  transition: background .2s ease, box-shadow .2s ease, border-color .2s ease;
-}
-.hub-pane:hover, .hub-pane:focus-visible, .hub-pve-hit:hover, .hub-pve-hit:focus-visible {
-  background: rgba(255, 196, 80, .16); border-color: rgba(255, 216, 120, .9); outline: none;
-  box-shadow: 0 0 30px 6px rgba(255, 190, 70, .55), inset 0 0 26px rgba(255, 200, 90, .35);
-}
-.hub-pane:active, .hub-pve-hit:active { background: rgba(255, 196, 80, .26); }
 
-/* ---------- Kopfzeile und HUD ---------- */
+/* ---------- Kopfzeile: Kontostand links, HUD rechts ---------- */
 .hub-head {
-  position: relative; z-index: 5; flex: none; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
-  gap: 8px 24px; width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  position: relative; z-index: 5; flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px 24px; width: 100%; max-width: 1280px; margin: 0 auto; padding: 12px 24px 0;
 }
-.hub-logo { display: block; height: 64px; width: auto; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .6)); }
-.hub-title { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 14px; text-align: center; }
-.hub-date { font-size: 12px; letter-spacing: .14em; color: #e0c89a; }
-.hub-title h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.1; color: #f3e3c3; }
-.hub-hud { display: flex; align-items: center; gap: 12px; padding-top: 12px; }
+.hub-hud { display: flex; align-items: center; gap: 12px; }
 .hub-round, .hub .bell-btn {
   position: relative; flex: none; width: 52px; height: 52px; padding: 0; border-radius: 50%;
   border: 3px solid #c9973a; background: #3b2517; color: #e8bf6a; display: flex; align-items: center; justify-content: center;
@@ -67,42 +54,31 @@ body:has(.hub) { background: #1d120c; }
 .hub-badges { position: absolute; top: -8px; right: -8px; display: flex; gap: 2px; }
 .hub-badges .nav-badge { margin: 0; min-width: 22px; height: 22px; border-radius: 11px; border: 2px solid #1d120c; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 .hub-badges .nav-live { display: none; }
-/* Geldbeutel (nur Anzeige) und Profilbild (Link zum eigenen Profil) */
-.hub-me { display: flex; align-items: center; gap: 12px; }
 .hub-purse-pill {
   display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px; border-radius: 26px;
   border: 3px solid #c9973a; background: linear-gradient(#3b2517, #2a1a12);
 }
 .hub-purse-text { display: flex; flex-direction: column; line-height: 1.1; }
-.hub-purse-name { font-size: 11px; color: #e0c89a; }
+.hub-purse-name { font-size: 11px; letter-spacing: .08em; color: #e0c89a; }
 .hub-purse-text strong { font-size: 19px; font-weight: 700; color: #e8bf6a; white-space: nowrap; }
 .hub-avatar { overflow: hidden; }
 .hub-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hub-avatar:hover { border-color: #e8bf6a; box-shadow: 0 0 16px 2px rgba(255, 190, 70, .45); }
 .hub .bell-panel { font-family: var(--font); line-height: 1.5; }
 
-/* ---------- Szene: Brett links, Händlerstand rechts ---------- */
-.hub-scene {
-  position: relative; flex: 1; min-height: 0; width: 100%; max-width: 1280px; margin: 0 auto; padding: 36px 24px 8px;
-  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 20px;
-}
-
-/* Schwarzes Brett */
+/* ---------- Brett: so breit wie der Tresen (gleiche Breite und Ränder), Logo mittig auf der Oberkante ---------- */
+.hub-scene { position: relative; flex: 1; min-height: 0; width: 100%; max-width: 1280px; margin: 0 auto; padding: 46px 24px 10px; display: flex; flex-direction: column; justify-content: center; }
 .hub-board {
-  min-width: 0; min-height: 0; display: flex; flex-direction: column; border-radius: 10px; padding: 14px;
+  position: relative; min-width: 0; display: flex; flex-direction: column; border-radius: 10px; padding: 14px;
   background: linear-gradient(145deg, #5a3a22, #3b2517); border: 3px solid #1d120c; box-shadow: 0 14px 30px rgba(0, 0, 0, .6);
 }
-.hub-plate {
-  align-self: center; margin-top: -30px; padding: 6px 20px; border-radius: 4px; border: 2px solid #c9973a; background: #2a1a12;
-  color: #e8bf6a; font-size: 14px; font-weight: 600; letter-spacing: .16em;
-}
+.hub-logo-wrap { position: absolute; z-index: 3; top: 0; left: 50%; margin: 0; transform: translate(-50%, -58%); line-height: 0; pointer-events: none; }
+.hub-logo { display: block; height: 104px; width: auto; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .7)); }
 .hub-board-in {
-  flex: 1; min-height: 0; margin-top: 12px; border-radius: 6px; padding: 22px 18px 16px;
+  border-radius: 6px; padding: 1cm; /* gleich viel Luft an allen vier Seiten */
   background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, .04), transparent 50%), #20160f; box-shadow: inset 0 0 40px rgba(0, 0, 0, .8);
-  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 28px;
+  display: flex; flex-direction: column; gap: 22px;
 }
-.hub-col { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 22px; }
-.hub-note-m { display: none; }
 
 /* Pergament-Rolle als 9-Slice (border-image) – passt sich jeder Inhaltsgröße an */
 .hub-scroll {
@@ -110,48 +86,43 @@ body:has(.hub) { background: #1d120c; }
   border-image: url("/img/taverne/scroll.webp") 165 80 fill / 43px 21px stretch;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .55)); color: #2b1d12;
 }
-.hub-scroll-sm {
-  border: solid transparent; border-width: 20px 10px;
-  border-image: url("/img/taverne/scroll.webp") 165 80 fill / 20px 10px stretch;
-  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .6)); color: #2b1d12; background-color: transparent;
-}
 .hub-note-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .hub-kicker { font-size: 14px; font-weight: 700; letter-spacing: .14em; }
 .hub-tag { font-size: 12px; padding: 3px 10px; border-radius: 10px; border: 1px solid #6b5638; color: #4a3a22; }
 
-.hub-wealth { position: relative; flex: none; padding: 2px 10px 0; display: flex; flex-direction: column; gap: 8px; }
-.hub-wealth-total { font-size: 34px; font-weight: 700; line-height: 1.05; }
+/* ein Pergament, drei Abschnitte nebeneinander: Vermögen | Dailys | Broker-Kurse. Die Höhe gibt das Vermögen vor,
+   Dailys und Kurse scrollen bei Bedarf in ihrem Abschnitt. */
+.hub-strip { flex: none; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.hub-strip-sec { min-width: 0; padding: 0 18px; }
+.hub-strip-sec + .hub-strip-sec { border-left: 2px dashed rgba(107, 86, 56, .55); }
+.hub-strip-sec:first-child { padding-left: 8px; }
+.hub-strip-sec:last-child { padding-right: 8px; }
+
+.hub-wealth { display: flex; flex-direction: column; gap: 8px; }
+.hub-wealth-total { font-size: 32px; font-weight: 700; line-height: 1.05; }
 .hub-delta { font-size: 14px; font-weight: 600; color: #4a3a22; }
 .hub-delta.is-down { color: #8c2f2a; }
 .hub-delta.is-up { color: #3d6b2a; }
 .hub-delta-days { color: #4a3a22; font-weight: 400; }
 .hub-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; background: #2b1d12; padding: 2px; }
 .hub-bar > span { border-radius: 4px; min-width: 3px; }
-.hub-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); gap: 6px 16px; }
+.hub-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr)); gap: 6px 14px; }
 .hub-part { display: flex; flex-direction: column; gap: 1px; }
 .hub-part-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4a3a22; }
 .hub-diamond { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); }
-.hub-part-value { font-size: 16px; font-weight: 700; }
+.hub-part-value { font-size: 15px; font-weight: 700; }
 
-/* PVE-Bild mit Hotspot über dem Schriftzug */
-.hub-pve {
-  position: relative; flex: none; aspect-ratio: 16 / 9; width: 100%; border-radius: 6px; overflow: hidden;
-  border: 3px solid #c9973a; box-shadow: 0 8px 18px rgba(0, 0, 0, .6); background: #141026;
-}
-.hub-pve img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.hub-pve-hit { position: absolute; left: 30%; top: 66%; width: 42%; height: 28%; padding: 0; }
-.hub-pve-timer { display: none; }
-
-/* Heute */
-.hub-today { position: relative; flex: 1; min-height: 0; padding: 2px 8px 0; display: flex; flex-direction: column; gap: 8px; }
+/* Dailys */
+.hub-today { position: relative; min-height: 0; }
+.hub-today-in { position: absolute; inset: 0 18px; display: flex; flex-direction: column; gap: 8px; }
 .hub-today .hub-note-head { flex-wrap: nowrap; gap: 12px; }
 .hub-seal {
-  width: 48px; height: 48px; flex: none; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #b3453b, #7a2520);
-  color: #f3e3c3; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; box-shadow: 0 3px 6px rgba(0, 0, 0, .5);
+  width: 44px; height: 44px; flex: none; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #b3453b, #7a2520);
+  color: #f3e3c3; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; box-shadow: 0 3px 6px rgba(0, 0, 0, .5);
 }
 .hub-fit { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #8a6f42 transparent; }
 .hub-quests { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.hub-quest { display: flex; align-items: center; gap: 12px; min-height: 44px; border-bottom: 1px dashed #8a6f42; color: #2b1d12; }
+.hub-quest { display: flex; align-items: center; gap: 12px; min-height: 44px; flex: none; border-bottom: 1px dashed #8a6f42; color: #2b1d12; }
 .hub-quest:hover .hub-quest-title { text-decoration: underline; text-underline-offset: 3px; }
 .hub-quest.is-off { color: #6b5638; }
 .hub-check {
@@ -164,28 +135,80 @@ body:has(.hub) { background: #1d120c; }
 .hub-quest-sub { font-size: 12px; color: #4a3a22; }
 .hub-quest.is-done .hub-quest-title { text-decoration: line-through; text-decoration-color: rgba(43, 29, 18, .5); }
 .hub-next {
-  flex: none; text-align: left; padding: 10px 4px 4px; border: 0; border-top: 2px dashed #8a6f42; background: transparent; color: #2b1d12;
-  display: flex; flex-direction: column; gap: 2px;
+  flex: none; text-align: left; padding: 8px 4px 2px; border: 0; border-top: 2px dashed #8a6f42; background: transparent; color: #2b1d12;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
 }
-.hub-next-label { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: #8c2f2a; }
-.hub-next-time { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.hub-next-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #8c2f2a; }
+.hub-next-time { font-size: 20px; font-weight: 700; line-height: 1.1; }
 
-/* ---------- Händlerstand ---------- */
-.hub-stall { min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
-.hub-stall-frame { position: relative; flex: none; width: min(100cqw, calc(100cqh * .5628)); aspect-ratio: 941 / 1672; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, .55)); }
-.hub-stall-frame > img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.hub-stall-title { position: absolute; left: 26.6%; top: 14.7%; width: 47.3%; height: 5.4%; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; letter-spacing: .16em; color: #e8bf6a; }
-.hub-ticker { position: absolute; left: 22.3%; top: 23%; width: 56.8%; height: 28.1%; padding: 3% 4%; color: #f3e3c3; display: flex; flex-direction: column; justify-content: space-between; text-align: left; }
-.hub-ticker-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; border-bottom: 1px solid rgba(201, 151, 58, .35); padding-bottom: 3px; white-space: nowrap; }
-.hub-ticker-sym { font-size: 13px; font-weight: 700; color: #e8bf6a; }
-.hub-ticker-ch { font-weight: 600; }
-.hub-ticker-ch.is-down { color: #ff9a8b; }
-.hub-ticker-ch.is-up { color: #7fe3a6; }
-.hub-slot { position: absolute; width: 29.3%; height: 16.2%; padding: 0; color: #f3e3c3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-.hub-slot > .cin, .hub-slot-m > .cin, .hub-link > .cin { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.hub-slot-ico { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 2px solid #c9973a; background: rgba(10, 10, 30, .7); display: flex; align-items: center; justify-content: center; }
-.hub-dot { position: absolute; top: 6px; right: 8px; width: 14px; height: 14px; border-radius: 7px; border: 2px solid #f3e3c3; background: #8c2f2a; }
-.hub-stall-m { display: none; }
+/* Broker-Kurse */
+.hub-kurse { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.hub-kurse .hub-note-head { flex-wrap: nowrap; }
+.hub-kurse-all:hover { border-color: #2b1d12; color: #2b1d12; }
+.hub-kurse-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.hub-kurs {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 10px; min-height: 36px; padding: 6px 0;
+  border-bottom: 1px dashed #8a6f42; color: #2b1d12; white-space: nowrap;
+}
+.hub-kurs:hover .hub-kurs-sym { text-decoration: underline; text-underline-offset: 3px; }
+.hub-kurs-sym { font-size: 14px; font-weight: 700; }
+.hub-kurs-price { font-size: 14px; font-weight: 600; text-align: right; }
+.hub-kurs-ch { font-size: 12px; font-weight: 700; text-align: right; }
+.hub-kurs-ch.is-down { color: #8c2f2a; }
+.hub-kurs-ch.is-up { color: #3d6b2a; }
+
+/* ---------- Kacheln: Shop | Gambling | TCG | PVE | Rangliste ---------- */
+.hub-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; --cols: 5; }
+.hub-tile {
+  position: relative; flex: 0 0 calc((100% - (var(--cols) - 1) * 16px) / var(--cols)); aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden;
+  border: 3px solid #c9973a; box-shadow: 0 8px 18px rgba(0, 0, 0, .6);
+  background: radial-gradient(ellipse at 50% 55%, #2c2350, #141026 70%);
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+.hub-tile:hover, .hub-tile:focus-within { border-color: #f0c870; box-shadow: 0 8px 18px rgba(0, 0, 0, .6), 0 0 22px 2px rgba(255, 190, 70, .35); }
+.hub-tile-hit { position: absolute; inset: 0; display: block; padding: 0; margin: 0; border: 0; background: none; color: inherit; outline: none; }
+/* Bühne im Seitenverhältnis des Motivs; der Schriftzug liegt in Prozent darauf, also bei jeder Größe an derselben Stelle */
+.hub-tile-stage { position: absolute; left: 50%; top: 50%; aspect-ratio: var(--ar); transform: translate(-50%, -50%); }
+.hub-tile.is-fill .hub-tile-stage { width: 100%; }
+.hub-tile.is-wide .hub-tile-stage { width: 112%; }
+.hub-tile.is-cover .hub-tile-stage { height: 100%; }
+.hub-tile-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Schriftzug: maskiert mit sich selbst, damit Aufhellung und Glanz nur auf den Buchstaben liegen */
+.hub-tile-logo, .hub-tile-glow { position: absolute; left: var(--l); top: var(--t); width: var(--w); aspect-ratio: var(--lar); pointer-events: none; }
+.hub-tile-logo {
+  -webkit-mask: var(--mask) center / 100% 100% no-repeat; mask: var(--mask) center / 100% 100% no-repeat;
+  -webkit-mask-mode: alpha; mask-mode: alpha;
+}
+.hub-tile-logo img, .hub-tile-glow img { display: block; width: 100%; height: 100%; }
+.hub-tile-logo img { transition: filter .3s ease; }
+.hub-tile-logo::after {
+  content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .3s ease;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 246, 214, .95) 50%, transparent 62%) 160% 0 / 260% 100% no-repeat;
+  mix-blend-mode: screen;
+}
+/* Leuchten um den Schriftzug: eigene Ebene ohne Maske, damit der Schein über die Buchstaben hinaus strahlt */
+.hub-tile-glow { opacity: 0; transition: opacity .3s ease; }
+.hub-tile-glow img { filter: blur(6px) brightness(1.9) saturate(1.8); mix-blend-mode: screen; } /* goldener Schein aus den eigenen Farben */
+.hub-tile:hover .hub-tile-logo img, .hub-tile-hit:focus-visible .hub-tile-logo img { animation: hub-logo-glow 1.6s ease-in-out infinite alternate; }
+.hub-tile:hover .hub-tile-logo::after, .hub-tile-hit:focus-visible .hub-tile-logo::after { opacity: 1; animation: hub-logo-shine 1.8s ease-in-out infinite; }
+.hub-tile:hover .hub-tile-glow, .hub-tile-hit:focus-visible .hub-tile-glow { opacity: .95; animation: hub-logo-halo 1.6s ease-in-out infinite alternate; }
+div.hub-tile-hit ~ * { cursor: auto; }
+@keyframes hub-logo-glow { from { filter: brightness(1.1) saturate(1.05); } to { filter: brightness(1.35) saturate(1.2); } }
+@keyframes hub-logo-shine { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+@keyframes hub-logo-halo { from { opacity: .6; transform: scale(1); } to { opacity: 1; transform: scale(1.025); } }
+.hub-dot { position: absolute; z-index: 2; top: 8px; right: 8px; width: 14px; height: 14px; border-radius: 7px; border: 2px solid #f3e3c3; background: #8c2f2a; pointer-events: none; }
+
+/* PVE: Clan-Plakette rechts oben (Teambild und Kürzel des eigenen Clans, Rahmen in der Teamfarbe) */
+.hub-pve-clan {
+  position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 2px 10px 2px 2px;
+  border-radius: 999px; border: 2px solid var(--clan, #c9973a); background: rgba(20, 12, 8, .86); color: #f3e3c3; text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .55); transition: box-shadow .2s ease, transform .2s ease;
+}
+.hub-pve-clan:hover, .hub-pve-clan:focus-visible { transform: translateY(-2px); box-shadow: 0 0 18px 2px rgba(255, 190, 70, .5); outline: none; }
+.hub-pve-clan-logo { width: 30px; height: 30px; flex: none; border-radius: 50%; overflow: hidden; border: 2px solid var(--clan, #c9973a); background: #2a1a12; display: flex; align-items: center; justify-content: center; }
+.hub-pve-clan-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hub-pve-clan-tag { font-size: 13px; font-weight: 700; color: #e8bf6a; letter-spacing: .04em; }
+.hub-pve-timer { display: none; }
 
 /* ---------- Tresen (mit den Pflicht-Links) ---------- */
 .hub-tresen { position: relative; flex: none; width: 100%; max-width: 1280px; margin: 0 auto; padding: 4px 24px 0; }
@@ -220,12 +243,11 @@ body:has(.hub) { background: #1d120c; }
 .hub-dlg-body { display: flex; flex-direction: column; gap: 10px; }
 @keyframes hubUnroll { from { opacity: 0; transform: scale(.96) translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* Bereich (PVE, Gambling, Handel): Termine und Schaltflächen */
+/* Bereich (PVE, Gambling): Termine und Schaltflächen */
 .hub-extra {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 4px 14px;
   border-radius: 8px; border: 1px solid #7a5a2c; background: #2a1a12;
 }
-a.hub-extra:hover { border-color: #c9973a; }
 .hub-extra-label { font-size: 12px; letter-spacing: .08em; color: #e0c89a; }
 .hub-extra-value { font-size: 16px; font-weight: 700; color: #e8bf6a; text-align: right; }
 .hub-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 4px; }
@@ -235,85 +257,62 @@ a.hub-extra:hover { border-color: #c9973a; }
   transition: box-shadow .2s ease, background .2s ease;
 }
 .hub-link:hover { box-shadow: 0 0 22px 4px rgba(255, 190, 70, .45); background: linear-gradient(#171c44, #0f1330); }
-.hub-link .hub-slot-ico { width: 38px; height: 38px; }
+.hub-link > .cin { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.hub-slot-ico { width: 38px; height: 38px; flex: none; border-radius: 50%; border: 2px solid #c9973a; background: rgba(10, 10, 30, .7); display: flex; align-items: center; justify-content: center; }
 .hub-link .nav-badge { margin-left: auto; }
-#hub-pve .hub-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* vier Bereiche als 2 × 2 */
+#hub-pve .hub-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* Bereiche als 2 × n */
 .hub-link-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hub-link-sub { font-size: 12px; line-height: 1.3; color: #c9b48a; }
-.hub-sheet-scroll { padding: 2px 6px 0; display: flex; flex-direction: column; gap: 10px; }
 
-/* ---------- 701–1000px: eine Spalte ---------- */
+/* ---------- 701–1000px: Seite scrollt, Pergament zweizeilig, drei Kacheln je Reihe ---------- */
 @media (max-width: 1000px) {
   .hub { height: auto; min-height: 100vh; overflow: visible; }
-  .hub-scene { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-  .hub-stall { container-type: normal; }
-  .hub-stall-frame { width: min(100%, 420px); }
+  .hub-scene { flex: none; }
+  .hub-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 18px; }
+  .hub-strip .hub-wealth { grid-column: 1 / -1; padding: 0 8px 18px; border-bottom: 2px dashed rgba(107, 86, 56, .55); }
+  .hub-strip .hub-today { border-left: 0; padding-left: 8px; }
+  .hub-today-in { position: static; max-height: 300px; }
+  .hub-today { min-height: 0; }
+  .hub-today-in { inset: auto; }
+  .hub-tiles { --cols: 3; }
 }
 
-/* ---------- bis 700px: Mobil (Vorlage 390 × 844) ---------- */
+/* ---------- bis 700px: Mobil ---------- */
 @media (max-width: 700px) {
   .hub { min-height: 100dvh; }
-  .hub-m-only { display: inline; }
-  .hub-glow, .hub-beam, .hub-logo, .hub-title { display: none; }
-  .hub-head {
-    flex-wrap: nowrap; align-items: center; gap: 10px; max-width: none; padding: 10px 16px;
-    border-bottom: 3px solid #0f0805; background: linear-gradient(#5a3a22, #2a1a12);
-  }
-  .hub-hud { flex: 1; min-width: 0; gap: 8px; padding-top: 0; }
-  .hub-round, .hub .bell-btn { width: 46px; height: 46px; }
-  .hub .bell-btn svg { width: 22px; height: 22px; }
-  .hub .bell-count { min-width: 22px; height: 22px; font-size: 11px; }
-  /* Profil links: Bild, daneben „Willkommen, Name“ und Kontostand (die Pille ohne Rahmen) */
-  .hub-me { order: -1; flex: 1; min-width: 0; margin-right: auto; gap: 10px; }
-  .hub-avatar { order: -1; width: 48px; height: 48px; }
-  .hub-purse-pill { height: auto; padding: 0; border: 0; background: none; min-width: 0; }
+  .hub-glow, .hub-beam { display: none; }
+  .hub-head { gap: 10px; max-width: none; padding: 10px 12px; border-bottom: 3px solid #0f0805; background: linear-gradient(#5a3a22, #2a1a12); }
+  .hub-hud { gap: 6px; }
+  .hub-round, .hub .bell-btn { width: 42px; height: 42px; border-width: 2px; }
+  .hub .bell-btn svg, .hub-round svg { width: 20px; height: 20px; }
+  .hub .bell-count { min-width: 20px; height: 20px; font-size: 11px; }
+  .hub-purse-pill { height: 42px; padding: 0 12px; gap: 8px; border-width: 2px; min-width: 0; }
   .hub-purse-coin { display: none; }
-  .hub-purse-text strong { font-size: 18px; }
-  .hub .bell-panel { top: 72px; }
+  .hub-purse-name { font-size: 10px; }
+  .hub-purse-text strong { font-size: 16px; }
+  .hub .bell-panel { top: 66px; }
 
-  .hub-scene { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 22px; padding: 30px 12px 0; }
-  .hub-board { flex: none; padding: 10px; box-shadow: 0 8px 18px rgba(0, 0, 0, .6); }
-  .hub-plate { margin-top: -24px; padding: 4px 14px; font-size: 11px; }
-  .hub-board-in { margin-top: 8px; padding: 14px 10px 10px; box-shadow: inset 0 0 24px rgba(0, 0, 0, .8); grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; gap: 12px; background: #20160f; }
-  .hub-note-m { display: flex; flex-direction: column; gap: 4px; min-height: 100px; padding: 0 2px; text-align: left; font: inherit; }
-  .hub-note-m .hub-kicker { font-size: 11px; }
-  .hub-note-total { font-size: 17px; font-weight: 700; line-height: 1.1; white-space: nowrap; }
-  .hub-note-m .hub-delta { font-size: 11px; }
-  .hub-bar-sm { height: 8px; border-radius: 4px; padding: 1px; }
-  .hub-bar-sm > span { border-radius: 3px; }
-  .hub-note-m .hub-note-head { flex-wrap: nowrap; gap: 6px; }
-  .hub-seal-sm { width: 36px; height: 36px; font-size: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, .5); }
-  .hub-note-quest { font-size: 13px; font-weight: 600; }
-  .hub-note-sub { font-size: 11px; color: #4a3a22; }
+  .hub-scene { padding: 44px 10px 0; }
+  .hub-board { padding: 8px; box-shadow: 0 8px 18px rgba(0, 0, 0, .6); }
+  .hub-logo { height: 72px; }
+  .hub-board-in { padding: 34px 10px 12px; gap: 14px; box-shadow: inset 0 0 24px rgba(0, 0, 0, .8); }
+  .hub-scroll { border-width: 30px 14px; border-image-width: 30px 14px; }
+  .hub-strip { grid-template-columns: minmax(0, 1fr); }
+  .hub-strip-sec, .hub-strip .hub-wealth, .hub-strip .hub-today { grid-column: auto; padding: 0 4px 14px; border-left: 0; }
+  .hub-strip-sec + .hub-strip-sec { border-top: 2px dashed rgba(107, 86, 56, .55); padding-top: 12px; }
+  .hub-strip .hub-wealth { border-bottom: 0; }
+  .hub-strip-sec:last-child { padding-bottom: 0; }
+  .hub-wealth-total { font-size: 26px; }
+  .hub-today-in { max-height: 260px; }
+  .hub-tiles { --cols: 2; gap: 10px; }
+  .hub-tile { flex-basis: calc((100% - 10px) / 2); }
   .hub-spot:hover { transform: none; filter: none; }
   .hub-spot:active { transform: scale(.96); }
-  .hub-col-l { display: contents; }
-  .hub-col-l .hub-wealth, .hub-col-r { display: none; }
-  .hub-pve { grid-column: 1 / -1; box-shadow: 0 6px 12px rgba(0, 0, 0, .6); border-radius: 6px; }
-  .hub-pve-hit { border-radius: 10px; }
-  .hub-pve-timer {
-    position: absolute; left: 6px; top: 6px; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 2px 10px;
-    border-radius: 8px; border: 2px solid #c9973a; background: rgba(20, 12, 8, .84); color: #f3e3c3;
-  }
-  .hub-pve-timer-label { font-size: 10px; letter-spacing: .1em; color: #f0b0a0; }
-  .hub-pve-timer .cin { font-size: 15px; font-weight: 700; }
+  .hub-pve-clan { top: 4px; right: 4px; padding: 1px 8px 1px 1px; gap: 4px; }
+  .hub-pve-clan-logo { width: 24px; height: 24px; }
+  .hub-pve-clan-tag { font-size: 11px; }
 
-  .hub-stall { container-type: normal; flex: none; display: flex; flex-direction: column; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .55)); }
-  .hub-stall-frame { display: none; }
-  .hub-stall-m { display: flex; flex-direction: column; width: 100%; }
-  .hub-stall-roof { position: relative; width: 100%; aspect-ratio: 941 / 345; background: url("/img/taverne/stall.webp") top center / 100% auto no-repeat; }
-  .hub-stall-roof h2 { position: absolute; left: 26.6%; top: 71%; width: 47.3%; height: 26%; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: .14em; color: #e8bf6a; }
-  .hub-stall-grid {
-    margin: -4px 14px 0; padding: 8px; border: 3px solid #c9973a; border-top: 0; border-radius: 0 0 10px 10px;
-    background: linear-gradient(180deg, #0f1330, #0a0d24); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
-  }
-  .hub-slot-m { position: relative; min-height: 76px; padding: 4px 0; color: #f3e3c3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 10px; }
-  .hub-slot-m > .cin { font-size: 10.5px; letter-spacing: .02em; }
-  .hub-slot-m .hub-slot-ico { width: 38px; height: 38px; }
-  .hub-slot-m .hub-dot { top: 5px; right: 7px; width: 12px; height: 12px; border-radius: 6px; }
-  .hub-pane:hover, .hub-pane:focus-visible, .hub-pve-hit:hover, .hub-pve-hit:focus-visible { box-shadow: 0 0 24px 4px rgba(255, 190, 70, .55), inset 0 0 20px rgba(255, 200, 90, .35); }
-
-  .hub-tresen { padding: 0 12px; margin-top: 22px; }
+  .hub-tresen { padding: 0 10px; margin-top: 18px; }
   .hub-tresen-top { height: 12px; }
   .hub-tresen-front { height: auto; min-height: 20px; padding: 2px 0; border-radius: 0; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 90px), linear-gradient(#3b2517, #1d120c); }
   .hub-legal { gap: 12px; font-size: 10px; }
@@ -324,8 +323,6 @@ a.hub-extra:hover { border-color: #c9973a; }
   }
   .hub-dlg[open] { gap: 12px; animation: hubRise .22s ease-out; }
   .hub-dlg-ico { width: 52px; height: 52px; }
-  .hub-sheet-scroll .hub-kicker { display: none; } /* Titel steht schon im Kopf des Sheets */
-  .hub-sheet-scroll .hub-note-head { justify-content: flex-start; }
   .hub-dlg-sub { font-size: 10px; }
   .hub-dlg h2 { font-size: 22px; }
   .hub-links, #hub-pve .hub-links { grid-template-columns: 1fr; }
@@ -334,5 +331,6 @@ a.hub-extra:hover { border-color: #c9973a; }
 
 @media (prefers-reduced-motion: reduce) {
   .hub-glow, .hub-dlg[open] { animation: none; }
-  .hub-spot, .hub-pane, .hub-pve-hit, .hub-link { transition: none; }
+  .hub-spot, .hub-tile, .hub-tile-logo img, .hub-link { transition: none; }
+  .hub-tile:hover .hub-tile-logo img, .hub-tile:hover .hub-tile-logo::after, .hub-tile:hover .hub-tile-glow { animation: none; }
 }

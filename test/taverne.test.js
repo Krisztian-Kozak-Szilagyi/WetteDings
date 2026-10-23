@@ -31,7 +31,7 @@ test('Taverne-Fenster: Bereich, aktiver Reiter und Startseite des Reiters', () =
 
 test('Taverne-Fenster: gesperrte Bereiche erscheinen nicht als Reiter', () => {
   assert.deepEqual(nav.taverneSection(locals('/dungeon', ben, { dungeon: true })).tabs.map((t) => t.label), ['Dungeon']);
-  assert.deepEqual(nav.taverneSection(locals('/dungeon', ben, { dungeon: true, ihk: true, grading: true, esports: true })).tabs.map((t) => t.label), ['Dungeon', 'IHK', 'Grading', 'eSports']);
+  assert.deepEqual(nav.taverneSection(locals('/dungeon', ben, { dungeon: true, ihk: true, grading: true, esports: true })).tabs.map((t) => t.label), ['Dungeon', 'IHK', 'Grading', 'Clan']); // eSports heißt jetzt Clan
   // Admin sieht alles, auch ohne Freigabe (eSports hängt am Mage Tower)
   assert.deepEqual(nav.taverneSection(locals('/ihk', admin)).tabs.map((t) => t.label), ['Dungeon', 'IHK', 'Grading']);
 });

@@ -9,10 +9,10 @@
     </div>
     <%- include('partials/grade-stats', { graded, own: true }) %>
   </div>
-  <%# Ansicht wählen: gestapelt (eine Kachel je Karte) oder einzeln (jede Version für sich) – bleibt für die Sitzung %>
+  <%# Ansicht wählen: gestapelt (eine Kachel je Karte) oder klassisch (das ursprüngliche Album, jede Version für sich) – bleibt für die Sitzung %>
   <div class="album-view-toggle" role="group" aria-label="Ansicht des Albums">
     <a class="album-view-btn<%= albumView === 'stapel' ? ' is-active' : '' %>" href="/tcg/album?ansicht=stapel#sammlung" aria-pressed="<%= albumView === 'stapel' %>" title="Eine Kachel je Karte, die Versionen beim Anklicken">Gestapelt</a>
-    <a class="album-view-btn<%= albumView === 'einzeln' ? ' is-active' : '' %>" href="/tcg/album?ansicht=einzeln#sammlung" aria-pressed="<%= albumView === 'einzeln' %>" title="Jede Version als eigene Karte">Einzeln</a>
+    <a class="album-view-btn<%= albumView === 'einzeln' ? ' is-active' : '' %>" href="/tcg/album?ansicht=einzeln#sammlung" aria-pressed="<%= albumView === 'einzeln' %>" title="Das ursprüngliche Album: jede Version als eigene Karte">Klassisch</a>
   </div>
 </div>
 

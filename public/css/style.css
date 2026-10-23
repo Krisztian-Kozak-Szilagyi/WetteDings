@@ -6310,7 +6310,10 @@ html::-webkit-scrollbar-track { background: var(--color-bg); box-shadow: inset 1
 
 /* Putzen und Bügeln (#204): Werkzeug am Zeiger, Nass-Glanz, Glitzern, Dampf, Hitze am Eisen */
 .gr-spot { transform: translate(-50%, -50%) scale(var(--sc, 1)); }
-.gr-wet { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
+/* Nass-Spur beim Putzen: höchstens halb deckend, damit wiederholtes Reiben die Karte nicht weiß zudeckt */
+.gr-wet { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; opacity: .5; }
+/* Eckpunkte der Vorderseite: geben der Nass-Spur die echte (gekippte) Kartenform */
+.gr-wet-pin { position: absolute; width: 0; height: 0; pointer-events: none; }
 .gr-tool {
   position: absolute; z-index: 7; left: 0; top: 0; width: 46px; height: 46px; pointer-events: none; opacity: 0;
   transform: translate(var(--tx, 0), var(--ty, 0)) translate(-50%, -50%) rotate(var(--tilt, 0deg)); transition: opacity .12s;

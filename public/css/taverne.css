@@ -112,6 +112,9 @@ body.taverne .tv-back {
 body.taverne .tv-back:hover, body.taverne .tv-back:focus-visible { color: #fff; border-color: #e8bf6a; box-shadow: 0 0 22px 4px rgba(255, 190, 70, .45); outline: none; }
 body.taverne .tv-tabs a:focus-visible { outline: 2px solid #f3e3c3; outline-offset: 3px; }
 .tv-tabs + .tv-back, .tv-tabs + .tv-side, .tv-tabs + .tv-logout { margin-left: 0; }
+/* „Zurück“ direkt neben „Zur Taverne“: beide rechts, dicht beieinander */
+.tv-prev + .tv-back { margin-left: 0; }
+body.taverne .tv-prev { padding: 0 16px 0 12px; }
 .tv-logout { margin: 0; display: flex; }
 /* Nebenknöpfe im Kopf (Profil: Abmelden, App) – zurückhaltender als „Zur Taverne“ */
 body.taverne .tv-side { margin-left: 0; padding: 0 16px; border-width: 2px; background: rgba(20, 12, 8, .5); color: #e0c89a; font-size: 13px; cursor: var(--cur-pointer, pointer); }
@@ -134,6 +137,11 @@ body.taverne .tv-dup-title { position: absolute; width: 1px; height: 1px; overfl
   .tv-tabs { order: 3; flex-basis: 100%; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; gap: 6px; }
   body.taverne .tv-tabs a { min-height: 38px; padding: 0 14px; font-size: 12px; }
   .tv-tabs + .tv-back, body.taverne .tv-back { margin-left: auto; height: 44px; padding: 0 14px 0 8px; font-size: 13px; }
+  body.taverne .tv-prev + .tv-back { margin-left: 0; }
+  /* schmal: „Zurück“ nur als Pfeil und der Titel darf schrumpfen, damit beide Knöpfe neben dem Titel bleiben */
+  .tv-head-titles { flex: 1 1 0; }
+  body.taverne .tv-prev { width: 44px; padding: 0; justify-content: center; }
+  body.taverne .tv-prev span { display: none; }
   /* Profil: Abmelden/App unter den Reitern, „Zur Taverne“ bleibt oben rechts */
   .tv-logout, body.taverne .tv-side { order: 4; }
   .tv-logout { margin-left: auto; }

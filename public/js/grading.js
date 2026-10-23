@@ -245,6 +245,7 @@
     stage.classList.toggle('mode-iron', m === 'iron');
     tool.setAttribute('data-tool', m === 'clean' || m === 'iron' ? m : '');
     if (m !== 'clean' && m !== 'iron') toolOff();
+    if (m !== 'clean') wetClear(); // keine Nass-Spur stehen lassen, wenn nicht mehr geputzt wird
     readout.hidden = m !== 'measure' || !!mbar; // mit Messleiste steht die Anzeige dort statt auf der Bühne
     if (mbar) mbar.hidden = m !== 'measure';
     if (m !== 'uv') uvOff();
@@ -352,11 +353,30 @@
     toolLast = null;
   }
 
-  // Nass-Glanz (#204): wo der Schwamm über die Vorderseite reibt, bleibt eine glänzende Spur, die langsam trocknet
+  // Nass-Glanz (#204): wo der Schwamm über die Vorderseite reibt, bleibt eine glänzende Spur, die schnell trocknet.
+  // Gedeckelt (CSS: .gr-wet opacity), damit mehrfaches Reiben die Karte nicht weiß zudeckt, und auf die echte – auch
+  // gekippte – Kartenform zugeschnitten: vier unsichtbare Punkte an den Ecken der Vorderseite liefern ihre Lage auf dem
+  // Bildschirm (das umschließende Rechteck allein ließ die Spur seitlich über die Karte hinaus stehen).
   var wet = el('canvas', 'gr-wet', stage);
   var wetCtx = wet.getContext ? wet.getContext('2d') : null;
   var wetLast = null;
   var wetActive = 0;
+  var WET_DRY_MS = 1200; // so lange nach dem letzten Strich ist die Spur ganz weg
+  var wetPins = [['0', '0'], ['100%', '0'], ['100%', '100%'], ['0', '100%']].map(function (p) {
+    var c = el('span', 'gr-wet-pin', front);
+    c.style.left = p[0];
+    c.style.top = p[1];
+    return c;
+  });
+  function wetClear() {
+    if (!wetCtx) return;
+    wetCtx.save();
+    wetCtx.setTransform(1, 0, 0, 1, 0, 0);
+    wetCtx.clearRect(0, 0, wet.width, wet.height);
+    wetCtx.restore();
+    wetActive = 0;
+    wetLast = null;
+  }
   function wetSize() {
     var dpr = Math.min(2, window.devicePixelRatio || 1);
     wet.width = Math.round(stage.clientWidth * dpr);
@@ -368,16 +388,21 @@
   function wetStroke(x, y) {
     if (!wetCtx || !facingFront) return; // Glanz bewegt sich nicht – auch bei reduzierter Bewegung
     var s = stage.getBoundingClientRect();
-    var f = front.getBoundingClientRect();
     var px = x - s.left;
     var py = y - s.top;
     wetCtx.save();
     wetCtx.beginPath();
-    wetCtx.rect(f.left - s.left, f.top - s.top, f.width, f.height); // nur auf der Karte
+    // nur auf der Karte – entlang ihrer vier (projizierten) Ecken
+    wetPins.forEach(function (c, i) {
+      var r = c.getBoundingClientRect();
+      if (i) wetCtx.lineTo(r.left - s.left, r.top - s.top);
+      else wetCtx.moveTo(r.left - s.left, r.top - s.top);
+    });
+    wetCtx.closePath();
     wetCtx.clip();
     wetCtx.lineCap = 'round';
     wetCtx.lineJoin = 'round';
-    wetCtx.strokeStyle = 'rgba(220, 240, 255, .14)';
+    wetCtx.strokeStyle = 'rgba(220, 240, 255, .28)'; // mit opacity .5 der Fläche wie bisher 14 % je Strich
     wetCtx.lineWidth = BRUSH * 2.2;
     wetCtx.beginPath();
     wetCtx.moveTo(wetLast ? wetLast.x : px, wetLast ? wetLast.y : py);
@@ -389,16 +414,15 @@
   }
   function wetDry(now) {
     if (!wetCtx || !wetActive) return;
-    // trocknet in etwa 1,5 s nach: jedes Bild ein wenig wegnehmen
+    // trocknet in etwa einer Sekunde: jedes Bild ein Stück wegnehmen. Kleine Reste rundet die 8-Bit-Deckkraft nicht mehr
+    // weg – darum ist WET_DRY_MS nach dem letzten Strich garantiert alles gelöscht.
+    if (performance.now() - wetActive > WET_DRY_MS) return wetClear();
     wetCtx.save();
+    wetCtx.setTransform(1, 0, 0, 1, 0, 0);
     wetCtx.globalCompositeOperation = 'destination-out';
-    wetCtx.fillStyle = 'rgba(0, 0, 0, .035)';
+    wetCtx.fillStyle = 'rgba(0, 0, 0, .08)';
     wetCtx.fillRect(0, 0, wet.width, wet.height);
     wetCtx.restore();
-    if (now - wetActive > 2500) {
-      wetCtx.clearRect(0, 0, wet.width, wet.height);
-      wetActive = 0;
-    }
   }
 
   // Fleckarten lösen sich verschieden schnell: Kaffee klebt (langsamer); schneller als bisher wird keiner, sonst passt

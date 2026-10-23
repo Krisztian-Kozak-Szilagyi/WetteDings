@@ -19,14 +19,14 @@ function requireEsports(req, res, next) {
     req.flash('error', 'eSports ist derzeit nicht verfügbar.');
     return res.redirect('/');
   }
-  res.render('error', { title: 'eSports', status: 'eSports', message: 'eSports ist derzeit nicht verfügbar. Schau später wieder vorbei!' });
+  res.render('error', { title: 'Clan', status: 'Clan', message: 'Clans sind derzeit nicht verfügbar. Schau später wieder vorbei!' });
 }
 router.use('/esports', requireLogin, requireEsports);
 
 router.get('/esports', async (req, res) => {
   const [teams, mine, invites, week] = await Promise.all([esports.list(), esports.teamOfUser(req.user._id), esports.invitesFor(req.user._id), esports.lastWeek()]);
   res.render('esports', {
-    title: 'eSports',
+    title: 'Clan',
     guideFan: guideCards(),
     teams,
     mine,
@@ -71,7 +71,7 @@ router.post('/esports/austreten', (req, res) =>
 // Teamprofil: Mitglieder, Trophäen, Wochen, ETF – der Kapitän bearbeitet Text, Motto, Farbe und Teambild
 router.get('/esports/team/:ticker', async (req, res) => {
   const team = await esports.byTicker(req.params.ticker);
-  if (!team) return res.status(404).render('error', { title: 'eSports', status: 404, message: 'Dieses Team gibt es nicht.' });
+  if (!team) return res.status(404).render('error', { title: 'Clan', status: 404, message: 'Diesen Clan gibt es nicht.' });
   const isCaptain = team.status !== 'aufgeloest' && team.captain.equals(req.user._id);
   const history = await esports.historyOf(team._id);
   res.render('esports-team', {
@@ -114,7 +114,7 @@ router.get('/esports/deep-dive', (req, res) => {
   const card = (id) => catalog.cardById[id] || null;
   const dungeon = require('../dungeon/dungeonService');
   res.render('esports-guide', {
-    title: 'eSports Deep Dive',
+    title: 'Clan Deep Dive',
     live: LIVE,
     towerRuns: { daily: dungeon.settings.tower.dailyRuns, esports: dungeon.settings.tower.esportsRuns },
     // Ziel-Punkte je Stockwerk wie im echten Turm (Admin: Ziel Runde 1, Anstieg)

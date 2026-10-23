@@ -48,7 +48,7 @@ function buildNav(l) {
   // Dungeon: mit eSports als Aufklappmenü (eSports hängt am Mage Tower), sonst ein einfacher Link
   if (l.dungeonOpen() || u.isAdmin) {
     const dungeonItem = { href: '/dungeon', label: 'Dungeon', active: path === '/dungeon' || path.startsWith('/dungeon/'), badges: [] };
-    navItems.push(l.esportsOpen(u) ? navGroup('dungeon', 'Dungeon', [dungeonItem, { href: '/esports', label: 'eSports', active: path === '/esports', badges: [] }]) : dungeonItem);
+    navItems.push(l.esportsOpen(u) ? navGroup('dungeon', 'Dungeon', [dungeonItem, { href: '/esports', label: 'Clan', active: path === '/esports', badges: [] }]) : dungeonItem);
   }
   if (l.gradingOpen() || u.isAdmin) navItems.push({ href: '/grading', label: 'Grading', active: path === '/grading', badges: [] });
   const forumBadges = [];
@@ -89,7 +89,12 @@ const me = (l) => '/profil/' + encodeURIComponent(l.currentUser.username);
 const TAVERNE_SECTIONS = [
   { key: 'gambling', title: 'Gambling', sub: 'HÄNDLERSTAND', icon: ICON.gambling, tabs: [{ href: '/wetten', label: 'Wetten' }, { href: '/broker', label: 'Broker' }, { href: '/lotterie', label: 'Lotterie' }], paths: ['/duell'] },
   { key: 'rangliste', title: 'Rangliste', sub: 'EHRENHALLE', icon: ICON.rangliste, tabs: [{ href: '/rangliste', label: 'Rangliste' }] },
-  { key: 'tcg', title: 'TCG', sub: 'KARTENTISCH', icon: ICON.tcg, tabs: [{ href: '/tcg', label: 'TCG' }, { href: '/inventar', label: 'Inventar' }], paths: ['/slab', '/deck'] },
+  // TCG: Album zuerst (dorthin führt der Händlerstand), die Seite /tcg (Pack-Kauf, Favoriten) bleibt im selben Fenster
+  {
+    key: 'tcg', title: 'TCG', sub: 'KARTENTISCH', icon: ICON.tcg,
+    tabs: [{ href: '/tcg/album', label: 'Album' }, { href: '/tcg/aufwertung', label: 'Trade-up' }, { href: '/inventar', label: 'Inventar' }, { href: '/inventar/shop', label: 'Shop' }],
+    paths: ['/tcg', '/slab', '/deck'],
+  },
   { key: 'handel', title: 'Handel', sub: 'MARKTPLATZ', icon: ICON.handel, tabs: [{ href: '/handel', label: 'Handel' }] },
   {
     key: 'pve', title: 'PVE', sub: 'ABENTEUER', icon: ICON.pve,
@@ -97,7 +102,7 @@ const TAVERNE_SECTIONS = [
       { href: '/dungeon', label: 'Dungeon', show: (l) => l.dungeonOpen() || l.currentUser.isAdmin },
       { href: '/ihk', label: 'IHK', show: (l) => l.ihkOpen() || l.currentUser.isAdmin },
       { href: '/grading', label: 'Grading', show: (l) => l.gradingOpen() || l.currentUser.isAdmin },
-      { href: '/esports', label: 'eSports', show: (l) => l.esportsOpen(l.currentUser) },
+      { href: '/esports', label: 'Clan', show: (l) => l.esportsOpen(l.currentUser) }, // bisher „eSports“
     ],
   },
   { key: 'forum', title: 'Forum', sub: 'STAMMTISCH', icon: ICON.forum, tabs: [{ href: '/forum', label: 'Forum' }] },
@@ -127,7 +132,8 @@ function taverneSection(l) {
   if (!l.currentUser) return null;
   for (const s of TAVERNE_SECTIONS) {
     const all = s.tabs.map((t) => ({ ...t, href: typeof t.href === 'function' ? t.href(l) : t.href }));
-    const hit = all.find((t) => inPath(p, t.match || t.href)) || null;
+    // genauester Treffer gewinnt (/inventar/shop ist der Reiter „Shop“, nicht „Inventar“)
+    const hit = all.filter((t) => inPath(p, t.match || t.href)).sort((a, b) => (b.match || b.href).length - (a.match || a.href).length)[0] || null;
     if (!hit && !(s.paths || []).some((x) => inPath(p, x))) continue;
     if (s.show && !s.show(l)) break;
     const tabs = all.filter((t) => t === hit || !t.show || t.show(l)).map((t) => ({ href: t.href, label: t.label, active: t === hit }));

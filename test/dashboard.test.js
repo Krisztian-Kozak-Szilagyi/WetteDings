@@ -63,3 +63,15 @@ test('Startseite: PVE-Fenster zeigt nur sichtbare Bereiche, mit Text aus „Heut
   const few = dash.pvePlaces({ today: { items: [{ key: 'ihk', text: 'x' }] }, dungeonAt: null, towerLeft: null, show: { dungeon: false } });
   assert.deepEqual(few.map((p) => p.key), ['ihk']);
 });
+
+test('PVE-Fenster: Clan (bisher eSports) erscheint, sobald Clans sichtbar sind – mit eigenem Clan oder Hinweis', () => {
+  const today = { items: [] };
+  const keys = (clan) => dash.pvePlaces({ today, dungeonAt: null, towerLeft: 1, show: { dungeon: false }, clan }).map((p) => p.key);
+  assert.ok(!keys(undefined).includes('clan'), 'Clans nicht sichtbar');
+  const none = dash.pvePlaces({ today, dungeonAt: null, towerLeft: 1, show: { dungeon: false }, clan: null }).find((p) => p.key === 'clan');
+  assert.equal(none.href, '/esports');
+  assert.match(none.text, /Noch in keinem Clan/);
+  const mine = dash.pvePlaces({ today, dungeonAt: null, towerLeft: 1, show: { dungeon: false }, clan: { name: 'Nachtschicht', ticker: 'NS' } }).find((p) => p.key === 'clan');
+  assert.equal(mine.label, 'Clan');
+  assert.equal(mine.text, 'Nachtschicht [NS]');
+});
