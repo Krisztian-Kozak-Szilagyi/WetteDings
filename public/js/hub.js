@@ -1,5 +1,5 @@
-// Taverne (Startseite, views/hub.ejs): Countdowns im Sekundentakt, Fenster (Weltkarte, Gambling, mobil: Handel,
-// Vermögen, Heute) und die Auswahl der Orte auf der Weltkarte. Bell und Profil-Menü steuert app.js wie überall.
+// Taverne (Startseite, views/hub.ejs): Countdowns im Sekundentakt und die Fenster (PVE, Gambling, mobil: Handel,
+// Vermögen, Heute). Bell und Profil-Menü steuert app.js wie überall.
 (function () {
   'use strict';
   var hub = document.querySelector('[data-hub]');
@@ -26,10 +26,9 @@
 
   // ---------- Fenster ----------
   var opener = null;
-  function open(id, place) {
+  function open(id) {
     var dlg = document.getElementById('hub-' + id);
     if (!dlg || typeof dlg.showModal !== 'function') return;
-    if (place) pick(dlg, place);
     opener = document.activeElement;
     dlg.showModal();
   }
@@ -37,7 +36,7 @@
     var btn = e.target.closest('[data-hub-open]');
     if (btn) {
       e.preventDefault();
-      open(btn.getAttribute('data-hub-open'), btn.getAttribute('data-hub-place'));
+      open(btn.getAttribute('data-hub-open'));
       return;
     }
     if (e.target.closest('[data-hub-close]')) e.target.closest('dialog').close();
@@ -55,21 +54,4 @@
     });
   });
 
-  // ---------- Weltkarte: Ort wählen, Beschreibung und „Betreten“ wechseln ----------
-  function pick(dlg, key) {
-    var found = false;
-    Array.prototype.forEach.call(dlg.querySelectorAll('[data-hub-pin]'), function (pin) {
-      var on = pin.getAttribute('data-hub-pin') === key;
-      if (on) found = true;
-      pin.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-    if (!found) return;
-    Array.prototype.forEach.call(dlg.querySelectorAll('[data-hub-place-info]'), function (info) {
-      info.hidden = info.getAttribute('data-hub-place-info') !== key;
-    });
-  }
-  hub.addEventListener('click', function (e) {
-    var pin = e.target.closest('[data-hub-pin]');
-    if (pin) pick(pin.closest('dialog'), pin.getAttribute('data-hub-pin'));
-  });
 })();

@@ -2,7 +2,7 @@
 <%
   // Startseite im Stil einer Fantasy-Taverne (Vorlage: Design-Paket „Eclipse TCG – Hub-Redesign“). Daten:
   // dash = dashboardService.load(user). Desktop ist ein One-Pager (ein Bildschirm hoch), mobil eine Spalte mit Sheets.
-  // Verhalten (Countdowns, Weltkarte, Sheets) in public/js/hub.js, Aussehen in public/css/hub.css.
+  // Verhalten (Countdowns, Fenster, Sheets) in public/js/hub.js, Aussehen in public/css/hub.css.
   const d = dash;
   const w = d.wealth;
   const t = d.today;
@@ -71,7 +71,6 @@
     dungeon: 'M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2',
     ihk: 'M9 4h6v3H9zM7 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1M9 14l2 2 4-4',
     tower: 'M8 21V10l4-6 4 6v11M6 21h12M12 13v3M10 10h4',
-    karte: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14',
     coins: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v10M9.5 9.5c0-1 1-1.5 2.5-1.5s2.5.6 2.5 1.7c0 2.2-5 1.2-5 3.6 0 1.1 1.1 1.7 2.5 1.7s2.5-.6 2.5-1.5',
     scroll: 'M5 4h12a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2zM9 9h6M9 13h6',
     wetten: 'M4 4h16v16H4zM8 9h8M8 13h8M8 17h5',
@@ -81,7 +80,6 @@
   const icon = (key, size, stroke = 'currentColor', width = 1.7) => '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="' + width + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + D[key] + '"/></svg>';
   const closeIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const pve = d.pve;
-  const firstPlace = pve[0];
   const gamblingItems = gambling ? gambling.items : [];
   const gIcon = { '/wetten': 'wetten', '/broker': 'broker', '/lotterie': 'lotterie' };
 %>
@@ -153,10 +151,10 @@
           <div class="hub-pve">
             <img src="<%= v(IMG + 'pve.webp') %>" alt="PVE: ein goldener Ritter in Rüstung zeigt auf dich" width="1672" height="941">
             <% if (pve.length) { %>
-              <button type="button" class="hub-pve-hit" data-hub-open="map" aria-label="PVE öffnen" title="PVE öffnen"></button>
+              <button type="button" class="hub-pve-hit" data-hub-open="pve" aria-label="PVE öffnen" title="PVE öffnen"></button>
             <% } %>
             <% if (d.dungeonAt) { %>
-              <button type="button" class="hub-spot hub-pve-timer" data-hub-open="map" data-hub-place="dungeon">
+              <button type="button" class="hub-spot hub-pve-timer" data-hub-open="pve">
                 <span class="hub-pve-timer-label">DUNGEON</span>
                 <span class="cin" data-hub-at="<%= d.dungeonAt.toISOString() %>"><%= clock(d.dungeonAt) %></span>
               </button>
@@ -172,7 +170,7 @@
             </div>
             <div class="hub-fit hub-quests"><%- include('partials/hub-quests', { today: t, clock }) %></div>
             <% if (d.dungeonAt) { %>
-              <button type="button" class="hub-spot hub-next" data-hub-open="map" data-hub-place="dungeon">
+              <button type="button" class="hub-spot hub-next" data-hub-open="pve">
                 <span class="cin hub-next-label">NÄCHSTER DUNGEON</span>
                 <span class="cin hub-next-time" data-hub-at="<%= d.dungeonAt.toISOString() %>"><%= clock(d.dungeonAt) %></span>
               </button>
@@ -225,41 +223,30 @@
   </section>
 
   <%# ---------- Fenster: Desktop als Pergament über der Taverne, mobil als Sheet von unten ---------- %>
+  <%# PVE: Fenster wie Gambling – Termine, darunter je Bereich eine Schaltfläche mit dem Stand von heute %>
   <% if (pve.length) { %>
-    <dialog class="hub-dlg hub-dlg-map" id="hub-map" aria-labelledby="hub-map-title">
+    <dialog class="hub-dlg hub-dlg-area" id="hub-pve" aria-labelledby="hub-pve-title">
       <div class="hub-dlg-head">
-        <span class="hub-dlg-ico hub-m-only"><%- icon('karte', 26, '#e8bf6a', 1.6) %></span>
+        <span class="hub-dlg-ico"><%- icon('dungeon', 30, '#e8bf6a', 1.6) %></span>
         <div class="hub-dlg-titles">
-          <span class="hub-dlg-sub hub-m-only">ABENTEUER</span>
-          <h2 class="cin" id="hub-map-title">PVE · WELTKARTE</h2>
+          <span class="hub-dlg-sub">ABENTEUER</span>
+          <h2 class="cin" id="hub-pve-title">PVE</h2>
         </div>
         <button type="button" class="hub-round hub-hit" data-hub-close aria-label="Schließen"><%- closeIcon %></button>
       </div>
-      <div class="hub-map">
-        <svg viewBox="0 0 300 190" preserveAspectRatio="none" aria-hidden="true">
-          <rect width="300" height="190" fill="#d9c08a"/>
-          <path d="M30 120 C20 80 50 40 100 45 C130 20 190 25 215 50 C260 55 285 95 265 130 C250 165 190 175 150 165 C110 178 50 165 30 120Z" fill="#e8d6a6" stroke="#7a5a2c" stroke-width="1.5"/>
-          <path d="M70 78l10-16 10 16zM88 82l8-12 8 12zM196 52l9-14 9 14z" fill="#a98a54" stroke="#7a5a2c" stroke-width="1"/>
-          <g fill="#8a9a5a" stroke="#5f6e38" stroke-width="0.8"><circle cx="120" cy="140" r="6"/><circle cx="132" cy="146" r="5"/><circle cx="108" cy="148" r="5"/><circle cx="238" cy="80" r="5"/><circle cx="248" cy="88" r="4"/></g>
-          <path d="M60 118 Q100 70 150 68 Q210 66 232 110M150 68 L150 129" fill="none" stroke="#8c2f2a" stroke-width="2" stroke-dasharray="5 5"/>
-          <g stroke="#7a5a2c" stroke-width="0.8" fill="none" opacity="0.7"><path d="M8 20c8-4 14 4 22 0s14 4 22 0"/><path d="M250 172c8-4 14 4 22 0s14 4 22 0"/></g>
-        </svg>
-        <% pve.forEach((p) => { %>
-          <button type="button" class="hub-spot hub-pin" style="left: <%= p.x %>%; --y: <%= p.y %>%; --ym: <%= p.yMobile %>%" data-hub-pin="<%= p.key %>" aria-pressed="<%= p === firstPlace ? 'true' : 'false' %>" aria-label="<%= p.label %>">
-            <%- icon(p.key, 40, '#f3e3c3') %>
-            <span class="cin hub-pin-plate"><%= p.label %></span>
-          </button>
+      <div class="hub-dlg-body">
+        <% pve.filter((p) => p.at).forEach((p) => { %>
+          <div class="hub-extra"><span class="hub-extra-label"><%= p.key === 'dungeon' ? 'NÄCHSTER DUNGEON' : p.label.toUpperCase() + ' FERTIG IN' %></span><span class="cin hub-extra-value" data-hub-at="<%= new Date(p.at).toISOString() %>" data-hub-days><%= clock(p.at) %></span></div>
         <% }) %>
-      </div>
-      <% pve.forEach((p) => { %>
-        <div class="hub-place" data-hub-place-info="<%= p.key %>"<%= p === firstPlace ? '' : ' hidden' %>>
-          <div class="hub-place-text">
-            <span class="cin hub-place-title"><%= p.label %></span>
-            <span class="hub-place-sub"><% if (p.at) { %><%= p.key === 'dungeon' ? 'Nächster Dungeon in ' : 'Fertig in ' %><span data-hub-at="<%= new Date(p.at).toISOString() %>"><%= clock(p.at) %></span>. <% } %><%= p.text %></span>
-          </div>
-          <a class="hub-enter cin" href="<%= p.href %>">BETRETEN</a>
+        <div class="hub-links">
+          <% pve.forEach((p) => { %>
+            <a class="hub-link" href="<%= p.href %>">
+              <span class="hub-slot-ico"><%- icon(p.key, 22, '#e8bf6a') %></span>
+              <span class="hub-link-text"><span class="cin"><%= p.label %></span><% if (p.text) { %><span class="hub-link-sub"><%= p.text %></span><% } %></span>
+            </a>
+          <% }) %>
         </div>
-      <% }) %>
+      </div>
     </dialog>
   <% } %>
 

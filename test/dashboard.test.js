@@ -41,7 +41,7 @@ test('Heute: ausgegraute Punkte (Tagesbonus während des Grading-Jobs bzw. Gradi
   assert.equal(dash.tally([]).total, 0);
 });
 
-test('Startseite: PVE-Weltkarte zeigt nur sichtbare Bereiche, mit Text aus „Heute“ und Turm-Läufen', () => {
+test('Startseite: PVE-Fenster zeigt nur sichtbare Bereiche, mit Text aus „Heute“ und Turm-Läufen', () => {
   const at = new Date('2026-10-22T18:00:00Z');
   const today = {
     items: [
@@ -56,7 +56,6 @@ test('Startseite: PVE-Weltkarte zeigt nur sichtbare Bereiche, mit Text aus „He
   assert.equal(all[0].at, at);
   assert.equal(all[1].text, 'Noch 3 offen');
   assert.match(all[2].text, /Heute noch 2 Läufe/);
-  for (const p of all) assert.ok(p.x > 0 && p.x < 100 && p.y > 0 && p.y < 100 && p.yMobile > 0, p.key);
   // ein Lauf, aufgebraucht, Turm nicht sichtbar
   assert.match(dash.pvePlaces({ today, dungeonAt: at, towerLeft: 1, show: { dungeon: true } })[2].text, /Heute noch 1 Lauf /);
   assert.match(dash.pvePlaces({ today, dungeonAt: at, towerLeft: 0, show: { dungeon: true } })[2].text, /Für heute bist du durch/);

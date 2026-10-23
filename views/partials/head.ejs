@@ -1,3 +1,6 @@
+<%# taverne: Seiten im Stil der Startseite (Bereiche in src/lib/navModel.js) – als Fenster über der Taverne, ohne Leiste.
+    Nur für angemeldete Mitglieder (Gäste haben keine Taverne als Startseite). %>
+<% const tvSection = !locals.hub ? navModel.taverneSection(locals) : null; const taverne = !!tvSection; %>
 <!doctype html>
 <html lang="de">
 <head>
@@ -5,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title><%= locals.title ? title + ' · ' : '' %><%= appName %></title>
   <meta name="description" content="<%= appName %> – Wetten unter Freunden mit Spielgeld. Stelle eigene Wetten mit Ja/Nein oder eigenen Optionen auf und wette mit.">
-  <meta name="theme-color" content="#161826">
+  <meta name="theme-color" content="<%= taverne || locals.hub ? '#1d120c' : '#161826' %>">
   <link rel="icon" href="/favicon-32.png?v=<%= assetVersion %>" sizes="32x32" type="image/png">
   <link rel="icon" href="/favicon-64.png?v=<%= assetVersion %>" sizes="64x64" type="image/png">
   <%# Als App installierbar (manifest + public/sw.js); Knopf „App herunterladen“ im Profil-Menü, Logik am Ende von app.js %>
@@ -16,13 +19,15 @@
   <meta name="apple-mobile-web-app-title" content="<%= appName %>">
   <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
+  <% if (taverne || locals.hub) { %><link rel="stylesheet" href="/css/taverne.css?v=<%= assetVersion %>"><% } %>
+  <% if (taverne) { %><script src="/js/taverne.js?v=<%= assetVersion %>" defer></script><% } %>
   <%# Seiten-CSS im head (nicht am Ende des body) – sonst blitzt die Seite kurz ungestylt auf (Dashboard: schwarzes Vermögens-Diagramm) %>
   <% (locals.pageCss || []).forEach((f) => { %><link rel="stylesheet" href="/css/<%= f %>.css?v=<%= assetVersion %>"><% }) %>
   <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
   <% if (deviceProbe) { %><script src="/js/device.js?v=<%= assetVersion %>" defer data-csrf="<%= csrfToken %>"></script><% } %>
   <% if (locals.actionToken) { %><meta name="bfw-at" content="<%= actionToken %>"><script src="/js/guard.js?v=<%= assetVersion %>" defer></script><% } %>
 </head>
-<body>
+<body<%- taverne ? ' class="taverne' + (tvSection.root ? ' tv-root' : '') + '" data-tv="' + tvSection.key + '"' : '' %>>
   <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
   <% if (locals.actionToken) { %><%# Falle für Skripte, die Seiten auslesen: unsichtbar, nicht erreichbar per Tastatur oder Vorlesefunktion (moderation/requestSignals.js) %><a class="hp-link" href="/tcg/gratis-packs" tabindex="-1" aria-hidden="true" rel="nofollow">Gratis-Packs abholen</a><% } %>
   <%
@@ -30,7 +35,7 @@
     // Profil-Menü gezeigt; dieselben Einträge nutzt das HUD der Taverne (views/hub.ejs)
     const navItems = navModel.buildNav(locals);
   %>
-  <% if (!locals.hub) { %>
+  <% if (!locals.hub && !taverne) { %>
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/">
@@ -57,8 +62,37 @@
   </header>
   <% } %>
 
+  <% if (taverne) { %>
+  <%# Fenster über der Taverne: Kopf wie die Fenster der Startseite (Gambling, PVE), darunter die Seite. foot.ejs schließt es. %>
+  <div class="tv-stage">
+    <section class="tv-window" aria-labelledby="tv-title" data-tv-names="<%= [tvSection.title].concat(tvSection.tab ? [tvSection.tab.label] : []).join('|') %>">
+      <header class="tv-head">
+        <span class="tv-head-ico" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#e8bf6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="<%= tvSection.icon %>"/></svg></span>
+        <div class="tv-head-titles">
+          <span class="tv-head-sub"><%= tvSection.sub %></span>
+          <span class="tv-head-title" id="tv-title"><%= tvSection.title %></span>
+        </div>
+        <% if (tvSection.tabs.length > 1) { %>
+          <nav class="tv-tabs" aria-label="<%= tvSection.title %>">
+            <% tvSection.tabs.forEach((t) => { %><a href="<%= t.href %>"<%- t.active ? ' class="active" aria-current="' + (tvSection.root ? 'page' : 'true') + '"' : '' %>><%= t.label %></a><% }) %>
+          </nav>
+        <% } %>
+        <% if (tvSection.key === 'profil') { %>
+          <%# Ohne Leiste fehlt das Profil-Menü – Abmelden (und „App herunterladen“, app.js zeigt ihn nur, wenn möglich) stehen hier %>
+          <button type="button" class="tv-back tv-side" data-app-install hidden>App herunterladen</button>
+          <form method="post" action="/abmelden" class="tv-logout">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="tv-back tv-side">Abmelden</button>
+          </form>
+        <% } %>
+        <a class="tv-back" href="/" title="Zurück zur Taverne">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>Zur Taverne</span>
+        </a>
+      </header>
+  <% } %>
   <%# hub: Startseite im Taverne-Stil (views/hub.ejs) – eigenes HUD statt der Leiste, volle Breite statt container %>
-  <main id="inhalt" class="<%= locals.hub ? 'hub-main' : 'container' %>">
+  <main id="inhalt" class="<%= locals.hub ? 'hub-main' : taverne ? 'container tv-body' : 'container' %>">
     <div data-flash-area>
     <% if (flash) { %>
       <div class="flash flash-<%= flash.type %>" role="status">

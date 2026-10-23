@@ -1,6 +1,6 @@
 // Startseite nach der Anmeldung (die Taverne, views/hub.ejs): sammelt, was für ein Mitglied gerade wichtig ist –
-// Vermögen, was heute ansteht, Termine, Kurse und die Orte der PVE-Weltkarte. Alles wird parallel geladen; die reinen
-// Hilfsfunktionen (Veränderung, Termine, Heute, Weltkarte) sind ohne Datenbank getestet.
+// Vermögen, was heute ansteht, Termine, Kurse und die Bereiche im PVE-Fenster. Alles wird parallel geladen; die reinen
+// Hilfsfunktionen (Veränderung, Termine, Heute, PVE) sind ohne Datenbank getestet.
 const config = require('../config');
 const StatDaily = require('../models/StatDaily');
 const { LotteryEntry } = require('../models/Lottery');
@@ -128,8 +128,8 @@ function ticker() {
 }
 
 /**
- * Orte der PVE-Weltkarte (Dungeon, IHK, Mage Tower, Grading) – nur Bereiche, die das Mitglied sehen darf (wie in der
- * Navigation: freigegeben oder Admin). x/y: Position der Pins in Prozent (Desktop, mobil etwas höher: yMobile).
+ * Bereiche im PVE-Fenster (Dungeon, IHK, Mage Tower, Grading) – nur die, die das Mitglied sehen darf (wie in der
+ * Navigation: freigegeben oder Admin). text: Stand von heute, at: Termin (Countdown im Fenster).
  * today = todayStatus(), dungeonAt = nächster Dungeon, towerLeft = Turm-Läufe heute (null = Turm nicht sichtbar).
  */
 function pvePlaces({ today, dungeonAt, towerLeft, show }) {
@@ -137,14 +137,14 @@ function pvePlaces({ today, dungeonAt, towerLeft, show }) {
   const places = [];
   if (show.dungeon) {
     const it = item('dungeon');
-    places.push({ key: 'dungeon', label: 'Dungeon', href: '/dungeon', x: 20, y: 62, yMobile: 58, at: dungeonAt, text: it ? it.text : '' });
+    places.push({ key: 'dungeon', label: 'Dungeon', href: '/dungeon', at: dungeonAt, text: it ? it.text : '' });
   }
-  if (item('ihk')) places.push({ key: 'ihk', label: 'IHK', href: '/ihk', x: 50, y: 36, yMobile: 30, text: item('ihk').text, at: item('ihk').at || null });
+  if (item('ihk')) places.push({ key: 'ihk', label: 'IHK', href: '/ihk', text: item('ihk').text, at: item('ihk').at || null });
   if (towerLeft !== null && towerLeft !== undefined) {
     const text = towerLeft > 0 ? `Heute noch ${towerLeft} ${towerLeft === 1 ? 'Lauf' : 'Läufe'} – Runde für Runde schwerer.` : 'Für heute bist du durch – ab Mitternacht geht es wieder.';
-    places.push({ key: 'tower', label: 'Mage Tower', href: '/dungeon#mage-tower', x: 77, y: 58, yMobile: 54, text });
+    places.push({ key: 'tower', label: 'Mage Tower', href: '/dungeon#mage-tower', text });
   }
-  if (item('grading')) places.push({ key: 'grading', label: 'Grading', href: '/grading', x: 50, y: 68, yMobile: 64, text: item('grading').text });
+  if (item('grading')) places.push({ key: 'grading', label: 'Grading', href: '/grading', text: item('grading').text });
   return places;
 }
 

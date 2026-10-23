@@ -1,4 +1,11 @@
   </main>
+  <%# Taverne-Seiten: Fenster schließen, die Pflicht-Links stehen klein darunter (statt der Fußzeile) %>
+  <% const tvFoot = !locals.hub && navModel.taverneTheme(locals); %>
+  <% if (tvFoot) { %>
+    </section>
+    <nav class="tv-legal" aria-label="Rechtliches"><a href="/regeln">Regeln</a><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a><a href="/patchnotes">Patchnotes<% if (patchNew) { %> <span class="nav-badge" aria-label="<%= patchNew %> neue Patchnotes"><%= patchNew > 99 ? '99+' : patchNew %></span><% } %></a></nav>
+  </div>
+  <% } %>
   <%# iPhone/iPad: Safari kann nicht selbst installieren – kurze Anleitung (öffnet app.js über „App herunterladen“) %>
   <dialog class="dialog" id="app-ios" aria-labelledby="app-ios-title">
     <div class="dialog-head">
@@ -76,7 +83,7 @@
     </dialog>
   <% } %>
   <%# Auf der Taverne (hub) stehen diese Links unten im Tresen, der Desktop-Hub ist genau einen Bildschirm hoch %>
-  <% if (!locals.hub) { %>
+  <% if (!locals.hub && !tvFoot) { %>
   <footer class="footer">
     <div class="footer-inner">
       <p><strong><%= appName %></strong> – Wetten mit Spielgeld. Kein echtes Geld!</p>
