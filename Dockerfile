@@ -2,7 +2,7 @@
 # zur Laufzeit aus der .env des Servers (siehe deploy/docker-compose.yml) – im Image stehen keine Geheimnisse.
 # Basis-Image vom offiziellen Spiegel bei AWS (dieselben Docker-Official-Images) – Docker Hub hat GitHub-Runner
 # mit 429 Too Many Requests / 500 abgewiesen und so den Deploy blockiert (2026-10-09)
-FROM public.ecr.aws/docker/library/node:22-slim
+FROM public.ecr.aws/docker/library/node:26-slim
 
 ENV NODE_ENV=production
 WORKDIR /app
